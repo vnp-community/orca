@@ -11,6 +11,8 @@
  */
 
 import type { IPlatformServices } from '../platform/types'
+import { resolve as resolvePath } from 'node:path'
+import { existsSync } from 'node:fs'
 import { DevServerManager } from './dev-server/dev-server-manager'
 import { registerDevServerIpcHandlers } from './ipc/dev-server-ipc'
 import { registerOnboardingIpcHandlers } from './ipc/onboarding-ipc'
@@ -202,11 +204,6 @@ export async function initializeOrcaServices(
   // the child_process.fork() doesn't emit MODULE_NOT_FOUND errors to the log.
   let daemonShutdown: (() => Promise<void>) | null = null
   try {
-    const { getPlatform } = await import('../platform/context')
-    const platform = getPlatform()
-    const { resolve: resolvePath } = await import('node:path')
-    const { existsSync } = await import('node:fs')
-
     const appPath = platform.app.getAppPath()
     const daemonEntryPath = resolvePath(appPath, 'out', 'main', 'daemon-entry.js')
 
