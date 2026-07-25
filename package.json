@@ -100,7 +100,11 @@
     "bench:multi-workspace-typing": "pnpm run ensure:electron-runtime && node config/scripts/run-multi-workspace-typing-bench.mjs",
     "bench:cold-park-reveal": "pnpm run ensure:electron-runtime && node tools/benchmarks/terminal-cold-park-reveal-bench.mjs",
     "bench:cold-park-resource": "pnpm run ensure:electron-runtime && node tools/benchmarks/terminal-cold-park-resource-bench.mjs",
-    "bench:compare": "node config/scripts/compare-benchmark-artifacts.mjs"
+    "bench:compare": "node config/scripts/compare-benchmark-artifacts.mjs",
+    "test:server": "vitest run --config tests/server/vitest.config.ts",
+    "test:server:watch": "vitest --config tests/server/vitest.config.ts",
+    "test:client": "vitest run --config tests/client/vitest.config.ts",
+    "test:client:watch": "vitest --config tests/client/vitest.config.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
