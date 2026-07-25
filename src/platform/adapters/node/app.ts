@@ -67,7 +67,16 @@ export class NodeApp extends EventEmitter implements IApp {
   }
 
   getAppPath(): string {
-    return process.env.ORCA_APP_PATH ?? join(__dirname, '..', '..', '..', '..')
+    // Why: ORCA_APP_PATH allows explicit override (e.g. in Docker / tests).
+    if (process.env.ORCA_APP_PATH) return resolve(process.env.ORCA_APP_PATH)
+    // Why: In server mode, compiled output is at <appRoot>/out/server/index.js.
+    // __dirname here is <appRoot>/out/server (or deeper in sub-modules).
+    // We find the app root by walking up to the directory that contains `out/`.
+    // Specifically: out/server → out → appRoot (2 levels up from out/server/).
+    // Using require.main?.filename is more reliable than __dirname for the
+    // root entry point, but __dirname in *this* file (node/app.ts) compiles to
+    // out/platform/adapters/node → 4 levels up to appRoot.
+    return resolve(__dirname, '..', '..', '..', '..')
   }
 
   async whenReady(): Promise<void> {

@@ -197,12 +197,29 @@ export async function initializeOrcaServices(
   }
 
   // 5. Initialize PTY daemon provider (non-fatal — terminal features may degrade)
+  // Why: In server mode (Node.js Docker), out/main/daemon-entry.js is not bundled
+  // (it's Electron-only). We check for its presence before attempting init so
+  // the child_process.fork() doesn't emit MODULE_NOT_FOUND errors to the log.
   let daemonShutdown: (() => Promise<void>) | null = null
   try {
-    const { initDaemonPtyProvider, disconnectDaemon } = await import('./daemon/daemon-init')
-    await initDaemonPtyProvider()
-    daemonShutdown = disconnectDaemon
-    console.log('[ServerBootstrap] ✅ PTY daemon initialized')
+    const { getPlatform } = await import('../platform/context')
+    const platform = getPlatform()
+    const { resolve: resolvePath } = await import('node:path')
+    const { existsSync } = await import('node:fs')
+
+    const appPath = platform.app.getAppPath()
+    const daemonEntryPath = resolvePath(appPath, 'out', 'main', 'daemon-entry.js')
+
+    if (!existsSync(daemonEntryPath)) {
+      console.log(
+        '[ServerBootstrap] PTY daemon skipped (daemon-entry.js not found — expected in server/web mode)'
+      )
+    } else {
+      const { initDaemonPtyProvider, disconnectDaemon } = await import('./daemon/daemon-init')
+      await initDaemonPtyProvider()
+      daemonShutdown = disconnectDaemon
+      console.log('[ServerBootstrap] ✅ PTY daemon initialized')
+    }
   } catch (err) {
     console.warn(
       '[ServerBootstrap] PTY daemon unavailable (terminal features may not work):',

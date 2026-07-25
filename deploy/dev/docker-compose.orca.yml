@@ -42,6 +42,9 @@ services:
       ORCA_HTTP_PORT: ${ORCA_HTTP_PORT:-6769}
       ORCA_USER_DATA_PATH: /data/orca
       ORCA_VERSION: ${ORCA_VERSION:-0.0.0}
+      # Explicit app root so getDaemonEntryPath() resolves correctly
+      # (NodeAdapter.__dirname → out/server, not app root)
+      ORCA_APP_PATH: /opt/orca/app
       NODE_ENV: production
 
       # ── Multi-User & Auth ─────────────────────────────────────
