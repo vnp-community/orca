@@ -11,7 +11,7 @@
  */
 
 import type { IPlatformServices } from '../platform/types'
-import { resolve as resolvePath } from 'node:path'
+import { join as pathJoin } from 'node:path'
 import { existsSync } from 'node:fs'
 import { DevServerManager } from './dev-server/dev-server-manager'
 import { registerDevServerIpcHandlers } from './ipc/dev-server-ipc'
@@ -205,7 +205,7 @@ export async function initializeOrcaServices(
   let daemonShutdown: (() => Promise<void>) | null = null
   try {
     const appPath = platform.app.getAppPath()
-    const daemonEntryPath = resolvePath(appPath, 'out', 'main', 'daemon-entry.js')
+    const daemonEntryPath = pathJoin(appPath, 'out', 'main', 'daemon-entry.js')
 
     if (!existsSync(daemonEntryPath)) {
       console.log(
