@@ -54,6 +54,10 @@ export type WebSocketTransportOptions = {
   // the (now free) preferred port instead would strand those pairings
   // (STA-1511). Callers pass the previously assigned fallback port here.
   fallbackPort?: number
+  /** Optional HTTP request handler invoked BEFORE normal static-file serving.
+   *  Return true if the handler fully responded to the request (prevents fallthrough).
+   *  Used for Prometheus /metrics endpoint (SOL-005 — CR-005). */
+  onHttpRequest?: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => Promise<boolean>
 }
 
 export class WebSocketTransport implements RpcTransport {
@@ -65,6 +69,9 @@ export class WebSocketTransport implements RpcTransport {
   private readonly preAuthTimeoutMs: number
   private readonly staticRoot: string | undefined
   private readonly fallbackPort: number | undefined
+  private readonly onHttpRequest:
+    | ((req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => Promise<boolean>)
+    | undefined
   private httpServer: HttpsServer | HttpServer | null = null
   private wss: WebSocketServer | null = null
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
@@ -89,7 +96,8 @@ export class WebSocketTransport implements RpcTransport {
     heartbeatIntervalMs,
     preAuthTimeoutMs,
     staticRoot,
-    fallbackPort
+    fallbackPort,
+    onHttpRequest
   }: WebSocketTransportOptions) {
     this.host = host
     this.port = port
@@ -99,6 +107,7 @@ export class WebSocketTransport implements RpcTransport {
     this.preAuthTimeoutMs = preAuthTimeoutMs ?? PRE_AUTH_TIMEOUT_MS
     this.staticRoot = staticRoot
     this.fallbackPort = fallbackPort
+    this.onHttpRequest = onHttpRequest
   }
 
   onMessage(handler: WebSocketMessageHandler): void {
@@ -188,9 +197,17 @@ export class WebSocketTransport implements RpcTransport {
   }
 
   private createHttpServer(): HttpServer | HttpsServer {
-    const requestListener = this.staticRoot
+    const staticHandler = this.staticRoot
       ? createStaticWebClientHandler(this.staticRoot)
       : undefined
+    const requestListener = this.onHttpRequest
+      ? (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
+          void this.onHttpRequest!(req, res).then((handled) => {
+            if (!handled && staticHandler) staticHandler(req, res)
+            else if (!handled) { res.writeHead(404); res.end() }
+          }).catch(() => { res.writeHead(500); res.end() })
+        }
+      : staticHandler
     return this.tlsCert && this.tlsKey
       ? createHttpsServer({ cert: this.tlsCert, key: this.tlsKey }, requestListener)
       : createHttpServer(requestListener)

@@ -1,0 +1,24 @@
+# SSH Config cho Orca Server container
+# Quản lý bởi: deploy/dev/scripts/setup-ssh-keys.sh
+# KHÔNG sửa thủ công — tái tạo bằng script
+
+# ── Dev Machine (172.20.2.31) ─────────────────────────────────
+Host dev-local
+    HostName 172.20.2.31
+    Port     22
+    User     ubuntu
+    IdentityFile /home/orca/.ssh/id_ed25519
+    UserKnownHostsFile /home/orca/.ssh/known_hosts
+    StrictHostKeyChecking accept-new
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+
+# ── Shortcut: địa chỉ IP trực tiếp ──────────────────────────
+Host 172.20.2.31
+    Port     22
+    User     ubuntu
+    IdentityFile /home/orca/.ssh/id_ed25519
+    UserKnownHostsFile /home/orca/.ssh/known_hosts
+    StrictHostKeyChecking accept-new
+    ServerAliveInterval 30
+    ServerAliveCountMax 3

@@ -35,6 +35,21 @@ import type { CommitMessageGenerationSlice } from './slices/commit-message-gener
 import type { PinnedTabCloseConfirmSlice } from './slices/pinned-tab-close-confirm'
 import type { OrcaProfilesSlice } from './slices/orca-profiles'
 import type { NewIssueDraftSlice } from './slices/new-issue-draft'
+import type { ProvisioningSlice } from './slices/provisioning'
+import type { BootstrapSlice } from './slices/bootstrap'
+import type { AuthSlice } from './slices/auth'
+import type { DevServerSlice } from './slices/dev-servers'
+import type { OnboardingChecklistSlice } from './slices/onboarding-checklist'
+
+// ── Re-exports for cross-slice consumers (import from '@/store/types') ────────
+export type {
+  FleetImportStatus,
+  FleetImportPhase,
+  ServerHealthMetrics,
+  FleetAlert,
+  FleetAlertType
+} from './slices/ssh'
+export type { OrcaUser, OrcaUserRole, AuthStatus } from './slices/auth'
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
@@ -72,4 +87,9 @@ export type AppState = RepoSlice &
   CommitMessageGenerationSlice &
   PinnedTabCloseConfirmSlice &
   OrcaProfilesSlice &
-  NewIssueDraftSlice
+  NewIssueDraftSlice &
+  ProvisioningSlice &
+  BootstrapSlice &
+  AuthSlice &
+  DevServerSlice &
+  OnboardingChecklistSlice

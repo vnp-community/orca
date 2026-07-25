@@ -45,6 +45,9 @@ import { createCommitMessageGenerationSlice } from './commit-message-generation'
 import { createPinnedTabCloseConfirmSlice } from './pinned-tab-close-confirm'
 import { createOrcaProfilesSlice } from './orca-profiles'
 import { createNewIssueDraftSlice } from './new-issue-draft'
+import { createProvisioningSlice } from './provisioning'
+import { createBootstrapSlice } from './bootstrap'
+import { createAuthSlice } from './auth'
 import { translate } from '@/i18n/i18n'
 
 export const TEST_REPO = {
@@ -93,7 +96,10 @@ export function createTestStore() {
     ...createCommitMessageGenerationSlice(...a),
     ...createPinnedTabCloseConfirmSlice(...a),
     ...createOrcaProfilesSlice(...a),
-    ...createNewIssueDraftSlice(...a)
+    ...createNewIssueDraftSlice(...a),
+    ...createProvisioningSlice(...a),
+    ...createBootstrapSlice(...a),
+    ...createAuthSlice(...a)
   }))
 }
 

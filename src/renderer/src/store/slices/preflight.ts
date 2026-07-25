@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { PreflightRuntimeContext, PreflightStatus } from '../../../../preload/api-types'
 import type { AppState } from '../types'
+import type { RemotePreflightStatus } from '../../../../shared/dev-server-types'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import {
   getLocalPreflightContext,
@@ -14,8 +15,13 @@ export type PreflightSlice = {
   preflightStatusContextKey: string | null
   preflightStatusLoading: boolean
   preflightStatusError: string | null
+  // ── Remote preflight (CR-OB-005) ──────────────────────────────────────────
+  remotePreflightByServer: Record<string, RemotePreflightStatus>
+  activeRemotePreflightStatus: RemotePreflightStatus | null
 
   refreshPreflightStatus: (options?: { force?: boolean }) => Promise<void>
+  setRemotePreflightStatus: (devServerId: string, status: RemotePreflightStatus) => void
+  clearRemotePreflightStatus: (devServerId: string) => void
 }
 
 let nonForcedPreflightRequest: { key: string; promise: Promise<void> } | null = null
@@ -50,6 +56,24 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
   preflightStatusContextKey: null,
   preflightStatusLoading: false,
   preflightStatusError: null,
+  remotePreflightByServer: {},
+  activeRemotePreflightStatus: null,
+
+  setRemotePreflightStatus: (devServerId, status) =>
+    set((state) => {
+      const updated = { ...state.remotePreflightByServer, [devServerId]: status }
+      return {
+        remotePreflightByServer: updated,
+        activeRemotePreflightStatus:
+          devServerId === state.activeDevServerId ? status : state.activeRemotePreflightStatus,
+      }
+    }),
+
+  clearRemotePreflightStatus: (devServerId) =>
+    set((state) => {
+      const { [devServerId]: _, ...rest } = state.remotePreflightByServer
+      return { remotePreflightByServer: rest }
+    }),
 
   refreshPreflightStatus: async (options) => {
     const force = options?.force === true

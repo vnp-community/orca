@@ -1,10 +1,10 @@
-import { Check } from 'lucide-react'
+import { Check, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import type { BuiltInWindowsTerminalShell } from '../../../../shared/windows-terminal-shell'
 import { WINDOWS_GIT_BASH_SHELL } from '../../../../shared/windows-terminal-shell'
 import type { GlobalSettings } from '../../../../shared/types'
 import { cn } from '@/lib/utils'
-import { useWindowsTerminalCapabilities } from '@/lib/windows-terminal-capabilities'
+import { useRemoteWindowsTerminalCapabilities } from '@/hooks/useRemoteWindowsTerminalCapabilities'
 import { SettingsSegmentedControl } from '../settings/SettingsFormControls'
 import { ShellIcon } from '../tab-bar/shell-icons'
 import {
@@ -19,6 +19,8 @@ import { translate } from '@/i18n/i18n'
 type WindowsTerminalStepProps = {
   settings: GlobalSettings | null
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
+  /** Active dev server id for remote capability detection and per-server settings */
+  activeDevServerId: string | null
 }
 
 type ShellOption = {
@@ -50,12 +52,27 @@ function normalizeWindowsShell(value: string | null | undefined): BuiltInWindows
 
 export function WindowsTerminalStep({
   settings,
-  updateSettings
+  updateSettings,
+  activeDevServerId
 }: WindowsTerminalStepProps): React.JSX.Element {
-  const capabilities = useWindowsTerminalCapabilities(Boolean(settings), true)
+  // Use remote capabilities from the dev server (with 60s cache) instead of
+  // local detection — the remote host is what matters in server mode.
+  const capabilities = useRemoteWindowsTerminalCapabilities(
+    activeDevServerId,
+    Boolean(settings)
+  )
   const [selectPortalRoot, setSelectPortalRoot] = useState<HTMLElement | null>(null)
-  const windowsShell = normalizeWindowsShell(settings?.terminalWindowsShell)
-  const selectedWslDistroName = settings?.terminalWindowsWslDistro?.trim() || null
+
+  // Read per-server settings when a server is active, fall back to global settings
+  const serverConfig = activeDevServerId
+    ? (settings?.terminalWindowsConfigByServer as Record<string, Partial<GlobalSettings>> | undefined)?.[activeDevServerId]
+    : undefined
+
+  const effectiveShell = serverConfig?.terminalWindowsShell ?? settings?.terminalWindowsShell
+  const effectiveWslDistro = serverConfig?.terminalWindowsWslDistro ?? settings?.terminalWindowsWslDistro
+
+  const windowsShell = normalizeWindowsShell(effectiveShell)
+  const selectedWslDistroName = effectiveWslDistro?.trim() || null
   const selectedWslDistro = selectedWslDistroName || DEFAULT_WSL_DISTRO_VALUE
   const wslDistroOptions =
     selectedWslDistroName && !capabilities.wslDistros.includes(selectedWslDistroName)
@@ -63,6 +80,48 @@ export function WindowsTerminalStep({
       : capabilities.wslDistros
   const showGitBashOption = capabilities.gitBashAvailable || windowsShell === WINDOWS_GIT_BASH_SHELL
   const showWslOption = capabilities.wslAvailable || windowsShell === 'wsl.exe'
+
+  /** Save shell setting — per-server when activeDevServerId is set, else global */
+  const handleShellChange = useCallback(
+    (shell: BuiltInWindowsTerminalShell) => {
+      if (activeDevServerId) {
+        const existing = (settings?.terminalWindowsConfigByServer as Record<string, unknown> | undefined) ?? {}
+        void updateSettings({
+          terminalWindowsConfigByServer: {
+            ...existing,
+            [activeDevServerId]: {
+              ...((existing[activeDevServerId] as Record<string, unknown>) ?? {}),
+              terminalWindowsShell: shell
+            }
+          } as GlobalSettings['terminalWindowsConfigByServer']
+        })
+      } else {
+        void updateSettings({ terminalWindowsShell: shell })
+      }
+    },
+    [activeDevServerId, settings, updateSettings]
+  )
+
+  /** Save WSL distro setting — per-server when activeDevServerId is set, else global */
+  const handleWslDistroChange = useCallback(
+    (distro: string | null) => {
+      if (activeDevServerId) {
+        const existing = (settings?.terminalWindowsConfigByServer as Record<string, unknown> | undefined) ?? {}
+        void updateSettings({
+          terminalWindowsConfigByServer: {
+            ...existing,
+            [activeDevServerId]: {
+              ...((existing[activeDevServerId] as Record<string, unknown>) ?? {}),
+              terminalWindowsWslDistro: distro
+            }
+          } as GlobalSettings['terminalWindowsConfigByServer']
+        })
+      } else {
+        void updateSettings({ terminalWindowsWslDistro: distro })
+      }
+    },
+    [activeDevServerId, settings, updateSettings]
+  )
 
   const setSelectPortalHost = useCallback((node: HTMLDivElement | null) => {
     // Why: onboarding sits above body-level portals, so the distro menu must
@@ -169,6 +228,34 @@ export function WindowsTerminalStep({
     )
   }
 
+  // Remote capabilities error banner
+  if (capabilities.error && !capabilities.loading) {
+    return (
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="text-sm font-medium text-foreground">
+              {translate(
+                'auto.components.onboarding.WindowsTerminalStep.capabilitiesError',
+                'Could not detect terminal capabilities'
+              )}
+            </p>
+            <p className="text-[13px] leading-relaxed text-muted-foreground">{capabilities.error}</p>
+            <button
+              type="button"
+              onClick={capabilities.retry}
+              className="flex items-center gap-1.5 text-[13px] text-primary hover:underline"
+            >
+              <RefreshCw className="size-3" />
+              {translate('auto.components.onboarding.WindowsTerminalStep.retry', 'Retry')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const rightClickValue = settings.terminalRightClickToPaste ? 'paste' : 'menu'
   const rightClickDescription =
     rightClickOptions.find((option) => option.value === rightClickValue)?.description ??
@@ -193,17 +280,26 @@ export function WindowsTerminalStep({
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          {shellOptions.map((option) => (
-            <PreferenceCard
-              key={option.value}
-              icon={<ShellIcon shell={option.value} size={18} />}
-              label={option.label}
-              description={option.description}
-              selected={windowsShell === option.value}
-              disabled={option.disabled}
-              onClick={() => void updateSettings({ terminalWindowsShell: option.value })}
-            />
-          ))}
+          {capabilities.loading ? (
+            <div className="col-span-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground animate-pulse">
+              {translate(
+                'auto.components.onboarding.WindowsTerminalStep.loadingCapabilities',
+                'Detecting terminal capabilities...'
+              )}
+            </div>
+          ) : (
+            shellOptions.map((option) => (
+              <PreferenceCard
+                key={option.value}
+                icon={<ShellIcon shell={option.value} size={18} />}
+                label={option.label}
+                description={option.description}
+                selected={windowsShell === option.value}
+                disabled={option.disabled}
+                onClick={() => handleShellChange(option.value)}
+              />
+            ))
+          )}
         </div>
 
         {windowsShell === 'wsl.exe' ? (
@@ -225,11 +321,9 @@ export function WindowsTerminalStep({
               </div>
               <Select
                 value={selectedWslDistro}
-                disabled={capabilities.isLoading || !capabilities.wslAvailable}
+                disabled={capabilities.loading || !capabilities.wslAvailable}
                 onValueChange={(value) =>
-                  void updateSettings({
-                    terminalWindowsWslDistro: value === DEFAULT_WSL_DISTRO_VALUE ? null : value
-                  })
+                  handleWslDistroChange(value === DEFAULT_WSL_DISTRO_VALUE ? null : value)
                 }
               >
                 <SelectTrigger
@@ -242,7 +336,7 @@ export function WindowsTerminalStep({
                 >
                   <SelectValue
                     placeholder={
-                      capabilities.isLoading
+                      capabilities.loading
                         ? translate(
                             'auto.components.onboarding.WindowsTerminalStep.loadingDistros',
                             'Loading distributions'

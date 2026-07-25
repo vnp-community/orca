@@ -8,9 +8,26 @@ import { OrcaProfileSwitcher } from '../orca-profiles/OrcaProfileSwitcher'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { hasFeatureInteraction } from '../../../../shared/feature-interactions'
+// CR-LOGIN-001 (TASK-FE-012): web-mode user avatar in sidebar
+import { UserAvatarMenu } from '../auth/UserAvatarMenu'
+import { useAuthUser } from '../../hooks/useAuthSession'
+import { useLogout } from '../../hooks/useLogout'
 
 const WORKSPACE_BOARD_MOVED_HINT_STORAGE_KEY = 'orca.workspaceBoardMovedHintSeen.v1'
 const WORKSPACE_BOARD_MOVED_HINT_DURATION_MS = 12000
+
+function isWebClient(): boolean {
+  return Boolean((window as unknown as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__)
+}
+
+// CR-LOGIN-001 (TASK-FE-012): shown only in web mode when the user is authenticated.
+// OrcaProfileSwitcher already returns null for web clients so this fills that slot.
+function WebUserAvatarSection(): React.JSX.Element | null {
+  const authUser = useAuthUser()
+  const logout = useLogout()
+  if (!isWebClient() || !authUser) return null
+  return <UserAvatarMenu user={authUser} onLogout={logout} />
+}
 
 type SidebarToolbarProps = {
   workspaceBoardOpen: boolean
@@ -68,6 +85,8 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
       <div className="flex items-center justify-between border-t border-worktree-sidebar-border px-2 py-1.5">
         <div className="flex min-w-0 items-center gap-1">
           <OrcaProfileSwitcher placement="sidebar" />
+          {/* CR-LOGIN-001 (TASK-FE-012): avatar shown in web mode instead of OrcaProfileSwitcher */}
+          <WebUserAvatarSection />
           <SidebarSettingsHelpMenu />
         </div>
         <div className="flex items-center gap-1">

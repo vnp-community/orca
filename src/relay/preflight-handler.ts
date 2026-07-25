@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process'
-import { userInfo } from 'node:os'
+import { userInfo, homedir } from 'node:os'
 import { promisify } from 'node:util'
 import path, { win32 } from 'node:path'
+import { existsSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import type { RelayDispatcher } from './dispatcher'
 import { buildRelayCommandEnv } from './relay-command-env'
 import { isPwshAvailable } from '../main/pwsh'
@@ -49,15 +51,27 @@ export class PreflightHandler {
     this.dispatcher.onRequest('preflight.detectWindowsTerminalCapabilities', () =>
       this.detectWindowsTerminalCapabilities()
     )
+    // TASK-018: Ghostty config detection
+    this.dispatcher.onRequest('preflight.detectGhosttyConfig', () => this.detectGhosttyConfig())
+    // TASK-020: Full preflight check (gh + git)
+    this.dispatcher.onRequest('preflight.check', () => this.checkFullPreflight())
+    // TASK-021: Set git identity on the remote dev server
+    this.dispatcher.onRequest('preflight.setGitIdentity', (p) =>
+      this.setGitIdentity(p as { name: string; email: string })
+    )
   }
 
   // Why: the client sends the command list rather than importing TUI_AGENT_CONFIG
   // on the relay side. This keeps the relay bundle minimal and makes the protocol
   // self-describing — the relay doesn't need to know the agent catalog.
-  private async detectAgents(params: Record<string, unknown>): Promise<{ agents: string[] }> {
+  private async detectAgents(params: Record<string, unknown>): Promise<{
+    agents: string[]
+    /** Platform of the dev server (relay process) */
+    platform: NodeJS.Platform
+  }> {
     const commands = params.commands as AgentDetectionCommand[]
     if (!Array.isArray(commands)) {
-      return { agents: [] }
+      return { agents: [], platform: process.platform }
     }
     const probeCommands = [
       ...new Set(
@@ -89,30 +103,66 @@ export class PreflightHandler {
             )
             .map(({ id }) => id)
         )
-      ]
+      ],
+      // Why: host side needs the dev server's platform to filter agent list for
+      // UI display. Sending it here avoids a separate RPC call (TASK-012).
+      platform: process.platform
     }
   }
+
 
   private async detectWindowsTerminalCapabilities(): Promise<{
     wslAvailable: boolean
     wslDistros: string[]
     pwshAvailable: boolean
+    pwshVersion?: string
     gitBashAvailable: boolean
+    gitBashPath?: string
     hostPlatform: NodeJS.Platform | null
   }> {
-    const [wslAvailable, pwshAvailable, gitBashAvailable] = await Promise.all([
+    const [wslAvailable, pwshResult, gitBashResult] = await Promise.all([
       Promise.resolve(isWslAvailable()).catch(() => false),
-      Promise.resolve(isPwshAvailable()).catch(() => false),
-      Promise.resolve(isGitBashAvailable()).catch(() => false)
+      this.checkPwsh(),
+      this.checkGitBash()
     ])
-    const wslDistros = wslAvailable ? await Promise.resolve(listWslDistros()).catch(() => []) : []
+    const wslDistros =
+      wslAvailable === true
+        ? await Promise.resolve(listWslDistros()).catch(() => [])
+        : []
     return {
-      wslAvailable,
+      wslAvailable: wslAvailable === true,
       wslDistros,
-      pwshAvailable,
-      gitBashAvailable,
+      ...pwshResult,
+      ...gitBashResult,
       hostPlatform: process.platform
     }
+  }
+
+  /** TASK-028: Get pwsh availability and version. */
+  private async checkPwsh(): Promise<{ pwshAvailable: boolean; pwshVersion?: string }> {
+    try {
+      const { stdout } = await execFileAsync('pwsh', ['--version'])
+      return { pwshAvailable: true, pwshVersion: stdout.trim() }
+    } catch {
+      return { pwshAvailable: false }
+    }
+  }
+
+  /** TASK-028: Find Git Bash installation path on Windows. */
+  private async checkGitBash(): Promise<{ gitBashAvailable: boolean; gitBashPath?: string }> {
+    const candidates = [
+      'C:\\Program Files\\Git\\bin\\bash.exe',
+      'C:\\Program Files (x86)\\Git\\bin\\bash.exe'
+    ]
+    for (const candidate of candidates) {
+      try {
+        await stat(candidate)
+        return { gitBashAvailable: true, gitBashPath: candidate }
+      } catch {
+        /* not found at this path, try next */
+      }
+    }
+    return { gitBashAvailable: false }
   }
 
   // Why: SSH exec channels give the relay a minimal environment without shell
@@ -121,6 +171,95 @@ export class PreflightHandler {
   // Windows has no POSIX shell on native OpenSSH hosts, so use where.exe there.
   private async isCommandOnPath(command: string): Promise<boolean> {
     return isCommandOnPathForRelay(command)
+  }
+
+  // ── TASK-018: Ghostty config detection ─────────────────────────────────────
+
+  /**
+   * Detect whether Ghostty's config file and theme directory exist on the
+   * remote dev server. Paths are relative to the remote user's $HOME.
+   */
+  private async detectGhosttyConfig(): Promise<{
+    configPath: string | null
+    themeDir: string | null
+  }> {
+    const home = homedir()
+    const ghosttyConfigPath = path.join(home, '.config', 'ghostty', 'config')
+    const ghosttyThemeDir = path.join(home, '.config', 'ghostty', 'themes')
+    return {
+      configPath: existsSync(ghosttyConfigPath) ? ghosttyConfigPath : null,
+      themeDir: existsSync(ghosttyThemeDir) ? ghosttyThemeDir : null
+    }
+  }
+
+  // ── TASK-020: Full preflight check (gh + git) ───────────────────────────────
+
+  private async checkFullPreflight(): Promise<{
+    platform: NodeJS.Platform
+    gh: { installed: boolean; authenticated: boolean; version?: string }
+    git: { installed: boolean; version?: string; hasUserName: boolean; hasUserEmail: boolean }
+  }> {
+    const [ghResult, gitResult] = await Promise.all([
+      this.checkGhCli(),
+      this.checkGitCli()
+    ])
+    return {
+      platform: process.platform,
+      gh: ghResult,
+      git: gitResult
+    }
+  }
+
+  private async checkGhCli(): Promise<{
+    installed: boolean
+    authenticated: boolean
+    version?: string
+  }> {
+    try {
+      const { stdout: version } = await execFileAsync('gh', ['--version'])
+      try {
+        await execFileAsync('gh', ['auth', 'status'])
+        return { installed: true, authenticated: true, version: version.trim() }
+      } catch {
+        return { installed: true, authenticated: false, version: version.trim() }
+      }
+    } catch {
+      return { installed: false, authenticated: false }
+    }
+  }
+
+  private async checkGitCli(): Promise<{
+    installed: boolean
+    version?: string
+    hasUserName: boolean
+    hasUserEmail: boolean
+  }> {
+    try {
+      const { stdout: version } = await execFileAsync('git', ['--version'])
+      const [nameResult, emailResult] = await Promise.allSettled([
+        execFileAsync('git', ['config', '--global', 'user.name']),
+        execFileAsync('git', ['config', '--global', 'user.email'])
+      ])
+      return {
+        installed: true,
+        version: version.trim(),
+        hasUserName: nameResult.status === 'fulfilled' && nameResult.value.stdout.trim() !== '',
+        hasUserEmail: emailResult.status === 'fulfilled' && emailResult.value.stdout.trim() !== ''
+      }
+    } catch {
+      return { installed: false, hasUserName: false, hasUserEmail: false }
+    }
+  }
+
+  // ── TASK-021: Set git identity ──────────────────────────────────────────────
+
+  /**
+   * Set `git config --global user.name` and `user.email` on the remote machine.
+   * Why: errors propagate so the IPC caller can show a meaningful message.
+   */
+  private async setGitIdentity(params: { name: string; email: string }): Promise<void> {
+    await execFileAsync('git', ['config', '--global', 'user.name', params.name])
+    await execFileAsync('git', ['config', '--global', 'user.email', params.email])
   }
 }
 

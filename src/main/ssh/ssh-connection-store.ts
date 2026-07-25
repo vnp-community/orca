@@ -6,6 +6,39 @@ import {
   buildRemovedSshTargetTombstone,
   readoptOrphanedWorkspacesForTarget
 } from './ssh-target-readoption'
+import {
+  parseFleetConfig,
+  fleetServerToSshTarget,
+  sshTargetsToFleetConfig,
+  type FleetConfig
+} from '../../shared/fleet-config-parser'
+import { resolveUserSshTarget } from './ssh-user-resolver'
+import type { OrcaSession } from '../auth/auth-types'
+
+// ── Fleet Import/Export Types ──────────────────────────────────
+
+export type FleetImportResult = {
+  configPath: string
+  serverCount: number
+  servers: Array<{
+    fleetId: string
+    action: 'created' | 'updated' | 'skipped'
+    targetId: string
+    error?: string
+  }>
+}
+
+// ── Fleet Filter Types ─────────────────────────────────────────────
+
+export type SshTargetFilterCriteria = {
+  project?: string
+  team?: string
+  environment?: 'development' | 'staging' | 'production'
+  /** Match targets that have ANY of these tags */
+  tags?: string[]
+  /** Case-insensitive substring match on label + host */
+  search?: string
+}
 
 export class SshConnectionStore {
   constructor(private store: Store) {}
@@ -218,6 +251,156 @@ export class SshConnectionStore {
 
     this.lastRepoReadoptions = readoptions
     return changed
+  }
+
+  // ── Fleet Config Import / Export ────────────────────────────
+
+  /**
+   * Import servers from a fleet config YAML file.
+   * - Creates new SshTargets for servers not yet in store
+   * - Updates fleet metadata (project/team/environment/tags/repos) for existing
+   *   targets matched by fleetId — does NOT overwrite SSH connection settings
+   *   that the user may have customised (host/port/identityFile etc.)
+   * - Idempotent: safe to run multiple times
+   */
+  async importFromFleetConfig(filePath: string): Promise<FleetImportResult> {
+    const config = await parseFleetConfig(filePath)
+    const results: FleetImportResult['servers'] = []
+
+    for (const server of config.servers) {
+      try {
+        const newTarget = fleetServerToSshTarget(server, config.defaults, filePath)
+        const existing = this.findTargetByFleetId(server.id)
+
+        if (existing) {
+          // Update fleet metadata only — preserve SSH connection settings
+          this.store.updateSshTarget(existing.id, {
+            project: newTarget.project,
+            team: newTarget.team,
+            environment: newTarget.environment,
+            tags: newTarget.tags,
+            repos: newTarget.repos,
+            fleetConfigSource: filePath,
+          })
+          results.push({ fleetId: server.id, action: 'updated', targetId: existing.id })
+        } else {
+          // Create new target
+          const created = this.addTarget(newTarget)
+          results.push({ fleetId: server.id, action: 'created', targetId: created.id })
+        }
+      } catch (err) {
+        results.push({
+          fleetId: server.id,
+          action: 'skipped',
+          targetId: '',
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
+    return {
+      configPath: filePath,
+      serverCount: config.servers.length,
+      servers: results,
+    }
+  }
+
+  /**
+   * Export fleet-aware targets (those with fleetId or project) to a FleetConfig.
+   */
+  exportToFleetConfig(): FleetConfig {
+    return sshTargetsToFleetConfig(this.listTargets())
+  }
+
+  /**
+   * Find a non-runtime target by its fleet config stable ID.
+   * @private
+   */
+  private findTargetByFleetId(fleetId: string): SshTarget | undefined {
+    return this.listTargets().find((t) => t.fleetId === fleetId)
+  }
+
+  // ── Fleet Grouping & Filtering ─────────────────────────────────
+
+  /**
+   * Group all non-runtime targets by project.
+   * Targets without a project are grouped under 'unassigned'.
+   */
+  listTargetsByProject(): Map<string, SshTarget[]> {
+    const groups = new Map<string, SshTarget[]>()
+    for (const target of this.listTargets()) {
+      const key = target.project ?? 'unassigned'
+      const group = groups.get(key) ?? []
+      group.push(target)
+      groups.set(key, group)
+    }
+    return groups
+  }
+
+  /**
+   * Filter targets by exact project name.
+   */
+  listTargetsByProjectFilter(project: string): SshTarget[] {
+    return this.listTargets().filter((t) => t.project === project)
+  }
+
+  /**
+   * Get a distinct sorted list of project names across all targets.
+   */
+  listProjects(): string[] {
+    const projects = this.listTargets()
+      .map((t) => t.project)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
+    return [...new Set(projects)].sort()
+  }
+
+  /**
+   * Get a distinct sorted list of team names across all targets.
+   */
+  listTeams(): string[] {
+    const teams = this.listTargets()
+      .map((t) => t.team)
+      .filter((t): t is string => typeof t === 'string' && t.length > 0)
+    return [...new Set(teams)].sort()
+  }
+
+  /**
+   * Multi-criteria filter. All provided criteria must match (AND logic).
+   * Tags use OR logic: target matches if it has ANY of the provided tags.
+   */
+  filterTargets(criteria: SshTargetFilterCriteria): SshTarget[] {
+    return this.listTargets().filter((target) => {
+      if (criteria.project !== undefined && target.project !== criteria.project) return false
+      if (criteria.team !== undefined && target.team !== criteria.team) return false
+      if (criteria.environment !== undefined && target.environment !== criteria.environment)
+        return false
+      if (criteria.tags && criteria.tags.length > 0) {
+        const targetTags = target.tags ?? []
+        if (!criteria.tags.some((tag) => targetTags.includes(tag))) return false
+      }
+      if (criteria.search) {
+        const q = criteria.search.toLowerCase()
+        const haystack = `${target.label} ${target.host}`.toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
+      return true
+    })
+  }
+
+  /**
+   * Resolve SshTarget with per-user username override.
+   *
+   * In ORCA_MULTI_USER=1 mode each user SSHes into the dev server
+   * with their own unix account (orca-alice) instead of the shared 'ubuntu'.
+   *
+   * @param targetId - SshTarget ID
+   * @param session  - OrcaSession of the requesting user
+   * @returns SshTarget with username = orca-{user}, or undefined if target not found
+   */
+  resolveSshTargetForUser(targetId: string, session: OrcaSession): SshTarget | undefined {
+    const base = this.getTarget(targetId)
+    if (!base) return undefined
+    return resolveUserSshTarget(base, session.userId, session.userEmail)
   }
 }
 

@@ -49,6 +49,27 @@ export type SshTarget = {
   /** Reuse a system OpenSSH connection across setup commands. Undefined means
    *  enabled; false is an explicit per-target compatibility opt-out. */
   systemSshConnectionReuse?: boolean
+
+  // ── Fleet Management Fields ────────────────────────────────
+  /** Project this server belongs to. e.g. "vnp-blc", "vnp-ai-ops", "vnp-claw" */
+  project?: string
+  /** Team owning this server. e.g. "backend", "frontend", "ai-platform" */
+  team?: string
+  /** Deployment environment */
+  environment?: 'development' | 'staging' | 'production'
+  /** Free-form tags for flexible grouping */
+  tags?: string[]
+  /** Repos available on this server */
+  repos?: Array<{
+    path: string    // e.g. /srv/projects/vnp-blc
+    name: string    // e.g. vnp-blc
+    url?: string    // git remote URL (optional)
+    branch?: string // default branch
+  }>
+  /** Path to the fleet config file that imported this target */
+  fleetConfigSource?: string
+  /** Stable ID from fleet config (used to detect re-imports and avoid duplicates) */
+  fleetId?: string
 }
 
 /** Identity of a removed SSH target, recorded so that re-adding the same host
@@ -162,4 +183,56 @@ export type DetectedPort = {
 export type EnrichedDetectedPort = DetectedPort & {
   advertisedUrl?: string
   advertisedProtocol?: 'http' | 'https'
+}
+
+// ─── Fleet Grouping ────────────────────────────────────────────
+
+/** A group of SSH targets belonging to the same project */
+export type SshTargetGroup = {
+  key: string           // project name or '__unassigned__'
+  label: string         // Display label (project name or 'Unassigned')
+  targets: SshTarget[]
+  isUnassigned: boolean
+}
+
+/**
+ * Group a flat list of SshTargets by project.
+ * Named projects appear first (sorted alphabetically), 'Unassigned' last.
+ * Pure function — safe to run in renderer process without IPC.
+ */
+export function groupSshTargetsByProject(targets: SshTarget[]): SshTargetGroup[] {
+  const map = new Map<string, SshTarget[]>()
+
+  for (const target of targets) {
+    const key = target.project ?? '__unassigned__'
+    const group = map.get(key) ?? []
+    group.push(target)
+    map.set(key, group)
+  }
+
+  const groups: SshTargetGroup[] = []
+
+  // Named projects first, sorted alphabetically
+  const projectKeys = [...map.keys()].filter((k) => k !== '__unassigned__').sort()
+  for (const key of projectKeys) {
+    groups.push({
+      key,
+      label: key,
+      targets: map.get(key)!,
+      isUnassigned: false,
+    })
+  }
+
+  // Unassigned servers last
+  const unassigned = map.get('__unassigned__')
+  if (unassigned && unassigned.length > 0) {
+    groups.push({
+      key: '__unassigned__',
+      label: 'Unassigned',
+      targets: unassigned,
+      isUnassigned: true,
+    })
+  }
+
+  return groups
 }

@@ -337,7 +337,7 @@ export class SshConnection {
     if (!this.useSystemSshTransport) {
       const sftp = await this.sftp()
       try {
-        const { uploadDirectory } = await import('./ssh-relay-deploy-helpers')
+        const { uploadDirectory } = await import('./ssh-relay-deploy-helpers.js')
         await uploadDirectory(sftp, localDir, remoteDir)
       } finally {
         sftp.end()
@@ -359,7 +359,7 @@ export class SshConnection {
     if (!this.useSystemSshTransport) {
       const sftp = await this.sftp()
       try {
-        const { fastGetViaSftp } = await import('../providers/ssh-filesystem-provider-sftp')
+        const { fastGetViaSftp } = await import('../providers/ssh-filesystem-provider-sftp.js')
         await fastGetViaSftp(sftp, remotePath, localPath)
       } finally {
         sftp.end()
@@ -376,7 +376,7 @@ export class SshConnection {
   async openFileUploadSession(options?: SshRemoteFileOptions): Promise<FileUploadSession> {
     if (!this.useSystemSshTransport) {
       const sftp = await this.sftp()
-      const { uploadFile } = await import('./sftp-upload')
+      const { uploadFile } = await import('./sftp-upload.js')
       return {
         uploadFile: (localPath, remotePath, uploadOptions) =>
           uploadFile(sftp, localPath, remotePath, uploadOptions),
@@ -461,7 +461,7 @@ export class SshConnection {
     if (!this.useSystemSshTransport) {
       const sftp = await this.sftp()
       try {
-        const { uploadBuffer } = await import('./sftp-upload')
+        const { uploadBuffer } = await import('./sftp-upload.js')
         await uploadBuffer(sftp, contents, remotePath, options)
       } finally {
         sftp.end()

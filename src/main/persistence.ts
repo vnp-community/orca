@@ -60,6 +60,7 @@ import type {
   OnboardingChecklistState,
   OnboardingOutcome,
   OnboardingState,
+  PerServerChecklistState,
   LegacyPaneKeyAliasEntry,
   TerminalPaneLayoutNode,
   TerminalLayoutSnapshot,
@@ -78,6 +79,7 @@ import {
   buildWorkspaceRunContext
 } from '../shared/task-source-context'
 import type { MigrationUnsupportedPtyEntry } from '../shared/agent-status-types'
+import type { WebPushSubscription } from '../shared/types'
 import { MOBILE_PAIRING_USERDATA_FILES } from './runtime/mobile-pairing-files'
 import { hardenExistingSecureFile } from '../shared/secure-file'
 import {
@@ -333,7 +335,9 @@ let _dataFile: string | null = null
 let _userDataDir: string | null = null
 
 export function initDataPath(): void {
-  const userDataDir = app.getPath('userData')
+  // ORCA_DATA_DIR: allows headless/container deployments to redirect data storage.
+  // Must be set before initDataPath() is called (i.e., before app.setName()).
+  const userDataDir = process.env.ORCA_DATA_DIR ?? app.getPath('userData')
   _userDataDir = userDataDir
   _dataFile = join(userDataDir, 'orca-data.json')
 }
@@ -1294,7 +1298,10 @@ export function sanitizeOnboardingUpdate(
       const checklist: Partial<OnboardingChecklistState> = {}
       for (const key of Object.keys(defaults) as (keyof OnboardingChecklistState)[]) {
         if (key in rc && typeof rc[key] === 'boolean') {
-          checklist[key] = rc[key] as boolean
+          // Why: perServer is Record<...>, not boolean — skip non-boolean keys
+          // so we only copy boolean checklist flags here.
+          if (typeof defaults[key] !== 'boolean') continue
+          ;(checklist as Record<string, unknown>)[key] = rc[key] as boolean
         }
       }
       out.checklist = checklist
@@ -1347,6 +1354,49 @@ function normalizeLoadedOnboardingState(
     checklist: {
       ...defaults.checklist,
       ...sanitized.checklist
+    }
+  }
+}
+
+/**
+ * TASK-038: Migration — OnboardingChecklist v1 (flat) → v2 (perServer).
+ *
+ * Why: Phase 3 moves per-server checklist items (addedRepo, ranFirstAgent, …)
+ * into a keyed Record so they can be tracked per dev-server. State files
+ * persisted before Phase 3 have these items at the flat root; we migrate them
+ * under the key 'local' (the implicit local machine dev server).
+ *
+ * Idempotent: if perServer already exists the migration is skipped.
+ */
+function migrateOnboardingChecklist(onboarding: OnboardingState): OnboardingState {
+  const cl = onboarding.checklist
+  // Already migrated, or no checklist yet.
+  if (!cl || cl.perServer !== undefined) return onboarding
+
+  const PER_SERVER_KEYS: (keyof PerServerChecklistState)[] = [
+    'addedRepo',
+    'ranFirstAgent',
+    'ranSecondAgentOnSameTask',
+    'reviewedDiff',
+    'openedPr',
+    'addedFolder',
+    'openedFile',
+    'ranAgentOnFile'
+  ]
+
+  const perServerItems: PerServerChecklistState = {}
+  for (const key of PER_SERVER_KEYS) {
+    if ((cl as Record<string, unknown>)[key] === true) {
+      perServerItems[key] = true
+    }
+  }
+
+  return {
+    ...onboarding,
+    checklist: {
+      ...cl,
+      perServer:
+        Object.keys(perServerItems).length > 0 ? { local: perServerItems } : {}
     }
   }
 }
@@ -3445,7 +3495,15 @@ export class Store {
             }
             return runs
           })(),
-          onboarding: normalizedOnboarding
+          onboarding: (() => {
+            // Run checklist migration (v1 flat → v2 perServer) after the
+            // onboarding state is fully normalized. TASK-038.
+            return migrateOnboardingChecklist(normalizedOnboarding)
+          })(),
+          // Why: v0 → v1 migration — devServers field added for remote dev server
+          // onboarding (CR-OB-002). Absent in all pre-feature state files; normalize
+          // to [] so DevServerStore never encounters undefined.
+          devServers: Array.isArray(parsed.devServers) ? parsed.devServers : []
         }
       }
     } catch (err) {
@@ -5203,6 +5261,40 @@ export class Store {
     for (const listener of this.uiChangeListeners) {
       listener(ui)
     }
+  }
+
+  // ─── Raw State Access (for DevServerStore and other sub-stores) ─────────────
+  // Why: DevServerStore needs direct PersistedState access to update devServers[]
+  // without going through GlobalSettings. These are the only two methods that
+  // expose the raw state — all other callers should use the typed accessors.
+
+  getState(): Readonly<PersistedState> {
+    return this.state
+  }
+
+  mutate(updater: (state: PersistedState) => void): void {
+    updater(this.state)
+    this.scheduleSave()
+  }
+
+  // ─── Web Push Persistence (Phase 3 — TASK-033) ─────────────────────────────
+
+  getVapidKeys(): { publicKey: string; privateKey: string } | null | undefined {
+    return this.state.vapidKeys
+  }
+
+  setVapidKeys(keys: { publicKey: string; privateKey: string }): void {
+    this.state.vapidKeys = keys
+    this.scheduleSave()
+  }
+
+  getWebPushSubscriptions(): WebPushSubscription[] {
+    return this.state.webPushSubscriptions ?? []
+  }
+
+  setWebPushSubscriptions(subscriptions: WebPushSubscription[]): void {
+    this.state.webPushSubscriptions = subscriptions
+    this.scheduleSave()
   }
 
   updateSettings(

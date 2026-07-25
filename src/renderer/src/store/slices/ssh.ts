@@ -21,6 +21,32 @@ export type RemoteWorkspaceSyncStatus = {
   message?: string
 }
 
+// ─── Fleet Import Types (CR-001) ──────────────────────────────────────────────
+
+export type FleetImportPhase =
+  | 'idle'
+  | 'reading'
+  | 'validating'
+  | 'importing'
+  | 'done'
+  | 'error'
+
+export type FleetImportStatus = {
+  phase: FleetImportPhase
+  /** Total server entries found in config file */
+  totalServers: number
+  /** How many have been successfully imported so far */
+  importedServers: number
+  /** How many were skipped (already exist, duplicate, etc.) */
+  skippedServers: number
+  /** How many failed to import */
+  failedServers: number
+  /** Per-entry error messages */
+  errors: string[]
+  /** Path to the fleet config file being imported */
+  configFilePath: string
+}
+
 export type SshCredentialRequest = {
   requestId: string
   targetId: string
@@ -28,7 +54,51 @@ export type SshCredentialRequest = {
   detail: string
 }
 
+// ─── Health Monitoring Types (CR-005) ─────────────────────────────────────────
+
+export type ServerHealthMetrics = {
+  serverId: string
+  lastCheckedAt: number
+  isReachable: boolean
+  uptimeSeconds: number | null
+  relayVersion: string | null
+  nodeVersion: string | null
+  diskUsagePercent: number | null
+  cpuUsagePercent: number | null
+  memUsagePercent: number | null
+}
+
+
+export type ProvisioningStatus =
+  | { phase: 'idle' }
+  | { phase: 'checking' }
+  | { phase: 'provisioning'; step: string; progress: number }
+  | { phase: 'done'; linuxUsername: string }
+  | { phase: 'error'; message: string }
+
+export type SshUserAccount = {
+  linuxUsername: string
+  provisioned: boolean
+  provisioningStatus: ProvisioningStatus
+}
+
+export type FleetAlertType = 'disconnected' | 'error' | 'relay-outdated'
+
+export type FleetAlert = {
+  id: string
+  serverId: string
+  serverLabel: string
+  type: FleetAlertType
+  message: string
+  timestamp: number
+  dismissed: boolean
+}
+
 export type SshSlice = {
+  sshUserAccounts: Map<string, SshUserAccount>
+  setSshUserAccount: (serverId: string, account: SshUserAccount) => void
+  updateProvisioningStatus: (serverId: string, status: ProvisioningStatus) => void
+
   sshConnectionStates: Map<string, SshConnectionState>
   /** Maps target IDs to their user-facing labels. Populated during hydration
    * so components can look up labels without per-component IPC calls. */
@@ -57,6 +127,19 @@ export type SshSlice = {
   /** Detected remote listening ports after main-process enrichment, keyed by
    *  connection ID. Updated from SSH IPC snapshots and push events. */
   detectedPortsByConnection: Record<string, EnrichedDetectedPort[]>
+  /** Fleet config import progress (CR-001). Null when no import is active. */
+  fleetImportStatus: FleetImportStatus | null
+  /** Full SSH target list synced from backend (CR-002). Used for grouping/filtering UI. */
+  sshTargets: SshTarget[]
+  /** Collapsed state for project groups in the SSH fleet view (CR-002).
+   *  Keyed by project name or '__unassigned__' for ungrouped targets. */
+  collapsedSshGroups: Record<string, boolean>
+  /** Fleet alert notifications — disconnect events and relay issues (CR-005). */
+  fleetAlerts: FleetAlert[]
+  /** Health metrics per server — synced from backend polling (CR-005). */
+  serverHealthMetrics: Record<string, ServerHealthMetrics>
+  /** Timestamp of the last successful fleet health poll (CR-005). */
+  lastFleetHealthCheck: number | null
   setSshConnectionState: (targetId: string, state: SshConnectionState) => void
   setSshTargetLabels: (labels: Map<string, string>) => void
   setRemovedSshTargetLabels: (labels: Record<string, string>) => void
@@ -70,9 +153,40 @@ export type SshSlice = {
   setPortForwards: (targetId: string, forwards: PortForwardEntry[]) => void
   clearPortForwards: (targetId: string) => void
   setDetectedPorts: (targetId: string, ports: EnrichedDetectedPort[]) => void
+  /** Update fleet import progress. Merges partial into existing status. (CR-001) */
+  setFleetImportStatus: (status: Partial<FleetImportStatus> & { phase: FleetImportPhase }) => void
+  /** Reset fleet import status to null (idle). (CR-001) */
+  clearFleetImportStatus: () => void
+  /** Replace full SSH target list (CR-002). Called from IPC hydration / useIpcEvents. */
+  setSshTargets: (targets: SshTarget[]) => void
+  /** Toggle collapsed state for a project group key (CR-002). */
+  toggleSshGroupCollapsed: (groupKey: string) => void
+  // ── Health Monitoring Actions (CR-005) ──────────────────────────────────────
+  /** Merge partial health metrics for a single server. */
+  updateServerHealth: (serverId: string, metrics: Partial<ServerHealthMetrics>) => void
+  /** Record the timestamp of the most recent fleet health poll. */
+  setLastFleetHealthCheck: (ts: number) => void
+  /** Add a fleet-level alert (disconnect / relay-outdated etc.). */
+  addFleetAlert: (alert: FleetAlert) => void
+  /** Soft-dismiss an alert by id — keeps it in the array but hides from UI. */
+  dismissFleetAlert: (alertId: string) => void
+  /** Purge all soft-dismissed alerts from the array. */
+  clearDismissedAlerts: () => void
+}
+
+const FLEET_IMPORT_IDLE: FleetImportStatus = {
+  phase: 'idle',
+  totalServers: 0,
+  importedServers: 0,
+  skippedServers: 0,
+  failedServers: 0,
+  errors: [],
+  configFilePath: ''
 }
 
 export const createSshSlice: StateCreator<AppState, [], [], SshSlice> = (set) => ({
+
+  sshUserAccounts: new Map(),
   sshConnectionStates: new Map(),
   sshTargetLabels: new Map(),
   removedSshTargetLabels: new Map(),
@@ -83,6 +197,13 @@ export const createSshSlice: StateCreator<AppState, [], [], SshSlice> = (set) =>
   sshConnectedGeneration: 0,
   portForwardsByConnection: {},
   detectedPortsByConnection: {},
+  fleetImportStatus: null,
+  sshTargets: [],
+  collapsedSshGroups: {},
+  // ── Health Monitoring State (CR-005) ──────────────────────────────────────
+  serverHealthMetrics: {},
+  lastFleetHealthCheck: null,
+  fleetAlerts: [],
 
   setSshConnectionState: (targetId, state) =>
     set((s) => {
@@ -170,5 +291,75 @@ export const createSshSlice: StateCreator<AppState, [], [], SshSlice> = (set) =>
         delete next[targetId]
       }
       return { detectedPortsByConnection: next }
-    })
+    }),
+
+  // ── Fleet Import Actions (CR-001) ──────────────────────────────────────────
+
+  setFleetImportStatus: (status) =>
+    set((s) => ({
+      fleetImportStatus: {
+        ...(s.fleetImportStatus ?? FLEET_IMPORT_IDLE),
+        ...status
+      }
+    })),
+
+  clearFleetImportStatus: () => set({ fleetImportStatus: null }),
+
+  // ── Grouping Actions (CR-002) ───────────────────────────────────────────────
+
+  setSshTargets: (targets) =>
+    set((s) => {
+      // Why: avoid re-render when the list reference is unchanged (e.g. same
+      // targets re-emitted during periodic sync).
+      if (s.sshTargets === targets) return s
+      return { sshTargets: targets }
+    }),
+
+  toggleSshGroupCollapsed: (groupKey) =>
+    set((s) => ({
+      collapsedSshGroups: {
+        ...s.collapsedSshGroups,
+        [groupKey]: !s.collapsedSshGroups[groupKey]
+      }
+    })),
+
+  // ── Health Monitoring Implementations (CR-005) ─────────────────────────────
+
+  updateServerHealth: (serverId, metrics) =>
+    set((s) => {
+      const existing: ServerHealthMetrics = s.serverHealthMetrics[serverId] ?? {
+        serverId,
+        lastCheckedAt: 0,
+        isReachable: false,
+        uptimeSeconds: null,
+        relayVersion: null,
+        nodeVersion: null,
+        diskUsagePercent: null,
+        cpuUsagePercent: null,
+        memUsagePercent: null
+      }
+      return {
+        serverHealthMetrics: {
+          ...s.serverHealthMetrics,
+          [serverId]: { ...existing, ...metrics }
+        }
+      }
+    }),
+
+  setLastFleetHealthCheck: (ts) => set({ lastFleetHealthCheck: ts }),
+
+  addFleetAlert: (alert) =>
+    set((s) => ({ fleetAlerts: [...s.fleetAlerts, alert] })),
+
+  dismissFleetAlert: (alertId) =>
+    set((s) => ({
+      fleetAlerts: s.fleetAlerts.map((a) =>
+        a.id === alertId ? { ...a, dismissed: true } : a
+      )
+    })),
+
+  clearDismissedAlerts: () =>
+    set((s) => ({
+      fleetAlerts: s.fleetAlerts.filter((a) => !a.dismissed)
+    }))
 })

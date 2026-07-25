@@ -7,6 +7,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { TuiAgent } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { DevServerStatusBadge } from '../dev-server/DevServerStatusBadge'
 
 const AGENT_GRID_MAX_ROWS = 4
 
@@ -20,6 +22,8 @@ type AgentStepProps = {
   isDetecting: boolean
   yoloPermissions?: boolean
   onYoloPermissionsChange?: (enabled: boolean) => void
+  /** [CR-OB-003] Active dev server id for remote agent detection context */
+  activeDevServerId?: string | null
 }
 
 function useAgentGridScrollMaxHeight(
@@ -65,8 +69,11 @@ export function AgentStep({
   detectedSet,
   isDetecting,
   yoloPermissions = true,
-  onYoloPermissionsChange
+  onYoloPermissionsChange,
+  activeDevServerId
 }: AgentStepProps) {
+  // [CR-OB-003] Show dev server context in agent detection step
+  const activeDevServer = useActiveDevServer()
   const agentCatalog = getAgentCatalog()
   const detected = agentCatalog.filter((agent) => detectedSet.has(agent.id))
   const rest = agentCatalog.filter((agent) => !detectedSet.has(agent.id))
@@ -111,6 +118,14 @@ export function AgentStep({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5">
+      {/* [CR-OB-003] Dev server context header */}
+      {activeDevServerId && activeDevServer && (
+        <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+          <span>Detecting agents on</span>
+          <strong>{activeDevServer.name}</strong>
+          <DevServerStatusBadge status={activeDevServer.status} platform={activeDevServer.platform} showLabel />
+        </div>
+      )}
       {!hasDetected && !isDetecting && (
         <div className="shrink-0 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-200/90">
           {translate(

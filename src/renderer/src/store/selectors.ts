@@ -193,3 +193,89 @@ export const useActiveWorktree = () => {
     activeWorktreeId ? (s.getKnownWorktreeById(activeWorktreeId) ?? null) : null
   )
 }
+
+// ─── SSH Fleet Grouping Selectors (CR-002) ──────────────────────────────────
+
+import type { SshTarget } from '../../../shared/ssh-types'
+
+/** Filter criteria for the SSH fleet view. All fields are optional. */
+export type SshTargetFilter = {
+  project?: string
+  team?: string
+  environment?: 'development' | 'staging' | 'production'
+  search?: string
+}
+
+/** Group SSH targets by project name. Targets without a project go under
+ *  the '__unassigned__' key. */
+export function selectSshTargetsByProject(
+  state: Pick<AppState, 'sshTargets'>
+): Record<string, SshTarget[]> {
+  const allTargets = state.sshTargets ?? []
+  return allTargets.reduce<Record<string, SshTarget[]>>((acc, target) => {
+    const group = target.project ?? '__unassigned__'
+    if (!acc[group]) acc[group] = []
+    acc[group].push(target)
+    return acc
+  }, {})
+}
+
+/** Sorted list of unique project names across all SSH targets. */
+export function selectUniqueProjects(state: Pick<AppState, 'sshTargets'>): string[] {
+  const targets = state.sshTargets ?? []
+  const projects = new Set(targets.map((t) => t.project).filter(Boolean) as string[])
+  return Array.from(projects).sort()
+}
+
+/** Sorted list of unique team names across all SSH targets. */
+export function selectUniqueTeams(state: Pick<AppState, 'sshTargets'>): string[] {
+  const targets = state.sshTargets ?? []
+  const teams = new Set(targets.map((t) => t.team).filter(Boolean) as string[])
+  return Array.from(teams).sort()
+}
+
+/** Filter SSH targets according to the given SshTargetFilter. All criteria are
+ *  applied with AND semantics. Empty/undefined criteria are ignored. */
+export function selectFilteredSshTargets(
+  state: Pick<AppState, 'sshTargets'>,
+  filter: SshTargetFilter
+): SshTarget[] {
+  const targets = state.sshTargets ?? []
+  return targets.filter((t) => {
+    if (filter.project && t.project !== filter.project) return false
+    if (filter.team && t.team !== filter.team) return false
+    if (filter.environment && t.environment !== filter.environment) return false
+    if (filter.search) {
+      const q = filter.search.toLowerCase()
+      return t.label.toLowerCase().includes(q) || t.host.toLowerCase().includes(q)
+    }
+    return true
+  })
+}
+
+// ── RBAC Filtering Selector (CR-006) ─────────────────────────────────────────
+
+/** Filter SSH targets according to the current authenticated user's permissions.
+ *
+ * - No user, or admin role → all targets visible.
+ * - Developer / lead → targets without project/team are always visible;
+ *   targets with a project or team are hidden unless the user belongs to that
+ *   project or team respectively.
+ */
+export function selectSshTargetsForCurrentUser(
+  state: Pick<AppState, 'sshTargets' | 'currentUser'>
+): SshTarget[] {
+  const user = state.currentUser
+  const all = state.sshTargets ?? []
+
+  // Admin or unauthenticated → see everything
+  if (!user || user.role === 'admin') return all
+
+  return all.filter((target) => {
+    // Targets assigned to a project the user doesn't belong to → hidden
+    if (target.project && !user.projects.includes(target.project)) return false
+    // Targets assigned to a team the user doesn't belong to → hidden
+    if (target.team && !user.teams.includes(target.team)) return false
+    return true
+  })
+}

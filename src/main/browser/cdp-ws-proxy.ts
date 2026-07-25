@@ -58,7 +58,7 @@ export class CdpWsProxy {
       this.wss.on('connection', (ws) => {
         this.closeClient()
         this.client = ws
-        const onMessage = (data: WebSocket.RawData): void => {
+        const onMessage = (data: any): void => {
           this.handleClientMessage(ws, data.toString())
         }
         const onClose = (): void => {

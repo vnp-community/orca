@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { BellRing, FileAudio, Upload } from 'lucide-react'
+import { BellRing, Bell, BellOff, FileAudio, Upload, Smartphone, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import type { GlobalSettings } from '../../../../shared/types'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,9 @@ import {
 } from '@/components/notifications/mac-notification-permission-card'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '@/lib/web-client-location'
+import { useBrowserNotificationPermission } from '@/hooks/useBrowserNotificationPermission'
+import { useWebPushSubscription } from '@/hooks/useWebPushSubscription'
 
 type NotificationStepProps = {
   settings: GlobalSettings | null
@@ -41,6 +44,9 @@ export function NotificationStep({
   settings,
   updateSettings
 }: NotificationStepProps): React.JSX.Element {
+  // Detect web mode — different UI for browser vs Electron
+  const isWebMode = isWebClientLocation()
+
   const notificationSettings = settings?.notifications
   const notificationSettingsRef = useRef(notificationSettings)
   // Why: undefined settings are still loading — assume enabled (the default)
@@ -175,6 +181,11 @@ export function NotificationStep({
   const selectedSoundId = notificationSettings.customSoundId
   const soundOptions = getNotificationSoundOptions(customPath)
 
+  // Web mode: use browser notification + web push UI
+  if (isWebMode) {
+    return <WebModeNotificationStep settings={settings} updateSettings={updateSettings} />
+  }
+
   return (
     <div ref={setSelectPortalHost} className="space-y-5">
       <MacNotificationPermissionCard state={macPermissionState} />
@@ -263,6 +274,138 @@ export function NotificationStep({
           </div>
         </div>
       </section>
+    </div>
+  )
+}
+
+// ── WebModeNotificationStep ───────────────────────────────────────────────────
+
+function WebModeNotificationStep({
+  settings,
+  updateSettings
+}: NotificationStepProps): React.JSX.Element {
+  const { state: permState, requestPermission } = useBrowserNotificationPermission()
+  const { state: pushState, subscribe, unsubscribe, isSupported: isPushSupported } = useWebPushSubscription()
+
+  const sendTestNotification = useCallback(() => {
+    if (permState === 'granted') {
+      // eslint-disable-next-line no-new
+      new Notification('Orca Test', { body: 'Notifications are working correctly.' })
+    }
+  }, [permState])
+
+  return (
+    <div className="space-y-5" data-web-notification-step>
+      {/* Section 1: Browser Notifications */}
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold text-foreground">Browser Notifications</h2>
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
+            Allow Orca to send desktop notifications from your browser.
+          </p>
+        </div>
+
+        {permState === 'unsupported' && (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+            <BellOff className="size-4 shrink-0" />
+            Browser notifications are not supported in this environment.
+          </div>
+        )}
+
+        {permState === 'denied' && (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
+            <BellOff className="size-4 shrink-0 text-amber-500" />
+            <p className="text-muted-foreground">
+              Notifications are blocked. Enable them in your browser settings, then reload.
+            </p>
+          </div>
+        )}
+
+        {permState === 'granted' && (
+          <div className="flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/5 px-4 py-3 text-sm text-green-700 dark:text-green-400">
+            <Check className="size-4 shrink-0" />
+            Browser notifications are enabled.
+          </div>
+        )}
+
+        {permState === 'default' && (
+          <Button
+            id="enable-browser-notif-btn"
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => void requestPermission()}
+          >
+            <Bell className="size-3.5" />
+            Enable Browser Notifications
+          </Button>
+        )}
+      </section>
+
+      {/* Section 2: Push Notifications (only when browser granted + SW supported) */}
+      {permState === 'granted' && isPushSupported && (
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold text-foreground">Push Notifications</h2>
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              Receive notifications even when Orca is not in the foreground.
+            </p>
+          </div>
+          {pushState === 'subscribed' ? (
+            <div className="flex items-center justify-between rounded-xl border border-green-500/30 bg-green-500/5 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                <Smartphone className="size-4" />
+                Push notifications active.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void unsubscribe()}
+              >
+                Disable
+              </Button>
+            </div>
+          ) : (
+            <Button
+              id="subscribe-push-btn"
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={pushState === 'subscribing'}
+              onClick={() => void subscribe()}
+            >
+              <Smartphone className="size-3.5" />
+              {pushState === 'subscribing' ? 'Subscribing…' : 'Enable Push Notifications'}
+            </Button>
+          )}
+        </section>
+      )}
+
+      {/* Section 3: Other Channels */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-foreground">Other Channels</h2>
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          Additional notification channels (Slack, email, webhooks) can be configured in server settings.
+        </p>
+      </section>
+
+      {/* Send Test Notification */}
+      {permState === 'granted' && (
+        <Button
+          id="test-notification-btn"
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={sendTestNotification}
+        >
+          <BellRing className="size-3.5" />
+          Send Test Notification
+        </Button>
+      )}
     </div>
   )
 }

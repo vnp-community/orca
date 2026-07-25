@@ -4,6 +4,7 @@
     "../electron.vite.config.*",
     "../build-plugins/**/*",
     "../src/main/**/*",
+    "../src/platform/**/*",
     "../src/preload/**/*",
     "../src/shared/**/*",
     "../src/relay/**/*",

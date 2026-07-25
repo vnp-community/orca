@@ -27,6 +27,8 @@ export type AgentCatalogEntry = {
   faviconDomain?: string
   /** Homepage/install docs URL, sourced from the README agent badge list. */
   homepageUrl: string
+  unsupportedPlatforms?: readonly NodeJS.Platform[]
+  yoloUnsupportedPlatforms?: readonly NodeJS.Platform[]
 }
 
 function getCatalogPlatform(): NodeJS.Platform {
@@ -69,7 +71,8 @@ export const getAgentCatalog = createLocalizedCatalog((): AgentCatalogEntry[] =>
     id: 'codex',
     label: translate('auto.lib.agent.catalog.760bc6883d', 'Codex'),
     cmd: 'codex',
-    homepageUrl: 'https://github.com/openai/codex'
+    homepageUrl: 'https://github.com/openai/codex',
+    unsupportedPlatforms: ['darwin']
   },
   {
     id: 'grok',
@@ -378,4 +381,16 @@ export function AgentIcon({
   }
   const label = catalogEntry?.label ?? agent
   return <AgentLetterIcon letter={label.charAt(0).toUpperCase()} size={size} />
+}
+
+export function getAgentCatalogForPlatform(platform: NodeJS.Platform): AgentCatalogEntry[] {
+  return getAgentCatalog().filter((entry) => !entry.unsupportedPlatforms?.includes(platform))
+}
+
+export function isYoloSupportedForPlatform(agentId: string, platform: NodeJS.Platform): boolean {
+  const entry = getAgentCatalog().find((e) => e.id === agentId)
+  if (!entry) return false
+  if (entry.unsupportedPlatforms?.includes(platform)) return false
+  if (entry.yoloUnsupportedPlatforms?.includes(platform)) return false
+  return true
 }

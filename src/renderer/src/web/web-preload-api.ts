@@ -2877,7 +2877,23 @@ function createSshApi(): NonNullable<Partial<PreloadApi>['ssh']> {
     browseDir: () => Promise.resolve({ entries: [], resolvedPath: '' }),
     onCredentialRequest: () => noopUnsubscribe,
     onCredentialResolved: () => noopUnsubscribe,
-    submitCredential: () => Promise.resolve()
+    submitCredential: () => Promise.resolve(),
+    // [CR-001] Fleet import — desktop-only feature; web client returns safe no-ops.
+    pickFleetConfigFile: () => Promise.resolve(null),
+    importFleetConfig: () =>
+      Promise.resolve({ imported: 0, skipped: 0, failed: 0, errors: [], targets: [] }),
+    onFleetImportProgress: () => noopUnsubscribe,
+    // [CR-003] Bulk provisioning — desktop-only; no-ops on web client.
+    provisionFleetServers: () => Promise.resolve(),
+    cancelProvisioning: () => Promise.resolve(),
+    onProvisioningProgress: () => noopUnsubscribe,
+    // [CR-005] Fleet health — desktop-only; no-ops on web client.
+    getFleetHealth: () => Promise.resolve({ servers: [] }),
+    refreshFleetHealth: () => Promise.resolve(),
+    // [CR-004] Dev bootstrap — desktop-only; no-ops on web client.
+    bootstrapServer: () => Promise.resolve(),
+    cancelBootstrap: () => Promise.resolve(),
+    onBootstrapProgress: () => noopUnsubscribe
   }
 }
 

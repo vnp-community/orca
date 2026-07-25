@@ -16,6 +16,7 @@ import { useWorkspaceBoardPanel } from './useWorkspaceBoardPanel'
 import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
 import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
+import { SshStatusSection } from './SshStatusSection'
 
 const WorktreeMetaDialog = lazyWithRetry(() => import('./WorktreeMetaDialog'))
 const RemoveFolderDialog = lazyWithRetry(() => import('./RemoveFolderDialog'))
@@ -153,6 +154,9 @@ function Sidebar({
               onWorkspaceBoardDragPreviewCommit={solidifyWorkspaceBoardFromDrag}
               onWorkspaceBoardDragPreviewCancel={cancelWorkspaceBoardDragPreview}
             />
+
+            {/* [CR-002] SSH fleet status summary — shows per-project connected counts */}
+            <SshStatusSection />
 
             <SetupScriptPromptCard />
 

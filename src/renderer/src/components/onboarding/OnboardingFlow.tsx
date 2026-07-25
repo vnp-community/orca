@@ -9,6 +9,7 @@ import { ThemeStep } from './ThemeStep'
 import { NotificationStep } from './NotificationStep'
 import { IntegrationsStep } from './IntegrationsStep'
 import { WindowsTerminalStep } from './WindowsTerminalStep'
+import { DevServerStep } from './DevServerStep'
 import { useOnboardingFlow } from './use-onboarding-flow'
 import { OnboardingSkipConfirmationDialog } from './OnboardingSkipConfirmationDialog'
 import { OnboardingFooter } from './OnboardingFooter'
@@ -17,6 +18,20 @@ import logo from '../../../../../resources/logo.svg'
 import { translate } from '@/i18n/i18n'
 
 const stepCopy = {
+  dev_server: {
+    get title() {
+      return translate(
+        'auto.components.onboarding.OnboardingFlow.devServerTitle',
+        'Connect a dev server'
+      )
+    },
+    get subtitle() {
+      return translate(
+        'auto.components.onboarding.OnboardingFlow.devServerSubtitle',
+        'Orca runs in the cloud. Connect a dev server so agents can access your code.'
+      )
+    }
+  },
   agent: {
     get title() {
       return translate(
@@ -89,7 +104,8 @@ const stepCopy = {
   }
 } as const
 
-const stepTooltipLabels = {
+const stepTooltipLabels: Record<string, string> = {
+  dev_server: 'Dev Server',
   agent: 'Default Agent',
   theme: 'Appearance',
   windows_terminal: 'Windows Terminal',
@@ -286,6 +302,9 @@ export default function OnboardingFlow({
                   : cn('scrollbar-sleek overflow-y-auto pr-1', 'mt-10')
               )}
             >
+              {currentStep.id === 'dev_server' && (
+                <DevServerStep onNext={() => void flow.next()} onSkip={() => void flow.next()} />
+              )}
               {currentStep.id === 'agent' && (
                 <AgentStep
                   selectedAgent={flow.selectedAgent}

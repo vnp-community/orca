@@ -1,0 +1,176 @@
+# ============================================================
+# VNP-BLC Dev Server Fleet Inventory
+# ============================================================
+# Mô tả: Khai báo tất cả dev servers của VNP-BLC dev team
+#
+# Status: WORKAROUND FILE — Dùng thủ công theo hướng dẫn trong CR-001
+#
+# Cách dùng (hiện tại):
+#   1. Xem phần "SSH Config Import" bên dưới
+#   2. Copy nội dung SSH config vào ~/.ssh/config trên Orca Server
+#   3. Trong Orca UI: Settings → SSH Hosts → Import from ~/.ssh/config
+#
+# Cách dùng (sau khi CR-001 implemented):
+#   orca fleet import deploy/dev/orca-fleet.yaml
+#   orca fleet provision --all
+# ============================================================
+
+version: "1"
+
+# ── Default settings áp dụng cho tất cả servers ──────────────
+defaults:
+  port: 22
+  username: dev
+  identityFile: /home/orca/.ssh/id_ed25519
+  relayGracePeriodSeconds: 86400   # 24 giờ — relay sống khi không có developer kết nối
+
+# ── Dev Servers ───────────────────────────────────────────────
+servers:
+
+  # ═══════════════════════════════════════════════════════════
+  # INFRASTRUCTURE: Orca Server Host (172.20.2.39)
+  # Đây là máy chạy Orca container — không phải dev server
+  # ═══════════════════════════════════════════════════════════
+
+  # ═══════════════════════════════════════════════════════════
+  # DEV MACHINE: Developer Remote Server (172.20.2.31)
+  # Orca Server (172.20.2.39) SSH vào đây để chạy code
+  # Team: all-dev
+  # ═══════════════════════════════════════════════════════════
+  - id: dev-local-31
+    label: "Dev Local — 172.20.2.31 (developer machine)"
+    host: 172.20.2.31
+    port: 22
+    username: ubuntu
+    identityFile: /home/orca/.ssh/id_ed25519
+    project: vnp-blc
+    group: local-dev
+    tags: [ubuntu, local, primary-dev]
+    metadata:
+      description: "Máy developer chạy code thực tế — Orca SSH vào để relay"
+      environment: dev
+
+  # ═══════════════════════════════════════════════════════════
+  # PROJECT: VNP-BLC (Backend Blockchain)
+  # Team: backend
+  # ═══════════════════════════════════════════════════════════
+  - id: dev-alpha
+    label: "Dev Alpha — vnp-blc (primary)"
+    host: dev-alpha.vnpblc.internal
+    port: 22
+    username: dev
+    identityFile: /home/orca/.ssh/id_ed25519
+    project: vnp-blc
+    team: backend
+    environment: development
+    repos:
+      - path: /srv/projects/vnp-blc
+        url: git@github.com:vnpblc/vnp-blc.git
+        branch: develop
+    portForwards:
+      - localPort: 18080
+        remoteHost: localhost
+        remotePort: 8080
+        label: "API Server (HTTP)"
+      - localPort: 15432
+        remoteHost: localhost
+        remotePort: 5432
+        label: "PostgreSQL"
+      - localPort: 16379
+        remoteHost: localhost
+        remotePort: 6379
+        label: "Redis"
+
+  - id: dev-alpha2
+    label: "Dev Alpha2 — vnp-blc (secondary)"
+    host: dev-alpha2.vnpblc.internal
+    project: vnp-blc
+    team: backend
+    environment: development
+    repos:
+      - path: /srv/projects/vnp-blc
+        url: git@github.com:vnpblc/vnp-blc.git
+        branch: develop
+
+  # ═══════════════════════════════════════════════════════════
+  # PROJECT: VNP-AI-OPS (AI Operations Platform)
+  # Team: ai-platform
+  # ═══════════════════════════════════════════════════════════
+  - id: dev-beta
+    label: "Dev Beta — vnp-ai-ops"
+    host: dev-beta.vnpblc.internal
+    project: vnp-ai-ops
+    team: ai-platform
+    environment: development
+    repos:
+      - path: /srv/projects/vnp-ai-ops
+        url: git@github.com:vnpblc/vnp-ai-ops.git
+        branch: develop
+      - path: /srv/projects/vnp-bytebase
+        url: git@github.com:vnpblc/vnp-bytebase.git
+        branch: main
+    portForwards:
+      - localPort: 15050
+        remoteHost: localhost
+        remotePort: 5050
+        label: "AI API Server"
+
+  # ═══════════════════════════════════════════════════════════
+  # PROJECT: VNP-CLAW (Frontend/Web)
+  # Team: frontend
+  # ═══════════════════════════════════════════════════════════
+  - id: dev-gamma
+    label: "Dev Gamma — vnp-claw"
+    host: dev-gamma.vnpblc.internal
+    project: vnp-claw
+    team: frontend
+    environment: development
+    repos:
+      - path: /srv/projects/vnp-claw
+        url: git@github.com:vnpblc/vnp-claw.git
+        branch: develop
+    portForwards:
+      - localPort: 13000
+        remoteHost: localhost
+        remotePort: 3000
+        label: "Frontend Dev Server"
+
+# ============================================================
+# SSH CONFIG IMPORT (Workaround hiện tại)
+# ============================================================
+# Copy phần dưới đây vào /home/orca/.ssh/config trên Orca Server
+# Sau đó trong Orca UI: Settings → SSH Hosts → Import from ~/.ssh/config
+# ============================================================
+#
+# # ── VNP-BLC Servers ──────────────────────────────────────
+# Host dev-alpha
+#   HostName dev-alpha.vnpblc.internal
+#   User dev
+#   Port 22
+#   IdentityFile /home/orca/.ssh/id_ed25519
+#   StrictHostKeyChecking accept-new
+#   ServerAliveInterval 60
+#   ServerAliveCountMax 5
+#
+# Host dev-alpha2
+#   HostName dev-alpha2.vnpblc.internal
+#   User dev
+#   IdentityFile /home/orca/.ssh/id_ed25519
+#   StrictHostKeyChecking accept-new
+#   ServerAliveInterval 60
+#
+# # ── VNP-AI-OPS Servers ────────────────────────────────────
+# Host dev-beta
+#   HostName dev-beta.vnpblc.internal
+#   User dev
+#   IdentityFile /home/orca/.ssh/id_ed25519
+#   StrictHostKeyChecking accept-new
+#   ServerAliveInterval 60
+#
+# # ── VNP-CLAW Servers ──────────────────────────────────────
+# Host dev-gamma
+#   HostName dev-gamma.vnpblc.internal
+#   User dev
+#   IdentityFile /home/orca/.ssh/id_ed25519
+#   StrictHostKeyChecking accept-new
+#   ServerAliveInterval 60

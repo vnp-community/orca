@@ -47,14 +47,24 @@ export function maybeRedirectPackagedCliEntryLaunch(options: RedirectOptions = {
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
   const isPackaged = options.isPackaged ?? false
-  const resourcesPath = options.resourcesPath ?? process.resourcesPath
+
+  if (!isPackaged) {
+    return { redirected: false }
+  }
+
+  const resourcesPath = options.resourcesPath ?? (process as any).resourcesPath
   const execPath = options.execPath ?? process.execPath
   const exists = options.exists ?? existsSync
   const spawn = options.spawn ?? spawnSync
+  
+  if (!resourcesPath) {
+    return { redirected: false }
+  }
+
   const cliEntryPath = buildPackagedCliEntryPath(platform, resourcesPath)
   const cliArgs = getPackagedCliEntryArgs(argv, cliEntryPath, platform)
 
-  if (!isPackaged || !cliArgs) {
+  if (!cliArgs) {
     return { redirected: false }
   }
   if (env[REDIRECT_ATTEMPT_ENV] === '1') {

@@ -117,6 +117,22 @@ export function detachHandshakeListener(sock: Socket): void {
   }
 }
 
+/**
+ * Platform info sent by the relay daemon in its handshake-ok response.
+ * Parsed on the host (bridge) side so DevServerRelayBridge can surface
+ * the relay's OS/arch/nodeVersion without a separate RPC call.
+ */
+export type RelayHandshakeInfo = {
+  /** The relay process's platform (e.g. 'linux', 'darwin', 'win32'). */
+  platform: NodeJS.Platform
+  /** The relay process's architecture (e.g. 'arm64', 'x64'). */
+  arch: string
+  /** The relay process's Node.js version (e.g. 'v20.11.0'). */
+  nodeVersion: string
+  /** Content-hashed relay version string. */
+  relayVersion: string
+}
+
 function handleDaemonHandshakeFrame(
   sock: Socket,
   frame: DecodedFrame,
@@ -160,8 +176,20 @@ function handleDaemonHandshakeFrame(
     sock.end()
     return false
   }
+
+  // Daemon sends handshake-ok with its own platform/arch/nodeVersion so the
+  // host side can read them without a separate RPC call (backward compat:
+  // old daemons send plain { type, version }; new fields default gracefully).
   process.stderr.write(`[relay] Handshake OK from version=${msg.version}\n`)
-  sock.write(encodeHandshakeFrame({ type: 'orca-relay-handshake-ok', version: launchVersion }))
+  sock.write(
+    encodeHandshakeFrame({
+      type: 'orca-relay-handshake-ok',
+      version: launchVersion,
+      // The HandshakeMessage union type allows extra fields via JSON—the
+      // encode/parse path uses JSON.stringify/parse so extra keys survive.
+      ...({ platform: process.platform, arch: process.arch, nodeVersion: process.version } as {})
+    })
+  )
   return true
 }
 
@@ -173,7 +201,7 @@ export type ConnectHandshakeCallbacks = {
   // (the SSH stdout pipe) before attaching the raw bridge, otherwise daemon
   // bytes coalesced into the same TCP send as handshake-ok are silently
   // dropped.
-  onAccepted: (leftover: Buffer) => void
+  onAccepted: (leftover: Buffer, info?: RelayHandshakeInfo) => void
 }
 
 // Why: the wire-level version handshake from the bridge side. Before we attach
@@ -218,7 +246,20 @@ export function runConnectHandshake(
         handshakeDone = true
         const leftover = decoder.drain()
         sock.removeAllListeners('data')
-        cb.onAccepted(leftover)
+        // Parse optional platform info sent by newer daemons (backward compat:
+        // old daemons don't include these fields so we fall back gracefully).
+        const okMsg = msg as typeof msg & {
+          platform?: string
+          arch?: string
+          nodeVersion?: string
+        }
+        const info: RelayHandshakeInfo = {
+          platform: (okMsg.platform ?? 'linux') as NodeJS.Platform,
+          arch: okMsg.arch ?? 'x64',
+          nodeVersion: okMsg.nodeVersion ?? 'unknown',
+          relayVersion: msg.version
+        }
+        cb.onAccepted(leftover, info)
         return
       }
       if (msg.type === 'orca-relay-handshake-mismatch') {

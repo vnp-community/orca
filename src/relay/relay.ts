@@ -40,6 +40,8 @@ import { FsHandler } from './fs-handler'
 import { installRelayLogRotation } from './rotating-log-writer'
 import { GitHandler } from './git-handler'
 import { PreflightHandler } from './preflight-handler'
+import { FsDirectoryBrowserHandler } from './fs-handler-directory-browse'
+import { GitCloneHandler } from './git-handler-clone'
 import { ExternalAutomationsHandler } from './external-automations-handler'
 import { PortScanHandler } from './port-scan-handler'
 import { AgentExecHandler } from './agent-exec-handler'
@@ -473,6 +475,12 @@ async function main(): Promise<void> {
   const _externalAutomationsHandler = new ExternalAutomationsHandler(dispatcher)
   void _preflightHandler
   void _externalAutomationsHandler
+
+  const _fsDirectoryBrowserHandler = new FsDirectoryBrowserHandler(dispatcher)
+  void _fsDirectoryBrowserHandler
+
+  const _gitCloneHandler = new GitCloneHandler(dispatcher)
+  void _gitCloneHandler
 
   const _portScanHandler = new PortScanHandler(dispatcher)
   void _portScanHandler

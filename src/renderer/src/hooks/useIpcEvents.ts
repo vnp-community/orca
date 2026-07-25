@@ -13,6 +13,7 @@ import { runSleepWorktree } from '@/components/sidebar/sleep-worktree-flow'
 import { createBackgroundSleepingAgentWakeDispatcher } from '@/lib/wake-sleeping-agents-in-background'
 import { OPEN_WORKSPACE_BOARD_EVENT } from '@/components/sidebar/useWorkspaceBoardPanel'
 import { SPLIT_TERMINAL_PANE_EVENT, CLOSE_TERMINAL_PANE_EVENT } from '@/constants/terminal'
+import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { requestBackgroundTerminalWorktreeMount } from '@/components/terminal/background-terminal-worktree-mount'
 import type { SplitTerminalPaneDetail, CloseTerminalPaneDetail } from '@/constants/terminal'
 import { getVisibleWorktreeIds } from '@/components/sidebar/visible-worktrees'
@@ -129,6 +130,7 @@ import { closeTerminalTab } from '@/components/terminal/terminal-tab-actions'
 import { initialAgentTabViewModeProps } from '@/lib/native-chat-initial-view-mode'
 import { getConnectionIdFromState } from '@/lib/connection-context'
 import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
+import { useDevServersSync } from './useDevServersSync'
 
 function getShortcutPlatform(): NodeJS.Platform {
   if (navigator.userAgent.includes('Mac')) {
@@ -157,9 +159,19 @@ function resolveTerminalPresentation(data: {
   return undefined
 }
 
+/** [CR-OB-009] Resolve the dev server associated with a worktree via its repo. */
+function getDevServerForWorktree(store: AppState, worktreeId: string): string | null {
+  const wt = store.worktrees?.find((w) => w.id === worktreeId)
+  if (!wt) return null
+  const repo = store.repos?.find((r) => r.id === wt.repoId)
+  // DevServer repos carry the dev server id on the repo record (field added by CR-OB-002)
+  return (repo as unknown as Record<string, unknown>)?.devServerId as string | null ?? null
+}
+
 function isPinnedSessionTab(store: AppState, worktreeId: string, visibleId: string): boolean {
   return (store.unifiedTabsByWorktree?.[worktreeId] ?? []).some(
     (tab) => (tab.id === visibleId || tab.entityId === visibleId) && tab.isPinned
+
   )
 }
 
@@ -831,6 +843,9 @@ function getWorktreeRuntimeEnvironmentId(worktreeId: string | null | undefined):
 }
 
 export function useIpcEvents(): void {
+  // Dev server list + status sync (CR-OB-002)
+  useDevServersSync()
+
   useEffect(() => {
     const unsubs: (() => void)[] = []
     const backgroundSleepingAgentWakeDispatcher = createBackgroundSleepingAgentWakeDispatcher()
@@ -2605,6 +2620,8 @@ export function useIpcEvents(): void {
       try {
         const targets = await window.api.ssh.listTargets()
         useAppStore.getState().setSshTargetsMetadata(targets)
+        // [CR-002] Also populate the full target list for fleet grouping/filtering.
+        useAppStore.getState().setSshTargets(targets)
         // Why: ghost-host UI (removed target still referenced by a workspace)
         // shows a friendly name from the removal tombstones instead of the raw id.
         try {
@@ -2671,6 +2688,156 @@ export function useIpcEvents(): void {
         useAppStore.getState().setDetectedPorts(targetId, ports)
       })
     )
+
+    // [CR-001] Fleet import progress events — forward to store for FleetImportDialog
+    // Why: optional chain guards against builds where pickFleetConfigFile isn't yet wired.
+    const unsubFleetImport = window.api.ssh.onFleetImportProgress?.((status) => {
+      useAppStore.getState().setFleetImportStatus(status)
+    })
+    if (unsubFleetImport) {
+      unsubs.push(unsubFleetImport)
+    }
+
+    // [CR-003] Bulk provisioning progress events
+    const unsubProvisioning = window.api.ssh.onProvisioningProgress?.((event) => {
+      const store = useAppStore.getState()
+      switch (event.type) {
+        case 'server.started':
+          store.updateProvisioningServerStatus(event.serverId, {
+            status: 'connecting',
+            startedAt: Date.now()
+          })
+          break
+        case 'server.relay-deploying':
+          store.updateProvisioningServerStatus(event.serverId, {
+            status: 'deploying-relay'
+          })
+          break
+        case 'server.done':
+          store.updateProvisioningServerStatus(event.serverId, {
+            status: 'done',
+            completedAt: Date.now(),
+            relayVersion: event.relayVersion
+          })
+          scheduleRuntimeGraphSync()
+          break
+        case 'server.error':
+          store.updateProvisioningServerStatus(event.serverId, {
+            status: 'error',
+            error: event.error,
+            completedAt: Date.now()
+          })
+          break
+        case 'server.skipped':
+          store.updateProvisioningServerStatus(event.serverId, {
+            status: 'skipped'
+          })
+          break
+        case 'session.done': {
+          store.finishProvisioningSession()
+          // Show summary toast after session finishes
+          const msg = `Provisioning complete: ${event.totalDone} ready, ${event.totalFailed} failed`
+          if (event.totalFailed > 0) {
+            toast.error(msg)
+          } else {
+            toast.success(msg)
+          }
+          break
+        }
+        default:
+          break
+      }
+    })
+    if (unsubProvisioning) {
+      unsubs.push(unsubProvisioning)
+    }
+
+    // [CR-004] Dev server bootstrap progress events
+    const unsubBootstrap = window.api.ssh.onBootstrapProgress?.((event) => {
+      const store = useAppStore.getState()
+      switch (event.type) {
+        case 'bootstrap.started':
+          store.initBootstrap(event.serverId)
+          break
+        case 'bootstrap.step.started':
+          store.updateBootstrapStep(event.serverId, event.stepId, {
+            status: 'running'
+          })
+          break
+        case 'bootstrap.step.done':
+          store.updateBootstrapStep(event.serverId, event.stepId, {
+            status: 'done',
+            detail: event.detail ?? null
+          })
+          break
+        case 'bootstrap.step.error':
+          store.updateBootstrapStep(event.serverId, event.stepId, {
+            status: 'error',
+            error: event.error
+          })
+          break
+        case 'bootstrap.step.skipped':
+          store.updateBootstrapStep(event.serverId, event.stepId, {
+            status: 'skipped',
+            detail: event.reason
+          })
+          break
+        case 'bootstrap.log':
+          store.appendBootstrapLog(event.serverId, event.line)
+          break
+        case 'bootstrap.done':
+          store.finishBootstrap(event.serverId, true)
+          toast.success(
+            `Bootstrap complete: ${event.serverLabel}`
+          )
+          scheduleRuntimeGraphSync()
+          break
+        case 'bootstrap.error':
+          store.finishBootstrap(event.serverId, false)
+          toast.error(
+            `Bootstrap failed: ${event.serverLabel}`
+          )
+          break
+        default:
+          break
+      }
+    })
+    if (unsubBootstrap) {
+      unsubs.push(unsubBootstrap)
+    }
+
+    // [CR-006] Auth state change events
+    const unsubAuth = window.api.auth?.onAuthStateChanged?.((event) => {
+      const store = useAppStore.getState()
+      switch (event.type) {
+        case 'authenticated':
+          if (event.user) {
+            store.setCurrentUser({
+              id: event.user.id,
+              email: event.user.email,
+              name: event.user.name,
+              avatarUrl: event.user.avatarUrl,
+              teams: event.user.teams,
+              projects: event.user.projects,
+              role: event.user.role
+            })
+            store.setAuthStatus('authenticated')
+            scheduleRuntimeGraphSync()
+          }
+          break
+        case 'unauthenticated':
+          store.clearAuth()
+          break
+        case 'error':
+          store.setAuthStatus('error', event.error)
+          break
+        default:
+          break
+      }
+    })
+    if (unsubAuth) {
+      unsubs.push(unsubAuth)
+    }
 
     const applySshConnectionStateChange = (targetId: string, state: SshConnectionState): void => {
       const store = useAppStore.getState()
@@ -3114,6 +3281,20 @@ export function useIpcEvents(): void {
           : undefined
       )
       applyResolvedAgentTerminalTitleToTab(store, data.paneKey, title, terminalTitle)
+      // [CR-OB-009] Checklist trigger: mark ranFirstAgent when agent transitions to 'running'
+      if (
+        statusPayload.state === 'running' &&
+        statusWorktreeId &&
+        options?.replay !== true
+      ) {
+        const devServerId = getDevServerForWorktree(store, statusWorktreeId)
+        if (devServerId) {
+          const perServer = store.checklistState?.perServer?.[devServerId]
+          if (!perServer?.ranFirstAgent) {
+            store.markServerChecklistItem(devServerId, 'ranFirstAgent')
+          }
+        }
+      }
       if (options?.replay !== true && statusWorktreeId) {
         // Why: local Codex/Claude hooks arrive through this main-process IPC
         // path, not the PTY OSC fallback, so task-complete notifications must

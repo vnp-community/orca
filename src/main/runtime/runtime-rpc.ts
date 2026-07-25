@@ -28,6 +28,10 @@ import {
 } from '../../shared/terminal-stream-protocol'
 
 const DEFAULT_WS_PORT = 6768
+// ORCA_PORT: allow headless/container deployments to override the WebSocket port
+// ORCA_DOMAIN: when running behind a reverse proxy, use this domain for pairing URLs
+const ORCA_PORT = process.env.ORCA_PORT ? parseInt(process.env.ORCA_PORT, 10) : undefined
+const ORCA_DOMAIN = process.env.ORCA_DOMAIN  // e.g. 'orca-backend.vnpblc.internal'
 
 type OrcaRuntimeRpcServerOptions = {
   runtime: OrcaRuntimeService
@@ -66,6 +70,18 @@ const LONG_POLL_CAP = 16
 function resolvePairingEndpoint(rawEndpoint: string, address: string | null | undefined): string {
   const endpoint = new URL(rawEndpoint)
   const override = address?.trim()
+
+  // ORCA_DOMAIN env var: use as public hostname for generated pairing URLs.
+  // Useful when running behind a reverse proxy (nginx, Caddy, etc.).
+  if (ORCA_DOMAIN && !override) {
+    const scheme = ORCA_DOMAIN.startsWith('wss://') || ORCA_DOMAIN.startsWith('https://') ? 'wss' : 'ws'
+    const cleanDomain = ORCA_DOMAIN.replace(/^https?:\/\/|^wss?:\/\//, '')
+    endpoint.hostname = cleanDomain.split(':')[0]
+    if (cleanDomain.includes(':')) endpoint.port = cleanDomain.split(':')[1]
+    endpoint.protocol = scheme + ':'
+    return formatWebSocketUrl(endpoint)
+  }
+
   if (!override) {
     endpoint.hostname = '127.0.0.1'
     return formatWebSocketUrl(endpoint)
@@ -436,7 +452,7 @@ export class OrcaRuntimeRpcServer {
     pid = process.pid,
     platform = process.platform,
     enableWebSocket = false,
-    wsPort = DEFAULT_WS_PORT,
+    wsPort = ORCA_PORT ?? DEFAULT_WS_PORT,
     webClientRoot,
     keepaliveIntervalMs = KEEPALIVE_INTERVAL_MS,
     longPollCap = LONG_POLL_CAP
@@ -703,6 +719,10 @@ export class OrcaRuntimeRpcServer {
         this.deviceRegistry = new DeviceRegistry(this.userDataPath)
         this.e2eeKeypair = loadOrCreateE2EEKeypair(this.userDataPath)
 
+        // Determine if fleet Prometheus metrics should be enabled
+        const currentSettings = this.runtime.getState?.()?.settings
+        const fleetMetricsEnabled = currentSettings?.fleetMetricsEnabled ?? false
+
         const wsTransport = new WebSocketTransport({
           host: '0.0.0.0',
           port: this.wsPort,
@@ -712,7 +732,18 @@ export class OrcaRuntimeRpcServer {
           // binds a persisted fallback before the preferred port. wsPort 0
           // means the caller explicitly wants a random port (E2E) — don't
           // pin it.
-          ...(this.wsPort !== 0 ? { fallbackPort: readWsFallbackPort(this.userDataPath) } : {})
+          ...(this.wsPort !== 0 ? { fallbackPort: readWsFallbackPort(this.userDataPath) } : {}),
+          // Wire fleet Prometheus /metrics if enabled (SOL-005 — CR-005)
+          ...(fleetMetricsEnabled ? {
+            onHttpRequest: async (req, res) => {
+              if (req.url !== '/metrics' || req.method !== 'GET') return false
+              const { createFleetMetricsHandler } = await import('./rpc/fleet-metrics-handler')
+              const { getFleetStatus } = await import('../ssh/fleet-status-service')
+              const handler = createFleetMetricsHandler(() => getFleetStatus())
+              await handler(req, res)
+              return true
+            }
+          } : {})
         })
         this.wsTransport = wsTransport
 
@@ -914,12 +945,55 @@ export class OrcaRuntimeRpcServer {
     if (typeof request.authToken !== 'string' || request.authToken.length === 0) {
       return { error: this.buildError(request.id, 'unauthorized', 'Missing auth token') }
     }
-    if (request.authToken !== this.authToken) {
-      return { error: this.buildError(request.id, 'unauthorized', 'Invalid auth token') }
+
+    // Check full-access admin token first
+    if (request.authToken === this.authToken) {
+      return { request }
     }
 
-    return { request }
+    // Check scoped pairing token (RBAC: fleet multi-user access)
+    const scopedToken = this.deviceRegistry?.getScopedToken(request.authToken)
+    if (scopedToken) {
+      // Enforce server-level access control for SSH/worktree/terminal methods
+      if (!this.isScopedMethodAllowed(request.method, request.params, scopedToken)) {
+        return {
+          error: this.buildError(
+            request.id,
+            'forbidden',
+            `Access to ${request.method} denied by scoped token policy`
+          ),
+        }
+      }
+      return { request }
+    }
+
+    return { error: this.buildError(request.id, 'unauthorized', 'Invalid auth token') }
   }
+
+  /** Check if a scoped token permits access to the requested method + params. */
+  private isScopedMethodAllowed(
+    method: string,
+    params: unknown,
+    scope: import('../../shared/rbac-types').ScopedPairingToken
+  ): boolean {
+    // SSH/worktree/terminal methods require allowedServerIds check
+    if (method.startsWith('ssh.') || method.startsWith('worktree.') || method.startsWith('terminal.')) {
+      const p = params as Record<string, unknown> | null
+      const targetId =
+        (p?.['targetId'] as string | undefined) ??
+        (p?.['sshTargetId'] as string | undefined)
+
+      if (targetId) {
+        const allowed = scope.allowedServerIds
+        if (!allowed.includes('*') && !allowed.includes(targetId)) {
+          return false
+        }
+      }
+    }
+
+    return true
+  }
+
 
   // Why: WebSocket messages go through streaming dispatch which can emit
   // multiple responses. Auth uses per-device tokens from the device registry.

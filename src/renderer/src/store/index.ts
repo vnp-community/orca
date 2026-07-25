@@ -37,6 +37,11 @@ import { createCommitMessageGenerationSlice } from './slices/commit-message-gene
 import { createPinnedTabCloseConfirmSlice } from './slices/pinned-tab-close-confirm'
 import { createOrcaProfilesSlice } from './slices/orca-profiles'
 import { createNewIssueDraftSlice } from './slices/new-issue-draft'
+import { createProvisioningSlice } from './slices/provisioning'
+import { createBootstrapSlice } from './slices/bootstrap'
+import { createAuthSlice } from './slices/auth'
+import { createDevServerSlice } from './slices/dev-servers'
+import { createOnboardingChecklistSlice } from './slices/onboarding-checklist'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 
@@ -77,7 +82,12 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createCommitMessageGenerationSlice(...a),
   ...createPinnedTabCloseConfirmSlice(...a),
   ...createOrcaProfilesSlice(...a),
-  ...createNewIssueDraftSlice(...a)
+  ...createNewIssueDraftSlice(...a),
+  ...createProvisioningSlice(...a),
+  ...createBootstrapSlice(...a),
+  ...createAuthSlice(...a),
+  ...createDevServerSlice(...a),
+  ...createOnboardingChecklistSlice(...a)
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())

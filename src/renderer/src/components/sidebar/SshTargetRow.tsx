@@ -8,6 +8,12 @@ import React, { useCallback, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { SshTarget, SshConnectionState } from '../../../../shared/ssh-types'
 import { translate } from '@/i18n/i18n'
+import { SshUserIndicator } from '../ssh/SshUserIndicator'
+import { useSshUserAccount } from '../../hooks/useSshUserAccount'
+import { useSshProvisioning } from '../../hooks/useSshProvisioning'
+import { useAuthUser } from '../../hooks/useAuthSession'
+import { useAppStore } from '@/store'
+
 
 type Props = {
   target: SshTarget & { state?: SshConnectionState }
@@ -23,6 +29,17 @@ export function SshTargetRow({
   onConnect
 }: Props): React.JSX.Element {
   const [connecting, setConnecting] = useState(false)
+
+  const authUser = useAuthUser()
+  const { linuxUsername, provisioned, previewUsername } = useSshUserAccount(
+    target.id,
+    { previewFromEmail: authUser?.email }
+  )
+  const provisioningStatus = useAppStore(
+    s => s.sshUserAccounts.get(target.id)?.provisioningStatus ?? { phase: 'idle' as const }
+  )
+  useSshProvisioning(target.id)
+
   const mountedRef = useRef(true)
   const status = target.state?.status ?? 'disconnected'
   const isConnected = status === 'connected'
@@ -69,7 +86,7 @@ export function SshTargetRow({
       ref={handleRowRootRef}
       role={isConnected ? 'button' : undefined}
       tabIndex={isConnected ? 0 : undefined}
-      className={`w-full flex items-center gap-2 px-3 py-2 rounded-md border text-xs transition-colors ${
+      className={`w-full flex flex-col px-3 py-2 rounded-md border text-xs transition-colors ${
         isSelected ? 'border-foreground/30 bg-accent' : 'border-border hover:bg-accent/50'
       } ${isConnected ? 'cursor-pointer' : ''}`}
       onClick={handleRowClick}
@@ -80,7 +97,8 @@ export function SshTargetRow({
         }
       }}
     >
-      <span className={`size-2 rounded-full shrink-0 ${dotColor}`} />
+      <div className="flex items-center gap-2 w-full">
+        <span className={`size-2 rounded-full shrink-0 ${dotColor}`} />
       <span className={`font-medium truncate ${!isConnected ? 'text-muted-foreground' : ''}`}>
         {target.label || `${target.username}@${target.host}`}
       </span>
@@ -102,6 +120,17 @@ export function SshTargetRow({
             translate('auto.components.sidebar.SshTargetRow.75ad429b5d', 'Connect')
           )}
         </button>
+      )}
+      </div>
+      {import.meta.env.ORCA_PLATFORM === 'web' && (
+        <div className="w-full border-t border-border/50 pt-1 mt-1">
+          <SshUserIndicator
+            serverId={target.id}
+            linuxUsername={linuxUsername ?? previewUsername ?? 'orca-?'}
+            provisioned={provisioned}
+            provisioningStatus={provisioningStatus}
+          />
+        </div>
       )}
     </div>
   )

@@ -7,6 +7,8 @@ export type FeatureWallSetupStepId =
   | 'task-sources'
   | 'agent-capabilities'
   | 'setup-script'
+  | 'connect-dev-server'  // Phase 3 — TASK-040
+  | 'add-dev-server-repo' // Phase 3 — TASK-040
 
 export type FeatureWallSetupStep = {
   readonly id: FeatureWallSetupStepId
@@ -121,4 +123,76 @@ export function isFeatureWallSetupStepId(value: unknown): value is FeatureWallSe
     typeof value === 'string' &&
     FEATURE_WALL_SETUP_STEP_IDS.includes(value as FeatureWallSetupStepId)
   )
+}
+
+// ── Phase 3: Dev-Server Setup Helpers (TASK-040) ──────────────────────────────────────────
+
+import type { DevServer } from './dev-server-types'
+import type { Repo } from './types'
+
+/**
+ * Returns true when at least one registered dev server has status 'connected'.
+ * Used by the feature wall to determine whether 'connect-dev-server' is done.
+ */
+export function isConnectDevServerComplete(devServers: DevServer[]): boolean {
+  return devServers.some((ds) => ds.status === 'connected')
+}
+
+/**
+ * Returns true when at least one repo is associated with the given dev server.
+ * Used by the feature wall to determine whether 'add-dev-server-repo' is done.
+ */
+export function isAddDevServerRepoComplete(
+  repos: Repo[],
+  activeDevServerId: string | null
+): boolean {
+  if (!activeDevServerId) return false
+  return repos.some((r) => r.devServerId === activeDevServerId)
+}
+
+/**
+ * Extended version of getFirstIncompleteFeatureWallSetupStepId that is
+ * aware of dev-server steps. Dev-server steps are always prioritized first:
+ *
+ * 1. If no server is connected → 'connect-dev-server'
+ * 2. Then all other steps in the ORDER below.
+ *
+ * ORDER mirrors the spec from TASK-040 §3.
+ */
+export function getFirstIncompleteDevServerStepId(
+  stepDone: Partial<Record<FeatureWallSetupStepId, boolean>>,
+  devServers: DevServer[],
+  repos: Repo[],
+  activeDevServerId: string | null
+): FeatureWallSetupStepId | null {
+  // Override: no connected server → highest priority
+  if (!isConnectDevServerComplete(devServers)) {
+    return 'connect-dev-server'
+  }
+
+  const ORDER: FeatureWallSetupStepId[] = [
+    'connect-dev-server',
+    'add-dev-server-repo',
+    'default-agent',
+    'agent-capabilities',
+    'task-sources',
+    'add-two-repos',
+    'setup-script',
+    'notifications',
+    'two-worktrees',
+    'browser'
+  ]
+
+  for (const id of ORDER) {
+    if (id === 'connect-dev-server') {
+      // already handled above — skip (it's complete at this point)
+      continue
+    }
+    if (id === 'add-dev-server-repo') {
+      if (!isAddDevServerRepoComplete(repos, activeDevServerId)) return id
+      continue
+    }
+    if (!stepDone[id]) return id
+  }
+  return null
 }

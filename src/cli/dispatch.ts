@@ -22,6 +22,7 @@ import { AGENT_HOOK_HANDLERS } from './handlers/agent-hooks'
 import { DIAGNOSTICS_HANDLERS } from './handlers/diagnostics'
 import { INTROSPECTION_HANDLERS } from './handlers/introspection'
 import { EMULATOR_HANDLERS } from './handlers/emulator'
+import { FLEET_HANDLERS } from './handlers/fleet'
 import { LINEAR_HANDLERS } from './handlers/linear'
 import { VM_HANDLERS } from './handlers/vm'
 
@@ -61,7 +62,8 @@ function buildHandlers(): Map<string, CommandHandler> {
     INTROSPECTION_HANDLERS,
     ENVIRONMENT_HANDLERS,
     LINEAR_HANDLERS,
-    VM_HANDLERS
+    VM_HANDLERS,
+    FLEET_HANDLERS
   ]
   for (const group of groups) {
     for (const [key, handler] of Object.entries(group)) {

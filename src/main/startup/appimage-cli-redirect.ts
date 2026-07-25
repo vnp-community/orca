@@ -102,7 +102,7 @@ export function maybeRedirectAppImageCliLaunch(options: RedirectOptions = {}): R
     commandNames: options.commandNames ?? APPIMAGE_CLI_COMMAND_NAMES
   })
 
-  if (!cliArgs) {
+  if (!cliArgs || !resourcesPath) {
     return { redirected: false }
   }
 

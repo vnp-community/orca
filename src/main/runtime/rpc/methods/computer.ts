@@ -47,8 +47,9 @@ export const COMPUTER_METHODS: RpcMethod[] = [
     name: 'computer.permissions',
     params: ComputerPermissions,
     handler: async (params) => {
-      const { openComputerUsePermissions } =
-        await import('../../../computer/macos-computer-use-permissions')
+      const { openComputerUsePermissions } = await import(
+        '../../../computer/macos-computer-use-permissions.js'
+      )
       return openComputerUsePermissions(params.id)
     }
   }),
@@ -57,7 +58,7 @@ export const COMPUTER_METHODS: RpcMethod[] = [
     params: z.object({}),
     handler: async () => {
       const { getComputerUsePermissionStatus } =
-        await import('../../../computer/macos-computer-use-permissions')
+        await import('../../../computer/macos-computer-use-permissions.js')
       return getComputerUsePermissionStatus()
     }
   }),

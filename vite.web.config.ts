@@ -22,7 +22,10 @@ export default defineConfig({
     outDir: resolve('out/web'),
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve('src/renderer/web-index.html')
+      input: {
+        main: resolve('src/renderer/web-index.html'),
+        admin: resolve('src/renderer/admin-index.html')
+      }
     }
   },
   worker: {

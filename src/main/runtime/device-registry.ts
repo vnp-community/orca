@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { hardenExistingSecureFile, writeSecureJsonFile } from '../../shared/secure-file'
 import type { DeviceScope } from '../../shared/runtime-types'
+import type { ScopedPairingToken, OrcaUser } from '../../shared/rbac-types'
 import { DEVICE_REGISTRY_FILENAME } from './mobile-pairing-files'
 
 export type { DeviceScope }
@@ -23,6 +24,10 @@ export type DeviceEntry = {
 export class DeviceRegistry {
   private readonly registryPath: string
   private devices: DeviceEntry[] = []
+
+  // Scoped tokens are in-memory only (not persisted) — they expire in 24h.
+  private scopedTokens = new Map<string, ScopedPairingToken>()
+  private readonly SCOPED_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 
   constructor(userDataPath: string) {
     this.registryPath = join(userDataPath, DEVICE_REGISTRY_FILENAME)
@@ -95,6 +100,59 @@ export class DeviceRegistry {
     if (device) {
       device.lastSeenAt = Date.now()
       this.save()
+    }
+  }
+
+  // ── Scoped Pairing Tokens ──────────────────────────────────────────────
+  // In-memory only — not persisted to disk. Expire after 24h.
+
+  generateScopedToken(
+    user: OrcaUser,
+    allowedServerIds: string[],
+    allowedProjects: string[],
+    agentTrust: 'minimal' | 'standard' | 'full'
+  ): ScopedPairingToken {
+    this.pruneExpiredTokens()
+    const token: ScopedPairingToken = {
+      token: randomBytes(32).toString('hex'),
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      teams: user.teams,
+      allowedServerIds,
+      allowedProjects,
+      agentTrust,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + this.SCOPED_TOKEN_TTL_MS,
+    }
+    this.scopedTokens.set(token.token, token)
+    return token
+  }
+
+  getScopedToken(token: string): ScopedPairingToken | null {
+    const found = this.scopedTokens.get(token)
+    if (!found) return null
+    if (found.expiresAt < Date.now()) {
+      this.scopedTokens.delete(token)
+      return null
+    }
+    return found
+  }
+
+  revokeScopedToken(token: string): void {
+    this.scopedTokens.delete(token)
+  }
+
+  revokeAllUserTokens(userId: string): void {
+    for (const [key, value] of this.scopedTokens) {
+      if (value.userId === userId) this.scopedTokens.delete(key)
+    }
+  }
+
+  pruneExpiredTokens(): void {
+    const now = Date.now()
+    for (const [key, value] of this.scopedTokens) {
+      if (value.expiresAt < now) this.scopedTokens.delete(key)
     }
   }
 

@@ -21,6 +21,10 @@ import { SetupGuideProgressRing } from './SetupGuideProgressRing'
 import { useSetupGuideProgress } from './use-setup-guide-progress'
 import { useSetupGuideOpenCloseTelemetry } from './use-setup-guide-telemetry'
 import { translate } from '@/i18n/i18n'
+import { useConnectedDevServers } from '@/store/slices/dev-servers'
+import { useServerChecklist } from '@/store/slices/onboarding-checklist'
+import type { DevServer } from '../../../../shared/dev-server-types'
+import type { PerServerChecklistState } from '../../../../shared/dev-server-types'
 
 export default function SetupGuideModal(): JSX.Element | null {
   const activeModal = useAppStore((s) => s.activeModal)
@@ -181,5 +185,122 @@ function isFeatureWallSetupStepId(value: unknown): value is FeatureWallSetupStep
   return (
     typeof value === 'string' &&
     FEATURE_WALL_SETUP_STEP_IDS.includes(value as FeatureWallSetupStepId)
+  )
+}
+
+// ─── Server checklist section ──────────────────────────────────────────────────
+
+const SERVER_CHECKLIST_ITEMS: Array<{ key: keyof PerServerChecklistState; label: string }> = [
+  { key: 'addedRepo', label: 'Add a repository' },
+  { key: 'ranFirstAgent', label: 'Run first agent' },
+  { key: 'reviewedDiff', label: 'Review a diff' },
+  { key: 'openedPr', label: 'Open a pull request' },
+]
+
+function ServerChecklistSection({
+  devServer,
+  checklist,
+}: {
+  devServer: DevServer
+  checklist: PerServerChecklistState
+}): JSX.Element {
+  return (
+    <div className="mt-4 rounded-lg border border-border p-4" data-devserver-id={devServer.id}>
+      <p className="mb-2 text-sm font-semibold">{devServer.name}</p>
+      <ul className="space-y-1">
+        {SERVER_CHECKLIST_ITEMS.map(({ key, label }) => (
+          <li key={key} className="flex items-center gap-2 text-sm">
+            <span
+              className={`size-4 rounded-full border-2 ${
+                checklist[key] ? 'border-green-500 bg-green-500' : 'border-muted-foreground'
+              }`}
+              aria-hidden
+            />
+            <span className={checklist[key] ? 'line-through text-muted-foreground' : ''}>
+              {label}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ServerChecklistSectionWrapper({ devServer }: { devServer: DevServer }): JSX.Element {
+  const checklist = useServerChecklist(devServer.id)
+  return <ServerChecklistSection devServer={devServer} checklist={checklist} />
+}
+
+// ─── Overall progress bar ──────────────────────────────────────────────────────
+
+export function OverallProgressBar({
+  completedCount,
+  totalCount,
+}: {
+  completedCount: number
+  totalCount: number
+}): JSX.Element {
+  const percent = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100)
+  return (
+    <div className="mt-4 space-y-1">
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>Overall progress</span>
+        <span>
+          {completedCount}/{totalCount} ({percent}%)
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full bg-green-500 transition-all"
+          style={{ width: `${percent}%` }}
+          role="progressbar"
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── Per-server panel ─────────────────────────────────────────────────────────
+
+/** Renders per-server checklist sections + overall progress bar.
+ *  Exported so it can be embedded anywhere in the setup guide flow. */
+export function PerServerChecklistPanel(): JSX.Element {
+  const connectedServers = useConnectedDevServers()
+  const checklistState = useAppStore((s) => s.checklistState)
+
+  if (connectedServers.length === 0) {
+    return (
+      <p className="mt-4 text-sm text-muted-foreground" id="connect-dev-server">
+        Connect a dev server to see per-server checklist.
+      </p>
+    )
+  }
+
+  const GLOBAL_ITEMS = 3 // choseAgent, addedRepo, ranFirstAgent
+  const PER_SERVER_ITEMS = SERVER_CHECKLIST_ITEMS.length
+  const totalCount = GLOBAL_ITEMS + PER_SERVER_ITEMS * connectedServers.length
+
+  let completedCount = 0
+  if (checklistState.choseAgent) completedCount++
+  if (checklistState.addedRepo) completedCount++
+  if (checklistState.ranFirstAgent) completedCount++
+
+  for (const ds of connectedServers) {
+    const cl = checklistState.perServer[ds.id] ?? {}
+    for (const { key } of SERVER_CHECKLIST_ITEMS) {
+      if (cl[key]) completedCount++
+    }
+  }
+
+  return (
+    <>
+      {connectedServers.map((ds) => (
+        <ServerChecklistSectionWrapper key={ds.id} devServer={ds} />
+      ))}
+      <OverallProgressBar completedCount={completedCount} totalCount={totalCount} />
+    </>
   )
 }

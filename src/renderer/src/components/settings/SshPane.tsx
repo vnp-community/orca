@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, Upload } from 'lucide-react'
+import { Plus, Upload, Package, Zap, Activity } from 'lucide-react'
 import type { SshTarget } from '../../../../shared/ssh-types'
 import { SSH_TERMINATE_RECONNECT_REQUIRED } from '../../../../shared/constants'
 import { useAppStore } from '@/store'
@@ -17,6 +17,10 @@ import { resolveSshHostRemoval } from '../sidebar/ssh-host-remove-resolution'
 import { getAllWorktreesFromState } from '@/store/selectors'
 import { toSshExecutionHostId } from '../../../../shared/execution-host'
 import { translate } from '@/i18n/i18n'
+import { FleetImportDialog } from './FleetImportDialog'
+import { FleetProvisionWizard } from './ssh/FleetProvisionWizard'
+import { ServerBootstrapPanel } from './ssh/ServerBootstrapPanel'
+import { FleetHealthDashboard } from './ssh/FleetHealthDashboard'
 export { getSshPaneSearchEntries } from './ssh-search'
 
 export function SshPane(): React.JSX.Element {
@@ -30,6 +34,18 @@ export function SshPane(): React.JSX.Element {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<EditingTarget>(EMPTY_FORM)
   const [testingIds, setTestingIds] = useState<Set<string>>(new Set())
+  // [CR-001] Fleet import dialog state
+  const [showFleetImport, setShowFleetImport] = useState(false)
+  // [CR-003] Bulk provisioning wizard state
+  const [showProvisionWizard, setShowProvisionWizard] = useState(false)
+  // [CR-004] Bootstrap panel — which target ID is expanded (null = none)
+  const [bootstrapExpandedId, setBootstrapExpandedId] = useState<string | null>(null)
+  // [CR-005] Fleet Health dashboard expanded state
+  const [showHealthDashboard, setShowHealthDashboard] = useState(false)
+  // Alert badge count
+  const unreadAlertCount = useAppStore(
+    (s) => s.fleetAlerts.filter((a) => !a.dismissed).length
+  )
   // Why: when a target still has workspaces, route removal through the shared
   // workspace-aware HostRemoveDialog (same as the sidebar) instead of the plain
   // confirm, so the user chooses to delete or keep them rather than silently
@@ -349,6 +365,47 @@ export function SshPane(): React.JSX.Element {
             <Upload className="size-3" />
             {translate('auto.components.settings.SshPane.51d7dba44d', 'Import')}
           </Button>
+          {/* [CR-001] Fleet Import button */}
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => setShowFleetImport(true)}
+            className="gap-1.5"
+          >
+            <Package className="size-3" />
+            {translate(
+              'auto.components.settings.SshPane.importFleet',
+              'Import Fleet'
+            )}
+          </Button>
+          {/* [CR-003] Provision Fleet button */}
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => setShowProvisionWizard(true)}
+            className="gap-1.5"
+          >
+            <Zap className="size-3" />
+            {translate(
+              'auto.components.settings.SshPane.provisionFleet',
+              'Provision Fleet'
+            )}
+          </Button>
+          {/* [CR-005] Fleet Health button with alert badge */}
+          <Button
+            variant={showHealthDashboard ? 'secondary' : 'outline'}
+            size="xs"
+            onClick={() => setShowHealthDashboard((v) => !v)}
+            className="relative gap-1.5"
+          >
+            <Activity className="size-3" />
+            {translate('auto.components.settings.SshPane.fleetHealth', 'Fleet Health')}
+            {unreadAlertCount > 0 && (
+              <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                {unreadAlertCount > 9 ? '9+' : unreadAlertCount}
+              </span>
+            )}
+          </Button>
           {!showForm ? (
             <Button
               variant="outline"
@@ -366,6 +423,13 @@ export function SshPane(): React.JSX.Element {
           ) : null}
         </div>
       </div>
+
+      {/* [CR-005] Fleet Health dashboard — collapsible */}
+      {showHealthDashboard && (
+        <div className="rounded-lg border border-border/50 bg-muted/20 p-4">
+          <FleetHealthDashboard />
+        </div>
+      )}
 
       <SshTargetDestructiveActions
         connectionStates={sshConnectionStates}
@@ -386,24 +450,53 @@ export function SshPane(): React.JSX.Element {
             ) : (
               <div className="space-y-2">
                 {targets.map((target) => (
-                  <SshTargetCard
-                    key={target.id}
-                    target={target}
-                    state={sshConnectionStates.get(target.id)}
-                    testing={testingIds.has(target.id)}
-                    busyAction={busyActionForTarget(target.id)}
-                    onConnect={handleConnect}
-                    onDisconnect={handleDisconnect}
-                    onTerminateSessions={(id) =>
-                      requestTerminateSessions({ id, label: target.label })
-                    }
-                    onResetRelay={(id) => requestResetRelay({ id, label: target.label })}
-                    onTest={handleTest}
-                    onEdit={handleEdit}
-                    onRemove={(id) =>
-                      requestRemoveTarget({ id, label: target.label }, requestRemove)
-                    }
-                  />
+                  <div key={target.id} className="overflow-hidden rounded-lg border border-border/50">
+                    <SshTargetCard
+                      target={target}
+                      state={sshConnectionStates.get(target.id)}
+                      testing={testingIds.has(target.id)}
+                      busyAction={busyActionForTarget(target.id)}
+                      onConnect={handleConnect}
+                      onDisconnect={handleDisconnect}
+                      onTerminateSessions={(id) =>
+                        requestTerminateSessions({ id, label: target.label })
+                      }
+                      onResetRelay={(id) => requestResetRelay({ id, label: target.label })}
+                      onTest={handleTest}
+                      onEdit={handleEdit}
+                      onRemove={(id) =>
+                        requestRemoveTarget({ id, label: target.label }, requestRemove)
+                      }
+                    />
+                    {/* [CR-004] Bootstrap expandable panel */}
+                    <div className="border-t">
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+                        onClick={() =>
+                          setBootstrapExpandedId(
+                            bootstrapExpandedId === target.id ? null : target.id
+                          )
+                        }
+                      >
+                        <span className="flex-1">
+                          {translate('ssh.bootstrap.tab', 'Bootstrap')}
+                        </span>
+                        <span
+                          className={`transition-transform duration-150 ${
+                            bootstrapExpandedId === target.id ? 'rotate-180' : ''
+                          }`}
+                        >
+                          ▾
+                        </span>
+                      </button>
+                      {bootstrapExpandedId === target.id && (
+                        <div className="border-t p-4">
+                          <ServerBootstrapPanel target={target} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -436,6 +529,19 @@ export function SshPane(): React.JSX.Element {
           target={{ kind: 'ssh', targetId: hostRemoveTarget.targetId }}
         />
       ) : null}
+
+      {/* [CR-001] Fleet Import Dialog */}
+      <FleetImportDialog
+        open={showFleetImport}
+        onClose={() => setShowFleetImport(false)}
+        onImportComplete={() => void loadTargets()}
+      />
+
+      {/* [CR-003] Bulk Provisioning Wizard */}
+      <FleetProvisionWizard
+        open={showProvisionWizard}
+        onClose={() => setShowProvisionWizard(false)}
+      />
     </div>
   )
 }

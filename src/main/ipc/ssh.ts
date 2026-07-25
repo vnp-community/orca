@@ -1,5 +1,6 @@
 /* oxlint-disable max-lines -- Why: co-locates SSH IPC handlers, port-forward
 broadcasting, and session lifecycle in one file to keep the data flow obvious. */
+import * as nodeFs from 'node:fs'
 import { ipcMain, powerMonitor, type BrowserWindow } from 'electron'
 import type { Store } from '../persistence'
 import { SshConnectionStore } from '../ssh/ssh-connection-store'
@@ -68,13 +69,30 @@ const SSH_IPC_CHANNELS = [
   'ssh:updatePortForward',
   'ssh:removePortForward',
   'ssh:listPortForwards',
-  'ssh:listDetectedPorts'
+  'ssh:listDetectedPorts',
+  // Fleet config management
+  'ssh:importFleetConfig',
+  'ssh:exportFleetConfig',
+  'ssh:watchFleetConfig',
+  'ssh:unwatchFleetConfig',
+  // Fleet grouping queries
+  'ssh:listTargetsByProject',
+  'ssh:listProjects',
+  'ssh:listTeams',
+  'ssh:filterTargets',
+  'ssh:getAllConnectionStates',
+  // Fleet bootstrap
+  'ssh:bootstrapServer'
 ] as const
 
 // Why: connection callbacks are process-lifetime; keeping this set outside
 // registerSshHandlers prevents in-flight connects from splitting credential
 // tracking when a BrowserWindow is recreated.
 const credentialRequestedForTarget = new Set<string>()
+
+// Why: registry of active fs.FSWatcher instances for fleet config files.
+// Prevents duplicate watchers for the same path on repeated watch calls.
+const fleetConfigWatchers = new Map<string, nodeFs.FSWatcher>()
 
 function getCurrentMainWindow(): BrowserWindow | null {
   return currentGetMainWindow()
@@ -99,6 +117,33 @@ export function listRegisteredSshTargets(): SshTarget[] {
 /** Removed-target id → last known label, for ghost-host display on paired clients. */
 export function listRegisteredRemovedSshTargetLabels(): Record<string, string> {
   return sshStore?.listRemovedTargetLabels() ?? {}
+}
+
+/** Distinct sorted project names — for fleet metadata in RPC/web clients. */
+export function listRegisteredSshProjects(): string[] {
+  return sshStore?.listProjects() ?? []
+}
+
+/** Distinct sorted team names — for fleet metadata in RPC/web clients. */
+export function listRegisteredSshTeams(): string[] {
+  return sshStore?.listTeams() ?? []
+}
+
+/** Filter targets by criteria — for RPC/CLI fleet commands. */
+export function listRegisteredFilteredTargets(
+  criteria: import('../ssh/ssh-connection-store').SshTargetFilterCriteria
+): SshTarget[] {
+  return sshStore?.filterTargets(criteria) ?? []
+}
+
+/** All connection states as targetId → state record — for CLI fleet status. */
+export function listRegisteredAllConnectionStates(): Record<string, import('../../shared/ssh-types').SshConnectionState | null> {
+  const targets = sshStore?.listTargets() ?? []
+  const states: Record<string, import('../../shared/ssh-types').SshConnectionState | null> = {}
+  for (const target of targets) {
+    states[target.id] = connectionManager?.getState(target.id) ?? null
+  }
+  return states
 }
 
 export async function disconnectRegisteredSshTarget(targetId: string): Promise<void> {
@@ -790,6 +835,160 @@ export function registerSshHandlers(
     const targets = sshStore!.importFromSshConfig(args)
     const repoReadoptions = takeRepoReadoptions()
     return { targets, repoReadoptions }
+  })
+
+  // ── Fleet Config Handlers ──────────────────────────────────────────
+
+  ipcMain.handle('ssh:importFleetConfig', async (_event, args: { filePath: string }) => {
+    try {
+      const result = await sshStore!.importFromFleetConfig(args.filePath)
+      // Notify renderer that targets changed
+      const win = getCurrentMainWindow()
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('ssh:targetsChanged')
+      }
+      return { ok: true, result }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('ssh:exportFleetConfig', () => {
+    try {
+      const config = sshStore!.exportToFleetConfig()
+      return { ok: true, config }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('ssh:watchFleetConfig', (_event, args: { filePath: string }) => {
+    try {
+      // Close any existing watcher for this path
+      fleetConfigWatchers.get(args.filePath)?.close()
+
+      const watcher = nodeFs.watch(args.filePath, { persistent: false }, () => {
+        sshStore!.importFromFleetConfig(args.filePath)
+          .then(() => {
+            const win = getCurrentMainWindow()
+            if (win && !win.isDestroyed()) {
+              win.webContents.send('ssh:fleetConfigChanged', { filePath: args.filePath })
+              win.webContents.send('ssh:targetsChanged')
+            }
+          })
+          .catch((err: unknown) => {
+            console.error('[fleet-watch] Error re-importing fleet config:', err)
+          })
+      })
+
+      fleetConfigWatchers.set(args.filePath, watcher)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('ssh:unwatchFleetConfig', (_event, args: { filePath: string }) => {
+    fleetConfigWatchers.get(args.filePath)?.close()
+    fleetConfigWatchers.delete(args.filePath)
+    return { ok: true }
+  })
+
+  // ── Fleet Grouping Handlers ────────────────────────────────────────
+
+  ipcMain.handle('ssh:listTargetsByProject', () => {
+    const grouped = sshStore!.listTargetsByProject()
+    // Convert Map → plain object for IPC serialization
+    return Object.fromEntries(grouped.entries())
+  })
+
+  ipcMain.handle('ssh:listProjects', () => {
+    return sshStore!.listProjects()
+  })
+
+  ipcMain.handle('ssh:listTeams', () => {
+    return sshStore!.listTeams()
+  })
+
+  ipcMain.handle(
+    'ssh:filterTargets',
+    (_event, criteria: import('../ssh/ssh-connection-store').SshTargetFilterCriteria) => {
+      return sshStore!.filterTargets(criteria)
+    }
+  )
+
+  ipcMain.handle('ssh:getAllConnectionStates', () => {
+    const targets = sshStore!.listTargets()
+    const states: Record<string, SshConnectionState | null> = {}
+    for (const target of targets) {
+      states[target.id] = connectionManager!.getState(target.id) ?? null
+    }
+    return states
+  })
+
+  // ── Fleet Bootstrap Handler ────────────────────────────────────────
+
+  ipcMain.handle(
+    'ssh:bootstrapServer',
+    async (
+      _event,
+      args: {
+        targetId: string
+        fleetConfigPath?: string
+        options?: {
+          skipNodeInstall?: boolean
+          skipGitInstall?: boolean
+          skipRepoClone?: boolean
+          skipSetupScript?: boolean
+          nodeVersion?: string
+        }
+      }
+    ) => {
+      try {
+        const { bootstrapServer } = await import('../ssh/fleet-bootstrap-service.js')
+        const result = await bootstrapServer(args.targetId, {
+          fleetConfigPath: args.fleetConfigPath,
+          ...args.options,
+          onProgress: (step) => {
+            // Stream progress events to all renderer windows
+            const { BrowserWindow } = require('electron')
+            for (const win of BrowserWindow.getAllWindows()) {
+              if (!win.isDestroyed()) {
+                win.webContents.send('ssh:bootstrapProgress', {
+                  targetId: args.targetId,
+                  step,
+                })
+              }
+            }
+          },
+        })
+        return { ok: result.success, result }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+  )
+
+  // ── Fleet Health Status Handlers ───────────────────────────────────
+
+  ipcMain.handle('fleet:getStatus', (_event, filter?: { project?: string; team?: string }) => {
+    const { getFleetStatus } = require('../ssh/fleet-status-service') as typeof import('../ssh/fleet-status-service')
+    return getFleetStatus(filter)
+  })
+
+  ipcMain.handle(
+    'fleet:getUptimeHistory',
+    (_event, { targetId, windowMs }: { targetId: string; windowMs?: number }) => {
+      const { fleetHealthStore } = require('../ssh/fleet-health-store') as typeof import('../ssh/fleet-health-store')
+      return fleetHealthStore.getUptimeForTarget(targetId, windowMs)
+    }
+  )
+
+  ipcMain.handle('fleet:setAlertWebhook', async (_event, { url }: { url: string | null }) => {
+    const { fleetHealthMonitor } = require('../ssh/fleet-health-monitor') as typeof import('../ssh/fleet-health-monitor')
+    // Override the webhook URL getter at runtime
+    fleetHealthMonitor.getWebhookUrl = url ? () => url : () => undefined
+    return { ok: true }
   })
 
   // ── Connection lifecycle ───────────────────────────────────────────

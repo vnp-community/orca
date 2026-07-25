@@ -2137,7 +2137,15 @@ const api = {
       updates: Partial<Omit<OnboardingState, 'checklist'>> & {
         checklist?: Partial<OnboardingState['checklist']>
       }
-    ): Promise<OnboardingState> => ipcRenderer.invoke('onboarding:update', updates)
+    ): Promise<OnboardingState> => ipcRenderer.invoke('onboarding:update', updates),
+    detectAgents: (params: { devServerId: string | null }): Promise<{
+      agents: string[]
+      platform: NodeJS.Platform | null
+      devServerId: string | null
+    }> => ipcRenderer.invoke('onboarding.detectAgents', params),
+    detectAgentsAllServers: (): Promise<
+      Record<string, { agents: string[]; platform: NodeJS.Platform | null; error?: string }>
+    > => ipcRenderer.invoke('onboarding.detectAgentsAllServers')
   },
 
   developerPermissions: {
@@ -4196,7 +4204,76 @@ const api = {
     },
 
     submitCredential: (args: { requestId: string; value: string | null }): Promise<void> =>
-      ipcRenderer.invoke('ssh:submitCredential', args)
+      ipcRenderer.invoke('ssh:submitCredential', args),
+
+    // ── Fleet Import Methods (CR-001) ──────────────────────────────────────────
+
+    pickFleetConfigFile: (): Promise<string | null> =>
+      ipcRenderer.invoke('ssh:pickFleetConfigFile'),
+
+    importFleetConfig: (args: {
+      filePath: string
+      overwrite?: boolean
+    }): Promise<{
+      imported: number
+      skipped: number
+      failed: number
+      errors: string[]
+      targets: SshTarget[]
+    }> => ipcRenderer.invoke('ssh:importFleetConfig', args),
+
+    onFleetImportProgress: (callback: (status: unknown) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: unknown) => callback(status)
+      ipcRenderer.on('ssh:fleet-import-progress', listener)
+      return () => ipcRenderer.removeListener('ssh:fleet-import-progress', listener)
+    },
+
+    // ── Bulk Provisioning (CR-003) ─────────────────────────────────────────────
+
+    provisionFleetServers: (args: {
+      serverIds: string[]
+      concurrency?: number
+    }): Promise<void> => ipcRenderer.invoke('ssh:provisionFleet', args),
+
+    cancelProvisioning: (): Promise<void> =>
+      ipcRenderer.invoke('ssh:cancelProvisioning'),
+
+    onProvisioningProgress: (callback: (event: unknown) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, evt: unknown) => callback(evt)
+      ipcRenderer.on('ssh:provisioningProgress', listener)
+      return () => ipcRenderer.removeListener('ssh:provisioningProgress', listener)
+    },
+
+    // ── Fleet Health Monitoring (CR-005) ──────────────────────────────────────
+
+    getFleetHealth: (): Promise<{
+      servers: Array<{
+        serverId: string
+        isReachable: boolean
+        uptimeSeconds?: number
+        relayVersion?: string
+        nodeVersion?: string
+        diskUsagePercent?: number
+      }>
+    }> => ipcRenderer.invoke('ssh:getFleetHealth'),
+
+    refreshFleetHealth: (): Promise<void> => ipcRenderer.invoke('ssh:refreshFleetHealth'),
+
+    // ── Dev Server Bootstrap (CR-004) ──────────────────────────────────────────
+
+    bootstrapServer: (args: {
+      serverId: string
+      options?: { installNode?: boolean; installGit?: boolean; cloneRepos?: boolean }
+    }): Promise<void> => ipcRenderer.invoke('ssh:bootstrapServer', args),
+
+    cancelBootstrap: (serverId: string): Promise<void> =>
+      ipcRenderer.invoke('ssh:cancelBootstrap', serverId),
+
+    onBootstrapProgress: (callback: (event: unknown) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, evt: unknown) => callback(evt)
+      ipcRenderer.on('ssh:bootstrapProgress', listener)
+      return () => ipcRenderer.removeListener('ssh:bootstrapProgress', listener)
+    }
   },
 
   automations: {

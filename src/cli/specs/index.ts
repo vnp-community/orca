@@ -4,6 +4,7 @@ import { BROWSER_BASIC_COMMAND_SPECS } from './browser-basic'
 import { AUTOMATION_COMMAND_SPECS } from './automations'
 import { CORE_COMMAND_SPECS } from './core'
 import { FILE_COMMAND_SPECS } from './file'
+import { FLEET_COMMAND_SPECS } from './fleet'
 import { PROJECT_COMMAND_SPECS } from './project'
 import { ORCHESTRATION_COMMAND_SPECS } from './orchestration'
 import { COMPUTER_COMMAND_SPECS } from './computer'
@@ -30,5 +31,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...ENVIRONMENT_COMMAND_SPECS,
   ...LINEAR_COMMAND_SPECS,
   ...VM_COMMAND_SPECS,
-  ...EMULATOR_COMMAND_SPECS
+  ...EMULATOR_COMMAND_SPECS,
+  ...FLEET_COMMAND_SPECS
 ]

@@ -1,4 +1,5 @@
-import { resolve } from 'node:path'
+import { resolve, dirname, resolve as resolvePath } from 'node:path'
+import { existsSync } from 'node:fs'
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -211,7 +212,8 @@ export default defineConfig({
           'node_modules/@xterm/addon-serialize/lib/addon-serialize.js'
         )
       }
-    }
+    },
+    plugins: []
   },
   preload: {
     build: {
@@ -230,6 +232,14 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     worker: {
       format: 'es'
+    },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          admin: resolve('src/renderer/admin-index.html')
+        }
+      }
     }
   }
 })

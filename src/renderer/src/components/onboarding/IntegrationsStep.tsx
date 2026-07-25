@@ -8,6 +8,8 @@ import { IntegrationStatusPill } from '@/components/integration-status-pill'
 import { cn } from '@/lib/utils'
 import { OnboardingInlineCommandTerminal } from './OnboardingInlineCommandTerminal'
 import { translate } from '@/i18n/i18n'
+import { GitIdentityCard } from './GitIdentityCard'
+import { useRemotePreflightStatus } from '../../hooks/useRemotePreflightStatus'
 
 type GitHubSetupState = 'checking' | 'connected' | 'not-installed' | 'not-authenticated'
 
@@ -224,8 +226,11 @@ const CAPABILITIES = [
   'Read, comment on, and merge pull requests without leaving Orca'
 ] as const
 
-export function IntegrationsStep(): React.JSX.Element {
+export function IntegrationsStep({ activeDevServerId }: { activeDevServerId?: string | null }): React.JSX.Element {
   const refreshPreflightStatus = useAppStore((s) => s.refreshPreflightStatus)
+  const { status: remoteStatus, refresh: refreshRemote } = useRemotePreflightStatus(
+    activeDevServerId ?? null
+  )
 
   useEffect(() => {
     void refreshPreflightStatus()
@@ -244,6 +249,15 @@ export function IntegrationsStep(): React.JSX.Element {
 
       <div className="space-y-3">
         <GitHubRow />
+        {/* [CR-OB-005] Git identity card — shown when dev server git is installed but identity missing */}
+        {activeDevServerId && remoteStatus?.git.installed && (
+          <GitIdentityCard
+            devServerId={activeDevServerId}
+            hasUserName={remoteStatus.git.hasUserName}
+            hasUserEmail={remoteStatus.git.hasUserEmail}
+            onSaved={() => void refreshRemote(true)}
+          />
+        )}
         <div className="mt-4 rounded-xl border border-border bg-muted/10 px-5 py-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-[14px] font-medium text-foreground/70">

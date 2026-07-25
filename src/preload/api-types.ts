@@ -390,6 +390,9 @@ import type {
   PortForwardEntry,
   EnrichedDetectedPort
 } from '../shared/ssh-types'
+import type { FleetImportStatus } from '../renderer/src/store/slices/ssh'
+import type { ProvisioningProgressEvent } from '../renderer/src/store/slices/provisioning-events'
+import type { BootstrapProgressEvent } from '../renderer/src/store/slices/bootstrap-events'
 import type {
   CodexUsageBreakdownKind,
   CodexUsageBreakdownRow,
@@ -1018,6 +1021,20 @@ export type PreloadApi = {
       limit?: number
     }) => Promise<BaseRefSearchResult[]>
     onChanged: (callback: () => void) => () => void
+    // ── Remote dev server repo operations (CR-OB-006) ─────────────────────────
+    listRemoteDirectory: (params: {
+      devServerId: string
+      path: string
+      includeGitStatus?: boolean
+    }) => Promise<{
+      entries: Array<{ name: string; path: string; isDirectory: boolean; isGitRepo: boolean }>
+      platform: NodeJS.Platform
+    }>
+    scanRemote: (params: {
+      devServerId: string
+      rootPath: string
+      maxDepth?: number
+    }) => Promise<{ path: string; name: string }[]>
   }
   projects: {
     list: () => Promise<Project[]>
@@ -2180,6 +2197,71 @@ export type PreloadApi = {
         checklist?: Partial<OnboardingState['checklist']>
       }
     ) => Promise<OnboardingState>
+    detectAgents: (params: { devServerId: string | null }) => Promise<{
+      agents: string[]
+      platform: NodeJS.Platform | null
+      devServerId: string | null
+    }>
+    detectAgentsAllServers: () => Promise<
+      Record<
+        string,
+        {
+          agents: string[]
+          platform: NodeJS.Platform | null
+          error?: string
+        }
+      >
+    >
+    getPreflightStatus: (params: {
+      devServerId: string
+      force?: boolean
+    }) => Promise<import('../shared/dev-server-types').RemotePreflightStatus>
+    setGitIdentity: (params: {
+      devServerId: string
+      name: string
+      email: string
+    }) => Promise<void>
+    openGhAuthTerminal: (params: {
+      devServerId: string
+    }) => Promise<{ ptyId: string; devServerId: string }>
+    detectGhosttyConfig: (params: {
+      devServerId: string
+    }) => Promise<{ configPath: string | null; themeDir: string | null }>
+    detectWindowsCapabilities: (params: {
+      devServerId: string
+    }) => Promise<import('../shared/dev-server-types').WindowsTerminalCapabilities>
+    markChecklistItem: (params: {
+      item: string
+      devServerId?: string
+      value?: boolean
+    }) => Promise<void>
+  }
+  devServer: {
+    /** Return all persisted dev servers (with their runtime status populated) */
+    list: () => Promise<import('../shared/dev-server-types').DevServer[]>
+    /** Add a new dev server entry (does not connect automatically) */
+    add: (
+      input: import('../shared/dev-server-types').DevServerInput
+    ) => Promise<import('../shared/dev-server-types').DevServer>
+    /** Remove a dev server and disconnect if connected */
+    remove: (id: string) => Promise<void>
+    /** Run a connectivity test without persisting the server */
+    testConnection: (
+      input: import('../shared/dev-server-types').DevServerInput
+    ) => Promise<import('../shared/dev-server-types').ConnectionTestResult>
+    /** Open the relay connection for a persisted server */
+    connect: (id: string) => Promise<import('../shared/dev-server-types').DevServer>
+    /** Close the relay connection for a persisted server */
+    disconnect: (id: string) => Promise<void>
+    /** Subscribe to push events when a server's connection status changes */
+    onStatusChanged: (
+      handler: (event: {
+        id: string
+        status: import('../shared/dev-server-types').DevServerStatus
+        platform?: NodeJS.Platform
+        error?: string
+      }) => void
+    ) => () => void
   }
   developerPermissions: {
     getStatus: () => Promise<DeveloperPermissionState[]>
@@ -3069,6 +3151,105 @@ export type PreloadApi = {
     ) => () => void
     onCredentialResolved: (callback: (data: { requestId: string }) => void) => () => void
     submitCredential: (args: { requestId: string; value: string | null }) => Promise<void>
+    // ── Fleet Import Methods (CR-001) ──────────────────────────────────────────
+    /** Open native file picker to select a fleet YAML config file. Returns the
+     *  selected file path, or null if the user cancelled. */
+    pickFleetConfigFile: () => Promise<string | null>
+    /** Parse and import servers from a fleet YAML/JSON config file.
+     *  Streams progress via onFleetImportProgress events. */
+    importFleetConfig: (args: {
+      filePath: string
+      /** When true, overwrites existing targets that share the same fleetId. */
+      overwrite?: boolean
+    }) => Promise<{
+      imported: number
+      skipped: number
+      failed: number
+      errors: string[]
+      targets: SshTarget[]
+    }>
+    /** Subscribe to streaming progress events during fleet config import.
+     *  Returns an unsubscribe function. */
+    onFleetImportProgress: (
+      callback: (status: FleetImportStatus) => void
+    ) => () => void
+    // ── Bulk Provisioning Methods (CR-003) ────────────────────────────────────
+    /** Trigger bulk relay deployment to the given server IDs.
+     *  Progress events are emitted via onProvisioningProgress. */
+    provisionFleetServers: (args: {
+      serverIds: string[]
+      concurrency?: number
+    }) => Promise<void>
+    /** Cancel the currently running provisioning session. */
+    cancelProvisioning: () => Promise<void>
+    /** Subscribe to per-server provisioning progress events.
+     *  Returns an unsubscribe function. */
+    onProvisioningProgress: (
+      callback: (event: ProvisioningProgressEvent) => void
+    ) => () => void
+    // ── Fleet Health Monitoring (CR-005) ─────────────────────────────────────
+    /** Fetch current health snapshot for all connected SSH targets. */
+    getFleetHealth: () => Promise<{
+      servers: Array<{
+        serverId: string
+        isReachable: boolean
+        uptimeSeconds?: number
+        relayVersion?: string
+        nodeVersion?: string
+        diskUsagePercent?: number
+        cpuUsagePercent?: number
+        memUsagePercent?: number
+      }>
+    }>
+    /** Trigger an immediate health refresh (without waiting for next poll). */
+    refreshFleetHealth: () => Promise<void>
+    // ── Dev Server Bootstrap Methods (CR-004) ────────────────────────────────
+    /** Trigger dev environment bootstrap on a single SSH target. */
+    bootstrapServer: (args: {
+      serverId: string
+      options?: {
+        installNode?: boolean
+        installGit?: boolean
+        cloneRepos?: boolean
+      }
+    }) => Promise<void>
+    /** Cancel an in-progress bootstrap for the given server. */
+    cancelBootstrap: (serverId: string) => Promise<void>
+    /** Subscribe to streaming bootstrap progress events.
+     *  Returns an unsubscribe function. */
+    onBootstrapProgress: (
+      callback: (event: BootstrapProgressEvent) => void
+    ) => () => void
+  }
+  /** Auth namespace — SSO and user identity (CR-006, Phase 2). */
+  auth?: {
+    /** Fetch server auth configuration (required auth, SSO providers, org name). */
+    getServerConfig: () => Promise<{
+      requiresAuth: boolean
+      orgName?: string
+      ssoProviders?: Array<{ id: string; label: string; iconUrl?: string }>
+    }>
+    /** Trigger SSO redirect flow for the given provider. */
+    startSsoFlow: (args: { providerId: string }) => Promise<void>
+    /** Sign out the current user and clear auth state. */
+    signOut: () => Promise<void>
+    /** Subscribe to auth state change events (authenticated / unauthenticated / error).
+     *  Returns an unsubscribe function. */
+    onAuthStateChanged: (
+      callback: (event: {
+        type: 'authenticated' | 'unauthenticated' | 'error'
+        user?: {
+          id: string
+          email: string
+          name: string
+          avatarUrl?: string
+          teams: string[]
+          projects: string[]
+          role: 'developer' | 'lead' | 'admin'
+        }
+        error?: string
+      }) => void
+    ) => () => void
   }
   automations: {
     list: () => Promise<Automation[]>

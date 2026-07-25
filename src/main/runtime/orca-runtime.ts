@@ -2153,6 +2153,8 @@ export class OrcaRuntimeService {
   private agentBrowserBridge: AgentBrowserBridge | null = null
   private offscreenBrowserBackend: BrowserBackend | null = null
   private emulatorBridge: EmulatorBridge | null = null
+  /** Web Push manager — optional; null until setPushManager() is called. TASK-036. */
+  private pushManager: import('../notifications/web-push-manager').WebPushManager | null = null
   private resolvedWorktreeCache: ResolvedWorktreeCache | null = null
   private resolvedWorktreeInFlight: ResolvedWorktreeInFlight | null = null
   private resolvedWorktreeGeneration = 0
@@ -2915,6 +2917,13 @@ export class OrcaRuntimeService {
 
   setAutomationService(service: AutomationService): void {
     this.automationService = service
+  }
+
+  /** TASK-036: Inject a WebPushManager so agent-task-complete triggers web push. */
+  setPushManager(
+    manager: import('../notifications/web-push-manager').WebPushManager
+  ): void {
+    this.pushManager = manager
   }
 
   getRuntimeId(): string {
@@ -7323,6 +7332,24 @@ export class OrcaRuntimeService {
   dispatchMobileNotification(event: MobileNotificationEvent): void {
     for (const listener of this.notificationListeners) {
       listener(event)
+    }
+    // TASK-036: fire web push for agent task completions.
+    // Fire-and-forget — push errors must never surface to the caller.
+    if (
+      event.type === 'notification' &&
+      event.source === 'agent-task-complete' &&
+      this.pushManager
+    ) {
+      this.pushManager
+        .sendToAll({
+          title: event.title,
+          body: event.body,
+          tag: event.worktreeId ? `worktree-${event.worktreeId}` : 'agent-task-complete',
+          url: event.worktreeId ? `/worktree/${event.worktreeId}` : undefined
+        })
+        .catch((err: unknown) => {
+          console.error('[WebPush] sendToAll failed:', err)
+        })
     }
   }
 

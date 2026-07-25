@@ -41,6 +41,7 @@ import type {
   LocalWindowsRuntimePreference
 } from './project-execution-runtime'
 import type { UsagePercentageDisplay } from './usage-percentage-display'
+import type { PersistedDevServer } from './dev-server-types'
 
 // Re-exported for backward compat with renderer call sites that import
 // `WorkspaceCreateTelemetrySource` from '../../../shared/types'.
@@ -284,6 +285,8 @@ export type Repo = {
   sourceControlAi?: RepoSourceControlAiOverrides
   /** Transitional source for ProjectHostSetup.setupMethod while Repo remains compatibility storage. */
   projectHostSetupMethod?: RepoProjectHostSetupMethod
+  /** ID of the DevServer that hosts this repo. null/undefined = local repo. Added in Phase 2. */
+  devServerId?: string | null
 }
 
 export type ProjectGroupCreatedFrom = 'manual' | 'folder-scan' | 'migration'
@@ -2496,6 +2499,37 @@ export type GlobalSettings = {
   /** Per-host overrides keyed by ExecutionHostId. Effective value for a
    *  host-varying setting is `host override ?? client default`. */
   hostSettingOverrides?: Partial<Record<ExecutionHostId, HostSettingOverrides>>
+  /** The dev server currently selected as the active remote target.
+   *  null = no active dev server (use local). */
+  activeDevServerId?: string | null
+  /** Webhook URL for fleet health alerts (Slack/Discord).
+   *  When set, FleetHealthMonitor sends a POST on server status change.
+   *  CR-005: SOL-005 — persisted to survive restarts. */
+  fleetAlertWebhookUrl?: string
+  /** Polling interval for fleet health checks in ms. Default: 60000 (1 min). CR-005. */
+  fleetHealthPingIntervalMs?: number
+  /** Enable Prometheus /metrics endpoint on the runtime RPC HTTP server. CR-005. */
+  fleetMetricsEnabled?: boolean
+
+  /** Per-server Windows terminal configuration. Keyed by dev server ID.
+   *  undefined / no entry = use local Windows terminal defaults.
+   *  Added in Phase 3 for multi-server Windows terminal support. */
+  terminalWindowsConfigByServer?: Record<
+    string,
+    {
+      /** Shell executable: 'powershell.exe' | 'cmd.exe' | 'wsl.exe' | git-bash-path */
+      shell: string
+      /** WSL distro name when shell = 'wsl.exe'. null = no distro override. */
+      wslDistro: string | null
+      /** Mirror of terminalWindowsRightClickAction for this server. */
+      rightClickToPaste: boolean
+    }
+  >
+  /** VAPID key pair for Web Push notifications. Generated once and persisted.
+   *  Phase 3 — TASK-032. */
+  vapidKeys?: { publicKey: string; privateKey: string } | null
+  /** Stored Web Push subscriptions. Phase 3 — TASK-032. */
+  webPushSubscriptions?: WebPushSubscription[]
   nestWorkspaces: boolean
   workspaceDirHistory?: OrcaWorkspaceLayout[]
   refreshLocalBaseRefOnWorktreeCreate: boolean
@@ -3122,6 +3156,19 @@ export type NotificationSoundPathResult =
 
 export type OnboardingOutcome = 'completed' | 'dismissed'
 
+/** Per-server subset of the onboarding checklist. Keyed by devServerId in
+ *  OnboardingChecklistState.perServer. Added in Phase 3 — TASK-037. */
+export type PerServerChecklistState = {
+  addedRepo?: boolean
+  ranFirstAgent?: boolean
+  ranSecondAgentOnSameTask?: boolean
+  reviewedDiff?: boolean
+  openedPr?: boolean
+  addedFolder?: boolean
+  openedFile?: boolean
+  ranAgentOnFile?: boolean
+}
+
 export type OnboardingChecklistState = {
   addedRepo: boolean
   choseAgent: boolean
@@ -3137,6 +3184,10 @@ export type OnboardingChecklistState = {
   // Why: UI state flag (panel visibility), not an activation event. The
   // telemetry checklist enum in telemetry-events.ts intentionally omits this.
   dismissed: boolean
+  /** Per-server checklist items, keyed by devServerId (or 'local' for the
+   *  local machine). Optional — absent in state files persisted before TASK-037.
+   *  Phase 3 — TASK-037. */
+  perServer?: Record<string, PerServerChecklistState>
 }
 
 export type OnboardingState = {
@@ -3622,6 +3673,16 @@ export type PersistedState = {
   onboarding: OnboardingState
   /** Main-owned telemetry de-dupe marker; never exposed through PersistedUIState. */
   featureInteractionTelemetryBuckets?: FeatureInteractionTelemetryBucketState
+  /** Remote dev servers registered by the user. Populated via onboarding flow.
+   *  Runtime state (status, platform, etc.) is NOT persisted — it is reconstructed
+   *  on startup. Optional/absent on legacy files (migrated to [] on load). */
+  devServers?: PersistedDevServer[]
+  /** VAPID key pair for Web Push notifications. Generated once on first startup
+   *  and reused across restarts. Stored at the top level (not inside settings)
+   *  so it survives settings resets. Phase 3 — TASK-033. */
+  vapidKeys?: { publicKey: string; privateKey: string } | null
+  /** Browser push subscriptions collected from web clients. Phase 3 — TASK-033. */
+  webPushSubscriptions?: WebPushSubscription[]
 }
 
 // ─── Filesystem ─────────────────────────────────────────────
@@ -3822,4 +3883,21 @@ export type MemorySnapshot = {
   /** Sum of app + all tracked worktree sessions in bytes. NOT the same as host.totalMemory, which is physical RAM. */
   totalMemory: number
   collectedAt: number
+}
+
+// ─── Web Push ─────────────────────────────────────────────────────────────────
+// Phase 3: Web Push Notifications (TASK-032, TASK-033).
+
+/** A stored Web Push subscription. Persisted in GlobalSettings.webPushSubscriptions. */
+export type WebPushSubscription = {
+  /** Unique ID for this subscription record. */
+  id: string
+  /** Push endpoint URL from PushSubscription. */
+  endpoint: string
+  /** ECDH keys from PushSubscription.toJSON(). */
+  keys: { auth: string; p256dh: string }
+  /** Timestamp when this subscription was first saved (ms since epoch). */
+  addedAt: number
+  /** Optional user agent string for debugging. */
+  userAgent?: string
 }
