@@ -19,7 +19,7 @@ export class FleetHealthMonitor {
   private lastAlertedStatus: Map<string, string> = new Map()
 
   // Dependency injection via properties — set externally after construction
-  getSshTargets: (() => Array<{ id: string; label: string; project?: string }>) | null = null
+  getSshTargets: (() => Array<{ id: string; label: string; project?: string }> | Promise<Array<{ id: string; label: string; project?: string }>>) | null = null
   getConnectionState:
     | ((targetId: string) => { status: string; error?: string | null; remotePlatform?: unknown } | null)
     | null = null
@@ -47,7 +47,7 @@ export class FleetHealthMonitor {
   async runHealthCheck(): Promise<void> {
     if (!this.getSshTargets || !this.getConnectionState) return
 
-    const targets = this.getSshTargets()
+    const targets = await this.getSshTargets()
     for (const target of targets) {
       const state = this.getConnectionState(target.id)
       const status = (state?.status ?? 'disconnected') as import('../../shared/ssh-types').SshConnectionStatus

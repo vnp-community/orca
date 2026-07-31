@@ -727,27 +727,19 @@ export class OrcaRuntimeRpcServer {
     // transport's in-flight set until the 30 s socket idle timer closes the
     // connection.
     socketTransport.onMessage((msg, reply, context) => {
-      void this.handleMessage(msg, context)
-        .then((response) => {
-          reply(JSON.stringify(response))
-        })
-        .catch((error) => {
-          const message = error instanceof Error ? error.message : String(error)
-          // Why: best-effort id recovery so the client can correlate the
-          // error frame to its pending request. A malformed message would
-          // have been caught by handleMessage and returned an envelope
-          // instead of throwing, so in practice the id is always present.
-          let id = 'unknown'
-          try {
-            const parsed = JSON.parse(msg) as { id?: unknown }
-            if (typeof parsed.id === 'string' && parsed.id.length > 0) {
-              id = parsed.id
-            }
-          } catch {
-            // ignore — fall through with id='unknown'
+      void this.handleMessage(msg, reply, context).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        let id = 'unknown'
+        try {
+          const parsed = JSON.parse(msg) as { id?: unknown }
+          if (typeof parsed.id === 'string' && parsed.id.length > 0) {
+            id = parsed.id
           }
-          reply(JSON.stringify(this.buildError(id, 'internal_error', message)))
-        })
+        } catch {
+          // ignore
+        }
+        reply(JSON.stringify(this.buildError(id, 'internal_error', message)))
+      })
     })
 
     await socketTransport.start()
@@ -929,18 +921,21 @@ export class OrcaRuntimeRpcServer {
   // dispatches. See design doc §3.1.
   private async handleMessage(
     rawMessage: string,
+    reply: (response: string) => void,
     context?: RpcMessageContext
-  ): Promise<RpcResponse> {
+  ): Promise<void> {
     // Why: empty messages are sent by the Unix socket transport layer when a
     // client exceeds the max message size. The transport closes the connection
     // after this response.
     if (!rawMessage) {
-      return this.buildError('unknown', 'request_too_large', 'RPC request exceeds the maximum size')
+      reply(JSON.stringify(this.buildError('unknown', 'request_too_large', 'RPC request exceeds the maximum size')))
+      return
     }
 
     const parsed = this.parseAndAuth(rawMessage)
     if ('error' in parsed) {
-      return parsed.error
+      reply(JSON.stringify(parsed.error))
+      return
     }
     const request = parsed.request
 
@@ -948,11 +943,12 @@ export class OrcaRuntimeRpcServer {
     // — it only guards handlers that can block for minutes. See §7 risk #2.
     const longPoll = isLongPollRequest(request)
     if (longPoll && this.activeLongPolls >= this.longPollCap) {
-      return this.buildError(
+      reply(JSON.stringify(this.buildError(
         request.id,
         'runtime_busy',
         'long-poll capacity reached; retry with backoff'
-      )
+      )))
+      return
     }
     if (longPoll) {
       this.activeLongPolls += 1
@@ -962,8 +958,9 @@ export class OrcaRuntimeRpcServer {
     }
 
     try {
-      return await this.dispatcher.dispatch(request, {
-        signal: longPoll ? context?.signal : undefined
+      await this.dispatcher.dispatchStreaming(request, reply, {
+        signal: longPoll ? context?.signal : undefined,
+        clientId: request.authToken
       })
     } finally {
       if (longPoll) {

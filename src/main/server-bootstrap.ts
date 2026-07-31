@@ -463,9 +463,10 @@ export async function initializeOrcaServices(
     const { SshConnectionStore } = await import('./ssh/ssh-connection-store')
     const sshStore = new SshConnectionStore(store)
     // Wire dependency injection properties
-    fleetHealthMonitor.getSshTargets = () => {
+    fleetHealthMonitor.getSshTargets = async () => {
       const sshTargets = sshStore.listTargets().map((t) => ({ id: t.id, label: t.label, project: t.project }))
-      const devServers = devServerManager.list().map((ds) => ({ id: ds.id, label: ds.name }))
+      const listRes = await devServerManager.list()
+      const devServers = listRes.map((ds: any) => ({ id: ds.id, label: ds.name }))
       // De-duplicate in case a dev server has the same ID as an SSH target
       const combined = new Map([...sshTargets, ...devServers].map(t => [t.id, t]))
       return Array.from(combined.values())
@@ -473,7 +474,7 @@ export async function initializeOrcaServices(
     
     fleetHealthMonitor.getConnectionState = (targetId) => {
       // DevServerManager takes precedence for DevServers
-      const dsState = devServerManager.getRuntimeState(targetId)
+      const dsState = typeof devServerManager.getRuntimeState === 'function' ? devServerManager.getRuntimeState(targetId) : null
       if (dsState) {
         return {
           status: dsState.status,

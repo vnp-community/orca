@@ -186,11 +186,10 @@ export class UnixSocketTransport implements RpcTransport {
     inflight.add(abortDispatch)
 
     const reply = (response: string): void => {
-      if (replied) {
-        return
+      if (!replied) {
+        replied = true
+        cleanupDispatch(false)
       }
-      replied = true
-      cleanupDispatch(false)
       if (!socket.destroyed && socket.writable) {
         socket.write(`${response}\n`)
       }
