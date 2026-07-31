@@ -102,6 +102,7 @@ import {
 } from './web-runtime-environment'
 import { parseWebPairingInput } from './web-pairing'
 import { WebRuntimeClient } from './web-runtime-client'
+import { WebSessionClient } from './web-session-client'
 import { RuntimeRpcCallQueuePool } from '../../../shared/runtime-rpc-call-queue'
 import {
   assertClipboardTextWriteWithinLimitWithYield,
@@ -143,7 +144,7 @@ export const CLIPBOARD_IMAGE_SINGLE_FRAME_FALLBACK_BASE64_CHARS = 256 * 1024
 const CLIPBOARD_IMAGE_SAVE_TIMEOUT_MS = 30_000
 
 let activeEnvironment: StoredWebRuntimeEnvironment | null = readStoredWebRuntimeEnvironment()
-let activeClient: WebRuntimeClient | null = null
+let activeClient: WebRuntimeClient | WebSessionClient | null = null
 let activeClientEnvironmentId: string | null = null
 let cachedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
 let cachedDetectedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
@@ -696,6 +697,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     gl: createGitLabApi(),
     hostedReview: createRuntimeNamespaceApi('hostedReview'),
     linear: createRuntimeNamespaceApi('linear'),
+    devServer: createDevServerApi(),
     hooks: createHooksApi(),
     stats: {
       getSummary: async () =>
@@ -2183,6 +2185,125 @@ function createRuntimeNamespaceApi(prefix: string): never {
   }) as never
 }
 
+// ─── Dev Server Web API ───────────────────────────────────────────────────────
+// Bridges the DevServer CRUD + status subscription to the runtime RPC layer.
+// In web mode (browser) there is no Electron IPC, so all calls go through
+// callRuntimeResult (WebSocket → Orca server process).
+function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
+  type StatusHandler = (event: {
+    id: string
+    status: import('../../../shared/dev-server-types').DevServerStatus
+    platform?: NodeJS.Platform
+    error?: string
+  }) => void
+
+  const statusHandlers = new Set<StatusHandler>()
+
+  // Subscribe to push events from the runtime for devServer status changes.
+  // Poll via devServer.list at regular intervals as a fallback since push events
+  // are not yet plumbed through the client-events stream in web mode.
+  let statusSubscribed = false
+  function ensureStatusSubscription(): void {
+    if (statusSubscribed) return
+    statusSubscribed = true
+
+    const poll = (): void => {
+      void callRuntimeResult<import('../../../shared/dev-server-types').DevServer[]>(
+        'devServer.list'
+      )
+        .then((servers) => {
+          for (const server of servers) {
+            // Emit full status event so updateDevServerStatus gets arch/nodeVersion/error too
+            for (const handler of statusHandlers) {
+              handler({
+                id: server.id,
+                status: server.status,
+                platform: server.platform ?? undefined,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                arch: (server as any).arch ?? undefined,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                nodeVersion: (server as any).nodeVersion ?? undefined,
+                error: server.lastError ?? undefined,
+              })
+            }
+          }
+        })
+        .catch(() => {})
+    }
+
+    // First poll after short delay (agents may reconnect quickly after container restart)
+    setTimeout(poll, 1_500)
+    // Then poll every 3s for live updates
+    setInterval(poll, 3_000)
+  }
+
+  return {
+    list: () =>
+      callRuntimeResult<import('../../../shared/dev-server-types').DevServer[]>('devServer.list'),
+
+    add: (input) =>
+      callRuntimeResult<import('../../../shared/dev-server-types').DevServer>(
+        'devServer.add',
+        input
+      ),
+
+    remove: (id) => callRuntimeResult<void>('devServer.remove', { id }),
+
+    connect: (id) =>
+      callRuntimeResult<import('../../../shared/dev-server-types').DevServer>(
+        'devServer.connect',
+        { id }
+      ),
+
+    disconnect: (id) => callRuntimeResult<void>('devServer.disconnect', { id }),
+
+    testConnection: (input) =>
+      callRuntimeResult<import('../../../shared/dev-server-types').ConnectionTestResult>(
+        'devServer.testConnection',
+        input
+      ),
+
+    listSshTargets: async () => {
+      const result = await callRuntimeResult<{ targets: import('../../../shared/ssh-types').SshTarget[] }>(
+        'devServer.listSshTargets'
+      )
+      return result.targets
+    },
+
+    addSshTarget: async (params) => {
+      const result = await callRuntimeResult<{ target: import('../../../shared/ssh-types').SshTarget }>(
+        'devServer.addSshTarget',
+        params
+      )
+      return result.target
+    },
+
+    onStatusChanged: (handler) => {
+      statusHandlers.add(handler)
+      ensureStatusSubscription()
+      return () => {
+        statusHandlers.delete(handler)
+      }
+    },
+
+    onAgentToken: () => noopUnsubscribe,
+    offAgentToken: () => {},
+
+    browseDir: async ({ id, path }) => {
+      return callRuntimeResult<{ resolvedPath: string; entries: Array<{ name: string; isDirectory: boolean; isSymlink: boolean }> }>(
+        'devServer.browseDir',
+        { id, path }
+      )
+    },
+    mkdir: async ({ id, path }) => {
+      return callRuntimeResult<{ path: string }>('devServer.mkdir', { id, path })
+    },
+    rmdir: async ({ id, path }) => {
+      return callRuntimeResult<void>('devServer.rmdir', { id, path })
+    }
+  } as NonNullable<Partial<PreloadApi>['devServer']>
+}
+
 function createHooksApi(): NonNullable<Partial<PreloadApi>['hooks']> {
   return {
     check: async ({ repoId }) => callRuntimeResult('repo.hooksCheck', { repo: repoId }),
@@ -3004,10 +3125,27 @@ async function getRemoteRuntimeStatus(): Promise<RuntimeStatus> {
   return callRuntimeResult<RuntimeStatus>('status.get', undefined, 15_000)
 }
 
-function getClientForEnvironment(environment: StoredWebRuntimeEnvironment): WebRuntimeClient {
+function getClientForEnvironment(
+  environment: StoredWebRuntimeEnvironment
+): WebRuntimeClient | WebSessionClient {
   if (!activeClient || activeClientEnvironmentId !== environment.id) {
     activeClient?.close()
-    activeClient = new WebRuntimeClient(getPreferredWebPairingOffer(environment))
+
+    const preferredEndpoint =
+      environment.endpoints.find((ep) => ep.id === environment.preferredEndpointId) ??
+      environment.endpoints[0]
+
+    if (preferredEndpoint && (!preferredEndpoint.deviceToken || !preferredEndpoint.publicKeyB64)) {
+      // Why: session-auth environment has empty E2EE keys — WsSessionRouter validates
+      // the session cookie server-side. Use WebSessionClient (plain WS over cookie)
+      // instead of WebRuntimeClient which requires Curve25519 key exchange.
+      // See TASK-PC-004 in specs/backend/bugs/paircode-v1/.
+      activeClient = new WebSessionClient(preferredEndpoint.endpoint)
+    } else {
+      // Pair code / E2EE environment: full key exchange via WebRuntimeClient.
+      activeClient = new WebRuntimeClient(getPreferredWebPairingOffer(environment))
+    }
+
     activeClientEnvironmentId = environment.id
   }
   return activeClient
@@ -3034,6 +3172,12 @@ function resolveEnvironment(selector: string): StoredWebRuntimeEnvironment {
   if (selector.startsWith('web-') && environment.id.startsWith('web-')) {
     // Why: persisted terminal ids can outlive a web-client re-pair, which creates
     // a fresh web-* environment id even when it points at the same active server.
+    return environment
+  }
+  if (selector === 'session-auth' && environment.id === 'session-auth') {
+    // Why: session-authenticated environments use the stable id 'session-auth'
+    // (created by createSessionWebRuntimeEnvironment). Route to the active
+    // environment without requiring an exact name/id match.
     return environment
   }
   throw new Error(`Unknown Orca runtime environment: ${selector}`)

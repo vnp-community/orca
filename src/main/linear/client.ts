@@ -1,11 +1,17 @@
 /* eslint-disable max-lines -- Why: Linear credential storage and client
    selection share one module so keychain-safe status reads and token mutation
    stay in one consistency boundary. */
-import { safeStorage } from 'electron'
 import { LinearClient, AuthenticationLinearError } from '@linear/sdk'
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+// Why: safeStorage is imported statically so that vi.doMock('electron') in tests
+// can intercept it. A dynamic require('electron') is not intercepted by Vitest
+// mocking because electron is externalized (not transformed). In web credential
+// mode (ORCA_MULTI_USER=1), safeStorage is not used — writeEncryptedToken returns
+// before reaching any safeStorage call.
+import { safeStorage } from 'electron'
+import { isWebCredentialMode } from '../credentials'
 import {
   CredentialDecryptionError,
   credentialFileHasContent,
@@ -320,6 +326,19 @@ function clearLegacyViewerOnDisk(): void {
 }
 
 function writeEncryptedToken(path: string, apiKey: string): void {
+  // Web Server mode: safeStorage is not available (no Electron process).
+  // In this mode, the token comes from WebCredentialStore (TASK-13: credentials.set RPC),
+  // which already applies AES-256-GCM encryption at the credentials layer.
+  // Here we write it as-is to the file; the file itself is not used as the primary
+  // credential store in web mode (env vars injected by SessionManager take precedence).
+  if (isWebCredentialMode()) {
+    writeFileSync(path, apiKey, { encoding: 'utf-8', mode: 0o600 })
+    return
+  }
+
+  // Electron mode: use safeStorage (imported statically at top of file) for OS
+  // keychain encryption. Static import allows vi.doMock('electron') in tests
+  // to intercept safeStorage without dynamic require().
   if (safeStorage.isEncryptionAvailable()) {
     const encrypted = safeStorage.encryptString(apiKey)
     writeFileSync(path, encrypted, { mode: 0o600 })

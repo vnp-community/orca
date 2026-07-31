@@ -5,6 +5,7 @@
 import { ZodError, type ZodType } from 'zod'
 import type { TerminalStreamFrame } from '../../../shared/terminal-stream-protocol'
 import type { OrcaRuntimeService } from '../orca-runtime'
+import type { DevServerManager } from '../../dev-server/dev-server-manager'
 
 export type RpcEnvelopeMeta = {
   runtimeId: string
@@ -75,6 +76,15 @@ export type RpcContext = {
     streamId: number,
     handler: (frame: TerminalStreamFrame) => void
   ) => () => void
+  // Why: integration proxy methods (preflight.check, github.startAuthLogin, etc.)
+  // need to reach the active relay for a given dev server when running in Web mode.
+  // Injected by RpcDispatcher from ServerBootstrapResult.devServerManager.
+  // Undefined in Electron / local mode — handlers must guard with `ctx.devServerManager?.`
+  devServerManager?: DevServerManager
+  // Why: credential-store reads are scoped per authenticated Orca user.
+  // Each user-process in ORCA_MULTI_USER=1 mode has a distinct userId injected
+  // via ORCA_USER_ID env var and forwarded here from the session router.
+  userId?: string
 }
 
 export type RpcHandler<TParams> = (params: TParams, ctx: RpcContext) => Promise<unknown> | unknown

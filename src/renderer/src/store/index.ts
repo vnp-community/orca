@@ -42,6 +42,13 @@ import { createBootstrapSlice } from './slices/bootstrap'
 import { createAuthSlice } from './slices/auth'
 import { createDevServerSlice } from './slices/dev-servers'
 import { createOnboardingChecklistSlice } from './slices/onboarding-checklist'
+import { createWorkspaceSlice } from './slices/workspace-slice'
+import { createProfileSlice } from './slices/profile-slice'
+import { createAIProviderSlice } from './slices/ai-provider-slice'
+import { createGitPanelSlice } from './slices/git-panel'
+import { createTaskSlice } from './slices/task'
+import { createWorkflowSlice } from './slices/workflow'
+import { createTraceSlice } from './slices/trace'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 
@@ -87,7 +94,14 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createBootstrapSlice(...a),
   ...createAuthSlice(...a),
   ...createDevServerSlice(...a),
-  ...createOnboardingChecklistSlice(...a)
+  ...createOnboardingChecklistSlice(...a),
+  ...createWorkspaceSlice(...a),
+  ...createProfileSlice(...a),
+  ...createAIProviderSlice(...a),
+  ...createGitPanelSlice(...a),
+  ...createTaskSlice(...a),
+  ...createWorkflowSlice(...a),
+  ...createTraceSlice(...a),
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())

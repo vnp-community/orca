@@ -19,8 +19,10 @@ import { registerOnboardingIpcHandlers } from './ipc/onboarding-ipc'
 import { registerRepoRemoteIpcHandlers } from './ipc/repo-remote-ipc'
 import { WebPushManager } from './notifications/web-push-manager'
 import { AuthManager } from './auth/auth-manager'
+import { initWebCredentialStore } from './credentials'
 import type { DatabaseConfig } from './db/config'
 import type { IConnectionPool } from './db/pool'
+import { AgentWebSocketServer } from './dev-server/agent-ws-server'
 
 export interface ServerBootstrapResult {
   /** Shutdown function — call to cleanly stop all services */
@@ -33,18 +35,81 @@ export interface ServerBootstrapResult {
   pushManager: WebPushManager
   /** AuthManager — exposed for HTTP server to mount /auth routes and admin panel */
   authManager: AuthManager
+  /**
+   * SessionManager — forks per-user child processes in multi-user mode.
+   * null when ORCA_MULTI_USER is not set (single-user / Electron mode).
+   */
+  sessionManager: import('./session/session-manager').SessionManager | null
+  /** AgentWebSocketServer — attach to HTTP server for direct-websocket agent connections */
+  agentWsServer: AgentWebSocketServer
+  // ─── v5.0 services (TDD-14 → TDD-20) ─────────────────────────────────────
+  /**
+   * RelayConnectionPool — ref-counted pool of DevServerRelayBridge connections.
+   * Prerequisite for ProjectServerRouter, AIProviderService, and WorkspaceService.
+   * (v5.0 TDD-15)
+   */
+  relayConnectionPool: import('./dev-server/relay-connection-pool').RelayConnectionPool
+  /**
+   * ProfileService — CRUD for company / department / user profiles.
+   * (v5.0 TDD-14)
+   */
+  profileService: import('./profile/ProfileService').ProfileService
+  /**
+   * ProfileResolver — 3-layer merge engine with 60s TTL cache.
+   * (v5.0 TDD-14)
+   */
+  profileResolver: import('./profile/ProfileResolver').ProfileResolver
+  /**
+   * ProjectService — project CRUD and member management.
+   * (v5.0 TDD-15)
+   */
+  projectService: import('./project/ProjectService').ProjectService
+  /**
+   * AIProviderService — AI provider account registry + relay credential store.
+   * (v5.0 TDD-16)
+   */
+  aiProviderService: import('./ai-providers/AIProviderService').AIProviderService
+  /**
+   * WorkflowOrchestrator — DAG-based multi-server workflow execution.
+   * (v5.0 TDD-17)
+   */
+  workflowOrchestrator: import('./workflow/WorkflowOrchestrator').WorkflowOrchestrator
+  /**
+   * TaskService — task graph CRUD, BFS tree operations, dependency edges.
+   * (v5.0 TDD-18)
+   */
+  taskService: import('./task/TaskService').TaskService
+  /**
+   * RPC auth token from OrcaRuntimeRpcServer — used by user-process-entry to
+   * report back to SessionManager so WsSessionRouter can inject it when proxying
+   * WebSocket messages over the Unix socket.
+   */
+  rpcAuthToken: string
 }
+
 
 export interface ServerBootstrapOptions {
   platform: IPlatformServices
-  /** Port for RPC WebSocket. Default: 6768 */
+  /** Port for RPC WebSocket. Default: 6768. Pass 0 to disable TCP WebSocket (user-process mode). */
   port?: number
+  /**
+   * Unix domain socket path for the RPC server to listen on.
+   * Used in user-process mode: WsSessionRouter connects here to proxy
+   * browser WebSocket traffic to the per-user OrcaRuntime.
+   * When set, the server listens on this socket instead of (or in addition to)
+   * the TCP WebSocket port.
+   */
+  socketPath?: string
   /**
    * Override database config (takes priority over env vars).
    * Pass `null` to explicitly force JSON file fallback.
    * Omit (undefined) to use loadDatabaseConfig() from environment.
    */
   database?: DatabaseConfig | null
+  /**
+   * True if running inside a User Process (child of SessionManager).
+   */
+  isUserProcess?: boolean
 }
 
 /**
@@ -62,7 +127,7 @@ export interface ServerBootstrapOptions {
 export async function initializeOrcaServices(
   options: ServerBootstrapOptions
 ): Promise<ServerBootstrapResult> {
-  const { platform, port: requestedPort = 6768 } = options
+  const { platform, port: requestedPort = 6768, socketPath } = options
 
   const userDataPath = platform.app.getPath('userData')
   console.log('[ServerBootstrap] userData:', userDataPath)
@@ -84,16 +149,55 @@ export async function initializeOrcaServices(
   const pushManager = new WebPushManager(store)
   console.log('[ServerBootstrap] ✅ WebPushManager initialized')
 
-  // 2a. Initialize DevServerManager
+  // 2a. Initialize DevServerManager + AgentWebSocketServer
   const { SshConnectionManager } = await import('./ssh/ssh-connection-manager')
   const sshManager = new SshConnectionManager({
     onStateChanged: () => {/* no-op in server bootstrap mode */}
   } as never)
-  const devServerManager = new DevServerManager(store, sshManager)
+
+  // Why: AgentWebSocketServer must be created BEFORE DevServerManager so it can
+  // be injected into DevServerRelayBridge for direct-websocket mode.
+  const agentWsServer = new AgentWebSocketServer(platform.app.getVersion())
+
+  let devServerManager: DevServerManager
+  if (options.isUserProcess) {
+    const { GatewayDevServerManagerProxy } = await import('./dev-server/gateway-proxy')
+    devServerManager = new GatewayDevServerManagerProxy() as unknown as DevServerManager
+    console.log('[ServerBootstrap] ✅ GatewayDevServerManagerProxy initialized (Proxying to Main Process)')
+  } else {
+    devServerManager = new DevServerManager(store, sshManager, agentWsServer)
+    console.log('[ServerBootstrap] ✅ DevServerManager + AgentWebSocketServer initialized')
+  }
+
   registerDevServerIpcHandlers(devServerManager, store)
   registerOnboardingIpcHandlers(devServerManager, store)
   registerRepoRemoteIpcHandlers(devServerManager, store)
-  console.log('[ServerBootstrap] ✅ DevServerManager initialized')
+
+  // 2a-pool. Initialize RelayConnectionPool (v5.0 — prerequisite for Project + AI services)
+  const { RelayConnectionPool } = await import('./dev-server/relay-connection-pool')
+  const { DevServerRelayBridge } = await import('./dev-server/dev-server-relay-bridge')
+  const relayConnectionPool = new RelayConnectionPool(async (server) => {
+    const bridge = new DevServerRelayBridge(server, sshManager, agentWsServer)
+    await bridge.connect()
+    return bridge
+  })
+  console.log('[ServerBootstrap] ✅ RelayConnectionPool initialized (v5.0)')
+
+  // 2b-pre. Initialize WebCredentialStore for multi-user Web mode.
+  // Why: must be init'd before any user session is spawned so SessionManager
+  // can call buildCredentialEnv() when forking child processes.
+  const serverSecret = process.env['ORCA_SERVER_SECRET']
+  if (process.env['ORCA_MULTI_USER'] === '1') {
+    if (!serverSecret) {
+      console.warn(
+        '[ServerBootstrap] ⚠️  ORCA_SERVER_SECRET not set — credential encryption will be weak. ' +
+        'Generate a secret with: openssl rand -hex 32'
+      )
+    }
+    const credUserId = process.env['ORCA_USER_ID'] ?? 'default'
+    initWebCredentialStore(userDataPath, credUserId, serverSecret ?? `orca-fallback-${userDataPath}`)
+    console.log(`[ServerBootstrap] ✅ WebCredentialStore initialized (userId: ${credUserId})`)
+  }
 
   // 2b. Initialize DB pool, run migrations, create state repository, start health monitor
   const { join } = await import('node:path')
@@ -179,6 +283,25 @@ export async function initializeOrcaServices(
   }
   console.log('[ServerBootstrap] ✅ AuthManager initialized')
 
+  // 2d. Initialize SessionManager for multi-user Web mode (TASK-14).
+  // Why: SessionManager forks per-user child processes and injects credential
+  // env vars (ORCA_BITBUCKET_*, ORCA_AZURE_DEVOPS_*, etc.) at spawn time.
+  // The serverSecret enables WebCredentialStore.getToken() to decrypt tokens.
+  let sessionManager: import('./session/session-manager').SessionManager | null = null
+  if (process.env['ORCA_MULTI_USER'] === '1') {
+    const { SessionManager } = await import('./session/session-manager')
+    const userProcessEntry = pathJoin(
+      platform.app.getAppPath(), 'out', 'main', 'user-process-entry.js'
+    )
+    sessionManager = new SessionManager({
+      baseDataPath: userDataPath,
+      userProcessEntry,
+      serverSecret: process.env['ORCA_SERVER_SECRET'],
+      devServerManager
+    })
+    console.log('[ServerBootstrap] ✅ SessionManager initialized (multi-user mode, serverSecret present:', !!process.env['ORCA_SERVER_SECRET'], ')')
+  }
+
 
   // 3. Initialize stats collector
   const { StatsCollector, initStatsPath } = await import('./stats/collector')
@@ -231,16 +354,108 @@ export async function initializeOrcaServices(
   runtime.setPushManager(pushManager)
   console.log('[ServerBootstrap] ✅ OrcaRuntimeService created')
 
-  // 7. Start OrcaRuntimeRpcServer (WebSocket enabled for web clients)
   const { OrcaRuntimeRpcServer } = await import('./runtime/runtime-rpc')
   const rpcServer = new OrcaRuntimeRpcServer({
     runtime,
     userDataPath,
-    enableWebSocket: true,
-    wsPort: requestedPort
+    enableWebSocket: !options.socketPath, // disable TCP WS when using Unix socket proxy
+    wsPort: requestedPort,
+    // Why: in user-process mode, the supervisor (WsSessionRouter) connects to
+    // this Unix socket to proxy browser WebSocket traffic. Passing socketPath
+    // overrides the default userData-derived socket so the process binds exactly
+    // where SessionManager expects it (ORCA_SOCKET_PATH).
+    ...(socketPath ? { socketPath } : {}),
+    // Why: proxy methods (preflight.check, github.startAuthLogin, etc.) need
+    // to reach the active relay for a given Dev Server.
+    devServerManager
   })
   await rpcServer.start()
-  console.log(`[ServerBootstrap] ✅ RPC server listening (WS) on :${requestedPort}`)
+  if (socketPath) {
+    console.log(`[ServerBootstrap] ✅ RPC server listening (Unix socket) on: ${socketPath}`)
+  } else {
+    console.log(`[ServerBootstrap] ✅ RPC server listening (WS) on :${requestedPort}`)
+  }
+
+  // 9. ProfileService + ProfileResolver [v5.0 TDD-14]
+  const { ProfileService } = await import('./profile/ProfileService')
+  const { ProfileResolver } = await import('./profile/ProfileResolver')
+  const profileService = new ProfileService(pool)
+  const profileResolver = new ProfileResolver(profileService)
+  console.log('[ServerBootstrap] ✅ ProfileService + ProfileResolver initialized (v5.0)')
+
+  // Register profile RPC methods [T01]
+  const { createProfileMethods } = await import('./profile/profile-rpc-handler')
+  rpcServer.addMethods(createProfileMethods(profileService, profileResolver))
+  console.log('[ServerBootstrap] ✅ Profile RPC methods registered (v5.0)')
+
+  // 10. ProjectService + ProjectServerRouter [v5.0 TDD-15]
+  const { ProjectService } = await import('./project/ProjectService')
+  const { ProjectServerRouter } = await import('./project/ProjectServerRouter')
+  const projectService = new ProjectService(pool, devServerManager)
+  const _projectRouter = new ProjectServerRouter(projectService, devServerManager, relayConnectionPool)
+  console.log('[ServerBootstrap] ✅ ProjectService + ProjectServerRouter initialized (v5.0)')
+
+  // Register project RPC methods [T01]
+  const { createProjectMethods } = await import('./project/project-rpc-handler')
+  rpcServer.addMethods(createProjectMethods(projectService))
+  console.log('[ServerBootstrap] ✅ Project RPC methods registered (v5.0)')
+
+  // 11. AIProviderService + ProviderResolver + ProviderHealthChecker [v5.0 TDD-16]
+  const { AIProviderService } = await import('./ai-providers/AIProviderService')
+  const { ProviderResolver } = await import('./ai-providers/ProviderResolver')
+  const { ProviderHealthChecker } = await import('./ai-providers/ProviderHealthChecker')
+  const { createAIProviderMethods } = await import('./ai-providers/ai-provider-rpc-handler')
+  const aiProviderService = new AIProviderService(pool, devServerManager, relayConnectionPool)
+  const providerResolver = new ProviderResolver(aiProviderService)
+  const providerHealthChecker = new ProviderHealthChecker()
+  providerHealthChecker.start(aiProviderService, relayConnectionPool)
+  // Register AI provider RPC methods into the already-running rpcServer
+  rpcServer.addMethods(createAIProviderMethods(aiProviderService, providerResolver))
+  console.log('[ServerBootstrap] ✅ AIProviderService + ProviderResolver + ProviderHealthChecker initialized (v5.0)')
+
+  // 12. WorkflowOrchestrator + TemplateResolver + StepExecutors [v5.0 TDD-17]
+  const { DAGBuilder } = await import('./workflow/DAGBuilder')
+  const { WorkflowOrchestrator } = await import('./workflow/WorkflowOrchestrator')
+  const { StepExecutors } = await import('./workflow/StepExecutors')
+  const { TemplateResolver } = await import('./workflow/TemplateResolver')
+  const { createWorkflowMethods } = await import('./workflow/workflow-rpc-handler')
+  const dagBuilder = new DAGBuilder()
+  // Note: _projectRouter from step 10 is used here — it is in scope
+  const stepExecutors = new StepExecutors(_projectRouter)
+  const templateResolver = new TemplateResolver(pool)
+  const workflowOrchestrator = new WorkflowOrchestrator(pool, dagBuilder, stepExecutors, _projectRouter)
+  await workflowOrchestrator.resumeRunningExecutions().catch(err =>
+    console.warn('[ServerBootstrap] resumeRunningExecutions (non-fatal):', (err as Error).message)
+  )
+  // Register workflow RPC methods into the already-running rpcServer
+  rpcServer.addMethods(createWorkflowMethods(workflowOrchestrator, templateResolver))
+  console.log('[ServerBootstrap] ✅ WorkflowOrchestrator initialized (v5.0)')
+
+  // 13. TaskService + TaskAgentExecutor [v5.0 TDD-18]
+  const { TaskDAGValidator } = await import('./task/TaskDAGValidator')
+  const { TaskService } = await import('./task/TaskService')
+  const { TaskGrantService } = await import('./task/TaskGrantService')
+  const { TaskAIPlanner } = await import('./task/TaskAIPlanner')
+  const { TaskAgentExecutor } = await import('./task/TaskAgentExecutor')
+  const { ProfileAwareAgentSpawner } = await import('./project/ProfileAwareAgentSpawner')
+  const { createTaskMethods } = await import('./task/task-rpc-handler')
+  const taskDagValidator = new TaskDAGValidator(pool)
+  const taskService = new TaskService(pool, taskDagValidator)
+  const taskGrantService = new TaskGrantService(pool, taskService)
+  const taskAIPlanner = new TaskAIPlanner(taskService, aiProviderService, _projectRouter)
+  const agentSpawner = new ProfileAwareAgentSpawner(_projectRouter, profileResolver, aiProviderService)
+  const taskAgentExecutor = new TaskAgentExecutor(taskService, agentSpawner, taskGrantService)
+  rpcServer.addMethods(createTaskMethods(taskService, taskGrantService, taskAIPlanner, taskAgentExecutor))
+  console.log('[ServerBootstrap] ✅ TaskService + TaskAgentExecutor initialized (v5.0)')
+
+  // 14. WorkspaceService [v5.0 TDD-19]
+  const { WorkspaceService } = await import('./workspace/WorkspaceService')
+  const { createWorkspaceMethods } = await import('./workspace/workspace-rpc-handler')
+  const workspaceService = new WorkspaceService(
+    _projectRouter, profileResolver, taskService, workflowOrchestrator, relayConnectionPool
+  )
+  rpcServer.addMethods(createWorkspaceMethods(workspaceService))
+  console.log('[ServerBootstrap] ✅ WorkspaceService initialized (v5.0)')
 
   // 8. Wire FleetHealthMonitor (SOL-005 — CR-005: fleet health wiring)
   try {
@@ -254,14 +469,13 @@ export async function initializeOrcaServices(
       const conn = sshStore.getConnectionState(targetId)
       return conn ?? null
     }
-    // Read persisted webhook URL from store settings (may be undefined — no-op)
-    const storedState = await stateRepo.getState().catch(() => null)
-    const webhookUrl = storedState?.settings?.fleetAlertWebhookUrl
-    if (webhookUrl) {
-      fleetHealthMonitor.getWebhookUrl = () => webhookUrl
+    // IStateRepository exposes settings.get() — NOT getState()
+    const settings = await stateRepo.settings.get().catch(() => null)
+    if (settings?.fleetAlertWebhookUrl) {
+      fleetHealthMonitor.getWebhookUrl = () => settings.fleetAlertWebhookUrl!
       console.log('[ServerBootstrap] ✅ Fleet alert webhook configured')
     }
-    const pingIntervalMs = storedState?.settings?.fleetHealthPingIntervalMs ?? 60_000
+    const pingIntervalMs = settings?.fleetHealthPingIntervalMs ?? 60_000
     fleetHealthMonitor.start(pingIntervalMs)
     console.log(`[ServerBootstrap] ✅ FleetHealthMonitor started (interval: ${pingIntervalMs}ms)`)
   } catch (err) {
@@ -273,8 +487,26 @@ export async function initializeOrcaServices(
     dbMonitor,
     pushManager,
     authManager: authManager!,
+    sessionManager,
+    agentWsServer,
+    // ─── v5.0 services (Phase 1+2 wired, later phases remain placeholder) ───
+    relayConnectionPool,                                                          // TASK-012 ✅
+    profileService,                                                               // TASK-012 ✅
+    profileResolver,                                                              // TASK-012 ✅
+    projectService,                                                               // TASK-020 ✅
+    aiProviderService,                                                            // TASK-021 ✅
+    workflowOrchestrator,                                                         // TASK-029 ✅
+    taskService,                                                                  // TASK-041 ✅
+    rpcAuthToken: rpcServer.getAuthToken(),                                       // BUG-PC-001 ✅
     async shutdown() {
       console.log('[ServerBootstrap] Shutting down...')
+      // Stop agent WS server first (clear pending slots)
+      try {
+        agentWsServer.stop()
+        console.log('[ServerBootstrap] ✅ AgentWebSocketServer stopped')
+      } catch (err) {
+        console.warn('[ServerBootstrap] AgentWebSocketServer stop error:', err)
+      }
       try {
         if (authManager) authManager.destroy()
         console.log('[ServerBootstrap] ✅ AuthManager destroyed')
@@ -297,6 +529,26 @@ export async function initializeOrcaServices(
         console.log('[ServerBootstrap] ✅ Database pool drained')
       } catch (err) {
         console.warn('[ServerBootstrap] Pool drain error:', err)
+      }
+      try {
+        if (sessionManager) await sessionManager.shutdown()
+        console.log('[ServerBootstrap] ✅ SessionManager shutdown complete')
+      } catch (err) {
+        console.warn('[ServerBootstrap] SessionManager shutdown error:', err)
+      }
+      // v5.0: disconnect all relay connections
+      try {
+        await relayConnectionPool.disconnectAll()
+        console.log('[ServerBootstrap] ✅ RelayConnectionPool disconnected')
+      } catch (err) {
+        console.warn('[ServerBootstrap] RelayConnectionPool disconnect error:', err)
+      }
+      // v5.0: stop AI provider health checker
+      try {
+        providerHealthChecker.stop()
+        console.log('[ServerBootstrap] ✅ ProviderHealthChecker stopped')
+      } catch (err) {
+        console.warn('[ServerBootstrap] ProviderHealthChecker stop error:', err)
       }
       console.log('[ServerBootstrap] Shutdown complete')
     }

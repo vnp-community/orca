@@ -6,6 +6,7 @@ import { SsoButton } from './SsoButton'
 import { PairCodeFallback } from './PairCodeFallback'
 import { loginLocal } from '../../auth/auth-api-client'
 import type { AuthUser, AuthError, SsoProvider } from '../../auth/auth-types'
+import '../../assets/login.css'
 
 type Props = {
   availableProviders: SsoProvider[]

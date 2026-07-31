@@ -1,6 +1,6 @@
 import '../assets/main.css'
 
-import { Suspense, useMemo, useState } from 'react'
+import React, { Suspense, useMemo, useState } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import ReactDOM from 'react-dom/client'
 import { useTranslation } from 'react-i18next'
@@ -19,13 +19,12 @@ import {
 import { installWebPreloadApi } from './web-preload-api'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { translate } from '../i18n/i18n'
+import { bootstrapWebApp } from './main-web-bootstrap'
 
 const App = lazy(() => import('../App'))
 
 function WebRoot(): React.JSX.Element {
   const initialPairingInput = useMemo(() => readPairingInputFromLocation(window.location), [])
-  // Why: current runtime links carry scope metadata. Runtime-scope offers keep
-  // the instant save path; mobile/legacy-unknown offers must be shown/probed.
   const startupDecision = useMemo(() => {
     const decision = decideWebPairingStartup({
       initialPairingInput,
@@ -85,8 +84,29 @@ function WebRootBoundary(): React.JSX.Element {
   )
 }
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <I18nProvider>
-    <WebRootBoundary />
-  </I18nProvider>
-)
+// Check if we are running against the Multi-User Web Server (which has /auth/config)
+// If so, use the new bootstrap logic that handles SSO/Local Login and auto-wires the environment.
+// If not (e.g. 404), we are in Desktop Pair Code sharing mode, so fallback to the original pair-code UI.
+fetch('/auth/config')
+  .then((res) => {
+    if (res.ok) {
+      void bootstrapWebApp()
+    } else {
+      renderOriginalPairCodeApp()
+    }
+  })
+  .catch(() => {
+    // Network error (or cross-origin if misconfigured), fallback to original pair-code mode
+    renderOriginalPairCodeApp()
+  })
+
+function renderOriginalPairCodeApp() {
+  const rootEl = document.getElementById('root')
+  if (rootEl) {
+    ReactDOM.createRoot(rootEl).render(
+      <I18nProvider>
+        <WebRootBoundary />
+      </I18nProvider>
+    )
+  }
+}

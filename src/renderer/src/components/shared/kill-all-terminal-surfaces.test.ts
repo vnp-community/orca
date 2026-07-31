@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
-import { useAppStore, type AppState } from '@/store'
+import { useAppStore, type AppState } from '../../store'
 import {
   runKillAllTerminalSurfaces,
   snapshotKillAllTerminalSurfaceIds,

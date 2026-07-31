@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
 import type { OrcaRuntimeService } from '../../orca-runtime'
@@ -115,5 +115,79 @@ describe('preflight RPC methods', () => {
         hostPlatform: 'win32'
       }
     })
+  })
+})
+
+// ── TASK-04: preflight.check proxy via devServerId ────────────────────────────
+describe('preflight.check with devServerId (Web mode proxy)', () => {
+  const cliStatusFromRelay = {
+    platform: 'linux' as NodeJS.Platform,
+    gh: { installed: true, authenticated: true, version: '2.40.0' },
+    glab: { installed: true, authenticated: false },
+    git: { installed: true, version: '2.45.0', hasUserName: true, hasUserEmail: true }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  function makeRelayMock(cliStatus: unknown) {
+    return {
+      call: vi.fn().mockResolvedValue(cliStatus)
+    }
+  }
+
+  function makeDevServerManagerMock(relay: { call: ReturnType<typeof vi.fn> } | null) {
+    return {
+      getRelay: vi.fn().mockReturnValue(relay)
+    }
+  }
+
+  it('proxies preflight.check to relay when devServerId is provided', async () => {
+    const relay = makeRelayMock(cliStatusFromRelay)
+    const devServerManager = makeDevServerManagerMock(relay)
+    runPreflightCheckMock.mockResolvedValue({ git: { installed: true }, gh: { installed: false } })
+
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PREFLIGHT_METHODS, devServerManager: devServerManager as never })
+
+    const response = await dispatcher.dispatch(makeRequest('preflight.check', { devServerId: 'ds-abc' }))
+
+    expect(relay.call).toHaveBeenCalledWith('preflight.check', expect.anything(), 30_000)
+    expect(runPreflightCheckMock).not.toHaveBeenCalled()
+    expect(response).toMatchObject({
+      ok: true,
+      result: expect.objectContaining({
+        gh: expect.objectContaining({ installed: true, authenticated: true }),
+        glab: expect.objectContaining({ installed: true, authenticated: false }),
+        git: expect.objectContaining({ installed: true })
+      })
+    })
+  })
+
+  it('falls back to runPreflightCheck() when no devServerId provided', async () => {
+    const localStatus = { git: { installed: true }, gh: { installed: true, authenticated: true } }
+    runPreflightCheckMock.mockResolvedValueOnce(localStatus)
+
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PREFLIGHT_METHODS })
+
+    const response = await dispatcher.dispatch(makeRequest('preflight.check', {}))
+
+    expect(runPreflightCheckMock).toHaveBeenCalled()
+    expect(response).toMatchObject({ ok: true, result: localStatus })
+  })
+
+  it('throws when devServerId is given but relay is not connected', async () => {
+    const devServerManager = makeDevServerManagerMock(null) // relay not found
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: PREFLIGHT_METHODS, devServerManager: devServerManager as never })
+
+    const response = await dispatcher.dispatch(makeRequest('preflight.check', { devServerId: 'ds-missing' }))
+
+    // Should return error response (ok: false) not throw
+    expect(response).toMatchObject({ ok: false })
+    const resp = response as { ok: false; error: { message?: string } }
+    expect(resp.error?.message ?? '').toMatch(/relay|dev server/i)
   })
 })

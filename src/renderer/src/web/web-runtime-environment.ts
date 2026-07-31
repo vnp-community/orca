@@ -114,3 +114,49 @@ export function updateStoredEnvironmentRuntimeId(
 export function isMixedContentWebSocket(endpoint: string): boolean {
   return window.location.protocol === 'https:' && endpoint.startsWith('ws://')
 }
+
+/**
+ * Create a StoredWebRuntimeEnvironment for session-based auth (no Pair Code / E2EE).
+ *
+ * Used when ORCA_MULTI_USER=1 and the user has logged in via /auth/local
+ * (email + password). WsSessionRouter routes WebSocket connections via
+ * session cookie — no E2EE Pair Code required.
+ *
+ * The generated environment:
+ *   - Points to ws(s)://same-host/ws (session-authenticated WS endpoint)
+ *   - Has stable id 'session-auth' (no random uuid — consistent across reloads)
+ *   - deviceToken = '' and publicKeyB64 = '' (no E2EE — cookie is the auth)
+ *
+ * @param location - window.location (or equivalent for testability)
+ */
+export function createSessionWebRuntimeEnvironment(
+  location: Pick<Location, 'protocol' | 'host'>
+): StoredWebRuntimeEnvironment {
+  const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsEndpoint = `${wsProtocol}//${location.host}/ws`
+  const now = Date.now()
+  const envId = 'session-auth'
+
+  return {
+    id: envId,
+    name: 'Orca Session',
+    createdAt: now,
+    updatedAt: now,
+    lastUsedAt: null,
+    runtimeId: null,
+    preferredEndpointId: `ws-${envId}`,
+    endpoints: [
+      {
+        id: `ws-${envId}`,
+        kind: 'websocket',
+        label: 'Session WebSocket',
+        endpoint: wsEndpoint,
+        // Why: No E2EE keys — WsSessionRouter validates session cookie instead
+        // of Curve25519 device token. getClientForEnvironment checks empty keys
+        // and routes to WebSocketRpcClient (plain cookie-auth WS).
+        deviceToken: '',
+        publicKeyB64: ''
+      }
+    ]
+  }
+}

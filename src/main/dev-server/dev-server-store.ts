@@ -29,6 +29,37 @@ export class DevServerStore {
     return record
   }
 
+  /**
+   * Upsert: find a DevServer by ID, or create it with the given data.
+   * Used by daemon-initiated connections (POST /api/agent-token) to
+   * register/re-register a server without duplicating records.
+   *
+   * If the record already exists, only its `name` and `connectionType` are
+   * updated (preserving workspaceDir, addedAt, etc.).
+   */
+  addOrUpdate(id: string, input: Omit<DevServerInput, 'sshTargetId' | 'wsUrl'>): PersistedDevServer {
+    const existing = (this.store.getState().devServers ?? []).find((ds) => ds.id === id)
+    if (existing) {
+      // Update name/connectionType only — don't reset other fields
+      this.update(id, { name: input.name, connectionType: input.connectionType })
+      return { ...existing, name: input.name, connectionType: input.connectionType }
+    }
+
+    const record: PersistedDevServer = {
+      id,
+      name: input.name,
+      connectionType: input.connectionType,
+      sshTargetId: undefined,
+      wsUrl: undefined,
+      workspaceDir: null,
+      addedAt: Date.now()
+    }
+    this.store.mutate((state) => {
+      state.devServers = [...(state.devServers ?? []), record]
+    })
+    return record
+  }
+
   update(id: string, updates: Partial<PersistedDevServer>): void {
     this.store.mutate((state) => {
       const servers = state.devServers ?? []

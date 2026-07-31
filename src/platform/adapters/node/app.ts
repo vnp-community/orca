@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+
 import { homedir, tmpdir } from 'node:os'
 import type { IApp, AppPathName, AppEvent } from '../../app-interface'
 

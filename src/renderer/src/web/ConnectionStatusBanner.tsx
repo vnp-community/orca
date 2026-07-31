@@ -4,12 +4,14 @@ import type { ConnectionStatus } from './ConnectionStatusProvider'
 export interface ConnectionStatusBannerProps {
   status: ConnectionStatus
   onRetry: () => void
+  onLogout?: () => void
 }
 
 // Why: banner is web-only — always null when connected so no DOM overhead
 export function ConnectionStatusBanner({
   status,
-  onRetry
+  onRetry,
+  onLogout
 }: ConnectionStatusBannerProps): React.JSX.Element | null {
   if (status === 'connected') return null
 
@@ -60,6 +62,23 @@ export function ConnectionStatusBanner({
           >
             Retry
           </button>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              title="Clear session and log in again"
+              style={{
+                background: 'rgba(0,0,0,0.25)',
+                border: '1px solid rgba(255,255,255,0.4)',
+                color: 'white',
+                padding: '4px 10px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 12
+              }}
+            >
+              Logout
+            </button>
+          )}
         </>
       )}
     </div>

@@ -22,7 +22,8 @@ export default defineConfig({
     lib: {
       entry: {
         index: resolve(__dirname, 'src/server/index.ts'),
-        'daemon-entry': resolve(__dirname, 'src/main/daemon/daemon-entry.ts')
+        'daemon-entry': resolve(__dirname, 'src/main/daemon/daemon-entry.ts'),
+        'user-process-entry': resolve(__dirname, 'src/main/session/user-process-entry.ts')
       },
       formats: ['cjs'],
       fileName: (_format, entryName) => `${entryName}.js`
@@ -98,6 +99,8 @@ export default defineConfig({
   },
   define: {
     // Expose platform identifier to code using process.env.ORCA_PLATFORM
-    'process.env.ORCA_PLATFORM': JSON.stringify('node')
+    'process.env.ORCA_PLATFORM': JSON.stringify('node'),
+    __ORCA_GIT_V6__: JSON.stringify(process.env.ORCA_FEATURE_GIT_V6 === 'true'),
+    __ORCA_WORKSPACE_V6__: JSON.stringify(process.env.ORCA_FEATURE_WORKSPACE_V6 === 'true')
   }
 }) satisfies UserConfig

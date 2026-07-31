@@ -66,6 +66,13 @@ export type RemotePreflightStatus = {
     authenticated: boolean
     version?: string
   }
+  // Why: GitLab CLI (glab) check via relay. Optional for backward compatibility
+  // with older relay versions that don't report glab status (FE-TASK-08 / FE-SOL-04).
+  glab?: {
+    installed: boolean
+    authenticated: boolean
+    version?: string
+  }
   git: {
     installed: boolean
     version?: string
@@ -100,4 +107,17 @@ export type WindowsTerminalCapabilities = {
   gitBashPath?: string
   /** Platform of the relay host (always 'win32' for Windows servers). */
   hostPlatform?: NodeJS.Platform | null
+}
+
+/**
+ * Payload emitted by DevServerRelayBridge when a direct-websocket token is generated.
+ * Shared between main process (IPC sender), preload, and renderer (IPC receiver).
+ */
+export type AgentTokenInfo = {
+  /** ID of the DevServer this token belongs to */
+  devServerId: string
+  /** One-time token for agent to authenticate: format "agt-<devServerId>-<timestamp>" */
+  agentToken: string
+  /** Orca WebSocket URL the agent should connect to: "ws://<host>:6768/agent" */
+  orcaUrl: string
 }

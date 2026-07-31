@@ -36,7 +36,15 @@ const BASE_CONFIG = {
   baseDataPath:      '/tmp/orca-test',
   userProcessEntry:  '/tmp/user-process-entry.js',
   idleTimeoutMs:     4 * 60 * 60 * 1000,
-  maxRespawnAttempts: 3
+  maxRespawnAttempts: 3,
+  // Why: SessionManager constructor calls devServerManager.on() to broadcast
+  // DevServer events. Provide a no-op EventEmitter-compatible mock so the
+  // constructor doesn't throw when devServerManager is referenced.
+  devServerManager: {
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
+  }
 }
 
 describe('SessionManager', () => {

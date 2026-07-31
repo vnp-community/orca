@@ -6,10 +6,12 @@
  */
 import type { StateCreator } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
+import { useAppStore } from '../index'
 import type { OnboardingChecklistState } from '../../../../shared/types'
 import type { PerServerChecklistState } from '../../../../shared/dev-server-types'
 import type { AppState } from '../types'
-import { useAppStore } from '../index'
+// Why: useAppStore is imported lazily inside each hook to avoid circular
+// dependency at module evaluation time (this file is imported by store/index.ts).
 
 // ─── Extended state types ─────────────────────────────────────────────────────
 

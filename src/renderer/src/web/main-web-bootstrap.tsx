@@ -11,7 +11,9 @@ import {
   readPairingInputFromLocation
 } from './web-pairing'
 import {
+  createSessionWebRuntimeEnvironment,
   createStoredWebRuntimeEnvironment,
+  clearStoredWebRuntimeEnvironment,
   readStoredWebRuntimeEnvironment,
   saveStoredWebRuntimeEnvironment
 } from './web-runtime-environment'
@@ -29,9 +31,14 @@ import { WebSocketRpcClient } from '../../../platform/adapters/web/rpc-client'
 import type { IRpcClient } from '../../../platform/rpc-client-interface'
 import { fetchCurrentUser, fetchAuthConfig } from '../auth/auth-api-client'
 import type { AuthUser, SsoProvider } from '../auth/auth-types'
+import { useLogout } from '../hooks/useLogout'
+import { initBrowserTrace } from '../../../shared/trace/browser'
+import { TracePanel } from '../components/trace/TracePanel'
+import { useAppStore } from '../store'
 
 const WebConnect = lazy(() => import('./WebConnect'))
 const App = lazy(() => import('../App'))
+import { WorkspaceProvider } from '../context/WorkspaceContext'
 const LoginPage = lazy(() => import('./login/LoginPage').then((m) => ({ default: m.LoginPage })))
 
 export interface BootstrapOptions {
@@ -60,12 +67,48 @@ function showErrorUi(rootEl: HTMLElement): void {
   `
 }
 
+/**
+ * Listen for `orca:auth-failed` events emitted by WebSessionClient / WebRuntimeClient
+ * when the WebSocket closes with code 4401 (session cookie missing/expired).
+ *
+ * On auth failure: clear all browser-side state and redirect to /login so the
+ * user can sign in again with a fresh session — no manual intervention required.
+ *
+ * Guards: only runs once (redirected flag), only for session-auth environments
+ * (E2EE-paired environments should reconnect, not logout).
+ */
+function installAuthFailedRedirect(): void {
+  let redirected = false
+  window.addEventListener('orca:auth-failed', () => {
+    if (redirected) return
+    const env = readStoredWebRuntimeEnvironment()
+    if (env?.id !== 'session-auth') return
+    redirected = true
+    console.warn('[Orca] Auth failed — clearing session and redirecting to /login')
+    try { localStorage.clear() } catch { /* sandboxed iframe */ }
+    try { sessionStorage.clear() } catch { /* sandboxed iframe */ }
+    document.cookie.split(';').forEach((c) => {
+      const name = c.split('=')[0].trim()
+      if (!name) return
+      const exp = 'expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      document.cookie = `${name}=; ${exp}; path=/`
+      document.cookie = `${name}=; ${exp}; path=/; domain=${location.hostname}`
+      document.cookie = `${name}=; ${exp}; path=/; domain=.${location.hostname}`
+    })
+    clearStoredWebRuntimeEnvironment()
+    window.location.href = '/login'
+  })
+}
+
 // Why: banner wrapper reads from ConnectionStatusProvider context so it stays
 // in sync with the connection poll without prop-drilling through App.
+// onLogout is forwarded so the banner's Logout button can clear stale sessions
+// (e.g., after container restart) without requiring the user to find the avatar menu.
 function WebConnectionBannerWrapper(): React.JSX.Element | null {
   const status = useConnectionStatus()
   const retry = useConnectionRetry()
-  return <ConnectionStatusBanner status={status} onRetry={retry} />
+  const logout = useLogout()
+  return <ConnectionStatusBanner status={status} onRetry={retry} onLogout={logout} />
 }
 
 // Why: WebRoot encapsulates the pairing/app decision so it can be tested
@@ -113,12 +156,24 @@ function WebRoot({
   // CR-LOGIN-001: if the user is already authenticated via session cookie,
   // skip the WebConnect / pairing flow entirely and render the App directly.
   if (sessionUser !== null) {
+    // Why: installWebPreloadApi reads activeEnvironment from localStorage via
+    // readStoredWebRuntimeEnvironment(). Without a stored environment, all RPC
+    // calls fail with "No active runtime environment" because requireActiveEnvironment()
+    // throws. Create a stable 'session-auth' environment (no E2EE — cookie auth)
+    // before installing the API so RPC calls route through WebSocketRpcClient.
+    // Guard: only create if no existing environment — don't overwrite a paired env.
+    // See TASK-PC-002 / TASK-PC-003 in specs/backend/bugs/paircode-v1/.
+    if (readStoredWebRuntimeEnvironment() === null) {
+      saveStoredWebRuntimeEnvironment(createSessionWebRuntimeEnvironment(window.location))
+    }
     installWebPreloadApi()
     return (
       <ConnectionStatusProvider client={client}>
         <WebConnectionBannerWrapper />
         <Suspense fallback={<div className="min-h-dvh bg-background" />}>
+        <WorkspaceProvider>
           <App />
+        </WorkspaceProvider>
         </Suspense>
       </ConnectionStatusProvider>
     )
@@ -231,10 +286,29 @@ export async function bootstrapWebApp(options: BootstrapOptions = {}): Promise<v
     return
   }
 
+  // Install early so auth-failed events from any WebSocket client trigger redirect.
+  installAuthFailedRedirect()
+
+  // Initialize browser trace sink — must happen before ReactDOM.createRoot
+  // so trace events from initial renders are captured.
+  initBrowserTrace((event) => {
+    useAppStore.getState().addTraceEvent(event)
+  })
+
+  // Ctrl+Shift+T → toggle TracePanel
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'T') {
+      e.preventDefault()
+      const state = useAppStore.getState()
+      state.setTracePanelOpen(!state.tracePanelOpen)
+    }
+  })
+
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
       <I18nProvider>
         <WebRootBoundary client={client} />
+        <TracePanel />
       </I18nProvider>
     </React.StrictMode>
   )

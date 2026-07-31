@@ -101,6 +101,10 @@ async function loadClientModule(options: SafeStorageMockOptions = {}) {
     const actual = await vi.importActual<typeof Os>('os')
     return { ...actual, homedir: () => tempHome }
   })
+  vi.doMock('node:os', async () => {
+    const actual = await vi.importActual<typeof Os>('os')
+    return { ...actual, homedir: () => tempHome }
+  })
   class AuthenticationLinearError extends Error {}
   vi.doMock('@linear/sdk', () => ({
     AuthenticationLinearError,

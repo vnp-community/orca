@@ -20,6 +20,7 @@ import { useActiveWorktree, useRepoById } from '@/store/selectors'
 import { cn } from '@/lib/utils'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { parseExecutionHostId } from '../../../../shared/execution-host'
 import {
   killWorkspacePortForTarget,
   getPortOpenBrowserTooltipLabel,
@@ -150,7 +151,11 @@ export default function PortsPanel({ isVisible }: { isVisible: boolean }): React
   const activeWorktree = useActiveWorktree()
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
 
-  if (activeRepo?.connectionId) {
+  const isSshConnection = activeRepo?.connectionId
+    ? parseExecutionHostId(activeRepo.connectionId)?.kind === 'ssh'
+    : false
+
+  if (isSshConnection) {
     return <SshPortsPanel />
   }
 

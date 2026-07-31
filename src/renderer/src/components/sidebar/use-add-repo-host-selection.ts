@@ -13,6 +13,7 @@ import type { AddRepoDialogStep } from './add-repo-dialog-types'
 import { useSidebarHostScopeOptions } from './use-sidebar-host-scope-options'
 import { canSelectAddRepoHost } from './add-repo-host-availability'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '@/lib/web-client-location'
 
 export function useAddRepoHostSelection({
   isOpen,
@@ -35,7 +36,9 @@ export function useAddRepoHostSelection({
   const setSshConnectionState = useAppStore((s) => s.setSshConnectionState)
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
+  const setActiveDevServerId = useAppStore((s) => s.setActiveDevServerId)
   const { hostOptions } = useSidebarHostScopeOptions()
+  const isWeb = isWebClientLocation()
   const ephemeralRuntimeEnvironmentIds = useMemo(
     () =>
       new Set(
@@ -55,8 +58,16 @@ export function useAddRepoHostSelection({
       }),
     [ephemeralRuntimeEnvironmentIds, hostOptions]
   )
+  // In web mode, default to the first connected dev server instead of local
+  const defaultHostId: ExecutionHostId = useMemo(() => {
+    if (isWeb && hostOptions.length > 0) {
+      return hostOptions[0].id
+    }
+    return LOCAL_EXECUTION_HOST_ID
+  }, [isWeb, hostOptions])
+
   const [selectedAddProjectHostId, setSelectedAddProjectHostId] =
-    useState<ExecutionHostId>(LOCAL_EXECUTION_HOST_ID)
+    useState<ExecutionHostId>(defaultHostId)
   const [hostSelectorOpen, setHostSelectorOpen] = useState(false)
   const previousOpenRef = useRef(false)
 
@@ -65,30 +76,35 @@ export function useAddRepoHostSelection({
       (host) => host.id === selectedAddProjectHostId && canSelectAddRepoHost(host)
     ) ??
     selectableHostOptions.find(
-      (host) => host.id === LOCAL_EXECUTION_HOST_ID && canSelectAddRepoHost(host)
+      (host) => host.id === defaultHostId && canSelectAddRepoHost(host)
     ) ??
     selectableHostOptions.find((host) => canSelectAddRepoHost(host)) ??
     selectableHostOptions[0]
-  const selectedHostId = selectedHost?.id ?? LOCAL_EXECUTION_HOST_ID
+  const selectedHostId = selectedHost?.id ?? defaultHostId
   const selectedParsedHost = parseExecutionHostId(selectedHostId)
   const selectedSshTargetId =
     selectedParsedHost?.kind === 'ssh' ? selectedParsedHost.targetId : null
 
   useEffect(() => {
     if (isOpen && !previousOpenRef.current) {
-      const focusedHostId = getSettingsFocusedExecutionHostId(settings)
-      const nextHostId = selectableHostOptions.some(
-        (host) => host.id === focusedHostId && canSelectAddRepoHost(host)
-      )
-        ? focusedHostId
-        : LOCAL_EXECUTION_HOST_ID
-      setSelectedAddProjectHostId(nextHostId)
+      if (isWeb && hostOptions.length > 0) {
+        // Web mode: auto-select first connected dev server
+        setSelectedAddProjectHostId(hostOptions[0].id)
+      } else {
+        const focusedHostId = getSettingsFocusedExecutionHostId(settings)
+        const nextHostId = selectableHostOptions.some(
+          (host) => host.id === focusedHostId && canSelectAddRepoHost(host)
+        )
+          ? focusedHostId
+          : LOCAL_EXECUTION_HOST_ID
+        setSelectedAddProjectHostId(nextHostId)
+      }
     }
     if (!isOpen) {
       setHostSelectorOpen(false)
     }
     previousOpenRef.current = isOpen
-  }, [isOpen, selectableHostOptions, settings])
+  }, [isOpen, isWeb, hostOptions, selectableHostOptions, settings])
 
   const handleSelectAddProjectHost = useCallback(
     async (hostId: ExecutionHostId): Promise<void> => {
@@ -96,6 +112,16 @@ export function useAddRepoHostSelection({
       if (!host || !canSelectAddRepoHost(host)) {
         return
       }
+
+      // Web mode: devserver:<id> host — record in store and proceed
+      if (hostId.startsWith('devserver:')) {
+        const devServerId = hostId.slice('devserver:'.length)
+        setActiveDevServerId(devServerId)
+        setSelectedAddProjectHostId(hostId)
+        setStep('add')
+        return
+      }
+
       const parsed = parseExecutionHostId(hostId)
       if (parsed?.kind === 'runtime') {
         const switched = await switchRuntimeEnvironment(parsed.environmentId)
@@ -111,7 +137,7 @@ export function useAddRepoHostSelection({
       setSelectedAddProjectHostId(hostId)
       setStep('add')
     },
-    [selectableHostOptions, settings?.activeRuntimeEnvironmentId, setStep, switchRuntimeEnvironment]
+    [selectableHostOptions, settings?.activeRuntimeEnvironmentId, setStep, switchRuntimeEnvironment, setActiveDevServerId]
   )
 
   const handleConnectAddProjectHost = useCallback(

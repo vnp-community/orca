@@ -10,6 +10,8 @@ export type AdminRoute =
   | '/policies/new'
   | '/sessions'
   | '/audit'
+  | '/profile'
+  | '/ai-providers'
 
 type Props = {
   currentRoute: AdminRoute
@@ -22,11 +24,13 @@ type Props = {
 type NavItem = { route: AdminRoute; label: string; icon: string; exact?: boolean }
 
 const NAV_ITEMS: NavItem[] = [
-  { route: '/',         label: 'Dashboard',  icon: '📊', exact: true },
-  { route: '/users',    label: 'Users',      icon: '👥' },
-  { route: '/policies', label: 'Policies',   icon: '🔐' },
-  { route: '/sessions', label: 'Sessions',   icon: '📡' },
-  { route: '/audit',    label: 'Audit Log',  icon: '📋' }
+  { route: '/',              label: 'Dashboard',    icon: '📊', exact: true },
+  { route: '/users',         label: 'Users',        icon: '👥' },
+  { route: '/policies',      label: 'Policies',     icon: '🔐' },
+  { route: '/sessions',      label: 'Sessions',     icon: '📡' },
+  { route: '/audit',         label: 'Audit Log',    icon: '📋' },
+  { route: '/ai-providers',  label: 'AI Providers', icon: '🤖' },
+  { route: '/profile',       label: 'Profile',      icon: '🏢' },
 ]
 
 function isActive(item: NavItem, current: AdminRoute): boolean {

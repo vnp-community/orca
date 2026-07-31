@@ -43,16 +43,23 @@ async function main(): Promise<void> {
 
   // Step 3: Boot Orca backend services — listen on Unix socket (not TCP)
   const { initializeOrcaServices } = await import('../server-bootstrap')
-  const { shutdown } = await initializeOrcaServices({
+  const { shutdown, rpcAuthToken } = await initializeOrcaServices({
     platform: adapter,
-    // TODO: unix socket support — for now uses default port
-    // Future: add socketPath support to ServerBootstrapOptions
-    port: parseInt(process.env['ORCA_PROCESS_PORT'] ?? '0', 10) || undefined
+    // Why: ORCA_SOCKET_PATH is the Unix domain socket this user process must
+    // listen on. WsSessionRouter (supervisor) connects to this socket to proxy
+    // browser WebSocket traffic. Without it, handleConnection() closes the
+    // client connection immediately with 1011 because the socket file is missing.
+    socketPath: sockPath ?? undefined,
+    // wsPort=0: disable the TCP WebSocket server in user-process mode; all
+    // traffic arrives via the Unix socket proxied by WsSessionRouter.
+    port: 0,
+    isUserProcess: true
   })
 
-  // Step 4: Signal supervisor that we are ready
+  // Step 4: Signal supervisor that we are ready — include rpcAuthToken so
+  // SessionManager stores it in UserProcess for WsSessionRouter proxy injection.
   if (process.send) {
-    process.send({ type: 'ready', socketPath: sockPath })
+    process.send({ type: 'ready', socketPath: sockPath, rpcAuthToken: rpcAuthToken })
   }
   console.log(`[UserProcess] Ready: userId=${userId}`)
 

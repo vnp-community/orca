@@ -1,0 +1,66 @@
+# ============================================================
+# orca-agent.service — Orca Dev Server Agent (systemd)
+# ============================================================
+# Tự động khởi động agent khi server reboot.
+# Agent kết nối vào Orca server qua direct-websocket mode.
+#
+# Install:
+#   sudo cp orca-agent.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable orca-agent
+#   sudo systemctl start orca-agent
+#
+# Update (khi deploy agent.js mới):
+#   scp out/relay/agent.js ubuntu@<devserver>:~/orca-agent/agent.js
+#   sudo systemctl restart orca-agent
+#
+# Logs:
+#   sudo journalctl -u orca-agent -f
+#
+# Status:
+#   sudo systemctl status orca-agent
+# ============================================================
+
+[Unit]
+Description=Orca Dev Server Agent v2.1
+Documentation=https://b15.openledger.vn
+After=network-online.target
+Wants=network-online.target
+# Retry nếu Orca server chưa sẵn sàng khi boot
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/orca-agent
+
+# start.sh lấy token mới từ Orca mỗi lần start và chạy agent.
+# Token là one-time use — systemd Restart=always + start.sh đảm bảo fresh token.
+ExecStart=/bin/bash /home/ubuntu/orca-agent/start.sh
+
+# Luôn restart khi exit (token hết hạn, network drop, crash)
+Restart=always
+RestartSec=5s
+
+# Log ra file — nhất quán với connect-agent.sh --logs dùng tail
+StandardOutput=append:/home/ubuntu/orca-agent/logs/agent-direct.log
+StandardError=append:/home/ubuntu/orca-agent/logs/agent-direct.log
+
+# Environment cơ bản
+Environment=HOME=/home/ubuntu
+Environment=PATH=/home/ubuntu/.local/bin:/home/ubuntu/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin
+Environment=NODE_ENV=production
+
+# Graceful shutdown: SIGTERM → agent log "Shutting down" → exit
+# 15s > curl --max-time 8 + 2s buffer
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+
+# Security hardening nhẹ (agent cần exec docker/git)
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -850,9 +850,9 @@ function hasMatchingOnboardingFeatureSetupSelectedCount(
 type _OnboardingChecklistItemSync =
   z.infer<typeof onboardingChecklistItemSchema> extends Exclude<
     keyof OnboardingChecklistState,
-    'dismissed'
+    'dismissed' | 'perServer'
   >
-    ? Exclude<keyof OnboardingChecklistState, 'dismissed'> extends z.infer<
+    ? Exclude<keyof OnboardingChecklistState, 'dismissed' | 'perServer'> extends z.infer<
         typeof onboardingChecklistItemSchema
       >
       ? true

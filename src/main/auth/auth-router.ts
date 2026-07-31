@@ -22,6 +22,7 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax' as const,
   secure: process.env['NODE_ENV'] === 'production',
+  path: '/',
   maxAge: 8 * 60 * 60 * 1000  // 8 hours in ms (matches SESSION_TTL_MS)
 }
 
@@ -85,6 +86,15 @@ export function createAuthRouter(authManager: AuthManager): Router {
     res.status(501).json({
       error:   'not_implemented',
       message: 'SSO login is not yet implemented. Use local email/password login.',
+    })
+  })
+
+  // ── GET /auth/config ────────────────────────────────────────────────────
+  // Returns auth configuration (enabled providers, local login state).
+  router.get('/config', (_req: Request, res: Response): void => {
+    res.json({
+      providers: [],
+      localEnabled: true
     })
   })
 

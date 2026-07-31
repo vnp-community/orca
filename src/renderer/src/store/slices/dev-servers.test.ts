@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { DevServer } from '../../../../../shared/dev-server-types'
-import { createDevServerSlice, type DevServerSlice } from '../dev-servers'
+import { createDevServerSlice, type DevServerSlice } from './dev-servers'
 
 // ─── Minimal in-memory store for unit tests ───────────────────────────────────
 

@@ -57,6 +57,10 @@ export class SshChannelMultiplexer {
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
   private timeoutTimer: ReturnType<typeof setInterval> | null = null
   private disposed = false
+  // Why: when this mux wraps a non-SSH transport (e.g. dev server WebSocket relay)
+  // the generic 'SSH connection lost' error message is confusing.  Callers can set
+  // a custom label so the error message says e.g. 'Connection lost' instead.
+  private connectionLostMessage: string
 
   // Track the oldest unacked outgoing message timestamp
   private unackedTimestamps = new Map<number, number>()
@@ -65,8 +69,9 @@ export class SshChannelMultiplexer {
   // a keepalive ack proves the relay round-trip without a full RPC.
   private livenessProbeWaiters: { succeed: () => void; fail: () => void }[] = []
 
-  constructor(transport: MultiplexerTransport) {
+  constructor(transport: MultiplexerTransport, opts: { connectionLostMessage?: string } = {}) {
     this.transport = transport
+    this.connectionLostMessage = opts.connectionLostMessage ?? 'SSH connection lost, reconnecting...'
 
     this.decoder = new FrameDecoder(
       (frame) => this.handleFrame(frame),
@@ -288,7 +293,7 @@ export class SshChannelMultiplexer {
     // Why: the renderer uses the error code to distinguish temporary disconnects
     // (show reconnection overlay) from permanent shutdown (show error toast).
     const errorMessage =
-      reason === 'connection_lost' ? 'SSH connection lost, reconnecting...' : 'Multiplexer disposed'
+      reason === 'connection_lost' ? this.connectionLostMessage : 'Multiplexer disposed'
     const errorCode = reason === 'connection_lost' ? 'CONNECTION_LOST' : 'DISPOSED'
 
     for (const waiter of this.livenessProbeWaiters.splice(0)) {

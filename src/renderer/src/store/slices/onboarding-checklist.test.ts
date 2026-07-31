@@ -4,12 +4,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createStore } from 'zustand'
-import type { OnboardingChecklistSlice } from '../onboarding-checklist'
+import type { OnboardingChecklistSlice } from './onboarding-checklist'
 import {
   createOnboardingChecklistSlice,
   DEFAULT_CHECKLIST_STATE,
   useServerChecklist,
-} from '../onboarding-checklist'
+} from './onboarding-checklist'
 
 // ─── Mock window.api ────────────────────────────────────────────────────────────
 

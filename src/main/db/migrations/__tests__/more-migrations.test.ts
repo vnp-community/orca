@@ -12,13 +12,13 @@ describe('ALL_MIGRATIONS registry', () => {
 
   afterEach(() => db.close())
 
-  it('contains 5 migrations', () => {
-    expect(ALL_MIGRATIONS).toHaveLength(5)
+  it('contains 10 migrations', () => {
+    expect(ALL_MIGRATIONS).toHaveLength(10)
   })
 
   it('migrations are ordered by version ascending', () => {
     const versions = ALL_MIGRATIONS.map((m) => m.version)
-    expect(versions).toEqual([1, 2, 3, 4, 5])
+    expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   })
 
   it('all migrations have unique versions', () => {
@@ -30,10 +30,10 @@ describe('ALL_MIGRATIONS registry', () => {
     expect(ALL_MIGRATIONS.every((m) => m.name.length > 0)).toBe(true)
   })
 
-  it('running ALL_MIGRATIONS reaches version 5', async () => {
+  it('running ALL_MIGRATIONS reaches version 10', async () => {
     const runner = new MigrationRunner(db, ALL_MIGRATIONS)
     await runner.migrate()
-    expect(await runner.currentVersion()).toBe(5)
+    expect(await runner.currentVersion()).toBe(10)
   })
 })
 

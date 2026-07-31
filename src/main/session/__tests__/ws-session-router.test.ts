@@ -17,6 +17,18 @@ vi.mock('node:net', () => ({
   createConnection: vi.fn(() => upstreamMock)
 }))
 
+// Mock readRuntimeMetadata so tests don't need real filesystem metadata files.
+// Returns a valid unix transport so the router proceeds to create the upstream
+// connection instead of closing early with 1011.
+// Why path '../../runtime/runtime-metadata': test is in session/__tests__/,
+// the module lives at main/runtime/runtime-metadata — two levels up.
+vi.mock('../../runtime/runtime-metadata', () => ({
+  readRuntimeMetadata: vi.fn(() => ({
+    authToken: 'test-token',
+    transports: [{ kind: 'unix', endpoint: '/tmp/orca-test/users/user-alice/orca.sock' }]
+  }))
+}))
+
 import { WsSessionRouter } from '../ws-session-router'
 import type { SessionManager } from '../session-manager'
 import type { AuthManager } from '../../auth/auth-manager'
@@ -55,7 +67,10 @@ describe('WsSessionRouter', () => {
         process:      null,
         respawnCount: 0
       }),
-      touch: vi.fn()
+      touch: vi.fn(),
+      // Why: WsSessionRouter accesses (sessionManager as any).config.baseDataPath
+      // to read RuntimeMetadata. Provide the config stub so the access doesn't throw.
+      config: { baseDataPath: '/tmp/orca-test' }
     } as unknown as SessionManager
 
     authManager = {

@@ -140,27 +140,34 @@ export class PreflightHandler {
 
   /** TASK-028: Get pwsh availability and version. */
   private async checkPwsh(): Promise<{ pwshAvailable: boolean; pwshVersion?: string }> {
+    const available = isPwshAvailable()
+    if (!available) return { pwshAvailable: false }
     try {
       const { stdout } = await execFileAsync('pwsh', ['--version'])
       return { pwshAvailable: true, pwshVersion: stdout.trim() }
     } catch {
-      return { pwshAvailable: false }
+      return { pwshAvailable: true }
     }
   }
 
   /** TASK-028: Find Git Bash installation path on Windows. */
   private async checkGitBash(): Promise<{ gitBashAvailable: boolean; gitBashPath?: string }> {
-    const candidates = [
-      'C:\\Program Files\\Git\\bin\\bash.exe',
-      'C:\\Program Files (x86)\\Git\\bin\\bash.exe'
-    ]
-    for (const candidate of candidates) {
-      try {
-        await stat(candidate)
-        return { gitBashAvailable: true, gitBashPath: candidate }
-      } catch {
-        /* not found at this path, try next */
+    const available = isGitBashAvailable()
+    if (available) {
+      // Try to find the path as well (optional enrichment)
+      const candidates = [
+        'C:\\Program Files\\Git\\bin\\bash.exe',
+        'C:\\Program Files (x86)\\Git\\bin\\bash.exe'
+      ]
+      for (const candidate of candidates) {
+        try {
+          await stat(candidate)
+          return { gitBashAvailable: true, gitBashPath: candidate }
+        } catch {
+          /* not found at this path, try next */
+        }
       }
+      return { gitBashAvailable: true }
     }
     return { gitBashAvailable: false }
   }
@@ -197,15 +204,18 @@ export class PreflightHandler {
   private async checkFullPreflight(): Promise<{
     platform: NodeJS.Platform
     gh: { installed: boolean; authenticated: boolean; version?: string }
+    glab: { installed: boolean; authenticated: boolean; version?: string }
     git: { installed: boolean; version?: string; hasUserName: boolean; hasUserEmail: boolean }
   }> {
-    const [ghResult, gitResult] = await Promise.all([
+    const [ghResult, glabResult, gitResult] = await Promise.all([
       this.checkGhCli(),
+      this.checkGlabCli(),
       this.checkGitCli()
     ])
     return {
       platform: process.platform,
       gh: ghResult,
+      glab: glabResult,
       git: gitResult
     }
   }
@@ -219,6 +229,26 @@ export class PreflightHandler {
       const { stdout: version } = await execFileAsync('gh', ['--version'])
       try {
         await execFileAsync('gh', ['auth', 'status'])
+        return { installed: true, authenticated: true, version: version.trim() }
+      } catch {
+        return { installed: true, authenticated: false, version: version.trim() }
+      }
+    } catch {
+      return { installed: false, authenticated: false }
+    }
+  }
+
+  // Why: GitLab CLI (glab) is the GitLab equivalent of gh. We check it here
+  // alongside gh so the preflight response covers both GitHub and GitLab CLI.
+  private async checkGlabCli(): Promise<{
+    installed: boolean
+    authenticated: boolean
+    version?: string
+  }> {
+    try {
+      const { stdout: version } = await execFileAsync('glab', ['--version'])
+      try {
+        await execFileAsync('glab', ['auth', 'status'])
         return { installed: true, authenticated: true, version: version.trim() }
       } catch {
         return { installed: true, authenticated: false, version: version.trim() }

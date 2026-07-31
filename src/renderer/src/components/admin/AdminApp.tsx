@@ -13,6 +13,12 @@ const PoliciesPage   = lazy(() => import('./PoliciesPage').then((m) => ({ defaul
 const PolicyForm     = lazy(() => import('./PolicyForm').then((m) => ({ default: m.PolicyForm })))
 const SessionsPage   = lazy(() => import('./SessionsPage').then((m) => ({ default: m.SessionsPage })))
 const AuditPage      = lazy(() => import('./AuditPage').then((m) => ({ default: m.AuditPage })))
+const CompanyProfileAdmin = lazy(() =>
+  import('../profile/CompanyProfileAdmin').then((m) => ({ default: m.CompanyProfileAdmin }))
+)
+const ProviderList = lazy(() =>
+  import('../ai-provider/ProviderList').then((m) => ({ default: m.ProviderList }))
+)
 
 function PageContent({
   route,
@@ -34,8 +40,10 @@ function PageContent({
     const id = route.split('/')[2]
     return <PolicyForm mode="edit" policyId={id} onDone={() => onNavigate('/policies')} />
   }
-  if (route === '/sessions') return <SessionsPage />
-  if (route === '/audit')    return <AuditPage />
+  if (route === '/sessions')      return <SessionsPage />
+  if (route === '/audit')          return <AuditPage />
+  if (route === '/profile')        return <CompanyProfileAdmin />
+  if (route === '/ai-providers')   return <ProviderList />
   return <AdminDashboard />
 }
 

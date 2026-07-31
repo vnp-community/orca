@@ -31,9 +31,18 @@ services:
     build:
       context: ../../
       dockerfile: deploy/dev/docker/orca/Dockerfile
+      # Why: frontend Vite build needs ~2-3GB RAM. Without shm-size, Docker
+      # defaults to 64MB shared memory which causes build OOM crashes.
+      shm_size: '2gb'
     image: vnpblc/orca-server:${ORCA_VERSION:-latest}
     container_name: orca-server
     restart: unless-stopped
+    # Why: limit runtime memory so the container doesn't starve other services.
+    # Build stage is NOT limited here (only runtime container gets deploy resources).
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
     environment:
       # Domain public mà người dùng truy cập (cho pairing URL)

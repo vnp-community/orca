@@ -200,7 +200,9 @@ export default defineConfig({
     define: {
       ORCA_BUILD_IDENTITY: ORCA_BUILD_IDENTITY_LITERAL,
       ORCA_POSTHOG_WRITE_KEY: ORCA_POSTHOG_WRITE_KEY_LITERAL,
-      ORCA_DIAGNOSTICS_TOKEN_URL: ORCA_DIAGNOSTICS_TOKEN_URL_LITERAL
+      ORCA_DIAGNOSTICS_TOKEN_URL: ORCA_DIAGNOSTICS_TOKEN_URL_LITERAL,
+      __ORCA_GIT_V6__: JSON.stringify(process.env.ORCA_FEATURE_GIT_V6 === 'true'),
+      __ORCA_WORKSPACE_V6__: JSON.stringify(process.env.ORCA_FEATURE_WORKSPACE_V6 === 'true')
     },
     // Why: @xterm/headless declares "exports": null in package.json, which
     // prevents Vite's default resolver from finding the CJS entry. Point

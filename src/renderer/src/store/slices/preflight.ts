@@ -102,7 +102,15 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
 
     const request = (
       runtimeTarget.kind === 'environment'
-        ? callRuntimeRpc<PreflightStatus>(runtimeTarget, 'preflight.check', force ? { force } : {})
+        ? (() => {
+            // Why: in web/session-auth mode, preflight.check must route to the
+            // active Dev Server's relay (where gh/git/glab are installed), not
+            // run locally on the Orca Server container (no tools there).
+            const activeDevServerId = get().activeDevServerId
+            const params: Record<string, unknown> = force ? { force } : {}
+            if (activeDevServerId) params.devServerId = activeDevServerId
+            return callRuntimeRpc<PreflightStatus>(runtimeTarget, 'preflight.check', params)
+          })()
         : window.api.preflight.check(preflightArgs)
     )
       .then((status) => {

@@ -62,6 +62,7 @@ import { RuntimeEnvironmentsPane } from './RuntimeEnvironmentsPane'
 import { PrivacyPane } from './PrivacyPane'
 import { AdvancedPane } from './AdvancedPane'
 import { SettingsSidebar } from './SettingsSidebar'
+import { DevServerPane } from './DevServerPane'
 import { SettingsSetupGuidePane } from './SettingsSetupGuidePane'
 import { ActiveSettingsSectionProvider, SettingsSection } from './SettingsSection'
 import { getSettingsSectionSearchEntries, rankSettingsSearchItems } from './settings-search'
@@ -1544,6 +1545,21 @@ function Settings(): React.JSX.Element {
                       allowLocalRuntime={!isWebClient}
                     />
                   ) : null}
+                </SettingsSection>
+
+                <SettingsSection
+                  id="dev-servers"
+                  title={translate(
+                    'auto.components.settings.Settings.devServersTitle',
+                    'Dev Servers'
+                  )}
+                  description={translate(
+                    'auto.components.settings.Settings.devServersDesc',
+                    'Connect remote developer machines so Orca agents run on your actual dev environment.'
+                  )}
+                  searchEntries={getSectionSearchEntries('dev-servers')}
+                >
+                  {isSectionMounted('dev-servers') ? <DevServerPane /> : null}
                 </SettingsSection>
 
                 {showDesktopOnlySettings ? (

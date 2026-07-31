@@ -10,6 +10,7 @@ import { translate } from '@/i18n/i18n'
 type AddRepoServerPathStartStepProps = {
   serverPath: string
   runtimeEnvironmentId: string | null | undefined
+  devServerId: string | null | undefined
   isAddingServerPath: boolean
   addProjectBusyLabel: string | null
   hostSelector?: ReactNode
@@ -23,6 +24,7 @@ type AddRepoServerPathStartStepProps = {
 export function AddRepoServerPathStartStep({
   serverPath,
   runtimeEnvironmentId,
+  devServerId,
   isAddingServerPath,
   addProjectBusyLabel,
   hostSelector,
@@ -35,7 +37,10 @@ export function AddRepoServerPathStartStep({
   const [browsing, setBrowsing] = useState(initialBrowsing)
   const [pathEntryOpen, setPathEntryOpen] = useState(initialBrowsing)
 
-  if (browsing && runtimeEnvironmentId) {
+  // Show folder browser when:
+  //   - runtimeEnvironmentId: Orca runtime environment (session-auth)
+  //   - devServerId: Dev Server agent relay (direct-websocket)
+  if (browsing && (runtimeEnvironmentId || devServerId)) {
     return (
       <>
         <DialogHeader>
@@ -52,22 +57,35 @@ export function AddRepoServerPathStartStep({
             )}
           </DialogDescription>
         </DialogHeader>
-        <RemoteFileBrowser
-          runtimeEnvironmentId={runtimeEnvironmentId}
-          initialPath={serverPath || '~'}
-          onSelect={(path) => {
-            onServerPathChange(path)
-            setBrowsing(false)
-            setPathEntryOpen(true)
-          }}
-          onCancel={() => setBrowsing(false)}
-        />
+        {runtimeEnvironmentId ? (
+          <RemoteFileBrowser
+            runtimeEnvironmentId={runtimeEnvironmentId}
+            initialPath={serverPath || '~'}
+            onSelect={(path) => {
+              onServerPathChange(path)
+              setBrowsing(false)
+              setPathEntryOpen(true)
+            }}
+            onCancel={() => setBrowsing(false)}
+          />
+        ) : (
+          <RemoteFileBrowser
+            devServerId={devServerId!}
+            initialPath={serverPath || '~'}
+            onSelect={(path) => {
+              onServerPathChange(path)
+              setBrowsing(false)
+              setPathEntryOpen(true)
+            }}
+            onCancel={() => setBrowsing(false)}
+          />
+        )}
       </>
     )
   }
 
   if (!pathEntryOpen) {
-    const disabled = isAddingServerPath || !runtimeEnvironmentId
+    const disabled = isAddingServerPath || (!runtimeEnvironmentId && !devServerId)
 
     return (
       <>

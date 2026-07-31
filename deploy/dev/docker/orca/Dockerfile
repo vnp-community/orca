@@ -24,10 +24,14 @@ RUN npm pkg delete scripts.postinstall scripts.prepare && corepack enable
 RUN pnpm install
 
 # Now copy the rest of the source code
+# Why: ARG CACHE_BUST lets sync-to-server.sh pass --build-arg CACHE_BUST=$(date +%s)
+# to invalidate this layer on every deploy, preventing Docker from reusing stale
+# cached source and skipping the pnpm build steps with outdated code.
+ARG CACHE_BUST=1
 COPY . .
-RUN pnpm build:relay
-RUN pnpm build:web
-RUN pnpm exec vite build -c vite.server.config.ts
+RUN pnpm build:dev-server
+RUN pnpm build:backend
+RUN pnpm build:frontend:web
 
 # ============================================================
 # Stage 2: Runtime
@@ -39,7 +43,7 @@ LABEL description="Orca AI Orchestrator — pure Node.js runtime"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/home/orca
 
-# Install runtime dependencies (git, ssh, wget)
+# Install runtime dependencies (git, ssh, wget, gh CLI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -47,7 +51,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     openssh-client \
     wget \
+    curl \
     ca-certificates \
+  && mkdir -p /usr/share/keyrings \
+  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+       | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+       > /etc/apt/sources.list.d/github-cli.list \
+  && apt-get update && apt-get install -y --no-install-recommends gh \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get clean
 

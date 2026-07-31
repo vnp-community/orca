@@ -40,6 +40,13 @@ import type { BootstrapSlice } from './slices/bootstrap'
 import type { AuthSlice } from './slices/auth'
 import type { DevServerSlice } from './slices/dev-servers'
 import type { OnboardingChecklistSlice } from './slices/onboarding-checklist'
+import type { WorkspaceSlice } from './slices/workspace-slice'
+import type { ProfileSlice } from './slices/profile-slice'
+import type { AIProviderSlice } from './slices/ai-provider-slice'
+import type { GitPanelSlice } from './slices/git-panel'
+import type { TaskSlice } from './slices/task'
+import type { WorkflowSlice } from './slices/workflow'
+import type { TraceSlice } from './slices/trace'
 
 // ── Re-exports for cross-slice consumers (import from '@/store/types') ────────
 export type {
@@ -92,4 +99,11 @@ export type AppState = RepoSlice &
   BootstrapSlice &
   AuthSlice &
   DevServerSlice &
-  OnboardingChecklistSlice
+  OnboardingChecklistSlice &
+  WorkspaceSlice &
+  ProfileSlice &
+  AIProviderSlice &
+  GitPanelSlice &
+  TaskSlice &
+  WorkflowSlice &
+  TraceSlice

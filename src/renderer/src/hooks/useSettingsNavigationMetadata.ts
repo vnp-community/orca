@@ -63,6 +63,7 @@ import { getSshPaneSearchEntries } from '@/components/settings/ssh-search'
 import { getMobileSettingsPaneSearchEntries } from '@/components/settings/mobile-settings-search'
 import { getMobileEmulatorSearchEntries } from '@/components/settings/mobile-emulator-search'
 import { getComputerUsePaneSearchEntries } from '@/components/settings/computer-use-search'
+import { getDevServerPaneSearchEntries } from '@/components/settings/dev-server-search'
 import { getVoicePaneSearchEntries } from '@/components/settings/voice-pane-search'
 import { getDeveloperPermissionsPaneSearchEntries } from '@/components/settings/developer-permissions-search'
 import { getPrivacyPaneSearchEntries } from '@/components/settings/privacy-search'
@@ -458,6 +459,20 @@ export function buildSettingsNavigationMetadata({
       searchEntries: [runtimeEnvironmentsSearchEntry],
       group: 'remote',
       badge: translate('auto.hooks.useSettingsNavigationMetadata.40d80bad8a', 'Beta')
+    },
+    {
+      id: 'dev-servers',
+      title: translate(
+        'auto.hooks.useSettingsNavigationMetadata.devServersTitle',
+        'Dev Servers'
+      ),
+      description: translate(
+        'auto.hooks.useSettingsNavigationMetadata.devServersDesc',
+        'Connect remote developer machines so Orca agents run on your actual dev environment.'
+      ),
+      icon: Server,
+      searchEntries: getDevServerPaneSearchEntries(),
+      group: 'remote'
     },
     ...(showDesktopOnlySettings && isMac
       ? [

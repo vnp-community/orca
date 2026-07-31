@@ -2262,6 +2262,50 @@ export type PreloadApi = {
         error?: string
       }) => void
     ) => () => void
+    /**
+     * List SSH targets from the Orca server DB (server-mode only).
+     * Bypasses the desktop-only ssh.listTargets ipc guard.
+     */
+    listSshTargets: () => Promise<import('../shared/ssh-types').SshTarget[]>
+    /**
+     * Create a new SSH target in the Orca server DB.
+     * Used by AddDevServerDialog inline host form (no Settings → SSH Hosts needed).
+     */
+    addSshTarget: (params: {
+      label: string
+      host: string
+      port?: number
+      username?: string
+    }) => Promise<import('../shared/ssh-types').SshTarget>
+    /**
+     * Subscribe to push events when a direct-websocket agent token is generated.
+     * The handler is called once per Connect attempt with the one-time token
+     * and Orca URL the agent should use.
+     */
+    onAgentToken: (
+      handler: (info: import('../shared/dev-server-types').AgentTokenInfo) => void
+    ) => void | (() => void)
+    /** Unsubscribe a previously registered onAgentToken handler */
+    offAgentToken: (
+      handler: (info: import('../shared/dev-server-types').AgentTokenInfo) => void
+    ) => void
+    /**
+     * Browse a directory on a connected dev server via the agent relay.
+     * Returns the resolved absolute path and a list of directory entries.
+     * Used by the web-mode folder picker (RemoteFileBrowser) when the
+     * selected host is a Dev Server rather than an Orca runtime environment.
+     */
+    browseDir?: (args: {
+      id: string
+      path: string
+    }) => Promise<{
+      resolvedPath: string
+      entries: Array<{ name: string; isDirectory: boolean; isSymlink: boolean }>
+    }>
+    /** Creates a directory on a connected dev server. */
+    mkdir?: (args: { id: string; path: string }) => Promise<{ path: string }>
+    /** Removes a directory from a connected dev server. */
+    rmdir?: (args: { id: string; path: string }) => Promise<void>
   }
   developerPermissions: {
     getStatus: () => Promise<DeveloperPermissionState[]>
@@ -3373,6 +3417,43 @@ export type PreloadApi = {
     onReady: (callback: (data: SpeechLifecycleEvent) => void) => () => void
     onStopped: (callback: (data: SpeechLifecycleEvent) => void) => () => void
     onError: (callback: (data: SpeechErrorEvent) => void) => () => void
+  }
+  // ── Web Server mode credential management (FE-SOL-03 / SOL-04-Credential-Store) ──
+  // Available in web mode only; electron mode returns errors from the RPC server.
+  credentials: {
+    set: (
+      service: string,
+      token: string,
+      config?: Record<string, string>
+    ) => Promise<{ success: boolean }>
+    revoke: (service: string) => Promise<{ success: boolean }>
+    status: (
+      service: string
+    ) => Promise<{ configured: boolean; mode: string; config?: Record<string, string> }>
+    list: () => Promise<{ services: string[]; mode: string }>
+  }
+  // ── CLI auth login via PTY on Dev Server (FE-SOL-02 / SOL-03-Remote-PTY) ──
+  // Spawn `gh auth login` / `gh auth logout` as a PTY on the Dev Server relay.
+  // Returns { ptyId, devServerId } — caller subscribes to PTY stream for output.
+  github: {
+    startAuthLogin: (
+      devServerId: string,
+      host?: string
+    ) => Promise<{ ptyId: string; devServerId: string }>
+    revokeAuth: (
+      devServerId: string,
+      host?: string
+    ) => Promise<{ ptyId: string; devServerId: string }>
+  }
+  gitlab: {
+    startAuthLogin: (
+      devServerId: string,
+      host?: string
+    ) => Promise<{ ptyId: string; devServerId: string }>
+    revokeAuth: (
+      devServerId: string,
+      host?: string
+    ) => Promise<{ ptyId: string; devServerId: string }>
   }
 }
 

@@ -1,6 +1,6 @@
 // Why: lightweight JSON-RPC WebSocket client for web mode — replaces Electron
 // ipcRenderer with the same invoke/on/once surface web-preload-api depends on.
-import type { IRpcClient } from '../../platform/rpc-client-interface'
+import type { IRpcClient } from '../../rpc-client-interface'
 
 type PendingInvocation = {
   resolve: (result: unknown) => void
@@ -17,10 +17,10 @@ function generateId(): string {
 }
 
 function getDefaultWsUrl(): string {
-  if (typeof window === 'undefined') return 'ws://localhost:6768/ws/runtime/api'
+  if (typeof window === 'undefined') return 'ws://localhost:6769/ws'
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const host = window.location.host || 'localhost:6768'
-  return `${protocol}//${host}/ws/runtime/api`
+  const host = window.location.host || 'localhost:6769'
+  return `${protocol}//${host}/ws`
 }
 
 export class WebSocketRpcClient implements IRpcClient {

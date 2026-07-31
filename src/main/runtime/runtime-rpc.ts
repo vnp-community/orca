@@ -9,6 +9,7 @@ import { readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RuntimeMetadata, RuntimeTransportMetadata } from '../../shared/runtime-bootstrap'
 import type { OrcaRuntimeService } from './orca-runtime'
+import type { DevServerManager } from '../dev-server/dev-server-manager'
 import { writeRuntimeMetadata } from './runtime-metadata'
 import { RpcDispatcher } from './rpc/dispatcher'
 import type { RpcRequest, RpcResponse } from './rpc/core'
@@ -41,6 +42,23 @@ type OrcaRuntimeRpcServerOptions = {
   enableWebSocket?: boolean
   wsPort?: number
   webClientRoot?: string
+  /**
+   * Unix domain socket path for the RPC server to listen on.
+   * Used in user-process (multi-user) mode: overrides the auto-generated socket
+   * path so WsSessionRouter can connect to the exact path it passed via
+   * ORCA_SOCKET_PATH env var. When omitted, defaults to the standard
+   * userData-derived path (o-<pid>-<runtimeId>.sock).
+   */
+  socketPath?: string
+  // Why: Web mode proxy handlers (preflight.check, github.startAuthLogin, etc.)
+  // need the relay manager at dispatch time. Passed in from server-bootstrap
+  // so the RpcDispatcher can inject it into handler context.
+  devServerManager?: DevServerManager
+  // Why: service-dependent RPC methods (e.g. AI provider, project, workflow)
+  // cannot be statically registered in ALL_RPC_METHODS because they require
+  // runtime service injection. Pass them here at bootstrap time so they are
+  // merged into the dispatcher's registry. (v5.0 TDD-16)
+  extraMethods?: import('./rpc/core').RpcAnyMethod[]
   // Why: test-only overrides for the two time-bound constants below.
   // Production callers must not pass these — defaults are set by the design
   // doc (§3.1) and changing them in production would weaken the admission
@@ -416,6 +434,7 @@ export class OrcaRuntimeRpcServer {
   private readonly platform: NodeJS.Platform
   private readonly enableWebSocket: boolean
   private readonly wsPort: number
+  private readonly socketPathOverride: string | undefined
   private readonly webClientRoot: string | undefined
   private readonly authToken = randomBytes(24).toString('hex')
   private readonly keepaliveIntervalMs: number
@@ -454,16 +473,20 @@ export class OrcaRuntimeRpcServer {
     enableWebSocket = false,
     wsPort = ORCA_PORT ?? DEFAULT_WS_PORT,
     webClientRoot,
+    socketPath,
+    devServerManager,
+    extraMethods,
     keepaliveIntervalMs = KEEPALIVE_INTERVAL_MS,
     longPollCap = LONG_POLL_CAP
   }: OrcaRuntimeRpcServerOptions) {
     this.runtime = runtime
-    this.dispatcher = new RpcDispatcher({ runtime })
+    this.dispatcher = new RpcDispatcher({ runtime, devServerManager, extraMethods })
     this.userDataPath = userDataPath
     this.pid = pid
     this.platform = platform
     this.enableWebSocket = enableWebSocket
     this.wsPort = wsPort
+    this.socketPathOverride = socketPath
     this.webClientRoot = webClientRoot
     this.keepaliveIntervalMs = keepaliveIntervalMs
     this.longPollCap = longPollCap
@@ -471,6 +494,11 @@ export class OrcaRuntimeRpcServer {
 
   getDeviceRegistry(): DeviceRegistry | null {
     return this.deviceRegistry
+  }
+
+  /** Auth token for Unix socket connections (used by WsSessionRouter in multi-user mode) */
+  getAuthToken(): string {
+    return this.authToken
   }
 
   getTlsFingerprint(): string | null {
@@ -501,6 +529,15 @@ export class OrcaRuntimeRpcServer {
     }
     this.wsTransport?.terminateClientConnections(device.token)
     return true
+  }
+
+  /**
+   * Register additional RPC methods after construction.
+   * Called by server-bootstrap to inject service-dependent methods (e.g. AI provider)
+   * that are initialized after the RPC server is created. (v5.0 TDD-16)
+   */
+  addMethods(methods: import('./rpc/core').RpcAnyMethod[]): void {
+    this.dispatcher.addMethods(methods)
   }
 
   getWebSocketEndpoint(): string | null {
@@ -666,6 +703,13 @@ export class OrcaRuntimeRpcServer {
       this.platform,
       this.runtime.getRuntimeId()
     )
+
+    // Why: in user-process mode (multi-user), SessionManager injects ORCA_SOCKET_PATH
+    // so WsSessionRouter knows exactly where to connect. Override the auto-generated
+    // path with the injected one so the two sides agree on the socket location.
+    if (this.socketPathOverride) {
+      transportMeta.endpoint = this.socketPathOverride
+    }
 
     const socketTransport = new UnixSocketTransport({
       endpoint: transportMeta.endpoint,

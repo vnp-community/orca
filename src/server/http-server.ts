@@ -27,6 +27,7 @@ import { AdminStatsHandler }    from '../main/admin/admin-stats-handler'
 import { AdminAuditHandlers }   from '../main/admin/admin-audit-handlers'
 import { AuditLogger }          from '../main/admin/audit-logger'
 import { ensureFirstAdminUser } from '../main/admin/first-run-setup'
+import { handleTraceStreamRequest } from './trace-sse-routes'
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -56,6 +57,12 @@ export interface HttpServerOptions {
   authManager?: AuthManager
   /** Sync DB instance for admin stats + audit logger. Required when authManager is set. */
   db?: ISyncDatabase
+  /**
+   * Optional handler for /api/* routes (e.g. agent-token registration).
+   * Called before static-file fallback. Must call res.end() if it handles the request.
+   * Return true if handled, false to fall through to static handler.
+   */
+  apiHandler?: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => boolean
 }
 
 /**
@@ -140,13 +147,24 @@ export async function startHttpServer(
       return
     }
 
-    // 2. /auth/* or /admin/api/* → Express app
+    // 2. /api/* → optional API handler (agent-token, etc.)
+    if (path.startsWith('/api/')) {
+      // 2a. /api/trace-stream → SSE trace event stream (always registered)
+      if (handleTraceStreamRequest(req, res)) return
+      // 2b. other /api/* → caller-provided handler (agent-token, etc.)
+      if (options.apiHandler) {
+        const handled = options.apiHandler(req, res)
+        if (handled) return
+      }
+    }
+
+    // 3. /auth/* or /admin/api/* → Express app
     if (path.startsWith('/auth') || path.startsWith('/admin')) {
       app(req, res)
       return
     }
 
-    // 3. Everything else → static file handler
+    // 4. Everything else → static file handler
     handleStaticRequest(req, res, normalizedRoot)
   })
 

@@ -28,22 +28,46 @@ import {
 import { ALL_RPC_METHODS } from './methods'
 import { emulatorProbe, emulatorProbeError } from '../../emulator/emulator-probe'
 import type { OrcaRuntimeService } from '../orca-runtime'
+import type { DevServerManager } from '../../dev-server/dev-server-manager'
 
 export type DispatcherOptions = {
   runtime: OrcaRuntimeService
   methods?: readonly RpcAnyMethod[]
+  // Why: Web mode proxy methods need the relay manager at dispatch time.
+  // Passed in from server-bootstrap so handlers can reach connected relays.
+  devServerManager?: DevServerManager
+  // Why: service-dependent methods injected at bootstrap (e.g. AI provider).
+  // Merged with `methods` so they share the same registry. (v5.0 TDD-16)
+  extraMethods?: RpcAnyMethod[]
 }
 
 export class RpcDispatcher {
   private readonly runtime: OrcaRuntimeService
-  private readonly registry: RpcRegistry
+  private registry: Map<string, RpcAnyMethod>
+  private readonly devServerManager?: DevServerManager
 
-  constructor({ runtime, methods = ALL_RPC_METHODS }: DispatcherOptions) {
+  constructor({ runtime, methods = ALL_RPC_METHODS, devServerManager, extraMethods }: DispatcherOptions) {
     this.runtime = runtime
-    this.registry = buildRegistry(methods)
+    const allMethods = extraMethods ? [...methods, ...extraMethods] : methods
+    this.registry = new Map(buildRegistry(allMethods))
+    this.devServerManager = devServerManager
   }
 
-  async dispatch(request: RpcRequest, options?: { signal?: AbortSignal }): Promise<RpcResponse> {
+  /**
+   * Register additional methods after construction.
+   * Used by server-bootstrap to wire service-injected methods (e.g. AI provider)
+   * that are initialized after the dispatcher is created. (v5.0 TDD-16)
+   */
+  addMethods(methods: RpcAnyMethod[]): void {
+    for (const method of methods) {
+      if (this.registry.has(method.name)) {
+        throw new Error(`duplicate_rpc_method:${method.name}`)
+      }
+      this.registry.set(method.name, method)
+    }
+  }
+
+  async dispatch(request: RpcRequest, options?: { signal?: AbortSignal; userId?: string }): Promise<RpcResponse> {
     const meta = this.meta()
     const method = this.registry.get(request.method)
     if (!method) {
@@ -79,7 +103,9 @@ export class RpcDispatcher {
     try {
       const result = await method.handler(parsedParams.value, {
         runtime: this.runtime,
-        signal: options?.signal
+        signal: options?.signal,
+        devServerManager: this.devServerManager,
+        userId: options?.userId
       })
       this.recordRuntimeFeatureInteraction(request.method, result, undefined, request.params)
       return successResponse(request.id, meta, result)
@@ -107,6 +133,9 @@ export class RpcDispatcher {
         streamId: number,
         handler: (frame: TerminalStreamFrame) => void
       ) => () => void
+      // Why: userId is set by the WebSocket transport from the session token
+      // so streaming handlers (subscribe methods) can scope their state to the user.
+      userId?: string
     }
   ): Promise<void> {
     const meta = this.meta()
@@ -136,7 +165,9 @@ export class RpcDispatcher {
           clientId: options?.clientId,
           clientKind: options?.clientKind,
           sendBinary: options?.sendBinary,
-          registerBinaryStreamHandler: options?.registerBinaryStreamHandler
+          registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
+          devServerManager: this.devServerManager,
+          userId: options?.userId
         })
         this.recordRuntimeFeatureInteraction(request.method, result, undefined, request.params)
         reply(JSON.stringify(successResponse(request.id, meta, result)))

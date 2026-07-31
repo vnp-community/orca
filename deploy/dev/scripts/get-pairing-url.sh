@@ -135,15 +135,24 @@ if (!device) {
 }
 
 // 4. Build pairing offer
+// Why: ORCA_DOMAIN có thể có hoặc không có scheme prefix (wss:// hoặc ws://)
+// Nếu đã có prefix thì dùng nguyên, nếu chưa thì thêm wss:// mặc định.
+const rawDomain = domain;
+let wsEndpoint;
+if (/^wss?:\/\//i.test(rawDomain)) {
+  wsEndpoint = rawDomain.replace(/\/$/, '');  // strip trailing slash
+} else {
+  wsEndpoint = `wss://${rawDomain}`;
+}
 const offer = {
   v: 2,
-  endpoint:    `wss://${domain}`,
+  endpoint:    wsEndpoint,
   deviceToken: device.token,
   publicKeyB64,
   scope
 };
 const pairingCode  = Buffer.from(JSON.stringify(offer)).toString('base64url');
-const webClientUrl = `https://${domain}/#pairing=${encodeURIComponent(pairingCode)}`;
+const webClientUrl = `https://${rawDomain.replace(/^wss?:\/\//i, '').split(':')[0]}/#pairing=${encodeURIComponent(pairingCode)}`;
 
 // 5. Output JSON
 console.log(JSON.stringify({

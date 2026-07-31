@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import type { DevServer } from '../../../../shared/dev-server-types'
 import type { AppState } from '../types'
+import { useAppStore } from '../index'
 
 // ─── Slice Type ───────────────────────────────────────────────────────────────
 
@@ -54,10 +55,12 @@ export const createDevServerSlice: StateCreator<AppState, [], [], DevServerSlice
 })
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
-// Import useAppStore lazily to avoid circular dependency at module evaluation time.
-// These hooks are only called at React render time, so the import is always resolved.
-
-import { useAppStore } from '../index'
+// Why: useAppStore is imported lazily (via require) inside each hook to avoid
+// a circular dependency at module evaluation time. dev-servers.ts is imported
+// by store/index.ts (which creates the store), so a top-level import of
+// useAppStore from '../index' would create a cycle that returns undefined for
+// createDevServerSlice in test isolation. The hooks are only called at React
+// render time, by which point all modules are fully initialized.
 
 /** All dev servers (stable reference via shallow equality) */
 export function useDevServers() {

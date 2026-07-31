@@ -20,3 +20,7 @@ declare const ORCA_POSTHOG_WRITE_KEY: string | null
 // point a packaged build at a staging server without re-running the
 // release pipeline.
 declare const ORCA_DIAGNOSTICS_TOKEN_URL: string | null
+
+// ── v6 Feature Flags (Conflict Resolution C1 & C2) ──────────────────────────
+declare const __ORCA_GIT_V6__: boolean
+declare const __ORCA_WORKSPACE_V6__: boolean

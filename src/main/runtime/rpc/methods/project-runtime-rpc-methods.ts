@@ -86,22 +86,10 @@ const ProjectHostSetupDelete = z.object({
   setupId: requiredString('Missing setup ID')
 })
 
+// NOTE: project.list và project.update được đăng ký bởi project-rpc-handler.ts
+// (server-bootstrap.ts → createProjectMethods) khi chạy ở server/web mode.
+// Chỉ giữ lại projectHostSetup.* vì chúng không bị duplicate.
 export const PROJECT_RUNTIME_METHODS: RpcMethod[] = [
-  defineMethod({
-    name: 'project.list',
-    params: null,
-    handler: (_params, { runtime }) => {
-      runtime.enrichMissingRepoGitRemoteIdentities?.()
-      return { projects: runtime.listProjects() }
-    }
-  }),
-  defineMethod({
-    name: 'project.update',
-    params: ProjectUpdate,
-    handler: (params, { runtime }) => ({
-      project: runtime.updateProject(params.projectId, params.updates)
-    })
-  }),
   defineMethod({
     name: 'projectHostSetup.list',
     params: null,

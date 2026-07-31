@@ -14,6 +14,7 @@ type AddRepoDialogStepContentProps = {
   step: AddRepoDialogStep
   isRuntimeEnvironmentActive: boolean
   activeRuntimeEnvironmentId: string | null | undefined
+  activeDevServerId: string | null | undefined
   isSshLikely: boolean
   repoCount: number
   isAdding: boolean
@@ -83,6 +84,7 @@ export function AddRepoDialogStepContent({
   step,
   isRuntimeEnvironmentActive,
   activeRuntimeEnvironmentId,
+  activeDevServerId,
   isSshLikely,
   repoCount,
   isAdding,
@@ -174,6 +176,7 @@ export function AddRepoDialogStepContent({
       <AddRepoServerPathStartStep
         serverPath={serverPath}
         runtimeEnvironmentId={activeRuntimeEnvironmentId}
+        devServerId={activeDevServerId}
         isAddingServerPath={isAddingServerPath}
         addProjectBusyLabel={addProjectBusyLabel}
         hostSelector={hostSelector}

@@ -16,12 +16,17 @@ function makeServer(status: DevServer['status']): DevServer {
   return {
     id: `ds-${Math.random()}`,
     name: 'Test Server',
-    connectionType: 'ssh',
+    connectionType: 'relay-ssh',
     sshTargetId: 'target-1',
-    wsUrl: null,
+    wsUrl: undefined,
     workspaceDir: null,
     addedAt: Date.now(),
-    status
+    status,
+    platform: null,
+    arch: null,
+    nodeVersion: null,
+    lastConnectedAt: null,
+    lastError: null
   }
 }
 

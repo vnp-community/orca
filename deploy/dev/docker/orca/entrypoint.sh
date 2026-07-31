@@ -57,6 +57,33 @@ if [ -n "${ORCA_USER_DATA_PATH}" ]; then
   echo "[entrypoint] Data directory: ${ORCA_USER_DATA_PATH}"
 fi
 
+# ── SSH key setup ──────────────────────────────────────────────────────────
+# Why: /home/orca/.ssh is a read-only bind-mount owned by ubuntu (uid=1000).
+# SSH refuses to read config/key files not owned by the current user (orca, uid=999).
+# Fix: copy SSH files to a writable directory and update HOME so SSH uses them.
+ORCA_SSH_SRC="/home/orca/.ssh"
+ORCA_SSH_DEST="/data/orca/.ssh"
+if [ -d "${ORCA_SSH_SRC}" ] && [ "$(ls -A ${ORCA_SSH_SRC} 2>/dev/null)" ]; then
+  mkdir -p "${ORCA_SSH_DEST}"
+  cp -n "${ORCA_SSH_SRC}/id_ed25519"     "${ORCA_SSH_DEST}/id_ed25519"     2>/dev/null || true
+  cp    "${ORCA_SSH_SRC}/id_ed25519.pub" "${ORCA_SSH_DEST}/id_ed25519.pub" 2>/dev/null || true
+  cp    "${ORCA_SSH_SRC}/known_hosts"    "${ORCA_SSH_DEST}/known_hosts"    2>/dev/null || true
+  # Rewrite config to point to /data/orca/.ssh paths (owned by orca)
+  if [ -f "${ORCA_SSH_SRC}/config" ] || [ -f "${ORCA_SSH_SRC}/config.bak" ]; then
+    SRC_CFG="${ORCA_SSH_SRC}/config"
+    [ ! -f "${SRC_CFG}" ] && SRC_CFG="${ORCA_SSH_SRC}/config.bak"
+    sed "s|/home/orca/\.ssh/|${ORCA_SSH_DEST}/|g" "${SRC_CFG}" > "${ORCA_SSH_DEST}/config"
+  fi
+  chmod 700 "${ORCA_SSH_DEST}"
+  chmod 600 "${ORCA_SSH_DEST}/id_ed25519" 2>/dev/null || true
+  chmod 644 "${ORCA_SSH_DEST}/id_ed25519.pub" "${ORCA_SSH_DEST}/known_hosts" 2>/dev/null || true
+  chmod 600 "${ORCA_SSH_DEST}/config" 2>/dev/null || true
+  export HOME="/data/orca"
+  echo "[entrypoint] SSH keys copied to ${ORCA_SSH_DEST} (HOME=${HOME})"
+else
+  echo "[entrypoint] No SSH keys found at ${ORCA_SSH_SRC} — skipping SSH setup"
+fi
+
 # Validate required files
 if [ ! -f "${ORCA_APP_DIR}/out/server/index.js" ]; then
   echo "[entrypoint] ERROR: ${ORCA_APP_DIR}/out/server/index.js not found!"

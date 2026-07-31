@@ -19,21 +19,40 @@ vi.mock('electron', () => ({
 // connect/disconnect outcomes independently.
 // Why vi.hoisted: vi.mock factories run before module imports; hoisted vars
 // must be created inside vi.hoisted() to be accessible from the factory.
-const { mockBridgeConnect, mockBridgeDisconnect, MockBridgeConstructor } = vi.hoisted(() => {
-  const mockBridgeConnect = vi.fn()
-  const mockBridgeDisconnect = vi.fn()
-  // Use function keyword so vitest can use it as a constructor
-  function MockBridgeConstructor(this: { connect: typeof mockBridgeConnect; disconnect: typeof mockBridgeDisconnect; session: null }) {
+const { mockBridgeConnect, mockBridgeDisconnect } = vi.hoisted(() => ({
+  mockBridgeConnect: vi.fn(),
+  mockBridgeDisconnect: vi.fn(),
+}))
+
+vi.mock('../dev-server-relay-bridge', () => {
+  // Return a constructor function that produces objects with the minimal
+  // EventEmitter surface (on/off) that DevServerManager.connect() calls.
+  // Providing no-op on/off means bridge.on('agentTokenGenerated', ...) does
+  // not throw; actual event-forwarding is tested in relay-bridge unit tests.
+  function MockBridge(this: {
+    connect: typeof mockBridgeConnect
+    disconnect: typeof mockBridgeDisconnect
+    session: null
+    on: () => void
+    off: () => void
+    emit: () => void
+  }) {
     this.connect = mockBridgeConnect
     this.disconnect = mockBridgeDisconnect
     this.session = null
+    this.on = () => { /* no-op */ }
+    this.off = () => { /* no-op */ }
+    this.emit = () => { /* no-op */ }
   }
-  return { mockBridgeConnect, mockBridgeDisconnect, MockBridgeConstructor }
+  return { DevServerRelayBridge: MockBridge }
 })
 
-vi.mock('../dev-server-relay-bridge', () => ({
-  DevServerRelayBridge: MockBridgeConstructor
-}))
+// Why static import (not per-test dynamic import): vi.mock() is hoisted and
+// runs before any import, so the mock is already registered when this module-
+// level import executes. Using static import avoids the 30s+ timeout caused
+// by the first dynamic import waiting for Vite's server.deps.inline transform
+// to complete when renderer tests are running concurrently in the same worker.
+import { DevServerManager } from '../dev-server-manager'
 
 // ── Minimal in-memory store ───────────────────────────────────────────────────
 function createMinimalStore(devServers: PersistedDevServer[] = []) {
@@ -71,7 +90,6 @@ describe('DevServerManager', () => {
   })
 
   it('add() persists devServer với id và addedAt', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     await manager.add({ name: 'Test', connectionType: 'relay-ssh' })
     expect(persistStore.getState().devServers).toHaveLength(1)
@@ -79,14 +97,12 @@ describe('DevServerManager', () => {
   })
 
   it('add() set runtime status = "disconnected"', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     const ds = await manager.add({ name: 'Test', connectionType: 'relay-ssh' })
     expect(ds.status).toBe('disconnected')
   })
 
   it('add() emit "devServer:added" event', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     const addedIds: string[] = []
     manager.on('devServer:added', (id: string) => addedIds.push(id))
@@ -95,7 +111,6 @@ describe('DevServerManager', () => {
   })
 
   it('testConnection() relay-ssh success → return { ok: true, platform, nodeVersion }', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockResolvedValueOnce({
       platform: 'linux' as NodeJS.Platform,
       arch: 'x64',
@@ -116,7 +131,6 @@ describe('DevServerManager', () => {
   })
 
   it('testConnection() relay-ssh failure → return { ok: false, error }', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockRejectedValueOnce(new Error('Connection refused'))
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     const result = await manager.testConnection({
@@ -131,7 +145,6 @@ describe('DevServerManager', () => {
   })
 
   it('connect() relay-ssh → status: "connecting" → "connected"', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockResolvedValueOnce({
       platform: 'darwin' as NodeJS.Platform,
       arch: 'arm64',
@@ -146,7 +159,6 @@ describe('DevServerManager', () => {
   })
 
   it('connect() relay-ssh → emit statusChanged "connecting" rồi "connected"', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockResolvedValueOnce({
       platform: 'darwin' as NodeJS.Platform,
       arch: 'arm64',
@@ -163,7 +175,6 @@ describe('DevServerManager', () => {
   })
 
   it('connect() relay-ssh failure → status: "error" + lastError set', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockRejectedValueOnce(new Error('timeout'))
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     const ds = await manager.add({ name: 'Test', connectionType: 'relay-ssh' })
@@ -174,7 +185,6 @@ describe('DevServerManager', () => {
   })
 
   it('connect() relay-ssh failure → emit statusChanged "error"', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockRejectedValueOnce(new Error('timeout'))
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     const ds = await manager.add({ name: 'Test', connectionType: 'relay-ssh' })
@@ -185,7 +195,6 @@ describe('DevServerManager', () => {
   })
 
   it('disconnect() → relay.close() được gọi, status: "disconnected"', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockResolvedValueOnce({
       platform: 'linux' as NodeJS.Platform,
       arch: 'x64',
@@ -203,7 +212,6 @@ describe('DevServerManager', () => {
   })
 
   it('disconnect() → emit statusChanged "disconnected"', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockResolvedValueOnce({
       platform: 'linux' as NodeJS.Platform,
       arch: 'x64',
@@ -221,7 +229,6 @@ describe('DevServerManager', () => {
   })
 
   it('remove() → disconnect() được gọi trước', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockResolvedValueOnce({
       platform: 'linux' as NodeJS.Platform,
       arch: 'x64',
@@ -237,7 +244,6 @@ describe('DevServerManager', () => {
   })
 
   it('remove() → xóa khỏi store', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     const ds = await manager.add({ name: 'Test', connectionType: 'relay-ssh' })
     await manager.remove(ds.id)
@@ -245,7 +251,6 @@ describe('DevServerManager', () => {
   })
 
   it('remove() → emit "devServer:removed"', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     const ds = await manager.add({ name: 'Test', connectionType: 'relay-ssh' })
     const removedIds: string[] = []
@@ -255,7 +260,6 @@ describe('DevServerManager', () => {
   })
 
   it('getRelay() trả về bridge khi connected', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     mockBridgeConnect.mockResolvedValueOnce({
       platform: 'linux' as NodeJS.Platform,
       arch: 'x64',
@@ -269,14 +273,12 @@ describe('DevServerManager', () => {
   })
 
   it('getRelay() trả về null khi không connected', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     const ds = await manager.add({ name: 'Test', connectionType: 'relay-ssh' })
     expect(manager.getRelay(ds.id)).toBeNull()
   })
 
   it('list() merge persisted + runtime state', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     await manager.add({ name: 'Test', connectionType: 'relay-ssh' })
     const list = manager.list()
@@ -287,13 +289,11 @@ describe('DevServerManager', () => {
   })
 
   it('get() trả về null khi không tìm thấy id', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const manager = new DevServerManager(persistStore as never, sshManager as never)
     expect(manager.get('non-existent-id')).toBeNull()
   })
 
   it('constructor() restore runtime state với status = "disconnected" cho tất cả persisted servers', async () => {
-    const { DevServerManager } = await import('../dev-server-manager')
     const preSeeded: PersistedDevServer = {
       id: 'ds-existing',
       name: 'Pre-seeded',

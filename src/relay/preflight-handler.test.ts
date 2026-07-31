@@ -261,7 +261,7 @@ describe('PreflightHandler', () => {
           { id: 'claude', cmd: 'claude' }
         ]
       })
-    ).resolves.toEqual({ agents: [] })
+    ).resolves.toMatchObject({ agents: [] })
   })
 
   it('does not report platform-unsupported agents on native Windows SSH hosts', async () => {
@@ -304,7 +304,7 @@ describe('PreflightHandler', () => {
             { id: 'claude', cmd: 'claude' }
           ]
         })
-      ).resolves.toEqual({ agents: ['claude'] })
+      ).resolves.toMatchObject({ agents: ['claude'] })
     } finally {
       Object.defineProperty(process, 'platform', {
         configurable: true,
@@ -351,5 +351,69 @@ describe('PreflightHandler', () => {
         value: originalPlatform
       })
     }
+  })
+  // ── TASK-03: glab CLI detection ─────────────────────────────────────────────
+  describe('glab CLI detection', () => {
+    function setupHandler(): Map<string, (params: Record<string, unknown>) => Promise<unknown>> {
+      const requestHandlers = new Map<string, (params: Record<string, unknown>) => Promise<unknown>>()
+      const dispatcher = {
+        onRequest: vi.fn(
+          (method: string, handler: (params: Record<string, unknown>) => Promise<unknown>) => {
+            requestHandlers.set(method, handler)
+          }
+        )
+      }
+      new PreflightHandler(dispatcher as never)
+      return requestHandlers
+    }
+
+    it('reports glab installed and authenticated when glab auth status succeeds', async () => {
+      execFileAsyncMock.mockImplementation(async (_file: string, args: string[]) => {
+        // glab --version
+        if (args[0] === '--version') return { stdout: 'glab version 1.45.0 (2025-01-10)\n' }
+        // glab auth status
+        if (args[0] === 'auth' && args[1] === 'status') return { stdout: '✓ Logged in to gitlab.com\n' }
+        throw new Error('not found')
+      })
+
+      const handlers = setupHandler()
+      const handler = handlers.get('preflight.check')
+      expect(handler).toBeDefined()
+      const result = await handler!({}) as Record<string, unknown>
+      expect(result).toMatchObject({
+        glab: { installed: true, authenticated: true }
+      })
+    })
+
+    it('reports glab installed but not authenticated when auth status fails', async () => {
+      execFileAsyncMock.mockImplementation(async (_file: string, args: string[]) => {
+        if (args[0] === '--version') return { stdout: 'glab version 1.45.0\n' }
+        if (args[0] === 'auth' && args[1] === 'status') throw new Error('not authenticated')
+        throw new Error('not found')
+      })
+
+      const handlers = setupHandler()
+      const handler = handlers.get('preflight.check')
+      expect(handler).toBeDefined()
+      const result = await handler!({}) as Record<string, unknown>
+      expect(result).toMatchObject({
+        glab: { installed: true, authenticated: false }
+      })
+    })
+
+    it('reports glab not installed when glab binary not found', async () => {
+      execFileAsyncMock.mockImplementation(async (_file: string, args: string[]) => {
+        if (args[0] === '--version') throw new Error('ENOENT: glab not found')
+        throw new Error('not found')
+      })
+
+      const handlers = setupHandler()
+      const handler = handlers.get('preflight.check')
+      expect(handler).toBeDefined()
+      const result = await handler!({}) as Record<string, unknown>
+      expect(result).toMatchObject({
+        glab: { installed: false, authenticated: false }
+      })
+    })
   })
 })

@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { net, safeStorage, session } from 'electron'
+import { isWebCredentialMode } from '../credentials'
 import {
   CredentialDecryptionError,
   credentialFileHasContent,
@@ -213,6 +214,17 @@ function writeSiteFile(file: JiraSiteFile): void {
 }
 
 function writeEncryptedToken(path: string, apiToken: string): void {
+  // Web Server mode: safeStorage is not available (no Electron process).
+  // Credentials reach clients via env vars injected by SessionManager;
+  // this file path is a fallback that is not the primary auth source.
+  if (isWebCredentialMode()) {
+    writeFileSync(path, apiToken, { encoding: 'utf-8', mode: 0o600 })
+    return
+  }
+
+  // Electron mode: use safeStorage (imported statically at top of file) for OS
+  // keychain encryption. Static import allows vi.doMock('electron') in tests
+  // to intercept safeStorage without dynamic require().
   if (safeStorage.isEncryptionAvailable()) {
     writeFileSync(path, safeStorage.encryptString(apiToken), { mode: 0o600 })
     return

@@ -5,7 +5,11 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import type { Store } from '../persistence'
 import type { DevServerManager } from '../dev-server/dev-server-manager'
-import type { DevServerInput, DevServerStatus } from '../../shared/dev-server-types'
+import type {
+  DevServerInput,
+  DevServerStatus,
+  AgentTokenInfo
+} from '../../shared/dev-server-types'
 
 // IPC channel names for the devServer namespace
 const DEV_SERVER_IPC_CHANNELS = [
@@ -104,5 +108,13 @@ export function registerDevServerIpcHandlers(manager: DevServerManager, store?: 
 
   manager.on('devServer:removed', (id: string) => {
     broadcastToAllWindows('devServer:removed', { id })
+  })
+
+  // Forward agentTokenGenerated from direct-websocket bridge to renderer.
+  // Why: when direct-websocket mode runs, the bridge generates a one-time
+  // agent token that the user must copy to start their agent. The renderer
+  // displays it in AgentTokenPanel via window.api.devServer.onAgentToken().
+  manager.on('devServer:agentToken', (info: AgentTokenInfo) => {
+    broadcastToAllWindows('devServer:agentToken', info)
   })
 }

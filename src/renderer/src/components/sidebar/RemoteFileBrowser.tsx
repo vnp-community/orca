@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: the remote file browser centralizes filter state, path-mode preview state, cache, debounce, request gen, and click/keyboard handling in one component so picker navigation stays coherent. */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight, Folder, ArrowUp, LoaderCircle, Home, Search } from 'lucide-react'
+import { ChevronRight, Folder, ArrowUp, LoaderCircle, Home, Search, FolderPlus, Trash2, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { getFileTypeIcon } from '@/lib/file-type-icons'
@@ -21,8 +21,9 @@ import { browseRuntimeServerDirectory } from '@/runtime/runtime-server-directory
 import { translate } from '@/i18n/i18n'
 
 type RemoteFileBrowserProps = (
-  | { targetId: string; runtimeEnvironmentId?: never }
-  | { runtimeEnvironmentId: string; targetId?: never }
+  | { targetId: string; runtimeEnvironmentId?: never; devServerId?: never }
+  | { runtimeEnvironmentId: string; targetId?: never; devServerId?: never }
+  | { devServerId: string; targetId?: never; runtimeEnvironmentId?: never }
 ) & {
   initialPath?: string
   onSelect: (path: string) => void
@@ -46,6 +47,7 @@ type PreviewState = {
 export function RemoteFileBrowser({
   targetId,
   runtimeEnvironmentId,
+  devServerId,
   initialPath = '~',
   onSelect,
   onCancel
@@ -56,6 +58,8 @@ export function RemoteFileBrowser({
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
   const [fileHint, setFileHint] = useState(false)
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
   // Preview state drives the list while path mode is active. It is kept
   // separate from committed state so typing `Documents/` does not silently
   // change the `Select folder` target before the user commits.
@@ -125,10 +129,12 @@ export function RemoteFileBrowser({
       }
       const result = targetId
         ? await window.api.ssh.browseDir({ targetId, dirPath })
-        : await browseRuntimeServerDirectory(
-            requireRuntimeEnvironmentId(runtimeEnvironmentId),
-            dirPath
-          )
+        : devServerId
+          ? await window.api.devServer!.browseDir!({ id: devServerId, path: dirPath })
+          : await browseRuntimeServerDirectory(
+              requireRuntimeEnvironmentId(runtimeEnvironmentId),
+              dirPath
+            )
       listingCacheRef.current.set(result.resolvedPath, result)
       // Also cache under the requested dirPath when it differs from the
       // server-resolved canonical path (e.g. `~`, `~/foo`, or a relative
@@ -139,7 +145,7 @@ export function RemoteFileBrowser({
       }
       return result
     },
-    [runtimeEnvironmentId, targetId]
+    [runtimeEnvironmentId, targetId, devServerId]
   )
 
   const loadDir = useCallback(
@@ -590,6 +596,40 @@ export function RemoteFileBrowser({
     ]
   )
 
+  const handleCreateFolder = useCallback(async () => {
+    if (!newFolderName.trim()) {
+      setIsCreatingFolder(false)
+      return
+    }
+    try {
+      const newPath = joinPath(resolvedPath, newFolderName.trim())
+      if (devServerId) {
+        await window.api.devServer!.mkdir!({ id: devServerId, path: newPath })
+      }
+      invalidateBrowseRequests()
+      await loadDir(resolvedPath)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsCreatingFolder(false)
+      setNewFolderName('')
+    }
+  }, [newFolderName, resolvedPath, devServerId, invalidateBrowseRequests, loadDir])
+
+  const handleDeleteFolder = useCallback(async (folderName: string) => {
+    if (!window.confirm(`Are you sure you want to delete folder '${folderName}'?`)) return
+    try {
+      const targetPath = joinPath(resolvedPath, folderName)
+      if (devServerId) {
+        await window.api.devServer!.rmdir!({ id: devServerId, path: targetPath })
+      }
+      invalidateBrowseRequests()
+      await loadDir(resolvedPath)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }, [resolvedPath, devServerId, invalidateBrowseRequests, loadDir])
+
   const pathSegments = resolvedPath.split('/').filter(Boolean)
 
   // What the list should render: preview listing (with its own filter and
@@ -637,6 +677,17 @@ export function RemoteFileBrowser({
         >
           <Home className="size-3.5" />
         </button>
+        {devServerId && (
+          <button
+            type="button"
+            onClick={() => setIsCreatingFolder(true)}
+            disabled={loading || !!preview?.error}
+            className="shrink-0 p-1 ml-1 rounded hover:bg-accent transition-colors cursor-pointer text-muted-foreground"
+            title="New Folder"
+          >
+            <FolderPlus className="size-3.5" />
+          </button>
+        )}
         <div className="flex items-center gap-0 text-[11px] text-muted-foreground ml-1 min-w-0">
           <button
             type="button"
@@ -736,35 +787,77 @@ export function RemoteFileBrowser({
               <p className="text-xs text-muted-foreground">{displayNoMatchesCopy}</p>
             </div>
           ) : (
-            displayEntries.map((entry) => {
-              const FileIcon = getFileTypeIcon(entry.name)
-              return (
-                <button
-                  key={entry.name}
-                  type="button"
-                  onClick={() => handleRowClick(entry)}
-                  onDoubleClick={() => handleRowDoubleClick(entry)}
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    inputRef.current?.focus()
-                  }}
-                  className={cn(
-                    'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer',
-                    'hover:bg-accent/60'
-                  )}
-                >
-                  {entry.isDirectory ? (
-                    <Folder className="size-3.5 text-muted-foreground shrink-0" />
-                  ) : (
-                    <FileIcon className="size-3.5 text-muted-foreground/60 shrink-0" />
-                  )}
-                  <span className="truncate flex-1 min-w-0">{entry.name}</span>
-                  {entry.isDirectory && (
-                    <ChevronRight className="size-3.5 text-muted-foreground/60 shrink-0" />
-                  )}
-                </button>
-              )
-            })
+            <>
+              {isCreatingFolder && (
+                <div className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors bg-accent/30">
+                  <Folder className="size-3.5 text-muted-foreground shrink-0" />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreateFolder()
+                      if (e.key === 'Escape') {
+                        setIsCreatingFolder(false)
+                        setNewFolderName('')
+                      }
+                    }}
+                    placeholder="Folder name..."
+                    className="flex-1 bg-transparent border-none outline-none min-w-0 h-5"
+                  />
+                  <button type="button" onClick={handleCreateFolder} className="p-0.5 rounded hover:bg-background text-muted-foreground cursor-pointer">
+                    <Check className="size-3.5" />
+                  </button>
+                  <button type="button" onClick={() => { setIsCreatingFolder(false); setNewFolderName('') }} className="p-0.5 rounded hover:bg-background text-muted-foreground cursor-pointer">
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
+              {displayEntries.map((entry) => {
+                const FileIcon = getFileTypeIcon(entry.name)
+                return (
+                  <div key={entry.name} className="group relative w-full flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => handleRowClick(entry)}
+                      onDoubleClick={() => handleRowDoubleClick(entry)}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        inputRef.current?.focus()
+                      }}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer',
+                        'hover:bg-accent/60'
+                      )}
+                    >
+                      {entry.isDirectory ? (
+                        <Folder className="size-3.5 text-muted-foreground shrink-0" />
+                      ) : (
+                        <FileIcon className="size-3.5 text-muted-foreground/60 shrink-0" />
+                      )}
+                      <span className="truncate flex-1 min-w-0 pr-6">{entry.name}</span>
+                      {entry.isDirectory && (
+                        <ChevronRight className="size-3.5 text-muted-foreground/60 shrink-0" />
+                      )}
+                    </button>
+                    {entry.isDirectory && devServerId && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteFolder(entry.name)
+                        }}
+                        title="Delete folder"
+                        className="hidden group-hover:flex absolute right-8 p-1 rounded bg-background hover:bg-destructive text-muted-foreground hover:text-destructive-foreground transition-colors cursor-pointer border border-border shadow-sm"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </>
           )}
         </div>
       </div>

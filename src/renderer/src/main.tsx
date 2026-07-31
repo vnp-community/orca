@@ -4,6 +4,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useTranslation } from 'react-i18next'
 import App from './App'
+import { WorkspaceProvider } from './context/WorkspaceContext'
 import { RecoverableRenderErrorBoundary } from './components/error-boundaries/RecoverableRenderErrorBoundary'
 import {
   installRendererCrashDiagnostics,
@@ -48,7 +49,9 @@ function RendererRoot(): React.JSX.Element {
         'The app shell could not finish rendering. Retry to remount it, or relaunch Orca if the error persists.'
       )}
     >
-      <App />
+      <WorkspaceProvider>
+        <App />
+      </WorkspaceProvider>
     </RecoverableRenderErrorBoundary>
   )
 }

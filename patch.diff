@@ -1,0 +1,33 @@
+--- src/main/server-bootstrap.ts
++++ src/main/server-bootstrap.ts
+@@ -54,2 +54,6 @@
+    */
+   database?: DatabaseConfig | null
++  /**
++   * True if running inside a User Process (child of SessionManager).
++   */
++  isUserProcess?: boolean
+ }
+@@ -103,9 +107,17 @@
+   const agentWsServer = new AgentWebSocketServer(platform.app.getVersion())
+ 
+-  const devServerManager = new DevServerManager(store, sshManager, agentWsServer)
+-  registerDevServerIpcHandlers(devServerManager, store)
+-  registerOnboardingIpcHandlers(devServerManager, store)
+-  registerRepoRemoteIpcHandlers(devServerManager, store)
+-  console.log('[ServerBootstrap] ✅ DevServerManager + AgentWebSocketServer initialized')
++  let devServerManager: DevServerManager
++  if (options.isUserProcess) {
++    const { GatewayDevServerManagerProxy } = await import('./dev-server/gateway-proxy')
++    devServerManager = new GatewayDevServerManagerProxy() as unknown as DevServerManager
++    console.log('[ServerBootstrap] ✅ GatewayDevServerManagerProxy initialized (Proxying to Main Process)')
++  } else {
++    devServerManager = new DevServerManager(store, sshManager, agentWsServer)
++    console.log('[ServerBootstrap] ✅ DevServerManager + AgentWebSocketServer initialized')
++  }
++
++  registerDevServerIpcHandlers(devServerManager, store)
++  registerOnboardingIpcHandlers(devServerManager, store)
++  registerRepoRemoteIpcHandlers(devServerManager, store)
+ 
+   // 2b-pre. Initialize WebCredentialStore for multi-user Web mode.

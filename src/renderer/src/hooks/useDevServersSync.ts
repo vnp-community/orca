@@ -33,10 +33,14 @@ export function useDevServersSync(): void {
         id: string
         status: 'connected' | 'disconnected' | 'connecting' | 'error'
         platform?: NodeJS.Platform
+        arch?: string
+        nodeVersion?: string
         error?: string
       }) => {
         updateDevServerStatus(event.id, event.status, {
           platform: event.platform ?? undefined,
+          arch: event.arch ?? undefined,
+          nodeVersion: event.nodeVersion ?? undefined,
           lastError: event.error ?? null,
           lastConnectedAt: event.status === 'connected' ? Date.now() : undefined,
         })

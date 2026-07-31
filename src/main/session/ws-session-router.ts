@@ -12,6 +12,9 @@ import type { IncomingMessage } from 'node:http'
 import type { WebSocket } from 'ws'
 import type { SessionManager } from './session-manager'
 import type { AuthManager } from '../auth/auth-manager'
+import { createTracer } from '../../shared/trace'
+
+const wsRouter = createTracer('wsSession:route')
 
 export class WsSessionRouter {
   private readonly sessionManager: SessionManager
@@ -33,11 +36,6 @@ export class WsSessionRouter {
       .then(session => session?.userId ?? null)
   }
 
-  async getOrCreateUserSocket(userId: string): Promise<string> {
-    const proc = await this.sessionManager.getOrSpawnUserProcess(userId)
-    return proc.socketPath
-  }
-
   /**
    * Main entry — called from WebSocket server 'connection' event.
    * - With valid login session: proxy WS ↔ user process Unix socket
@@ -47,28 +45,49 @@ export class WsSessionRouter {
    * They connect directly to the shared runtime (ORCA_MULTI_USER=0 legacy path).
    */
   async handleConnection(ws: WebSocket, req: IncomingMessage): Promise<void> {
+    const span = wsRouter.start()
     const userId = await this.resolveUserFromRequest(req)
 
     if (!userId) {
+      span.fail('auth required', { cookie: req.headers.cookie ? 'present' : 'absent' })
       ws.close(4401, 'Authentication required. Please log in first.')
       return
     }
 
+    span.step('accepted', { userId })
+    console.log(`[WsSessionRouter] Connection accepted for userId=${userId}`)
     this.sessionManager.touch(userId)
 
-    let socketPath: string
+    let proc
     try {
-      socketPath = await this.getOrCreateUserSocket(userId)
+      proc = await this.sessionManager.getOrSpawnUserProcess(userId)
     } catch (err) {
-      console.error(`[WsSessionRouter] Failed to spawn process: userId=${userId}`, err)
+      span.fail(err, { userId, phase: 'spawn' })
       ws.close(1011, 'Internal error: cannot start user session')
       return
     }
+
+    // Why: use socketPath and authToken directly from UserProcess rather than
+    // reading runtime-metadata. The metadata file is only written by the Electron
+    // runtime path; user-process-entry sends the values via IPC 'ready' message
+    // instead, which SessionManager stores in UserProcess. Reading from proc
+    // eliminates the race where the socket exists but the metadata file doesn't.
+    const socketPath = proc.socketPath
+    const authToken  = proc.authToken
+
+    if (!socketPath) {
+      span.fail('no socket path', { userId })
+      ws.close(1011, 'Internal error: user session socket unavailable')
+      return
+    }
+
+    span.step('proxy-start', { userId, socketPath })
 
     // Proxy WS ↔ Unix socket (binary-safe, bidirectional)
     const upstream = net.createConnection(socketPath)
 
     upstream.on('error', (err) => {
+      span.fail(err, { userId, phase: 'upstream' })
       console.error(`[WsSessionRouter] Upstream error: userId=${userId}`, err)
       if ((ws as unknown as { readyState: number; OPEN: number }).readyState ===
           (ws as unknown as { readyState: number; OPEN: number }).OPEN) {
@@ -77,14 +96,38 @@ export class WsSessionRouter {
     })
 
     ws.on('message', (data: Buffer | string, isBinary: boolean) => {
-      if (upstream.writable) {
-        upstream.write(isBinary ? data : Buffer.from(data as string))
+      if (!upstream.writable) return
+      if (!isBinary) {
+        try {
+          const raw = (data as string | Buffer).toString('utf8')
+          const parsed = JSON.parse(raw)
+          if (parsed && typeof parsed === 'object' && parsed.authToken === 'cookie-auth') {
+            parsed.authToken = authToken
+            upstream.write(JSON.stringify(parsed) + '\n')
+            return
+          }
+        } catch {
+          // ignore parse errors, forward raw bytes
+        }
       }
+      upstream.write(isBinary ? data : Buffer.from(data as string))
     })
 
+    let upstreamBuffer = ''
     upstream.on('data', (chunk: Buffer) => {
-      const wsAny = ws as unknown as { readyState: number; OPEN: number; send: (d: Buffer) => void }
-      if (wsAny.readyState === wsAny.OPEN) wsAny.send(chunk)
+      const wsAny = ws as unknown as { readyState: number; OPEN: number; send: (d: string) => void }
+      if (wsAny.readyState !== wsAny.OPEN) return
+
+      upstreamBuffer += chunk.toString('utf8')
+      let newlineIndex = upstreamBuffer.indexOf('\n')
+      while (newlineIndex !== -1) {
+        const rawMessage = upstreamBuffer.slice(0, newlineIndex).trim()
+        upstreamBuffer = upstreamBuffer.slice(newlineIndex + 1)
+        if (rawMessage) {
+          wsAny.send(rawMessage)
+        }
+        newlineIndex = upstreamBuffer.indexOf('\n')
+      }
     })
 
     ws.on('close', () => {
