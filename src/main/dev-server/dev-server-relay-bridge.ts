@@ -515,53 +515,77 @@ export class DevServerRelayBridge extends EventEmitter {
     params: Record<string, unknown>,
     timeoutMs: number
   ): Promise<T> {
-    // If session is available, call immediately
-    let session = this.session
+    const startTime = Date.now()
 
-    // If session is null but we're reconnecting, wait for it to be restored
-    if (!session && this._reconnecting) {
-      console.log(`[DevServerRelayBridge] Session reconnecting — queuing call '${method}' (wait up to ${DevServerRelayBridge.RECONNECT_WAIT_MS}ms)`)
-      session = await new Promise<SshChannelMultiplexer | null>((resolve) => {
-        const timeout = setTimeout(() => {
-          // Remove this waiter from the queue on timeout
-          const idx = this._reconnectWaiters.indexOf(resolve)
-          if (idx !== -1) this._reconnectWaiters.splice(idx, 1)
-          resolve(null)
-        }, DevServerRelayBridge.RECONNECT_WAIT_MS)
+    while (true) {
+      // If session is available, call immediately
+      let session = this.session
 
-        this._reconnectWaiters.push((mux) => {
-          clearTimeout(timeout)
-          resolve(mux)
+      // If session is null but we're reconnecting, wait for it to be restored
+      if (!session && this._reconnecting) {
+        const timeElapsed = Date.now() - startTime
+        const waitTime = Math.max(0, DevServerRelayBridge.RECONNECT_WAIT_MS - timeElapsed)
+        
+        console.log(`[DevServerRelayBridge] Session reconnecting — queuing call '${method}' (wait up to ${waitTime}ms)`)
+        session = await new Promise<SshChannelMultiplexer | null>((resolve) => {
+          const timeout = setTimeout(() => {
+            // Remove this waiter from the queue on timeout
+            const idx = this._reconnectWaiters.indexOf(resolve)
+            if (idx !== -1) this._reconnectWaiters.splice(idx, 1)
+            resolve(null)
+          }, waitTime)
+
+          this._reconnectWaiters.push((mux) => {
+            clearTimeout(timeout)
+            resolve(mux)
+          })
         })
-      })
-    }
+      }
 
-    if (!session) {
+      if (!session) {
+        const span = relayCallTracer.start({ devServerId: this.config.id, method })
+        span.fail('Not connected', { method, devServerId: this.config.id })
+        throw new Error('Not connected')
+      }
+
       const span = relayCallTracer.start({ devServerId: this.config.id, method })
-      span.fail('Not connected', { method, devServerId: this.config.id })
-      throw new Error('Not connected')
+      try {
+        const result = await new Promise<T>((resolve, reject) => {
+          const timer = setTimeout(
+            () => {
+              reject(new Error(`Relay call '${method}' timed out after ${timeoutMs}ms`))
+            },
+            timeoutMs
+          )
+          session!.request(method, params)
+            .then((res: unknown) => {
+              clearTimeout(timer)
+              resolve(res as T)
+            })
+            .catch((err: unknown) => {
+              clearTimeout(timer)
+              reject(err)
+            })
+        })
+        span.ok({ method })
+        return result
+      } catch (err: unknown) {
+        const isConnectionLost = err instanceof Error && err.message.includes('Connection lost, reconnecting...')
+        
+        if (isConnectionLost) {
+          // The multiplexer was disposed. Give the ws.on('close') handler a tick to set _reconnecting=true
+          await new Promise(r => setTimeout(r, 50))
+          
+          if (this._reconnecting) {
+            span.fail('Call interrupted by disconnect, retrying...', { method, devServerId: this.config.id, retry: true })
+            console.log(`[DevServerRelayBridge] Call '${method}' interrupted by disconnect. Retrying via queue...`)
+            continue // Loop back to the queue wait
+          }
+        }
+        
+        span.fail(err, { method, devServerId: this.config.id })
+        throw err
+      }
     }
-
-    const span = relayCallTracer.start({ devServerId: this.config.id, method })
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(
-        () => {
-          span.fail(`timed out after ${timeoutMs}ms`, { method, devServerId: this.config.id })
-          reject(new Error(`Relay call '${method}' timed out after ${timeoutMs}ms`))
-        },
-        timeoutMs
-      )
-      session!.request(method, params)
-        .then((result: unknown) => {
-          clearTimeout(timer)
-          span.ok({ method })
-          resolve(result as T)
-        })
-        .catch((err: unknown) => {
-          clearTimeout(timer)
-          span.fail(err, { method, devServerId: this.config.id })
-          reject(err)
-        })
-    })
   }
 }
