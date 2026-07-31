@@ -187,7 +187,7 @@ export class DevServerRelayBridge extends EventEmitter {
    * an existing connection can be reused before requesting a new one.
    */
   isAlive(): boolean {
-    return this.session !== null
+    return this.session !== null || this._reconnecting
   }
 
   /**

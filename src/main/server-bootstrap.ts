@@ -461,12 +461,29 @@ export async function initializeOrcaServices(
   try {
     const { fleetHealthMonitor } = await import('./ssh/fleet-health-monitor')
     const { SshConnectionStore } = await import('./ssh/ssh-connection-store')
-    const sshStore = new SshConnectionStore()
+    const sshStore = new SshConnectionStore(store)
     // Wire dependency injection properties
-    fleetHealthMonitor.getSshTargets = () =>
-      sshStore.getAll().map((t) => ({ id: t.id, label: t.label, project: t.project }))
+    fleetHealthMonitor.getSshTargets = () => {
+      const sshTargets = sshStore.listTargets().map((t) => ({ id: t.id, label: t.label, project: t.project }))
+      const devServers = devServerManager.list().map((ds) => ({ id: ds.id, label: ds.name }))
+      // De-duplicate in case a dev server has the same ID as an SSH target
+      const combined = new Map([...sshTargets, ...devServers].map(t => [t.id, t]))
+      return Array.from(combined.values())
+    }
+    
     fleetHealthMonitor.getConnectionState = (targetId) => {
-      const conn = sshStore.getConnectionState(targetId)
+      // DevServerManager takes precedence for DevServers
+      const dsState = devServerManager.getRuntimeState(targetId)
+      if (dsState) {
+        return {
+          status: dsState.status,
+          error: dsState.lastError ? dsState.lastError.message : null,
+          remotePlatform: dsState.platform
+        }
+      }
+      
+      // Fallback to legacy SSH connection state
+      const conn = sshManager.getState(targetId)
       return conn ?? null
     }
     // IStateRepository exposes settings.get() — NOT getState()

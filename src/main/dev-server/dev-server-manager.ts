@@ -290,8 +290,8 @@ export class DevServerManager extends EventEmitter {
     //    - Pending/disconnected: disconnect and create a fresh bridge.
     const existingRelay = this.relays.get(opts.devServerId)
     if (existingRelay) {
-      if (existingRelay.session !== null) {
-        // Bridge is already live — no need to reset.
+      if (existingRelay.isAlive()) {
+        // Bridge is already live or reconnecting — no need to reset.
         // IMPORTANT: do NOT await connectWithExternalToken here.
         // The API must return the token immediately so start.sh can exec agent.js.
         // Awaiting would deadlock: API waits for agent to connect, but agent
