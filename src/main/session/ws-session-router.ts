@@ -95,6 +95,12 @@ export class WsSessionRouter {
       }
     })
 
+    const keepaliveTimer = setInterval(() => {
+      if (upstream.writable) {
+        upstream.write('\n')
+      }
+    }, 15000)
+
     ws.on('message', (data: Buffer | string, isBinary: boolean) => {
       if (!upstream.writable) return
       if (!isBinary) {
@@ -131,11 +137,13 @@ export class WsSessionRouter {
     })
 
     ws.on('close', () => {
+      clearInterval(keepaliveTimer)
       upstream.end()
       this.sessionManager.touch(userId)
     })
 
     upstream.on('close', () => {
+      clearInterval(keepaliveTimer)
       const wsAny = ws as unknown as { readyState: number; OPEN: number; close: (code: number, reason: string) => void }
       if (wsAny.readyState === wsAny.OPEN) wsAny.close(1011, 'User session ended')
     })
