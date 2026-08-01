@@ -13,6 +13,8 @@ import { AuthSessionStore } from './auth-session-store'
 import { AuthUserStore }    from './auth-user-store'
 import { AuthLocalHandler } from './auth-local-handler'
 import type { OrcaSession, LocalLoginInput, LocalLoginResult } from './auth-types'
+// FIX TASK-AUTH-002: Import AuditLogger for login/logout audit trail
+import type { AuditLogger } from './audit-logger'
 
 /** How often to sweep expired sessions. 30 minutes. */
 const CLEANUP_INTERVAL_MS = 30 * 60 * 1000
@@ -30,7 +32,11 @@ export class AuthManager {
 
   private cleanupTimer: ReturnType<typeof setInterval> | null = null
 
-  constructor(private readonly db: IDatabase) {
+  constructor(
+    private readonly db: IDatabase,
+    // FIX TASK-AUTH-002: Optional AuditLogger — undefined in tests/CLI mode
+    private readonly auditLogger?: AuditLogger
+  ) {
     this.sessionStore = new AuthSessionStore(db)
     this.userStore    = new AuthUserStore(db)
     this.localHandler = new AuthLocalHandler(this.userStore, this.sessionStore)
@@ -60,7 +66,21 @@ export class AuthManager {
 
   /** Attempt local email+password login. Returns sessionId on success. */
   async login(input: LocalLoginInput, ip: string, ua: string): Promise<LocalLoginResult> {
-    return this.localHandler.login(input, ip, ua)
+    const result = await this.localHandler.login(input, ip, ua)
+
+    // FIX TASK-AUTH-002: Write audit log entry (fire-and-forget — never blocks login response).
+    void this.auditLogger?.log({
+      action:    result.success ? 'auth.login.success' : 'auth.login.failed',
+      userId:    result.success ? result.user.id : 'unknown',
+      userEmail: input.email,
+      ip,
+      userAgent: ua,
+      details:   result.success
+        ? { sessionId: result.sessionId }
+        : { reason: 'invalid_credentials' },
+    })
+
+    return result
   }
 
   /** Revoke a session by ID (logout). */

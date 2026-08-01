@@ -41,6 +41,18 @@ const REMOTE_TERMINAL_INPUT_FLUSH_MS = 8
 const REMOTE_TERMINAL_VIEWPORT_FLUSH_MS = 33
 const HOST_SESSION_ATTACH_POLL_MS = 150
 const HOST_SESSION_ATTACH_TIMEOUT_MS = 15_000
+// Why: terminal.create involves relay spawning a PTY process on the remote server.
+// Cold-start (first terminal after server idle) can take up to 60 s.
+const TERMINAL_CREATE_TIMEOUT_MS = 60_000
+const DEFAULT_RUNTIME_TIMEOUT_MS = 15_000
+// Why: retry terminal.create once on timeout/cold-start error before surfacing
+// the error to the user. Relay may be warming up a fresh PTY worker.
+const COLD_START_MAX_RETRIES = 1
+const LONG_TIMEOUT_METHODS = new Set([
+  'terminal.create',
+  'terminal.subscribe',
+  'terminal.attach',
+])
 
 function isRemoteTerminalGoneMessage(message: string): boolean {
   return (
@@ -78,7 +90,11 @@ export function createRemoteRuntimePtyTransport(
     onAgentBecameIdle,
     onAgentBecameWorking,
     onAgentExited,
-    onAgentStatus
+    onAgentStatus,
+    onColdStartBegin,
+    onColdStartRetry,
+    onColdStartComplete,
+    onColdStartFailed,
   } = opts
   let connected = false
   let destroyed = false
@@ -245,13 +261,54 @@ export function createRemoteRuntimePtyTransport(
   }
 
   async function callRuntime<TResult>(method: string, params?: unknown): Promise<TResult> {
+    const timeoutMs = LONG_TIMEOUT_METHODS.has(method)
+      ? TERMINAL_CREATE_TIMEOUT_MS
+      : DEFAULT_RUNTIME_TIMEOUT_MS
     const response = await window.api.runtimeEnvironments.call({
       selector: currentRuntimeEnvironmentId,
       method,
       params,
-      timeoutMs: 15_000
+      timeoutMs
     })
     return unwrapRuntimeRpcResult(response as RuntimeRpcResponse<TResult>)
+  }
+
+  /**
+   * TM-001-B: callRuntime with retry for cold-start scenarios.
+   * Only retries terminal.create (the method that times out on cold servers).
+   * Fires onColdStart* callbacks so UI can show a loading overlay.
+   */
+  async function callRuntimeWithColdStartRetry<TResult>(
+    method: string,
+    params?: unknown
+  ): Promise<TResult> {
+    let lastError: unknown
+    for (let attempt = 0; attempt <= COLD_START_MAX_RETRIES; attempt++) {
+      if (attempt === 0) {
+        onColdStartBegin?.()
+      } else {
+        onColdStartRetry?.(attempt)
+      }
+      try {
+        const result = await callRuntime<TResult>(method, params)
+        onColdStartComplete?.()
+        return result
+      } catch (err: unknown) {
+        lastError = err
+        const msg = err instanceof Error ? err.message : String(err)
+        // Only retry on timeout or cold-start related errors
+        const isRetryable =
+          msg.includes('timed out') ||
+          msg.includes('timeout') ||
+          msg.includes('relay_starting') ||
+          msg.includes('worker_cold')
+        if (!isRetryable || attempt >= COLD_START_MAX_RETRIES) {
+          break
+        }
+      }
+    }
+    onColdStartFailed?.()
+    throw lastError
   }
 
   async function closeRemoteTerminal(handleOverride?: string): Promise<void> {
@@ -638,7 +695,8 @@ export function createRemoteRuntimePtyTransport(
         const launchConfigToSend = options.launchConfig ?? launchConfig
         const launchTokenToSend = options.launchToken ?? launchToken
         const launchAgentToSend = options.launchAgent ?? launchAgent
-        const created = await callRuntime<{ terminal: RuntimeTerminalCreate }>('terminal.create', {
+        // TM-001-B: Use retry-aware helper for terminal.create (cold-start resilience)
+        const created = await callRuntimeWithColdStartRetry<{ terminal: RuntimeTerminalCreate }>('terminal.create', {
           worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
           ...(commandToSend !== undefined ? { command: commandToSend } : {}),
           ...(startupCommandDeliveryToSend !== undefined
@@ -738,6 +796,28 @@ export function createRemoteRuntimePtyTransport(
       connected = false
       clearPendingViewportClaim()
       const id = remotePtyId
+      // TM-002-A: Serialize terminal buffer before closing the multiplexed stream
+      // so snapshot data is still accessible. Fire-and-forget via terminalSessions
+      // preload IPC (non-fatal if it fails).
+      if (id && worktreeId && tabId) {
+        const stream = multiplexedStream
+        if (stream) {
+          stream.serializeBuffer?.({ scrollbackRows: 1000 })
+            .then(snap => {
+              if (snap && worktreeId && tabId) {
+                void window.api.terminalSessions?.save?.({
+                  worktreeId,
+                  tabId,
+                  leafId: leafId ?? undefined,
+                  snapshotData: snap.data,
+                  snapshotCols: snap.cols,
+                  snapshotRows: snap.rows,
+                })
+              }
+            })
+            .catch(() => { /* Non-fatal snapshot save */ })
+        }
+      }
       closeMultiplexedStream()
       handle = null
       remotePtyId = null

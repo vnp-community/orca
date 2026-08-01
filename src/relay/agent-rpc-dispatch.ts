@@ -482,7 +482,110 @@ async function route(
       }
     }
 
-    // ── shell.eval ───────────────────────────────────────────────────────────
+    // ── v5.0: agent.sendInput ────────────────────────────────────────────────
+    // ORCH-001: Send data to a running agent PTY's stdin.
+    // Used for graceful stop (Ctrl+C = '\x03') and interactive input.
+    case 'agent.sendInput': {
+      try {
+        const { handleAgentSendInput } = await import('./agent-spawner')
+        return (await handleAgentSendInput(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `agent.sendInput unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: agent.exec ─────────────────────────────────────────────────────
+    // TG-001: Non-interactive subprocess execution (for task graph steps).
+    // Returns captured stdout/stderr/exitCode instead of streaming.
+    // Distinct from agent.spawn (interactive PTY) — no terminal allocation.
+    case 'agent.exec': {
+      try {
+        const { spawn } = await import('node:child_process')
+        const p       = rpc.params ?? {}
+        const binary  = typeof p.binary   === 'string' ? p.binary                 : ''
+        const args    = Array.isArray(p.args) ? (p.args as unknown[]).map(String) : []
+        const cwd     = typeof p.cwd      === 'string' ? p.cwd                    : config.workDir
+        const stdin   = typeof p.stdin    === 'string' ? p.stdin                  : null
+        const extraEnv = (p.env && typeof p.env === 'object' && !Array.isArray(p.env))
+          ? p.env as Record<string, string>
+          : {}
+        const timeoutMs = typeof p.timeoutMs === 'number'
+          ? Math.min(Math.max(p.timeoutMs, 1_000), 5 * 60_000)
+          : 300_000
+
+        if (!binary) {
+          return makeError(rpc.id, AgentErrorCode.InvalidParams, 'agent.exec: binary is required')
+        }
+
+        const result = await new Promise<{
+          stdout: string; stderr: string; exitCode: number | null; timedOut: boolean
+        }>((resolve) => {
+          let stdout = '', stderr = '', timedOut = false, settled = false
+          const spawnEnv = { ...process.env, ...extraEnv } as NodeJS.ProcessEnv
+          const child = spawn(binary, args, { cwd, env: spawnEnv, stdio: ['pipe', 'pipe', 'pipe'] })
+
+          const finish = (r: typeof result): void => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            resolve(r)
+          }
+          const timer = setTimeout(() => {
+            timedOut = true
+            try { child.kill('SIGKILL') } catch { /* ignore */ }
+            finish({ stdout, stderr, exitCode: null, timedOut })
+          }, timeoutMs)
+
+          child.stdout?.on('data', (d: Buffer) => { stdout += d.toString('utf8') })
+          child.stderr?.on('data', (d: Buffer) => { stderr += d.toString('utf8') })
+          child.on('error', (err) => {
+            finish({ stdout, stderr: err.message, exitCode: null, timedOut })
+          })
+          child.on('close', (code) => { finish({ stdout, stderr, exitCode: code, timedOut }) })
+
+          if (stdin !== null) child.stdin?.end(stdin)
+          else child.stdin?.end()
+        })
+
+        log.info(`agent.exec: binary=${binary} exitCode=${result.exitCode} timedOut=${result.timedOut}`)
+        return { jsonrpc: '2.0', id: rpc.id, result }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `agent.exec failed: ${msg}`)
+      }
+    }
+
+    // ── v5.0: ai.complete ─────────────────────────────────────────────────────
+    // TG-002: Non-interactive AI completion for task planning (TaskAIPlanner.decompose)
+    // and git commit message generation.
+    // Called by: relay.call('ai.complete', { prompt, format: 'json'|'text', model? })
+    case 'ai.complete': {
+      try {
+        const p      = rpc.params ?? {}
+        const prompt = typeof p['prompt'] === 'string' ? p['prompt'] : ''
+        if (!prompt.trim()) {
+          return makeError(rpc.id, AgentErrorCode.InvalidParams, 'ai.complete: prompt is required')
+        }
+        const { handleAIComplete } = await import('./ai-complete-handler')
+        const result = await handleAIComplete(
+          {
+            prompt,
+            format: typeof p['format'] === 'string' ? p['format'] as 'json' | 'text' : 'text',
+            taskId: typeof p['taskId'] === 'string' ? p['taskId']  : undefined,
+            model:  typeof p['model']  === 'string' ? p['model']   : undefined,
+          },
+          config,
+          log
+        )
+        return { jsonrpc: '2.0', id: rpc.id, result }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ai.complete failed: ${msg}`)
+      }
+    }
+
+
     // Runs a short shell command and returns stdout/stderr.
     // Used by devServer.browseDir on the Orca server to resolve '~' on the remote.
     // SECURITY: only used internally via relay — not exposed to browser directly.
@@ -517,6 +620,85 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `fs.rmdir unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: pty.create ─────────────────────────────────────────────────────
+    // TM-001/TM-006: Create a PTY session in agent mode.
+    // Params: { cwd, cols?, rows?, env?, shellOverride? }
+    // Returns: { id, cols, rows, cwd, shell }
+    case 'pty.create': {
+      try {
+        const { handlePtyCreate } = await import('./pty-agent-bridge')
+        return (await handlePtyCreate(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.create unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: pty.write ──────────────────────────────────────────────────────
+    // Send input data to PTY stdin.
+    // Params: { id, data }
+    case 'pty.write': {
+      try {
+        const { handlePtyWrite } = await import('./pty-agent-bridge')
+        return (await handlePtyWrite(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.write unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: pty.resize ─────────────────────────────────────────────────────
+    // Resize PTY terminal window.
+    // Params: { id, cols, rows }
+    case 'pty.resize': {
+      try {
+        const { handlePtyResize } = await import('./pty-agent-bridge')
+        return (await handlePtyResize(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.resize unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: pty.destroy ────────────────────────────────────────────────────
+    // Close and cleanup a PTY session.
+    // Params: { id, graceful? }
+    case 'pty.destroy': {
+      try {
+        const { handlePtyDestroy } = await import('./pty-agent-bridge')
+        return (await handlePtyDestroy(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.destroy unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: pty.scrollback ─────────────────────────────────────────────────
+    // Get scrollback buffer content.
+    // Params: { id, lines? }
+    case 'pty.scrollback': {
+      try {
+        const { handlePtyScrollback } = await import('./pty-agent-bridge')
+        return (await handlePtyScrollback(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.scrollback unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: pty.sendSignal ─────────────────────────────────────────────────
+    // Send a signal to the PTY process (SIGTERM, SIGKILL, SIGINT, etc.).
+    // Params: { id, signal }
+    case 'pty.sendSignal': {
+      try {
+        const { handlePtySendSignal } = await import('./pty-agent-bridge')
+        return (await handlePtySendSignal(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.sendSignal unavailable: ${msg}`)
       }
     }
 

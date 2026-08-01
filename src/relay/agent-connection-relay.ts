@@ -23,14 +23,26 @@ export async function listenRelay(
   tools: ToolDefinition[],
   log: AgentLogger
 ): Promise<never> {
-  const token = config.agentToken || 'relay-secret'
+  // ORCH-013: Token is mandatory — no fallback to insecure 'relay-secret'.
+  // If ORCA_AGENT_TOKEN is not set, the agent cannot operate in relay mode.
+  const token = config.agentToken?.trim()
+  if (!token) {
+    log.error('FATAL: agentToken (ORCA_AGENT_TOKEN) is not set or empty.')
+    log.error('In relay-websocket mode, a shared secret is required for authentication.')
+    log.error('On the Dev Server, run:')
+    log.error('  export ORCA_AGENT_TOKEN=$(openssl rand -hex 32)')
+    log.error('  node ~/orca-agent/agent.js')
+    process.exit(1)
+  }
 
   return new Promise<never>((_, reject) => {
     const wss = new WebSocketServer({ port: config.agentPort, path: '/orca-relay' })
 
     wss.once('listening', () => {
       log.info(`✅ Relay server ready: ws://0.0.0.0:${config.agentPort}/orca-relay`)
-      log.info(`Orca UI config → Type: relay-websocket  URL: ws://<devServerHost>:${config.agentPort}/orca-relay?token=${token}`)
+      // ORCH-013: Do NOT log the token — security risk.
+      log.info(`Orca UI config → Type: relay-websocket  URL: ws://<devServerHost>:${config.agentPort}/orca-relay`)
+      log.info(`Set the token in Orca UI → Dev Server settings (matches ORCA_AGENT_TOKEN on this machine)`)
     })
 
     wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {

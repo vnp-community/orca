@@ -4498,6 +4498,70 @@ const api = {
       ipcRenderer.on('speech:error', listener)
       return () => ipcRenderer.removeListener('speech:error', listener)
     }
+  },
+
+  // ─── Agent Orchestration IPC Bridge (BUG-FE-ORCH-001) ───────────────────────
+  // Why: exposes start/stop/resume for remote agent sessions so the renderer
+  // can orchestrate agents on remote runtime environments without going through
+  // the local PTY spawn path.
+  agentOrchestration: {
+    start: (opts: {
+      worktreeId: string
+      agentType: 'claude' | 'codex' | 'custom'
+      trustPreset?: 'standard' | 'permissive' | 'strict'
+    }): Promise<{ sessionId: string; status: 'started' | 'already-running' }> =>
+      ipcRenderer.invoke('agentOrchestration:start', opts),
+
+    stop: (opts: { sessionId: string }): Promise<void> =>
+      ipcRenderer.invoke('agentOrchestration:stop', opts),
+
+    resume: (opts: { sessionId: string }): Promise<{ resumed: boolean }> =>
+      ipcRenderer.invoke('agentOrchestration:resume', opts),
+
+    onStatusChanged: (callback: (event: {
+      worktreeId: string
+      sessionId?: string
+      status: 'starting' | 'running' | 'stopped' | 'error'
+      errorMessage?: string
+    }) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: unknown): void =>
+        callback(data as Parameters<typeof callback>[0])
+      ipcRenderer.on('agentOrchestration:statusChanged', listener)
+      return () => ipcRenderer.removeListener('agentOrchestration:statusChanged', listener)
+    }
+  },
+
+  // ─── Terminal Session Persistence IPC Bridge (BUG-FE-TM-003) ────────────────
+  // Why: allows the renderer to save/restore terminal scrollback snapshots
+  // through the main process DB so sessions survive disconnects.
+  terminalSessions: {
+    save: (input: {
+      worktreeId: string
+      tabId: string
+      leafId?: string
+      runtimeEnvId?: string
+      snapshotData: string
+      snapshotCols: number
+      snapshotRows: number
+      remoteHandle?: string
+    }) => ipcRenderer.invoke('terminal.session.save', input),
+
+    get: (key: {
+      worktreeId: string
+      tabId: string
+      leafId?: string
+      runtimeEnvId?: string
+    }) => ipcRenderer.invoke('terminal.session.get', key),
+
+    list: (worktreeId: string) =>
+      ipcRenderer.invoke('terminal.session.list', worktreeId),
+
+    archive: (key: {
+      worktreeId: string
+      tabId: string
+      leafId?: string
+      runtimeEnvId?: string
+    }) => ipcRenderer.invoke('terminal.session.archive', key),
   }
 }
 

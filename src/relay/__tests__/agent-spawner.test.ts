@@ -1,7 +1,7 @@
 // src/relay/__tests__/agent-spawner.test.ts
 // Unit tests for agent-spawner.ts.
 // Strategy:
-//   - AgentStateMachine, resolveAgentSpec, buildAgentEnv: pure unit tests (no PTY)
+//   - SubAgentSpawner, resolveAgentSpec, buildAgentEnv: pure unit tests (no PTY)
 //   - handleAgentKill: pure unit (in-process PTY_REGISTRY check)
 //   - handleAgentSpawn: validation-only tests (stop before actual node-pty spawn)
 import { describe, it, expect, vi } from 'vitest'
@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import type WebSocket from 'ws'
 import type { WireState } from '../agent-wire'
 import {
-  AgentStateMachine,
+  SubAgentSpawner,
   resolveAgentSpec,
   buildAgentEnv,
   handleAgentKill,
@@ -52,74 +52,69 @@ const MOCK_WIRE = {
   frameKey: Buffer.alloc(32),
 } as unknown as WireState
 
-// ─── AgentStateMachine ────────────────────────────────────────────────────────
-describe('AgentStateMachine', () => {
+// ─── SubAgentSpawner ─────────────────────────────────────────────────────────
+describe('SubAgentSpawner', () => {
   it('starts in idle state', () => {
-    const sm = new AgentStateMachine()
-    expect(sm.current()).toBe('idle')
+    const sm = new SubAgentSpawner()
+    expect(sm.getState()).toBe('idle')
   })
 
-  it('idle → running on first_output', () => {
-    const sm = new AgentStateMachine()
-    sm.transition('first_output')
-    expect(sm.current()).toBe('running')
+  it('idle → spawning', () => {
+    const sm = new SubAgentSpawner()
+    sm.transition('spawning')
+    expect(sm.getState()).toBe('spawning')
   })
 
-  it('running → waiting_for_input on osc_prompt_open', () => {
-    const sm = new AgentStateMachine()
-    sm.transition('first_output')
-    sm.transition('osc_prompt_open')
-    expect(sm.current()).toBe('waiting_for_input')
+  it('spawning → running', () => {
+    const sm = new SubAgentSpawner()
+    sm.transition('spawning')
+    sm.transition('running')
+    expect(sm.getState()).toBe('running')
   })
 
-  it('waiting_for_input → running on osc_prompt_close', () => {
-    const sm = new AgentStateMachine()
-    sm.transition('first_output')
-    sm.transition('osc_prompt_open')
-    sm.transition('osc_prompt_close')
-    expect(sm.current()).toBe('running')
+  it('running → stopping', () => {
+    const sm = new SubAgentSpawner()
+    sm.transition('spawning')
+    sm.transition('running')
+    sm.transition('stopping')
+    expect(sm.getState()).toBe('stopping')
   })
 
-  it('running → completed on exit_ok', () => {
-    const sm = new AgentStateMachine()
-    sm.transition('first_output')
-    sm.transition('exit_ok')
-    expect(sm.current()).toBe('completed')
+  it('stopping → stopped', () => {
+    const sm = new SubAgentSpawner()
+    sm.transition('spawning')
+    sm.transition('running')
+    sm.transition('stopping')
+    sm.transition('stopped')
+    expect(sm.getState()).toBe('stopped')
   })
 
-  it('running → error on exit_err', () => {
-    const sm = new AgentStateMachine()
-    sm.transition('first_output')
-    sm.transition('exit_err')
-    expect(sm.current()).toBe('error')
+  it('spawning → error (e.g. binary not found)', () => {
+    const sm = new SubAgentSpawner()
+    sm.transition('spawning')
+    sm.transition('error')
+    expect(sm.getState()).toBe('error')
   })
 
-  it('idle → completed (exit without output)', () => {
-    const sm = new AgentStateMachine()
-    sm.transition('exit_ok')
-    expect(sm.current()).toBe('completed')
+  it('running → error', () => {
+    const sm = new SubAgentSpawner()
+    sm.transition('spawning')
+    sm.transition('running')
+    sm.transition('error')
+    expect(sm.getState()).toBe('error')
   })
 
-  it('osc_prompt_open does NOT transition from idle (no-op)', () => {
-    const sm = new AgentStateMachine()
-    sm.transition('osc_prompt_open')
-    expect(sm.current()).toBe('idle')
+  it('throws on invalid transition idle → running', () => {
+    const sm = new SubAgentSpawner()
+    expect(() => sm.transition('running')).toThrow(/invalid transition/)
   })
 
-  it('transition() returns the new state', () => {
-    const sm = new AgentStateMachine()
-    const nextState = sm.transition('first_output')
-    expect(nextState).toBe('running')
-  })
-
-  it('exit_ok from running → completed (terminal check)', () => {
-    const sm = new AgentStateMachine()
-    sm.transition('first_output')
-    sm.transition('exit_ok')
-    // completed is reached via exit_ok
-    expect(sm.current()).toBe('completed')
-    // state machine doesn't block further exit transitions
-    // (implementation uses simple switch, no terminal guard)
+  it('error → idle (reset)', () => {
+    const sm = new SubAgentSpawner()
+    sm.transition('spawning')
+    sm.transition('error')
+    sm.transition('idle')
+    expect(sm.getState()).toBe('idle')
   })
 })
 
@@ -128,7 +123,7 @@ describe('resolveAgentSpec', () => {
   it('resolves exact "claude" → binary=claude', () => {
     const spec = resolveAgentSpec('claude')
     expect(spec?.binary).toBe('claude')
-    expect(spec?.apiKeyEnv).toBe('ANTHROPIC_API_KEY')
+    expect(spec?.apiKeyEnvVar).toBe('ANTHROPIC_API_KEY')
   })
 
   it('resolves "claude-opus-4-5" via prefix → claude binary', () => {
@@ -142,13 +137,13 @@ describe('resolveAgentSpec', () => {
   it('resolves exact "codex" → binary=codex', () => {
     const spec = resolveAgentSpec('codex')
     expect(spec?.binary).toBe('codex')
-    expect(spec?.apiKeyEnv).toBe('OPENAI_API_KEY')
+    expect(spec?.apiKeyEnvVar).toBe('OPENAI_API_KEY')
   })
 
   it('resolves exact "gemini" → binary=gemini', () => {
     const spec = resolveAgentSpec('gemini')
     expect(spec?.binary).toBe('gemini')
-    expect(spec?.apiKeyEnv).toBe('GOOGLE_API_KEY')
+    expect(spec?.apiKeyEnvVar).toBe('GEMINI_API_KEY')
   })
 
   it('resolves "gemini-2.0-flash" via prefix → gemini binary', () => {
@@ -158,14 +153,14 @@ describe('resolveAgentSpec', () => {
   it('resolves "opencode" → binary=opencode, no apiKeyEnv', () => {
     const spec = resolveAgentSpec('opencode')
     expect(spec?.binary).toBe('opencode')
-    expect(spec?.apiKeyEnv).toBeNull()
+    expect(spec?.apiKeyEnvVar).toBeNull()
   })
 
   it('resolves "ollama" → binary=ollama, localInference=true', () => {
     const spec = resolveAgentSpec('ollama')
     expect(spec?.binary).toBe('ollama')
     expect(spec?.localInference).toBe(true)
-    expect(spec?.apiKeyEnv).toBeNull()
+    expect(spec?.apiKeyEnvVar).toBeNull()
   })
 
   it('resolves "ollama-llama3" via ollama catch-all → ollama binary', () => {

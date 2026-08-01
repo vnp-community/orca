@@ -408,10 +408,17 @@ export async function initializeOrcaServices(
   const aiProviderService = new AIProviderService(pool, devServerManager, relayConnectionPool)
   const providerResolver = new ProviderResolver(aiProviderService)
   const providerHealthChecker = new ProviderHealthChecker()
-  providerHealthChecker.start(aiProviderService, relayConnectionPool)
+  // FIX BUG-AIP-004: Removed relayPool param (unused — service manages relay internally)
+  providerHealthChecker.start(aiProviderService)
+  // FIX BUG-AIP-003: Wire status change alerts to console log (can be extended with WS push/webhook)
+  providerHealthChecker.onStatusChanged = (event) => {
+    console.log(`[ProviderHealthChecker] Status change: account=${event.accountId} ${event.oldStatus}→${event.newStatus}`)
+    // TODO: extend with rpcServer.broadcast('provider:statusChanged', event) and webhook call
+  }
   // Register AI provider RPC methods into the already-running rpcServer
   rpcServer.addMethods(createAIProviderMethods(aiProviderService, providerResolver))
   console.log('[ServerBootstrap] ✅ AIProviderService + ProviderResolver + ProviderHealthChecker initialized (v5.0)')
+
 
   // 12. WorkflowOrchestrator + TemplateResolver + StepExecutors [v5.0 TDD-17]
   const { DAGBuilder } = await import('./workflow/DAGBuilder')

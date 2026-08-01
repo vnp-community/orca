@@ -1,10 +1,12 @@
 # BUG-DS-001 — relay-websocket Handshake Token Không Khớp
 
 **ID:** BUG-DS-001  
-**Mức độ:** 🔴 Critical  
+**Mức độ:** 🔴 Critical
+
+**Status:** ✅ FIXED — 2026-08-01 (Tasks: TASK-DS-001~011)  
 **Module:** relay-websocket handshake  
 **Phát hiện:** 2026-07-26  
-**Status:** 🔴 Open
+**Status:** ✅ FIXED — 2026-08-01 (Tasks: TASK-DS-001~011)
 
 ---
 

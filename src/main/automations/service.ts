@@ -1,4 +1,5 @@
-import type { WebContents } from 'electron'
+// FIX TASK-AT-001: Removed 'electron' import — use RendererBridge interface instead.
+// AutomationService now works in server mode (ORCA_MULTI_USER=1) without Electron.
 import type { Store } from '../persistence'
 import {
   isFinalAutomationRunStatus,
@@ -22,11 +23,17 @@ import {
 
 const DEFAULT_TICK_MS = 60 * 1000
 
+/** FIX TASK-AT-001: Minimal interface replacing WebContents — Electron's WebContents satisfies this. */
+interface RendererBridge {
+  isDestroyed(): boolean
+  send(channel: string, ...args: unknown[]): void
+}
+
 export class AutomationService {
   private readonly store: Store
   private readonly tickMs: number
   private timer: ReturnType<typeof setInterval> | null = null
-  private webContents: WebContents | null = null
+  private webContents: RendererBridge | null = null
   private rendererReady = false
   private evaluating = false
   private readonly claudeUsage: ClaudeUsageStore | null
@@ -52,7 +59,8 @@ export class AutomationService {
     this.headlessDispatcher = opts.headlessDispatcher ?? null
   }
 
-  setWebContents(webContents: WebContents | null): void {
+  // FIX TASK-AT-001: Accept RendererBridge instead of WebContents — Electron's WebContents satisfies it.
+  setWebContents(webContents: RendererBridge | null): void {
     this.webContents = webContents
     this.rendererReady = false
   }

@@ -243,7 +243,27 @@ export class WorkflowOrchestrator {
         const wave = waves[waveIndex]
 
         const results = await Promise.allSettled(
-          wave.map((step) => this.executeStep(step, execution, controller.signal))
+          wave.map(async (step) => {
+            // FIX TASK-WF-002: On resume (startWave > 0 or execution was 'running' at bootstrap),
+            // check if this individual step already completed in a previous run.
+            // This prevents re-running completed steps when a server crash interrupted mid-wave.
+            if (startWave > 0 || execution.status === 'running') {
+              const rows = await this.pool.withConnection((db) =>
+                db.query(
+                  `SELECT status FROM orca_workflow_step_executions
+                   WHERE execution_id = ? AND step_id = ?`,
+                  [execution.id, step.id]
+                )
+              ).catch(() => null)
+
+              const stepRecord = rows?.[0] as { status: string } | undefined
+              if (stepRecord?.status === 'completed') {
+                console.log(`[WorkflowOrchestrator] Skipping already-completed step ${step.id} (resume)`)
+                return { exitCode: 0, data: { skippedOnResume: true } }
+              }
+            }
+            return this.executeStep(step, execution, controller.signal)
+          })
         )
 
         // Check if any step failed (and continueOnError is not set)

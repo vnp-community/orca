@@ -203,57 +203,80 @@ export async function handleHealthCheck(
   const start = Date.now()
   const span  = credTracer.start({ method: 'ai.provider.healthCheck', provider })
 
-  // Verify credential is readable and decryptable
+  // AIP-001 Step 1: Verify credential exists and is readable
   const credResult = await handleReadCredential(id, { accountId }, config, log) as { error?: unknown; result?: unknown }
   if (credResult.error) {
     span.fail('credential unreadable', { accountId, provider })
-    return credResult
+    return {
+      jsonrpc: '2.0', id,
+      error: {
+        code:    -32001,
+        message: 'No credential found or decrypt failed. Please re-add the API key in Settings.',
+        data:    { credentialFound: false, provider },
+      },
+    }
   }
 
-  const note = await checkProviderReachability(provider)
+  // AIP-001 Step 2: Network reachability with structured response
+  const reachability = await checkProviderReachabilityDetailed(provider)
   const latencyMs = Date.now() - start
-  log.info(`ai.provider.healthCheck: accountId=${accountId} provider=${provider} → ${note}`)
-  if (note === 'reachable' || note === 'local_provider') {
-    span.ok({ provider, latencyMs, note })
+  log.info(`ai.provider.healthCheck: accountId=${accountId} provider=${provider} ok=${reachability.ok} note=${reachability.note}`)
+
+  if (reachability.ok) {
+    span.ok({ provider, latencyMs, note: reachability.note })
   } else {
-    span.fail(note, { provider, latencyMs })
+    span.fail(reachability.note, { provider, latencyMs })
   }
+
   return {
     jsonrpc: '2.0', id,
     result: {
-      ok:        note === 'reachable' || note === 'local_provider',
+      ok:              reachability.ok,
       latencyMs,
-      note,
+      note:            reachability.note,
+      credentialFound: true,  // AIP-001: credential exists and decryptable
+      ...(reachability.statusCode !== undefined ? { statusCode: reachability.statusCode } : {}),
     },
   }
 }
 
-// ─── checkProviderReachability ────────────────────────────────────────────────
-
+// AIP-001: Structured reachability check — returns ok, note, and optional HTTP statusCode
 const PROVIDER_HEALTH_URLS: Record<string, string> = {
   anthropic: 'https://api.anthropic.com',
   openai:    'https://api.openai.com',
   gemini:    'https://generativelanguage.googleapis.com',
 }
 
-async function checkProviderReachability(provider: string): Promise<string> {
+async function checkProviderReachabilityDetailed(provider: string): Promise<{
+  ok: boolean; note: string; statusCode?: number
+}> {
   const url = PROVIDER_HEALTH_URLS[provider]
+
   // Local providers (Ollama, vLLM, LM Studio) — no external check needed
-  if (!url) return 'local_provider'
+  if (!url) return { ok: true, note: 'local_provider' }
 
   try {
     const ctrl  = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), 5_000)
     const resp  = await fetch(url, { method: 'HEAD', signal: ctrl.signal })
     clearTimeout(timer)
-    // Any HTTP response (even 401/403) means server is reachable
-    return resp.status < 500 ? 'reachable' : 'server_error'
-  } catch {
-    return 'unreachable'
+    const statusCode = resp.status
+    // 401/403/429 = server reachable (auth required / rate-limited — expected without auth)
+    // 5xx = server error = not ok
+    if (statusCode < 500) return { ok: true, note: 'reachable', statusCode }
+    return { ok: false, note: 'server_error', statusCode }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('abort') || msg.includes('timeout')) {
+      return { ok: false, note: 'timeout' }
+    }
+    return { ok: false, note: 'unreachable' }
   }
 }
 
+
 // ─── ai.provider.deleteCredential ────────────────────────────────────────────
+
 
 export async function handleDeleteCredential(
   id:     string | number | null,

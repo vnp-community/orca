@@ -21,6 +21,7 @@ import {
   connectRegisteredSshTarget,
   disconnectRegisteredSshTarget
 } from '../ipc/ssh'
+import { generateAgentToken } from '../../shared/agent-wire-protocol'
 import { createTracer } from '../../shared/trace'
 
 const mgr = createTracer('devServer:manager')
@@ -365,6 +366,37 @@ export class DevServerManager extends EventEmitter {
     })
 
     return { devServerId: opts.devServerId, created: wasCreated }
+  }
+
+  /**
+   * generateAgentToken — Generate a one-time agent token for a direct-websocket dev server.
+   * Called by session-manager.ts IPC handler 'generateAgentToken'.
+   *
+   * Flow: UI calls generateAgentToken(id) → gets token → displays setup instructions
+   * Then: agent calls agent.handshake with token → AgentWebSocketServer validates → bridge connects.
+   *
+   * Note: This only generates the token. The actual slot registration happens in
+   * connectWithExternalToken() which is called by connectDaemonAgent(). For now,
+   * this generates and returns the token for use in setup instructions.
+   */
+  async generateAgentToken(devServerId: string): Promise<AgentTokenInfo> {
+    const token = generateAgentToken(devServerId)
+    const persisted = this.store.list().find((ds) => ds.id === devServerId)
+    if (!persisted) {
+      throw new Error(`Dev server not found: ${devServerId}`)
+    }
+    // Register slot so agent can connect immediately after user configures token
+    const relay = this.relays.get(devServerId)
+    if (relay && this.agentWsServer) {
+      // Pre-register the slot so the agent can connect when ready
+      void relay.connectWithExternalToken(token).catch(() => {
+        // Slot may expire if agent doesn't connect — that's fine
+      })
+    }
+    const host   = process.env['ORCA_ADVERTISED_HOST'] ?? 'localhost'
+    const port   = process.env['ORCA_HTTP_PORT']       ?? '6768'
+    const orcaUrl = `ws://${host}:${port}/agent`
+    return { devServerId, agentToken: token, orcaUrl }
   }
 
   // ── Relay access (for IPC handlers) ──────────────────────────────────────

@@ -27,7 +27,7 @@ export class GitCloneHandler {
 
       child.stdout.on('data', (chunk: Buffer) => {
         // Not typically used by git clone, but we stream it just in case
-        this.dispatcher.sendEvent('git.clone.output', {
+        this.dispatcher.notify('git.clone.output', {
           data: chunk.toString('utf-8'),
           clientId: ctx.clientId
         })
@@ -37,7 +37,7 @@ export class GitCloneHandler {
         const text = chunk.toString('utf-8')
         errorOutput += text
         // git clone --progress writes progress to stderr
-        this.dispatcher.sendEvent('git.clone.output', {
+        this.dispatcher.notify('git.clone.output', {
           data: text,
           clientId: ctx.clientId
         })

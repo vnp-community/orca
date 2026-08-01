@@ -4,7 +4,7 @@
 **Mức độ:** 🟡 Low  
 **Module:** `deploy/dev/agent/` + `deploy/dev/scripts/`  
 **Phát hiện:** 2026-07-26  
-**Status:** 🔴 Open
+**Status:** ✅ FIXED — 2026-08-01 (Tasks: TASK-DS-001~011)
 
 ---
 

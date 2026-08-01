@@ -65,10 +65,36 @@ const mockTool: ToolDefinition = {
 const mockLog: AgentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
+
+/** Pre-built capabilities for tests — avoids async git/pty checks in most tests */
+const MOCK_CAPS = ['fs', 'git', 'preflight', 'ai.providers', 'agent.spawn', 'worktrees', 'pty'] as const
+
+/** Create session with pre-built capabilities (sync handshake path — no git/pty I/O) */
+function createTestSession(
+  cfg: AgentConfig = mockConfig,
+  tools: typeof mockTool[] = [],
+  log: typeof mockLog = mockLog
+) {
+  return createSession(cfg, tools, log, MOCK_CAPS)
+}
+
+/**
+ * Wait until the async sendHandshake (which runs buildCapabilities including git check)
+ * has completed and ws.send has been called at least once.
+ * Only used in tests that explicitly test dynamic capability detection.
+ */
+async function waitForHandshake(ws: MockWs): Promise<void> {
+  await vi.waitFor(() => {
+    if (ws.send.mock.calls.length === 0) {
+      throw new Error('waitForHandshake: ws.send not called yet')
+    }
+  }, { timeout: 5000 })
+}
+
 describe('createSession().start()', () => {
   it('sends handshake immediately when ws.readyState=1 (OPEN)', () => {
     const ws = new MockWs()
-    createSession(mockConfig, [mockTool], mockLog).start(ws as any)
+    createTestSession(mockConfig, [mockTool]).start(ws as any)
     expect(ws.send).toHaveBeenCalledOnce()
     const rpc = extractJson(ws, 0)
     expect(rpc.method).toBe('agent.handshake')
@@ -76,43 +102,63 @@ describe('createSession().start()', () => {
 
   it('handshake jsonrpc version is "2.0"', () => {
     const ws = new MockWs()
-    createSession(mockConfig, [mockTool], mockLog).start(ws as any)
+    createTestSession(mockConfig, [mockTool]).start(ws as any)
     expect(extractJson(ws, 0).jsonrpc).toBe('2.0')
   })
 
   it('handshake params include devServerId', () => {
     const ws = new MockWs()
-    createSession(mockConfig, [mockTool], mockLog).start(ws as any)
+    createTestSession(mockConfig, [mockTool]).start(ws as any)
     expect((extractJson(ws, 0).params as any).devServerId).toBe('test-server')
   })
 
   it('handshake params include tools list', () => {
     const ws = new MockWs()
-    createSession(mockConfig, [mockTool], mockLog).start(ws as any)
+    createTestSession(mockConfig, [mockTool]).start(ws as any)
     expect((extractJson(ws, 0).params as any).tools).toContain('tool1')
   })
 
   it('handshake params include agentToken when non-empty', () => {
     const ws = new MockWs()
-    createSession(mockConfig, [], mockLog).start(ws as any)
+    createTestSession(mockConfig).start(ws as any)
     expect((extractJson(ws, 0).params as any).agentToken).toBe('tok-test')
   })
 
   it('handshake does NOT include agentToken when empty string', () => {
     const ws = new MockWs()
     const cfg = { ...mockConfig, agentToken: '' }
-    createSession(cfg, [], mockLog).start(ws as any)
+    createTestSession(cfg).start(ws as any)
     expect((extractJson(ws, 0).params as any).agentToken).toBeUndefined()
   })
 
   it('waits for open event when ws.readyState != 1', () => {
     const ws = new MockWs()
     ws.readyState = 0  // CONNECTING
-    createSession(mockConfig, [], mockLog).start(ws as any)
+    createTestSession(mockConfig).start(ws as any)
     expect(ws.send).not.toHaveBeenCalled()
     ws.readyState = 1
     ws.emit('open')
     expect(ws.send).toHaveBeenCalledOnce()
+  })
+
+  it('handshake params include capabilities array', () => {
+    const ws = new MockWs()
+    createTestSession(mockConfig).start(ws as any)
+    const caps = (extractJson(ws, 0).params as any).capabilities
+    expect(Array.isArray(caps)).toBe(true)
+    expect(caps).toContain('fs')
+    expect(caps).toContain('preflight')
+    expect(caps).toContain('agent.spawn')
+  })
+
+  it('dynamic buildCapabilities runs when no prebuilt caps provided', async () => {
+    const ws = new MockWs()
+    // No MOCK_CAPS — triggers real async buildCapabilities()
+    createSession(mockConfig, [], mockLog).start(ws as any)
+    await waitForHandshake(ws)
+    const caps = (extractJson(ws, 0).params as any).capabilities
+    expect(Array.isArray(caps)).toBe(true)
+    expect(caps).toContain('fs')
   })
 })
 
@@ -120,9 +166,12 @@ describe('keepalive', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
-  it('sends keepalive frame every 5000ms', () => {
+  it('sends keepalive frame every 5000ms', async () => {
     const ws = new MockWs()
-    createSession(mockConfig, [], mockLog).start(ws as any)
+    // createTestSession uses MOCK_CAPS → sync handshake path (no I/O)
+    // doHandshake() uses .then() → drain microtask queue with await Promise.resolve()
+    createTestSession(mockConfig).start(ws as any)
+    await Promise.resolve()  // drain .then() chain so startKeepalive is registered
     ws.send.mockClear()  // clear handshake
 
     vi.advanceTimersByTime(5001)
@@ -133,18 +182,20 @@ describe('keepalive', () => {
     expect(frame.length).toBe(HEADER_SIZE)
   })
 
-  it('sends multiple keepalives over 10s', () => {
+  it('sends multiple keepalives over 10s', async () => {
     const ws = new MockWs()
-    createSession(mockConfig, [], mockLog).start(ws as any)
+    createTestSession(mockConfig).start(ws as any)
+    await Promise.resolve()  // drain microtask queue
     ws.send.mockClear()
     vi.advanceTimersByTime(10001)
     expect(ws.send.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('stop() prevents further keepalive sends', () => {
+  it('stop() prevents further keepalive sends', async () => {
     const ws = new MockWs()
-    const session = createSession(mockConfig, [], mockLog)
+    const session = createTestSession(mockConfig)
     session.start(ws as any)
+    await Promise.resolve()  // drain microtask queue
     session.stop()
     ws.send.mockClear()
     vi.advanceTimersByTime(10000)

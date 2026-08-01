@@ -991,6 +991,21 @@ export function registerSshHandlers(
     return { ok: true }
   })
 
+  // FIX TASK-FLEET-001: Wire onAlert to BrowserWindow in Electron mode.
+  // fleet-health-monitor.ts no longer imports BrowserWindow directly; the callback is injected here.
+  ;(async () => {
+    const { BrowserWindow } = await import('electron')
+    const { fleetHealthMonitor } = await import('../ssh/fleet-health-monitor')
+    fleetHealthMonitor.onAlert = (alert) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('fleet:serverAlert', alert)
+        }
+      }
+    }
+  })().catch((err) => console.warn('[SSH] FleetHealthMonitor onAlert wiring failed:', err))
+
+
   // ── Connection lifecycle ───────────────────────────────────────────
 
   async function connectTarget(targetId: string): Promise<SshConnectionState> {

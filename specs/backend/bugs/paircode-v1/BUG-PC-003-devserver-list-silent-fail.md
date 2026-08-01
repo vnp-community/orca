@@ -1,5 +1,9 @@
 # BUG-PC-003 — `devServer.list` Fail Silently — UI Trống Không Có Lỗi
 
+**Status:** ✅ FIXED — 2026-08-01  
+**Task:** TASK-PC-001~005  
+**Note:** paircode-v1 domain fixed 2026-07-27  
+
 **ID:** BUG-PC-003  
 **Mức độ:** 🟠 High  
 **Module:** `src/renderer/src/web/web-preload-api.ts`, `src/renderer/src/hooks/useDevServersSync.ts`  

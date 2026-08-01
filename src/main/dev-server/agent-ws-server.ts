@@ -13,6 +13,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { IncomingMessage } from 'node:http'
 import type { Server as HttpServer } from 'node:http'
+import { createHash } from 'node:crypto'  // FIX TASK-AWS-002: for SHA-256 token hashing
 import { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
 import { createWebSocketTransport } from './ws-transport'
 import { runOrcaReceiverHandshake } from './ws-handshake'
@@ -39,7 +40,11 @@ type PendingSlot = {
 
 export class AgentWebSocketServer {
   private wss: WebSocketServer | null = null
-  /** Map<agentToken, PendingSlot> — slots waiting for agent to connect */
+  /**
+   * FIX TASK-AWS-002: Store SHA-256(agentToken) as map key, not plaintext.
+   * Prevents token extraction from heap dumps or core files.
+   * Map<SHA-256(agentToken), PendingSlot>
+   */
   private pendingSlots = new Map<string, PendingSlot>()
   private orcaVersion: string
 
@@ -82,11 +87,16 @@ export class AgentWebSocketServer {
     onConnected: AgentConnectionCallback,
     onExpired: (reason: string) => void
   ): () => void {
+    // FIX TASK-AWS-002: Store SHA-256 hash of token as map key.
+    // The plaintext token is only used to build the setup instructions below.
+    // The hash is used for all internal lookups — token never stored in pendingSlots.
+    const tokenHash = hashToken(agentToken)
+
     // Clear any existing slot for same token (idempotent re-register for reconnect)
-    this.removeSlot(agentToken)
+    this.removeSlotByHash(tokenHash)
 
     const expireTimer = setTimeout(() => {
-      this.pendingSlots.delete(agentToken)
+      this.pendingSlots.delete(tokenHash)
       onExpired(
         `direct-websocket: Agent did not connect within ${AGENT_CONNECT_TIMEOUT_MS / 1000}s. ` +
         `Configure your agent with:\n` +
@@ -95,30 +105,33 @@ export class AgentWebSocketServer {
       )
     }, AGENT_CONNECT_TIMEOUT_MS)
 
-    this.pendingSlots.set(agentToken, { callback: onConnected, expireTimer, onExpired })
+    this.pendingSlots.set(tokenHash, { callback: onConnected, expireTimer, onExpired })
 
-    return () => this.removeSlot(agentToken)
+    return () => this.removeSlotByHash(tokenHash)
   }
 
-  private removeSlot(agentToken: string): void {
-    const slot = this.pendingSlots.get(agentToken)
+  private removeSlotByHash(tokenHash: string): void {
+    const slot = this.pendingSlots.get(tokenHash)
     if (slot) {
       clearTimeout(slot.expireTimer)
-      this.pendingSlots.delete(agentToken)
+      this.pendingSlots.delete(tokenHash)
     }
   }
 
   private handleConnection(ws: WebSocket): void {
-    // Why: runOrcaReceiverHandshake validates agentToken from handshake params.
-    // We pass a validator that checks our slot map — unknown tokens are rejected early.
+    // FIX TASK-AWS-002: Validate against SHA-256 hash of incoming token.
+    // The validator receives the plaintext token from the handshake, hashes it,
+    // and checks the hashed map — so plaintext is only held in the transient
+    // handshake stack frame, never in the long-lived pendingSlots map.
     runOrcaReceiverHandshake(
       ws,
-      (token) => this.pendingSlots.has(token),
+      (token) => this.pendingSlots.has(hashToken(token)),
       this.orcaVersion
     )
       .then((info) => {
         const agentToken = info.agentToken ?? ''
-        const slot = this.pendingSlots.get(agentToken)
+        const tokenHash  = hashToken(agentToken)
+        const slot = this.pendingSlots.get(tokenHash)
 
         if (!slot) {
           // Race condition: slot expired between validate check and resolve
@@ -126,8 +139,8 @@ export class AgentWebSocketServer {
           return
         }
 
-        // Consume slot (one-time use per connect cycle)
-        this.removeSlot(agentToken)
+        // FIX TASK-AWS-002: Consume slot by hash
+        this.removeSlotByHash(tokenHash)
 
         const span = Tracers.agentWsFlow.start({
           devServerId: info.devServerId ?? 'unknown',
@@ -162,10 +175,20 @@ export class AgentWebSocketServer {
 
   /** Stop the server and cancel all pending slots */
   stop(): void {
-    for (const [token] of this.pendingSlots) {
-      this.removeSlot(token)
+    // FIX TASK-AWS-002: keys are now hashes (not plaintext tokens)
+    for (const [tokenHash] of this.pendingSlots) {
+      this.removeSlotByHash(tokenHash)
     }
     this.wss?.close()
     this.wss = null
   }
+}
+
+// ── Helper: SHA-256 hash token ─────────────────────────────────────────────────
+// FIX TASK-AWS-002: Store hashed tokens only in memory.
+// SHA-256 is deterministic and fast (no salt needed here — it's a lookup key,
+// not a password hash; the security goal is preventing token recovery from
+// heap dumps, not collision resistance).
+function hashToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex')
 }

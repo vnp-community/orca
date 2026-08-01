@@ -112,7 +112,7 @@ export function WorkspacePortScanner({ enabled = true }: { enabled?: boolean }):
           const key = workspacePortScanKeyForTarget(target)
           try {
             const result = await scanWorkspacePortsForTarget(target)
-            return { key, result }
+            return { key, result: result || makeUnavailableScan('Workspace port scan returned empty response.') }
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             return { key, result: makeUnavailableScan(message || 'Workspace port scan failed.') }

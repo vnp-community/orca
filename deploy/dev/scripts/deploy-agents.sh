@@ -414,7 +414,7 @@ while [ \$RETRY -lt \$MAX_RETRY ]; do
   API_RESP=\$(curl -sf --max-time 10 -X POST \\
     -H "Content-Type: application/json" \\
     -H "${AUTH_HEADER}" \\
-    -d '{"devServerId":"${DEV_LABEL}","name":"${DEV_LABEL}","ttl":600}' \\
+    -d "{\"devServerId\":\"${DEV_LABEL}\",\"name\":\"${DEV_LABEL}\",\"ttl\":86400,\"permanent\":true}" \\
     "http://${ORCA_HTTP_HOST}:${ORCA_HTTP_PORT}/api/agent-token" 2>/dev/null) && break || true
   RETRY=\$((RETRY+1))
   echo "[\$(TS)] Token fetch failed (attempt \$RETRY/\$MAX_RETRY). Wait \${WAIT}s..."
@@ -436,13 +436,15 @@ if [ -z "\${NEW_TOKEN:-}" ]; then
 fi
 
 echo "[\$(TS)] Token OK. Starting agent (mode=direct-websocket)..."
-exec env \\
-  ORCA_URL="${ORCA_URL}" \\
-  AGENT_TOKEN="\${NEW_TOKEN}" \\
-  DEV_SERVER_ID="${DEV_LABEL}" \\
-  MODE="direct-websocket" \\
-  AGENT_WORK_DIR="${WORK_DIR}" \\
-  HOME="/home/${SSH_USER}" \\
+exec env \
+  ORCA_URL="${ORCA_URL}" \
+  AGENT_TOKEN="\${NEW_TOKEN}" \
+  ORCA_AGENT_API_SECRET="${ORCA_AGENT_API_SECRET}" \
+  ORCA_HTTP_URL="http://${ORCA_HTTP_HOST}:${ORCA_HTTP_PORT}" \
+  DEV_SERVER_ID="${DEV_LABEL}" \
+  MODE="direct-websocket" \
+  AGENT_WORK_DIR="${WORK_DIR}" \
+  HOME="/home/${SSH_USER}" \
   "${NODE_BIN}" "${AGENT_DIR}/agent.js"
 WRAPPER
 chmod +x "${AGENT_DIR}/start-${DEV_LABEL}.sh"

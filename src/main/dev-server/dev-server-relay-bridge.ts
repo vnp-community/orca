@@ -41,6 +41,18 @@ function parseRelayPlatform(relayPlatform: RelayPlatform): {
   return { platform, arch: arch ?? 'x64' }
 }
 
+// ── FIX TASK-SSH-001: Exponential backoff helper ──────────────────────────────
+// Delays: 2s, 4s, 8s, 16s, 32s, 60s (capped), with ±1s jitter to prevent thundering herd.
+function calcBackoffDelay(attempt: number): number {
+  const BASE_MS    = 2_000
+  const MAX_MS     = 60_000
+  const JITTER_MS  = 1_000
+  const exponential = BASE_MS * Math.pow(2, attempt)
+  const capped      = Math.min(exponential, MAX_MS)
+  const jitter      = Math.random() * JITTER_MS
+  return capped + jitter
+}
+
 export class DevServerRelayBridge extends EventEmitter {
   /** The active relay multiplexer. Exposed so IPC handlers can forward relay calls. */
   session: SshChannelMultiplexer | null = null
@@ -50,6 +62,8 @@ export class DevServerRelayBridge extends EventEmitter {
   private _relayWsActive = false
   /** Timer handle for relay-ws reconnect delay */
   private _relayWsReconnectTimer: ReturnType<typeof setTimeout> | null = null
+  /** FIX TASK-SSH-001: Reconnect attempt counter for exponential backoff (reset on success) */
+  private _relayWsReconnectAttempt = 0
 
   /**
    * Reconnect queue: when the agent WebSocket closes and we're awaiting a new
@@ -115,7 +129,10 @@ export class DevServerRelayBridge extends EventEmitter {
 
       // Store transport as session for downstream relay calls (TASK-013+).
       // The actual session object from the existing infrastructure is the transport.
-      this.session = result.transport
+      // Why cast: MultiplexerTransport from deployAndLaunchRelay is structurally
+      // compatible with SshChannelMultiplexer at runtime (same channel/call API).
+      // The type mismatch is a class hierarchy gap — both implement the same protocol.
+      this.session = result.transport as unknown as SshChannelMultiplexer
 
       // Close immediately if this is a test-only probe.
       if (opts.testOnly) {
@@ -173,10 +190,13 @@ export class DevServerRelayBridge extends EventEmitter {
       this._directWsDisposer()
       this._directWsDisposer = null
     }
-    if (this.session && typeof this.session.close === 'function') {
-      await this.session.close()
-    } else if (this.session && typeof (this.session as unknown as { destroy?(): void }).destroy === 'function') {
-      (this.session as unknown as { destroy(): void }).destroy()
+    if (this.session) {
+      const s = this.session as unknown as { close?(): void; destroy?(): void }
+      if (typeof s.close === 'function') {
+        await (s as { close(): Promise<void> | void }).close()
+      } else if (typeof s.destroy === 'function') {
+        s.destroy()
+      }
     }
     this.session = null
   }
@@ -221,6 +241,17 @@ export class DevServerRelayBridge extends EventEmitter {
           this._directWsDisposer = null
           this.session = mux
 
+          // FIX TASK-TRM-004: clear session when agent WS closes.
+          // Without this, bridge.session remains non-null with a dead mux (stale reference).
+          // Pattern mirrors connectWithExternalToken (lines 304-310).
+          mux.onDispose(() => {
+            if (this.session === mux) {
+              console.log(`[DevServerRelayBridge] Agent WS closed — clearing session (direct-ws mode)`)
+              this.session = null
+              this.onSessionDropped()  // mark reconnecting → queue subsequent calls
+            }
+          })
+
           if (opts.testOnly) {
             void this.disconnect()
           }
@@ -251,7 +282,7 @@ export class DevServerRelayBridge extends EventEmitter {
         process.env['ORCA_AGENT_WS_URL'] ??
         (() => {
           const host = process.env['ORCA_ADVERTISED_HOST'] ?? 'localhost'
-          const port = process.env['ORCA_HTTP_PORT'] ?? '6769'
+          const port = process.env['ORCA_HTTP_PORT'] ?? '6768'  // FIX TASK-TRM-003: align with TDD-11 (single HTTP server)
           return `ws://${host}:${port}${AGENT_WS_PATH}`
         })()
       this.emit('agentTokenGenerated', {
@@ -411,17 +442,19 @@ export class DevServerRelayBridge extends EventEmitter {
                 void this.disconnect()
               } else {
                 // TASK-DS-008: monitor close → trigger reconnect
-                ws.on('close', () => {
-                  if (this.session) {
-                    console.log('[RelayBridge] relay-ws disconnected — clearing session')
-                    this.session = null
-                    this.onSessionDropped()  // queue subsequent RPC calls
-                  }
-                  if (this._relayWsActive) {
-                    console.log('[RelayBridge] relay-ws will reconnect in 15s...')
-                    this._relayWsReconnectTimer = setTimeout(attempt, 15_000)
-                  }
-                })
+                 ws.on('close', () => {
+                   if (this.session) {
+                     console.log('[RelayBridge] relay-ws disconnected — clearing session')
+                     this.session = null
+                     this.onSessionDropped()  // queue subsequent RPC calls
+                   }
+                   if (this._relayWsActive) {
+                     // FIX TASK-SSH-001: Exponential backoff — 2s, 4s, 8s, 16s, 30s, 60s max
+                     const delayMs = calcBackoffDelay(this._relayWsReconnectAttempt++)
+                     console.log(`[RelayBridge] relay-ws will reconnect in ${Math.round(delayMs / 1000)}s (attempt ${this._relayWsReconnectAttempt})...`)
+                     this._relayWsReconnectTimer = setTimeout(attempt, delayMs)
+                   }
+                 })
               }
 
               if (!initialResolved) {
@@ -433,6 +466,8 @@ export class DevServerRelayBridge extends EventEmitter {
                   relayVersion: info.agentVersion,
                 })
               } else {
+                // FIX TASK-SSH-001: Reset backoff counter on successful reconnection
+                this._relayWsReconnectAttempt = 0
                 console.log('[RelayBridge] relay-ws reconnected successfully')
                 // Flush any calls that were queued during the reconnect gap
                 if (this._reconnectWaiters.length > 0) {
@@ -448,9 +483,11 @@ export class DevServerRelayBridge extends EventEmitter {
               if (!initialResolved) {
                 reject(err)
               } else {
-                console.warn(`[RelayBridge] relay-ws handshake failed: ${err.message} — retry in 15s`)
+                // FIX TASK-SSH-001: Exponential backoff on handshake failure too
+                const delayMs = calcBackoffDelay(this._relayWsReconnectAttempt++)
+                console.warn(`[RelayBridge] relay-ws handshake failed: ${err.message} — retry in ${Math.round(delayMs / 1000)}s`)
                 if (this._relayWsActive) {
-                  this._relayWsReconnectTimer = setTimeout(attempt, 15_000)
+                  this._relayWsReconnectTimer = setTimeout(attempt, delayMs)
                 }
               }
             })
@@ -493,9 +530,21 @@ export class DevServerRelayBridge extends EventEmitter {
   async call<T = unknown>(
     method: string,
     params: Record<string, unknown> = {},
-    timeoutMs = 30_000
+    // TRM-002: reduced from 30s → 10s to fail-fast when agent is not running.
+    // 30s timeout felt frozen; 10s still allows slow relay round-trips.
+    timeoutMs = 10_000
   ): Promise<T> {
-    if (!this.session) throw new Error('Not connected')
+    if (!this.session) {
+      // TRM-001: Better error with actionable instructions
+      throw Object.assign(
+        new Error(
+          `Dev Server agent not connected (devServerId=${this.config.id}). ` +
+          `Ensure the Orca agent is running on the Dev Server. ` +
+          `On the Dev Server, run: node ~/orca-agent/agent.js`
+        ),
+        { code: 'AGENT_NOT_CONNECTED', devServerId: this.config.id, method }
+      )
+    }
     return this.callWithTimeout<T>(method, params, timeoutMs)
   }
 
@@ -544,8 +593,15 @@ export class DevServerRelayBridge extends EventEmitter {
 
       if (!session) {
         const span = relayCallTracer.start({ devServerId: this.config.id, method })
-        span.fail('Not connected', { method, devServerId: this.config.id })
-        throw new Error('Not connected')
+        span.fail('AGENT_NOT_CONNECTED', { method, devServerId: this.config.id })
+        // TRM-001: Structured error with actionable message
+        throw Object.assign(
+          new Error(
+            `Dev Server agent not connected (devServerId=${this.config.id}, method=${method}). ` +
+            `Run: node ~/orca-agent/agent.js on the Dev Server.`
+          ),
+          { code: 'AGENT_NOT_CONNECTED', devServerId: this.config.id, method }
+        )
       }
 
       const span = relayCallTracer.start({ devServerId: this.config.id, method })

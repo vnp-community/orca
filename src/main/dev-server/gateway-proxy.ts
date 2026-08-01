@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { DevServerManager } from './dev-server-manager'
-import type { DevServer, DevServerInput, ConnectionTestResult } from '../../../shared/dev-server'
+import type { DevServer, DevServerInput, ConnectionTestResult } from '../../shared/dev-server-types'
 
 type IpcRequestMessage = {
   type: 'devServer:proxyRequest'
@@ -85,7 +84,7 @@ export class GatewayDevServerManagerProxy {
     return this.sendRequest('remove', id)
   }
 
-  get(id: string): DevServer | null {
+  get(_id: string): DevServer | null {
     // Synchronous get is trickier via IPC, but typically 'list' or 'connect' are what matter.
     // For now we'll throw, or return a stub. The RPC layer uses `list` and `connect`.
     // getRelay uses getRelay, which we must mock below.

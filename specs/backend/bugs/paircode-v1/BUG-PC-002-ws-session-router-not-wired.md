@@ -1,5 +1,9 @@
 # BUG-PC-002 — `WsSessionRouter` Được Tạo Nhưng Không Được Wired
 
+**Status:** ✅ FIXED — 2026-08-01  
+**Task:** TASK-PC-001~005  
+**Note:** paircode-v1 domain fixed 2026-07-27  
+
 **ID:** BUG-PC-002  
 **Mức độ:** 🔴 Critical  
 **Module:** `src/server/index.ts`  

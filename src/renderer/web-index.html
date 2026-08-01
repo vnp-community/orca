@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Orca Web</title>
+    <script>
+      window.__orca_platform = 'web';
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        var el = document.createElement('div');
+        el.style = 'color:red; background:white; padding:20px; font-family:monospace; position:fixed; top:0; left:0; right:0; z-index:99999;';
+        el.innerText = 'Global Error: ' + msg + '\n' + (error ? error.stack : '');
+        document.body.appendChild(el);
+      };
+      window.onunhandledrejection = function(event) {
+        var el = document.createElement('div');
+        el.style = 'color:red; background:white; padding:20px; font-family:monospace; position:fixed; top:100px; left:0; right:0; z-index:99999;';
+        el.innerText = 'Unhandled Promise Rejection: ' + (event.reason ? event.reason.stack || event.reason : 'Unknown');
+        document.body.appendChild(el);
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

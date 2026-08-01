@@ -159,4 +159,13 @@ export type IpcPtyTransportOptions = {
   onAgentBecameWorking?: () => void
   onAgentExited?: () => void
   onAgentStatus?: (payload: ParsedAgentStatusPayload) => void
+  // TM-001-B: Cold-start lifecycle callbacks — triggered by callRuntimeWithColdStartRetry
+  /** Called when terminal.create begins (first attempt). Use to show loading overlay. */
+  onColdStartBegin?: () => void
+  /** Called before each retry attempt (attempt ≥ 1). Use to update loading message. */
+  onColdStartRetry?: (attempt: number) => void
+  /** Called when terminal.create succeeds (any attempt). Use to hide loading overlay. */
+  onColdStartComplete?: () => void
+  /** Called when all retry attempts fail. Use to show error state. */
+  onColdStartFailed?: () => void
 }

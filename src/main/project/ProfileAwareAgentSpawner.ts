@@ -96,17 +96,28 @@ export class ProfileAwareAgentSpawner {
     const provider = await this.providerService.resolveForProject(projectId, preferredModel)
     if (provider) {
       profileEnv['ORCA_AI_PROVIDER_ID'] = provider.providerId
-      profileEnv['ORCA_AI_MODEL_ID'] = provider.modelId
-      // Merge provider credentials into env (e.g. API keys)
-      Object.assign(profileEnv, provider.credentials)
+      profileEnv['ORCA_AI_MODEL_ID']    = provider.modelId
+      // FIX TASK-WT-002 (SECURITY): Do NOT inject raw credentials into agent env.
+      // Raw API keys in process.env are visible via /proc/<pid>/environ on Linux.
+      // Agent reads credentials via ORCA_ACCOUNT_ID from the credential store on Dev Server.
+      profileEnv['ORCA_ACCOUNT_ID']     = provider.providerId
+      // Removed: Object.assign(profileEnv, provider.credentials)
     }
 
     // 6. Get relay and send agent.exec
+    // FIX TASK-TG-001: relay agent.exec expects { binary, args, cwd } not { command, workdir }.
+    // agent-rpc-dispatch.ts:506-508 reads p.binary, p.args, p.cwd respectively.
     const relay = await this.router.getRelayForProject(projectId, userId)
+    const commandParts = command.trim().split(/\s+/).filter(Boolean)
+    const binary = commandParts[0] ?? ''
+    const args   = commandParts.slice(1)
+
     const result = await relay.call('agent.exec', {
-      command,
-      workdir: workdir ?? project.repoPath,
+      binary,                            // was: command (wrong field name)
+      args,                              // was: missing
+      cwd: workdir ?? project.repoPath,  // was: workdir (wrong field name)
       env: profileEnv,
+      timeoutMs: 5 * 60 * 1000,         // 5 minutes
     })
 
     const sessionId = (result as { sessionId?: string }).sessionId ?? randomId()

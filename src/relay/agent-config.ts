@@ -13,8 +13,13 @@ export interface AgentConfig {
   readonly mode: AgentConnectionMode
   /** WebSocket URL for direct-websocket mode (ORCA_URL env var) */
   readonly orcaUrl: string
+  /** HTTP base URL of the Orca Server for token API calls, e.g. http://172.20.2.39:6769.
+   *  Derived from ORCA_HTTP_URL env var or auto-converted from ORCA_URL (wss→https, ws→http). */
+  readonly orcaHttpUrl: string
   /** One-time bearer token for direct-ws, long-lived secret for relay-ws */
   readonly agentToken: string
+  /** API secret for POST /api/agent-token (ORCA_AGENT_API_SECRET). Required for token renewal. */
+  readonly apiSecret: string
   /** Port the agent listens on in relay-websocket mode (AGENT_PORT) */
   readonly agentPort: number
   /** Identifier for this dev server (DEV_SERVER_ID) */
@@ -49,9 +54,22 @@ function buildToolPath(home: string): string {
 }
 
 /**
- * Load and validate agent configuration from process.env.
- * Throws on invalid MODE to fail fast at startup — not at connection time.
+ * Derive an HTTP base URL from the WS URL for token API calls.
+ * wss://host/agent → https://host
+ * ws://host/agent  → http://host
  */
+function deriveHttpUrl(wsUrl: string): string {
+  try {
+    const u = new URL(wsUrl)
+    u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:'
+    u.pathname = '/'
+    u.search   = ''
+    return u.origin
+  } catch {
+    return 'http://localhost:6769'
+  }
+}
+
 export function loadAgentConfig(): AgentConfig {
   // Use || instead of ?? so that empty string env vars also fall back to defaults.
   const rawMode = process.env.MODE || 'direct-websocket'
@@ -65,10 +83,17 @@ export function loadAgentConfig(): AgentConfig {
   const home = homedir()
   const toolPath = buildToolPath(home)
 
+  const orcaUrl = process.env.ORCA_URL || 'wss://b15.openledger.vn/agent'
+  // ORCA_HTTP_URL can be set explicitly (e.g. http://172.20.2.39:6769) for
+  // environments where the HTTP and WS endpoints are on different addresses.
+  const orcaHttpUrl = process.env.ORCA_HTTP_URL || deriveHttpUrl(orcaUrl)
+
   return {
     mode,
-    orcaUrl:     process.env.ORCA_URL      || 'wss://b15.openledger.vn/agent',
-    agentToken:  process.env.AGENT_TOKEN   ?? '',
+    orcaUrl,
+    orcaHttpUrl,
+    agentToken:  process.env.AGENT_TOKEN        ?? '',
+    apiSecret:   process.env.ORCA_AGENT_API_SECRET ?? '',
     agentPort:   parseInt(process.env.AGENT_PORT || '6799', 10),
     devServerId: process.env.DEV_SERVER_ID || 'dev-local',
     logLevel:    (process.env.LOG_LEVEL    || 'info') as AgentLogLevel,

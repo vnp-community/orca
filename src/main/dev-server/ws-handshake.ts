@@ -30,6 +30,7 @@ export type WsHandshakeInfo = {
   agentVersion: string
   sessionId: string
   agentToken?: string  // set by receiver handshake; used by AgentWebSocketServer to find slot
+  devServerId?: string // set by DevServerRelayBridge when it claims the connection (for tracing)
 }
 
 // ─── Initiator Handshake (relay-websocket) ────────────────────────────────────

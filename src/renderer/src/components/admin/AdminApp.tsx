@@ -19,6 +19,9 @@ const CompanyProfileAdmin = lazy(() =>
 const ProviderList = lazy(() =>
   import('../ai-provider/ProviderList').then((m) => ({ default: m.ProviderList }))
 )
+const FleetDashboard = lazy(() =>
+  import('./fleet/fleet-dashboard').then((m) => ({ default: m.FleetDashboard }))
+)
 
 function PageContent({
   route,
@@ -44,6 +47,7 @@ function PageContent({
   if (route === '/audit')          return <AuditPage />
   if (route === '/profile')        return <CompanyProfileAdmin />
   if (route === '/ai-providers')   return <ProviderList />
+  if (route === '/fleet')          return <FleetDashboard />
   return <AdminDashboard />
 }
 

@@ -1284,23 +1284,34 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
   defineMethod({
     name: 'terminal.create',
     params: TerminalCreateParams,
-    handler: async (params, { runtime }) => ({
-      terminal: await runtime.createTerminal(params.worktree, {
-        command: params.command,
-        startupCommandDelivery: params.startupCommandDelivery,
-        env: params.env,
-        ...(params.launchConfig ? { launchConfig: params.launchConfig } : {}),
-        ...(params.launchToken ? { launchToken: params.launchToken } : {}),
-        ...(params.launchAgent ? { launchAgent: params.launchAgent } : {}),
-        title: params.title,
-        focus: params.focus === true,
-        rendererBacked: params.rendererBacked === true,
-        activate: params.activate === true,
-        presentation: params.presentation,
-        tabId: params.tabId,
-        leafId: params.leafId
-      })
-    })
+    handler: async (params, ctx) => {
+      // FIX TASK-TRM-006: Require authenticated userId.
+      // In ORCA_MULTI_USER=1 mode, ctx.userId is set from the session cookie by WsSessionRouter.
+      // Anonymous / unauthenticated connections have ctx.userId === undefined.
+      // This prevents any browser without a valid session from creating terminals.
+      if (!ctx.userId) {
+        throw new Error('UNAUTHORIZED: terminal.create requires an authenticated session. Please log in.')
+      }
+
+      const { runtime } = ctx
+      return {
+        terminal: await runtime.createTerminal(params.worktree, {
+          command: params.command,
+          startupCommandDelivery: params.startupCommandDelivery,
+          env: params.env,
+          ...(params.launchConfig ? { launchConfig: params.launchConfig } : {}),
+          ...(params.launchToken ? { launchToken: params.launchToken } : {}),
+          ...(params.launchAgent ? { launchAgent: params.launchAgent } : {}),
+          title: params.title,
+          focus: params.focus === true,
+          rendererBacked: params.rendererBacked === true,
+          activate: params.activate === true,
+          presentation: params.presentation,
+          tabId: params.tabId,
+          leafId: params.leafId
+        })
+      }
+    }
   }),
   defineMethod({
     name: 'terminal.split',

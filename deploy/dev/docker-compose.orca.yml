@@ -55,6 +55,8 @@ services:
       # (NodeAdapter.__dirname → out/server, not app root)
       ORCA_APP_PATH: /opt/orca/app
       NODE_ENV: production
+      # Set ORCA_TRACE=1 in .env to enable structured trace logs (wsSession, agentWs, relay flows)
+      ORCA_TRACE: ${ORCA_TRACE:-}
 
       # ── Multi-User & Auth ─────────────────────────────────────
       # Set ORCA_MULTI_USER=1 để enable login + per-user process isolation
@@ -69,6 +71,12 @@ services:
       # ── Fleet Monitoring ──────────────────────────────────────
       ORCA_FLEET_METRICS_ENABLED: ${ORCA_FLEET_METRICS_ENABLED:-false}
       ORCA_FLEET_ALERT_WEBHOOK_URL: ${ORCA_FLEET_ALERT_WEBHOOK_URL:-}
+
+      # ── Security ──────────────────────────────────────────────
+      # Master secret cho WebCredentialStore AES-256-GCM encryption
+      ORCA_SERVER_SECRET: ${ORCA_SERVER_SECRET:-}
+      # Secret để xác thực POST /api/agent-token (agents dùng để lấy token)
+      ORCA_AGENT_API_SECRET: ${ORCA_AGENT_API_SECRET:-}
 
       # AI API Keys (shared hoặc để trống, developer set qua UI)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

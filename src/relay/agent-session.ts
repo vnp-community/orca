@@ -32,6 +32,7 @@ import {
 } from '../shared/agent-wire-protocol'
 import { MessageType } from '../main/ssh/relay-protocol'
 import { createTracer } from '../shared/trace'
+import { cleanupAllPtys } from './agent-spawner'
 
 const sessionTracer = createTracer('agent:session')
 
@@ -47,14 +48,111 @@ export interface AgentSession {
 export function createSession(
   config: AgentConfig,
   tools: ToolDefinition[],
-  log: AgentLogger
+  log: AgentLogger,
+  /** Optional: pre-built capabilities (used in tests to bypass async git/pty checks) */
+  _prebuiltCapabilities?: readonly string[],
+  /** Optional: token override for renewed tokens (supersedes config.agentToken) */
+  tokenOverride?: string
 ): AgentSession {
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null
   let handshakeDone = false
   const handshakeOkCallbacks: Array<() => void> = []
   const dispatcher = createRpcDispatcher(tools, config, log)
 
-  function sendHandshake(ws: WebSocket, wireState: ReturnType<typeof createWireState>): void {
+  // ── WT-Issue-2: Dynamic capability detection ─────────────────────────────
+  /**
+   * checkGitAvailable — Check if git binary is accessible in toolPath or system PATH.
+   * Quick check via fs.access first, fallback to spawning git --version.
+   */
+  async function checkGitAvailable(): Promise<boolean> {
+    const { access: fsAccess, constants } = await import('node:fs/promises')
+    const { join } = await import('node:path')
+    const dirs = (config.toolPath ?? process.env['PATH'] ?? '').split(':').filter(Boolean)
+    for (const dir of dirs) {
+      try {
+        await fsAccess(join(dir, 'git'), constants.X_OK)
+        return true
+      } catch { /* continue to next dir */ }
+    }
+    // Fallback: try running git --version (works on Windows too)
+    const { execFile } = await import('node:child_process')
+    return new Promise<boolean>((resolve) => {
+      const child = execFile('git', ['--version'], { timeout: 3000 })
+      child.on('close', (code) => resolve(code === 0))
+      child.on('error', () => resolve(false))
+    })
+  }
+
+  /**
+   * checkPtyAvailable — Check if node-pty native module loads successfully.
+   * Returns false if the native module is missing or incompatible.
+   */
+  async function checkPtyAvailable(): Promise<boolean> {
+    try {
+      await import('node-pty')
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * buildCapabilities — Dynamically build the capabilities list based on what is
+   * actually installed and functional on this Dev Server.
+   * Falls back to a static list if the check takes > 5 seconds.
+   */
+  async function buildCapabilities(): Promise<readonly string[]> {
+    const caps: string[] = [
+      'fs',
+      'preflight',
+      'ai.providers',
+      'agent.spawn',
+      'agent.exec',
+      'agent.sendInput',
+      'agent.kill',
+    ]
+
+    const [hasGit, hasPty] = await Promise.all([checkGitAvailable(), checkPtyAvailable()])
+
+    log.info(`capability check: git=${hasGit} pty=${hasPty}`)
+
+    if (hasGit) {
+      caps.push('git', 'git.exec', 'git.execStream')
+      caps.push('worktrees', 'git.worktree.list', 'git.worktree.add', 'git.worktree.remove')
+    }
+    if (hasPty) {
+      caps.push('pty', 'pty.create', 'pty.write', 'pty.resize', 'pty.destroy', 'pty.scrollback')
+    }
+
+    log.info(`capabilities: [${caps.join(', ')}]`)
+    return caps
+  }
+
+  const STATIC_CAPABILITIES_FALLBACK = [
+    'fs', 'git', 'preflight', 'ai.providers', 'agent.spawn', 'worktrees', 'pty',
+  ] as const
+
+  async function sendHandshake(ws: WebSocket, wireState: ReturnType<typeof createWireState>): Promise<void> {
+    // WT-Issue-2: Use dynamic capabilities with 5s timeout fallback
+    // If _prebuiltCapabilities is provided (e.g. in tests), skip the async check entirely.
+    let capabilities: readonly string[]
+    if (_prebuiltCapabilities) {
+      capabilities = _prebuiltCapabilities
+    } else {
+      try {
+        capabilities = await Promise.race([
+          buildCapabilities(),
+          new Promise<readonly string[]>((_res, reject) =>
+            setTimeout(() => reject(new Error('capability check timeout')), 5000)
+          ),
+        ])
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        log.warn(`buildCapabilities failed (${msg}) — using static fallback`)
+        capabilities = STATIC_CAPABILITIES_FALLBACK
+      }
+    }
+
     const rpc = {
       jsonrpc: '2.0' as const,
       id: 1,
@@ -64,9 +162,10 @@ export function createSession(
         platform:      process.platform,
         arch:          process.arch,
         nodeVersion:   process.version,
-        capabilities:  ['fs', 'git', 'preflight', 'ai.providers', 'agent.spawn', 'worktrees'] as const,
-        // agentToken is only sent in direct-websocket mode; empty string = omit
-        ...(config.agentToken ? { agentToken: config.agentToken } : {}),
+        capabilities,
+        // agentToken is only sent in direct-websocket mode; empty string = omit.
+        // tokenOverride takes precedence so renewed tokens are used transparently.
+        ...((tokenOverride || config.agentToken) ? { agentToken: tokenOverride ?? config.agentToken } : {}),
         devServerId:   config.devServerId,
         tools:         tools.map(t => t.name),
       },
@@ -89,16 +188,25 @@ export function createSession(
       const wireState = createWireState()
       const span = sessionTracer.start({ devServerId: config.devServerId })
 
+      // sendHandshake is async (builds dynamic capabilities) — wrap in a local helper
+      const doHandshake = (): void => {
+        void sendHandshake(ws, wireState).then(() => {
+          span.step('handshake-sent')
+          startKeepalive(ws, wireState)
+        }).catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err)
+          log.error(`sendHandshake failed: ${msg}`)
+          span.fail(err, { phase: 'handshake' })
+          ws.close(1011, 'Handshake error')
+        })
+      }
+
       if (ws.readyState === 1 /* WebSocket.OPEN */) {
-        sendHandshake(ws, wireState)
-        span.step('handshake-sent')
-        startKeepalive(ws, wireState)
+        doHandshake()
       } else {
         ws.once('open', () => {
           log.info('WebSocket opened')
-          sendHandshake(ws, wireState)
-          span.step('handshake-sent')
-          startKeepalive(ws, wireState)
+          doHandshake()
         })
       }
 
@@ -179,6 +287,9 @@ export function createSession(
         clearInterval(keepaliveTimer)
         keepaliveTimer = null
       }
+      // ORCH-011: Kill any orphaned agent PTYs so they don't linger
+      // as zombie processes on the Dev Server after WS disconnect.
+      cleanupAllPtys(log)
     },
 
     onHandshakeOk(callback: () => void): void {

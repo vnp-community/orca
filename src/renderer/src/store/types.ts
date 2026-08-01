@@ -47,6 +47,7 @@ import type { GitPanelSlice } from './slices/git-panel'
 import type { TaskSlice } from './slices/task'
 import type { WorkflowSlice } from './slices/workflow'
 import type { TraceSlice } from './slices/trace'
+import type { RemoteAgentSessionSlice } from './slices/remote-agent-sessions'
 
 // ── Re-exports for cross-slice consumers (import from '@/store/types') ────────
 export type {
@@ -106,4 +107,5 @@ export type AppState = RepoSlice &
   GitPanelSlice &
   TaskSlice &
   WorkflowSlice &
-  TraceSlice
+  TraceSlice &
+  RemoteAgentSessionSlice

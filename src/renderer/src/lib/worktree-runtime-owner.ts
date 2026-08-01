@@ -43,6 +43,17 @@ function findFolderProjectGroup(
   return findIndexedProjectGroupOwner(state.projectGroups, folderWorkspace.projectGroupId)
 }
 
+function getGlobalActiveRuntimeEnvironmentId(state: WorktreeRuntimeOwnerState): string | null {
+  const envId = state.settings?.activeRuntimeEnvironmentId?.trim()
+  if (envId) {
+    return envId
+  }
+  if (typeof window !== 'undefined' && (window as any)?.__orca_platform === 'web') {
+    return 'session-auth'
+  }
+  return null
+}
+
 function findFolderWorkspace(
   state: WorktreeRuntimeOwnerState,
   folderWorkspaceId: string
@@ -54,6 +65,9 @@ function getRuntimeEnvironmentIdForFolderWorkspace(
   state: WorktreeRuntimeOwnerState,
   folderWorkspaceId: string
 ): string | null {
+  if (typeof window !== 'undefined' && (window as any)?.__orca_platform === 'web') {
+    return 'session-auth'
+  }
   const folderWorkspace = findFolderWorkspace(state, folderWorkspaceId)
   const projectGroup = findFolderProjectGroup(state, folderWorkspaceId)
   const parsed = parseExecutionHostId(projectGroup?.executionHostId)
@@ -72,7 +86,7 @@ function getRuntimeEnvironmentIdForFolderWorkspace(
   if (restoredRuntimeHost) {
     return restoredRuntimeHost.environmentId
   }
-  return state.settings?.activeRuntimeEnvironmentId?.trim() || null
+  return getGlobalActiveRuntimeEnvironmentId(state)
 }
 
 function getRestoredRuntimeHostForFolderWorkspace(
@@ -144,7 +158,7 @@ function getExecutionHostIdForFolderWorkspace(
   if (restoredRuntimeHost) {
     return restoredRuntimeHost.id
   }
-  const environmentId = state.settings?.activeRuntimeEnvironmentId?.trim()
+  const environmentId = getGlobalActiveRuntimeEnvironmentId(state)
   return environmentId ? `runtime:${encodeURIComponent(environmentId)}` : 'local'
 }
 
@@ -152,6 +166,9 @@ export function getRuntimeEnvironmentIdForWorktree(
   state: WorktreeRuntimeOwnerState,
   worktreeId: string | null | undefined
 ): string | null {
+  if (typeof window !== 'undefined' && (window as any)?.__orca_platform === 'web') {
+    return 'session-auth'
+  }
   if (!worktreeId) {
     return null
   }
@@ -176,7 +193,7 @@ export function getRuntimeEnvironmentIdForWorktree(
     const parsed = parseExecutionHostId(getRepoExecutionHostId(repo))
     return parsed?.kind === 'runtime' ? parsed.environmentId : null
   }
-  return state.settings?.activeRuntimeEnvironmentId?.trim() || null
+  return getGlobalActiveRuntimeEnvironmentId(state)
 }
 
 export function getExplicitRuntimeEnvironmentIdForWorktree(
@@ -209,7 +226,7 @@ export function getExplicitRuntimeEnvironmentIdForWorktree(
 
 export function getRuntimeSessionMirrorEnvironmentIds(state: WorktreeRuntimeOwnerState): string[] {
   const ids = new Set<string>()
-  const activeRuntimeEnvironmentId = state.settings?.activeRuntimeEnvironmentId?.trim()
+  const activeRuntimeEnvironmentId = getGlobalActiveRuntimeEnvironmentId(state)
   if (activeRuntimeEnvironmentId) {
     ids.add(activeRuntimeEnvironmentId)
   }
@@ -269,7 +286,7 @@ export function getExecutionHostIdForWorktree(
   if (repo && hasExplicitOwner) {
     return getRepoExecutionHostId(repo)
   }
-  const environmentId = state.settings?.activeRuntimeEnvironmentId?.trim()
+  const environmentId = getGlobalActiveRuntimeEnvironmentId(state)
   return environmentId ? `runtime:${encodeURIComponent(environmentId)}` : 'local'
 }
 

@@ -303,3 +303,149 @@ export class AgentExecHandler {
     })
   }
 }
+
+// ─── TG-001: handleAgentExec — Non-interactive AI agent execution ─────────────
+//
+// Called by:
+//   - StepExecutors.executeAgent() via relay.call('agent.exec', {...})
+//   - ProfileAwareAgentSpawner via relay.call('agent.exec', {...})
+//
+// Difference from agent.spawn (interactive PTY):
+//   - No terminal allocation (runs as subprocess with piped stdio)
+//   - Returns captured stdout/stderr in JSON-RPC response (not streamed)
+//   - Has a fixed timeout (default 5min)
+//   - Structured result includes stepId for workflow tracking
+// ─────────────────────────────────────────────────────────────────────────────
+
+import type { AgentConfig } from './agent-config'
+import type { AgentLogger } from './agent-logger'
+
+export interface AgentExecRequest {
+  prompt:       string
+  worktreePath: string
+  trustPreset?: 'standard' | 'full' | 'none'
+  model?:       string
+  accountId?:   string
+  taskId?:      string
+  stepId?:      string
+  timeoutMs?:   number
+}
+
+function parseAgentExecRequest(params: Record<string, unknown>): AgentExecRequest | null {
+  if (typeof params.prompt       !== 'string' || !params.prompt)       return null
+  if (typeof params.worktreePath !== 'string' || !params.worktreePath) return null
+  return {
+    prompt:       params.prompt,
+    worktreePath: params.worktreePath,
+    trustPreset:  typeof params.trustPreset === 'string' ? params.trustPreset as AgentExecRequest['trustPreset'] : 'standard',
+    model:        typeof params.model       === 'string' ? params.model       : undefined,
+    accountId:    typeof params.accountId   === 'string' ? params.accountId   : undefined,
+    taskId:       typeof params.taskId      === 'string' ? params.taskId      : undefined,
+    stepId:       typeof params.stepId      === 'string' ? params.stepId      : undefined,
+    timeoutMs:    typeof params.timeoutMs   === 'number' ? params.timeoutMs   : undefined,
+  }
+}
+
+/**
+ * handleAgentExec — Run an AI agent CLI non-interactively and capture output.
+ *
+ * Supports Claude (--print mode), Codex, Gemini, and opencode.
+ * Returns { stdout, stderr, exitCode, latencyMs, timedOut, stepId }.
+ */
+export async function handleAgentExec(
+  id:     string | number | null,
+  params: Record<string, unknown>,
+  config: AgentConfig,
+  log:    AgentLogger,
+): Promise<object> {
+  const req = parseAgentExecRequest(params)
+  if (!req) {
+    return {
+      jsonrpc: '2.0', id,
+      error: { code: -32602, message: 'agent.exec: prompt and worktreePath are required' },
+    }
+  }
+
+  // Resolve binary based on model
+  const { resolveAgentSpec } = await import('./agent-spawner')
+  const spec = resolveAgentSpec(req.model ?? 'claude')
+  if (!spec) {
+    return {
+      jsonrpc: '2.0', id,
+      error: { code: -32602, message: `agent.exec: unknown model "${req.model ?? 'claude'}"` },
+    }
+  }
+
+  const { homedir } = await import('node:os')
+  const toolEnv: NodeJS.ProcessEnv = {
+    HOME: homedir(),
+    PATH: config.toolPath ?? process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
+    TERM: 'dumb',
+    // Non-interactive mode — no color output
+    NO_COLOR: '1',
+    ...(req.taskId ? { ORCA_TASK_ID: req.taskId } : {}),
+    ...(req.worktreePath ? { ORCA_WORKTREE_PATH: req.worktreePath } : {}),
+  }
+
+  // Build CLI args for non-interactive (print) mode
+  // Claude uses: --print <prompt> --output-format text
+  const args: string[] = []
+  if (req.model)        args.push('--model', req.model)
+  args.push('--print', req.prompt, '--output-format', 'text')
+  if (req.trustPreset && req.trustPreset !== 'standard') {
+    args.push('--allowedTools', req.trustPreset === 'full' ? 'all' : 'none')
+  }
+
+  const timeoutMs = Math.min(req.timeoutMs ?? 300_000, 600_000)
+  log.info(`agent.exec: model=${req.model ?? 'claude'} cwd=${req.worktreePath} stepId=${req.stepId ?? '-'}`)
+
+  const start = Date.now()
+  const { spawn: nodeSpawn } = await import('node:child_process')
+
+  const result = await new Promise<{
+    stdout: string; stderr: string; exitCode: number | null; timedOut: boolean
+  }>((resolve) => {
+    let stdout = '', stderr = '', timedOut = false, settled = false
+
+    const finish = (r: typeof result): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(r)
+    }
+
+    const child = nodeSpawn(spec.binary, args, {
+      cwd:   req.worktreePath,
+      env:   toolEnv,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+
+    const timer = setTimeout(() => {
+      timedOut = true
+      try { child.kill('SIGKILL') } catch { /* best effort */ }
+      finish({ stdout, stderr, exitCode: null, timedOut: true })
+    }, timeoutMs)
+
+    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString('utf8') })
+    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString('utf8') })
+    child.on('error',  (err) => { finish({ stdout, stderr: err.message, exitCode: null, timedOut }) })
+    child.on('close',  (code) => { finish({ stdout, stderr, exitCode: code, timedOut }) })
+
+    child.stdin?.end()
+  })
+
+  const latencyMs = Date.now() - start
+  log.info(`agent.exec: done exitCode=${result.exitCode} latency=${latencyMs}ms timedOut=${result.timedOut}`)
+
+  return {
+    jsonrpc: '2.0', id,
+    result: {
+      stdout:    result.stdout,
+      stderr:    result.stderr,
+      exitCode:  result.exitCode,
+      latencyMs,
+      timedOut:  result.timedOut,
+      stepId:    req.stepId,
+    },
+  }
+}

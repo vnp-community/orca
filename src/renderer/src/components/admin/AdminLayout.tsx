@@ -12,6 +12,7 @@ export type AdminRoute =
   | '/audit'
   | '/profile'
   | '/ai-providers'
+  | '/fleet'
 
 type Props = {
   currentRoute: AdminRoute
@@ -31,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { route: '/audit',         label: 'Audit Log',    icon: '📋' },
   { route: '/ai-providers',  label: 'AI Providers', icon: '🤖' },
   { route: '/profile',       label: 'Profile',      icon: '🏢' },
+  { route: '/fleet',         label: 'Fleet',        icon: '🖥️' },
 ]
 
 function isActive(item: NavItem, current: AdminRoute): boolean {

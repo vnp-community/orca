@@ -20,7 +20,7 @@ import { requireAuth, extractSessionToken } from './auth-middleware'
 /** Cookie options for HttpOnly session cookie */
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  sameSite: 'lax' as const,
+  sameSite: 'strict' as const,   // FIX TASK-AUTH-001: Strict prevents CSRF via cross-site requests
   secure: process.env['NODE_ENV'] === 'production',
   path: '/',
   maxAge: 8 * 60 * 60 * 1000  // 8 hours in ms (matches SESSION_TTL_MS)

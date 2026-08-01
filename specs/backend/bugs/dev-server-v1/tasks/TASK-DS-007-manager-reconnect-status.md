@@ -1,5 +1,7 @@
 # TASK-DS-007 — DevServerManager: direct-ws Status → 'connecting' Khi Startup
 
+**Status:** ✅ DONE — 2026-08-01 (DevServerRelayBridge exponential backoff + reconnect status)
+
 **Solution:** [SOL-DS-004 §1](../solutions/SOL-DS-004-reconnect-status.md)  
 **Bug:** [BUG-DS-004](../BUG-DS-004-inmemory-state-lost-on-restart.md)  
 **File:** `src/main/dev-server/dev-server-manager.ts`  

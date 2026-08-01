@@ -161,11 +161,10 @@ export class StepExecutors {
     inputs: Record<string, unknown>
   ): Promise<StepOutput> {
     try {
-      // Safe eval: only allows access to `inputs` via Function constructor
       const expression = step.config['expression'] as string
-      // eslint-disable-next-line @typescript-eslint/no-implied-eval
-      const fn = new Function('inputs', `return !!(${expression})`)
-      const result = fn(inputs) as boolean
+      // FIX TASK-WF-001: Replace new Function() (code injection risk) with
+      // a sandboxed evaluator supporting only safe comparison operators.
+      const result = evaluateSafeCondition(expression, inputs)
       return Promise.resolve({
         exitCode: result ? 0 : 1,
         data: { result },
@@ -203,4 +202,66 @@ export class StepExecutors {
 
     throw new Error(`UNKNOWN_SERVER_SPEC_TYPE: "${specType}"`)
   }
+}
+
+// ── Safe condition evaluator (no eval/Function) ─────────────────────────────
+//
+// Supports expressions in the form:
+//   "${varName} == 'value'"   → string equality
+//   "${varName} != 'value'"   → string inequality
+//   "${varName} > 5"          → numeric comparison (>, <, >=, <=)
+//   "true" / "false"          → literal boolean
+//
+// Anything else logs a warning and returns false (fail-safe).
+
+function evaluateSafeCondition(
+  expression: string,
+  context:    Record<string, unknown>
+): boolean {
+  // Step 1: Interpolate ${varName} placeholders from context
+  const interpolated = expression.replace(
+    /\$\{([^}]+)\}/g,
+    (_, key: string) => {
+      const val = context[key.trim()]
+      return val === undefined ? '' : String(val)
+    }
+  )
+
+  // Step 2: Parse supported comparison patterns
+  const normalize = (s: string): unknown => {
+    const trimmed = s.trim().replace(/^['"](.*)['"]$/, '$1')
+    if (trimmed === 'true')  return true
+    if (trimmed === 'false') return false
+    const n = Number(trimmed)
+    return isNaN(n) ? trimmed : n
+  }
+
+  // Match operators in order of specificity (>= before >)
+  const patterns: Array<[RegExp, (a: unknown, b: unknown) => boolean]> = [
+    [/^(.+?)\s*===\s*(.+)$/, (a, b) => a === b],
+    [/^(.+?)\s*!==\s*(.+)$/, (a, b) => a !== b],
+    [/^(.+?)\s*==\s*(.+)$/,  (a, b) => String(a) === String(b)],
+    [/^(.+?)\s*!=\s*(.+)$/,  (a, b) => String(a) !== String(b)],
+    [/^(.+?)\s*>=\s*(.+)$/,  (a, b) => Number(a) >= Number(b)],
+    [/^(.+?)\s*<=\s*(.+)$/,  (a, b) => Number(a) <= Number(b)],
+    [/^(.+?)\s*>\s*(.+)$/,   (a, b) => Number(a) >  Number(b)],
+    [/^(.+?)\s*<\s*(.+)$/,   (a, b) => Number(a) <  Number(b)],
+  ]
+
+  for (const [pattern, compare] of patterns) {
+    const m = interpolated.match(pattern)
+    if (m) return compare(normalize(m[1]!), normalize(m[2]!))
+  }
+
+  // Literal boolean
+  const trimmed = interpolated.trim()
+  if (trimmed === 'true')  return true
+  if (trimmed === 'false') return false
+
+  // Unknown expression — fail-safe: return false and warn
+  console.warn(
+    `[StepExecutors] evaluateSafeCondition: unsupported expression "${expression}" ` +
+    '— returning false. Supported: ==, !=, >, <, >=, <=, true, false, ${varName}.'
+  )
+  return false
 }

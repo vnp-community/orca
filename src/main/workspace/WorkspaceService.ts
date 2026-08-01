@@ -18,6 +18,8 @@ import type { TaskService } from '../task/TaskService'
 import type { WorkflowOrchestrator } from '../workflow/WorkflowOrchestrator'
 import type { RelayConnectionPool } from '../dev-server/relay-connection-pool'
 import type { OrcaTask } from '../../shared/task-types'
+// FIX TASK-PW-001: Import OrcaRuntimeService for PTY cleanup on workspace teardown
+import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -68,7 +70,9 @@ export class WorkspaceService {
     private readonly profileResolver: ProfileResolver,
     private readonly taskService: TaskService,
     private readonly workflowOrchestrator: WorkflowOrchestrator,
-    private readonly relayPool: RelayConnectionPool
+    private readonly relayPool: RelayConnectionPool,
+    // FIX TASK-PW-001: Optional runtime for PTY cleanup — undefined in headless/CLI mode
+    private readonly runtime?: OrcaRuntimeService
   ) {}
 
   /**
@@ -84,9 +88,11 @@ export class WorkspaceService {
             .catch(() => null) as Promise<{ stdout?: string } | null>
         : Promise.resolve(null),
 
+      // FIX TASK-WT-001: Use git.worktree.list relay API instead of git.exec + manual parse.
+      // git.worktree.list is already implemented in agent-git-handler.ts and relay dispatch.
       relay
-        ? relay.call('git.exec', { args: ['worktree', 'list', '--porcelain'] })
-            .catch(() => null) as Promise<{ stdout?: string } | null>
+        ? relay.call('git.worktree.list', { cwd: '.' })
+            .catch(() => null) as Promise<{ worktrees?: GitWorktree[] } | null>
         : Promise.resolve(null),
 
       relay
@@ -104,9 +110,8 @@ export class WorkspaceService {
       ? this.parseGitStatus(gitStatusRaw.stdout)
       : null
 
-    const worktrees = worktreeRaw?.stdout
-      ? this.parseWorktreeList(worktreeRaw.stdout)
-      : []
+    // FIX TASK-WT-001: git.worktree.list returns { worktrees } (already parsed)
+    const worktrees = (worktreeRaw as { worktrees?: GitWorktree[] } | null)?.worktrees ?? []
 
     const fileTree = Array.isArray(fileTreeRaw) ? fileTreeRaw : []
 
@@ -120,6 +125,18 @@ export class WorkspaceService {
   async teardownWorkspace(projectId: string): Promise<void> {
     try {
       const project = await this.router.getProject(projectId).catch(() => null)
+
+      // FIX TASK-PW-001: Kill all PTY processes associated with this project before releasing relay.
+      // Prevents zombie PTY processes when a workspace is closed.
+      // worktree teardown uses project.repoPath as the canonical worktreeId.
+      if (this.runtime && project?.repoPath) {
+        await this.runtime.stopTerminalsForWorktree(project.repoPath)
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err)
+            console.warn(`[WorkspaceService] PTY cleanup warning (non-fatal): ${msg}`)
+          })
+      }
+
       if (project?.devServerId) {
         this.relayPool.release(project.devServerId)
       }

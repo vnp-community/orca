@@ -308,8 +308,8 @@ export async function handleGitPrCreate(
 // ─── git.worktree.list ────────────────────────────────────────────────────────
 
 /**
- * List git worktrees — delegates to handleGitExec with safe args.
- * 'worktree' is already in ALLOWED_GIT_SUBCOMMANDS.
+ * List git worktrees — returns structured WorktreeInfo[] (WT-Issue-4).
+ * Parses `git worktree list --porcelain` output for typed response.
  */
 export async function handleGitWorktreeList(
   id:     string | number | null,
@@ -317,11 +317,20 @@ export async function handleGitWorktreeList(
   config: AgentConfig,
   log:    AgentLogger
 ): Promise<object> {
-  return handleGitExec(id, {
-    args:    ['worktree', 'list', '--porcelain'],
-    cwd:     params.cwd,
-    timeout: 10_000,
-  }, config, log)
+  const cwd = typeof params.cwd === 'string' ? params.cwd : config.workDir
+  try {
+    const { execFile } = await import('node:child_process')
+    const { promisify } = await import('node:util')
+    const { parseWorktreePorcelain } = await import('./git-handler')
+    const execAsync = promisify(execFile)
+    const { stdout } = await execAsync('git', ['worktree', 'list', '--porcelain'], { cwd, timeout: 10_000 })
+    const worktrees = parseWorktreePorcelain(stdout)
+    log.info(`git.worktree.list: cwd=${cwd} count=${worktrees.length}`)
+    return { jsonrpc: '2.0', id, result: { worktrees } }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: `git.worktree.list failed: ${msg}` } }
+  }
 }
 
 // ─── git.worktree.add ─────────────────────────────────────────────────────────
@@ -332,21 +341,32 @@ export async function handleGitWorktreeAdd(
   config: AgentConfig,
   log:    AgentLogger
 ): Promise<object> {
-  const path   = typeof params.path   === 'string' ? params.path.trim()   : ''
-  const branch = typeof params.branch === 'string' ? params.branch.trim() : ''
+  const worktreePath = typeof params.path   === 'string' ? params.path.trim()   : ''
+  const branch       = typeof params.branch === 'string' ? params.branch.trim() : ''
+  const createBranch = params.createBranch === true
+  const cwd          = typeof params.cwd    === 'string' ? params.cwd           : config.workDir
 
-  if (!path || !branch) {
+  if (!worktreePath || !branch) {
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing required params: path, branch' } }
   }
-  if (SHELL_METACHARACTERS.test(path) || SHELL_METACHARACTERS.test(branch)) {
+  if (SHELL_METACHARACTERS.test(worktreePath) || SHELL_METACHARACTERS.test(branch)) {
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Unsafe characters in worktree params' } }
   }
 
-  return handleGitExec(id, {
-    args:    ['worktree', 'add', path, branch],
-    cwd:     params.cwd,
-    timeout: 15_000,
-  }, config, log)
+  // WT-Issue-1: Security validation — prevent path traversal
+  try {
+    const { validateWorktreePath } = await import('./git-handler')
+    validateWorktreePath(['worktree', 'add', worktreePath], cwd)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: msg } }
+  }
+
+  const args = createBranch
+    ? ['worktree', 'add', '-b', branch, worktreePath]
+    : ['worktree', 'add', worktreePath, branch]
+
+  return handleGitExec(id, { args, cwd: params.cwd, timeout: 15_000 }, config, log)
 }
 
 // ─── git.worktree.remove ──────────────────────────────────────────────────────

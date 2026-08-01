@@ -159,7 +159,106 @@ function execFileWithStdin(
   })
 }
 
+// ── Worktree utilities (exported for agent-rpc-dispatch.ts) ─────────────────
+
+/**
+ * validateWorktreePath — Security check for `git worktree add <path>`.
+ *
+ * Prevents path traversal attacks (../../etc) and cross-user worktree conflicts.
+ * Allowed roots: workDir, its parent (for sibling worktrees), /tmp, /var/tmp.
+ *
+ * @throws Error with code GIT_WORKTREE_PATH_NOT_ALLOWED if path is rejected.
+ */
+export function validateWorktreePath(args: string[], workDir: string): void {
+  // Only validate 'git worktree add <path> [branch]'
+  if (args[0] !== 'worktree' || args[1] !== 'add' || !args[2]) return
+
+  const rawPath = args[2]
+  const resolved = rawPath.startsWith('/')
+    ? path.resolve(rawPath)
+    : path.resolve(path.join(workDir, rawPath))
+
+  // Reject null bytes (injection attack)
+  if (resolved.includes('\0')) {
+    throw Object.assign(
+      new Error('GIT_WORKTREE_PATH_INVALID: null bytes in path'),
+      { code: 'GIT_WORKTREE_PATH_INVALID' }
+    )
+  }
+
+  // Allow: workDir and its parent dir (for sibling worktrees), plus /tmp
+  const parentDir = path.dirname(workDir)
+  const allowedRoots = [workDir, parentDir, '/tmp', '/var/tmp']
+  const isAllowed = allowedRoots.some(
+    (root) => resolved === root || resolved.startsWith(root + '/')
+  )
+
+  if (!isAllowed) {
+    throw Object.assign(
+      new Error(`GIT_WORKTREE_PATH_NOT_ALLOWED: "${resolved}" is outside allowed roots`),
+      { code: 'GIT_WORKTREE_PATH_NOT_ALLOWED', path: resolved }
+    )
+  }
+}
+
+export interface WorktreeInfo {
+  path:         string
+  head:         string      // commit SHA
+  branch:       string      // branch name (without refs/heads/)
+  bare:         boolean
+  detached:     boolean
+  prunable:     boolean
+  locked:       boolean
+  lockedReason?: string
+}
+
+/**
+ * parseWorktreePorcelain — Parse `git worktree list --porcelain` output.
+ * Returns a structured array of WorktreeInfo objects.
+ */
+export function parseWorktreePorcelain(stdout: string): WorktreeInfo[] {
+  const worktrees: WorktreeInfo[] = []
+  let current: Partial<WorktreeInfo> | null = null
+
+  const flush = (): void => {
+    if (current?.path !== undefined) {
+      worktrees.push({
+        path:         current.path       ?? '',
+        head:         current.head       ?? '',
+        branch:       current.branch     ?? '',
+        bare:         current.bare       ?? false,
+        detached:     current.detached   ?? false,
+        prunable:     current.prunable   ?? false,
+        locked:       current.locked     ?? false,
+        lockedReason: current.lockedReason,
+      })
+    }
+    current = null
+  }
+
+  for (const rawLine of stdout.split('\n')) {
+    const line = rawLine.trim()
+    if (line === '') {
+      flush()
+      continue
+    }
+    if (line.startsWith('worktree '))     { flush(); current = { path: line.slice('worktree '.length) } }
+    else if (line.startsWith('HEAD ')   && current) { current.head    = line.slice('HEAD '.length) }
+    else if (line.startsWith('branch ') && current) { current.branch  = line.slice('branch '.length).replace('refs/heads/', '') }
+    else if (line === 'bare'            && current) { current.bare     = true }
+    else if (line === 'detached'        && current) { current.detached = true }
+    else if (line.startsWith('prunable') && current) { current.prunable = true }
+    else if (line === 'locked'          && current) { current.locked   = true }
+    else if (line.startsWith('locked ') && current) { current.locked = true; current.lockedReason = line.slice('locked '.length) }
+  }
+  flush()
+  return worktrees
+}
+
+// ── End worktree utilities ────────────────────────────────────────────────────
+
 export class GitHandler {
+
   private dispatcher: RelayDispatcher
   private readonly gitDiffReadDedupe = new InFlightPromiseDedupe<unknown>()
   private readonly gitCapabilities = new GitCapabilityCache()

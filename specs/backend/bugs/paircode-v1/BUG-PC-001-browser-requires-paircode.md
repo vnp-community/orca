@@ -1,5 +1,9 @@
 # BUG-PC-001 — Browser Yêu Cầu Pair Code Dù Đã Login Email/Password
 
+**Status:** ✅ FIXED — 2026-08-01  
+**Task:** TASK-PC-001~005  
+**Note:** paircode-v1 domain fixed 2026-07-27  
+
 **ID:** BUG-PC-001  
 **Mức độ:** 🔴 Critical  
 **Module:** `src/renderer/src/web/web-preload-api.ts`  

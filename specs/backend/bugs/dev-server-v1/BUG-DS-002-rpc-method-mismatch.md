@@ -1,10 +1,12 @@
 # BUG-DS-002 — Agent Không Implement Relay RPC Methods
 
 **ID:** BUG-DS-002  
-**Mức độ:** 🔴 Critical  
+**Mức độ:** 🔴 Critical
+
+**Status:** ✅ FIXED — 2026-08-01 (Tasks: TASK-DS-001~011)  
 **Module:** agent.js RPC dispatch / Orca onboarding & remote workspace  
 **Phát hiện:** 2026-07-26  
-**Status:** 🔴 Open
+**Status:** ✅ FIXED — 2026-08-01 (Tasks: TASK-DS-001~011)
 
 ---
 

@@ -33,14 +33,21 @@ const tokenTracer = createTracer('agentToken:register')
 const pendingMeta = new Map<string, { devServerId: string; createdAt: number; expiresAt: number }>()
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
+// FIX TASK-AWS-001: If ORCA_AGENT_API_SECRET not configured, BLOCK all requests.
+// NEVER fall back to X-Orca-Admin header bypass — this is a production security requirement.
 function isAuthorized(req: IncomingMessage): boolean {
-  const apiSecret = process.env['ORCA_AGENT_API_SECRET']
-  if (apiSecret) {
-    const auth = req.headers['authorization'] ?? ''
-    return auth === `Bearer ${apiSecret}`
+  const apiSecret = process.env['ORCA_AGENT_API_SECRET']?.trim()
+  if (!apiSecret) {
+    // Fail-secure: no secret → endpoint is disabled entirely.
+    console.error(
+      '[SECURITY] ORCA_AGENT_API_SECRET not configured. ' +
+      'POST /api/agent-token is BLOCKED. ' +
+      'Set ORCA_AGENT_API_SECRET to a strong random secret to enable this endpoint.'
+    )
+    return false
   }
-  // Dev fallback: X-Orca-Admin: 1 header (no secret configured)
-  return req.headers['x-orca-admin'] === '1'
+  const auth = req.headers['authorization'] ?? ''
+  return auth === `Bearer ${apiSecret}`
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -108,11 +115,19 @@ async function handleAgentTokenRequest(
 
     const devServerId = (body['devServerId'] as string | undefined) ?? 'dev-local'
     const name        = (body['name']        as string | undefined) ?? `Dev Server (${devServerId})`
-    const ttlSec      = Math.min(Number(body['ttl'] ?? 300), 600)   // max 10 min
-    const expiresAt   = Date.now() + ttlSec * 1000
-    const token       = generateAgentToken(devServerId)
 
-    const span = tokenTracer.start({ devServerId, name, ttl: ttlSec })
+    // FIX TASK-AWS-003: Support permanent tokens (30-day TTL) for production dev servers.
+    // Requires ORCA_AGENT_API_SECRET to be configured (guaranteed by isAuthorized check above).
+    const THIRTY_DAYS_SEC = 30 * 24 * 60 * 60  // 2,592,000 seconds
+    const isPermanent = body['permanent'] === true
+    const ttlSec = isPermanent
+      ? THIRTY_DAYS_SEC
+      : Math.min(Number(body['ttl'] ?? 300), 600)  // ephemeral: max 10 min
+
+    const expiresAt = Date.now() + ttlSec * 1000
+    const token     = generateAgentToken(devServerId)
+
+    const span = tokenTracer.start({ devServerId, name, ttl: ttlSec, permanent: isPermanent })
 
     if (devServerManager) {
       // ── Path A: Full wiring via DevServerManager ──────────────────────────

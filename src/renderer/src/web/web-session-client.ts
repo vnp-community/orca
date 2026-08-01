@@ -275,7 +275,11 @@ export class WebSessionClient {
     this.clearKeepaliveTimer()
 
     // Handle session expiry or unauthorized disconnect from backend
-    if (event && (event.code === 1008 || event.code === 3000)) {
+    // FIX TASK-TRM-007: Also handle code 4401 (WsSessionRouter sends this for missing/expired session).
+    // 1008: WebSocket protocol "Policy Violation"
+    // 3000: Legacy Orca session expired
+    // 4401: WsSessionRouter unauthenticated (no valid session cookie)
+    if (event && (event.code === 1008 || event.code === 3000 || event.code === 4401)) {
       this.intentionallyClosed = true
       this.setState('auth-failed')
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('orca:auth-failed'))

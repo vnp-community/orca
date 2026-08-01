@@ -1,7 +1,8 @@
 // src/main/ssh/fleet-health-monitor.ts
 // Periodically polls SSH connection states and records health snapshots.
 // Also emits renderer events and optional Slack/webhook alerts on error transitions.
-import { BrowserWindow } from 'electron'
+// FIX TASK-FLEET-001: Removed direct BrowserWindow dependency — use optional onAlert callback instead.
+// This makes FleetHealthMonitor usable in server mode (ORCA_MULTI_USER=1) without crashing.
 import { fleetHealthStore } from './fleet-health-store'
 
 const DEFAULT_PING_INTERVAL_MS = 60_000 // 1 minute
@@ -24,6 +25,10 @@ export class FleetHealthMonitor {
     | ((targetId: string) => { status: string; error?: string | null; remotePlatform?: unknown } | null)
     | null = null
   getWebhookUrl: (() => string | undefined) | null = null
+  // FIX TASK-FLEET-001: Optional alert callback instead of BrowserWindow.
+  // In Electron mode: wire this to BrowserWindow.getAllWindows().forEach(w => w.webContents.send(...))
+  // In server mode: leave undefined (no renderer to notify)
+  onAlert: ((alert: FleetAlert) => void) | null = null
 
   /** Start the periodic health check loop. No-op if already running. */
   start(intervalMs = DEFAULT_PING_INTERVAL_MS): void {
@@ -81,11 +86,11 @@ export class FleetHealthMonitor {
   }
 
   private emitAlert(alert: FleetAlert): void {
-    // Notify all renderer windows
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) {
-        win.webContents.send('fleet:serverAlert', alert)
-      }
+    // FIX TASK-FLEET-001: Use injected callback instead of BrowserWindow.getAllWindows().
+    // Electron mode: caller sets onAlert = (a) => BrowserWindow.getAllWindows().forEach(w => w.webContents.send('fleet:serverAlert', a))
+    // Server mode: onAlert is null → only webhook fires
+    if (this.onAlert) {
+      this.onAlert(alert)
     }
     // Send webhook if configured
     const webhookUrl = this.getWebhookUrl?.()

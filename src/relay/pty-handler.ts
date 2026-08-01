@@ -239,6 +239,37 @@ export type PtyEnvAugmenter = (ctx: {
   command?: string
 }) => Record<string, string>
 
+/**
+ * validatePtyCwd — TM-002: Validate the cwd parameter for PTY spawn requests.
+ *
+ * Prevents path traversal attacks via cwd (e.g., '../../etc').
+ * Falls back to home directory if cwd is invalid or does not exist.
+ * Does NOT throw — callers get a safe cwd or the home directory.
+ */
+function validatePtyCwd(rawCwd: string): string {
+  const { resolve } = require('node:path') as typeof import('node:path')
+  const { statSync } = require('node:fs') as typeof import('node:fs')
+  const { homedir } = require('node:os') as typeof import('node:os')
+
+  const home = homedir()
+  if (!rawCwd) return home
+
+  // Reject null bytes
+  if (rawCwd.includes('\0')) return home
+
+  const resolved = resolve(rawCwd)
+
+  // Must exist and be a directory
+  try {
+    const stat = statSync(resolved)
+    if (!stat.isDirectory()) return home
+  } catch {
+    return home
+  }
+
+  return resolved
+}
+
 export class PtyHandler {
   private ptys = new Map<string, ManagedPty>()
   private nextId = 1
@@ -601,7 +632,7 @@ export class PtyHandler {
   private async spawn(
     params: Record<string, unknown>,
     context?: RequestContext
-  ): Promise<{ id: string }> {
+  ): Promise<{ id: string; cols: number; rows: number; cwd: string; shell: string }> {
     if (this.ptys.size >= 50) {
       throw new Error('Maximum number of PTY sessions reached (50)')
     }
@@ -612,7 +643,9 @@ export class PtyHandler {
 
     const cols = (params.cols as number) || 80
     const rows = (params.rows as number) || 24
-    const cwd = (params.cwd as string) || resolveDefaultCwd()
+    // TM-002: Validate cwd — reject path traversal, fallback to home if invalid/missing
+    const rawCwd = (params.cwd as string) || resolveDefaultCwd()
+    const cwd = validatePtyCwd(rawCwd)
     const env = params.env as Record<string, string> | undefined
     const envToDelete = sanitizeEnvToDelete(params.envToDelete)
     const explicitTerm =
@@ -626,7 +659,13 @@ export class PtyHandler {
     const shellOverride =
       typeof params.shellOverride === 'string' ? params.shellOverride.trim() : ''
     const resolvedShellOverride = resolvePtyShellOverride(shellOverride)
-    const shell = resolvedShellOverride || resolveDefaultShell()
+    // TM-003: On Linux/macOS, resolvePtyShellOverride() always returns '' (only
+    // processes Windows shell overrides). Fall back to env.SHELL if provided.
+    // This lets callers set a specific shell (bash, zsh, fish) via env.SHELL.
+    const envShell = (env && typeof env.SHELL === 'string' && env.SHELL.trim())
+      ? env.SHELL.trim()
+      : ''
+    const shell = resolvedShellOverride || envShell || resolveDefaultShell()
     const id = `pty-${this.nextId++}`
 
     // Why: server-side augmenter values (ORCA_AGENT_HOOK_* and plugin overlay
@@ -744,7 +783,11 @@ export class PtyHandler {
           : STARTUP_COMMAND_WRITE_DELAY_MS
       )
     }
-    return { id }
+    // TM-004: Return all fields callers need to configure a terminal pane.
+    // id alone is insufficient — clients need cols/rows to verify spawn matches
+    // their resize request, cwd to update the path display, and shell to show
+    // the shell type in the UI.
+    return { id, cols, rows, cwd, shell }
   }
 
   private async attach(params: Record<string, unknown>): Promise<{ replay?: string }> {

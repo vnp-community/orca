@@ -86,53 +86,76 @@ describe('SubAgentSpawner', () => {
 
 describe('resolveAgentSpec', () => {
   it('claude → binary=claude', () => {
-    expect(resolveAgentSpec('claude-3-5-sonnet').binary).toBe('claude')
+    expect(resolveAgentSpec('claude-3-5-sonnet')?.binary).toBe('claude')
   })
 
   it('gemini → binary=gemini', () => {
-    expect(resolveAgentSpec('gemini-2.0-flash').binary).toBe('gemini')
+    expect(resolveAgentSpec('gemini-2.0-flash')?.binary).toBe('gemini')
   })
 
-  it('unknown modelId throws', () => {
-    expect(() => resolveAgentSpec('unknown-model')).toThrow('unknown modelId')
+  it('unknown modelId returns undefined (not throw)', () => {
+    expect(resolveAgentSpec('unknown-model')).toBeUndefined()
   })
 
-  it('claude args includes stream-json', () => {
-    expect(resolveAgentSpec('claude-3').args).toContain('stream-json')
+  it('claude buildArgs() includes stream-json (no resumeId)', () => {
+    const spec = resolveAgentSpec('claude-3')
+    expect(spec?.buildArgs()).toContain('stream-json')
   })
 
-  it('gemini args includes --stream', () => {
-    expect(resolveAgentSpec('gemini-2.5').args).toContain('--stream')
+  it('gemini buildArgs() includes --stream', () => {
+    const spec = resolveAgentSpec('gemini-2.5')
+    expect(spec?.buildArgs()).toContain('--stream')
   })
 })
 
 // ── buildAgentEnv ─────────────────────────────────────────────────────────────
 
+const MOCK_CONFIG_ENV = {
+  mode: 'direct-websocket' as const,
+  orcaUrl: '',
+  agentToken: '',
+  agentPort: 6799,
+  devServerId: 'test',
+  logLevel: 'info' as const,
+  workDir: '/tmp',
+  toolPath: '/usr/bin:/bin',
+  toolEnv: {},
+  credentialsDir: '/tmp/.orca/creds',
+}
+const claudeSpec = resolveAgentSpec('claude')!
+
 describe('buildAgentEnv', () => {
+  const baseReq = {
+    accountId: 'acc-1',
+    userId: 'user-1',
+    taskId: 'task-1',
+    cwd: '/repo',
+  }
+
   it('returns object với ANTHROPIC_API_KEY', async () => {
-    const env = await buildAgentEnv('acc-1', 'sk-xxx', '/repo')
+    const env = await buildAgentEnv(baseReq, claudeSpec, MOCK_CONFIG_ENV, 'sk-xxx')
     expect(env.ANTHROPIC_API_KEY).toBe('sk-xxx')
   })
 
   it('ORCA_AGENT_CWD = cwd param', async () => {
-    const env = await buildAgentEnv('acc-1', 'sk-xxx', '/my/repo')
+    const env = await buildAgentEnv({ ...baseReq, cwd: '/my/repo' }, claudeSpec, MOCK_CONFIG_ENV, 'sk-xxx')
     expect(env.ORCA_AGENT_CWD).toBe('/my/repo')
   })
 
   it('ORCA_ACCOUNT_ID = accountId param', async () => {
-    const env = await buildAgentEnv('my-account', 'key', '/cwd')
+    const env = await buildAgentEnv({ ...baseReq, accountId: 'my-account' }, claudeSpec, MOCK_CONFIG_ENV, 'key')
     expect(env.ORCA_ACCOUNT_ID).toBe('my-account')
   })
 
   it('all 3 provider keys have same value (shared apiKey)', async () => {
-    const env = await buildAgentEnv('acc', 'shared-key', '/cwd')
+    const env = await buildAgentEnv(baseReq, claudeSpec, MOCK_CONFIG_ENV, 'shared-key')
     expect(env.ANTHROPIC_API_KEY).toBe('shared-key')
     expect(env.OPENAI_API_KEY).toBe('shared-key')
     expect(env.GEMINI_API_KEY).toBe('shared-key')
   })
 
   it('HOME và PATH are set', async () => {
-    const env = await buildAgentEnv('a', 'k', '/c')
+    const env = await buildAgentEnv(baseReq, claudeSpec, MOCK_CONFIG_ENV, null)
     expect(env.HOME).toBeDefined()
     expect(env.PATH).toBeDefined()
   })

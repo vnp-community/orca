@@ -81,6 +81,13 @@ export class WsSessionRouter {
       return
     }
 
+    // FIX TASK-TRM-005: Validate authToken exists before starting proxy
+    if (!authToken) {
+      span.fail('no auth token', { userId })
+      ws.close(1011, 'Internal error: auth token unavailable for user session')
+      return
+    }
+
     span.step('proxy-start', { userId, socketPath })
 
     // Proxy WS ↔ Unix socket (binary-safe, bidirectional)
@@ -95,11 +102,9 @@ export class WsSessionRouter {
       }
     })
 
-    const keepaliveTimer = setInterval(() => {
-      if (upstream.writable) {
-        upstream.write('\n')
-      }
-    }, 15000)
+    // FIX TASK-TRM-001: Removed bare-\n keepalive — Unix domain sockets are local IPC,
+    // they do not have TCP NAT timeouts and do not need application-level keepalive.
+    // The bare \n caused JSON-RPC parse errors in the user process every 15 seconds.
 
     ws.on('message', (data: Buffer | string, isBinary: boolean) => {
       if (!upstream.writable) return
@@ -119,11 +124,27 @@ export class WsSessionRouter {
       upstream.write(isBinary ? data : Buffer.from(data as string))
     })
 
+    // FIX TASK-TRM-002: Handle both binary wire-protocol frames and text/JSON-RPC data.
+    // Binary frames use type byte 0x01–0x09 as first byte (PTY, file-transfer, etc.).
+    // Text frames are newline-delimited JSON-RPC 2.0 messages.
     let upstreamBuffer = ''
     upstream.on('data', (chunk: Buffer) => {
-      const wsAny = ws as unknown as { readyState: number; OPEN: number; send: (d: string) => void }
+      const wsAny = ws as unknown as {
+        readyState: number
+        OPEN: number
+        send: (d: string | Buffer, opts?: { binary: boolean }) => void
+      }
       if (wsAny.readyState !== wsAny.OPEN) return
 
+      // Detect binary wire-protocol frames (type byte 0x01–0x09).
+      // Forward them as binary WS frames without UTF-8 coercion.
+      const firstByte = chunk[0]
+      if (firstByte !== undefined && firstByte >= 0x01 && firstByte <= 0x09) {
+        wsAny.send(chunk, { binary: true })
+        return
+      }
+
+      // Text/JSON-RPC data — buffer by newline delimiter
       upstreamBuffer += chunk.toString('utf8')
       let newlineIndex = upstreamBuffer.indexOf('\n')
       while (newlineIndex !== -1) {
@@ -137,13 +158,13 @@ export class WsSessionRouter {
     })
 
     ws.on('close', () => {
-      clearInterval(keepaliveTimer)
+      // FIX TASK-TRM-001: keepaliveTimer removed — clearInterval no longer needed
       upstream.end()
       this.sessionManager.touch(userId)
     })
 
     upstream.on('close', () => {
-      clearInterval(keepaliveTimer)
+      // FIX TASK-TRM-001: keepaliveTimer removed — clearInterval no longer needed
       const wsAny = ws as unknown as { readyState: number; OPEN: number; close: (code: number, reason: string) => void }
       if (wsAny.readyState === wsAny.OPEN) wsAny.close(1011, 'User session ended')
     })

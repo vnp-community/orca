@@ -1,5 +1,10 @@
 // Why: lightweight JSON-RPC WebSocket client for web mode — replaces Electron
 // ipcRenderer with the same invoke/on/once surface web-preload-api depends on.
+//
+// Auto-reconnect: when the WS drops unexpectedly (network blip, server restart,
+// proxy timeout), scheduleReconnect() fires with exponential backoff.
+// ConnectionStatusProvider polls isConnected() every 2s — after reconnect the
+// banner disappears automatically without any user interaction.
 import type { IRpcClient } from '../../rpc-client-interface'
 
 type PendingInvocation = {
@@ -11,6 +16,10 @@ type PendingInvocation = {
 type PushHandlers = Set<(...args: unknown[]) => void>
 
 const INVOKE_TIMEOUT_MS = 30_000
+const CONNECT_TIMEOUT_MS = 10_000
+
+/** Reconnect backoff delays (ms): 500ms → 1s → 2s → 5s → 10s → 30s (max) */
+const RECONNECT_DELAYS_MS = [500, 1_000, 2_000, 5_000, 10_000, 30_000]
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -30,37 +39,30 @@ export class WebSocketRpcClient implements IRpcClient {
   private readonly pending = new Map<string, PendingInvocation>()
   private readonly listeners = new Map<string, PushHandlers>()
 
+  // ── Reconnect state ────────────────────────────────────────────────────────
+  /** Set to true by disconnect() — prevents reconnect loop on intentional close */
+  private intentionallyClosed = false
+  private reconnectAttempt = 0
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private connectTimer: ReturnType<typeof setTimeout> | null = null
+
   constructor(url?: string) {
     this.url = url ?? getDefaultWsUrl()
   }
 
+  // ── Public API ─────────────────────────────────────────────────────────────
+
+  /** Initial explicit connect (called by bootstrapWebApp). Auto-reconnect handles subsequent attempts. */
   connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(this.url)
-      this.ws = ws
-
-      ws.onopen = () => {
-        this.connected = true
-        resolve()
-      }
-
-      ws.onerror = () => {
-        this.connected = false
-        reject(new Error(`WebSocket connection failed: ${this.url}`))
-      }
-
-      ws.onclose = () => {
-        this.connected = false
-        this.rejectAllPending(new Error('WebSocket connection closed'))
-      }
-
-      ws.onmessage = (event) => {
-        this.handleMessage(event.data as string)
-      }
-    })
+    this.intentionallyClosed = false
+    return this.connectInternal()
   }
 
+  /** Intentional close — stops reconnect loop. Call on logout or unmount. */
   disconnect(): void {
+    this.intentionallyClosed = true
+    this.clearReconnectTimer()
+    this.clearConnectTimer()
     this.connected = false
     if (this.ws) {
       this.ws.onopen = null
@@ -122,6 +124,99 @@ export class WebSocketRpcClient implements IRpcClient {
       handler(...args)
     }
     this.on(channel, wrapper)
+  }
+
+  // ── Internals ──────────────────────────────────────────────────────────────
+
+  /** Open a WebSocket connection. Resolves on open, rejects on connect failure. */
+  private connectInternal(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.intentionallyClosed) {
+        reject(new Error('Client has been disconnected'))
+        return
+      }
+
+      let settled = false
+      const settle = (ok: boolean, err?: Error): void => {
+        if (settled) return
+        settled = true
+        this.clearConnectTimer()
+        if (ok) resolve()
+        else reject(err!)
+      }
+
+      const ws = new WebSocket(this.url)
+      this.ws = ws
+
+      // Why: guard against the rare case where the TCP handshake hangs
+      // (e.g. firewall drops SYN without RST). Browser WS API doesn't expose
+      // connect timeouts, so we close manually if open hasn't fired.
+      this.connectTimer = setTimeout(() => {
+        if (ws.readyState !== 1 /* OPEN */) {
+          ws.close()
+          settle(false, new Error(`WebSocket connect timed out: ${this.url}`))
+        }
+      }, CONNECT_TIMEOUT_MS)
+
+      ws.onopen = () => {
+        this.connected = true
+        this.reconnectAttempt = 0  // reset backoff on successful connect
+        settle(true)
+      }
+
+      ws.onerror = () => {
+        this.connected = false
+        settle(false, new Error(`WebSocket connection failed: ${this.url}`))
+      }
+
+      ws.onclose = () => {
+        this.connected = false
+        this.clearConnectTimer()
+        // Reject any in-flight initial connect promise
+        settle(false, new Error('WebSocket closed during connect'))
+        this.rejectAllPending(new Error('WebSocket connection closed'))
+
+        // Why: schedule reconnect for any unexpected drop (network blip, proxy
+        // reset, server restart). intentionallyClosed is set by disconnect() to
+        // stop the loop on logout / explicit teardown.
+        if (!this.intentionallyClosed) {
+          this.scheduleReconnect()
+        }
+      }
+
+      ws.onmessage = (event) => {
+        this.handleMessage(event.data as string)
+      }
+    })
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer || this.intentionallyClosed) return
+    const delay = RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)]
+    this.reconnectAttempt += 1
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      // Silent reconnect — no UI interaction required.
+      // ConnectionStatusProvider polls isConnected() every 2s and updates the
+      // banner automatically when this succeeds.
+      void this.connectInternal().catch(() => {
+        // connectInternal already schedules next attempt via ws.onclose
+      })
+    }, delay)
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+  }
+
+  private clearConnectTimer(): void {
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer)
+      this.connectTimer = null
+    }
   }
 
   private handleMessage(raw: string): void {

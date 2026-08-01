@@ -49,6 +49,7 @@ import { createGitPanelSlice } from './slices/git-panel'
 import { createTaskSlice } from './slices/task'
 import { createWorkflowSlice } from './slices/workflow'
 import { createTraceSlice } from './slices/trace'
+import { createRemoteAgentSessionSlice } from './slices/remote-agent-sessions'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 
@@ -102,6 +103,7 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createTaskSlice(...a),
   ...createWorkflowSlice(...a),
   ...createTraceSlice(...a),
+  ...createRemoteAgentSessionSlice(...a),
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())

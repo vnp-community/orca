@@ -237,6 +237,11 @@ export class AIProviderService {
 
     const relay = await this.relayPool.getOrConnect(account.devServerId, server)
     await relay.call('ai.provider.writeCredential', { accountId, encryptedBlob, iv })
+
+    // FIX TASK-AIP-001: Update status pending → active after successful credential write.
+    // Without this, resolveForProject() returns no candidates (it filters for status='active')
+    // and all AI features fail silently.
+    await this.updateAccount(accountId, { status: 'active' })
   }
 
   /**
