@@ -1,6 +1,6 @@
 import { gitExecFileAsync, glabExecFileAsync } from '../git/runner'
 import type { IssueSourcePreference } from '../../shared/types'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import { clearProjectRefInFlight, runProjectRefProbeOnce } from './project-ref-inflight'
 import {
   DEFAULT_GITLAB_HOSTS,
@@ -93,7 +93,7 @@ async function resolveProjectRefForRemote(
   localGitOptions: LocalGitExecOptions
 ): Promise<ProjectRef | null> {
   try {
-    const sshGitProvider = connectionId ? getSshGitProvider(connectionId) : null
+    const sshGitProvider = connectionId ? getRemoteGitProvider(connectionId) : null
     if (connectionId && !sshGitProvider) {
       return null
     }

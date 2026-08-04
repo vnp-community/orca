@@ -85,7 +85,7 @@ vi.mock('../worktree-root-preparation', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: vi.fn()
+  getRemoteGitProvider: vi.fn()
 }))
 
 vi.mock('./ssh', () => ({

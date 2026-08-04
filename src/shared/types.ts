@@ -252,7 +252,7 @@ export type Repo = {
    * Explicit execution owner for this repo. Runtime-host repos need this
    * because they otherwise look identical to local repos (`connectionId: null`).
    */
-  executionHostId?: 'local' | `ssh:${string}` | `runtime:${string}` | null
+  executionHostId?: 'local' | `ssh:${string}` | `runtime:${string}` | `devServer:${string}` | null
   /** Per-repo override for issue-source resolution. `undefined` is treated
    *  identically to `'auto'`; writers leave it undefined on creation so
    *  existing persisted records stay forward-compatible. */
@@ -3292,7 +3292,12 @@ export type ActiveRightSidebarTab = Exclude<RightSidebarTab, 'search'>
 export type RightSidebarExplorerView = 'files' | 'search'
 
 export type ProjectOrderBy = 'manual' | 'recent'
-export type WorkspaceHostScope = 'all' | 'local' | `ssh:${string}` | `runtime:${string}`
+export type WorkspaceHostScope =
+  | 'all'
+  | 'local'
+  | `ssh:${string}`
+  | `runtime:${string}`
+  | `devServer:${string}`
 export type VisibleWorkspaceHostIds = Exclude<WorkspaceHostScope, 'all'>[] | null
 export type WorkspaceHostOrder = Exclude<WorkspaceHostScope, 'all'>[]
 

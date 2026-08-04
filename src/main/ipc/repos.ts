@@ -73,9 +73,9 @@ import {
   mergeBaseRefSearchResultGroups,
   searchBaseRefDetails
 } from '../git/repo'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import { getSshGitCapabilityCache } from '../git/git-capability-state'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { getSshGitUsername, resolveLocalGitUsername } from '../git/git-username'
 import { enrichRepoGitUsernames } from '../repo-git-username-enrichment'
 import { getActiveMultiplexer } from './ssh'
@@ -87,7 +87,11 @@ import type { RepoMethod } from '../../shared/telemetry-events'
 import { detectRepoIconAndUpstream } from '../repo-icon-autodetect'
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
 import { getProjectHostSetupForRepo } from '../../shared/project-host-setup-projection'
-import { normalizeExecutionHostId, parseExecutionHostId } from '../../shared/execution-host'
+import {
+  normalizeExecutionHostId,
+  parseExecutionHostId,
+  getRepoProviderConnectionKey
+} from '../../shared/execution-host'
 import { joinRemotePath } from '../ssh/ssh-remote-platform'
 import {
   assertFolderWorkspacePathUsable,
@@ -191,7 +195,7 @@ async function addLocalRepoFromPath(
   const pathKey = normalizeRuntimePathForComparison(path)
   const existing = store
     .getRepos()
-    .find((repo) => !repo.connectionId && normalizeRuntimePathForComparison(repo.path) === pathKey)
+    .find((repo) => !getRepoProviderConnectionKey(repo) && normalizeRuntimePathForComparison(repo.path) === pathKey)
   if (existing) {
     return { repo: existing, alreadyExisted: true }
   }
@@ -202,7 +206,7 @@ async function addLocalRepoFromPath(
       .getRepos()
       .find(
         (repo) =>
-          !repo.connectionId && normalizeRuntimePathForComparison(repo.path) === resolvedPathKey
+          !getRepoProviderConnectionKey(repo) && normalizeRuntimePathForComparison(repo.path) === resolvedPathKey
       )
     if (existingAfterRootResolve) {
       return { repo: existingAfterRootResolve, alreadyExisted: true }
@@ -237,16 +241,30 @@ async function addLocalRepoFromPath(
 async function addRemoteRepoFromPath(
   store: Store,
   args: {
+    /** Provider-registry key — an SSH targetId or Dev Server id (see
+     *  getRepoProviderConnectionKey). Both resolve through the same
+     *  getRemoteGitProvider/getRemoteFilesystemProvider registries. */
     connectionId: string
+    /** Which persisted Repo field connectionId actually identifies — decides
+     *  whether the created repo is SSH-bound (repo.connectionId) or
+     *  Dev-Server-bound (repo.devServerId). Defaults to 'ssh' to preserve
+     *  existing callers' behavior. */
+    hostKind?: 'ssh' | 'devServer'
     remotePath: string
     displayName?: string
     kind?: 'git' | 'folder'
     setupMethod?: Repo['projectHostSetupMethod']
   }
 ): Promise<{ repo: Repo; alreadyExisted: boolean } | { error: string }> {
-  const gitProvider = getSshGitProvider(args.connectionId)
+  const hostKind = args.hostKind ?? 'ssh'
+  const gitProvider = getRemoteGitProvider(args.connectionId)
   if (!gitProvider) {
-    return { error: `SSH connection "${args.connectionId}" not found or not connected` }
+    return {
+      error:
+        hostKind === 'devServer'
+          ? `Dev Server "${args.connectionId}" not found or not connected`
+          : `SSH connection "${args.connectionId}" not found or not connected`
+    }
   }
 
   let repoKind: 'git' | 'folder' = args.kind ?? 'git'
@@ -256,7 +274,7 @@ async function addRemoteRepoFromPath(
     .getRepos()
     .find(
       (repo) =>
-        repo.connectionId === args.connectionId &&
+        getRepoProviderConnectionKey(repo) === args.connectionId &&
         normalizeRuntimePathForComparison(repo.path) ===
           normalizeRuntimePathForComparison(resolvedPath)
     )
@@ -287,7 +305,7 @@ async function addRemoteRepoFromPath(
     .getRepos()
     .find(
       (repo) =>
-        repo.connectionId === args.connectionId &&
+        getRepoProviderConnectionKey(repo) === args.connectionId &&
         normalizeRuntimePathForComparison(repo.path) ===
           normalizeRuntimePathForComparison(resolvedPath)
     )
@@ -297,7 +315,7 @@ async function addRemoteRepoFromPath(
 
   const folderName = getRemoteRepoFolderName(resolvedPath)
   let displayName = args.displayName || folderName
-  if (!args.displayName && (args.remotePath === '~' || args.remotePath === '~/')) {
+  if (hostKind === 'ssh' && !args.displayName && (args.remotePath === '~' || args.remotePath === '~/')) {
     const sshTarget = store.getSshTarget(args.connectionId)
     if (sshTarget) {
       displayName = sshTarget.label
@@ -317,7 +335,9 @@ async function addRemoteRepoFromPath(
     ...detected,
     addedAt: Date.now(),
     kind: repoKind,
-    connectionId: args.connectionId,
+    ...(hostKind === 'devServer'
+      ? { devServerId: args.connectionId }
+      : { connectionId: args.connectionId }),
     ...(repoKind === 'git'
       ? {
           externalWorktreeVisibility: 'hide' as const,
@@ -328,9 +348,11 @@ async function addRemoteRepoFromPath(
   }
 
   store.addRepo(repo)
-  const mux = getActiveMultiplexer(args.connectionId)
-  if (mux) {
-    mux.notify('session.registerRoot', { rootPath: resolvedPath })
+  if (hostKind === 'ssh') {
+    const mux = getActiveMultiplexer(args.connectionId)
+    if (mux) {
+      mux.notify('session.registerRoot', { rootPath: resolvedPath })
+    }
   }
 
   return { repo, alreadyExisted: false }
@@ -353,11 +375,11 @@ async function cloneRemoteRepo(
     destination: string
   }
 ): Promise<Repo> {
-  const gitProvider = getSshGitProvider(args.connectionId)
+  const gitProvider = getRemoteGitProvider(args.connectionId)
   if (!gitProvider) {
     throw new Error(`SSH connection "${args.connectionId}" not found or not connected`)
   }
-  const fsProvider = getSshFilesystemProvider(args.connectionId)
+  const fsProvider = getRemoteFilesystemProvider(args.connectionId)
   if (!fsProvider) {
     throw new Error(`SSH connection "${args.connectionId}" not found or not connected`)
   }
@@ -377,7 +399,7 @@ async function cloneRemoteRepo(
   const clonePathKey = normalizeRuntimePathForComparison(clonePath)
   const existing = store.getRepos().find((repo) => {
     return (
-      repo.connectionId === args.connectionId &&
+      getRepoProviderConnectionKey(repo) === args.connectionId &&
       normalizeRuntimePathForComparison(repo.path) === clonePathKey
     )
   })
@@ -405,7 +427,7 @@ async function cloneRemoteRepo(
     // Why: the SSH relay exposes argv-based git execution, not a shell. Use
     // the repo folder name as the target so git creates it inside the chosen
     // parent, and keep the same flag separator safety as local clone.
-    await gitProvider.clone(
+    await gitProvider.clone!(
       ['clone', '--progress', '--', args.url.trim(), repoName],
       trimmedDestination,
       {
@@ -480,8 +502,8 @@ async function createRemoteRepo(
   if (!parentPath) {
     return { error: 'Parent directory is required' }
   }
-  const gitProvider = getSshGitProvider(args.connectionId)
-  const fsProvider = getSshFilesystemProvider(args.connectionId)
+  const gitProvider = getRemoteGitProvider(args.connectionId)
+  const fsProvider = getRemoteFilesystemProvider(args.connectionId)
   if (!gitProvider || !fsProvider) {
     return { error: `SSH connection "${args.connectionId}" not found or not connected` }
   }
@@ -500,7 +522,7 @@ async function createRemoteRepo(
   const targetPathKey = normalizeRuntimePathForComparison(targetPath)
   const existing = store.getRepos().find((repo) => {
     return (
-      repo.connectionId === args.connectionId &&
+      getRepoProviderConnectionKey(repo) === args.connectionId &&
       normalizeRuntimePathForComparison(repo.path) === targetPathKey
     )
   })
@@ -535,7 +557,7 @@ async function createRemoteRepo(
     } catch (err) {
       const raceWinner = store.getRepos().find((repo) => {
         return (
-          repo.connectionId === args.connectionId &&
+          getRepoProviderConnectionKey(repo) === args.connectionId &&
           normalizeRuntimePathForComparison(repo.path) === targetPathKey
         )
       })
@@ -576,7 +598,7 @@ async function createRemoteRepo(
 
   const raceWinner = store.getRepos().find((repo) => {
     return (
-      repo.connectionId === args.connectionId &&
+      getRepoProviderConnectionKey(repo) === args.connectionId &&
       normalizeRuntimePathForComparison(repo.path) === targetPathKey
     )
   })
@@ -1030,8 +1052,8 @@ async function scanNestedReposForIpc(args: {
       onProgress: args.onProgress
     })
   }
-  const gitProvider = getSshGitProvider(args.connectionId)
-  const fsProvider = getSshFilesystemProvider(args.connectionId)
+  const gitProvider = getRemoteGitProvider(args.connectionId)
+  const fsProvider = getRemoteFilesystemProvider(args.connectionId)
   if (!gitProvider || !fsProvider) {
     throw new Error('ssh_connection_unavailable')
   }
@@ -1279,14 +1301,23 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
           : parsedHost.kind === 'ssh'
             ? await addRemoteRepoFromPath(store, {
                 connectionId: parsedHost.targetId,
+                hostKind: 'ssh',
                 remotePath: args.path,
                 displayName: args.displayName,
                 kind: args.kind
               })
-            : {
-                error:
-                  'Runtime hosts must be set up through the runtime projectHostSetup.setupExistingFolder RPC.'
-              }
+            : parsedHost.kind === 'devServer'
+              ? await addRemoteRepoFromPath(store, {
+                  connectionId: parsedHost.devServerId,
+                  hostKind: 'devServer',
+                  remotePath: args.path,
+                  displayName: args.displayName,
+                  kind: args.kind
+                })
+              : {
+                  error:
+                    'Runtime hosts must be set up through the runtime projectHostSetup.setupExistingFolder RPC.'
+                }
       if ('error' in result) {
         throw new Error(result.error)
       }
@@ -1319,7 +1350,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       rawArgs,
       'invalid_folder_workspace_path_status_args'
     ) as FolderWorkspacePathStatusRequest
-    return getFolderWorkspacePathStatus(store, args, { getSshFilesystemProvider })
+    return getFolderWorkspacePathStatus(store, args, { getRemoteFilesystemProvider })
   })
 
   ipcMain.handle(
@@ -1347,7 +1378,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
           projectGroups,
           repos: store.getRepos()
         },
-        { getSshFilesystemProvider }
+        { getRemoteFilesystemProvider }
       )
       assertFolderWorkspacePathUsable(status)
       const workspace = store.createFolderWorkspace(args)
@@ -1384,7 +1415,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
             projectGroups,
             repos: store.getRepos()
           },
-          { getSshFilesystemProvider }
+          { getRemoteFilesystemProvider }
         )
         assertFolderWorkspacePathUsable(status)
       }
@@ -1531,7 +1562,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
         try {
           let importRepoPath = repoPath
           if (args.connectionId) {
-            const gitProvider = getSshGitProvider(args.connectionId)
+            const gitProvider = getRemoteGitProvider(args.connectionId)
             const check = gitProvider ? await gitProvider.isGitRepoAsync(repoPath) : null
             if (!gitProvider || !check?.isRepo) {
               results.push({
@@ -1563,7 +1594,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
             .getRepos()
             .find(
               (repo) =>
-                (repo.connectionId ?? null) === (args.connectionId ?? null) &&
+                (getRepoProviderConnectionKey(repo) ?? null) === (args.connectionId ?? null) &&
                 normalizeRuntimePathForComparison(repo.path) === normalizedImportRepoPath
             )
           const group = groupResolver.getGroupForRepo(repoPath)
@@ -2418,8 +2449,9 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
     }
     // Why: remote repos have their git config on the remote host. Keep this
     // to explicit username config; user.email/name are author identity.
-    if (repo.connectionId) {
-      const provider = getSshGitProvider(repo.connectionId)
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    if (providerConnectionId) {
+      const provider = getRemoteGitProvider(providerConnectionId)
       if (!provider) {
         return ''
       }
@@ -2440,8 +2472,9 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       }
       // Why: remote repos need the relay to resolve symbolic-ref on the
       // remote host where the git data lives.
-      if (repo.connectionId) {
-        const provider = getSshGitProvider(repo.connectionId)
+      const providerConnectionId = getRepoProviderConnectionKey(repo)
+      if (providerConnectionId) {
+        const provider = getRemoteGitProvider(providerConnectionId)
         if (!provider) {
           return { defaultBaseRef: null, remoteCount: 0 }
         }
@@ -2533,8 +2566,9 @@ async function searchBaseRefDetailsForRepo(
     return []
   }
   // Why: remote repos need the relay to list branches on the remote host.
-  if (repo.connectionId) {
-    const provider = getSshGitProvider(repo.connectionId)
+  const providerConnectionId = getRepoProviderConnectionKey(repo)
+  if (providerConnectionId) {
+    const provider = getRemoteGitProvider(providerConnectionId)
     if (!provider) {
       return []
     }

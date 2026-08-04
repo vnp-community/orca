@@ -44,8 +44,8 @@ vi.mock('./ssh', () => ({ getSshConnectionManager: getConnMgrMock }))
 
 import { registerFilesystemMutationHandlers } from './filesystem-mutations'
 import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
+  registerRemoteFilesystemProvider,
+  unregisterRemoteFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 
 const store = {
@@ -164,12 +164,12 @@ describe('fs:importExternalPaths — SSH routing & connection', () => {
       close: vi.fn()
     }
     provider = createProvider(uploadSession)
-    registerSshFilesystemProvider(connId, provider)
+    registerRemoteFilesystemProvider(connId, provider)
     registerFilesystemMutationHandlers(store as never)
   })
 
   afterEach(() => {
-    unregisterSshFilesystemProvider(connId)
+    unregisterRemoteFilesystemProvider(connId)
   })
 
   it('routes SSH imports through the filesystem provider when connectionId is present', async () => {
@@ -206,7 +206,7 @@ describe('fs:importExternalPaths — SSH routing & connection', () => {
   })
 
   it('returns empty results without opening SFTP or requiring a provider', async () => {
-    unregisterSshFilesystemProvider(connId)
+    unregisterRemoteFilesystemProvider(connId)
     const conn = makeConn()
     getConnMgrMock.mockReturnValue({ getConnection: () => conn })
     const { results } = await invoke({ sourcePaths: [], destDir, connectionId: connId })
@@ -236,7 +236,7 @@ describe('fs:importExternalPaths — SSH routing & connection', () => {
   })
 
   it('throws when the SSH filesystem provider is unavailable', async () => {
-    unregisterSshFilesystemProvider(connId)
+    unregisterRemoteFilesystemProvider(connId)
     getConnMgrMock.mockReturnValue({ getConnection: () => makeConn() })
     await expect(
       invoke({ sourcePaths: ['/tmp/x'], destDir, connectionId: connId })

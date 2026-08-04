@@ -100,7 +100,10 @@ Admin → POST /admin/api/fleet/provision → FleetProvisioner
     ▼
 FOR each active server in orca_dev_servers:
     ├─ WebSocket ping: relay.call('health.get')
-    │   Response: { cpu: 45%, ram: 60%, disk: 30%, agentCount: 2, latency: 12ms }
+    │   Response: { cpu: 45%, ram: 60%, disk: 30%, agentCount: 2, latency: 12ms,
+    │               ptySupported: true|false }
+    │   ptySupported=false khi Dev Server Agent chưa cài node-pty → dashboard hiển
+    │   thị badge "No terminal support" thay vì ẩn server khỏi danh sách
     ├─ IF timeout (5s): status = 'unreachable'
     ├─ Evaluate thresholds:
     │   cpu > 90% OR ram > 90% → status = 'warning'
@@ -111,6 +114,7 @@ FOR each active server in orca_dev_servers:
     ▼
 [Admin SPA] nhận event → update health dashboard
     ├─ Color-coded status: green/yellow/red
+    ├─ Badge riêng cho ptySupported (hỗ trợ / chưa hỗ trợ terminal)
     └─ Alert nếu critical
 
 [Webhook alerts (optional)]:

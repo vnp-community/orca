@@ -296,14 +296,27 @@ export function createRemoteRuntimePtyTransport(
       } catch (err: unknown) {
         lastError = err
         const msg = err instanceof Error ? err.message : String(err)
-        // Only retry on timeout or cold-start related errors
+        // Why 'agent not connected' is retryable: this specific message means
+        // the Dev Server's agent WS to Orca is mid-reconnect — a normal,
+        // self-healing ~1-2s network blip (see agent-connection-direct.ts's
+        // proactive-renew-on-drop fix), not a real outage. A request that
+        // happens to land in that narrow gap shouldn't surface a scary error
+        // for something that resolves itself a moment later.
+        const isAgentReconnectRace = msg.includes('agent not connected')
         const isRetryable =
           msg.includes('timed out') ||
           msg.includes('timeout') ||
           msg.includes('relay_starting') ||
-          msg.includes('worker_cold')
+          msg.includes('worker_cold') ||
+          isAgentReconnectRace
         if (!isRetryable || attempt >= COLD_START_MAX_RETRIES) {
           break
+        }
+        if (isAgentReconnectRace) {
+          // Why a fixed delay instead of retrying immediately: an instant
+          // retry would almost certainly land in the same still-reconnecting
+          // gap. Tonight's observed reconnect times were ~1.1-2.3s.
+          await new Promise((resolve) => setTimeout(resolve, 2000))
         }
       }
     }

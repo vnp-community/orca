@@ -32,7 +32,7 @@ vi.mock('./filesystem-auth', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: vi.fn()
+  getRemoteGitProvider: vi.fn()
 }))
 
 vi.mock('./ssh', () => ({

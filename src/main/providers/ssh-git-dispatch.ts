@@ -1,26 +1,32 @@
-import type { SshGitProvider } from './ssh-git-provider'
+// Registry of git providers for remote-connection-backed repos, keyed by
+// connectionId (either a real SSH target id or a devServerId — both resolve
+// through the same generic key, see getRepoProviderConnectionKey). Typed
+// against the IGitProvider interface, not any concrete provider class: this
+// map holds both SshGitProvider and DevServerGitProvider instances (see
+// dev-server-provider-lifecycle.ts) interchangeably.
+import type { IGitProvider } from './types'
 
-const sshProviders = new Map<string, SshGitProvider>()
+const gitConnectionProviders = new Map<string, IGitProvider>()
 
-export const SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE =
-  'Remote connection dropped. Click Reconnect on the SSH target before retrying.'
+export const REMOTE_GIT_PROVIDER_UNAVAILABLE_MESSAGE =
+  'Remote connection dropped. Reconnect the host before retrying.'
 
-export function registerSshGitProvider(connectionId: string, provider: SshGitProvider): void {
-  sshProviders.set(connectionId, provider)
+export function registerRemoteGitProvider(connectionId: string, provider: IGitProvider): void {
+  gitConnectionProviders.set(connectionId, provider)
 }
 
-export function unregisterSshGitProvider(connectionId: string): void {
-  sshProviders.delete(connectionId)
+export function unregisterRemoteGitProvider(connectionId: string): void {
+  gitConnectionProviders.delete(connectionId)
 }
 
-export function getSshGitProvider(connectionId: string): SshGitProvider | undefined {
-  return sshProviders.get(connectionId)
+export function getRemoteGitProvider(connectionId: string): IGitProvider | undefined {
+  return gitConnectionProviders.get(connectionId)
 }
 
-export function requireSshGitProvider(connectionId: string): SshGitProvider {
-  const provider = getSshGitProvider(connectionId)
+export function requireRemoteGitProvider(connectionId: string): IGitProvider {
+  const provider = getRemoteGitProvider(connectionId)
   if (!provider) {
-    throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+    throw new Error(REMOTE_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
   }
   return provider
 }

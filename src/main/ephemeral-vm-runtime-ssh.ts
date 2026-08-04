@@ -1,5 +1,5 @@
-import { getSshFilesystemProvider } from './providers/ssh-filesystem-dispatch'
-import { getSshGitProvider } from './providers/ssh-git-dispatch'
+import { getRemoteFilesystemProvider } from './providers/ssh-filesystem-dispatch'
+import { getRemoteGitProvider } from './providers/ssh-git-dispatch'
 import {
   connectRegisteredSshTarget,
   disconnectRegisteredSshTarget,
@@ -62,7 +62,7 @@ async function waitForRuntimeSshProviders(targetId: string, signal?: AbortSignal
     if (signal?.aborted) {
       throw new Error(`SSH provider wait aborted for target "${targetId}".`)
     }
-    if (getSshGitProvider(targetId) && getSshFilesystemProvider(targetId)) {
+    if (getRemoteGitProvider(targetId) && getRemoteFilesystemProvider(targetId)) {
       return
     }
     await new Promise((resolve) => setTimeout(resolve, SSH_PROVIDER_READY_INTERVAL_MS))

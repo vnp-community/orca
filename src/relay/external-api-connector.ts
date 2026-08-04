@@ -241,6 +241,7 @@ export async function handleGitHubIssueList(
   const userId = typeof params.userId === 'string' ? params.userId : ''
   const limit  = typeof params.limit  === 'number' ? Math.min(params.limit, 50) : 30
   const state  = typeof params.state  === 'string' ? params.state : 'open'
+  const span   = apiTracer.start({ method: 'github.issue.list', state, limit })
 
   const env = buildGhEnv(userId, config.toolEnv)
   const ghArgs = ['issue', 'list', '--json', 'number,title,state,url', '--limit', String(limit), '--state', state]
@@ -248,13 +249,16 @@ export async function handleGitHubIssueList(
   try {
     const result = await execFileCaptured('gh', ghArgs, { cwd, env, timeout: 30_000 })
     if (result.exitCode !== 0) {
+      span.fail(result.stderr || 'gh issue list failed', { method: 'github.issue.list', exitCode: result.exitCode })
       return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: result.stderr } }
     }
     const issues = JSON.parse(result.stdout) as unknown[]
     log.info(`github.issue.list: ${issues.length} issues`)
+    span.ok({ total: issues.length })
     return { jsonrpc: '2.0', id, result: { issues, total: issues.length } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
+    span.fail(err, { method: 'github.issue.list' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }
@@ -271,11 +275,14 @@ export async function handleGitHubIssueCreate(
   const body   = typeof params.body   === 'string' ? params.body           : ''
   const cwd    = typeof params.cwd    === 'string' && params.cwd ? params.cwd : config.workDir
   const userId = typeof params.userId === 'string' ? params.userId : ''
+  const span   = apiTracer.start({ method: 'github.issue.create', title: title.slice(0, 40) })
 
   if (!title) {
+    span.fail('missing title', { method: 'github.issue.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing required param: title' } }
   }
   if (SHELL_METACHARACTERS.test(title)) {
+    span.fail('unsafe characters in params', { method: 'github.issue.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Unsafe characters in issue title' } }
   }
 
@@ -285,13 +292,16 @@ export async function handleGitHubIssueCreate(
   try {
     const result = await execFileCaptured('gh', ghArgs, { cwd, env, timeout: 30_000 })
     if (result.exitCode !== 0) {
+      span.fail(result.stderr || 'gh issue create failed', { method: 'github.issue.create', exitCode: result.exitCode })
       return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: result.stderr } }
     }
     const parsed = JSON.parse(result.stdout) as { number: number; url: string; title: string }
     log.info(`github.issue.create: issue #${parsed.number} → ${parsed.url}`)
+    span.ok({ issueNumber: parsed.number, url: parsed.url })
     return { jsonrpc: '2.0', id, result: parsed }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
+    span.fail(err, { method: 'github.issue.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }
@@ -306,16 +316,24 @@ export async function handleGitHubAuthStatus(
 ): Promise<object> {
   const userId = typeof params.userId === 'string' ? params.userId : ''
   const env = buildGhEnv(userId, config.toolEnv)
+  const span = apiTracer.start({ method: 'github.auth.status', cli: 'gh' })
 
+  span.step('exec', { cli: 'gh' })
   try {
     const result = await execFileCaptured('gh', ['auth', 'status'], {
       cwd: config.workDir, env, timeout: 10_000,
     })
     const ok = result.exitCode === 0
     log.info(`github.auth.status: userId=${userId} ok=${ok}`)
+    if (ok) {
+      span.ok({ cli: 'gh', authenticated: ok })
+    } else {
+      span.fail(result.stderr || 'gh auth status non-zero exit', { cli: 'gh', exitCode: result.exitCode, authenticated: false })
+    }
     return { jsonrpc: '2.0', id, result: { ok, stdout: result.stdout, stderr: result.stderr } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
+    span.fail(err, { cli: 'gh' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }
@@ -333,11 +351,14 @@ export async function handleGitLabMrCreate(
   const targetBranch = typeof params.targetBranch === 'string' ? params.targetBranch.trim()  : 'main'
   const cwd          = typeof params.cwd          === 'string' && params.cwd ? params.cwd : config.workDir
   const userId       = typeof params.userId       === 'string' ? params.userId               : ''
+  const span = apiTracer.start({ method: 'gitlab.mr.create', title: title.slice(0, 40), targetBranch })
 
   if (!title) {
+    span.fail('missing title', { method: 'gitlab.mr.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing required param: title' } }
   }
   if (SHELL_METACHARACTERS.test(title) || SHELL_METACHARACTERS.test(targetBranch)) {
+    span.fail('unsafe characters in params', { method: 'gitlab.mr.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Unsafe characters in MR params' } }
   }
 
@@ -354,13 +375,16 @@ export async function handleGitLabMrCreate(
   try {
     const result = await execFileCaptured('glab', glabArgs, { cwd, env, timeout: 30_000 })
     if (result.exitCode !== 0) {
+      span.fail(result.stderr || 'glab mr create failed', { method: 'gitlab.mr.create', exitCode: result.exitCode })
       return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: result.stderr || 'glab mr create failed' } }
     }
     const url = result.stdout.trim().split('\n').find((l: string) => l.startsWith('https://')) ?? result.stdout.trim()
     log.info(`gitlab.mr.create: MR → ${url}`)
+    span.ok({ url })
     return { jsonrpc: '2.0', id, result: { url, stdout: result.stdout, stderr: result.stderr } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
+    span.fail(err, { method: 'gitlab.mr.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }
@@ -376,6 +400,7 @@ export async function handleGitLabMrList(
   const cwd    = typeof params.cwd    === 'string' && params.cwd ? params.cwd : config.workDir
   const userId = typeof params.userId === 'string' ? params.userId : ''
   const state  = typeof params.state  === 'string' ? params.state : 'opened'
+  const span   = apiTracer.start({ method: 'gitlab.mr.list', state })
 
   const env = buildGlabEnv(userId, config.toolEnv)
   const glabArgs = ['mr', 'list', '--state', state, '--output', 'json']
@@ -383,13 +408,16 @@ export async function handleGitLabMrList(
   try {
     const result = await execFileCaptured('glab', glabArgs, { cwd, env, timeout: 30_000 })
     if (result.exitCode !== 0) {
+      span.fail(result.stderr || 'glab mr list failed', { method: 'gitlab.mr.list', exitCode: result.exitCode })
       return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: result.stderr } }
     }
     const mrs = JSON.parse(result.stdout) as unknown[]
     log.info(`gitlab.mr.list: ${mrs.length} MRs state=${state}`)
+    span.ok({ total: mrs.length })
     return { jsonrpc: '2.0', id, result: { mrs, total: mrs.length } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
+    span.fail(err, { method: 'gitlab.mr.list' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }
@@ -404,6 +432,7 @@ export async function handleGitLabPipelineStatus(
 ): Promise<object> {
   const cwd    = typeof params.cwd    === 'string' && params.cwd ? params.cwd : config.workDir
   const userId = typeof params.userId === 'string' ? params.userId : ''
+  const span   = apiTracer.start({ method: 'gitlab.pipeline.status' })
 
   const env = buildGlabEnv(userId, config.toolEnv)
 
@@ -412,13 +441,16 @@ export async function handleGitLabPipelineStatus(
       cwd, env, timeout: 30_000,
     })
     if (result.exitCode !== 0) {
+      span.fail(result.stderr || 'glab pipeline status failed', { method: 'gitlab.pipeline.status', exitCode: result.exitCode })
       return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: result.stderr } }
     }
     const status = JSON.parse(result.stdout) as unknown
     log.info(`gitlab.pipeline.status: ok`)
+    span.ok({})
     return { jsonrpc: '2.0', id, result: { status, raw: result.stdout } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
+    span.fail(err, { method: 'gitlab.pipeline.status' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }
@@ -433,16 +465,24 @@ export async function handleGitLabAuthStatus(
 ): Promise<object> {
   const userId = typeof params.userId === 'string' ? params.userId : ''
   const env = buildGlabEnv(userId, config.toolEnv)
+  const span = apiTracer.start({ method: 'gitlab.auth.status', cli: 'glab' })
 
+  span.step('exec', { cli: 'glab' })
   try {
     const result = await execFileCaptured('glab', ['auth', 'status'], {
       cwd: config.workDir, env, timeout: 10_000,
     })
     const ok = result.exitCode === 0
     log.info(`gitlab.auth.status: userId=${userId} ok=${ok}`)
+    if (ok) {
+      span.ok({ cli: 'glab', authenticated: ok })
+    } else {
+      span.fail(result.stderr || 'glab auth status non-zero exit', { cli: 'glab', exitCode: result.exitCode, authenticated: false })
+    }
     return { jsonrpc: '2.0', id, result: { ok, stdout: result.stdout, stderr: result.stderr } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
+    span.fail(err, { cli: 'glab' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }

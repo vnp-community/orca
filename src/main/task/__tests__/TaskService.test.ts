@@ -11,6 +11,13 @@ import { MigrationRunner } from '../../db/migrations/runner'
 import { ALL_MIGRATIONS } from '../../db/migrations'
 import { TaskService } from '../TaskService'
 import { TaskDAGValidator } from '../TaskDAGValidator'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -191,6 +198,44 @@ describe('TaskService', () => {
       await service.addEdge(b.id, a.id, 'depends_on') // b depends on a
       const deps = await service.getDependencies(b.id)
       expect(deps.some(d => d.task.id === a.id)).toBe(true)
+    })
+  })
+
+  // ── addEdge tracing (TASK-BE-018.1) ──────────────────────────────────────────
+  describe('addEdge tracing', () => {
+    it('valid edge → step(cycle-check, {wouldCycle:false}) then ok()', async () => {
+      const { events, stop } = captureTraceEvents()
+      const a = await service.create({ title: 'A', type: 'task', status: 'backlog', priority: 'low', reporterId: 'user-001', visibility: 'team' })
+      const b = await service.create({ title: 'B', type: 'task', status: 'backlog', priority: 'low', reporterId: 'user-001', visibility: 'team' })
+
+      await service.addEdge(a.id, b.id, 'depends_on')
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'taskGraph:addEdge')
+      const stepEvent = spanEvents.find((e) => e.level === 'step' && e.label === 'cycle-check')
+      expect(stepEvent?.fields.wouldCycle).toBe(false)
+      expect(spanEvents.some((e) => e.level === 'ok')).toBe(true)
+      expect(spanEvents.some((e) => e.level === 'fail')).toBe(false)
+    })
+
+    it('cycle-creating edge → span.fail(TASK_DEPENDENCY_CYCLE), no INSERT runs', async () => {
+      const a = await service.create({ title: 'A', type: 'task', status: 'backlog', priority: 'low', reporterId: 'user-001', visibility: 'team' })
+      const b = await service.create({ title: 'B', type: 'task', status: 'backlog', priority: 'low', reporterId: 'user-001', visibility: 'team' })
+      await service.addEdge(a.id, b.id, 'depends_on')
+
+      const { events, stop } = captureTraceEvents()
+      await expect(service.addEdge(b.id, a.id, 'depends_on')).rejects.toThrow('TASK_DAG_CYCLE')
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'taskGraph:addEdge')
+      const failEvent = spanEvents.find((e) => e.level === 'fail')
+      expect(failEvent?.fields.err).toContain('TASK_DEPENDENCY_CYCLE')
+      expect(spanEvents.some((e) => e.level === 'ok')).toBe(false)
+
+      // No new edge was inserted by the rejected addEdge() call — b has zero outgoing edges
+      // (only the original a→b exists, which is a's outgoing edge, not b's).
+      const deps = await service.getDependencies(b.id)
+      expect(deps).toHaveLength(0)
     })
   })
 

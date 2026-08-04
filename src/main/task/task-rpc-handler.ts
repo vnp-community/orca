@@ -92,6 +92,7 @@ const EdgeParam = z.object({
   fromTaskId: z.string().min(1),
   toTaskId: z.string().min(1),
   edgeType: z.enum(['depends_on', 'blocks', 'relates_to', 'duplicates']),
+  traceId: z.string().optional(), // [NEW CR-TRACE-018]
 })
 
 const CommentParam = z.object({
@@ -117,6 +118,7 @@ const ResolvePermParam = z.object({
 const AiDecomposeParam = z.object({
   taskId: z.string().min(1),
   projectId: z.string().min(1),
+  traceId: z.string().optional(), // [NEW CR-TRACE-018]
 })
 
 const AiApplyParam = z.object({
@@ -134,6 +136,7 @@ const ExecuteParam = z.object({
   projectId: z.string().min(1),
   worktreePath: z.string().min(1),
   accountId: z.string().optional(),
+  traceId: z.string().optional(), // [NEW CR-TRACE-018]
 })
 
 // ── Factory ───────────────────────────────────────────────────────────────────

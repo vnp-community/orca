@@ -600,6 +600,21 @@ WebSocket request → WsSessionRouter
         └── Proxy WS ↔ Unix socket
 ```
 
+#### Addendum v5.0: Dev Server Notification Relay qua Per-User Process — IMPLEMENTED ✅ (2026-08-02/03)
+
+Mỗi user process chỉ thấy `DevServerManager` thật qua `GatewayDevServerManagerProxy` (child process, forward `call()` qua IPC tới parent/gateway). Trước v5.0 proxy này chỉ hỗ trợ request/response — agent không có đường PUSH notification (pty output, file-change event) vào đúng user process. Giải pháp: broadcast message type mới `devServer:proxyNotification`, song song với `devServer:event` đã có:
+
+```
+DevServerManager (parent) emit 'devServer:notification'  ← từ DevServerRelayBridge.onNotification()
+  → SessionManager.on('devServer:notification')
+        → proc.process.send({ type: 'devServer:proxyNotification', devServerId, method, params })
+        // tới MỌI live user child process
+  → GatewayDevServerManagerProxy (child) — process.on('message') nhận proxyNotification
+        → re-dispatch tới subscriber đăng ký qua getRelay(id).onNotification(handler)
+```
+
+Chi tiết provider-side consumer (fs.watch push cho `DevServerFilesystemProvider`): xem [TDD-13 §11.4](./13-dev-server-onboarding.md#11-provider-unification-with-ssh-registries-v50).
+
 ### Updated Environment Variables
 
 | Variable | Default | Description |

@@ -208,3 +208,30 @@ describe('agent-wire', () => {
 ```
 
 **Target:** ≥ 15 tests
+
+---
+
+## 5. One-Way Notifications — Addendum (2026-08-03)
+
+**Status: ✅ IMPLEMENTED** — `src/relay/agent-rpc-dispatch.ts`
+
+The wire format itself is unchanged (still the 13-byte header + `encodeDataFrame`/`decodeFrame` above). What's new is a second *use* of that same codec: a one-way JSON-RPC 2.0 notification (no `id` field), sent by the agent without a preceding request, for long-lived resources (a live PTY, an fs watcher) that need to push data to Orca between request/response cycles.
+
+```typescript
+// src/relay/agent-rpc-dispatch.ts
+
+function makeNotifier(
+  ws: WebSocket,
+  state: WireState
+): (method: string, params: Record<string, unknown>) => void {
+  return (method, params) => {
+    if (ws.readyState !== 1 /* WebSocket.OPEN */) return
+    ws.send(encodeDataFrame(state, JSON.stringify({ jsonrpc: '2.0', method, params })))
+  }
+}
+```
+
+Key points:
+- Same `encodeDataFrame(state, payload)` as every response frame — no new `MessageType`, no header change.
+- The JSON-RPC payload omits `id` (per spec, a request without `id` is a notification), so Orca's dispatcher must route these separately from correlated responses.
+- `makeNotifier(ws, state)` is built once per inbound RPC in `route()` and passed as a 4th/extra param into handlers that need to push — currently `pty.create` (`pty-agent-bridge.ts`, methods `pty.data`/`pty.exit`) and `fs.watch` (`fs-agent-extensions.ts`, method `fs.changed`). See TDD-AG-07 §9 for the method-level detail.

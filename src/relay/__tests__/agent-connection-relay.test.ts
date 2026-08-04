@@ -2,17 +2,20 @@
 // Tests for the authenticate() logic in agent-connection-relay.ts.
 // We test via duck-typed MockWs and MockReq without starting a real server.
 
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { EventEmitter } from 'node:events'
-import type { Socket } from 'node:net'
+import { describe, it, expect, vi } from 'vitest'
+import { registerTraceSink, createTracer } from '../../shared/trace'
+import type { TraceEvent, TraceSpan } from '../../shared/trace'
 
 // ─── Minimal authenticate() extracted for isolated testing ──────────────────
 // Replicated inline so we can test without spinning up a real WebSocket server.
+// Kept in sync with the real implementation's signature in agent-connection-relay.ts
+// (TASK-AG-013.1 added the trailing optional `span` param).
 function authenticate(
   ws: { close: (code: number, reason: string) => void },
   req: { url?: string; headers: Record<string, string>; socket: { remoteAddress?: string } },
   expectedToken: string,
-  log: { warn: (msg: string) => void }
+  log: { warn: (msg: string) => void },
+  span?: TraceSpan
 ): boolean {
   const rawUrl = req.url ?? ''
   let queryToken = ''
@@ -23,14 +26,21 @@ function authenticate(
   const authHeader  = (req.headers['authorization'] ?? '')
   const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim()
   const incoming    = queryToken || bearerToken
+  const source: 'query' | 'header' | 'none' = queryToken ? 'query' : bearerToken ? 'header' : 'none'
 
   if (incoming !== expectedToken) {
+    span?.fail('unauthorized', { source })
     log.warn(`Rejected unauthorized connection from ${req.socket.remoteAddress ?? 'unknown'}`)
     ws.close(1008, 'Unauthorized')
     return false
   }
+  span?.step('tokenAccepted', { source })
   return true
 }
+
+// Local tracer replicate — same flow name as `relayConnTracer` in
+// agent-connection-relay.ts, so emitted events' `flow` field matches.
+const relayConnTracerForTest = createTracer('agent:connectionRelay')
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const TOKEN = 'my-relay-secret'
@@ -131,5 +141,38 @@ describe('authenticate() — priority and edge cases', () => {
     const req = makeReq(`/orca-relay?token=${TOKEN}`)
     authenticate(ws, req, TOKEN, mockLog)
     expect(ws.close).not.toHaveBeenCalled()
+  })
+})
+
+describe('authenticate() — agent:connectionRelay tracing', () => {
+  it('span.step("tokenAccepted", {source:"query"}) khi token hợp lệ qua query string', () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    const span = relayConnTracerForTest.start({ remoteAddr: '127.0.0.1' })
+
+    const ok = authenticate(makeWs(), makeReq(`/orca-relay?token=${TOKEN}`), TOKEN, mockLog, span)
+
+    unregister()
+    expect(ok).toBe(true)
+    const step = events.find(e => e.level === 'step' && e.label === 'tokenAccepted')
+    expect(step?.fields.source).toBe('query')
+  })
+
+  it('span.fail("unauthorized", {source:"none"}) khi thiếu token, KHÔNG có field nào chứa token thật', () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    const span = relayConnTracerForTest.start({ remoteAddr: '127.0.0.1' })
+
+    const ok = authenticate(makeWs(), makeReq(''), TOKEN, mockLog, span)
+
+    unregister()
+    expect(ok).toBe(false)
+    const fail = events.find(e => e.level === 'fail')
+    expect(fail?.fields.source).toBe('none')
+    expect(JSON.stringify(events)).not.toContain(TOKEN)
+  })
+
+  it('authenticate() vẫn hoạt động khi span không được truyền (backward-compat)', () => {
+    expect(authenticate(makeWs(), makeReq(`/orca-relay?token=${TOKEN}`), TOKEN, mockLog)).toBe(true)
   })
 })

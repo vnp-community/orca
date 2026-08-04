@@ -19,6 +19,7 @@ import type {
   WorktreeMeta
 } from '../../../../shared/types'
 import type { RuntimeWorktreeListResult } from '../../../../shared/runtime-types'
+import { Tracers } from '../../../../shared/trace/tracers'
 import {
   findWorktreeById,
   applyWorktreeUpdates,
@@ -2963,9 +2964,20 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     const nextCandidateName = (current: string, attempt: number): string =>
       attempt === 0 ? current : `${current}-${attempt + 1}`
 
+    // Why: one span wraps the entire 25-attempt retry loop (CR-TRACE-000 §5) —
+    // retries on name conflict step() the same span instead of starting a new one.
+    const span = Tracers.uiWorktreeCreateFlow.start({
+      repoId,
+      baseBranch: baseBranch ?? '',
+      telemetrySource: telemetrySource ?? ''
+    })
+
     try {
       for (let attempt = 0; attempt < 25; attempt += 1) {
         const candidateName = nextCandidateName(name, attempt)
+        if (attempt > 0) {
+          span.step('retry-name-conflict', { attempt, candidateName })
+        }
         // Why: older runtimes may still reject exact PR branch overrides on
         // collision, so the renderer retries both branch and worktree names.
         const candidateBranchNameOverride = branchNameOverride
@@ -3070,7 +3082,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                             : {}),
                           activate: true
                         }
-                      : {})
+                      : {}),
+                    traceId: span.id
                   },
                   { timeoutMs: 10 * 60_000 }
                 )
@@ -3127,11 +3140,13 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             openSettingsPage: get().openSettingsPage,
             openSettingsTarget: get().openSettingsTarget
           })
+          span.ok({ worktreeId: result.worktree.id, path: result.worktree.path, attempt })
           return result
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           const shouldRetry = retryableConflictPatterns.some((pattern) => pattern.test(message))
           if (!shouldRetry || attempt === 24) {
+            span.fail(error, { repoId, attempt })
             throw error
           }
         }
@@ -3233,6 +3248,12 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     }
     const hostId = removalOwner.hostId ?? undefined
     const forgetLocalOnly = options?.mode === 'forget-local'
+
+    // Why: span created before set() so it wraps ensureHooksConfirmed() (hook-trust
+    // dialog) too — CR-TRACE-001 §4 BL-WT-03 folds that wait into the same "delete"
+    // span (frontend has no separate "checkSafety" round-trip like the backend).
+    const span = Tracers.uiWorktreeDeleteFlow.start({ worktreeId, force, forgetLocalOnly })
+
     set((s) => ({
       deleteStateByWorktreeId: {
         ...s.deleteStateByWorktreeId,
@@ -3276,6 +3297,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           ? settingsForExecutionHostOwner(get().settings, hostId)
           : settingsForWorktreeOwner(get(), worktreeId)
       )
+      span.step('resolve-target', { targetKind: target.kind })
       const removalResult = await (forgetLocalOnly
         ? window.api.worktrees.forgetLocal({ worktreeId, hostId })
         : target.kind === 'local'
@@ -3286,7 +3308,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
               {
                 worktree: toRuntimeWorktreeSelector(worktreeId),
                 force,
-                runHooks: !skipArchive
+                runHooks: !skipArchive,
+                traceId: span.id
               },
               { timeoutMs: 60_000 }
             ))
@@ -3626,10 +3649,12 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         })
       }
       pruneHostedReviewLinkMutationGenerations([worktreeId])
+      span.ok({ worktreeId, preservedBranch: Boolean(preservedBranch) })
       return preservedBranch ? { ok: true as const, preservedBranch } : { ok: true as const }
     } catch (err) {
       // Why: git refusing a non-force delete for dirty/untracked files is a
-      // handled user decision point surfaced by the delete toast, not an app error.
+      // handled user decision point surfaced by the delete toast, not an app error —
+      // but still worth fail()-ing so TracePanel shows the delete failure rate/reason.
       console.warn('Failed to remove worktree:', err)
       const error = err instanceof Error ? err.message : String(err)
       const forceDeleteReason = classifyWorktreeForceDeleteReason(error, force)
@@ -3646,6 +3671,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           }
         }
       }))
+      span.fail(err, { worktreeId, force, forceDeleteReason: forceDeleteReason ?? '', locked })
       return { ok: false as const, error }
     }
   },

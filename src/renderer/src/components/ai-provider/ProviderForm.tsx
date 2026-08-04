@@ -1,6 +1,8 @@
 // ProviderForm.tsx — Add/Edit AI provider account dialog (TASK-V5-08)
 import { useState } from 'react'
-import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
+import { useAppStore } from '../../store'
+import { Tracers } from '../../../../shared/trace/tracers'
 import { CredentialInput } from './CredentialInput'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -30,24 +32,42 @@ export function ProviderForm({ account, onClose }: ProviderFormProps) {
 
   const handleSave = async () => {
     setIsSaving(true)
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
     try {
       const payload = { provider, label, model, baseUrl, scope, devServerId: devServer, quotaLimitDay: quota }
       let accountId = account?.id
 
+      // Metadata create/update: KHÔNG traced riêng — CRUD đơn (không băng qua boundary
+      // quan trọng ngoài WS RPC 1 hop, latency thấp). Chỉ writeCredential đáng trace vì
+      // nó băng qua relay tới Dev Server và có thể timeout/fail độc lập.
       if (!accountId) {
-        const created = await callRuntimeRpc('aiProvider.create', payload) as AIProviderAccount
+        const created = await callRuntimeRpc(target, 'aiProvider.create', payload) as AIProviderAccount
         accountId = created.id
       } else {
-        await callRuntimeRpc('aiProvider.update', { accountId, ...payload })
+        await callRuntimeRpc(target, 'aiProvider.update', { accountId, ...payload })
       }
 
-      // Write credential if new one provided
+      // Write credential if new one provided — BL-AIP-01, băng qua relay tới Dev Server.
       if (hasNewCred && encryptedCred) {
-        await callRuntimeRpc('aiProvider.writeCredential', {
-          accountId,
-          encryptedBlob: encryptedCred.encryptedBlob,
-          iv:            encryptedCred.iv,
+        // SECURITY: span fields chỉ chứa accountId/provider/blobLength — KHÔNG bao giờ
+        // encryptedCred.encryptedBlob/iv.
+        const span = Tracers.uiAiProviderWriteCredFlow.start({
+          accountId, provider, blobLength: encryptedCred.encryptedBlob.length,
         })
+        try {
+          await callRuntimeRpc(target, 'aiProvider.writeCredential', {
+            accountId,
+            encryptedBlob: encryptedCred.encryptedBlob,
+            iv:            encryptedCred.iv,
+            traceId:       span.id,
+          })
+          span.ok({ accountId })
+        } catch (err: any) {
+          // SECURITY: err có thể chứa message từ backend — không đưa toàn bộ err object
+          // vào fields nếu nó có khả năng echo lại input; chỉ truyền qua span.fail(err).
+          span.fail(err, { accountId })
+          throw err
+        }
       }
 
       toast.success(account ? 'Account updated' : 'Account created')

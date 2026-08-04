@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { useAppStore } from '../store'
-import { callRuntimeRpc } from '../runtime/runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
+import { Tracers } from '../../../shared/trace/tracers'
 
 export function useWorkflowExecution(executionId: string) {
   const { stepStatuses, streamingOutput } = useAppStore(s => ({
@@ -29,8 +30,19 @@ export function useWorkflowExecution(executionId: string) {
   }, [executionId])
 
   const cancelExecution = useCallback(async () => {
-    await callRuntimeRpc('workflow.cancel', { executionId })
-    useAppStore.getState().updateExecutionStatus(executionId, 'cancelled')
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    const rootTraceId = useAppStore.getState().executions.find(e => e.id === executionId)?.rootTraceId
+    // Field `parentTraceId` (không phải resume) nhóm thao tác cancel này vào cùng
+    // execution trong TracePanel, dù span này có id riêng.
+    const span = Tracers.uiWorkflowCancelFlow.start({ executionId, parentTraceId: rootTraceId })
+    try {
+      await callRuntimeRpc(target, 'workflow.cancel', { executionId, traceId: span.id })
+      useAppStore.getState().updateExecutionStatus(executionId, 'cancelled')
+      span.ok({ executionId })
+    } catch (err) {
+      span.fail(err, { executionId })
+      throw err
+    }
   }, [executionId])
 
   return { execution, stepStatuses, streamingOutput, cancelExecution }

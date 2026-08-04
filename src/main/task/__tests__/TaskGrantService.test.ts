@@ -15,6 +15,13 @@ import { ALL_MIGRATIONS } from '../../db/migrations'
 import { TaskService } from '../TaskService'
 import { TaskDAGValidator } from '../TaskDAGValidator'
 import { TaskGrantService } from '../TaskGrantService'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -248,6 +255,101 @@ describe('TaskGrantService', () => {
       await grantService.grantPermission({ taskId: task.id, scope: 'user', scopeId: 'user-002', permission: 'comment', grantedBy: 'reporter-001' })
       const grants = await grantService.listGrants(task.id)
       expect(grants.length).toBe(2)
+    })
+  })
+
+  // ── resolvePermission tracing (TASK-BE-018.3) ────────────────────────────────
+  describe('resolvePermission tracing', () => {
+    it('direct grant match → step(grant-match, {direct:true})', async () => {
+      const task = await taskService.create({
+        title: 'T', type: 'task', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team',
+      })
+      await grantService.grantPermission({
+        taskId: task.id, scope: 'user', scopeId: 'user-001',
+        permission: 'edit', grantedBy: 'reporter-001',
+      })
+
+      const { events, stop } = captureTraceEvents()
+      await grantService.resolvePermission('user-001', task.id)
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'taskGraph:grantResolve')
+      const matchStep = spanEvents.find((e) => e.level === 'step' && e.label === 'grant-match')
+      expect(matchStep?.fields.direct).toBe(true)
+      expect(spanEvents.some((e) => e.level === 'ok')).toBe(true)
+    })
+
+    it('ancestor-only match (applyTree) → step(grant-match, {direct:false})', async () => {
+      const parent = await taskService.create({
+        title: 'Epic', type: 'epic', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team',
+      })
+      const child = await taskService.create({
+        title: 'Task', type: 'task', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team', parentId: parent.id,
+      })
+      await grantService.grantPermission({
+        taskId: parent.id, scope: 'user', scopeId: 'user-001',
+        permission: 'edit', applyTree: true, grantedBy: 'reporter-001',
+      })
+
+      const { events, stop } = captureTraceEvents()
+      await grantService.resolvePermission('user-001', child.id)
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'taskGraph:grantResolve')
+      const matchStep = spanEvents.find((e) => e.level === 'step' && e.label === 'grant-match')
+      expect(matchStep?.fields.direct).toBe(false)
+    })
+
+    it('no match → span.fail(NO_GRANT_FOUND), returns null', async () => {
+      const task = await taskService.create({
+        title: 'T', type: 'task', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team',
+      })
+
+      const { events, stop } = captureTraceEvents()
+      const result = await grantService.resolvePermission('user-001', task.id)
+      stop()
+
+      expect(result).toBeNull()
+      const spanEvents = events.filter((e) => e.flow === 'taskGraph:grantResolve')
+      const failEvent = spanEvents.find((e) => e.level === 'fail')
+      expect(failEvent?.fields.err).toContain('NO_GRANT_FOUND')
+      expect(spanEvents.some((e) => e.level === 'step')).toBe(false)
+    })
+
+    it('emits exactly 1 step() per call — no per-candidate/per-grant noise', async () => {
+      const parent = await taskService.create({
+        title: 'Epic', type: 'epic', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team',
+      })
+      const child = await taskService.create({
+        title: 'Task', type: 'task', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team', parentId: parent.id,
+      })
+      // Multiple grants across multiple candidates (task itself + ancestor) —
+      // the nested candidates × grants loop must NOT emit a step per iteration.
+      await grantService.grantPermission({
+        taskId: child.id, scope: 'user', scopeId: 'user-001',
+        permission: 'view', grantedBy: 'reporter-001',
+      })
+      await grantService.grantPermission({
+        taskId: child.id, scope: 'everyone',
+        permission: 'comment', grantedBy: 'reporter-001',
+      })
+      await grantService.grantPermission({
+        taskId: parent.id, scope: 'user', scopeId: 'user-001',
+        permission: 'edit', applyTree: true, grantedBy: 'reporter-001',
+      })
+
+      const { events, stop } = captureTraceEvents()
+      await grantService.resolvePermission('user-001', child.id)
+      stop()
+
+      const stepEvents = events.filter((e) => e.flow === 'taskGraph:grantResolve' && e.level === 'step')
+      expect(stepEvents).toHaveLength(1)
     })
   })
 })

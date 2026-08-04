@@ -44,7 +44,7 @@ export interface TraceSpan {
 }
 
 export interface Tracer {
-  start(fields?: TraceFields): TraceSpan
+  start(fields?: TraceFields, resume?: { id: string }): TraceSpan
 }
 
 // ─── Sink registry (platform-agnostic) ───────────────────────────────────────
@@ -149,8 +149,12 @@ function emit(event: TraceEvent): void {
  */
 export function createTracer(flow: string): Tracer {
   return {
-    start(fields: TraceFields = {}): TraceSpan {
-      const id = shortId()
+    start(fields: TraceFields = {}, resume?: { id: string }): TraceSpan {
+      // resume.id lets a span continue a parent's id across a process/RPC
+      // boundary (Browser/Main/Relay/Agent) instead of starting a fresh one —
+      // see CR-TRACE-000 §3.1/§3.2. elapsedMs below is still measured from
+      // THIS layer's own startMs, not inherited from the resumed span.
+      const id = resume?.id ?? shortId()
       const startMs = Date.now()
 
       emit({ id, flow, level: 'start', fields, ts: startMs })

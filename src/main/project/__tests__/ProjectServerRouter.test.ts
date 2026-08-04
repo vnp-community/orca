@@ -14,6 +14,7 @@ import type { DevServerManager } from '../../dev-server/dev-server-manager'
 import type { RelayConnectionPool } from '../../dev-server/relay-connection-pool'
 import type { ProfileResolver } from '../../profile/ProfileResolver'
 import type { ProjectMember, OrcaProject } from '../../../shared/project-types'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -186,5 +187,66 @@ describe('ProjectServerRouter', () => {
     })
     const profileResolver = makeProfileResolver()
     await expect(router.getProjectContext('proj-1', 'u-1', profileResolver)).rejects.toThrow('DEV_SERVER_NOT_FOUND')
+  })
+})
+
+// ── CR-TRACE-015: getRelayForProject() tracing (TASK-BE-015.5) ─────────────
+
+describe('ProjectServerRouter.getRelayForProject tracing (CR-TRACE-015)', () => {
+  function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    return { events, stop: unregister }
+  }
+
+  it('getRelayForProject() success → span field op === "getRelay" (distinct from create())', async () => {
+    const router = makeRouter()
+    const { events, stop } = captureTraceEvents()
+
+    await router.getRelayForProject('proj-1', 'u-1')
+    stop()
+
+    const okEvent = events.find((e) => e.flow === 'profile:projectRoute' && e.level === 'ok')
+    expect(okEvent?.fields).toMatchObject({ op: 'getRelay', projectId: 'proj-1', devServerId: 'srv-1' })
+  })
+
+  it('getRelayForProject() → PROJECT_NOT_FOUND rejection emits span.fail with op: "getRelay"', async () => {
+    const router = makeRouter({
+      projectService: {
+        assertAccess: vi.fn().mockResolvedValue(FAKE_MEMBER),
+        get: vi.fn().mockResolvedValue(null),
+      }
+    })
+    const { events, stop } = captureTraceEvents()
+
+    await expect(router.getRelayForProject('no-proj', 'u-1')).rejects.toThrow('PROJECT_NOT_FOUND')
+    stop()
+
+    const failEvent = events.find((e) => e.flow === 'profile:projectRoute' && e.level === 'fail')
+    expect(failEvent?.fields).toMatchObject({ op: 'getRelay' })
+  })
+
+  it('getRelayForProject() → DEV_SERVER_NOT_FOUND rejection emits span.fail with op: "getRelay"', async () => {
+    const router = makeRouter({
+      devServerManager: { get: vi.fn().mockReturnValue(null) }
+    })
+    const { events, stop } = captureTraceEvents()
+
+    await expect(router.getRelayForProject('proj-1', 'u-1')).rejects.toThrow('DEV_SERVER_NOT_FOUND')
+    stop()
+
+    const failEvent = events.find((e) => e.flow === 'profile:projectRoute' && e.level === 'fail')
+    expect(failEvent?.fields).toMatchObject({ op: 'getRelay' })
+  })
+
+  it('getProjectContext() does NOT emit any profile:projectRoute or other Tracers span (out of scope for this task)', async () => {
+    const router = makeRouter()
+    const profileResolver = makeProfileResolver()
+    const { events, stop } = captureTraceEvents()
+
+    await router.getProjectContext('proj-1', 'u-1', profileResolver)
+    stop()
+
+    expect(events).toEqual([])
   })
 })

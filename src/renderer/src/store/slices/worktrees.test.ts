@@ -2,7 +2,7 @@
  * Why: this slice test keeps the worktree store scenarios in one file so the
  * shared mock store setup stays consistent across closely related behaviors.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { create } from 'zustand'
 import type { AppState } from '../types'
 import type {
@@ -20,6 +20,7 @@ import {
   type RuntimeEnvironmentCallRequest
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
+import { registerTraceSink, type TraceEvent } from '../../../../shared/trace'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import {
   beginHugeRepoWarningProbe,
@@ -3271,6 +3272,138 @@ describe('createWorktree base status merge', () => {
   })
 })
 
+// TASK-FE-001.1 / TASK-FE-001.2: createWorktree()/removeWorktree() tracing.
+describe('createWorktree/removeWorktree tracing (CR-TRACE-001)', () => {
+  let events: TraceEvent[]
+  let unregister: () => void
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetRemoteRuntimeMocks()
+    events = []
+    unregister = registerTraceSink((event) => events.push(event))
+  })
+
+  afterEach(() => {
+    unregister()
+  })
+
+  it('starts one ui:worktree.create span before the RPC and ok()s it on success', async () => {
+    const store = createTestStore()
+    const wt = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
+    mockApi.worktrees.create.mockResolvedValue({ worktree: wt })
+
+    await store.getState().createWorktree('repo1', 'feature', 'origin/main')
+
+    const createEvents = events.filter((e) => e.flow === 'ui:worktree.create')
+    expect(createEvents[0]?.level).toBe('start')
+    expect(createEvents[0]?.fields).toMatchObject({ repoId: 'repo1', baseBranch: 'origin/main' })
+    const okEvent = createEvents.find((e) => e.level === 'ok')
+    expect(okEvent?.fields).toMatchObject({ worktreeId: wt.id, path: wt.path, attempt: 0 })
+    // Only one span for the whole call — no extra 'start' events from retries.
+    expect(createEvents.filter((e) => e.level === 'start')).toHaveLength(1)
+  })
+
+  it('step()s the same span once per retry instead of starting a new span', async () => {
+    const store = createTestStore()
+    const error = new Error('Branch "feature" already exists. Pick a different worktree name.')
+    const wt = makeWorktree({
+      id: 'repo1::/path/feature-2',
+      repoId: 'repo1',
+      path: '/path/feature-2'
+    })
+    mockApi.worktrees.create.mockRejectedValueOnce(error)
+    mockApi.worktrees.create.mockResolvedValueOnce({ worktree: wt })
+
+    await store.getState().createWorktree('repo1', 'feature', 'origin/main')
+
+    const createEvents = events.filter((e) => e.flow === 'ui:worktree.create')
+    expect(createEvents.filter((e) => e.level === 'start')).toHaveLength(1)
+    const stepEvents = createEvents.filter((e) => e.level === 'step')
+    expect(stepEvents).toHaveLength(1)
+    expect(stepEvents[0]?.label).toBe('retry-name-conflict')
+    // step and ok share the same span id as the single start event.
+    expect(stepEvents[0]?.id).toBe(createEvents[0]?.id)
+  })
+
+  it('fail()s the create span with repoId/attempt on a non-retryable error', async () => {
+    const store = createTestStore()
+    const error = new Error('permission denied')
+    mockApi.worktrees.create.mockRejectedValue(error)
+
+    await expect(store.getState().createWorktree('repo1', 'feature')).rejects.toThrow(
+      'permission denied'
+    )
+
+    const createEvents = events.filter((e) => e.flow === 'ui:worktree.create')
+    const failEvent = createEvents.find((e) => e.level === 'fail')
+    expect(failEvent?.fields).toMatchObject({ repoId: 'repo1', attempt: 0 })
+  })
+
+  it('does not attach traceId to the local Electron IPC create/remove calls', async () => {
+    const store = createTestStore()
+    const wt = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
+    mockApi.worktrees.create.mockResolvedValue({ worktree: wt })
+    await store.getState().createWorktree('repo1', 'feature')
+    expect(mockApi.worktrees.create).toHaveBeenCalledWith(
+      expect.not.objectContaining({ traceId: expect.anything() })
+    )
+
+    store.setState({ worktreesByRepo: { repo1: [wt] } } as Partial<AppState>)
+    await store.getState().removeWorktree(wt.id)
+    expect(mockApi.worktrees.remove).toHaveBeenCalledWith(
+      expect.not.objectContaining({ traceId: expect.anything() })
+    )
+  })
+
+  it('starts one ui:worktree.delete span wrapping hook-confirm + removal and ok()s it', async () => {
+    const store = createTestStore()
+    const wt = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
+    store.setState({ worktreesByRepo: { repo1: [wt] } } as Partial<AppState>)
+
+    await store.getState().removeWorktree(wt.id)
+
+    const deleteEvents = events.filter((e) => e.flow === 'ui:worktree.delete')
+    expect(deleteEvents.filter((e) => e.level === 'start')).toHaveLength(1)
+    expect(deleteEvents[0]?.fields).toMatchObject({ worktreeId: wt.id, forgetLocalOnly: false })
+    expect(deleteEvents.some((e) => e.level === 'step' && e.label === 'resolve-target')).toBe(true)
+    const okEvent = deleteEvents.find((e) => e.level === 'ok')
+    expect(okEvent?.fields).toMatchObject({ worktreeId: wt.id })
+  })
+
+  it('fail()s the delete span when the backend rejects a non-force delete', async () => {
+    const store = createTestStore()
+    const wt = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
+    store.setState({ worktreesByRepo: { repo1: [wt] } } as Partial<AppState>)
+    mockApi.worktrees.remove.mockRejectedValueOnce(new Error('worktree has uncommitted changes'))
+
+    const result = await store.getState().removeWorktree(wt.id, false)
+
+    expect(result.ok).toBe(false)
+    const deleteEvents = events.filter((e) => e.flow === 'ui:worktree.delete')
+    const failEvent = deleteEvents.find((e) => e.level === 'fail')
+    expect(failEvent?.fields).toMatchObject({ worktreeId: wt.id, force: false })
+  })
+
+  it('runs N parallel deletes as N independent spans, not sharing an id', async () => {
+    const store = createTestStore()
+    const wt1 = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
+    const wt2 = makeWorktree({ id: 'repo1::/path/wt2', repoId: 'repo1', path: '/path/wt2' })
+    store.setState({ worktreesByRepo: { repo1: [wt1, wt2] } } as Partial<AppState>)
+
+    await Promise.all([
+      store.getState().removeWorktree(wt1.id),
+      store.getState().removeWorktree(wt2.id)
+    ])
+
+    const startIds = events
+      .filter((e) => e.flow === 'ui:worktree.delete' && e.level === 'start')
+      .map((e) => e.id)
+    expect(startIds).toHaveLength(2)
+    expect(new Set(startIds).size).toBe(2)
+  })
+})
+
 describe('removeWorktree state cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -3943,7 +4076,9 @@ describe('worktree remote runtime mutations', () => {
         displayName: 'Feature title',
         linkedIssue: 123,
         linkedPR: 456,
-        pushTarget: { remoteName: 'fork', branchName: 'feature' }
+        pushTarget: { remoteName: 'fork', branchName: 'feature' },
+        // TASK-FE-001.1: traceId is forwarded on the callRuntimeRpc branch only.
+        traceId: expect.any(String)
       },
       timeoutMs: 10 * 60_000
     })
@@ -4168,7 +4303,13 @@ describe('worktree remote runtime mutations', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'worktree.rm',
-      params: { worktree: `id:${wt.id}`, force: undefined, runHooks: true },
+      params: {
+        worktree: `id:${wt.id}`,
+        force: undefined,
+        runHooks: true,
+        // TASK-FE-001.2: traceId is forwarded on the callRuntimeRpc branch only.
+        traceId: expect.any(String)
+      },
       timeoutMs: 60_000
     })
     expect(mockApi.worktrees.remove).not.toHaveBeenCalled()

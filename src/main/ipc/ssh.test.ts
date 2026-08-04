@@ -155,22 +155,22 @@ vi.mock('../providers/ssh-filesystem-provider', () => ({
 }))
 
 vi.mock('./pty', () => ({
-  registerSshPtyProvider: vi.fn(),
-  unregisterSshPtyProvider: vi.fn(),
+  registerRemotePtyProvider: vi.fn(),
+  unregisterRemotePtyProvider: vi.fn(),
   clearPtyOwnershipForConnection: vi.fn(),
   clearProviderPtyState: vi.fn(),
   deletePtyOwnership: vi.fn(),
   setPtyOwnership: vi.fn(),
   answerStartupTerminalColorQueriesForPty: vi.fn((_id: string, data: string) => data),
-  getSshPtyProvider: vi.fn(),
+  getRemotePtyProvider: vi.fn(),
   getPtyIdsForConnection: vi.fn().mockReturnValue([]),
   isRendererPtyOutputPaused: vi.fn().mockReturnValue(false)
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  registerSshFilesystemProvider: vi.fn(),
-  unregisterSshFilesystemProvider: vi.fn(),
-  getSshFilesystemProvider: vi.fn()
+  registerRemoteFilesystemProvider: vi.fn(),
+  unregisterRemoteFilesystemProvider: vi.fn(),
+  getRemoteFilesystemProvider: vi.fn()
 }))
 
 vi.mock('../providers/ssh-git-provider', () => ({
@@ -182,8 +182,8 @@ vi.mock('../providers/ssh-git-provider', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  registerSshGitProvider: vi.fn(),
-  unregisterSshGitProvider: vi.fn()
+  registerRemoteGitProvider: vi.fn(),
+  unregisterRemoteGitProvider: vi.fn()
 }))
 
 vi.mock('../ssh/ssh-port-forward', () => ({
@@ -218,7 +218,7 @@ import { SSH_RELAY_CONFIGURE_GRACE_TIME_METHOD, type SshTarget } from '../../sha
 import {
   clearProviderPtyState,
   deletePtyOwnership,
-  getSshPtyProvider,
+  getRemotePtyProvider,
   getPtyIdsForConnection
 } from './pty'
 
@@ -340,7 +340,7 @@ describe('SSH IPC handlers', () => {
     mockPortForwardManager.callbacksRef.current = null
     powerMonitorOnMock.mockReset()
     powerMonitorOffMock.mockReset()
-    vi.mocked(getSshPtyProvider).mockReset()
+    vi.mocked(getRemotePtyProvider).mockReset()
     vi.mocked(getPtyIdsForConnection).mockReset().mockReturnValue([])
     vi.mocked(clearProviderPtyState).mockReset()
     vi.mocked(deletePtyOwnership).mockReset()
@@ -1167,7 +1167,7 @@ describe('SSH IPC handlers', () => {
     mockStore.getSshRemotePtyLeases.mockReturnValue([
       { targetId: 'ssh-1', ptyId: 'pty-1', state: 'detached' }
     ])
-    vi.mocked(getSshPtyProvider).mockReturnValue(mockPtyProvider as never)
+    vi.mocked(getRemotePtyProvider).mockReturnValue(mockPtyProvider as never)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['pty-1'])
     mockPtyProvider.shutdown.mockRejectedValue(new Error('mux down'))
 
@@ -1199,7 +1199,7 @@ describe('SSH IPC handlers', () => {
     mockStore.getSshRemotePtyLeases.mockReturnValue([
       { targetId: 'ssh-1', ptyId: 'pty-lease', state: 'detached' }
     ])
-    vi.mocked(getSshPtyProvider).mockReturnValue(mockPtyProvider as never)
+    vi.mocked(getRemotePtyProvider).mockReturnValue(mockPtyProvider as never)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['ssh:ssh-1@@pty-live'])
     mockPtyProvider.shutdown.mockResolvedValue(undefined)
 
@@ -1226,7 +1226,7 @@ describe('SSH IPC handlers', () => {
     mockStore.getSshRemotePtyLeases.mockReturnValue([
       { targetId: 'ssh-1', ptyId: 'pty-expired', state: 'expired' }
     ])
-    vi.mocked(getSshPtyProvider).mockReturnValue(undefined)
+    vi.mocked(getRemotePtyProvider).mockReturnValue(undefined)
     vi.mocked(getPtyIdsForConnection).mockReturnValue([])
 
     await expect(

@@ -31,7 +31,11 @@ import type {
   WorktreeMeta
 } from '../../shared/types'
 import { assertWorktreeUnlockedForRemoval } from '../../shared/worktree-removal'
-import { getRepoExecutionHostId, type ExecutionHostId } from '../../shared/execution-host'
+import {
+  getRepoExecutionHostId,
+  getRepoProviderConnectionKey,
+  type ExecutionHostId
+} from '../../shared/execution-host'
 import {
   buildKnownOrcaWorkspaceLayouts,
   isLegacyRepoForExternalWorktreeVisibility,
@@ -50,8 +54,8 @@ import { fetchPrHeadTrackingRef } from '../github/pr-head-tracking-ref'
 import { pruneWorktreePRRefreshAliases } from '../github/pr-refresh-coordinator'
 import { getDefaultRemote } from '../git/repo'
 import { listRepoWorktrees } from '../repo-worktrees'
-import { getSshGitProvider, requireSshGitProvider } from '../providers/ssh-git-dispatch'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteGitProvider, requireRemoteGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
   createIssueCommandRunnerScript,
   getEffectiveHooks,
@@ -272,7 +276,7 @@ async function isAlreadyRemovedWorktreePath(
   worktreePath: string,
   localWorktreeGitOptions: { wslDistro?: string } = {}
 ): Promise<boolean> {
-  if (!repo.connectionId) {
+  if (!getRepoProviderConnectionKey(repo)) {
     const access = getLocalWorktreePathAccess(localWorktreeGitOptions)
     return isWorktreePathMissing(
       toLocalWorktreeRuntimePath(worktreePath, localWorktreeGitOptions),
@@ -280,7 +284,7 @@ async function isAlreadyRemovedWorktreePath(
     )
   }
 
-  const fsProvider = getSshFilesystemProvider(repo.connectionId)
+  const fsProvider = getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!)
   if (!fsProvider) {
     return false
   }
@@ -329,11 +333,11 @@ function getWorktreeRemovalInFlightKey(worktreeId: string, hostId?: ExecutionHos
 }
 
 async function getArchiveHooksForRemoval(repo: Repo): Promise<OrcaHooks | null> {
-  if (!repo.connectionId) {
+  if (!getRepoProviderConnectionKey(repo)) {
     return getEffectiveHooks(repo)
   }
 
-  const fsProvider = getSshFilesystemProvider(repo.connectionId)
+  const fsProvider = getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!)
   if (!fsProvider) {
     return getEffectiveHooksFromConfig(repo, null)
   }
@@ -352,15 +356,15 @@ async function runRemoteArchiveHook(
   worktreePath: string,
   script: string
 ): Promise<{ success: boolean; output: string }> {
-  if (!repo.connectionId) {
+  if (!getRepoProviderConnectionKey(repo)) {
     return { success: true, output: '' }
   }
 
-  const provider = requireSshGitProvider(repo.connectionId)
+  const provider = requireRemoteGitProvider(getRepoProviderConnectionKey(repo)!)
   const env = getSetupRunnerEnvVars(repo, worktreePath)
   const isWindowsRemote = isWindowsAbsolutePathLike(worktreePath)
   const result = await provider
-    .execNonInteractive(
+    .execNonInteractive!(
       isWindowsRemote ? 'cmd.exe' : '/bin/bash',
       isWindowsRemote ? ['/d', '/s', '/c', script] : ['-lc', script],
       worktreePath,
@@ -530,7 +534,7 @@ async function listDetectedGitWorktrees(
   repo: Repo
 ): Promise<DetectedWorktreeScanResult> {
   const localWorktreeGitOptions = getLocalProjectWorktreeGitOptions(store, repo)
-  if (repo.connectionId || isFolderRepo(repo)) {
+  if (getRepoProviderConnectionKey(repo) || isFolderRepo(repo)) {
     return {
       gitWorktrees: await listRepoWorktrees(repo, localWorktreeGitOptions),
       fresh: true
@@ -594,7 +598,7 @@ function rememberLocalWorktreeRoots(
   repo: Repo,
   gitWorktrees: GitWorktreeInfo[]
 ): void {
-  if (repo.connectionId) {
+  if (getRepoProviderConnectionKey(repo)) {
     return
   }
   // Why: worktrees:list already paid the `git worktree list` cost. Reusing
@@ -996,7 +1000,7 @@ export function registerWorktreeHandlers(
 
   ipcMain.handle('worktrees:listAll', async () => {
     const repos = store.getRepos()
-    const sshWorktreeMetaIndex = repos.some((repo) => repo.connectionId)
+    const sshWorktreeMetaIndex = repos.some((repo) => getRepoProviderConnectionKey(repo))
       ? createSshWorktreeMetaIndex(Object.entries(store.getAllWorktreeMeta()))
       : new Map()
 
@@ -1008,17 +1012,17 @@ export function registerWorktreeHandlers(
         let freshScan = true
         if (isFolderRepo(repo)) {
           return listVisibleFolderWorkspaces(store, repo)
-        } else if (repo.connectionId) {
-          const provider = getSshGitProvider(repo.connectionId)
+        } else if (getRepoProviderConnectionKey(repo)) {
+          const provider = getRemoteGitProvider(getRepoProviderConnectionKey(repo)!)
           if (!provider) {
             warnOnce(
               loggedUnavailableSshGitProviders,
-              `${repo.connectionId}:${repo.id}`,
-              `[worktrees] SSH git provider unavailable; skipping worktree list for repo "${repo.displayName}" (${repo.id}) at ${repo.path} on connection ${repo.connectionId}`
+              `${getRepoProviderConnectionKey(repo)}:${repo.id}`,
+              `[worktrees] SSH git provider unavailable; skipping worktree list for repo "${repo.displayName}" (${repo.id}) at ${repo.path} on connection ${getRepoProviderConnectionKey(repo)}`
             )
             return listDisconnectedSshWorktrees(store, repo, sshWorktreeMetaIndex)
           }
-          loggedUnavailableSshGitProviders.delete(`${repo.connectionId}:${repo.id}`)
+          loggedUnavailableSshGitProviders.delete(`${getRepoProviderConnectionKey(repo)}:${repo.id}`)
           try {
             gitWorktrees = await provider.listWorktrees(repo.path)
           } catch (err) {
@@ -1069,7 +1073,7 @@ export function registerWorktreeHandlers(
     if (!repo) {
       return []
     }
-    const sshWorktreeMetaIndex = repo.connectionId
+    const sshWorktreeMetaIndex = getRepoProviderConnectionKey(repo)
       ? createSshWorktreeMetaIndex(Object.entries(store.getAllWorktreeMeta()))
       : new Map()
 
@@ -1078,17 +1082,17 @@ export function registerWorktreeHandlers(
       let freshScan = true
       if (isFolderRepo(repo)) {
         return listVisibleFolderWorkspaces(store, repo)
-      } else if (repo.connectionId) {
-        const provider = getSshGitProvider(repo.connectionId)
+      } else if (getRepoProviderConnectionKey(repo)) {
+        const provider = getRemoteGitProvider(getRepoProviderConnectionKey(repo)!)
         if (!provider) {
           warnOnce(
             loggedUnavailableSshGitProviders,
-            `${repo.connectionId}:${repo.id}`,
-            `[worktrees] SSH git provider unavailable; skipping worktree list for repo "${repo.displayName}" (${repo.id}) at ${repo.path} on connection ${repo.connectionId}`
+            `${getRepoProviderConnectionKey(repo)}:${repo.id}`,
+            `[worktrees] SSH git provider unavailable; skipping worktree list for repo "${repo.displayName}" (${repo.id}) at ${repo.path} on connection ${getRepoProviderConnectionKey(repo)}`
           )
           return listDisconnectedSshWorktrees(store, repo, sshWorktreeMetaIndex)
         }
-        loggedUnavailableSshGitProviders.delete(`${repo.connectionId}:${repo.id}`)
+        loggedUnavailableSshGitProviders.delete(`${getRepoProviderConnectionKey(repo)}:${repo.id}`)
         try {
           gitWorktrees = await provider.listWorktrees(repo.path)
         } catch (err) {
@@ -1138,7 +1142,7 @@ export function registerWorktreeHandlers(
           worktrees: []
         }
       }
-      const sshWorktreeMetaIndex = repo.connectionId
+      const sshWorktreeMetaIndex = getRepoProviderConnectionKey(repo)
         ? createSshWorktreeMetaIndex(Object.entries(store.getAllWorktreeMeta()))
         : new Map()
 
@@ -1152,8 +1156,8 @@ export function registerWorktreeHandlers(
             source: 'git',
             worktrees: buildFolderDetectedWorktrees(store, repo)
           }
-        } else if (repo.connectionId) {
-          const provider = getSshGitProvider(repo.connectionId)
+        } else if (getRepoProviderConnectionKey(repo)) {
+          const provider = getRemoteGitProvider(getRepoProviderConnectionKey(repo)!)
           if (!provider) {
             const worktrees = listDisconnectedSshWorktrees(store, repo, sshWorktreeMetaIndex)
             return {
@@ -1187,7 +1191,7 @@ export function registerWorktreeHandlers(
           `[worktrees] failed to list detected worktrees for repo "${repo.displayName}" (${repo.id}) at ${repo.path}`,
           err
         )
-        if (repo.connectionId) {
+        if (getRepoProviderConnectionKey(repo)) {
           const worktrees = listDisconnectedSshWorktrees(store, repo, sshWorktreeMetaIndex)
           return {
             repoId: repo.id,
@@ -1257,7 +1261,7 @@ export function registerWorktreeHandlers(
           // into `unknown` would pollute the failure taxonomy.
           result = isFolderRepo(repo)
             ? createFolderWorkspace(createArgs, repo, store)
-            : repo.connectionId
+            : getRepoProviderConnectionKey(repo)
               ? await createRemoteWorktree(createArgs, repo, store, mainWindow)
               : await createLocalWorktree(createArgs, repo, store, mainWindow, runtime)
         } catch (error) {
@@ -1317,10 +1321,10 @@ export function registerWorktreeHandlers(
         return { error: 'Folder mode does not support creating worktrees.' }
       }
       const gitExec = async (args: string[]): Promise<{ stdout: string; stderr: string }> => {
-        if (!repo.connectionId) {
+        if (!getRepoProviderConnectionKey(repo)) {
           return gitExecFileAsync(args, getLocalProjectGitExecOptions(store, repo))
         }
-        const provider = getSshGitProvider(repo.connectionId)
+        const provider = getRemoteGitProvider(getRepoProviderConnectionKey(repo)!)
         if (!provider) {
           throw new Error(
             'SSH Git provider is not available. Reconnect to this target and try again.'
@@ -1333,7 +1337,7 @@ export function registerWorktreeHandlers(
       const fetchRemoteTrackingRef = (remote: string, branch: string): Promise<void> =>
         fetchPrHeadTrackingRef(
           repo,
-          repo.connectionId ? getSshGitProvider(repo.connectionId) : undefined,
+          getRepoProviderConnectionKey(repo) ? getRemoteGitProvider(getRepoProviderConnectionKey(repo)!) : undefined,
           remote,
           branch,
           { localGitExecOptions: getLocalProjectGitExecOptions(store, repo) }
@@ -1345,12 +1349,12 @@ export function registerWorktreeHandlers(
         headRefName: args.headRefName,
         baseRefName: args.baseRefName,
         isCrossRepository: args.isCrossRepository,
-        connectionId: repo.connectionId ?? null,
+        connectionId: getRepoProviderConnectionKey(repo) ?? null,
         localGitOptions: getLocalProjectWorktreeGitOptions(store, repo),
         gitExec,
         fetchRemoteTrackingRef,
         resolveRemote: async () => {
-          if (repo.connectionId) {
+          if (getRepoProviderConnectionKey(repo)) {
             const { stdout } = await gitExec(['remote'])
             return (
               stdout
@@ -1442,12 +1446,12 @@ export function registerWorktreeHandlers(
 
         // Why: the renderer-supplied worktreeId contains a filesystem path.
         // Re-derive the canonical path from git before any destructive action.
-        const provider = repo.connectionId ? requireSshGitProvider(repo.connectionId) : null
-        const localWorktreeGitOptions = repo.connectionId
+        const provider = getRepoProviderConnectionKey(repo) ? requireRemoteGitProvider(getRepoProviderConnectionKey(repo)!) : null
+        const localWorktreeGitOptions = getRepoProviderConnectionKey(repo)
           ? {}
           : getLocalProjectWorktreeGitOptions(store, repo)
         const hasLocalWorktreeGitOptions = Object.keys(localWorktreeGitOptions).length > 0
-        const registeredWorktrees = repo.connectionId
+        const registeredWorktrees = getRepoProviderConnectionKey(repo)
           ? await provider!.listWorktrees(repo.path)
           : hasLocalWorktreeGitOptions
             ? await listGitWorktreesStrict(repo.path, localWorktreeGitOptions)
@@ -1460,14 +1464,14 @@ export function registerWorktreeHandlers(
           registeredWorktrees
         )
         if (!registeredWorktree) {
-          const fsProvider = repo.connectionId ? getSshFilesystemProvider(repo.connectionId) : null
+          const fsProvider = getRepoProviderConnectionKey(repo) ? getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!) : null
           let canCleanOrphanedDirectory = false
           if (
             canCleanupUnregisteredOrcaWorktreeDirectory({
               meta: removedMeta
             })
           ) {
-            if (repo.connectionId) {
+            if (getRepoProviderConnectionKey(repo)) {
               if (!fsProvider) {
                 throw new Error('SSH filesystem provider unavailable')
               }
@@ -1497,7 +1501,7 @@ export function registerWorktreeHandlers(
             if (!args.force) {
               throw new Error(ORPHANED_WORKTREE_DIRECTORY_MESSAGE)
             }
-            if (repo.connectionId) {
+            if (getRepoProviderConnectionKey(repo)) {
               await fsProvider!.deletePath(worktreePath, true)
               await cleanupUnusedWorktreePushTargetRemoteSsh(
                 provider!,
@@ -1524,7 +1528,7 @@ export function registerWorktreeHandlers(
             notifyWorktreesChanged(mainWindow, repoId)
             return {}
           }
-          if (!repo.connectionId) {
+          if (!getRepoProviderConnectionKey(repo)) {
             const access = getLocalWorktreePathAccess(localWorktreeGitOptions)
             const runtimeWorktreePath = toLocalWorktreeRuntimePath(
               worktreePath,
@@ -1571,7 +1575,7 @@ export function registerWorktreeHandlers(
             // Why: a manually deleted worktree is already gone from Git and disk.
             // The sidebar delete action has persisted metadata proving this was
             // an Orca-known row, so no force confirmation is needed.
-            if (repo.connectionId) {
+            if (getRepoProviderConnectionKey(repo)) {
               await cleanupUnusedWorktreePushTargetRemoteSsh(
                 provider!,
                 repo.path,
@@ -1613,7 +1617,7 @@ export function registerWorktreeHandlers(
         // Why: a prior forced Windows recovery can delete the directory but leave
         // Git's stale registration; recover and verify it before clearing metadata.
         if (
-          !repo.connectionId &&
+          !getRepoProviderConnectionKey(repo) &&
           args.force === true &&
           process.platform === 'win32' &&
           (isWindowsAbsolutePathLike(canonicalWorktreePath) ||
@@ -1653,7 +1657,7 @@ export function registerWorktreeHandlers(
         // Run archive hook before removal so teardown scripts still see the worktree directory.
         const hooks = await getArchiveHooksForRemoval(repo)
         if (hooks?.scripts.archive && !args.skipArchive) {
-          const result = repo.connectionId
+          const result = getRepoProviderConnectionKey(repo)
             ? await runRemoteArchiveHook(repo, canonicalWorktreePath, hooks.scripts.archive)
             : await runHook(
                 'archive',
@@ -1670,7 +1674,7 @@ export function registerWorktreeHandlers(
           }
         }
 
-        if (repo.connectionId) {
+        if (getRepoProviderConnectionKey(repo)) {
           // Why: SSH deletion mirrors the local flow: hooks run while the
           // directory is intact, then the clean check guards destructive removal.
           if (!args.force) {
@@ -1900,7 +1904,7 @@ export function registerWorktreeHandlers(
   // Why: forget-locally drops a workspace from Orca without any remote Git or
   // filesystem work. It exists so a workspace pinned to a removed/disconnected
   // SSH target — whose provider is gone and whose `worktrees:remove` therefore
-  // throws at requireSshGitProvider before any cleanup runs — can still be
+  // throws at requireRemoteGitProvider before any cleanup runs — can still be
   // cleared from the app. It never touches the remote: no worktree registration,
   // no branches, no files are deleted there.
   ipcMain.handle(
@@ -1985,12 +1989,12 @@ export function registerWorktreeHandlers(
         throw new Error('Folder workspaces do not have local Git branches.')
       }
 
-      if (repo.connectionId) {
-        const provider = requireSshGitProvider(repo.connectionId)
+      if (getRepoProviderConnectionKey(repo)) {
+        const provider = requireRemoteGitProvider(getRepoProviderConnectionKey(repo)!)
         // Why: SSH must use the write-capable relay RPC; the shared exec-based
         // helper routes through the read-only git.exec allowlist, which rejects
         // the worktree/update-ref/config writes this delete needs.
-        await provider.forceDeletePreservedBranch(
+        await provider.forceDeletePreservedBranch!(
           repo.path,
           cleanupTarget.branchName,
           cleanupTarget.head
@@ -2131,8 +2135,8 @@ export function registerWorktreeHandlers(
         return { status: 'ok', hasHooks: false, hooks: null, mayNeedUpdate: false }
       }
 
-      if (repo.connectionId) {
-        const fsProvider = getSshFilesystemProvider(repo.connectionId)
+      if (getRepoProviderConnectionKey(repo)) {
+        const fsProvider = getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!)
         if (!fsProvider) {
           return { status: 'error', hasHooks: false, hooks: null, mayNeedUpdate: false }
         }
@@ -2196,8 +2200,8 @@ export function registerWorktreeHandlers(
     return inspectSetupScriptImportCandidates(
       async (relativePath) => {
         const filePath = joinWorktreeRelativePath(repo.path, relativePath)
-        if (repo.connectionId) {
-          const fsProvider = getSshFilesystemProvider(repo.connectionId)
+        if (getRepoProviderConnectionKey(repo)) {
+          const fsProvider = getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!)
           if (!fsProvider) {
             return null
           }
@@ -2221,8 +2225,8 @@ export function registerWorktreeHandlers(
       {
         fileExists: async (relativePath) => {
           const filePath = joinWorktreeRelativePath(repo.path, relativePath)
-          if (repo.connectionId) {
-            const fsProvider = getSshFilesystemProvider(repo.connectionId)
+          if (getRepoProviderConnectionKey(repo)) {
+            const fsProvider = getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!)
             if (!fsProvider) {
               return false
             }
@@ -2260,9 +2264,9 @@ export function registerWorktreeHandlers(
         source: 'none' as const
       }
     }
-    if (repo.connectionId) {
+    if (getRepoProviderConnectionKey(repo)) {
       const issueCommandPath = joinWorktreeRelativePath(repo.path, '.orca/issue-command')
-      const fsProvider = getSshFilesystemProvider(repo.connectionId)
+      const fsProvider = getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!)
       if (!fsProvider) {
         return {
           status: 'error',
@@ -2319,9 +2323,9 @@ export function registerWorktreeHandlers(
       if (!repo || isFolderRepo(repo)) {
         return
       }
-      if (repo.connectionId) {
+      if (getRepoProviderConnectionKey(repo)) {
         const issueCommandPath = joinWorktreeRelativePath(repo.path, '.orca/issue-command')
-        const fsProvider = getSshFilesystemProvider(repo.connectionId)
+        const fsProvider = getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!)
         if (!fsProvider) {
           throw new Error(
             'Remote filesystem unavailable. Reconnect the SSH target before retrying.'

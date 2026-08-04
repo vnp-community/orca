@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ProfileResolver } from '../ProfileResolver'
 import type { ProfileService } from '../ProfileService'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
 
 // ── helper ──────────────────────────────────────────────────────────────────
 
@@ -224,5 +225,86 @@ describe('ProfileResolver', () => {
     await resolver.resolve('u-1')
     await resolver.resolve('u-2')
     expect(svc.getCompanyProfileForUser).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ── CR-TRACE-015: ProfileResolver.resolve() tracing (TASK-BE-015.5) ────────
+
+describe('ProfileResolver tracing (CR-TRACE-015)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    return { events, stop: unregister }
+  }
+
+  it('resolve() cache miss → step(cacheCheck, { cacheHit: false }) then ok({ cacheHit: false })', async () => {
+    const svc = makeService()
+    const resolver = new ProfileResolver(svc)
+    const { events, stop } = captureTraceEvents()
+
+    await resolver.resolve('u-1')
+    stop()
+
+    const spanEvents = events.filter((e) => e.flow === 'profile:resolve')
+    expect(spanEvents.map((e) => (e.level === 'step' ? e.label : e.level))).toEqual([
+      'start',
+      'cacheCheck',
+      'ok'
+    ])
+    expect(spanEvents.find((e) => e.label === 'cacheCheck')?.fields).toMatchObject({ cacheHit: false })
+    expect(spanEvents.find((e) => e.level === 'ok')?.fields).toMatchObject({ cacheHit: false })
+  })
+
+  it('resolve() cache hit → step(cacheCheck, { cacheHit: true }) then ok({ cacheHit: true }), no re-fetch', async () => {
+    const svc = makeService()
+    const resolver = new ProfileResolver(svc)
+    await resolver.resolve('u-1') // warm the cache (not captured)
+
+    const { events, stop } = captureTraceEvents()
+    await resolver.resolve('u-1')
+    stop()
+
+    const spanEvents = events.filter((e) => e.flow === 'profile:resolve')
+    expect(spanEvents.map((e) => (e.level === 'step' ? e.label : e.level))).toEqual([
+      'start',
+      'cacheCheck',
+      'ok'
+    ])
+    expect(spanEvents.find((e) => e.label === 'cacheCheck')?.fields).toMatchObject({ cacheHit: true })
+    expect(spanEvents.find((e) => e.level === 'ok')?.fields).toMatchObject({ cacheHit: true })
+    expect(svc.getUserProfile).toHaveBeenCalledTimes(1)
+  })
+
+  it('resolve() does not emit any trace event with a flow other than profile:resolve (no nested span for merge())', async () => {
+    const svc = makeService({
+      getCompanyProfileForUser: vi.fn().mockResolvedValue({ agent: { preferredModel: 'gpt-4' } }),
+      getDeptProfileForUser: vi.fn().mockResolvedValue({ shell: { pathAdditions: ['/x'] } }),
+      getUserProfile: vi.fn().mockResolvedValue({ mcp: { servers: [{ name: 's1', command: 'run' }] } }),
+    })
+    const resolver = new ProfileResolver(svc)
+    const { events, stop } = captureTraceEvents()
+
+    await resolver.resolve('u-1')
+    stop()
+
+    expect(events.every((e) => e.flow === 'profile:resolve')).toBe(true)
+  })
+
+  it('resolve() ok() reports hasSecurityLock true when company profile has a security section', async () => {
+    const svc = makeService({
+      getCompanyProfileForUser: vi.fn().mockResolvedValue({ security: { approvedModels: ['gpt-4'] } }),
+    })
+    const resolver = new ProfileResolver(svc)
+    const { events, stop } = captureTraceEvents()
+
+    await resolver.resolve('u-1')
+    stop()
+
+    const okEvent = events.find((e) => e.flow === 'profile:resolve' && e.level === 'ok')
+    expect(okEvent?.fields).toMatchObject({ hasSecurityLock: true })
   })
 })

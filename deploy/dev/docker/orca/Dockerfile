@@ -26,8 +26,14 @@ RUN pnpm install
 # Now copy the rest of the source code
 # Why: ARG CACHE_BUST lets sync-to-server.sh pass --build-arg CACHE_BUST=$(date +%s)
 # to invalidate this layer on every deploy, preventing Docker from reusing stale
-# cached source and skipping the pnpm build steps with outdated code.
+# cached source and skipping the pnpm build steps with outdated code. A bare
+# `ARG` declaration does NOT do this by itself -- Docker only treats an ARG as
+# cache-relevant once something actually consumes its value. Without this RUN,
+# the ARG changing every deploy was a no-op and the entire builder stage
+# (COPY . . through all three pnpm build steps) kept being served from a
+# stale cache, silently shipping outdated compiled code on every deploy.
 ARG CACHE_BUST=1
+RUN echo "cache-bust:${CACHE_BUST}" > /tmp/cache-bust
 COPY . .
 RUN pnpm build:dev-server
 RUN pnpm build:backend

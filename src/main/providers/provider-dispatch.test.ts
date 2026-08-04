@@ -57,9 +57,9 @@ vi.mock('../pi/titlebar-extension-service', () => ({
 import {
   deletePtyOwnership,
   registerPtyHandlers,
-  registerSshPtyProvider,
+  registerRemotePtyProvider,
   setPtyOwnership,
-  unregisterSshPtyProvider
+  unregisterRemotePtyProvider
 } from '../ipc/pty'
 import type { IPtyProvider } from './types'
 
@@ -132,7 +132,7 @@ describe('PTY provider dispatch', () => {
     setup()
     const mockSshProvider = createMockProvider('ssh-pty-1')
 
-    registerSshPtyProvider('conn-123', mockSshProvider)
+    registerRemotePtyProvider('conn-123', mockSshProvider)
 
     const result = (await handlers.get('pty:spawn')!(null, {
       cols: 80,
@@ -148,7 +148,7 @@ describe('PTY provider dispatch', () => {
       env: undefined
     })
 
-    unregisterSshPtyProvider('conn-123')
+    unregisterRemotePtyProvider('conn-123')
   })
 
   it('throws for unknown connectionId', async () => {
@@ -162,12 +162,12 @@ describe('PTY provider dispatch', () => {
     ).rejects.toThrow('No PTY provider for connection "unknown-conn"')
   })
 
-  it('unregisterSshPtyProvider removes the provider', async () => {
+  it('unregisterRemotePtyProvider removes the provider', async () => {
     setup()
     const mockProvider = createMockProvider('ssh-pty-2')
 
-    registerSshPtyProvider('conn-456', mockProvider)
-    unregisterSshPtyProvider('conn-456')
+    registerRemotePtyProvider('conn-456', mockProvider)
+    unregisterRemotePtyProvider('conn-456')
 
     await expect(
       handlers.get('pty:spawn')!(null, {
@@ -182,8 +182,8 @@ describe('PTY provider dispatch', () => {
     setup()
     const providerA = createMockProvider('ssh:conn-a@@pty-1')
     const providerB = createMockProvider('ssh:conn-b@@pty-1')
-    registerSshPtyProvider('conn-a', providerA)
-    registerSshPtyProvider('conn-b', providerB)
+    registerRemotePtyProvider('conn-a', providerA)
+    registerRemotePtyProvider('conn-b', providerB)
     setPtyOwnership('ssh:conn-a@@pty-1', 'conn-a')
     setPtyOwnership('ssh:conn-b@@pty-1', 'conn-b')
 
@@ -199,8 +199,8 @@ describe('PTY provider dispatch', () => {
     } finally {
       deletePtyOwnership('ssh:conn-a@@pty-1')
       deletePtyOwnership('ssh:conn-b@@pty-1')
-      unregisterSshPtyProvider('conn-a')
-      unregisterSshPtyProvider('conn-b')
+      unregisterRemotePtyProvider('conn-a')
+      unregisterRemotePtyProvider('conn-b')
     }
   })
 })

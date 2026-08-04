@@ -54,7 +54,7 @@ describe('folder workspace path status', () => {
             projectGroups: [makeGroup({ parentPath: root })],
             repos: []
           },
-          { getSshFilesystemProvider: () => undefined }
+          { getRemoteFilesystemProvider: () => undefined }
         )
       ).resolves.toEqual({ path: root, exists: true })
 
@@ -66,7 +66,7 @@ describe('folder workspace path status', () => {
             projectGroups: [makeGroup({ parentPath: filePath })],
             repos: []
           },
-          { getSshFilesystemProvider: () => undefined }
+          { getRemoteFilesystemProvider: () => undefined }
         )
       ).resolves.toEqual({ path: filePath, exists: false, reason: 'not-directory' })
     } finally {
@@ -85,7 +85,7 @@ describe('folder workspace path status', () => {
           projectGroups: [makeGroup({ parentPath: missingPath })],
           repos: []
         },
-        { getSshFilesystemProvider: () => undefined }
+        { getRemoteFilesystemProvider: () => undefined }
       )
     ).resolves.toEqual({ path: missingPath, exists: false, reason: 'missing' })
   })
@@ -103,7 +103,7 @@ describe('folder workspace path status', () => {
           projectGroups: [makeGroup()],
           repos: [makeRepo({ connectionId: 'ssh-1' })]
         },
-        { getSshFilesystemProvider: () => provider }
+        { getRemoteFilesystemProvider: () => provider }
       )
     ).resolves.toEqual({ path: '/workspace/platform', exists: true })
     expect(provider.stat).toHaveBeenCalledWith('/workspace/platform')
@@ -123,7 +123,7 @@ describe('folder workspace path status', () => {
           projectGroups: [makeGroup({ connectionId: 'ssh-1' })],
           repos: []
         },
-        { getSshFilesystemProvider: () => provider }
+        { getRemoteFilesystemProvider: () => provider }
       )
     ).resolves.toEqual({ path: '/workspace/platform', exists: true })
     expect(provider.stat).toHaveBeenCalledWith('/workspace/platform')
@@ -138,7 +138,7 @@ describe('folder workspace path status', () => {
           projectGroups: [makeGroup()],
           repos: [makeRepo({ connectionId: 'ssh-1' })]
         },
-        { getSshFilesystemProvider: () => undefined }
+        { getRemoteFilesystemProvider: () => undefined }
       )
     ).resolves.toEqual({ path: '/workspace/platform', exists: false, reason: 'unavailable' })
   })
@@ -199,7 +199,7 @@ describe('folder workspace path status', () => {
           getFolderWorkspaces: () => []
         },
         { scope: 'path', path: '/workspace/platform', connectionId: 'ssh-1' },
-        { getSshFilesystemProvider: () => provider }
+        { getRemoteFilesystemProvider: () => provider }
       )
     ).resolves.toEqual({ path: '/workspace/platform', exists: true })
     expect(provider.stat).toHaveBeenCalledWith('/workspace/platform')
@@ -231,7 +231,7 @@ describe('folder workspace path status', () => {
           ]
         },
         {
-          getSshFilesystemProvider: (connectionId) =>
+          getRemoteFilesystemProvider: (connectionId) =>
             connectionId === 'ssh-1' ? provider : undefined
         }
       )

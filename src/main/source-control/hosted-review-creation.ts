@@ -31,7 +31,7 @@ import {
   glabRepoExecOptions,
   release as releaseGlab
 } from '../gitlab/gl-utils'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import { detectHostedReviewProvider, getForgeProviderForRepository } from './forge-provider'
 import { getHostedReviewForBranch } from './hosted-review'
 import {
@@ -103,7 +103,7 @@ async function runGitForHostedReview(
   options: HostedReviewExecutionOptions = {}
 ): Promise<{ stdout: string; stderr?: string }> {
   if (connectionId) {
-    const provider = getSshGitProvider(connectionId)
+    const provider = getRemoteGitProvider(connectionId)
     if (!provider) {
       throw new Error(
         'Remote connection dropped. Click Reconnect on the SSH target before retrying.'
@@ -144,7 +144,7 @@ async function hasUncommittedChanges(
   options: HostedReviewExecutionOptions = {}
 ): Promise<boolean> {
   if (connectionId) {
-    const provider = getSshGitProvider(connectionId)
+    const provider = getRemoteGitProvider(connectionId)
     if (!provider) {
       throw new Error(
         'Remote connection dropped. Click Reconnect on the SSH target before retrying.'
@@ -172,7 +172,7 @@ async function getHostedReviewUpstreamStatus(
   if (!connectionId) {
     return getUpstreamStatus(repoPath, undefined, getHostedReviewLocalGitOptions(options))
   }
-  const provider = getSshGitProvider(connectionId)
+  const provider = getRemoteGitProvider(connectionId)
   if (!provider) {
     throw new Error('Remote connection dropped. Click Reconnect on the SSH target before retrying.')
   }

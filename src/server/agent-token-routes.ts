@@ -98,6 +98,9 @@ async function handleAgentTokenRequest(
         devServerId: meta.devServerId,
         expiresIn: Math.round((meta.expiresAt - now) / 1000),
       }))
+    // [CR-TRACE-013] nhánh GET trước đây không có tracer nào — tái dùng
+    // tokenTracer, op:'list' để phân biệt với op ngầm định của nhánh POST.
+    tokenTracer.start({ op: 'list' }).ok({ count: tokens.length })
     sendJson(res, 200, { tokens })
     return
   }

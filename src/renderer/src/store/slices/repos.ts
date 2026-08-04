@@ -2631,6 +2631,13 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   setupProjectClone: async (args) => {
     try {
       const parsedHost = parseExecutionHostId(args.hostId)
+      // Why: cloneRemoteRepo (main) only knows SSH-specific concepts (host
+      // platform detection, remote home-path resolution, the SSH multiplexer).
+      // Falling through to the local-clone branch below would silently clone
+      // onto the Orca server's own filesystem instead of the Dev Server.
+      if (parsedHost?.kind === 'devServer') {
+        throw new Error('Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.')
+      }
       const target = getProjectSetupRuntimeTarget(args.hostId)
       if (parsedHost?.kind !== 'ssh') {
         await assertProjectHostSetupMutationRuntimeCapabilities(target)

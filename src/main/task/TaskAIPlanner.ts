@@ -15,6 +15,7 @@ import type { TaskService } from './TaskService'
 import type { AIProviderService } from '../ai-providers/AIProviderService'
 import type { ProjectServerRouter } from '../project/ProjectServerRouter'
 import type { OrcaTask } from '../../shared/task-types'
+import { Tracers } from '../../shared/trace/tracers'
 
 // ── Decomposed subtask shape from AI response ─────────────────────────────────
 
@@ -44,39 +45,56 @@ export class TaskAIPlanner {
    * @param userId - User requesting decomposition
    */
   async decompose(taskId: string, projectId: string, userId: string): Promise<OrcaTask[]> {
-    const task = await this.taskService.get(taskId)
-    if (!task) throw new Error(`TASK_NOT_FOUND: ${taskId}`)
+    const span = Tracers.taskGraphAiPlanFlow.start({ taskId, projectId, userId })
 
-    const prompt = this.buildDecomposePrompt(task)
+    try {
+      const task = await this.taskService.get(taskId)
+      if (!task) {
+        span.fail('TASK_NOT_FOUND', { taskId })
+        throw new Error(`TASK_NOT_FOUND: ${taskId}`)
+      }
 
-    // Route to relay and call ai.complete
-    const relay = await this.router.getRelayForProject(projectId, userId)
-    const response = (await relay.call('ai.complete', {
-      prompt,
-      format: 'json',
-      taskId,
-    })) as { content?: string; text?: string } | string
+      const prompt = this.buildDecomposePrompt(task)
 
-    // Parse AI response
-    const proposals = this.parseAIResponse(response)
+      // Route to relay and call ai.complete
+      const relay = await this.router.getRelayForProject(projectId, userId)
+      span.step('ai-call', { method: 'ai.complete', promptLength: prompt.length })
+      const response = (await relay.call('ai.complete', {
+        prompt,
+        format: 'json',
+        taskId,
+        traceId: span.id, // [NEW CR-TRACE-018] — forward into relay envelope per CR-TRACE-000 §3.3
+      })) as { content?: string; text?: string } | string
 
-    // Convert proposals to OrcaTask-shaped objects (not persisted)
-    return proposals.map((p) => ({
-      id: `proposed:${Date.now()}:${Math.random().toString(36).slice(2)}`,
-      parentId: taskId,
-      projectId: task.projectId,
-      title: p.title,
-      description: p.description,
-      type: p.type ?? 'subtask',
-      status: 'backlog' as const,
-      priority: task.priority,
-      labels: [],
-      visibility: task.visibility,
-      progressPercent: 0,
-      estimatedHours: p.estimatedHours,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }))
+      // Parse AI response — parseAIResponseWithDiagnostics() wraps parseAIResponse() to expose
+      // parseOk without changing decompose()'s public behavior (still returns [] on parse failure).
+      const { proposals, parseOk } = this.parseAIResponseWithDiagnostics(response)
+      span.step('parse-plan', { subtaskCount: proposals.length, parseOk })
+
+      // Convert proposals to OrcaTask-shaped objects (not persisted)
+      const result = proposals.map((p) => ({
+        id: `proposed:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        parentId: taskId,
+        projectId: task.projectId,
+        title: p.title,
+        description: p.description,
+        type: p.type ?? 'subtask',
+        status: 'backlog' as const,
+        priority: task.priority,
+        labels: [],
+        visibility: task.visibility,
+        progressPercent: 0,
+        estimatedHours: p.estimatedHours,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }))
+
+      span.ok({ subtaskCount: result.length, parseOk })
+      return result
+    } catch (err) {
+      span.fail(err, { taskId })
+      throw err
+    }
   }
 
   /**
@@ -166,6 +184,31 @@ export class TaskAIPlanner {
     } catch {
       console.warn('[TaskAIPlanner] Failed to parse AI response')
       return []
+    }
+  }
+
+  // [NEW CR-TRACE-018] — wrapper around parseAIResponse() that does NOT change its public
+  // behavior (still returns [] on parse failure), but exposes parseOk so decompose() can
+  // trace "AI call slow/failed" (ai-call step latency) separately from "parse JSON failed"
+  // (parseOk: false) — previously indistinguishable from outside since parseAIResponse()
+  // swallowed every parse error into an empty array.
+  private parseAIResponseWithDiagnostics(
+    response: unknown
+  ): { proposals: SubtaskProposal[]; parseOk: boolean } {
+    try {
+      let text = ''
+      if (typeof response === 'string') {
+        text = response
+      } else if (response && typeof response === 'object') {
+        const r = response as Record<string, unknown>
+        text = (r['content'] ?? r['text'] ?? '') as string
+      }
+      const match = text.match(/\[[\s\S]*\]/)
+      if (!match) return { proposals: [], parseOk: false }
+      return { proposals: JSON.parse(match[0]) as SubtaskProposal[], parseOk: true }
+    } catch {
+      console.warn('[TaskAIPlanner] Failed to parse AI response')
+      return { proposals: [], parseOk: false }
     }
   }
 

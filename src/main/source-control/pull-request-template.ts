@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { HostedReviewProvider } from '../../shared/hosted-review'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
 
 const PULL_REQUEST_TEMPLATE_CANDIDATES = [
@@ -43,7 +43,7 @@ export async function readHostedReviewTemplate(
   connectionId?: string | null,
   provider?: HostedReviewProvider | null
 ): Promise<string> {
-  const remoteProvider = connectionId ? getSshFilesystemProvider(connectionId) : undefined
+  const remoteProvider = connectionId ? getRemoteFilesystemProvider(connectionId) : undefined
   if (connectionId && !remoteProvider) {
     return ''
   }

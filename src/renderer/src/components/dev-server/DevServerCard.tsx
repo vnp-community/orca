@@ -4,6 +4,7 @@ import type { DevServer } from '../../../../shared/dev-server-types'
 import { DevServerStatusBadge } from './DevServerStatusBadge'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '../../store'
+import { latestAgentWsStatusForDevServer } from '@/lib/agent-ws-trace-status'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,9 @@ export function DevServerCard({ server, showActions = true }: Props) {
   const [connecting, setConnecting] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const removeDevServer = useAppStore((s) => s.removeDevServer)
+  // Read-only: consumes agentWs:*/agentToken:* trace events already fed by
+  // the SSE bridge (initBrowserTrace) — does not subscribe or emit spans.
+  const agentWsStatus = useAppStore((s) => latestAgentWsStatusForDevServer(s.traceEvents, server.id))
 
   const handleConnect = async () => {
     setConnecting(true)
@@ -91,6 +95,22 @@ export function DevServerCard({ server, showActions = true }: Props) {
           <span className="dev-server-card__name">{server.name}</span>
           {/* Always show status badge — shows 'connected', 'connecting', etc. */}
           <DevServerStatusBadge status={server.status} platform={server.platform} />
+          {/* Read-only Agent WS trace badge — only when a matching trace event exists */}
+          {agentWsStatus && (
+            <span
+              className={
+                agentWsStatus.level === 'fail'
+                  ? 'text-xs text-destructive'
+                  : 'text-xs text-muted-foreground'
+              }
+              title={`${agentWsStatus.flow} · ${new Date(agentWsStatus.ts).toLocaleTimeString()}`}
+            >
+              {agentWsStatus.level === 'ok' ? 'Agent WS: handshake ok' : null}
+              {agentWsStatus.level === 'fail'
+                ? `Agent WS: ${agentWsStatus.reason ?? 'handshake failed'}`
+                : null}
+            </span>
+          )}
         </div>
 
         {showActions && (

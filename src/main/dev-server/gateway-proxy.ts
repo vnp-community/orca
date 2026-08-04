@@ -15,6 +15,13 @@ type IpcResponseMessage = {
   result?: any
 }
 
+type IpcNotificationMessage = {
+  type: 'devServer:proxyNotification'
+  devServerId: string
+  method: string
+  params: Record<string, unknown>
+}
+
 /**
  * Proxy for DevServerManager to be used inside the User Process.
  * Routes all method calls over IPC to the Main Process.
@@ -22,6 +29,10 @@ type IpcResponseMessage = {
 export class GatewayDevServerManagerProxy {
   private pendingRequests = new Map<string, { resolve: (val: any) => void; reject: (err: Error) => void }>()
   private listeners = new Map<string, Set<Function>>()
+  private notificationHandlers = new Map<
+    string,
+    Set<(method: string, params: Record<string, unknown>) => void>
+  >()
 
   constructor() {
     process.on('message', (message: any) => {
@@ -29,8 +40,18 @@ export class GatewayDevServerManagerProxy {
         this.handleResponse(message as IpcResponseMessage)
       } else if (message && message.type === 'devServer:event') {
         this.emitLocal(message.event, ...message.args)
+      } else if (message && message.type === 'devServer:proxyNotification') {
+        this.handleNotification(message as IpcNotificationMessage)
       }
     })
+  }
+
+  private handleNotification(message: IpcNotificationMessage): void {
+    const handlers = this.notificationHandlers.get(message.devServerId)
+    if (!handlers) return
+    for (const handler of handlers) {
+      handler(message.method, message.params)
+    }
   }
 
   private handleResponse(message: IpcResponseMessage) {
@@ -108,17 +129,23 @@ export class GatewayDevServerManagerProxy {
   }
 
   getRelay(id: string): any {
-    // Returns a mock relay object that forwards `call` over IPC.
-    // The Main process has the actual relay connected to the dev server.
+    // Returns a mock relay object that forwards `call` over IPC, and dispatches
+    // `onNotification` from devServer:proxyNotification broadcasts (see
+    // handleNotification above) — the Main process holds the actual relay/mux
+    // connected to the dev server; this process only sees what gets forwarded.
     return {
       call: async <T>(method: string, params: any, timeoutMs?: number): Promise<T> => {
         return this.sendRequest('relayCall', id, method, params, timeoutMs)
       },
-      // Pty interface requires multiplex over WS or we just route pty methods over IPC
-      // Note: the frontend relies on connecting WebSocket to Main Process for terminal?
-      // Wait, the frontend connects to User Process WebSocket for `terminal.multiplex`.
-      // `terminal.multiplex` uses `runtime.resolveLeafForHandle(ptyId)`.
-      // Actually `terminal.multiplex` handler in backend needs to pipe streams.
+      onNotification: (handler: (method: string, params: Record<string, unknown>) => void): (() => void) => {
+        let handlers = this.notificationHandlers.get(id)
+        if (!handlers) {
+          handlers = new Set()
+          this.notificationHandlers.set(id, handlers)
+        }
+        handlers.add(handler)
+        return () => handlers!.delete(handler)
+      },
     }
   }
 

@@ -1,29 +1,34 @@
+// Registry of filesystem providers for remote-connection-backed repos, keyed
+// by connectionId (either a real SSH target id or a devServerId — both
+// resolve through the same generic key, see getRepoProviderConnectionKey).
+// Holds both SshFilesystemProvider and DevServerFilesystemProvider instances
+// (see dev-server-provider-lifecycle.ts) interchangeably via IFilesystemProvider.
 import type { IFilesystemProvider } from './types'
 
-const sshProviders = new Map<string, IFilesystemProvider>()
+const filesystemConnectionProviders = new Map<string, IFilesystemProvider>()
 
-export const SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE =
-  'Remote connection dropped. Click Reconnect on the SSH target before retrying.'
+export const REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE =
+  'Remote connection dropped. Reconnect the host before retrying.'
 
-export function registerSshFilesystemProvider(
+export function registerRemoteFilesystemProvider(
   connectionId: string,
   provider: IFilesystemProvider
 ): void {
-  sshProviders.set(connectionId, provider)
+  filesystemConnectionProviders.set(connectionId, provider)
 }
 
-export function unregisterSshFilesystemProvider(connectionId: string): void {
-  sshProviders.delete(connectionId)
+export function unregisterRemoteFilesystemProvider(connectionId: string): void {
+  filesystemConnectionProviders.delete(connectionId)
 }
 
-export function getSshFilesystemProvider(connectionId: string): IFilesystemProvider | undefined {
-  return sshProviders.get(connectionId)
+export function getRemoteFilesystemProvider(connectionId: string): IFilesystemProvider | undefined {
+  return filesystemConnectionProviders.get(connectionId)
 }
 
-export function requireSshFilesystemProvider(connectionId: string): IFilesystemProvider {
-  const provider = getSshFilesystemProvider(connectionId)
+export function requireRemoteFilesystemProvider(connectionId: string): IFilesystemProvider {
+  const provider = getRemoteFilesystemProvider(connectionId)
   if (!provider) {
-    throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+    throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
   }
   return provider
 }

@@ -26,7 +26,8 @@ function makeServer(status: DevServer['status']): DevServer {
     arch: null,
     nodeVersion: null,
     lastConnectedAt: null,
-    lastError: null
+    lastError: null,
+    capabilities: null
   }
 }
 

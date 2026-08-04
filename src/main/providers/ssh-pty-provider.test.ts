@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { SshPtyProvider } from './ssh-pty-provider'
 import { POWERLEVEL10K_WIZARD_DISABLE_ENV } from '../pty/powerlevel10k-wizard-env'
+import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 
 type MockMultiplexer = {
   request: ReturnType<typeof vi.fn>
@@ -372,6 +373,47 @@ describe('SshPtyProvider', () => {
       )
 
       expect(mux.request).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ── CR-TRACE-003: spawn() tracing (TASK-BE-003.2/003.4) ──────────────────────
+  describe('spawn tracing (CR-TRACE-003)', () => {
+    it('spawn() emits a terminalCreate span with providerType=ssh, ok() containing ptyId', async () => {
+      mux.request.mockResolvedValue({ id: 'pty-1' })
+      const events: TraceEvent[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+
+      await provider.spawn({ cols: 80, rows: 24 })
+      unregister()
+
+      const created = events.filter((e) => e.flow === 'terminal:create')
+      expect(created[0]?.level).toBe('start')
+      expect(created[0]?.fields).toMatchObject({ providerType: 'ssh', step: 'provider-spawn' })
+      const ok = created.find((e) => e.level === 'ok')
+      expect(ok?.fields).toMatchObject({ providerType: 'ssh', ptyId: scopedPty1 })
+    })
+
+    it('spawn() does not propagate traceId into the remote shell — no wire field added to pty.spawn/pty.attach requests', async () => {
+      mux.request.mockResolvedValue({ id: 'pty-1' })
+
+      await provider.spawn({ cols: 80, rows: 24 })
+
+      const [, params] = mux.request.mock.calls[0] as [string, Record<string, unknown>]
+      expect(params).not.toHaveProperty('traceId')
+      expect(params).not.toHaveProperty('_trace')
+    })
+
+    it('spawn() calls span.fail() with providerType=ssh on pty.spawn rejection, then rethrows', async () => {
+      mux.request.mockRejectedValue(new Error('relay_unreachable'))
+      const events: TraceEvent[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+
+      await expect(provider.spawn({ cols: 80, rows: 24 })).rejects.toThrow('relay_unreachable')
+      unregister()
+
+      const failEvent = events.find((e) => e.flow === 'terminal:create' && e.level === 'fail')
+      expect(failEvent).toBeDefined()
+      expect(failEvent?.fields).toMatchObject({ providerType: 'ssh' })
     })
   })
 

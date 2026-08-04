@@ -24,11 +24,22 @@ import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { encodeDataFrame, createWireState } from './agent-wire'
 import { createTracer } from '../shared/trace'
+import { Tracers } from '../shared/trace/tracers'
 import { readDecryptedKey } from './agent-credential-store'
 
 const spawnerTracer = createTracer('agent:spawn')
 import type { WireState } from './agent-wire'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
+
+// ─── Trace propagation helper ───────────────────────────────────────────────
+// Agent WS JSON-RPC 2.0: traceId nested at params._trace.id (CR-TRACE-000 §3.3).
+function extractResume(params: Record<string, unknown>): { id: string } | undefined {
+  const t = params['_trace']
+  if (t && typeof t === 'object' && typeof (t as { id?: unknown }).id === 'string') {
+    return { id: (t as { id: string }).id }
+  }
+  return undefined
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -186,6 +197,9 @@ export async function buildAgentEnv(
   config:        AgentConfig,
   resolvedApiKey: string | null,
   log?:          AgentLogger,
+  parentSpanId?:  string,   // NEW — CR-TRACE-016: correlates the fallback
+                            // credential-read span with the agent:spawn span
+                            // that triggered it (see agent-credential-store.ts)
 ): Promise<Record<string, string>> {
   // Normalise: AgentSpawnRequest uses taskId/userId/accountId directly
   const accountId  = ('accountId'  in req) ? req.accountId  : ''
@@ -222,7 +236,7 @@ export async function buildAgentEnv(
       error: () => {},
       debug: () => {},
     }
-    const blob = await readDecryptedKey(accountId, config, logFn as AgentLogger)
+    const blob = await readDecryptedKey(accountId, config, logFn as AgentLogger, parentSpanId)
     if (blob) {
       base[spec.apiKeyEnvVar] = blob
       logFn.warn?.(`buildAgentEnv: injecting Layer1 blob for ${spec.apiKeyEnvVar} — agent may fail auth if key not plaintext`)
@@ -274,6 +288,13 @@ export async function handleAgentSpawn(
 
   const span = spawnerTracer.start({ method: 'agent.spawn', taskId: req.taskId, modelId: req.modelId })
 
+  // BL-AG-01 vs BL-AG-03: same code path, distinguished by req.resumeId (already existed)
+  const orchTracer = req.resumeId ? Tracers.agentOrchResume : Tracers.agentOrchSpawn
+  const orchSpan = orchTracer.start(
+    { taskId: req.taskId, modelId: req.modelId, resumeId: req.resumeId },
+    extractResume(params)
+  )
+
   // ── Validation ────────────────────────────────────────────────────────────────
   const missing: string[] = []
   if (!req.modelId)  missing.push('model')
@@ -283,6 +304,7 @@ export async function handleAgentSpawn(
 
   if (missing.length > 0) {
     span.fail(`missing ${missing.join(',')}`, { taskId: req.taskId, modelId: req.modelId })
+    orchSpan.fail(`missing ${missing.join(',')}`, { taskId: req.taskId })
     const errResp = {
       jsonrpc: '2.0', id,
       error: { code: AgentErrorCode.InvalidParams, message: `Missing required fields: ${missing.join(', ')}` },
@@ -295,6 +317,7 @@ export async function handleAgentSpawn(
   const specResolved = resolveAgentSpec(req.modelId)
   if (!specResolved) {
     span.fail('unknown model', { modelId: req.modelId })
+    orchSpan.fail('unknown model', { modelId: req.modelId })
     const errResp = {
       jsonrpc: '2.0', id,
       error: { code: AgentErrorCode.InvalidParams, message: `Unknown model: ${req.modelId}` },
@@ -311,12 +334,14 @@ export async function handleAgentSpawn(
     // specResolved already validated above (not null)
     const spec = specResolved
     // ORCH-003: Pass spec and resolvedApiKey — no more 'placeholder-key'
+    orchSpan.step('resolve-credential', { accountId: req.accountId || '(none)' })
     const envBase = await buildAgentEnv(
       req,
       spec,
       config,
       resolvedApiKey ?? null,
       log,
+      span.id,   // NEW — CR-TRACE-016 correlation field (spawnerTracer span, NOT orchSpan)
     )
     // WT-Issue-3: Inject worktree context so agent knows which branch/path it owns
     const env: Record<string, string> = {
@@ -358,6 +383,7 @@ export async function handleAgentSpawn(
       )
     }
 
+    orchSpan.step('node-pty-spawn', { binary: spec.binary, ptyId })
     const pty = nodePty.spawn(spec.binary, args, {
       name: 'xterm-256color',
       cols: 220, rows: 50,
@@ -373,7 +399,13 @@ export async function handleAgentSpawn(
 
     // ORCH-006: JSON-RPC 2.0 requires notifications (no id) for streaming output.
     // Sending multiple responses with the same id violates the spec.
+    // BL-AG-05: state-transition on the ALREADY-OPEN span, not a new span per frame.
+    let firstOutputReported = false
     pty.onData((data) => {
+      if (!firstOutputReported) {
+        firstOutputReported = true
+        orchSpan.step('first-output', { ptyId })
+      }
       const notification = JSON.stringify({
         jsonrpc: '2.0',
         method: 'agent.output',
@@ -389,8 +421,10 @@ export async function handleAgentSpawn(
       spawner.transition('stopped')
       if (exitCode === 0) {
         span.ok({ ptyId, exitCode })
+        orchSpan.ok({ ptyId, exitCode })
       } else {
         span.fail(`exit code ${exitCode}`, { ptyId, exitCode })
+        orchSpan.fail(`exit code ${exitCode}`, { ptyId, exitCode })
       }
       const notification = JSON.stringify({
         jsonrpc: '2.0',
@@ -407,6 +441,7 @@ export async function handleAgentSpawn(
     spawner.transition('error')
     const msg = err instanceof Error ? err.message : String(err)
     span.fail(err, { taskId: req.taskId, modelId: req.modelId })
+    orchSpan.fail(err, { taskId: req.taskId, modelId: req.modelId })
     log.error(`agent.spawn: error ${msg}`)
     const errWireState = createWireState()
     const errResp = { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
@@ -428,15 +463,18 @@ export async function handleAgentKill(
   const rawSignal = typeof params.signal === 'string' ? params.signal : 'SIGTERM'
   const signal: 'SIGTERM' | 'SIGKILL' = rawSignal === 'SIGKILL' ? 'SIGKILL' : 'SIGTERM'
   const span  = spawnerTracer.start({ method: 'agent.kill', ptyId: ptyId || '(empty)', signal })
+  const orchSpan = Tracers.agentOrchStop.start({ ptyId: ptyId || '(empty)', signal, via: 'agent.kill' }, extractResume(params))
 
   if (!ptyId) {
     span.fail('missing ptyId', { method: 'agent.kill' })
+    orchSpan.fail('missing ptyId')
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing ptyId' } }
   }
 
   const entry = PTY_REGISTRY.get(ptyId)
   if (!entry) {
     span.ok({ ptyId, note: 'already dead' })
+    orchSpan.ok({ ptyId, note: 'already dead' })
     return { jsonrpc: '2.0', id, result: { ok: true, note: 'pty not found (already dead)' } }
   }
 
@@ -448,6 +486,7 @@ export async function handleAgentKill(
   }
   PTY_REGISTRY.delete(ptyId)
   span.ok({ ptyId, signal })
+  orchSpan.ok({ ptyId, signal })
   log.info(`agent.kill: ptyId=${ptyId} ${signal} sent`)
   return { jsonrpc: '2.0', id, result: { ok: true } }
 }
@@ -464,23 +503,42 @@ export async function handleAgentSendInput(
 ): Promise<object> {
   const ptyId = typeof params.ptyId === 'string' ? params.ptyId : ''
   const data  = typeof params.data  === 'string' ? params.data  : ''
+  // Ctrl+C is the graceful-stop signal worth tracing (agentOrch:stop); regular
+  // interactive keystrokes are per-frame and excluded (CR-TRACE-000 §5).
+  const isGracefulStop = data === '\x03'
+  const orchSpan = isGracefulStop
+    ? Tracers.agentOrchStop.start({ ptyId, via: 'agent.sendInput' }, extractResume(params))
+    : undefined
+  // CR-TRACE-005: separate infra span (agent:spawn, reused — not a new tracer)
+  // covering EVERY call, not just Ctrl+C — records ptyId on every event so
+  // BL-CR-02/03 remote-feedback-into-PTY calls are traceable even when they
+  // aren't the graceful-stop byte.
+  const span = spawnerTracer.start({ method: 'agent.sendInput', ptyId: ptyId || '(empty)' })
 
   if (!ptyId) {
+    span.fail('missing ptyId', { method: 'agent.sendInput' })
+    orchSpan?.fail('missing ptyId')
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing ptyId' } }
   }
 
   const entry = PTY_REGISTRY.get(ptyId)
   if (!entry) {
+    span.fail('pty-not-found', { ptyId })
+    orchSpan?.fail('pty not found', { ptyId })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.PathNotFound, message: `PTY not found: ${ptyId}` } }
   }
 
   try {
     entry.pty.write(data)
     log.info(`agent.sendInput: ptyId=${ptyId} bytes=${data.length}`)
+    span.ok({ ptyId, bytes: data.length })
+    orchSpan?.ok({ ptyId })
     return { jsonrpc: '2.0', id, result: { ok: true } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     log.error(`agent.sendInput failed: ${msg}`)
+    span.fail(err, { ptyId })
+    orchSpan?.fail(err, { ptyId })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }

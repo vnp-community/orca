@@ -29,8 +29,8 @@ vi.mock('fs/promises', () => ({
 
 import { registerFilesystemMutationHandlers } from './filesystem-mutations'
 import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
+  registerRemoteFilesystemProvider,
+  unregisterRemoteFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 
 // Why: paths are resolved via path.resolve() in production code, so test
@@ -275,7 +275,7 @@ describe('registerFilesystemMutationHandlers', () => {
 
   it('routes rename through the SSH no-clobber filesystem provider when a connection is present', async () => {
     const renameNoClobber = vi.fn().mockResolvedValue(undefined)
-    registerSshFilesystemProvider('ssh-1', { renameNoClobber } as never)
+    registerRemoteFilesystemProvider('ssh-1', { renameNoClobber } as never)
 
     try {
       await handlers.get('fs:rename')!(null, {
@@ -284,7 +284,7 @@ describe('registerFilesystemMutationHandlers', () => {
         connectionId: 'ssh-1'
       })
     } finally {
-      unregisterSshFilesystemProvider('ssh-1')
+      unregisterRemoteFilesystemProvider('ssh-1')
     }
 
     expect(renameNoClobber).toHaveBeenCalledWith('/home/me/repo/old.ts', '/home/me/repo/new.ts')
@@ -293,7 +293,7 @@ describe('registerFilesystemMutationHandlers', () => {
 
   it('propagates SSH no-clobber rename failures', async () => {
     const renameNoClobber = vi.fn().mockRejectedValue(new Error('destination exists'))
-    registerSshFilesystemProvider('ssh-1', { renameNoClobber } as never)
+    registerRemoteFilesystemProvider('ssh-1', { renameNoClobber } as never)
 
     try {
       await expect(
@@ -304,7 +304,7 @@ describe('registerFilesystemMutationHandlers', () => {
         })
       ).rejects.toThrow('destination exists')
     } finally {
-      unregisterSshFilesystemProvider('ssh-1')
+      unregisterRemoteFilesystemProvider('ssh-1')
     }
 
     expect(renameMock).not.toHaveBeenCalled()
@@ -324,7 +324,7 @@ describe('registerFilesystemMutationHandlers', () => {
 
   it('routes copy through the SSH filesystem provider when a connection is present', async () => {
     const copy = vi.fn().mockResolvedValue(undefined)
-    registerSshFilesystemProvider('ssh-1', { copy } as never)
+    registerRemoteFilesystemProvider('ssh-1', { copy } as never)
 
     try {
       await handlers.get('fs:copy')!(null, {
@@ -333,7 +333,7 @@ describe('registerFilesystemMutationHandlers', () => {
         connectionId: 'ssh-1'
       })
     } finally {
-      unregisterSshFilesystemProvider('ssh-1')
+      unregisterRemoteFilesystemProvider('ssh-1')
     }
 
     expect(copy).toHaveBeenCalledWith('/home/me/repo/source.ts', '/home/me/repo/source copy.ts')

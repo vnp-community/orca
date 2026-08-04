@@ -14,6 +14,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { Tracers } from '../../shared/trace/tracers'
 import type { IConnectionPool } from '../db/pool'
 import type { WorkflowDefinition, WorkflowStep } from './WorkflowTypes'
 
@@ -118,27 +119,41 @@ export class TemplateResolver {
    * @returns The new template ID
    */
   async create(params: CreateTemplateParams): Promise<string> {
-    const id = randomUUID()
-    const now = Date.now()
-    await this.pool.withConnection((db) =>
-      db.query(
-        `INSERT INTO orca_workflow_templates
-           (id, name, definition_json, owner_id, scope, parent_template_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          params.name,
-          JSON.stringify(params.definition),
-          params.ownerId,
-          params.scope ?? 'user',
-          params.parentTemplateId ?? null,
-          now,
-          now,
-        ]
+    const span = Tracers.workflowTemplateCreateFlow.start({
+      name: params.name,
+      scope: params.scope ?? 'user',
+      hasParent: !!params.parentTemplateId,
+    })
+    try {
+      const id = randomUUID()
+      const now = Date.now()
+      await this.pool.withConnection((db) =>
+        db.query(
+          `INSERT INTO orca_workflow_templates
+             (id, name, definition_json, owner_id, scope, parent_template_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            params.name,
+            JSON.stringify(params.definition),
+            params.ownerId,
+            params.scope ?? 'user',
+            params.parentTemplateId ?? null,
+            now,
+            now,
+          ]
+        )
       )
-    )
-    return id
+      span.ok({ templateId: id })
+      return id
+    } catch (err) {
+      span.fail(err)
+      throw err
+    }
   }
+
+  // resolve() (ở trên) — KHÔNG có tracer: đây là read-path gọi mỗi lần cần resolve
+  // inheritance chain (kể cả trong workflow.execute), không phải write path BL-WF-01.
 
   /**
    * List templates by scope, optionally filtered by ownerId.

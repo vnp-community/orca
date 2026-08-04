@@ -806,4 +806,109 @@ describe('ReviewNotesSendMenuContent', () => {
       launchSource: 'notes_send'
     })
   })
+
+  // TASK-FE-005.2: ui:codeReview.sendFeedback tracing (BL-CR-03).
+  describe('tracing (CR-TRACE-005)', () => {
+    async function loadTraceSink(): Promise<{
+      events: { id: string; flow: string; level: string; fields: Record<string, unknown> }[]
+      unregister: () => void
+    }> {
+      const { registerTraceSink } = await import('../../../../shared/trace')
+      const events: { id: string; flow: string; level: string; fields: Record<string, unknown> }[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+      return { events, unregister }
+    }
+
+    function seedEligibleTarget(): { paneKey: string } {
+      const statusPaneKey = makePaneKey(TAB_A, LEAF_A)
+      setStore({
+        tabsByWorktree: { 'wt-1': [tab(TAB_A, { title: 'Terminal 1' })] },
+        terminalLayoutsByTabId: { [TAB_A]: leafLayout(LEAF_A, 'pty-a') }
+      })
+      harness.noteTargets = [
+        {
+          paneKey: statusPaneKey,
+          tabId: TAB_A,
+          leafId: LEAF_A,
+          agentType: 'claude',
+          tabTitle: 'Terminal 1',
+          status: 'eligible'
+        }
+      ]
+      return { paneKey: statusPaneKey }
+    }
+
+    it('ok()s the span when launchSource is notes_send and the send succeeds', async () => {
+      const { events, unregister } = await loadTraceSink()
+      seedEligibleTarget()
+
+      const tree = render({ launchSource: 'notes_send' })
+      ;(findByType(tree, 'DropdownMenuItem').props.onSelect as () => void)()
+      await flushMicrotasks()
+
+      const feedbackEvents = events.filter((e) => e.flow === 'ui:codeReview.sendFeedback')
+      expect(feedbackEvents.some((e) => e.level === 'start')).toBe(true)
+      expect(feedbackEvents.some((e) => e.level === 'ok')).toBe(true)
+      unregister()
+    })
+
+    it('does not create a span for a non notes_send launchSource', async () => {
+      const { events, unregister } = await loadTraceSink()
+      seedEligibleTarget()
+
+      const tree = render({ launchSource: 'markdown_notes' })
+      ;(findByType(tree, 'DropdownMenuItem').props.onSelect as () => void)()
+      await flushMicrotasks()
+
+      expect(events.filter((e) => e.flow === 'ui:codeReview.sendFeedback')).toHaveLength(0)
+      unregister()
+    })
+
+    it('fail()s the span on a real send rejection but not on a resolved non-sent status', async () => {
+      const { events, unregister } = await loadTraceSink()
+      harness.sendNotesToActiveAgentSession.mockRejectedValueOnce(new Error('runtime unavailable'))
+      seedEligibleTarget()
+
+      const tree = render({ launchSource: 'notes_send' })
+      ;(findByType(tree, 'DropdownMenuItem').props.onSelect as () => void)()
+      await flushMicrotasks()
+
+      const feedbackEvents = events.filter((e) => e.flow === 'ui:codeReview.sendFeedback')
+      expect(feedbackEvents.some((e) => e.level === 'fail')).toBe(true)
+      expect(feedbackEvents.some((e) => e.level === 'ok')).toBe(false)
+      unregister()
+    })
+
+    it('does not double-fire a second span while a prior send is still in flight', async () => {
+      const { events, unregister } = await loadTraceSink()
+      let resolveSend: ((value: { status: string }) => void) | undefined
+      harness.sendNotesToActiveAgentSession.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSend = resolve
+        })
+      )
+      seedEligibleTarget()
+
+      const tree = render({ launchSource: 'notes_send' })
+      const onSelect = findByType(tree, 'DropdownMenuItem').props.onSelect as () => void
+      onSelect()
+      onSelect()
+      await flushMicrotasks()
+      resolveSend?.({ status: 'sent' })
+      await flushMicrotasks()
+
+      const startEvents = events.filter(
+        (e) => e.flow === 'ui:codeReview.sendFeedback' && e.level === 'start'
+      )
+      // Why: each click opens its own span (not a shared/reused one) — this
+      // asserts no span accidentally double-fires ok()/fail() for one click.
+      for (const start of startEvents) {
+        const matchingOk = events.filter(
+          (e) => e.id === start.id && e.flow === 'ui:codeReview.sendFeedback' && e.level === 'ok'
+        )
+        expect(matchingOk.length).toBeLessThanOrEqual(1)
+      }
+      unregister()
+    })
+  })
 })

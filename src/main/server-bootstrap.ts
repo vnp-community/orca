@@ -173,6 +173,21 @@ export async function initializeOrcaServices(
   registerOnboardingIpcHandlers(devServerManager, store)
   registerRepoRemoteIpcHandlers(devServerManager, store)
 
+  // Why: makes a connected Dev Server's agent WebSocket usable as a repo
+  // execution-host connection (fs/git/pty), reusing the ssh-*-dispatch.ts
+  // provider registries orca-runtime.ts already resolves through — see
+  // dev-server-provider-lifecycle.ts. Kept here, immediately after
+  // devServerManager, rather than after OrcaRuntimeService exists further
+  // down: a real Dev Server can finish its WebSocket handshake and fire
+  // 'connected' before the rest of bootstrap (DB/migrations/auth/session-
+  // manager) finishes, so attaching this listener any later risks missing
+  // that event outright. The runtime-dependent half (PTY controller + data
+  // relay) is wired separately via .attachRuntime(runtime) once runtime
+  // exists — see that call site for why it's still race-safe despite the
+  // gap between this line and that one.
+  const { wireDevServerProviders } = await import('./providers/dev-server-provider-lifecycle')
+  const devServerProviderLifecycle = wireDevServerProviders(devServerManager)
+
   // 2a-pool. Initialize RelayConnectionPool (v5.0 — prerequisite for Project + AI services)
   const { RelayConnectionPool } = await import('./dev-server/relay-connection-pool')
   const { DevServerRelayBridge } = await import('./dev-server/dev-server-relay-bridge')
@@ -354,6 +369,16 @@ export async function initializeOrcaServices(
   runtime.setPushManager(pushManager)
   console.log('[ServerBootstrap] ✅ OrcaRuntimeService created')
 
+  // Why only now, not alongside wireDevServerProviders() above: runtime
+  // didn't exist yet there. attachRuntime() wires runtime.setPtyController +
+  // the PTY data-plane relay (this pure-Node process has no Electron
+  // ipc/pty.ts controller wiring it any other way — without this every
+  // terminal.create would throw 'runtime_unavailable') and retroactively
+  // wires the relay for any Dev Server that already connected and registered
+  // during the gap between these two calls, so registration order never
+  // matters.
+  devServerProviderLifecycle.attachRuntime(runtime)
+
   const { OrcaRuntimeRpcServer } = await import('./runtime/runtime-rpc')
   const rpcServer = new OrcaRuntimeRpcServer({
     runtime,
@@ -435,7 +460,7 @@ export async function initializeOrcaServices(
     console.warn('[ServerBootstrap] resumeRunningExecutions (non-fatal):', (err as Error).message)
   )
   // Register workflow RPC methods into the already-running rpcServer
-  rpcServer.addMethods(createWorkflowMethods(workflowOrchestrator, templateResolver))
+  rpcServer.addMethods(createWorkflowMethods(workflowOrchestrator, templateResolver, pool))
   console.log('[ServerBootstrap] ✅ WorkflowOrchestrator initialized (v5.0)')
 
   // 13. TaskService + TaskAgentExecutor [v5.0 TDD-18]

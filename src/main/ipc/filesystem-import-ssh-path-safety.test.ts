@@ -21,7 +21,7 @@ vi.mock('./filesystem-auth', () => ({
 }))
 vi.mock('./ssh', () => ({ getSshConnectionManager: getConnMgrMock }))
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  requireSshFilesystemProvider: providerMock
+  requireRemoteFilesystemProvider: providerMock
 }))
 
 import { importExternalPathsSsh } from './filesystem-import-ssh'

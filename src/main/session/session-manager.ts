@@ -47,6 +47,18 @@ export class SessionManager {
     this.config.devServerManager.on('devServer:removed', (id: string) => broadcastEvent('devServer:removed', id))
     this.config.devServerManager.on('devServer:statusChanged', (id: string, status: string, err?: Error) => broadcastEvent('devServer:statusChanged', id, status, err))
 
+    // Push agent notifications (pty.data, pty.exit, fs.changed) to every user
+    // process — mirrors devServer:event above. Each process's DevServerPtyProvider
+    // / watch subscriber filters to the devServerId/ids it actually cares about.
+    this.config.devServerManager.on(
+      'devServer:notification',
+      (devServerId: string, method: string, params: Record<string, unknown>) => {
+        for (const proc of this.processes.values()) {
+          proc.process.send({ type: 'devServer:proxyNotification', devServerId, method, params })
+        }
+      }
+    )
+
     // Periodic idle-process sweep — unref so it won't prevent process exit
     this.idleTimer = setInterval(() => this.sweepIdleProcesses(), IDLE_CHECK_INTERVAL_MS)
     if (this.idleTimer.unref) this.idleTimer.unref()

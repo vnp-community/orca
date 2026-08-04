@@ -143,7 +143,8 @@ export const WorktreeCreate = z
       .unknown()
       .transform((value) => (isTuiAgent(value) ? value : undefined))
       .optional(),
-    automationProvenanceRequest: AutomationWorkspaceProvenanceRequest.optional()
+    automationProvenanceRequest: AutomationWorkspaceProvenanceRequest.optional(),
+    traceId: OptionalString // [NEW CR-TRACE-001] wire-propagated span id, xem CR-TRACE-000 §3.2
   })
   .superRefine((params, ctx) => {
     if ((params.parentWorkspace || params.parentWorktree) && params.noParent === true) {
@@ -224,7 +225,8 @@ export const WorktreeSet = WorktreeSelector.extend({
 
 export const WorktreeRemove = WorktreeSelector.extend({
   force: OptionalBoolean,
-  runHooks: OptionalBoolean
+  runHooks: OptionalBoolean,
+  traceId: OptionalString // [NEW CR-TRACE-001]
 })
 
 export const WorktreeForceDeleteBranch = WorktreeSelector.extend({

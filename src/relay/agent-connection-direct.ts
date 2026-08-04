@@ -64,7 +64,7 @@ export async function connectDirect(
   // ── Reconnect loop ────────────────────────────────────────────────────────
   let reconnectAttempt = 0
 
-  const runConnection = (): Promise<'reconnect' | 'reconnect-auth-failed' | 'exit'> =>
+  const runConnection = (): Promise<'reconnect-renew' | 'reconnect-auth-failed' | 'exit'> =>
     new Promise((resolve) => {
       const token = tokenManager ? tokenManager.consume() : config.agentToken
       const connSpan = connTracer.start({ url: config.orcaUrl, attempt: reconnectAttempt })
@@ -99,15 +99,31 @@ export async function connectDirect(
         if (lastHandshakeOk) {
           connSpan.fail(`connection dropped after handshake`, { code })
           log.warn(`Connection dropped (code=${code}). Reconnecting...`)
+          // Why renew here too, not just on outright rejection: the server
+          // consumes an agent token the moment it first connects successfully
+          // (AgentWebSocketServer.registerSlot — single-use by design), so a
+          // token that already handshaked once is guaranteed stale for the
+          // NEXT reconnect. The token manager's own 80%-of-TTL background
+          // renewal won't help here — the server grants ~30-day TTLs, so that
+          // timer doesn't fire again for weeks. Renewing immediately means
+          // the very next connection attempt uses a fresh token instead of
+          // failing once first (see BUG-DS-AWS below for the same fix on the
+          // outright-rejected path).
+          resolve('reconnect-renew')
+          return
         } else {
           connSpan.fail(`closed before handshake`, { code })
           log.warn(`Connection closed before handshake (code=${code}). Reconnecting...`)
-          if (code === 1008) {
-            resolve('reconnect-auth-failed')
-            return
-          }
+          // FIX BUG-DS-AWS: treat ANY close before a successful handshake as a
+          // token problem, not just code 1008. A rejected/unregistered token
+          // (e.g. after an Orca Server restart wipes in-memory pending slots)
+          // is the overwhelmingly common cause of a pre-handshake close, and the
+          // exact wire code isn't reliable across ws versions/proxies (a bare
+          // ws.close() with no code surfaces as 1005, not 1008). Without this,
+          // the agent retries the same dead token forever instead of renewing it.
+          resolve('reconnect-auth-failed')
+          return
         }
-        resolve('reconnect')
       })
 
       ws.once('error', (err) => {
@@ -127,8 +143,12 @@ export async function connectDirect(
       return new Promise<never>(() => {})
     }
 
-    if (result === 'reconnect-auth-failed' && tokenManager) {
-      log.warn('Handshake rejected (likely unregistered token). Forcing proactive token renewal...')
+    if (tokenManager) {
+      log.warn(
+        result === 'reconnect-auth-failed'
+          ? 'Handshake rejected (likely unregistered token). Forcing proactive token renewal...'
+          : 'Connection dropped after a successful handshake — its token is now stale server-side. Forcing proactive token renewal...'
+      )
       try {
         await tokenManager.forceRenew()
       } catch (err) {

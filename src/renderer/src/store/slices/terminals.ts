@@ -76,6 +76,7 @@ import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { getFolderWorkspaceConnectionId } from '@/lib/folder-workspace-connection'
 import { hasWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
+import { Tracers } from '../../../../shared/trace/tracers'
 import { sanitizeTerminalLayoutPaneTitles } from '@/lib/terminal-pane-title-sanitization'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
@@ -2340,6 +2341,19 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
     // Why: expectedRuntimePtyIds are raw RPC handles. Only renderer-bound ids
     // can emit pane exit callbacks, so they are the complete guard identity set.
     const exitGuardPtyIds = rendererShutdownPtyIds
+    // Why: only open a span when there's an actual RPC round-trip
+    // (expectedRuntimePtyIds.length > 0) — otherwise this is purely
+    // in-process state cleanup, not worth tracing.
+    const span =
+      expectedRuntimePtyIds.length > 0
+        ? Tracers.uiTerminalDestroyFlow.start({
+            worktreeId,
+            route: 'worktree-teardown',
+            shutdownReason,
+            keepHistory: keepIdentifiers,
+            ptyCount: expectedRuntimePtyIds.length
+          })
+        : undefined
     const sleepingAgentSessionRecords = keepIdentifiers
       ? collectSleepingAgentSessionRecordsForWorktree(get(), worktreeId, {
           paneKeys: opts?.sleepingPaneKeys,
@@ -2396,6 +2410,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
 
     if (expectedRuntimePtyIds.length > 0) {
       if (!runtimeEnvironmentId) {
+        span?.fail(new Error('missing_runtime_for_exact_terminal_stop'), { worktreeId })
         throw new Error('missing_runtime_for_exact_terminal_stop')
       }
       set((s) => ({
@@ -2412,6 +2427,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
         remainingLivePtyIds?: string[]
       }
       try {
+        span?.step('relay-terminal-stopExact', { ptyCount: expectedRuntimePtyIds.length })
         stopResult = await callRuntimeRpc<{
           stoppedPtyIds?: string[]
           livePtyIds?: string[]
@@ -2421,7 +2437,8 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
           {
             worktree: toRuntimeWorktreeSelector(worktreeId),
             expectedPtyIds: expectedRuntimePtyIds,
-            keepHistory: keepIdentifiers
+            keepHistory: keepIdentifiers,
+            traceId: span?.id
           },
           { timeoutMs: 15_000 }
         )
@@ -2433,6 +2450,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
           }
           return { suppressedPtyExitIds: next }
         })
+        span?.fail(err, { worktreeId })
         throw err
       }
       const stoppedPtyIds = sortedUniquePtyIds(stopResult.stoppedPtyIds)
@@ -2448,6 +2466,10 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
           }
           return { suppressedPtyExitIds: next }
         })
+        span?.fail(new Error('exact_terminal_stop_mismatch'), {
+          worktreeId,
+          stoppedCount: stoppedPtyIds.length
+        })
         throw new Error('exact_terminal_stop_mismatch')
       }
       if (stopResult.postStopVerified !== true) {
@@ -2458,9 +2480,13 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
           }
           return { suppressedPtyExitIds: next }
         })
+        span?.fail(new Error(stopResult.postStopFailure ?? 'exact_terminal_stop_unverified'), {
+          worktreeId
+        })
         throw new Error(stopResult.postStopFailure ?? 'exact_terminal_stop_unverified')
       }
       unregisterPtyDataHandlers(rendererShutdownPtyIds)
+      span?.ok({ worktreeId, stoppedCount: stoppedPtyIds.length })
     }
 
     set((s) => {

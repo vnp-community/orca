@@ -1,5 +1,5 @@
 import { gitExecFileAsync } from '../git/runner'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 
 export type GiteaRepoRef = {
   host: string
@@ -153,7 +153,7 @@ export async function getGiteaRepoRefForRemote(
     return repoRefCache.get(cacheKey)!
   }
   try {
-    const sshGitProvider = connectionId ? getSshGitProvider(connectionId) : null
+    const sshGitProvider = connectionId ? getRemoteGitProvider(connectionId) : null
     if (connectionId && !sshGitProvider) {
       return null
     }

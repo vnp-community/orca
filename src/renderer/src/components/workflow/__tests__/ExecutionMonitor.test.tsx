@@ -73,4 +73,27 @@ describe('ExecutionMonitor', () => {
     fireEvent.click(screen.getByTestId('cancel-btn'))
     expect(cancelExecution).toHaveBeenCalled()
   })
+
+  it('rootTraceId present → shows copyable badge, click copies to clipboard', () => {
+    vi.mocked(useWorkflowExecution).mockReturnValue({
+      execution: { ...execution, rootTraceId: 'trace-root-123' },
+      stepStatuses: { s1: 'completed', s2: 'running' },
+      streamingOutput: {},
+      cancelExecution
+    } as any)
+    const writeText = vi.fn()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+
+    render(<ExecutionMonitor executionId="e1" />)
+    const badge = screen.getByTestId('root-trace-id-badge')
+    expect(badge).toHaveTextContent('trace:trace-root-123')
+
+    fireEvent.click(badge)
+    expect(writeText).toHaveBeenCalledWith('trace-root-123')
+  })
+
+  it('rootTraceId undefined → badge not rendered', () => {
+    render(<ExecutionMonitor executionId="e1" />)
+    expect(screen.queryByTestId('root-trace-id-badge')).not.toBeInTheDocument()
+  })
 })

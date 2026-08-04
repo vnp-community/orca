@@ -26,6 +26,24 @@ import {
   resetAgentStartupDelayedDeliveryForTests
 } from '@/lib/agent-startup-delayed-delivery'
 import type { PaneForegroundAgentEntry } from '@/store/slices/pane-foreground-agent'
+import type { DevServer } from '../../../../shared/dev-server-types'
+
+function makeDevServerFixture(id: string): DevServer {
+  return {
+    id,
+    name: id,
+    connectionType: 'direct-websocket',
+    status: 'connected',
+    platform: 'linux',
+    arch: 'x64',
+    nodeVersion: 'v22.0.0',
+    lastConnectedAt: null,
+    lastError: null,
+    workspaceDir: null,
+    addedAt: 0,
+    capabilities: null
+  }
+}
 
 // Repro command:
 //   pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-connection.test.ts -t "OpenTUI-style small ANSI redraw"
@@ -13657,6 +13675,75 @@ describe('connectPanePty', () => {
     expect(transport.connect).toHaveBeenCalled()
   })
 
+  it('routes a Dev Server-owned repo through the remote-runtime transport in the web client', async () => {
+    // Regression: window.api.pty.spawn (the local IPC transport) is a
+    // permanent stub in the web build ("Local PTYs are unavailable in the
+    // web client.") — Dev Server-backed repos have no 'runtime'-kind
+    // execution host, so getRuntimeEnvironmentIdForWorktree returned null
+    // and the web client picked the (broken) local IPC transport instead of
+    // falling back to the remote-runtime transport like other web terminals.
+    const originalOrcaPlatform = (globalThis.window as unknown as { __orca_platform?: string })
+      .__orca_platform
+    ;(globalThis.window as unknown as { __orca_platform?: string }).__orca_platform = 'web'
+    try {
+      const { connectPanePty } = await import('./pty-connection')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const { createIpcPtyTransport } = await import('./pty-transport')
+      const transport = createMockTransport('remote:session-auth@@terminal-1')
+      transportFactoryQueue.push(transport)
+
+      mockStoreState = {
+        ...mockStoreState,
+        tabsByWorktree: {
+          'wt-1': [{ id: 'tab-1', ptyId: null }]
+        },
+        repos: [{ id: 'repo1', connectionId: 'dev-01', displayName: 'orca' }],
+        devServers: [makeDevServerFixture('dev-01')]
+      } as StoreState
+
+      const pane = createPane(2)
+      const manager = createManager(2)
+      const deps = createDeps()
+
+      connectPanePty(pane as never, manager as never, deps as never)
+
+      expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith('session-auth', expect.any(Object))
+      expect(createIpcPtyTransport).not.toHaveBeenCalled()
+    } finally {
+      ;(globalThis.window as unknown as { __orca_platform?: string }).__orca_platform =
+        originalOrcaPlatform
+    }
+  })
+
+  it('keeps the local IPC transport for a Dev Server-owned repo on desktop', async () => {
+    // Desktop already has a real DevServerPtyProvider registered against this
+    // connectionId in the main process's local IPC path — must not divert to
+    // the remote-runtime transport there.
+    const { connectPanePty } = await import('./pty-connection')
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const { createIpcPtyTransport } = await import('./pty-transport')
+    const transport = createMockTransport('pty-dev-server-1')
+    transportFactoryQueue.push(transport)
+
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: {
+        'wt-1': [{ id: 'tab-1', ptyId: null }]
+      },
+      repos: [{ id: 'repo1', connectionId: 'dev-01', displayName: 'orca' }],
+      devServers: [makeDevServerFixture('dev-01')]
+    } as StoreState
+
+    const pane = createPane(2)
+    const manager = createManager(2)
+    const deps = createDeps()
+
+    connectPanePty(pane as never, manager as never, deps as never)
+
+    expect(createRemoteRuntimePtyTransport).not.toHaveBeenCalled()
+    expect(createIpcPtyTransport).toHaveBeenCalled()
+  })
+
   it('prints a terminal notice when the startup cwd fell back to the workspace root', async () => {
     const { connectPanePty, STARTUP_CWD_FALLBACK_NOTICE } = await import('./pty-connection')
     const transport = createMockTransport('pty-fallback')
@@ -15771,6 +15858,43 @@ describe('connectPanePty', () => {
     expect(deps.onPtyErrorRef.current).not.toHaveBeenCalled()
     expect(mockStoreState.removeDeferredSshSessionId).not.toHaveBeenCalled()
     expect(mockStoreState.removeDeferredSshReconnectTarget).not.toHaveBeenCalled()
+  })
+
+  it('never routes a Dev Server connectionId through the SSH reconnect gate', async () => {
+    // Regression: a repo's connectionId can be a Dev Server id (not an SSH
+    // target). Dev Servers never register SSH IPC handlers (the web/server
+    // deployment doesn't call registerSshHandlers at all), so entering the
+    // SSH-specific deferred-reconnect flow for one throws
+    // "ssh_handlers_not_registered" instead of just falling through to the
+    // generic PTY reattach path.
+    const devServerFixture = makeDevServerFixture('dev-01')
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport()
+    transportFactoryQueue.push(transport)
+
+    mockStoreState = {
+      ...mockStoreState,
+      repos: [{ id: 'repo1', connectionId: 'dev-01', displayName: 'orca' }],
+      devServers: [devServerFixture],
+      // Even a stale/leftover deferred-SSH-reconnect entry for this id must
+      // not matter — the id is a Dev Server, so the SSH gate must never run.
+      deferredSshReconnectTargets: ['dev-01'],
+      deferredSshSessionIdsByTabId: { 'tab-1': 'saved-session' }
+    } as StoreState
+
+    const pane = createPane(1)
+    const manager = createManager(1)
+    const deps = createDeps()
+
+    connectPanePty(pane as never, manager as never, deps as never)
+    await flushAsyncTicks(10)
+
+    const api = (
+      globalThis as unknown as {
+        window: { api: { ssh: { connect: ReturnType<typeof vi.fn> } } }
+      }
+    ).window.api
+    expect(api.ssh.connect).not.toHaveBeenCalled()
   })
 
   it('spawns a fresh PTY when a deferred SSH session expired', async () => {

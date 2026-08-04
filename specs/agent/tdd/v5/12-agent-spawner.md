@@ -26,6 +26,8 @@
 - Stream PTY output về Gateway
 - Cleanup resources khi agent exit
 
+> **Lưu ý — 2 hệ thống PTY khác nhau (2026-08-03):** `agent-spawner.ts` (module này) spawns and manages PTYs for **AI agent CLIs** (`agent.spawn`/`agent.kill`, exports `cleanupAllPtys`). This is a *separate* concern from the plain **terminal PTYs** created via `pty.create`/`pty.write`/`pty.scrollback`/etc, which live in `src/relay/pty-agent-bridge.ts` and export `cleanupAgentPtys` (note the similar but distinct name). Both are called from `agent-session.ts`'s `stop()` — see TDD-AG-04 §8. Do not conflate the two: this doc (TDD-AG-12) covers AI-agent PTYs only; terminal PTY streaming is covered in TDD-AG-07 §9.
+
 ---
 
 ## 2. Source File

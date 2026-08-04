@@ -304,3 +304,9 @@ describe('createSession', () => {
 ```
 
 **Target:** ≥ 20 tests
+
+---
+
+## 5. Addendum (2026-08-03) — Push Notifications Use the Same Connection
+
+All 3 current production Dev Servers run in `direct-websocket` mode (agent-initiated outbound connection, per §1). The one-way push notifications added in TDD-AG-02 §5 / TDD-AG-07 §9 (`pty.data`, `pty.exit`, `fs.changed`) don't open a second channel or change the connection mode — they're agent-initiated frames sent over this same `ws` connection, using the same `WireState`/`encodeDataFrame` as every response. No change to `connectDirect()`, `listenRelay()`, or the mode-selection logic was needed.

@@ -1,8 +1,8 @@
 # Luồng Dữ liệu — Remote Development
 
-**Domain:** Remote Development (SSH)  
-**Nghiệp vụ:** BL-SSH-01 → BL-SSH-04  
-**Kiến trúc tham chiếu:** HLD v1 — Relay Binary, C3.3/C3.5, F07 SSH Worktrees
+**Domain:** Remote Development (SSH + Dev Server)  
+**Nghiệp vụ:** BL-SSH-01 → BL-SSH-05  
+**Kiến trúc tham chiếu:** HLD v1 — Relay Binary, C3.3/C3.5, F07 SSH Worktrees, F28 Dev Server Onboarding
 
 ---
 
@@ -10,13 +10,14 @@
 
 | Thành phần | Layer | Vai trò |
 |------------|-------|---------|
-| Renderer (React UI) | UI | SSH host dialog, relay status, port forward panel |
+| Renderer (React UI) | UI | SSH host dialog, relay status, port forward panel, Available Hosts picker |
 | Main Process | Business Logic | SshManager, RelayManager, PortForwardManager |
 | ssh2 Library | Transport | SSH connection management |
 | SFTP | Transport | Upload relay binary |
 | Orca Relay Binary | Remote | Node.js binary chạy trên remote host |
 | Remote Host | Infrastructure | Linux/macOS server với git, shell |
-| SQLite Database | Persistence | SSH host config, connection state |
+| SQLite Database | Persistence | SSH host config, Dev Server config, connection state |
+| Dev Server Agent | Remote | Agent tự kết nối ngược (phone-home) qua WebSocket, cài qua Onboarding Wizard |
 
 ---
 
@@ -144,6 +145,49 @@ Remote agent starts → Relay scanner → relay protocol → Main
                                                       → SSH forward
                                                       → SQLite
                                                       → Renderer (port card)
+```
+
+---
+
+## BL-SSH-05 — Dev Server: phương thức remote khác (kết nối ngược qua WebSocket)
+
+```
+Người dùng (Carlos/DevOps) — cài Dev Server Agent qua Onboarding Wizard
+    │
+    ▼
+[Dev Server Agent] tự kết nối NGƯỢC đến Orca qua WebSocket
+    │ (khác với SSH Host ở BL-SSH-01: ở đây agent là bên chủ động connect ra,
+    │   Orca không cần ssh2.connect() vào máy đó)
+    ▼
+[Main Process] nhận connection → INSERT/UPDATE Dev Server { id, status: 'connected' }
+    │
+    ▼
+[Renderer] Dev Server đã kết nối xuất hiện như một Host chọn được, ngang hàng SSH
+    Host, trong Settings → "Available Hosts" của project và trong host picker của
+    "Add repo"
+    │
+    ├─ Gán project vào THƯ MỤC/CHECKOUT CÓ SẴN trên Dev Server đó
+    │   → hoạt động đầy đủ: file explorer, git status/diff/stage/commit/push,
+    │     worktree add/remove — tất cả route qua kết nối này đến Dev Server thật
+    │
+    └─ Clone REPO MỚI lên Dev Server → CHƯA hỗ trợ
+        → hiển thị lỗi rõ ràng, yêu cầu user thêm một thư mục có sẵn thay vì clone
+
+TERMINAL / PTY qua Dev Server (mới hỗ trợ):
+    ├─ Dùng lại ĐÚNG kết nối WebSocket đã mở cho git/file — không mở kết nối thứ hai
+    ├─ Yêu cầu Dev Server Agent đó đã cài node-pty (build tools + node-pty +
+    │   restart agent) — bước setup riêng của người vận hành Dev Server, tách biệt
+    │   với việc kết nối Dev Server; agent chưa cài vẫn kết nối OK nhưng không mở
+    │   được terminal
+    └─ KHÔNG hỗ trợ reattach: đóng tab, mất kết nối, hoặc restart Orca → phiên
+        terminal kết thúc, phải mở phiên mới (xem terminal-management.md). Khác
+        với SSH Host ở BL-SSH-03, nơi PTY có thể sống qua grace period và
+        reconnect vào phiên cũ.
+
+Luồng:
+Dev Server Agent → WS connect (phone-home) → Main Process (lưu trạng thái kết nối)
+                                            → Renderer (xuất hiện trong host picker)
+Chọn làm host cho project → mọi thao tác git/fs/pty route qua đúng 1 kết nối WS đó
 ```
 
 ---

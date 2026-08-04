@@ -484,3 +484,51 @@ Tham khảo:
 - [TDD-13: Dev Server Onboarding §5](./13-dev-server-onboarding.md) — relay deploy mechanics
 - `src/main/ssh/ssh-user-resolver.ts`
 - `src/main/ssh/dev-server-provisioner.ts`
+
+---
+
+## Addendum v5.0: Provider Registries Are Transport-Agnostic — IMPLEMENTED ✅
+
+> **Date:** 2026-08-02/03 | **TDD-13:** [13-dev-server-onboarding.md §11](./13-dev-server-onboarding.md#11-provider-unification-with-ssh-registries-v50)
+
+Trước đây, mọi file/git operation trên remote host đi qua `orca-runtime.ts` đều giả định host là một **SSH Target** — lookup bằng `connectionId` vào 2 registry:
+
+```typescript
+// src/main/providers/ssh-filesystem-dispatch.ts
+// src/main/providers/ssh-git-dispatch.ts
+const sshProviders = new Map<string, IGitProvider>()  // key: opaque connection-id string
+
+registerSshGitProvider(connectionId: string, provider: IGitProvider): void
+getSshGitProvider(connectionId: string): IGitProvider | undefined
+requireSshGitProvider(connectionId: string): IGitProvider
+```
+
+Nhận thấy 2 registry này **đã transport-agnostic** — key chỉ là 1 string bất kỳ, provider chỉ cần implement `IGitProvider`/`IFilesystemProvider` — nên một **Dev Server** (agent kết nối OUTBOUND qua WebSocket, xem TDD-13) giờ đăng ký vào **CÙNG registry** mà SSH dùng, keyed bằng `devServerId` thay vì SSH `targetId`. Không mở thêm connection nào mới; ~40+ call site đọc từ registry (qua `getSshGitProvider`/`getSshFilesystemProvider`) không đổi.
+
+```typescript
+// src/main/providers/ssh-git-dispatch.ts — WIDENED:
+// Map và các hàm export (registerSshGitProvider/getSshGitProvider/requireSshGitProvider)
+// được retype từ concrete `SshGitProvider` sang interface `IGitProvider`,
+// để registry chứa được cả provider SSH-backed lẫn Dev-Server-backed.
+// ssh-filesystem-dispatch.ts đã dùng interface type từ trước — không cần đổi.
+```
+
+Provider mới cho Dev Server (`src/main/providers/`):
+
+| File | Vai trò |
+|------|---------|
+| `dev-server-relay-connection.ts` | `DevServerRelayConnection` type — shape tối thiểu `{ call(), onNotification?() }`, không type theo concrete `DevServerRelayBridge` (multi-user child process chỉ thấy `GatewayDevServerManagerProxy.getRelay()`, một plain object khác forward qua IPC — cả 2 đều thoả interface) |
+| `dev-server-filesystem-provider.ts` | `DevServerFilesystemProvider implements IFilesystemProvider` — compose từ agent RPC surface hẹp (fs.stat/readDir/readFile/writeFile/mkdir/rmdir/glob/grep, fs.watch/unwatch); method không có agent equivalent (rename, copy, realpath) throw "not supported for Dev Server hosts yet" |
+| `dev-server-git-provider.ts` | `DevServerGitProvider implements IGitProvider` — compose từ 1 method generic `git.exec({args, cwd})` (agent whitelist subcommand, không shell) + `git.worktree.list/add/remove`; tái dùng `StatusPorcelainParser` không đổi |
+| `dev-server-provider-lifecycle.ts` | `wireDevServerProviders(devServerManager)` — lắng nghe `devServer:statusChanged`/`devServer:removed`, register/unregister 2 provider trên vào registry theo `devServerId`. Gọi 1 lần trong `server-bootstrap.ts` ngay sau khi tạo `devServerManager` — giống nhau cho single-user main process và multi-user parent/gateway process |
+
+`IGitProvider` (`src/main/providers/types.ts`) có thêm vài method optional (executeCommitMessagePlan, cancelGenerateCommitMessage, execNonInteractive, clone, fetchRemoteTrackingRef, fetchGitLabMergeRequestHead, refreshLocalBaseRefForWorktreeCreate, getHostPlatform) để các call site SSH-only dùng interface đã widen vẫn type-check — Dev Server provider đơn giản là omit các method này.
+
+**File watch:** `.watch()` dùng push thật (subscribe qua `relay.onNotification` + gọi `fs.watch`) khi agent hỗ trợ, fallback về poll readDir-diff mỗi 3s cho agent binary cũ hơn — fallback này giúp rollout an toàn khi chỉ 1 phần Dev Server đã update agent.
+
+**Chưa làm:** `DevServerPtyProvider` (`IPtyProvider` cho Dev Server) chưa được xây — xem TDD-13 §11 để biết lý do (thiếu ~8 method equivalent + chưa Dev Server nào report `pty=true` ở handshake).
+
+Tham khảo:
+- [TDD-13: Dev Server Onboarding §11](./13-dev-server-onboarding.md#11-provider-unification-with-ssh-registries-v50)
+- `src/main/providers/ssh-git-dispatch.ts`, `ssh-filesystem-dispatch.ts`
+- `src/main/providers/dev-server-*.ts`

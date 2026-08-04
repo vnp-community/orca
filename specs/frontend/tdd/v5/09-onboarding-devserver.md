@@ -341,3 +341,21 @@ window.api.onboarding = {
 6. **useShallow** — Dùng khi selector trả về object
 7. **Error boundaries** — Mỗi wizard step cần `<ErrorBoundary>`
 8. **60s TTL cache** — Windows capabilities, agent detection results
+
+---
+
+## 11. Dev Server as a First-Class Execution Host (2026-08-03) ✅ IMPLEMENTED
+
+**Trước:** Dev Server chỉ tồn tại trong flow onboarding ở trên — sidebar host UI, panel "Available Hosts" (`RepositoryHostSetupsSection.tsx`), và toàn bộ routing file/git/terminal đều được xây riêng cho SSH Targets/Hosts cổ điển (`Repo.connectionId`/`Repo.executionHostId`) và **không biết Dev Server tồn tại**.
+
+**Sau:** Dev Server là một `ExecutionHostKind` thật (`'devServer'`, xem TDD-FE-02 Addendum), đi qua đúng pipeline `buildExecutionHostRegistry`/`buildSidebarHostOptions` như local/ssh/runtime, thay vì các hack tự chế sau:
+
+- `use-sidebar-host-scope-options.ts` — trước đây ở web mode BYPASS hoàn toàn pipeline chung, tự build `SidebarHostOption` bằng chuỗi `` `devserver:${id}` `` viết thường ép kiểu `ExecutionHostId` và `kind: 'runtime'` giả ("closest semantic match"). Đã xoá — giờ gọi `buildSidebarHostOptions({ ..., devServers })` dùng chung, web mode chỉ filter kết quả còn `option.kind === 'devServer' && option.health === 'available'` (web mode không có local/SSH, nên chỉ Dev Server đã connect là host chọn được — filter này là logic hợp lệ, giữ nguyên, chỉ không còn dựa trên id giả nữa).
+- `use-add-repo-host-selection.ts` — bỏ nhánh `hostId.startsWith('devserver:')`, dùng `parseExecutionHostId(hostId)?.kind === 'devServer'` + `.devServerId` thật thay vì `hostId.slice('devserver:'.length)`.
+- `AddRepoDialog.tsx` — bỏ pattern `selectedHostId.startsWith('devserver:')` tương tự, dùng `hostSelection.selectedParsedHost?.kind === 'devServer' ? ... .devServerId : null`.
+- `sidebar-host-options.ts` — `SidebarHostOption.kind` mở rộng thêm `'devServer'`; `buildSidebarHostOptions()` nhận và forward `devServers` cho `buildExecutionHostRegistry`.
+- **"Available Hosts" panel** (`src/renderer/src/components/settings/RepositoryHostSetupsSection.tsx`) đã pass `devServers` vào `buildExecutionHostRegistry` từ trước (Phase 1/2 — không thuộc session này) — không cần sửa, panel này đã genuinely surface Dev Servers.
+
+**Known limitation:** clone một repo **mới** lên Dev Server qua `setupProjectClone` chưa được hỗ trợ — trước đây silently fall through xuống local clone path (`window.api.repos.clone`), tức là clone nhầm vào filesystem của container Orca server thay vì Dev Server. Giờ có guard tường minh, throw `'Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.'`. Setup một folder/repo **có sẵn** trên Dev Server (`setupProjectExistingFolder`) đã hoạt động đúng từ trước, không cần fix.
+
+**Terminal routing:** xem TDD-FE-04 §Connection/Host Resolution — `connection-owner-resolution.ts` giờ resolve đúng `connectionId` cho repo bind vào Dev Server, nên terminal của repo đó route được tới `DevServerPtyProvider` ở backend (cần Dev Server cài `node-pty` + advertise `pty`/`pty.stream`).

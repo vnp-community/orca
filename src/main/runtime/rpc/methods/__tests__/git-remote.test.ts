@@ -13,6 +13,7 @@ import type { ProjectServerRouter } from '../../../../project/ProjectServerRoute
 import type { AIProviderService } from '../../../../ai-providers/AIProviderService'
 import type { TaskService } from '../../../../task/TaskService'
 import type { TaskGrantService } from '../../../../task/TaskGrantService'
+import { registerTraceSink, type TraceEvent } from '../../../../../shared/trace'
 
 // ── Mock factories ─────────────────────────────────────────────────────────────
 
@@ -301,5 +302,108 @@ describe('git-remote RPC methods', () => {
     await new Promise(r => setTimeout(r, 20))
 
     expect(taskService.update).not.toHaveBeenCalled()
+  })
+
+  // ── CR-TRACE-001: git.worktree.add / git.worktree.remove tracing (TASK-BE-001.4) ─
+
+  function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    return { events, stop: unregister }
+  }
+
+  it('git.worktree.add emits a worktree:create span and forwards traceId into relay.call', async () => {
+    const { events, stop } = captureTraceEvents()
+
+    const result = await findMethod(methods, 'git.worktree.add').handler(
+      { projectId: 'proj-1', worktreePath: '/repo', path: '/repo/../wt-1', branch: 'feature' },
+      makeCtx()
+    )
+    stop()
+
+    expect(result).toMatchObject({ stdout: 'mock output' })
+    const span = events.find((e) => e.flow === 'worktree:create')
+    expect(span).toBeDefined()
+    const callParams = vi.mocked(relay.call).mock.calls[0]?.[1] as { traceId?: string }
+    expect(callParams.traceId).toBe(span!.id)
+  })
+
+  it('git.worktree.add resumes the span id from params.traceId when provided', async () => {
+    const { events, stop } = captureTraceEvents()
+
+    await findMethod(methods, 'git.worktree.add').handler(
+      {
+        projectId: 'proj-1',
+        worktreePath: '/repo',
+        path: '/repo/wt-1',
+        branch: 'feature',
+        traceId: 'resume-add-1'
+      },
+      makeCtx()
+    )
+    stop()
+
+    const created = events.filter((e) => e.flow === 'worktree:create')
+    expect(created.every((e) => e.id === 'resume-add-1')).toBe(true)
+  })
+
+  it('git.worktree.remove emits a worktree:delete span and forwards traceId into relay.call', async () => {
+    const { events, stop } = captureTraceEvents()
+
+    const result = await findMethod(methods, 'git.worktree.remove').handler(
+      { projectId: 'proj-1', worktreePath: '/repo', path: '/repo/wt-1', force: true },
+      makeCtx()
+    )
+    stop()
+
+    expect(result).toMatchObject({ stdout: 'mock output' })
+    const span = events.find((e) => e.flow === 'worktree:delete')
+    expect(span).toBeDefined()
+    const callParams = vi.mocked(relay.call).mock.calls[0]?.[1] as { traceId?: string; args: string[] }
+    expect(callParams.traceId).toBe(span!.id)
+    expect(callParams.args).toEqual(expect.arrayContaining(['--force']))
+  })
+
+  it('git.worktree.remove calls span.fail() when relay.call rejects, then rethrows', async () => {
+    const failingRelay = makeRelay()
+    vi.mocked(failingRelay.call).mockRejectedValue(new Error('remote worktree busy'))
+    router = makeRouter(failingRelay)
+    methods = registerRemoteGitRpcMethods(router, makeAIService(), taskService, taskGrantService)
+    const { events, stop } = captureTraceEvents()
+
+    await expect(
+      findMethod(methods, 'git.worktree.remove').handler(
+        { projectId: 'proj-1', worktreePath: '/repo', path: '/repo/wt-1' },
+        makeCtx()
+      )
+    ).rejects.toThrow('remote worktree busy')
+    stop()
+
+    const failEvent = events.find((e) => e.flow === 'worktree:delete' && e.level === 'fail')
+    expect(failEvent?.fields.err).toContain('remote worktree busy')
+  })
+
+  it('git.diff does NOT create any worktree:* span (regression guard against mislabeling a shared method)', async () => {
+    const { events, stop } = captureTraceEvents()
+
+    await findMethod(methods, 'git.diff').handler(
+      { projectId: 'proj-1', worktreePath: '/repo' },
+      makeCtx()
+    )
+    stop()
+
+    expect(events.some((e) => e.flow.startsWith('worktree:'))).toBe(false)
+  })
+
+  it('git.status does NOT create any worktree:* span', async () => {
+    const { events, stop } = captureTraceEvents()
+
+    await findMethod(methods, 'git.status').handler(
+      { projectId: 'proj-1', worktreePath: '/repo' },
+      makeCtx()
+    )
+    stop()
+
+    expect(events.some((e) => e.flow.startsWith('worktree:'))).toBe(false)
   })
 })

@@ -12,9 +12,16 @@ import { TemplateResolver } from '../TemplateResolver'
 import { SqliteSingleConnectionPool } from '../../db/sqlite/sqlite-pool'
 import { MigrationRunner } from '../../db/migrations/runner'
 import { ALL_MIGRATIONS } from '../../db/migrations'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
 import type { WorkflowDefinition } from '../WorkflowTypes'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
+}
 
 function def(stepIds: string[]): WorkflowDefinition {
   return {
@@ -203,5 +210,59 @@ describe('TemplateResolver', () => {
     const u1Templates = await resolver.list('user', 'u-1')
     expect(u1Templates.length).toBe(1)
     expect(u1Templates[0].name).toBe('A')
+  })
+})
+
+// ── CR-TRACE-017 tracing (BL-WF-01) ─────────────────────────────────────────
+
+describe('TemplateResolver — CR-TRACE-017 tracing (BL-WF-01)', () => {
+  let pool: SqliteSingleConnectionPool
+  let resolver: TemplateResolver
+
+  beforeEach(async () => {
+    const setup = await makeResolver()
+    pool = setup.pool
+    resolver = setup.resolver
+  })
+
+  afterEach(async () => {
+    await pool.destroy().catch(() => {})
+  })
+
+  it('create() without parentTemplateId → span field hasParent: false', async () => {
+    const { events, stop } = captureTraceEvents()
+    const id = await resolver.create({ name: 'NoParent', definition: def(['A']), ownerId: 'u-1' })
+    stop()
+
+    const startEvent = events.find((e) => e.flow === 'workflow:templateCreate' && e.level === 'start')
+    expect(startEvent?.fields).toMatchObject({ name: 'NoParent', hasParent: false })
+    const okEvent = events.find((e) => e.flow === 'workflow:templateCreate' && e.level === 'ok')
+    expect(okEvent?.fields).toMatchObject({ templateId: id })
+  })
+
+  it('create() with parentTemplateId → span field hasParent: true', async () => {
+    const parentId = await resolver.create({ name: 'Parent', definition: def(['A']), ownerId: 'u-1' })
+
+    const { events, stop } = captureTraceEvents()
+    await resolver.create({
+      name: 'Child',
+      definition: def(['B']),
+      ownerId: 'u-1',
+      parentTemplateId: parentId,
+    })
+    stop()
+
+    const startEvent = events.find((e) => e.flow === 'workflow:templateCreate' && e.level === 'start')
+    expect(startEvent?.fields).toMatchObject({ name: 'Child', hasParent: true })
+  })
+
+  it('resolve() does not emit any workflow:* tracer event — read-path, no tracer per BL-WF-01 design', async () => {
+    const id = await resolver.create({ name: 'X', definition: def(['A']), ownerId: 'u-1' })
+
+    const { events, stop } = captureTraceEvents()
+    await resolver.resolve(id)
+    stop()
+
+    expect(events.filter((e) => e.flow.startsWith('workflow:'))).toHaveLength(0)
   })
 })

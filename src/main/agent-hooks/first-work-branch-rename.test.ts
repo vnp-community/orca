@@ -30,7 +30,7 @@ vi.mock('../git/git-username', () => ({
   getSshGitUsername: getSshGitUsernameMock,
   resolveLocalGitUsername: resolveLocalGitUsernameMock
 }))
-vi.mock('../providers/ssh-git-dispatch', () => ({ getSshGitProvider: getSshGitProviderMock }))
+vi.mock('../providers/ssh-git-dispatch', () => ({ getRemoteGitProvider: getSshGitProviderMock }))
 vi.mock('../text-generation/commit-message-text-generation', () => ({
   generateBranchNameFromContext: generateBranchNameMock,
   resolveTextGenerationParams: resolveTextGenerationParamsMock

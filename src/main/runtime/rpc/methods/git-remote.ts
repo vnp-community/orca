@@ -23,6 +23,8 @@ import type { AIProviderService } from '../../../ai-providers/AIProviderService'
 import type { TaskService } from '../../../task/TaskService'
 import type { TaskGrantService } from '../../../task/TaskGrantService'
 import type { GitExecResult } from '../../../../relay/git-remote-handler'
+import { OptionalString } from '../schemas'
+import { Tracers } from '../../../../shared/trace/tracers'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ async function autoAdvanceTasks(
 const ProjectWorktreeParam = z.object({
   projectId: z.string().min(1),
   worktreePath: z.string().min(1),
+  traceId: OptionalString, // [NEW CR-TRACE-001], dùng bởi git.worktree.add/remove bên dưới
 })
 
 const FilesParam = ProjectWorktreeParam.extend({
@@ -323,11 +326,24 @@ export function registerRemoteGitRpcMethods(
         branch: z.string().min(1),
       }),
       handler: async (params, ctx) => {
-        const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
-        return relay.call('git.exec', {
-          cwd: params.worktreePath,
-          args: ['worktree', 'add', params.path, params.branch],
-        }) as Promise<GitExecResult>
+        const span = Tracers.worktreeCreate.start(
+          { projectId: params.projectId, path: params.path },
+          params.traceId ? { id: params.traceId } : undefined
+        )
+        try {
+          const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
+          span.step('relay-git-worktree-add', { devServerId: params.projectId })
+          const result = (await relay.call('git.exec', {
+            cwd: params.worktreePath,
+            args: ['worktree', 'add', params.path, params.branch],
+            traceId: span.id, // [NEW CR-TRACE-001] forward vào relay envelope — CR-TRACE-000 §3.3
+          })) as GitExecResult
+          span.ok({ path: params.path })
+          return result
+        } catch (error) {
+          span.fail(error, { projectId: params.projectId })
+          throw error
+        }
       },
     }),
 
@@ -340,10 +356,26 @@ export function registerRemoteGitRpcMethods(
         force: z.boolean().optional(),
       }),
       handler: async (params, ctx) => {
-        const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
-        const args = ['worktree', 'remove', params.path]
-        if (params.force) args.push('--force')
-        return relay.call('git.exec', { cwd: params.worktreePath, args }) as Promise<GitExecResult>
+        const span = Tracers.worktreeDelete.start(
+          { projectId: params.projectId, path: params.path, force: params.force === true },
+          params.traceId ? { id: params.traceId } : undefined
+        )
+        try {
+          const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
+          const args = ['worktree', 'remove', params.path]
+          if (params.force) args.push('--force')
+          span.step('relay-git-worktree-remove', { devServerId: params.projectId })
+          const result = (await relay.call('git.exec', {
+            cwd: params.worktreePath,
+            args,
+            traceId: span.id,
+          })) as GitExecResult
+          span.ok({ path: params.path })
+          return result
+        } catch (error) {
+          span.fail(error, { projectId: params.projectId })
+          throw error
+        }
       },
     }),
 

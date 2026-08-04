@@ -1,7 +1,7 @@
 // src/relay/__tests__/agent-credential-store.test.ts
 // Tests use real AES-256-GCM crypto (no mocks) with real tmpdir.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -13,6 +13,7 @@ import {
 } from '../agent-credential-store'
 import type { AgentConfig } from '../agent-config'
 import type { AgentLogger } from '../agent-logger'
+import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 
 let tmpDir: string
 const mockLog: AgentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
@@ -267,5 +268,68 @@ describe('readDecryptedKey', () => {
     expect(keyA).toBe('blob-A')
     expect(keyB).toBe('blob-B')
     expect(keyA).not.toBe(keyB)
+  })
+})
+
+// ─── handleWriteCredential — blobLength (CR-TRACE-016) ────────────────────────
+describe('handleWriteCredential — blobLength (CR-TRACE-016)', () => {
+  it('start event includes blobLength = encryptedBlob.length', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    await handleWriteCredential(1, { accountId: 'acc-1', encryptedBlob: 'x'.repeat(128), iv: 'iv1' }, makeConfig(), mockLog)
+    unregister()
+    const start = events.find(e => e.flow === 'agent:credential' && e.level === 'start')!
+    expect(start.fields.blobLength).toBe(128)
+  })
+})
+
+// ─── handleReadCredential — parentSpanId correlation (CR-TRACE-016) ───────────
+describe('handleReadCredential — parentSpanId correlation (CR-TRACE-016)', () => {
+  it('forwards parentSpanId into the span fields when present', async () => {
+    const cfg = makeConfig()
+    await handleWriteCredential(1, { accountId: 'psid-1', encryptedBlob: 'b', iv: 'i' }, cfg, mockLog)
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    await handleReadCredential(2, { accountId: 'psid-1', parentSpanId: 'parent-abc123' }, cfg, mockLog)
+    unregister()
+    const start = events.find(e => e.flow === 'agent:credential' && e.level === 'start' && e.fields.accountId === 'psid-1')!
+    expect(start.fields.parentSpanId).toBe('parent-abc123')
+  })
+
+  it('omits parentSpanId cleanly when absent (existing RPC callers unaffected)', async () => {
+    const cfg = makeConfig()
+    await handleWriteCredential(1, { accountId: 'psid-2', encryptedBlob: 'b', iv: 'i' }, cfg, mockLog)
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const resp = await handleReadCredential(2, { accountId: 'psid-2' }, cfg, mockLog) as any
+    unregister()
+    expect(resp.result.accountId).toBe('psid-2')
+    const start = events.find(e => e.flow === 'agent:credential' && e.level === 'start' && e.fields.accountId === 'psid-2')!
+    expect(start.fields.parentSpanId).toBeUndefined()
+  })
+})
+
+// ─── SECURITY — no trace event ever contains raw credential material (CR-TRACE-016 §1) ──
+describe('SECURITY — no trace event ever contains raw credential material (CR-TRACE-016 §1)', () => {
+  it('write/read/healthCheck/delete: no TraceEvent.fields value equals or contains the plaintext encryptedBlob/iv used in the test', async () => {
+    const cfg = makeConfig()
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const SECRET_BLOB = 'super-secret-blob-value-should-never-appear-in-trace'
+    const SECRET_IV    = 'super-secret-iv-value'
+    await handleWriteCredential(1, { accountId: 'acc-sec', encryptedBlob: SECRET_BLOB, iv: SECRET_IV }, cfg, mockLog)
+    await handleReadCredential(2, { accountId: 'acc-sec' }, cfg, mockLog)
+    await handleHealthCheck(3, { accountId: 'acc-sec', provider: 'ollama' }, cfg, mockLog)
+    await handleDeleteCredential(4, { accountId: 'acc-sec' }, cfg, mockLog)
+    unregister()
+    expect(events.length).toBeGreaterThan(0)
+    for (const e of events) {
+      const serialized = JSON.stringify(e.fields)
+      expect(serialized).not.toContain(SECRET_BLOB)
+      expect(serialized).not.toContain(SECRET_IV)
+      expect(Object.keys(e.fields)).not.toContain('apiKey')
+      expect(Object.keys(e.fields)).not.toContain('encryptedBlob')
+      expect(Object.keys(e.fields)).not.toContain('iv')
+    }
   })
 })

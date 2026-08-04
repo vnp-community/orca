@@ -57,7 +57,7 @@ vi.mock('../git/runner', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: getSshGitProviderMock
+  getRemoteGitProvider: getSshGitProviderMock
 }))
 
 vi.mock('../memory/pty-registry', () => ({
@@ -65,7 +65,7 @@ vi.mock('../memory/pty-registry', () => ({
 }))
 
 vi.mock('./pty', () => ({
-  getSshPtyProvider: getSshPtyProviderMock
+  getRemotePtyProvider: getSshPtyProviderMock
 }))
 
 import { registerWorkspaceCleanupHandlers, scanWorkspaceCleanup } from './workspace-cleanup'

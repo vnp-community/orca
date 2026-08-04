@@ -64,15 +64,13 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
   })
 
   const hostSelection = useAddRepoHostSelection({ isOpen: activeModal === 'add-repo', setStep })
-  const selectedHostId = hostSelection.selectedHostId
   const selectedRuntimeEnvironmentId =
     hostSelection.selectedParsedHost?.kind === 'runtime'
       ? hostSelection.selectedParsedHost.environmentId
       : null
-  // Dev Server host: selectedHostId = 'devserver:<id>'
   const selectedDevServerId =
-    typeof selectedHostId === 'string' && selectedHostId.startsWith('devserver:')
-      ? selectedHostId.slice('devserver:'.length)
+    hostSelection.selectedParsedHost?.kind === 'devServer'
+      ? hostSelection.selectedParsedHost.devServerId
       : null
   const { showRemoteNestedRepoReview, trackRemoteNestedScanResult } = useAddRepoRemoteNestedScan({
     setActiveNestedScanId,

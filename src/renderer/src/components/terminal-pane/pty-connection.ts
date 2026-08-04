@@ -3069,8 +3069,29 @@ export function connectPanePty(
     (restoredPtyIdForTransport
       ? getRemoteRuntimePtyEnvironmentId(restoredPtyIdForTransport)
       : null) ?? (tab?.ptyId ? getRemoteRuntimePtyEnvironmentId(tab.ptyId) : null)
+  // Why: getRuntimeEnvironmentIdForWorktree returns null for a Dev
+  // Server-owned worktree (it only recognizes 'runtime'-kind hosts) because on
+  // desktop a Dev Server correctly uses the local IPC transport with its own
+  // registered DevServerPtyProvider. The web client has no local IPC at all
+  // (window.api.pty is a stub there — see web-preload-api.ts), so a Dev
+  // Server connectionId must still route through the remote-runtime
+  // transport, which the backend resolves via that same provider registry
+  // over the WebSocket/RPC bridge instead. Scoped to this function's local
+  // transport decision only — getRuntimeEnvironmentIdForWorktree itself has
+  // 60+ unrelated callers (file explorer watch, git status, editor mirroring)
+  // that must keep their existing null-for-Dev-Server behavior.
+  const isWebClient =
+    typeof window !== 'undefined' &&
+    (window as unknown as { __orca_platform?: string })?.__orca_platform === 'web'
+  const isDevServerConnection = Boolean(
+    connectionId && state.devServers?.some((ds) => ds.id === connectionId)
+  )
   const runtimeEnvironmentId =
-    remoteRuntimeOwnerForTransport ?? getRuntimeEnvironmentIdForWorktree(state, deps.worktreeId)
+    remoteRuntimeOwnerForTransport ??
+    getRuntimeEnvironmentIdForWorktree(state, deps.worktreeId) ??
+    (isWebClient && isDevServerConnection
+      ? state.settings?.activeRuntimeEnvironmentId?.trim() || 'session-auth'
+      : null)
   const localWindowsTerminalCapabilities = hasCachedWindowsTerminalCapabilities()
     ? getCachedWindowsTerminalCapabilities()
     : null
@@ -6680,7 +6701,15 @@ export function connectPanePty(
     // (not per-target) because multiple tabs for the same target each need
     // to reattach independently. This must run before session ID resolution
     // because the SSH provider isn't registered until after connect succeeds.
-    if (connectionId) {
+    // Why: Dev Server connectionIds must never enter the SSH-specific
+    // deferred-reconnect flow below — ssh.connect/sshConnectionStates and the
+    // rest of the SSH IPC surface only exist for real SSH targets. The web/
+    // server deployment never registers SSH handlers at all, so routing a
+    // Dev Server id through here throws "ssh_handlers_not_registered".
+    const connectionIdIsDevServer = Boolean(
+      connectionId && useAppStore.getState().devServers?.some((ds) => ds.id === connectionId)
+    )
+    if (connectionId && !connectionIdIsDevServer) {
       const storeState = useAppStore.getState()
       // Why: the SSH target was removed entirely (a ghost workspace). Reattaching
       // can only fail with "SSH target not found", which surfaces a red "file an

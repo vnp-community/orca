@@ -5035,6 +5035,160 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
   })
 })
 
+// TASK-FE-003.3: shutdownWorktreeTerminals() worktree-teardown route tracing.
+describe('shutdownWorktreeTerminals tracing (CR-TRACE-003 route b)', () => {
+  async function loadTraceSink(): Promise<{
+    events: { id: string; flow: string; level: string; fields: Record<string, unknown> }[]
+    unregister: () => void
+  }> {
+    const { registerTraceSink } = await import('../../../../shared/trace')
+    const events: { id: string; flow: string; level: string; fields: Record<string, unknown> }[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    return { events, unregister }
+  }
+
+  it('does not open a ui:terminal.destroy span when expectedRuntimePtyIds is empty', async () => {
+    const { events, unregister } = await loadTraceSink()
+    const store = createTestStore()
+    const wt = 'repo1::/path/wt1'
+    seedStore(store, {
+      worktreesByRepo: { repo1: [makeWorktree({ id: wt, repoId: 'repo1', path: '/path/wt1' })] },
+      tabsByWorktree: { [wt]: [makeTab({ id: 'tab-1', worktreeId: wt, title: 'shell' })] },
+      ptyIdsByTabId: { 'tab-1': [] }
+    })
+
+    await store.getState().shutdownWorktreeTerminals(wt)
+
+    expect(events.filter((e) => e.flow === 'ui:terminal.destroy')).toHaveLength(0)
+    unregister()
+  })
+
+  it('opens a ui:terminal.destroy span (route worktree-teardown) and ok()s it on success', async () => {
+    const { events, unregister } = await loadTraceSink()
+    const store = createTestStore()
+    const wt = 'repo1::/path/wt1'
+    mockApi.runtimeEnvironments.call.mockImplementation((args: { method: string }) =>
+      Promise.resolve(
+        createCompatibleRuntimeStatusResponseIfNeeded(args) ?? {
+          id: 'rpc-default',
+          ok: true,
+          result:
+            args.method === 'terminal.stopExact'
+              ? { stoppedPtyIds: ['pty-1'], livePtyIds: ['pty-1'], postStopVerified: true }
+              : {},
+          _meta: { runtimeId: 'remote-runtime' }
+        }
+      )
+    )
+    seedStore(store, {
+      settings: { ...getDefaultSettings('/tmp'), activeRuntimeEnvironmentId: 'runtime-1' },
+      worktreesByRepo: { repo1: [makeWorktree({ id: wt, repoId: 'repo1', path: '/path/wt1' })] },
+      tabsByWorktree: { [wt]: [makeTab({ id: 'tab-1', worktreeId: wt, title: 'shell' })] },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] }
+    })
+
+    await store.getState().shutdownWorktreeTerminals(wt, {
+      keepIdentifiers: true,
+      expectedRuntimePtyIds: ['pty-1']
+    })
+
+    const destroyEvents = events.filter((e) => e.flow === 'ui:terminal.destroy')
+    const startEvent = destroyEvents.find((e) => e.level === 'start')
+    expect(startEvent?.fields).toMatchObject({
+      worktreeId: wt,
+      route: 'worktree-teardown',
+      keepHistory: true,
+      ptyCount: 1
+    })
+    const okEvent = destroyEvents.find((e) => e.level === 'ok' && e.id === startEvent?.id)
+    expect(okEvent?.fields).toMatchObject({ worktreeId: wt, stoppedCount: 1 })
+    expect(mockApi.runtimeEnvironments.call).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'terminal.stopExact',
+        params: expect.objectContaining({ traceId: expect.any(String) })
+      })
+    )
+    unregister()
+  })
+
+  it('fail()s the span when stoppedPtyIds/livePtyIds mismatch the expected set', async () => {
+    const { events, unregister } = await loadTraceSink()
+    const store = createTestStore()
+    const wt = 'repo1::/path/wt1'
+    mockApi.runtimeEnvironments.call.mockImplementation((args: { method: string }) =>
+      Promise.resolve(
+        createCompatibleRuntimeStatusResponseIfNeeded(args) ?? {
+          id: 'rpc-default',
+          ok: true,
+          result:
+            args.method === 'terminal.stopExact'
+              ? { stoppedPtyIds: ['pty-other'], livePtyIds: ['pty-other'], postStopVerified: true }
+              : {},
+          _meta: { runtimeId: 'remote-runtime' }
+        }
+      )
+    )
+    seedStore(store, {
+      settings: { ...getDefaultSettings('/tmp'), activeRuntimeEnvironmentId: 'runtime-1' },
+      worktreesByRepo: { repo1: [makeWorktree({ id: wt, repoId: 'repo1', path: '/path/wt1' })] },
+      tabsByWorktree: { [wt]: [makeTab({ id: 'tab-1', worktreeId: wt, title: 'shell' })] },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] }
+    })
+
+    await expect(
+      store.getState().shutdownWorktreeTerminals(wt, {
+        keepIdentifiers: true,
+        expectedRuntimePtyIds: ['pty-1']
+      })
+    ).rejects.toThrow('exact_terminal_stop_mismatch')
+
+    const failEvent = events.find((e) => e.flow === 'ui:terminal.destroy' && e.level === 'fail')
+    expect(failEvent?.fields.err).toContain('exact_terminal_stop_mismatch')
+    unregister()
+  })
+
+  it('fail()s the span when postStopVerified is not true', async () => {
+    const { events, unregister } = await loadTraceSink()
+    const store = createTestStore()
+    const wt = 'repo1::/path/wt1'
+    mockApi.runtimeEnvironments.call.mockImplementation((args: { method: string }) =>
+      Promise.resolve(
+        createCompatibleRuntimeStatusResponseIfNeeded(args) ?? {
+          id: 'rpc-default',
+          ok: true,
+          result:
+            args.method === 'terminal.stopExact'
+              ? {
+                  stoppedPtyIds: ['pty-1'],
+                  livePtyIds: ['pty-1'],
+                  postStopVerified: false,
+                  postStopFailure: 'terminal_liveness_unavailable'
+                }
+              : {},
+          _meta: { runtimeId: 'remote-runtime' }
+        }
+      )
+    )
+    seedStore(store, {
+      settings: { ...getDefaultSettings('/tmp'), activeRuntimeEnvironmentId: 'runtime-1' },
+      worktreesByRepo: { repo1: [makeWorktree({ id: wt, repoId: 'repo1', path: '/path/wt1' })] },
+      tabsByWorktree: { [wt]: [makeTab({ id: 'tab-1', worktreeId: wt, title: 'shell' })] },
+      ptyIdsByTabId: { 'tab-1': ['pty-1'] }
+    })
+
+    await expect(
+      store.getState().shutdownWorktreeTerminals(wt, {
+        keepIdentifiers: true,
+        expectedRuntimePtyIds: ['pty-1']
+      })
+    ).rejects.toThrow('terminal_liveness_unavailable')
+
+    const failEvent = events.find((e) => e.flow === 'ui:terminal.destroy' && e.level === 'fail')
+    expect(failEvent?.fields.err).toContain('terminal_liveness_unavailable')
+    unregister()
+  })
+})
+
 // Why: CLI-spawned background terminals stamp ORCA_PANE_KEY into the PTY env
 // at spawn time. The renderer must adopt the tab under the same id so hook
 // events route to the correct slot.

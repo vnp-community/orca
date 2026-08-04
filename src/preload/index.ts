@@ -4509,13 +4509,17 @@ const api = {
       worktreeId: string
       agentType: 'claude' | 'codex' | 'custom'
       trustPreset?: 'standard' | 'permissive' | 'strict'
+      // Why: optional so existing callers stay source-compatible; carries the
+      // ui:agentOrch.spawn span id (CR-TRACE-002) through to the main-process
+      // IPC handler (reading it there is out of scope for this frontend task).
+      traceId?: string
     }): Promise<{ sessionId: string; status: 'started' | 'already-running' }> =>
       ipcRenderer.invoke('agentOrchestration:start', opts),
 
-    stop: (opts: { sessionId: string }): Promise<void> =>
+    stop: (opts: { sessionId: string; traceId?: string }): Promise<void> =>
       ipcRenderer.invoke('agentOrchestration:stop', opts),
 
-    resume: (opts: { sessionId: string }): Promise<{ resumed: boolean }> =>
+    resume: (opts: { sessionId: string; traceId?: string }): Promise<{ resumed: boolean }> =>
       ipcRenderer.invoke('agentOrchestration:resume', opts),
 
     onStatusChanged: (callback: (event: {

@@ -66,8 +66,8 @@ import {
 } from '../../shared/text-search'
 import type { Store } from '../persistence'
 import {
-  getSshFilesystemProvider,
-  SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE
+  getRemoteFilesystemProvider,
+  REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE
 } from '../providers/ssh-filesystem-dispatch'
 import type { FileStat, IFilesystemProvider } from '../providers/types'
 import { assertNoClobberRenameDestinationAvailable } from '../../shared/filesystem-rename-collision'
@@ -486,9 +486,9 @@ export class RuntimeFileCommands {
     absolutePath: string,
     connectionId: string
   ): Promise<RuntimeFileStatLike & { isDirectory: () => boolean }> {
-    const provider = getSshFilesystemProvider(connectionId)
+    const provider = getRemoteFilesystemProvider(connectionId)
     if (!provider) {
-      throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+      throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
     }
     const stats = await provider.stat(absolutePath)
     return { ...stats, isDirectory: () => stats.type === 'directory' }
@@ -509,9 +509,9 @@ export class RuntimeFileCommands {
     absolutePath: string,
     connectionId: string
   ): Promise<string | null> {
-    const provider = getSshFilesystemProvider(connectionId)
+    const provider = getRemoteFilesystemProvider(connectionId)
     if (!provider) {
-      throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+      throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
     }
     const roots = ['/tmp', '/private/tmp']
     const providerTempDir = await provider.getTempDir?.().catch(() => null)
@@ -873,9 +873,9 @@ export class RuntimeFileCommands {
     if (!grant.connectionId) {
       throw new Error('terminal_file_grant_mismatch')
     }
-    const provider = getSshFilesystemProvider(grant.connectionId)
+    const provider = getRemoteFilesystemProvider(grant.connectionId)
     if (!provider) {
-      throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+      throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
     }
     const allowedPath = await this.resolveAllowedRemoteTerminalArtifactPath(
       grant.absolutePath,
@@ -891,10 +891,10 @@ export class RuntimeFileCommands {
 
   async readFileExplorerDir(worktreeSelector: string, relativePath: string): Promise<DirEntry[]> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       return provider.readDir(target.path)
     }
@@ -926,10 +926,10 @@ export class RuntimeFileCommands {
     signal?: AbortSignal
   ): Promise<() => void> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, '')
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       // Why: the RPC layer already threads AbortSignal for local watches; SSH
       // must cancel the remote fs.watch request instead of waiting it out.
@@ -962,10 +962,10 @@ export class RuntimeFileCommands {
     relativePath: string
   ): Promise<RuntimeFilePreviewResult> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       const fileStats = await provider.stat(target.path)
       if (fileStats.size > RUNTIME_PREVIEWABLE_BINARY_MAX_BYTES) {
@@ -1008,10 +1008,10 @@ export class RuntimeFileCommands {
     length: number
   ): Promise<RuntimeFileReadChunkResult> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       const fileStat = await provider.stat(target.path)
       if (fileStat.type === 'directory') {
@@ -1046,10 +1046,10 @@ export class RuntimeFileCommands {
     content: string
   ): Promise<{ ok: true }> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.writeFile(target.path, content)
       return { ok: true }
@@ -1076,11 +1076,11 @@ export class RuntimeFileCommands {
     contentBase64: string
   ): Promise<{ ok: true }> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     const content = Buffer.from(contentBase64, 'base64')
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.writeFileBase64(target.path, contentBase64)
       return { ok: true }
@@ -1099,11 +1099,11 @@ export class RuntimeFileCommands {
     append: boolean
   ): Promise<{ ok: true }> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     const content = Buffer.from(contentBase64, 'base64')
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.writeFileBase64Chunk(target.path, contentBase64, append)
       return { ok: true }
@@ -1120,10 +1120,10 @@ export class RuntimeFileCommands {
     relativePath: string
   ): Promise<{ ok: true }> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.createFile(target.path)
       return { ok: true }
@@ -1144,10 +1144,10 @@ export class RuntimeFileCommands {
     relativePath: string
   ): Promise<{ ok: true }> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.createDir(target.path)
       return { ok: true }
@@ -1164,10 +1164,10 @@ export class RuntimeFileCommands {
     relativePath: string
   ): Promise<{ ok: true }> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.createDirNoClobber(target.path)
       return { ok: true }
@@ -1186,11 +1186,11 @@ export class RuntimeFileCommands {
     const tempTarget = await this.resolveFileExplorerPath(worktreeSelector, tempRelativePath)
     const finalTarget = await this.resolveFileExplorerPath(worktreeSelector, finalRelativePath)
     const provider = tempTarget.connectionId
-      ? getSshFilesystemProvider(tempTarget.connectionId)
+      ? getRemoteFilesystemProvider(tempTarget.connectionId)
       : null
     if (tempTarget.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.copy(tempTarget.path, finalTarget.path)
       await provider.deletePath(tempTarget.path, false).catch(() => {})
@@ -1214,11 +1214,11 @@ export class RuntimeFileCommands {
     const oldTarget = await this.resolveFileExplorerPath(worktreeSelector, oldRelativePath)
     const newTarget = await this.resolveFileExplorerPath(worktreeSelector, newRelativePath)
     const provider = oldTarget.connectionId
-      ? getSshFilesystemProvider(oldTarget.connectionId)
+      ? getRemoteFilesystemProvider(oldTarget.connectionId)
       : null
     if (oldTarget.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.renameNoClobber(oldTarget.path, newTarget.path)
       return { ok: true }
@@ -1243,11 +1243,11 @@ export class RuntimeFileCommands {
       destinationRelativePath
     )
     const provider = sourceTarget.connectionId
-      ? getSshFilesystemProvider(sourceTarget.connectionId)
+      ? getRemoteFilesystemProvider(sourceTarget.connectionId)
       : null
     if (sourceTarget.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.copy(sourceTarget.path, destinationTarget.path)
       return { ok: true }
@@ -1273,10 +1273,10 @@ export class RuntimeFileCommands {
     recursive?: boolean
   ): Promise<{ ok: true }> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       await provider.deletePath(target.path, recursive)
       return { ok: true }
@@ -1296,12 +1296,12 @@ export class RuntimeFileCommands {
     options: Omit<SearchOptions, 'rootPath'>
   ): Promise<SearchResult> {
     const target = await this.host.resolveRuntimeFileTarget(worktreeSelector)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     const rootPath = target.worktree.path
     const searchOptions = { ...options, rootPath }
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       return provider.search(searchOptions)
     }
@@ -1313,7 +1313,7 @@ export class RuntimeFileCommands {
     options: { excludePaths?: string[] } = {}
   ): Promise<string[]> {
     const target = await this.host.resolveRuntimeFileTarget(worktreeSelector)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
         return []
@@ -1325,10 +1325,10 @@ export class RuntimeFileCommands {
 
   async listRuntimeMarkdownDocuments(worktreeSelector: string): Promise<MarkdownDocument[]> {
     const target = await this.host.resolveRuntimeFileTarget(worktreeSelector)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       const relativePaths = await provider.listFiles(target.worktree.path)
       return markdownDocumentsFromRelativePaths(target.worktree.path, relativePaths)
@@ -1341,10 +1341,10 @@ export class RuntimeFileCommands {
     relativePath: string
   ): Promise<{ size: number; isDirectory: boolean; mtime: number }> {
     const target = await this.resolveFileExplorerPath(worktreeSelector, relativePath)
-    const provider = target.connectionId ? getSshFilesystemProvider(target.connectionId) : null
+    const provider = target.connectionId ? getRemoteFilesystemProvider(target.connectionId) : null
     if (target.connectionId) {
       if (!provider) {
-        throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+        throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
       }
       const fileStat = await provider.stat(target.path)
       return {
@@ -1484,7 +1484,7 @@ export class RuntimeFileCommands {
   }
 
   private async listRemoteMobileFiles(rootPath: string, connectionId: string): Promise<string[]> {
-    const provider = getSshFilesystemProvider(connectionId)
+    const provider = getRemoteFilesystemProvider(connectionId)
     if (!provider) {
       return []
     }
@@ -1492,9 +1492,9 @@ export class RuntimeFileCommands {
   }
 
   private async readRemoteMobileFile(filePath: string, connectionId: string): Promise<string> {
-    const provider = getSshFilesystemProvider(connectionId)
+    const provider = getRemoteFilesystemProvider(connectionId)
     if (!provider) {
-      throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+      throw new Error(REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
     }
     const fileStat = await provider.stat(filePath)
     // Why: the SSH filesystem API does not expose ranged reads here, so reject

@@ -42,6 +42,7 @@ export function RepositoryHostSetupsSection({
   const settings = useAppStore((state) => state.settings)
   const runtimeEnvironments = useAppStore((state) => state.runtimeEnvironments)
   const runtimeStatusByEnvironmentId = useAppStore((state) => state.runtimeStatusByEnvironmentId)
+  const devServers = useAppStore((state) => state.devServers)
   const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
   const hostOptions = useMemo(
     () =>
@@ -52,6 +53,7 @@ export function RepositoryHostSetupsSection({
         sshConnectionStates,
         runtimeEnvironments,
         runtimeStatusByEnvironmentId,
+        devServers,
         hostLabelOverrides
       }),
     [
@@ -61,6 +63,7 @@ export function RepositoryHostSetupsSection({
       sshConnectionStates,
       runtimeEnvironments,
       runtimeStatusByEnvironmentId,
+      devServers,
       hostLabelOverrides
     ]
   )

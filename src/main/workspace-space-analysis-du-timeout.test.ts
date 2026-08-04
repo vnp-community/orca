@@ -32,11 +32,11 @@ vi.mock('./repo-worktrees', () => ({
 }))
 
 vi.mock('./providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: vi.fn()
+  getRemoteFilesystemProvider: vi.fn()
 }))
 
 vi.mock('./providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: vi.fn()
+  getRemoteGitProvider: vi.fn()
 }))
 
 import { analyzeWorkspaceSpace } from './workspace-space-analysis'

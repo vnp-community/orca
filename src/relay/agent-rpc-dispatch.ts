@@ -17,8 +17,19 @@ import type { WireState } from './agent-wire'
 import { encodeDataFrame } from './agent-wire'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { createTracer } from '../shared/trace'
+import { Tracers } from '../shared/trace/tracers'
 
 const rpcTracer = createTracer('agent:rpc')
+
+// ─── Trace resume extraction ────────────────────────────────────────────────
+// Agent WS JSON-RPC 2.0: traceId nested at params._trace.id (CR-TRACE-000 §3.3).
+function extractResume(params: Record<string, unknown>): { id: string } | undefined {
+  const t = params['_trace']
+  if (t && typeof t === 'object' && typeof (t as { id?: unknown }).id === 'string') {
+    return { id: (t as { id: string }).id }
+  }
+  return undefined
+}
 
 // ─── JSON-RPC types ───────────────────────────────────────────────────────────
 
@@ -107,13 +118,76 @@ function extractTraceFields(method: string, params: Record<string, unknown>): Tr
     }
   }
 
+  if (method === 'ai.complete') {
+    // CR-TRACE-018 BL-TG-02: this method used to fall through to `return {}`
+    // — the outer agent:rpc span had no context fields at all. This is a thin
+    // dispatch-level wrapper (id, timing of the whole dispatch incl. the
+    // dynamic import of ./ai-complete-handler); the detailed breakdown
+    // (provider-call step, contentLength, fail reason) lives in the separate
+    // agent:aiComplete tracer (ai-complete-handler.ts, TASK-AG-005.1) — the two
+    // are complementary, not duplicates.
+    return {
+      model:        str(p['model']),
+      taskId:       str(p['taskId']),
+      promptLength: typeof p['prompt'] === 'string' ? (p['prompt'] as string).length : undefined,
+    }
+  }
+
+  if (method === 'agent.exec') {
+    // CR-TRACE-015 BL-PRF-04: agent.exec (non-interactive, used by
+    // ProfileAwareAgentSpawner.spawn() on the backend) has a params shape
+    // completely different from agent.spawn (interactive PTY) — the generic
+    // 'agent.' bucket below (session/binary/cmd) doesn't match any field of
+    // agent.exec, which used to leave the span showing session=undefined
+    // cmd=undefined. This dedicated bucket matches { binary, args, cwd, env,
+    // timeoutMs } instead. Must be checked BEFORE the 'agent.' prefix bucket.
+    return {
+      // (TASK-AG-015.1) base — request shape:
+      binary:         str(p['binary']),
+      argsCount:      Array.isArray(p['args']) ? (p['args'] as unknown[]).length : undefined,
+      hasEnvOverride: p['env'] !== undefined && p['env'] !== null,
+      timeoutMs:      num(p['timeoutMs']),
+      // CR-TRACE-017 BL-WF-02: StepExecutors.executeAgent() already sends
+      // `stepId` — this field has a real value immediately, no backend change needed.
+      stepId: str(p['stepId']),
+      // CR-TRACE-017 §4: `parentTraceId` is a plain business field so the
+      // TracePanel can group every step-span of the same workflow execution —
+      // NOT Tracer.start()'s `resume` mechanism (CR-TRACE-000 §3.1), since that
+      // core API hasn't shipped. Only populated once WorkflowOrchestrator.ts is
+      // updated to send `traceId: stepSpan.id` + `parentTraceId: rootTraceId` in
+      // the relay.call('agent.exec', ...) params — until then this stays
+      // undefined without error (agent side is ready, no second edit needed).
+      parentTraceId: str(p['parentTraceId']),
+      // CR-TRACE-018 BL-TG-04: only populated once the backend
+      // (ProfileAwareAgentSpawner.spawn() / TaskAgentExecutor) is updated to
+      // send `taskId` as a top-level param instead of only inside
+      // `env.ORCA_TASK_ID` — until then this stays undefined without error.
+      taskId: str(p['taskId']),
+    }
+  }
+
   if (method.startsWith('agent.')) {
     return {
-      session: str(p['sessionId']),
+      session: str(p['sessionId'] ?? p['taskId']),
+      binary:  str(p['binary'] ?? p['model'] ?? p['modelId']),
       cmd:     truncCmd(p['cmd'] ?? p['command']),
     }
   }
 
+  return {}
+}
+
+// ─── Result field extraction (generic — extend as more methods need it) ──────
+// Surfaces result-level fields the handler already computed (e.g.
+// exitCode/timedOut for agent.exec) onto span.ok(), instead of only { method }.
+function extractResultFields(method: string, result: unknown): TraceFields {
+  if (method === 'agent.exec' && result && typeof result === 'object') {
+    const r = result as Record<string, unknown>
+    return {
+      exitCode: typeof r['exitCode'] === 'number'  ? r['exitCode']  : undefined,
+      timedOut: typeof r['timedOut'] === 'boolean' ? r['timedOut'] : undefined,
+    }
+  }
   return {}
 }
 
@@ -125,7 +199,10 @@ export function createRpcDispatcher(
   return {
     async dispatch(ws: WebSocket, state: WireState, rpc: JsonRpcRequest): Promise<void> {
       const ctxFields = extractTraceFields(rpc.method, rpc.params ?? {})
-      const span = rpcTracer.start({ method: rpc.method, id: String(rpc.id ?? 'notify'), ...ctxFields })
+      const span = rpcTracer.start(
+        { method: rpc.method, id: String(rpc.id ?? 'notify'), ...ctxFields },
+        extractResume(rpc.params ?? {})
+      )
       let response: JsonRpcResponse
       try {
         response = await route(rpc, tools, config, log, ws, state)
@@ -133,7 +210,9 @@ export function createRpcDispatcher(
         if ('error' in response) {
           span.fail(response.error.message, { method: rpc.method, code: response.error.code })
         } else {
-          span.ok({ method: rpc.method })
+          // CR-TRACE-015 BL-PRF-04: surface result-level fields the handler
+          // already computed (exitCode/timedOut for agent.exec) instead of { method }.
+          span.ok({ method: rpc.method, ...extractResultFields(rpc.method, response.result) })
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -151,6 +230,19 @@ export function createRpcDispatcher(
 
 
 // ─── Router ───────────────────────────────────────────────────────────────────
+
+/**
+ * Builds a one-way JSON-RPC notification sender bound to this connection.
+ * Used by long-lived agent-side resources (PTY sessions, fs watchers) to push
+ * data back to Orca outside the request/response cycle — the same frame codec
+ * as regular responses, just without an `id`.
+ */
+function makeNotifier(ws: WebSocket, state: WireState): (method: string, params: Record<string, unknown>) => void {
+  return (method, params) => {
+    if (ws.readyState !== 1 /* WebSocket.OPEN */) return
+    ws.send(encodeDataFrame(state, JSON.stringify({ jsonrpc: '2.0', method, params })))
+  }
+}
 
 async function route(
   rpc: JsonRpcRequest,
@@ -500,10 +592,14 @@ async function route(
     // Returns captured stdout/stderr/exitCode instead of streaming.
     // Distinct from agent.spawn (interactive PTY) — no terminal allocation.
     case 'agent.exec': {
+      const p       = rpc.params ?? {}
+      const binary  = typeof p.binary === 'string' ? p.binary : ''
+      const span = Tracers.agentOrchSpawn.start(
+        { binary, taskId: typeof p.taskId === 'string' ? p.taskId : undefined },
+        extractResume(p)
+      )
       try {
         const { spawn } = await import('node:child_process')
-        const p       = rpc.params ?? {}
-        const binary  = typeof p.binary   === 'string' ? p.binary                 : ''
         const args    = Array.isArray(p.args) ? (p.args as unknown[]).map(String) : []
         const cwd     = typeof p.cwd      === 'string' ? p.cwd                    : config.workDir
         const stdin   = typeof p.stdin    === 'string' ? p.stdin                  : null
@@ -515,9 +611,11 @@ async function route(
           : 300_000
 
         if (!binary) {
+          span.fail('binary is required')
           return makeError(rpc.id, AgentErrorCode.InvalidParams, 'agent.exec: binary is required')
         }
 
+        span.step('subprocess-spawn', { binary, cwd })
         const result = await new Promise<{
           stdout: string; stderr: string; exitCode: number | null; timedOut: boolean
         }>((resolve) => {
@@ -549,9 +647,17 @@ async function route(
         })
 
         log.info(`agent.exec: binary=${binary} exitCode=${result.exitCode} timedOut=${result.timedOut}`)
+        if (result.timedOut) {
+          span.fail(`timeout after ${timeoutMs}ms`, { binary })
+        } else if (result.exitCode !== 0) {
+          span.fail(`exit code ${result.exitCode}`, { binary, exitCode: result.exitCode ?? -1 })
+        } else {
+          span.ok({ binary, exitCode: result.exitCode ?? 0 })
+        }
         return { jsonrpc: '2.0', id: rpc.id, result }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
+        span.fail(err, { binary })
         return makeError(rpc.id, AgentErrorCode.ServerError, `agent.exec failed: ${msg}`)
       }
     }
@@ -623,17 +729,59 @@ async function route(
       }
     }
 
+    // ── fs.watch ─────────────────────────────────────────────────────────────
+    // Starts pushing `fs.changed` notifications for a path. Idempotent/refcounted.
+    case 'fs.watch': {
+      try {
+        const { handleFsWatch } = await import('./fs-agent-extensions')
+        return (await handleFsWatch(rpc.id, rpc.params ?? {}, config, makeNotifier(ws, state))) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `fs.watch unavailable: ${msg}`)
+      }
+    }
+
+    // ── fs.unwatch ───────────────────────────────────────────────────────────
+    case 'fs.unwatch': {
+      try {
+        const { handleFsUnwatch } = await import('./fs-agent-extensions')
+        return (await handleFsUnwatch(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `fs.unwatch unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: pty.create ─────────────────────────────────────────────────────
     // TM-001/TM-006: Create a PTY session in agent mode.
     // Params: { cwd, cols?, rows?, env?, shellOverride? }
     // Returns: { id, cols, rows, cwd, shell }
+    // Why all six pty.* cases below pass makeNotifier(ws, state) (not just
+    // create/attach): PTYs now live in the detached pty-daemon process
+    // (pty-daemon-client.ts), which can push pty.data/pty.exit/pty.replay for
+    // ANY live PTY at any time, independent of which request last arrived —
+    // every dispatch call rebinds the client's "current notify" to the live
+    // WebSocket connection so a push always reaches it.
     case 'pty.create': {
       try {
-        const { handlePtyCreate } = await import('./pty-agent-bridge')
-        return (await handlePtyCreate(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+        const { handlePtyCreate } = await import('./pty-daemon-client')
+        return (await handlePtyCreate(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `pty.create unavailable: ${msg}`)
+      }
+    }
+
+    // ── pty.attach ───────────────────────────────────────────────────────────
+    // Reattach to a PTY that survived a WebSocket disconnect (grace period)
+    // or an agent process restart (the pty-daemon process survives it).
+    case 'pty.attach': {
+      try {
+        const { handlePtyAttach } = await import('./pty-daemon-client')
+        return (await handlePtyAttach(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.attach unavailable: ${msg}`)
       }
     }
 
@@ -642,8 +790,8 @@ async function route(
     // Params: { id, data }
     case 'pty.write': {
       try {
-        const { handlePtyWrite } = await import('./pty-agent-bridge')
-        return (await handlePtyWrite(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+        const { handlePtyWrite } = await import('./pty-daemon-client')
+        return (await handlePtyWrite(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `pty.write unavailable: ${msg}`)
@@ -655,8 +803,8 @@ async function route(
     // Params: { id, cols, rows }
     case 'pty.resize': {
       try {
-        const { handlePtyResize } = await import('./pty-agent-bridge')
-        return (await handlePtyResize(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+        const { handlePtyResize } = await import('./pty-daemon-client')
+        return (await handlePtyResize(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `pty.resize unavailable: ${msg}`)
@@ -668,8 +816,8 @@ async function route(
     // Params: { id, graceful? }
     case 'pty.destroy': {
       try {
-        const { handlePtyDestroy } = await import('./pty-agent-bridge')
-        return (await handlePtyDestroy(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+        const { handlePtyDestroy } = await import('./pty-daemon-client')
+        return (await handlePtyDestroy(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `pty.destroy unavailable: ${msg}`)
@@ -681,8 +829,8 @@ async function route(
     // Params: { id, lines? }
     case 'pty.scrollback': {
       try {
-        const { handlePtyScrollback } = await import('./pty-agent-bridge')
-        return (await handlePtyScrollback(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+        const { handlePtyScrollback } = await import('./pty-daemon-client')
+        return (await handlePtyScrollback(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `pty.scrollback unavailable: ${msg}`)
@@ -694,8 +842,8 @@ async function route(
     // Params: { id, signal }
     case 'pty.sendSignal': {
       try {
-        const { handlePtySendSignal } = await import('./pty-agent-bridge')
-        return (await handlePtySendSignal(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+        const { handlePtySendSignal } = await import('./pty-daemon-client')
+        return (await handlePtySendSignal(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `pty.sendSignal unavailable: ${msg}`)

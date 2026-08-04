@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getActiveMultiplexer: vi.fn(),
-  getSshFilesystemProvider: vi.fn()
+  getRemoteFilesystemProvider: vi.fn()
 }))
 
 vi.mock('./ipc/ssh', () => ({
@@ -10,7 +10,7 @@ vi.mock('./ipc/ssh', () => ({
 }))
 
 vi.mock('./providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: mocks.getSshFilesystemProvider
+  getRemoteFilesystemProvider: mocks.getRemoteFilesystemProvider
 }))
 
 const { markRemoteAgentWorkspaceTrusted } = await import('./remote-agent-trust-presets')
@@ -38,7 +38,7 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
 
   it('writes Codex trust to the remote home and canonicalized workspace path', async () => {
     const fsProvider = makeFsProvider()
-    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+    mocks.getRemoteFilesystemProvider.mockReturnValue(fsProvider)
 
     await markRemoteAgentWorkspaceTrusted({
       preset: 'codex',
@@ -62,7 +62,7 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
     mocks.getActiveMultiplexer.mockReturnValue({
       request: vi.fn(async () => ({ resolvedPath: 'C:\\Users\\alice\\' }))
     })
-    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+    mocks.getRemoteFilesystemProvider.mockReturnValue(fsProvider)
 
     await markRemoteAgentWorkspaceTrusted({
       preset: 'codex',
@@ -79,7 +79,7 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
 
   it('writes Cursor trust marker on the remote host', async () => {
     const fsProvider = makeFsProvider()
-    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+    mocks.getRemoteFilesystemProvider.mockReturnValue(fsProvider)
 
     await markRemoteAgentWorkspaceTrusted({
       preset: 'cursor',
@@ -101,7 +101,7 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
     mocks.getActiveMultiplexer.mockReturnValue({
       request: vi.fn(async () => ({ resolvedPath: 'C:/Users/alice/' }))
     })
-    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+    mocks.getRemoteFilesystemProvider.mockReturnValue(fsProvider)
 
     await markRemoteAgentWorkspaceTrusted({
       preset: 'cursor',
@@ -127,7 +127,7 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
       })),
       writeFile
     })
-    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+    mocks.getRemoteFilesystemProvider.mockReturnValue(fsProvider)
 
     await markRemoteAgentWorkspaceTrusted({
       preset: 'copilot',
@@ -149,7 +149,7 @@ describe('markRemoteAgentWorkspaceTrusted', () => {
     mocks.getActiveMultiplexer.mockReturnValue({
       request: vi.fn(async () => ({ resolvedPath: 'relative/home' }))
     })
-    mocks.getSshFilesystemProvider.mockReturnValue(fsProvider)
+    mocks.getRemoteFilesystemProvider.mockReturnValue(fsProvider)
 
     await markRemoteAgentWorkspaceTrusted({
       preset: 'codex',

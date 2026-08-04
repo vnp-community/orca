@@ -55,4 +55,7 @@ export type WorkflowExecution = {
   endedAt?:    number
   triggeredBy: string
   definition:  WorkflowDefinition
+  /** Span id của `ui:workflow.execute` (FE) == `workflow:execute` (BE, nếu resume đúng).
+   *  Dùng để filter TracePanel theo toàn bộ execution. */
+  rootTraceId?: string
 }

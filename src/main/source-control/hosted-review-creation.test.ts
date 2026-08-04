@@ -102,7 +102,7 @@ vi.mock('../git/upstream', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: getSshGitProviderMock
+  getRemoteGitProvider: getSshGitProviderMock
 }))
 
 vi.mock('./hosted-review', () => ({

@@ -12,6 +12,13 @@ import { ProviderHealthChecker } from '../ProviderHealthChecker'
 import type { AIProviderService } from '../AIProviderService'
 import type { RelayConnectionPool } from '../../dev-server/relay-connection-pool'
 import type { AIProviderAccount } from '../../../shared/ai-provider-types'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
+}
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -215,5 +222,91 @@ describe('ProviderHealthChecker', () => {
 
     const call = updateMock.mock.calls[0] as [string, { lastHealthCheck?: Date }]
     expect(call[1].lastHealthCheck).toBeInstanceOf(Date)
+  })
+
+  // ── TASK-BE-016.3: runCheck() tracing (aiProvider:healthCheck) ────────────────
+
+  describe('runCheck tracing', () => {
+    it('N accounts (mixed outcomes) → span.ok({activeCount, quotaExceededCount, invalidCount, errorCount}) sums to N', async () => {
+      const active = makeAccount('acc-active')
+      const quota = makeAccount('acc-quota')
+      const invalid = makeAccount('acc-invalid')
+      const { service } = makeService([active, quota, invalid], {
+        'acc-active': { ok: true, latencyMs: 5 },
+        'acc-quota': { ok: false, latencyMs: 0, error: 'quota exceeded' },
+        'acc-invalid': { ok: false, latencyMs: 0, error: 'bad credentials' },
+      })
+      const { events, stop } = captureTraceEvents()
+
+      checker.start(service)
+      await flushPromises()
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:healthCheck')
+      const okEvent = flowEvents.find((e) => e.level === 'ok')
+      expect(okEvent?.fields).toMatchObject({ activeCount: 1, quotaExceededCount: 1, invalidCount: 1, errorCount: 0 })
+      const counts = okEvent!.fields as Record<string, number>
+      expect(
+        (counts.activeCount ?? 0) + (counts.quotaExceededCount ?? 0) + (counts.invalidCount ?? 0) + (counts.errorCount ?? 0)
+      ).toBe(3)
+    })
+
+    it('one account throws → errorCount increments, span still ok() (cycle not failed)', async () => {
+      const acc1 = makeAccount('acc-1')
+      const acc2 = makeAccount('acc-2')
+      const service = {
+        getAllAccounts: vi.fn().mockResolvedValue([acc1, acc2]),
+        testConnection: vi.fn().mockImplementation((id: string) => {
+          if (id === 'acc-2') return Promise.reject(new Error('unexpected error'))
+          return Promise.resolve({ ok: true, latencyMs: 5 })
+        }),
+        updateAccount: vi.fn().mockResolvedValue(undefined),
+      } as unknown as AIProviderService
+      const { events, stop } = captureTraceEvents()
+
+      checker.start(service)
+      await flushPromises()
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:healthCheck')
+      expect(flowEvents.some((e) => e.level === 'fail')).toBe(false)
+      const okEvent = flowEvents.find((e) => e.level === 'ok')
+      expect(okEvent?.fields).toMatchObject({ activeCount: 1, errorCount: 1 })
+    })
+
+    it('getAllAccounts throws → no span created at all', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const service = {
+        getAllAccounts: vi.fn().mockRejectedValue(new Error('DB error')),
+        testConnection: vi.fn(),
+        updateAccount: vi.fn(),
+      } as unknown as AIProviderService
+      const { events, stop } = captureTraceEvents()
+
+      checker.start(service)
+      await flushPromises()
+      stop()
+
+      expect(events.filter((e) => e.flow === 'aiProvider:healthCheck')).toHaveLength(0)
+      warnSpy.mockRestore()
+    })
+
+    it('onStatusChanged callback still fires on status transition alongside tracing', async () => {
+      const acc = makeAccount('acc-transition', { status: 'pending' })
+      const { service } = makeService([acc], { 'acc-transition': { ok: true, latencyMs: 5 } })
+      const onStatusChanged = vi.fn()
+      checker.onStatusChanged = onStatusChanged
+      const { events, stop } = captureTraceEvents()
+
+      checker.start(service)
+      await flushPromises()
+      stop()
+
+      expect(onStatusChanged).toHaveBeenCalledWith(
+        expect.objectContaining({ accountId: 'acc-transition', oldStatus: 'pending', newStatus: 'active' })
+      )
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:healthCheck')
+      expect(flowEvents.some((e) => e.level === 'ok')).toBe(true)
+    })
   })
 })

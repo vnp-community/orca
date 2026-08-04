@@ -387,3 +387,30 @@ function resolveTerminalFontSettings(settings: GlobalSettings): {
 // terminal-webgl-diagnostics-breadcrumbs.ts
 // Sentry breadcrumbs khi WebGL events xảy ra
 ```
+
+---
+
+## 13. Connection/Host Resolution for Terminals (2026-08-03) ✅ IMPLEMENTED
+
+```typescript
+// src/renderer/src/lib/connection-owner-resolution.ts (~100 dòng)
+// Resolve connectionId truyền vào window.api.pty.create(...) và các IPC file-access
+// dựa trên repo/worktree nào sở hữu một path/worktreeId cho trước.
+
+export function getConnectionIdFromState(
+  state: ConnectionOwnerState,
+  worktreeId: string | null
+): string | null | undefined
+
+export function getConnectionIdForFileFromState(
+  state: ConnectionOwnerState,
+  worktreeId: string | null,
+  filePath: string
+): string | null | undefined
+```
+
+**Bug đã fix:** cả hai hàm trước đây đọc thẳng `repo.connectionId ?? null` — KHÔNG BAO GIỜ check `repo.devServerId`. Kết quả: một repo bind vào Dev Server luôn resolve `connectionId: null`, khiến terminal/file access của nó bị route về LOCAL PTY provider thay vì Dev Server. Fix: dùng `getRepoProviderConnectionKey(repo)` (từ `src/shared/execution-host.ts`, xem TDD-FE-02 Addendum) — trả về `repo.connectionId ?? repo.devServerId ?? null` — nên giờ terminal của repo bind Dev Server route đúng.
+
+Fix này là điều kiện cần để `DevServerPtyProvider` (backend — `IPtyProvider` chạy qua các RPC `pty.create/write/resize/destroy/scrollback/sendSignal` của Dev Server agent, cộng push `pty.data`/`pty.exit` real-time) thực sự reachable từ một terminal tab thật; nếu không có fix renderer này, provider backend tồn tại nhưng không bao giờ được chọn cho repo bind Dev Server.
+
+**Điều kiện cần thêm (vận hành, không phải code):** Dev Server phải cài `node-pty` và advertise cả hai capability `pty` + `pty.stream` khi handshake — backend chỉ đăng ký `DevServerPtyProvider` khi cả hai đều có mặt. Không phải Dev Server nào cũng đáp ứng điều kiện này ngay lập tức.

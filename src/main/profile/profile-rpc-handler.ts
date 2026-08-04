@@ -20,11 +20,13 @@ import type { RpcMethod } from '../runtime/rpc/core'
 import type { ProfileService } from './ProfileService'
 import type { ProfileResolver } from './ProfileResolver'
 import type { OrcaProfile } from './OrcaProfile'
+import { Tracers } from '../../shared/trace/tracers'
 
 // ── Shared param schemas ─────────────────────────────────────────────────────
 
 const UserIdParam = z.object({
-  userId: z.string().min(1).optional()
+  userId: z.string().min(1).optional(),
+  traceId: z.string().optional() // [NEW CR-TRACE-015] — chỉ dùng cho profile.invalidate
 })
 
 const CompanyIdParam = z.object({
@@ -36,17 +38,20 @@ const DeptIdParam = z.object({
 })
 
 const ProfileJsonParam = z.object({
-  profile: z.record(z.string(), z.unknown())
+  profile: z.record(z.string(), z.unknown()),
+  traceId: z.string().optional() // [NEW CR-TRACE-015]
 })
 
 const SetCompanyProfileParam = z.object({
   companyId: z.string().min(1),
-  profile: z.record(z.string(), z.unknown())
+  profile: z.record(z.string(), z.unknown()),
+  traceId: z.string().optional() // [NEW CR-TRACE-015]
 })
 
 const SetDeptProfileParam = z.object({
   deptId: z.string().min(1),
-  profile: z.record(z.string(), z.unknown())
+  profile: z.record(z.string(), z.unknown()),
+  traceId: z.string().optional() // [NEW CR-TRACE-015]
 })
 
 const CreateCompanyParam = z.object({
@@ -114,15 +119,27 @@ export function createProfileMethods(
         const userId = ctx.userId
         if (!userId) throw new Error('UNAUTHENTICATED')
 
-        const profile = params.profile as OrcaProfile
-        if ('security' in profile && profile.security !== undefined) {
-          throw new Error('PROFILE_FIELD_LOCKED: security section is company-admin only')
-        }
+        const span = Tracers.profileUpdateLayerFlow.start(
+          { scope: 'user', targetId: userId },
+          params.traceId ? { id: params.traceId } : undefined
+        )
+        try {
+          const profile = params.profile as OrcaProfile
+          if ('security' in profile && profile.security !== undefined) {
+            span.fail('PROFILE_FIELD_LOCKED', { scope: 'user' })
+            throw new Error('PROFILE_FIELD_LOCKED: security section is company-admin only')
+          }
 
-        await profileService.setUserProfile(userId, profile)
-        // Invalidate cache for this user
-        profileResolver.invalidate(userId)
-        return { success: true }
+          await profileService.setUserProfile(userId, profile)
+          // Invalidate cache for this user
+          span.step('invalidateCache', { scope: 'user', affectedUserId: userId })
+          profileResolver.invalidate(userId)
+          span.ok({ scope: 'user', targetId: userId })
+          return { success: true }
+        } catch (err) {
+          span.fail(err, { scope: 'user' })
+          throw err
+        }
       }
     }),
 
@@ -145,14 +162,25 @@ export function createProfileMethods(
       handler: async (params, ctx) => {
         requireAdmin(ctx)
         const userId = ctx.userId ?? 'unknown'
-        await profileService.setCompanyProfile(
-          params.companyId,
-          params.profile as OrcaProfile,
-          userId
+        const span = Tracers.profileUpdateLayerFlow.start(
+          { scope: 'company', targetId: params.companyId },
+          params.traceId ? { id: params.traceId } : undefined
         )
-        // Invalidate all cached profiles (company change affects everyone)
-        profileResolver.invalidate()
-        return { success: true }
+        try {
+          await profileService.setCompanyProfile(
+            params.companyId,
+            params.profile as OrcaProfile,
+            userId
+          )
+          // Invalidate all cached profiles (company change affects everyone)
+          span.step('invalidateCache', { scope: 'company' })
+          profileResolver.invalidate()
+          span.ok({ scope: 'company', targetId: params.companyId })
+          return { success: true }
+        } catch (err) {
+          span.fail(err, { scope: 'company' })
+          throw err
+        }
       }
     }),
 
@@ -164,14 +192,25 @@ export function createProfileMethods(
       handler: async (params, ctx) => {
         requireAdmin(ctx)
         const userId = ctx.userId ?? 'unknown'
-        await profileService.setDeptProfile(
-          params.deptId,
-          params.profile as OrcaProfile,
-          userId
+        const span = Tracers.profileUpdateLayerFlow.start(
+          { scope: 'dept', targetId: params.deptId },
+          params.traceId ? { id: params.traceId } : undefined
         )
-        // Invalidate all to be safe (dept affects all dept members)
-        profileResolver.invalidate()
-        return { success: true }
+        try {
+          await profileService.setDeptProfile(
+            params.deptId,
+            params.profile as OrcaProfile,
+            userId
+          )
+          // Invalidate all to be safe (dept affects all dept members)
+          span.step('invalidateCache', { scope: 'dept' })
+          profileResolver.invalidate() // an toàn: invalidate toàn bộ vì không track dept membership trong cache key
+          span.ok({ scope: 'dept', targetId: params.deptId })
+          return { success: true }
+        } catch (err) {
+          span.fail(err, { scope: 'dept' })
+          throw err
+        }
       }
     }),
 
@@ -182,7 +221,13 @@ export function createProfileMethods(
       params: UserIdParam,
       handler: async (params, ctx) => {
         requireAdmin(ctx)
+        const span = Tracers.profileUpdateLayerFlow.start(
+          { scope: 'manual', targetId: params.userId ?? 'all' },
+          params.traceId ? { id: params.traceId } : undefined
+        )
+        span.step('invalidateCache', { scope: 'manual', affectedUserId: params.userId })
         profileResolver.invalidate(params.userId)
+        span.ok({ scope: 'manual', targetId: params.userId ?? 'all' })
         return { success: true, cleared: params.userId ?? 'all' }
       }
     }),

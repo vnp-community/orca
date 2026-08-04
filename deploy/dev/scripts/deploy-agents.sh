@@ -368,6 +368,13 @@ deploy_one_server() {
     local WORK_DIR_V="${work_dir}"
     local SSH_USER_V="${ssh_user}"
     local NODE_BIN_V="${NODE_BIN}"
+    # FIX BUG-DS-AWS: the generated start.sh template below embeds
+    # ${ORCA_AGENT_API_SECRET} directly into the agent's exec env so
+    # AgentTokenManager can renew its own token on auth failure. Without
+    # forwarding it here, the remote heredoc only ever sees AUTH_HEADER
+    # (used for the initial curl), so the agent always launches with an
+    # empty secret and silently falls back to the no-renewal legacy path.
+    local API_SECRET_V="${ORCA_AGENT_API_SECRET:-}"
 
     echo "${log_prefix} Installing systemd service (orca-agent-${LABEL_V})..."
     # shellcheck disable=SC2086
@@ -380,6 +387,7 @@ deploy_one_server() {
          WORK_DIR='${WORK_DIR_V}' \
          SSH_USER='${SSH_USER_V}' \
          AUTH_HEADER='${AUTH_HDR_VAL}' \
+         ORCA_AGENT_API_SECRET='${API_SECRET_V}' \
          NODE_BIN='${NODE_BIN_V}' \
          bash -s" << 'REMOTE_SCRIPT'
 mkdir -p "${AGENT_DIR}/logs"
@@ -477,6 +485,15 @@ ExecStart=/bin/bash ${AGENT_DIR}/start-${DEV_LABEL}.sh
 Restart=always
 RestartSec=15
 StartLimitBurst=0
+
+# Why KillMode=process (default is control-group): the agent spawns a
+# detached pty-daemon child process that holds live terminal PTYs so they
+# survive an agent restart (see src/relay/pty-daemon-server.ts). The default
+# control-group KillMode would kill that daemon (and every shell under it)
+# along with the agent on every "systemctl restart" — defeating the entire
+# point. process scopes every stop/restart signal to only the tracked agent
+# PID, leaving the daemon and its PTYs alone.
+KillMode=process
 
 TimeoutStopSec=15
 MemoryMax=512M

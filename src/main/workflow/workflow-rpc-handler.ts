@@ -18,6 +18,7 @@
 import { z } from 'zod'
 import { defineMethod } from '../runtime/rpc/core'
 import type { RpcMethod } from '../runtime/rpc/core'
+import type { IConnectionPool } from '../db/pool'
 import type { WorkflowOrchestrator } from './WorkflowOrchestrator'
 import type { TemplateResolver } from './TemplateResolver'
 
@@ -46,6 +47,7 @@ const ExecuteParam = z.object({
   definition: WorkflowDefinitionSchema,
   inputs: z.record(z.unknown()).optional(),
   projectId: z.string().optional(),
+  traceId: z.string().optional(), // [NEW] — reserved for future FE-initiated resume, không wire vào orchestrator.execute() (chưa có resume param, xem note bên dưới)
 })
 
 const GetExecutionParam = z.object({
@@ -82,7 +84,8 @@ const TemplateResolveParam = z.object({
 
 export function createWorkflowMethods(
   orchestrator: WorkflowOrchestrator,
-  templateResolver: TemplateResolver
+  templateResolver: TemplateResolver,
+  pool?: IConnectionPool // [NEW] optional — chỉ dùng để đọc lại root_trace_id đã persist cho response
 ): RpcMethod[] {
   return [
     // ── workflow.execute ───────────────────────────────────────────────────
@@ -92,14 +95,29 @@ export function createWorkflowMethods(
       params: ExecuteParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId ?? 'system'
+        // NOTE: orchestrator.execute() hiện chưa nhận resume param — cần overload tương tự
+        // AIProviderService.writeCredentialToDevServer() (TASK-BE-016.1) nếu muốn FE-initiated
+        // traceId resume vào workflowExecuteFlow. Việc này để lại cho patch nhỏ bổ sung khi cần,
+        // không chặn phần còn lại của task (rootTraceId nội bộ vẫn hoạt động độc lập).
         const execution = await orchestrator.execute(
           params.definition as Parameters<typeof orchestrator.execute>[0],
           params.inputs ?? {},
           userId,
           params.projectId
         )
+        // Trả traceId để FE filter TracePanel theo execution — đọc lại root_trace_id đã
+        // persist (TASK-BE-017.2), không phải giá trị tính lại trong bộ nhớ.
+        let traceId: string | undefined
+        if (pool) {
+          const rows = await pool.withConnection((db) =>
+            db.query(`SELECT root_trace_id as rootTraceId FROM orca_workflow_executions WHERE id = ?`, [
+              execution.id,
+            ])
+          )
+          traceId = (rows[0] as { rootTraceId: string | null } | undefined)?.rootTraceId ?? undefined
+        }
         // Return execution ID immediately (non-blocking)
-        return { executionId: execution.id, status: execution.status }
+        return { executionId: execution.id, status: execution.status, traceId }
       },
     }),
 

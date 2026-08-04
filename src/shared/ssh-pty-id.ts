@@ -4,13 +4,20 @@ const SSH_PTY_ID_PREFIX = 'ssh:'
 const SSH_PTY_ID_SEPARATOR = '@@'
 
 // Why: reconnect/restore paths sometimes hand these routers the execution-host
-// id form ("ssh:<targetId>", from a workspace `hostId`) instead of the bare SSH
-// target id that app PTY ids embed. Both name the same connection, so collapse
-// to the bare id before comparing/encoding — otherwise a valid reattach throws a
-// spurious "belongs to SSH connection" error at the user.
+// id form ("ssh:<targetId>" or "devServer:<id>", from a workspace `hostId`)
+// instead of the bare connection id that app PTY ids embed. Both name the same
+// connection, so collapse to the bare id before comparing/encoding — otherwise
+// a valid reattach throws a spurious "belongs to SSH connection" error. Dev
+// Server PTYs reuse this same id-namespacing scheme (see plan Phase 3).
 function normalizeConnectionId(connectionId: string): string {
   const parsed = parseExecutionHostId(connectionId)
-  return parsed?.kind === 'ssh' ? parsed.targetId : connectionId
+  if (parsed?.kind === 'ssh') {
+    return parsed.targetId
+  }
+  if (parsed?.kind === 'devServer') {
+    return parsed.devServerId
+  }
+  return connectionId
 }
 
 // Why: SSH relays allocate target-local ids like "pty-1"; app-wide routing

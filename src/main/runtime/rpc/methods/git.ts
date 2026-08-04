@@ -2,6 +2,7 @@
 import { defineMethod, type RpcMethod } from '../core'
 import type { GlobalSettings } from '../../../../shared/types'
 import type { ResolvedSourceControlAiGenerationParams } from '../../../../shared/source-control-ai'
+import { Tracers } from '../../../../shared/trace/tracers'
 import {
   GitBranchCompare,
   GitBranchDiff,
@@ -156,13 +157,26 @@ export const GIT_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'git.diff',
     params: GitDiff,
-    handler: async (params, { runtime }) =>
-      runtime.getRuntimeGitDiff(
-        params.worktree,
-        params.filePath,
-        params.staged,
-        params.compareAgainstHead
-      )
+    handler: async (params, { runtime }) => {
+      const span = Tracers.codeReviewDiff.start({
+        worktreeId: params.worktree,
+        mode: 'local',
+        staged: params.staged ?? false
+      })
+      try {
+        const result = await runtime.getRuntimeGitDiff(
+          params.worktree,
+          params.filePath,
+          params.staged,
+          params.compareAgainstHead
+        )
+        span.ok({ mode: 'local' })
+        return result
+      } catch (err) {
+        span.fail(err, { mode: 'local' })
+        throw err
+      }
+    }
   }),
   defineMethod({
     name: 'git.branchCompare',
@@ -263,11 +277,24 @@ export const GIT_METHODS: RpcMethod[] = [
     name: 'git.generateCommitMessage',
     params: GitGenerateCommitMessage,
     handler: async (params, { runtime }) => {
-      const override = buildCommitMessageGenerationOverride(params)
-      if (override === undefined) {
-        return runtime.generateRuntimeCommitMessage(params.worktree)
+      const span = Tracers.codeReviewAiCommit.start({ worktreeId: params.worktree, mode: 'local' })
+      try {
+        const override = buildCommitMessageGenerationOverride(params)
+        span.step('diffStaged', { mode: 'local' })
+        const result =
+          override === undefined
+            ? await runtime.generateRuntimeCommitMessage(params.worktree)
+            : await runtime.generateRuntimeCommitMessage(params.worktree, override)
+        if (!result.success) {
+          span.fail(result.error, { mode: 'local' })
+          return result
+        }
+        span.ok({ mode: 'local', messageChars: result.message?.length ?? 0 })
+        return result
+      } catch (err) {
+        span.fail(err, { mode: 'local' })
+        throw err
       }
-      return runtime.generateRuntimeCommitMessage(params.worktree, override)
     }
   }),
   defineMethod({
@@ -294,19 +321,28 @@ export const GIT_METHODS: RpcMethod[] = [
     name: 'git.generatePullRequestFields',
     params: GitGeneratePullRequestFields,
     handler: async (params, { runtime }) => {
-      const input = {
-        base: params.base,
-        title: params.title,
-        body: params.body,
-        draft: params.draft,
-        provider: params.provider,
-        useTemplate: params.useTemplate
+      const span = Tracers.codeReviewCreatePr.start({ worktreeId: params.worktree, mode: 'local' })
+      try {
+        const input = {
+          base: params.base,
+          title: params.title,
+          body: params.body,
+          draft: params.draft,
+          provider: params.provider,
+          useTemplate: params.useTemplate
+        }
+        const override = buildCommitMessageGenerationOverride(params)
+        span.step('aiGenerate', { mode: 'local' })
+        const result =
+          override === undefined
+            ? await runtime.generateRuntimePullRequestFields(params.worktree, input)
+            : await runtime.generateRuntimePullRequestFields(params.worktree, input, override)
+        span.ok({ mode: 'local' })
+        return result
+      } catch (err) {
+        span.fail(err, { mode: 'local' })
+        throw err
       }
-      const override = buildCommitMessageGenerationOverride(params)
-      if (override === undefined) {
-        return runtime.generateRuntimePullRequestFields(params.worktree, input)
-      }
-      return runtime.generateRuntimePullRequestFields(params.worktree, input, override)
     }
   }),
   defineMethod({

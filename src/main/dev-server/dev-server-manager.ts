@@ -35,6 +35,7 @@ type RuntimeDevServerState = {
   nodeVersion: string | null
   lastConnectedAt: number | null
   lastError: string | null
+  capabilities: readonly string[] | null
 }
 
 const DEFAULT_RUNTIME_STATE: RuntimeDevServerState = {
@@ -43,7 +44,8 @@ const DEFAULT_RUNTIME_STATE: RuntimeDevServerState = {
   arch: null,
   nodeVersion: null,
   lastConnectedAt: null,
-  lastError: null
+  lastError: null,
+  capabilities: null
 }
 
 export class DevServerManager extends EventEmitter {
@@ -223,6 +225,9 @@ export class DevServerManager extends EventEmitter {
       bridge.on('agentTokenGenerated', (info: AgentTokenInfo) => {
         this.emit('devServer:agentToken', info)
       })
+      bridge.onNotification((method, params) => {
+        this.emit('devServer:notification', id, method, params)
+      })
 
       const info = await bridge.connect()
 
@@ -233,7 +238,8 @@ export class DevServerManager extends EventEmitter {
         arch: info.arch,
         nodeVersion: info.nodeVersion,
         lastConnectedAt: Date.now(),
-        lastError: null
+        lastError: null,
+        capabilities: info.capabilities ?? null
       })
       this.emit('devServer:statusChanged', id, 'connected')
       span.ok({ platform: String(info.platform), node: info.nodeVersion })
@@ -310,6 +316,7 @@ export class DevServerManager extends EventEmitter {
             nodeVersion: info.nodeVersion,
             lastConnectedAt: Date.now(),
             lastError: null,
+            capabilities: info.capabilities ?? null,
           })
           this.emit('devServer:statusChanged', opts.devServerId, 'connected')
         }).catch((err: Error) => {
@@ -338,6 +345,9 @@ export class DevServerManager extends EventEmitter {
     bridge.on('agentTokenGenerated', (info: AgentTokenInfo) => {
       this.emit('devServer:agentToken', info)
     })
+    bridge.onNotification((method, params) => {
+      this.emit('devServer:notification', opts.devServerId, method, params)
+    })
 
     this.relays.set(opts.devServerId, bridge)
     this.setRuntimeState(opts.devServerId, { status: 'connecting', lastError: null })
@@ -352,6 +362,7 @@ export class DevServerManager extends EventEmitter {
         nodeVersion: info.nodeVersion,
         lastConnectedAt: Date.now(),
         lastError: null,
+        capabilities: info.capabilities ?? null,
       })
       this.emit('devServer:statusChanged', opts.devServerId, 'connected')
       console.log(

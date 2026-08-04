@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   generatePullRequestFieldsFromContext: vi.fn(),
   resolveCommitMessageSettings: vi.fn(),
   resolveHostedReviewBodyForGeneration: vi.fn(),
-  getSshGitProvider: vi.fn()
+  getRemoteGitProvider: vi.fn()
 }))
 
 vi.mock('../git/status', async () => ({
@@ -51,7 +51,7 @@ vi.mock('../text-generation/pull-request-context', async () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: mocks.getSshGitProvider
+  getRemoteGitProvider: mocks.getRemoteGitProvider
 }))
 
 vi.mock('../source-control/pull-request-template', () => ({
@@ -93,7 +93,7 @@ describe('RuntimeGitCommands', () => {
     mocks.resolveCommitMessageSettings.mockReset()
     mocks.resolveHostedReviewBodyForGeneration.mockReset()
     mocks.resolveHostedReviewBodyForGeneration.mockImplementation(async ({ body }) => body)
-    mocks.getSshGitProvider.mockReset()
+    mocks.getRemoteGitProvider.mockReset()
     mocks.checkoutBranch.mockReset()
     mocks.listLocalBranches.mockReset()
   })
@@ -117,7 +117,7 @@ describe('RuntimeGitCommands', () => {
 
   it('aborts a remote merge through the SSH git provider', async () => {
     const provider = { abortMerge: vi.fn().mockResolvedValue(undefined) }
-    mocks.getSshGitProvider.mockReturnValue(provider)
+    mocks.getRemoteGitProvider.mockReturnValue(provider)
     const commands = new RuntimeGitCommands({
       resolveRuntimeGitTarget: async () => ({
         worktree: makeWorktree('/remote/repo'),
@@ -145,7 +145,7 @@ describe('RuntimeGitCommands', () => {
 
   it('aborts a remote rebase through the SSH git provider', async () => {
     const provider = { abortRebase: vi.fn().mockResolvedValue(undefined) }
-    mocks.getSshGitProvider.mockReturnValue(provider)
+    mocks.getRemoteGitProvider.mockReturnValue(provider)
     const commands = new RuntimeGitCommands({
       resolveRuntimeGitTarget: async () => ({
         worktree: makeWorktree('/remote/repo'),
@@ -176,7 +176,7 @@ describe('RuntimeGitCommands', () => {
 
   it('checks out a remote branch through the SSH git provider', async () => {
     const provider = { checkoutBranch: vi.fn().mockResolvedValue(undefined) }
-    mocks.getSshGitProvider.mockReturnValue(provider)
+    mocks.getRemoteGitProvider.mockReturnValue(provider)
     const commands = new RuntimeGitCommands({
       resolveRuntimeGitTarget: async () => ({
         worktree: makeWorktree('/remote/repo'),
@@ -212,7 +212,7 @@ describe('RuntimeGitCommands', () => {
     const provider = {
       listLocalBranches: vi.fn().mockResolvedValue({ current: 'main', branches: ['main'] })
     }
-    mocks.getSshGitProvider.mockReturnValue(provider)
+    mocks.getRemoteGitProvider.mockReturnValue(provider)
     const commands = new RuntimeGitCommands({
       resolveRuntimeGitTarget: async () => ({
         worktree: makeWorktree('/remote/repo'),
@@ -552,7 +552,7 @@ describe('RuntimeGitCommands', () => {
       getStagedCommitContext: vi.fn().mockResolvedValue(context),
       executeCommitMessagePlan: vi.fn()
     }
-    mocks.getSshGitProvider.mockReturnValue(provider)
+    mocks.getRemoteGitProvider.mockReturnValue(provider)
     const commands = new RuntimeGitCommands({
       resolveRuntimeGitTarget: async () => ({
         worktree: makeWorktree(worktreePath),

@@ -1,7 +1,8 @@
 import type { GitWorktreeInfo, Repo } from '../shared/types'
 import { listWorktrees } from './git/worktree'
 import { isFolderRepo } from '../shared/repo-kind'
-import { getSshGitProvider } from './providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from './providers/ssh-git-dispatch'
+import { getRepoProviderConnectionKey } from '../shared/execution-host'
 import { areWorktreePathsEqual } from './ipc/worktree-logic'
 
 type LocalRepoWorktreeListOptions = {
@@ -39,8 +40,9 @@ export async function listRepoWorktrees(
   if (isFolderRepo(repo)) {
     return [createFolderWorktree(repo)]
   }
-  if (repo.connectionId) {
-    const provider = getSshGitProvider(repo.connectionId)
+  const providerConnectionId = getRepoProviderConnectionKey(repo)
+  if (providerConnectionId) {
+    const provider = getRemoteGitProvider(providerConnectionId)
     // Why: runtime worktree resolution can run before SSH providers have
     // reattached during startup. Return empty instead of falling back to
     // local git against a server path.

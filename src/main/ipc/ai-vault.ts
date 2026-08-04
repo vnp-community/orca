@@ -27,8 +27,8 @@ import {
   type ExecutionHostScope
 } from '../../shared/execution-host'
 import {
-  getSshFilesystemProvider,
-  SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE
+  getRemoteFilesystemProvider,
+  REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE
 } from '../providers/ssh-filesystem-dispatch'
 import { getActiveSshAiVaultHostInfo, getActiveSshAiVaultHostInfos } from './ssh'
 
@@ -241,12 +241,12 @@ async function scanSshAiVaultSessions(
 ): Promise<AiVaultListResult> {
   const executionHostId = toSshExecutionHostId(targetId)
   const hostInfo = getActiveSshAiVaultHostInfo(targetId)
-  const provider = getSshFilesystemProvider(targetId)
+  const provider = getRemoteFilesystemProvider(targetId)
   if (!hostInfo || !provider) {
     return sshScanIssueResult({
       executionHostId,
       targetId,
-      message: SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE
+      message: REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE
     })
   }
   return scanRemoteAiVaultSessions({

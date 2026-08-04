@@ -3,7 +3,7 @@ import type { Store } from '../persistence'
 import type { IPtyProvider } from '../providers/types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { listRegisteredPtys } from '../memory/pty-registry'
-import { getSshPtyProvider } from './pty'
+import { getRemotePtyProvider } from './pty'
 import {
   WORKSPACE_CLEANUP_CLASSIFIER_VERSION,
   type WorkspaceCleanupDismissArgs,
@@ -125,7 +125,7 @@ async function hasKillableSshProcesses(
   worktreePath: string,
   livenessUnknown: boolean
 ): Promise<boolean | null> {
-  const provider = getSshPtyProvider(connectionId)
+  const provider = getRemotePtyProvider(connectionId)
   if (!provider) {
     return null
   }

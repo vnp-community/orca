@@ -150,6 +150,31 @@ describe('task RPC methods', () => {
       const result = await method.handler({ taskId: 'task-001', projectId: 'proj-001', worktreePath: '/repo' }, makeCtx('user-001'))
       expect(result).toEqual({ started: true })
     })
+
+    // ── CR-TRACE-002: traceId param propagation (TASK-BE-002.4) ─────────────
+
+    it('accepts an optional traceId param and forwards it to executor.executeTask', async () => {
+      const executor = makeExecutor()
+      const methods = createTaskMethods(makeTaskService() as any, makeGrantService('execute') as any, makeAIPlanner() as any, executor as any)
+      const method = findMethod(methods, 'task.execute')
+      await method.handler(
+        { taskId: 'task-001', projectId: 'proj-001', worktreePath: '/repo', traceId: 'resume-execute-1' },
+        makeCtx('user-001')
+      )
+      expect(executor.executeTask).toHaveBeenCalledWith(expect.objectContaining({
+        traceId: 'resume-execute-1',
+      }))
+    })
+
+    it('omits traceId gracefully (backward compatible) when the param is not provided', async () => {
+      const executor = makeExecutor()
+      const methods = createTaskMethods(makeTaskService() as any, makeGrantService('execute') as any, makeAIPlanner() as any, executor as any)
+      const method = findMethod(methods, 'task.execute')
+      await method.handler({ taskId: 'task-001', projectId: 'proj-001', worktreePath: '/repo' }, makeCtx('user-001'))
+      expect(executor.executeTask).toHaveBeenCalledWith(expect.objectContaining({
+        traceId: undefined,
+      }))
+    })
   })
 
   // ── task.aiDecompose ───────────────────────────────────────────────────────

@@ -26,6 +26,9 @@ export type DevServer = {
   lastError: string | null
   workspaceDir: string | null // Remote default workspace directory
   addedAt: number
+  /** Capabilities the agent advertised at handshake (e.g. 'pty', 'pty.stream',
+   *  'fs.watch'). Null until a successful handshake has completed at least once. */
+  capabilities: readonly string[] | null
 }
 
 export type DevServerInput = {

@@ -20,6 +20,7 @@ import { migration0009Workflows } from './0009_workflows'
 import { migration0010Tasks } from './0010_tasks'
 import { migration0011TerminalSessions } from './0011_terminal_sessions'
 import { migration0012PortForwardsPush } from './0012_port_forwards_push'
+import { migration0013WorkflowTraceCorrelation } from './0013_workflow_trace_correlation'
 import type { Migration } from './types'
 
 /** All migrations in version order. */
@@ -38,6 +39,8 @@ export const ALL_MIGRATIONS: readonly Migration[] = [
   migration0011TerminalSessions,
   // v5.1 — Port Forward persistence + Push Subscriptions (BUG-BE-SSH-002, TASK-MB-001)
   migration0012PortForwardsPush,
+  // v5.1 — Workflow Trace Correlation (CR-TRACE-017 §3.1 — parentTraceId resume-after-restart)
+  migration0013WorkflowTraceCorrelation,
 ]
 
 export { MigrationRunner } from './runner'

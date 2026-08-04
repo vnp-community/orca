@@ -4,6 +4,7 @@
 //   fs.readDir, fs.readFile, fs.grep, preflight.check
 
 import { readdir, stat, writeFile, mkdir, rmdir as fsRmdir, rm } from 'node:fs/promises'
+import { watch as fsWatchSync, type FSWatcher } from 'node:fs'
 import { join, isAbsolute, resolve as resolvePath, dirname } from 'node:path'
 import { spawn } from 'node:child_process'
 import type { AgentConfig } from './agent-config'
@@ -13,6 +14,9 @@ import { checkRgAvailable } from './fs-handler-utils'
 import { createTracer } from '../shared/trace'
 
 const fsTracer = createTracer('agent:fs')
+// Distinct from `agent:fs` (used for fs.* RPC methods) — preflight.check is a
+// separate concern (binary/tool availability probing).
+const preflightTracer = createTracer('agent:preflight')
 
 // ─── fs.readDir ───────────────────────────────────────────────────────────────
 
@@ -258,6 +262,7 @@ export async function handlePreflightCheck(
 ): Promise<object> {
   const services = Array.isArray(params.services) ? params.services.map(String) : []
   const results: Record<string, boolean> = {}
+  const span = preflightTracer.start({ services: services.join(',') || '(empty)' })
 
   await Promise.all(services.map(async (service) => {
     try {
@@ -281,6 +286,15 @@ export async function handlePreflightCheck(
       results[service] = false
     }
   }))
+
+  // Business-level fail (some service unavailable) is distinguished from an
+  // exception path, per CR-TRACE-014.
+  const failedServices = Object.entries(results).filter(([, ok]) => !ok).map(([svc]) => svc)
+  if (failedServices.length > 0) {
+    span.fail(`unavailable: ${failedServices.join(',')}`, { failedCount: failedServices.length })
+  } else {
+    span.ok({ checkedCount: services.length })
+  }
 
   return { jsonrpc: '2.0', id, result: results }
 }
@@ -567,5 +581,91 @@ export async function handleFsRmdir(
     const msg = err instanceof Error ? err.message : String(err)
     span.fail(err, { path: absPath, recursive })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
+  }
+}
+
+// ─── fs.watch / fs.unwatch ──────────────────────────────────────────────────
+// Pushes `fs.changed` notifications for a watched path. Refcounted per path:
+// multiple Orca-side callers (different user processes sharing this Dev
+// Server) can watch the same path without one's unwatch tearing it down for
+// the others.
+
+interface AgentWatchEntry {
+  watcher: FSWatcher
+  refCount: number
+}
+
+const AGENT_WATCH_MAP = new Map<string, AgentWatchEntry>()
+
+export async function handleFsWatch(
+  id:     string | number | null,
+  params: Record<string, unknown>,
+  config: AgentConfig,
+  notify: (method: string, params: Record<string, unknown>) => void,
+): Promise<object> {
+  const rawPath = typeof params.path === 'string' ? params.path : ''
+  if (!rawPath) {
+    return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing required param: path' } }
+  }
+  const absPath = isAbsolute(rawPath) ? rawPath : join(config.workDir, rawPath)
+
+  const existing = AGENT_WATCH_MAP.get(absPath)
+  if (existing) {
+    existing.refCount++
+    return { jsonrpc: '2.0', id, result: { ok: true, path: absPath } }
+  }
+
+  try {
+    // Why: recursive:true is only honored by Node on macOS/Windows. On Linux
+    // this watches the top-level directory only — still covers the common
+    // create/delete/rename-at-this-level case; deeper changes rely on the
+    // client's periodic re-read until a Linux-side recursive strategy lands.
+    const watcher = fsWatchSync(absPath, { recursive: process.platform !== 'linux' }, (eventType, filename) => {
+      notify('fs.changed', { path: absPath, eventType, filename: filename ?? null })
+    })
+    watcher.on('error', (err: Error) => {
+      notify('fs.changed', { path: absPath, eventType: 'error', filename: null, error: err.message })
+      AGENT_WATCH_MAP.delete(absPath)
+    })
+    AGENT_WATCH_MAP.set(absPath, { watcher, refCount: 1 })
+    return { jsonrpc: '2.0', id, result: { ok: true, path: absPath } }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: `fs.watch failed: ${msg}` } }
+  }
+}
+
+export async function handleFsUnwatch(
+  id:     string | number | null,
+  params: Record<string, unknown>,
+  config: AgentConfig,
+): Promise<object> {
+  const rawPath = typeof params.path === 'string' ? params.path : ''
+  const absPath = isAbsolute(rawPath) ? rawPath : join(config.workDir, rawPath)
+
+  const entry = AGENT_WATCH_MAP.get(absPath)
+  if (entry) {
+    entry.refCount--
+    if (entry.refCount <= 0) {
+      entry.watcher.close()
+      AGENT_WATCH_MAP.delete(absPath)
+    }
+  }
+  return { jsonrpc: '2.0', id, result: { ok: true } }
+}
+
+/**
+ * cleanupAgentWatches — Close all active fs watchers.
+ * Must be called on session termination (agent-session.ts stop()), mirroring
+ * cleanupAgentPtys — otherwise watchers outlive a dropped WebSocket.
+ */
+export function cleanupAgentWatches(): void {
+  for (const [path, entry] of AGENT_WATCH_MAP.entries()) {
+    try {
+      entry.watcher.close()
+    } catch {
+      // best effort
+    }
+    AGENT_WATCH_MAP.delete(path)
   }
 }

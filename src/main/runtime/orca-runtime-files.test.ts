@@ -89,13 +89,13 @@ vi.mock('../ipc/local-worktree-runtime-options', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: vi.fn(),
-  SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE:
+  getRemoteFilesystemProvider: vi.fn(),
+  REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE:
     'Remote connection dropped. Click Reconnect on the SSH target before retrying.'
 }))
 
 import { awaitRuntimeFileWatcherUnsubscribes, RuntimeFileCommands } from './orca-runtime-files'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { SEARCH_TIMEOUT_MS } from '../../shared/text-search'
 
 type MockRuntimeSearchChild = EventEmitter & {
@@ -202,7 +202,7 @@ describe('RuntimeFileCommands', () => {
     watchInWatcherProcessMock.mockReset()
     watchMock.mockReset()
     checkRgAvailableMock.mockReset()
-    vi.mocked(getSshFilesystemProvider).mockReset()
+    vi.mocked(getRemoteFilesystemProvider).mockReset()
     getLocalGitOptionsForRegisteredWorktreeMock.mockReset()
     wslAwareSpawnMock.mockReset()
     getLocalGitOptionsForRegisteredWorktreeMock.mockReturnValue({})
@@ -382,7 +382,7 @@ describe('RuntimeFileCommands', () => {
 
   it('routes runtime remote rename through the SSH no-clobber provider method', async () => {
     const renameNoClobber = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(getSshFilesystemProvider).mockReturnValue({ renameNoClobber } as never)
+    vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ renameNoClobber } as never)
     const { commands, store } = createRuntimeFileCommands()
     store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
 
@@ -394,7 +394,7 @@ describe('RuntimeFileCommands', () => {
 
   it('propagates runtime remote no-clobber rename failures', async () => {
     const renameNoClobber = vi.fn().mockRejectedValue(new Error('destination exists'))
-    vi.mocked(getSshFilesystemProvider).mockReturnValue({ renameNoClobber } as never)
+    vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ renameNoClobber } as never)
     const { commands, store } = createRuntimeFileCommands()
     store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
 
@@ -593,7 +593,7 @@ describe('RuntimeFileCommands', () => {
         .mockResolvedValue({ content: '{"ok":true}', isBinary: false })
       const writeTerminalArtifact = vi.fn().mockResolvedValue({ type: 'file', size: 12, mtime: 4 })
       const realpath = vi.fn(async (p: string) => (p === artifactPath ? realArtifactPath : p))
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({
         stat,
         readTerminalArtifact,
         realpath,
@@ -911,7 +911,7 @@ describe('RuntimeFileCommands', () => {
       const realpath = vi.fn(async (p: string) =>
         p === '/tmp/link-result.json' ? '/tmp/result.json' : p
       )
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, realpath } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat, realpath } as never)
 
       const result = await resolveTerminalArtifactPath(commands, '/tmp/link-result.json')
 
@@ -933,7 +933,7 @@ describe('RuntimeFileCommands', () => {
       store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
       const stat = vi.fn().mockResolvedValue({ type: 'file', size: 2, mtime: 3, nlink: 2 })
       const realpath = vi.fn(async (p: string) => p)
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, realpath } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat, realpath } as never)
 
       const result = await resolveTerminalArtifactPath(commands, '/tmp/result.json')
 
@@ -950,7 +950,7 @@ describe('RuntimeFileCommands', () => {
       store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
       const stat = vi.fn().mockResolvedValue({ type: 'file', size: 2, mtime: 3 })
       const realpath = vi.fn(async (p: string) => p)
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, realpath } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat, realpath } as never)
 
       const result = await resolveTerminalArtifactPath(commands, '/private/tmp/result.json')
 
@@ -974,7 +974,7 @@ describe('RuntimeFileCommands', () => {
       const realpath = vi.fn(async (p: string) =>
         p === '/tmp/link-result.json' ? '/home/me/.ssh/config' : p
       )
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, realpath } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat, realpath } as never)
 
       const result = await commands.resolveTerminalPath(
         'id:wt-1',
@@ -1145,7 +1145,7 @@ describe('RuntimeFileCommands', () => {
       store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
       const stat = vi.fn().mockResolvedValue({ type: 'file', size: 2, mtime: 3 })
       const realpath = vi.fn(async (p: string) => p)
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, realpath } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat, realpath } as never)
 
       const result = await resolveTerminalArtifactPath(commands, '//remote-host/tmp/result.json')
 
@@ -1177,7 +1177,7 @@ describe('RuntimeFileCommands', () => {
       store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
       const stat = vi.fn().mockResolvedValue({ type: 'file', size: 2, mtime: 3 })
       const realpath = vi.fn(async (p: string) => p)
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, realpath } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat, realpath } as never)
 
       const result = await commands.resolveTerminalPath(
         'id:wt-1',
@@ -1205,7 +1205,7 @@ describe('RuntimeFileCommands', () => {
       store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
       const stat = vi.fn().mockResolvedValue({ type: 'file', size: 2, mtime: 3 })
       const realpath = vi.fn(async (p: string) => p)
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat, realpath } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat, realpath } as never)
 
       const result = await commands.resolveTerminalPath(
         'id:wt-1',
@@ -1559,7 +1559,7 @@ describe('RuntimeFileCommands', () => {
       const writeTerminalArtifact = vi.fn().mockRejectedValue(new Error('binary_file'))
       const realpath = vi.fn(async (p: string) => p)
       const writeFile = vi.fn()
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({
         stat,
         realpath,
         writeFile,
@@ -1655,7 +1655,7 @@ describe('RuntimeFileCommands', () => {
       const { commands, store } = createRuntimeFileCommands({ path: '/repo' })
       store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
       const stat = vi.fn()
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat } as never)
 
       const result = await commands.resolveTerminalPath('id:wt-1', '~/notes.md')
 
@@ -1667,7 +1667,7 @@ describe('RuntimeFileCommands', () => {
       const { commands, store } = createRuntimeFileCommands({ path: '/repo' })
       store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
       const stat = vi.fn().mockRejectedValue(new Error('ENOENT: no such file'))
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat } as never)
 
       const result = await commands.resolveTerminalPath('id:wt-1', 'src/missing.ts')
 
@@ -1678,7 +1678,7 @@ describe('RuntimeFileCommands', () => {
       const { commands, store } = createRuntimeFileCommands({ path: '/repo' })
       store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
       const stat = vi.fn().mockRejectedValue(new Error('Remote connection dropped'))
-      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat } as never)
+      vi.mocked(getRemoteFilesystemProvider).mockReturnValue({ stat } as never)
 
       await expect(commands.resolveTerminalPath('id:wt-1', 'src/x.ts')).rejects.toThrow(
         'Remote connection dropped'

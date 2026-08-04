@@ -51,6 +51,8 @@ Trigger: mở project workspace, mở terminal mới, khởi động agent
     │
     ▼
 [Dev Server — relay/pty-handler.ts]
+    ├─ IF Dev Server chưa cài node-pty (agent cũ / chưa setup): trả lỗi
+    │   → Browser hiển thị thông báo rõ ràng "máy này chưa hỗ trợ terminal"
     ├─ node-pty.spawn(shellPath, [], { cwd, cols, rows, env })
     ├─ PTY_REGISTRY.set(ptyId, { pty, cwd, connectedAt })
     └─ Return: { ptyId, sessionId }
@@ -232,6 +234,26 @@ Chiều kết nối (quan trọng):
   Dev Server ──stream──► Orca Server       (PTY output events)
   Orca Server ──WS push──► Browser         (xterm.js data)
 ```
+
+---
+
+## Giới hạn của Terminal khi Dev Server là agent phone-home (WebSocket)
+
+> Terminal/PTY qua Dev Server mới được hỗ trợ. Traffic của terminal đi qua ĐÚNG kết
+> nối WebSocket mà Dev Server Agent đã mở sẵn cho git/file — không mở kết nối riêng.
+
+- **Cần node-pty cài trên đúng máy đó**: Dev Server Agent phải cài `node-pty`
+  (build tools + `npm install` + restart agent) thì mới mở được terminal. Đây là
+  bước setup riêng của người vận hành Dev Server — tách biệt với việc chỉ kết nối
+  Dev Server. Agent chưa cài node-pty vẫn kết nối/dùng git/file bình thường, chỉ
+  không mở được terminal (xem lỗi ở BL-TM-01).
+- **Không hỗ trợ reattach**: đóng tab (hoặc mất kết nối), hay restart Orca → phiên
+  PTY trên Dev Server kết thúc, phải `pty.create` một phiên mới (BL-TM-01). BL-TM-03
+  chỉ khôi phục lại **nội dung scrollback** vào một PTY hoàn toàn mới, không resume
+  đúng process đang chạy. Khác với terminal trên SSH Host, vốn có thể sống qua
+  grace period và reconnect vào đúng phiên cũ.
+- **Không có "danh sách terminal đang chạy" hay shell profile đã lưu**: mỗi
+  terminal mở trên Dev Server đều dùng default shell của máy đó.
 
 ---
 

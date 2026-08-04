@@ -5,6 +5,8 @@ import type { ToolDefinition, ToolResult } from '../agent-tool-registry'
 import type { AgentConfig } from '../agent-config'
 import type { AgentLogger } from '../agent-logger'
 import { createWireState, HEADER_SIZE } from '../agent-wire'
+import { registerTraceSink, type TraceEvent } from '../../shared/trace'
+import { AgentErrorCode } from '../../shared/agent-wire-protocol'
 
 // ─── Mock WebSocket ──────────────────────────────────────────────────────────
 class MockWs {
@@ -236,4 +238,274 @@ describe('makeError', () => {
     const e = makeError(1, -32000, 'err') as any
     expect('data' in e.error).toBe(false)
   })
+})
+
+// ─── dispatch() — trace resume (CR-TRACE-000) ────────────────────────────────
+describe('dispatch() — trace resume', () => {
+  it('resumes agent:rpc span id from params._trace.id', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const ws = new MockWs()
+    await d.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _trace: { id: 'resumed-rpc-1' } },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')
+    expect(start?.id).toBe('resumed-rpc-1')
+  })
+
+  it('generates a new span id when params._trace is absent', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const ws = new MockWs()
+    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')
+    expect(start?.id).toBeTruthy()
+    expect(start?.id).not.toBe('resumed-rpc-1')
+  })
+})
+
+// ─── agent.exec — extractTraceFields (CR-TRACE-015) ──────────────────────────
+describe('agent.exec — extractTraceFields (CR-TRACE-015)', () => {
+  it('start event includes binary/argsCount/hasEnvOverride/timeoutMs, not session/cmd', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: 'echo', args: ['hi'], cwd: '/tmp', env: { FOO: 'bar' }, timeoutMs: 5000 },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    expect(start.fields.binary).toBe('echo')
+    expect(start.fields.argsCount).toBe(1)
+    expect(start.fields.hasEnvOverride).toBe(true)
+    expect(start.fields.timeoutMs).toBe(5000)
+    expect(start.fields.session).toBeUndefined()
+  })
+
+  it('ok event includes exitCode and timedOut from the agent.exec result', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: process.execPath, args: ['-e', 'process.exit(0)'] },
+    })
+    unregister()
+    const ok = events.find(e => e.flow === 'agent:rpc' && e.level === 'ok')!
+    expect(ok.fields.exitCode).toBe(0)
+    expect(ok.fields.timedOut).toBe(false)
+  })
+
+  it('agent.spawn (interactive) still uses the legacy session/cmd bucket, unaffected', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.spawn',
+      params: { taskId: 'task-1', modelId: 'unknown-model-xyz', userId: 'u1', accountId: 'a1' },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    // Legacy 'agent.' bucket (session/binary/cmd) still applies — unaffected by
+    // the new dedicated agent.exec bucket, which is checked BEFORE this one.
+    expect(start.fields.session).toBe('task-1')
+    // argsCount/hasEnvOverride only exist on the new agent.exec bucket, never
+    // set by the legacy 'agent.' bucket used for agent.spawn.
+    expect(start.fields.argsCount).toBeUndefined()
+    expect(start.fields.hasEnvOverride).toBeUndefined()
+  })
+
+  it('agent.exec without env param → hasEnvOverride is false, not undefined-vs-false ambiguity', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: 'echo', args: ['hi'] },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    expect(start.fields.hasEnvOverride).toBe(false)
+  })
+})
+
+// ─── agent.exec — stepId / parentTraceId (CR-TRACE-017) ──────────────────────
+describe('agent.exec — stepId / parentTraceId (CR-TRACE-017)', () => {
+  it('surfaces stepId when StepExecutors sends it', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp', stepId: 'step-42' },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    expect(start.fields.stepId).toBe('step-42')
+  })
+
+  it('surfaces parentTraceId when present (forward-compat with future backend change)', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp', parentTraceId: 'root-abc123' },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    expect(start.fields.parentTraceId).toBe('root-abc123')
+  })
+
+  it('omits stepId/parentTraceId cleanly for non-workflow agent.exec callers (Profile/Task Graph)', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp' },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    expect(start.fields.stepId).toBeUndefined()
+    expect(start.fields.parentTraceId).toBeUndefined()
+  })
+})
+
+// ─── shell.exec / notification.send — documented gap (CR-TRACE-017) ──────────
+describe('shell.exec / notification.send — documented gap (CR-TRACE-017)', () => {
+  it('shell.exec returns MethodNotFound today (no agent-side handler exists)', async () => {
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'shell.exec', params: { script: 'echo hi' },
+    })
+    const resp = lastResponseJson(ws) as any
+    expect(resp.error.code).toBe(AgentErrorCode.MethodNotFound)
+  })
+
+  it('notification.send returns MethodNotFound today (no agent-side handler exists)', async () => {
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'notification.send', params: { message: 'hi' },
+    })
+    const resp = lastResponseJson(ws) as any
+    expect(resp.error.code).toBe(AgentErrorCode.MethodNotFound)
+  })
+})
+
+// ─── ai.complete — extractTraceFields (CR-TRACE-018) ─────────────────────────
+describe('ai.complete — extractTraceFields (CR-TRACE-018)', () => {
+  it('surfaces model/taskId/promptLength on the agent:rpc dispatch span', async () => {
+    // No provider API key in env → handleAIComplete fails fast (no network
+    // call) — irrelevant here since the agent:rpc 'start' event is emitted by
+    // dispatch() BEFORE route() runs, from extractTraceFields() alone.
+    vi.stubEnv('ANTHROPIC_API_KEY', '')
+    vi.stubEnv('OPENAI_API_KEY', '')
+    vi.stubEnv('GOOGLE_API_KEY', '')
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'ai.complete',
+      params: { prompt: 'hello world', taskId: 'task-77', model: 'claude-opus-4-5' },
+    })
+    unregister()
+    vi.unstubAllEnvs()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    expect(start.fields.model).toBe('claude-opus-4-5')
+    expect(start.fields.taskId).toBe('task-77')
+    expect(start.fields.promptLength).toBe('hello world'.length)
+  })
+})
+
+// ─── agent.exec — taskId (CR-TRACE-018, forward-compat) ──────────────────────
+describe('agent.exec — taskId (CR-TRACE-018, forward-compat)', () => {
+  it('surfaces taskId when present in params', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp', taskId: 'task-99' },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    expect(start.fields.taskId).toBe('task-99')
+  })
+
+  it('omits taskId cleanly when absent (current ProfileAwareAgentSpawner behavior)', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    // Matches today's real backend payload: ProfileAwareAgentSpawner.spawn()
+    // only sends { binary, args, cwd, env, timeoutMs } — no top-level taskId.
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp' },
+    })
+    unregister()
+    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    expect(start.fields.taskId).toBeUndefined()
+  })
+})
+
+// ─── case 'agent.exec' — agentOrch:spawn (CR-TRACE-002) ──────────────────────
+describe("case 'agent.exec' — agentOrch:spawn", () => {
+  it('emits agentOrch:spawn span with ok() containing exitCode on success', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await d.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: process.execPath, args: ['-e', 'process.exit(0)'] },
+    })
+    unregister()
+    const ok = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'ok')
+    expect(ok?.fields.exitCode).toBe(0)
+  })
+
+  it('emits fail() when binary is missing', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await d.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec', params: {},
+    })
+    unregister()
+    const fail = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'fail')
+    expect(fail?.fields.err).toBe('binary is required')
+  })
+
+  it('emits fail() with timeout field when subprocess times out', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await d.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.exec',
+      params: { binary: process.execPath, args: ['-e', 'setTimeout(() => {}, 5000)'], timeoutMs: 1000 },
+    })
+    unregister()
+    const fail = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'fail')
+    expect(fail?.fields.err).toContain('timeout')
+  }, 10_000)
 })

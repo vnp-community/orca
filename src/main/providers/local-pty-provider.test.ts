@@ -87,6 +87,7 @@ vi.mock('../wsl', () => ({
 import { LocalPtyProvider } from './local-pty-provider'
 import { isRootLikePath } from './pty-path-safety'
 import { POWERLEVEL10K_WIZARD_DISABLE_ENV } from '../pty/powerlevel10k-wizard-env'
+import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 
 describe('LocalPtyProvider', () => {
   let provider: LocalPtyProvider
@@ -884,6 +885,38 @@ describe('LocalPtyProvider', () => {
           })
         })
       )
+    })
+  })
+
+  // ── CR-TRACE-003: spawn() tracing (TASK-BE-003.2/003.4) ──────────────────────
+  describe('spawn tracing (CR-TRACE-003)', () => {
+    it('spawn() emits a terminalCreate span with providerType=local, ok() containing ptyId', async () => {
+      const events: TraceEvent[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+
+      const { id } = await provider.spawn({ cols: 80, rows: 24 })
+      unregister()
+
+      const created = events.filter((e) => e.flow === 'terminal:create')
+      expect(created[0]?.level).toBe('start')
+      expect(created[0]?.fields).toMatchObject({ providerType: 'local', step: 'provider-spawn' })
+      const ok = created.find((e) => e.level === 'ok')
+      expect(ok?.fields).toMatchObject({ providerType: 'local', ptyId: id })
+    })
+
+    it('spawn() calls span.fail() with providerType=local on underlying spawn error, then rethrows', async () => {
+      existsSyncMock.mockImplementation((p: string) => p !== '/nonexistent')
+      const events: TraceEvent[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+
+      await expect(
+        provider.spawn({ cols: 80, rows: 24, cwd: '/nonexistent' })
+      ).rejects.toThrow('does not exist')
+      unregister()
+
+      const failEvent = events.find((e) => e.flow === 'terminal:create' && e.level === 'fail')
+      expect(failEvent).toBeDefined()
+      expect(failEvent?.fields).toMatchObject({ providerType: 'local' })
     })
   })
 

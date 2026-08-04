@@ -121,3 +121,28 @@ npx tsx src/relay/agent-entry.ts
 | Deploy: copy `agent.js` (raw) | Deploy: copy `out/relay/agent.js` (built) |
 | `.env` file | `.env` hoặc env vars từ `start.sh` (unchanged) |
 | `deploy/dev/agent/*.ts` | `src/relay/agent-*.ts` |
+
+---
+
+## 8. node-pty Prerequisite for PTY Support — Addendum (2026-08-03)
+
+**Status: ✅ IMPLEMENTED (operational, not a code change)**
+
+`node-pty` is deliberately kept `external` in the agent's esbuild bundle (`config/scripts/build-agent-only.mjs`, `external: ['node-pty']` — comment says "agent has no PTY", which is now stale wording; it really means *not bundled*, must be present as a real `node_modules/node-pty` on the host, matching the exact Node.js ABI/platform/arch of that Dev Server). `checkPtyAvailable()` in `agent-session.ts` does `await import('node-pty').catch(() => null)` at handshake time — if this fails, the agent reports `pty=false` and omits `pty`/`pty.stream`/`pty.create`/etc from its capabilities.
+
+All 3 Dev Servers (dev-01, dev-ai, test-01) previously reported `pty=false` because `node-pty` was never installed. To enable PTY/terminal support on a Dev Server:
+
+```bash
+# 1. Native build toolchain (node-pty compiles a native binding):
+sudo apt-get install -y build-essential   # g++, gcc, make
+
+# 2. Install node-pty where Node's module resolution will find it —
+#    e.g. in the home directory containing agent.js, no NODE_PATH needed:
+npm install node-pty
+
+# 3. Restart the agent — capability checks only run once, at handshake time,
+#    so an already-running process won't pick up a newly-installed node-pty:
+sudo systemctl restart orca-agent-<id>
+```
+
+Unlike `git`/`fs`, which work with zero extra installs, PTY specifically needs this step — easy to forget when standing up a new Dev Server. All 3 current Dev Servers now report `pty=true` and `pty.stream` in their capabilities after this install + restart.

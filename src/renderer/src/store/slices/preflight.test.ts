@@ -19,6 +19,29 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
   }
 }))
 
+// TASK-FE-014.1: mock spans expose id/step/ok/fail so tests can assert both
+// the RPC `traceId` forwarding AND the span lifecycle calls (start/step/ok/fail fields).
+const { preflightSpans, uiRemoteIntegrationPreflightFlowStart } = vi.hoisted(() => {
+  const preflightSpans: { id: string; step: ReturnType<typeof vi.fn>; ok: ReturnType<typeof vi.fn>; fail: ReturnType<typeof vi.fn> }[] = []
+  const uiRemoteIntegrationPreflightFlowStart = vi.fn(() => {
+    const span = {
+      id: `preflight-span-${preflightSpans.length}`,
+      step: vi.fn(),
+      ok: vi.fn(),
+      fail: vi.fn()
+    }
+    preflightSpans.push(span)
+    return span
+  })
+  return { preflightSpans, uiRemoteIntegrationPreflightFlowStart }
+})
+
+vi.mock('../../../../shared/trace/tracers', () => ({
+  Tracers: {
+    uiRemoteIntegrationPreflightFlow: { start: uiRemoteIntegrationPreflightFlowStart }
+  }
+}))
+
 globalThis.window = {
   api: {
     preflight: {
@@ -52,6 +75,8 @@ function resetPreflightMocks(): void {
   preflightCheck.mockReset()
   callRuntimeRpc.mockReset()
   platformGet.mockReset().mockReturnValue({ platform: 'linux' })
+  preflightSpans.length = 0
+  uiRemoteIntegrationPreflightFlowStart.mockClear()
 }
 
 function makeStatus(glabInstalled: boolean): PreflightStatus {
@@ -319,13 +344,13 @@ describe('createPreflightSlice', () => {
       1,
       { kind: 'environment', environmentId: 'runtime-1' },
       'preflight.check',
-      {}
+      { traceId: preflightSpans[0].id }
     )
     expect(callRuntimeRpc).toHaveBeenNthCalledWith(
       2,
       { kind: 'environment', environmentId: 'runtime-2' },
       'preflight.check',
-      {}
+      { traceId: preflightSpans[1].id }
     )
     firstRuntime.resolve(makeStatus(false))
     secondRuntime.resolve(makeStatus(true))
@@ -360,5 +385,148 @@ describe('createPreflightSlice', () => {
     wsl.resolve(makeStatus(false))
     await second
     expect(store.getState().preflightStatus?.glab?.installed).toBe(false)
+  })
+
+  // --- TASK-FE-014.1: ui:remoteIntegration.preflight tracer coverage ---
+
+  it('starts a ui:remoteIntegration.preflight span with { force, mode } before calling window.api.preflight.check', async () => {
+    resetPreflightMocks()
+    preflightCheck.mockResolvedValueOnce(makeStatus(true))
+    const store = createTestStore()
+
+    await store.getState().refreshPreflightStatus()
+
+    expect(uiRemoteIntegrationPreflightFlowStart).toHaveBeenCalledWith({ force: false, mode: 'local' })
+    expect(uiRemoteIntegrationPreflightFlowStart.mock.invocationCallOrder[0]).toBeLessThan(
+      preflightCheck.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('starts a span with { force: true, mode } before calling callRuntimeRpc when force refreshing a runtime environment', async () => {
+    resetPreflightMocks()
+    callRuntimeRpc.mockResolvedValueOnce(makeStatus(true))
+    const store = createTestStore()
+    store.setState({ settings: { activeRuntimeEnvironmentId: 'runtime-1' } } as Partial<AppState>)
+
+    await store.getState().refreshPreflightStatus({ force: true })
+
+    expect(uiRemoteIntegrationPreflightFlowStart).toHaveBeenCalledWith({
+      force: true,
+      mode: 'environment'
+    })
+    expect(uiRemoteIntegrationPreflightFlowStart.mock.invocationCallOrder[0]).toBeLessThan(
+      callRuntimeRpc.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('emits a relayDelegate step before delegating to callRuntimeRpc', async () => {
+    resetPreflightMocks()
+    callRuntimeRpc.mockResolvedValueOnce(makeStatus(true))
+    const store = createTestStore()
+    store.setState({
+      settings: { activeRuntimeEnvironmentId: 'runtime-1' },
+      activeDevServerId: 'dev-server-1'
+    } as Partial<AppState>)
+
+    await store.getState().refreshPreflightStatus()
+
+    const span = preflightSpans[0]
+    expect(span.step).toHaveBeenCalledWith('relayDelegate', { devServerId: 'dev-server-1' })
+    expect(span.step.mock.invocationCallOrder[0]).toBeLessThan(callRuntimeRpc.mock.invocationCallOrder[0])
+  })
+
+  it('forwards traceId: span.id in callRuntimeRpc params only when runtimeTarget.kind is environment', async () => {
+    resetPreflightMocks()
+    callRuntimeRpc.mockResolvedValueOnce(makeStatus(true))
+    const store = createTestStore()
+    store.setState({ settings: { activeRuntimeEnvironmentId: 'runtime-1' } } as Partial<AppState>)
+
+    await store.getState().refreshPreflightStatus()
+
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'runtime-1' },
+      'preflight.check',
+      expect.objectContaining({ traceId: preflightSpans[0].id })
+    )
+  })
+
+  it('does NOT include traceId in window.api.preflight.check args when runtimeTarget.kind is local', async () => {
+    resetPreflightMocks()
+    preflightCheck.mockResolvedValueOnce(makeStatus(true))
+    const store = createTestStore()
+
+    await store.getState().refreshPreflightStatus()
+
+    expect(preflightCheck).toHaveBeenCalledWith(undefined)
+  })
+
+  it('does NOT start a new span for a request coalesced by the non-forced dedupe guard', async () => {
+    resetPreflightMocks()
+    const pending = deferred<PreflightStatus>()
+    preflightCheck.mockReturnValueOnce(pending.promise)
+    const store = createTestStore()
+
+    const first = store.getState().refreshPreflightStatus()
+    const second = store.getState().refreshPreflightStatus()
+
+    expect(uiRemoteIntegrationPreflightFlowStart).toHaveBeenCalledTimes(1)
+    pending.resolve(makeStatus(true))
+    await Promise.all([first, second])
+    expect(uiRemoteIntegrationPreflightFlowStart).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT start a new span for a lazy request coalesced onto an in-flight forced refresh', async () => {
+    resetPreflightMocks()
+    const fresh = deferred<PreflightStatus>()
+    preflightCheck.mockReturnValueOnce(fresh.promise)
+    const store = createTestStore()
+
+    const forced = store.getState().refreshPreflightStatus({ force: true })
+    const lazy = store.getState().refreshPreflightStatus()
+
+    expect(uiRemoteIntegrationPreflightFlowStart).toHaveBeenCalledTimes(1)
+    fresh.resolve(makeStatus(true))
+    await Promise.all([forced, lazy])
+    expect(uiRemoteIntegrationPreflightFlowStart).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks the span ok with ghAuthenticated/glabAuthenticated on success', async () => {
+    resetPreflightMocks()
+    preflightCheck.mockResolvedValueOnce(makeStatus(true))
+    const store = createTestStore()
+
+    await store.getState().refreshPreflightStatus()
+
+    expect(preflightSpans[0].ok).toHaveBeenCalledWith({ ghAuthenticated: true, glabAuthenticated: true })
+  })
+
+  it('marks the span ok({ stale: true }) and does not overwrite state for a superseded response', async () => {
+    resetPreflightMocks()
+    const stale = deferred<PreflightStatus>()
+    const fresh = deferred<PreflightStatus>()
+    preflightCheck.mockReturnValueOnce(stale.promise).mockReturnValueOnce(fresh.promise)
+    const store = createTestStore()
+
+    const normal = store.getState().refreshPreflightStatus()
+    const forced = store.getState().refreshPreflightStatus({ force: true })
+
+    fresh.resolve(makeStatus(true))
+    await forced
+    stale.resolve(makeStatus(false))
+    await normal
+
+    expect(preflightSpans[0].ok).toHaveBeenCalledWith({ stale: true })
+    expect(store.getState().preflightStatus?.glab?.installed).toBe(true)
+  })
+
+  it('marks the span fail(error, { force, mode }) when the request rejects', async () => {
+    resetPreflightMocks()
+    const error = new Error('boom')
+    preflightCheck.mockRejectedValueOnce(error)
+    const store = createTestStore()
+
+    await store.getState().refreshPreflightStatus()
+
+    expect(preflightSpans[0].fail).toHaveBeenCalledWith(error, { force: false, mode: 'local' })
   })
 })

@@ -23,8 +23,20 @@ import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { createTracer } from '../shared/trace'
+import { Tracers } from '../shared/trace/tracers'
 
 const gitTracer = createTracer('agent:git')
+
+// ─── Trace propagation helper ───────────────────────────────────────────────
+// Agent WS JSON-RPC 2.0: traceId nested at params._trace.id (CR-TRACE-000 §3.3),
+// not a flat params.traceId — avoids colliding with JSON-RPC 2.0's own `id` field.
+function resumeFrom(params: Record<string, unknown>): { id: string } | undefined {
+  const t = params['_trace']
+  if (t && typeof t === 'object' && typeof (t as { id?: unknown }).id === 'string') {
+    return { id: (t as { id: string }).id }
+  }
+  return undefined
+}
 
 // ─── Whitelist ────────────────────────────────────────────────────────────────
 
@@ -105,7 +117,7 @@ export async function handleGitExec(
   const cwd     = typeof params.cwd === 'string' && params.cwd ? params.cwd : config.workDir
   const timeout = Math.min(typeof params.timeout === 'number' ? params.timeout : 30_000, 60_000)
   const argsStr = rawArgs.join(' ').slice(0, 80)
-  const span    = gitTracer.start({ method: 'git.exec', cmd: argsStr, cwd })
+  const span    = gitTracer.start({ method: 'git.exec', cmd: argsStr, cwd }, resumeFrom(params))
 
   try {
     validateGitArgs(rawArgs)
@@ -275,10 +287,14 @@ export async function handleGitPrCreate(
   const cwd    = typeof params.cwd    === 'string' && params.cwd ? params.cwd : config.workDir
   const userId = typeof params.userId === 'string' ? params.userId          : ''
 
+  const span = gitTracer.start({ method: 'git.pr.create', title: title.slice(0, 40), base })
+
   if (!title) {
+    span.fail('missing title', { method: 'git.pr.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing required param: title' } }
   }
   if (SHELL_METACHARACTERS.test(title) || SHELL_METACHARACTERS.test(base)) {
+    span.fail('unsafe characters in params', { method: 'git.pr.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Unsafe characters in PR params' } }
   }
 
@@ -293,14 +309,17 @@ export async function handleGitPrCreate(
     GH_PROMPT_DISABLED:    '1',
   }
 
+  span.step('ghExec', { base })
   try {
     const { stdout, stderr } = await execFileAsync('gh', ghArgs, { cwd, env, timeout: 30_000 })
     const url = stdout.trim()
     log.info(`git.pr.create: PR created → ${url}`)
+    span.ok({ url })
     return { jsonrpc: '2.0', id, result: { url, stdout, stderr } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     log.error(`git.pr.create failed: ${msg}`)
+    span.fail(err, { method: 'git.pr.create' })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
   }
 }
@@ -346,19 +365,25 @@ export async function handleGitWorktreeAdd(
   const createBranch = params.createBranch === true
   const cwd          = typeof params.cwd    === 'string' ? params.cwd           : config.workDir
 
+  const span = Tracers.worktreeCreate.start({ path: worktreePath, branch, cwd }, resumeFrom(params))
+
   if (!worktreePath || !branch) {
+    span.fail('missing required params', { path: worktreePath, branch })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing required params: path, branch' } }
   }
   if (SHELL_METACHARACTERS.test(worktreePath) || SHELL_METACHARACTERS.test(branch)) {
+    span.fail('unsafe characters in params', { path: worktreePath, branch })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Unsafe characters in worktree params' } }
   }
 
   // WT-Issue-1: Security validation — prevent path traversal
   try {
     const { validateWorktreePath } = await import('./git-handler')
+    span.step('validate-path', { path: worktreePath })
     validateWorktreePath(['worktree', 'add', worktreePath], cwd)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
+    span.fail(msg, { path: worktreePath })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: msg } }
   }
 
@@ -366,7 +391,19 @@ export async function handleGitWorktreeAdd(
     ? ['worktree', 'add', '-b', branch, worktreePath]
     : ['worktree', 'add', worktreePath, branch]
 
-  return handleGitExec(id, { args, cwd: params.cwd, timeout: 15_000 }, config, log)
+  span.step('git-worktree-add-exec', { branch })
+  const result = await handleGitExec(
+    id,
+    { args, cwd: params.cwd, timeout: 15_000, _trace: { id: span.id } },
+    config,
+    log
+  )
+  if (result && typeof result === 'object' && 'error' in result) {
+    span.fail((result as { error: { message: string } }).error.message, { path: worktreePath })
+  } else {
+    span.ok({ path: worktreePath, branch })
+  }
+  return result
 }
 
 // ─── git.worktree.remove ──────────────────────────────────────────────────────
@@ -380,15 +417,31 @@ export async function handleGitWorktreeRemove(
   const path  = typeof params.path  === 'string' ? params.path.trim() : ''
   const force = params.force === true
 
+  const span = Tracers.worktreeDelete.start({ path, force }, resumeFrom(params))
+
   if (!path) {
+    span.fail('missing required param: path')
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Missing required param: path' } }
   }
   if (SHELL_METACHARACTERS.test(path)) {
+    span.fail('unsafe characters in path', { path })
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: 'Unsafe characters in path' } }
   }
 
   const args = ['worktree', 'remove', path]
   if (force) args.push('--force')
 
-  return handleGitExec(id, { args, cwd: params.cwd, timeout: 15_000 }, config, log)
+  span.step('git-worktree-remove-exec', { force })
+  const result = await handleGitExec(
+    id,
+    { args, cwd: params.cwd, timeout: 15_000, _trace: { id: span.id } },
+    config,
+    log
+  )
+  if (result && typeof result === 'object' && 'error' in result) {
+    span.fail((result as { error: { message: string } }).error.message, { path })
+  } else {
+    span.ok({ path, force })
+  }
+  return result
 }

@@ -1,6 +1,6 @@
 import { gitExecFileAsync } from '../git/runner'
 import type { GitHubOwnerRepo, IssueSourcePreference } from '../../shared/types'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import { readLocalGitConfigSignature } from './local-git-config-signature'
 import {
   parseGitHubOwnerRepo,
@@ -93,7 +93,7 @@ export async function getRemoteUrlForRepo(
   remoteName: string
 ): Promise<string | null> {
   if (context.connectionId) {
-    const provider = getSshGitProvider(context.connectionId)
+    const provider = getRemoteGitProvider(context.connectionId)
     if (!provider) {
       return null
     }

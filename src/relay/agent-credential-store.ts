@@ -110,10 +110,18 @@ export async function handleWriteCredential(
   const encryptedBlob = typeof params.encryptedBlob === 'string' ? params.encryptedBlob : ''
   const iv            = typeof params.iv            === 'string' ? params.iv            : ''
   const algorithm     = typeof params.algorithm     === 'string' ? params.algorithm     : 'AES-GCM'
-  const span          = credTracer.start({ method: 'ai.provider.writeCredential', accountId })
+  // CR-TRACE-016 §4 BL-AIP-01 + §1 security constraint: blobLength (metadata,
+  // NOT the blob value) helps distinguish "empty/abnormal blob" from other
+  // failure modes when debugging a stuck/failed "Add Provider Account" flow —
+  // encryptedBlob/iv/apiKey must never be placed in TraceFields anywhere in this file.
+  const span          = credTracer.start({
+    method: 'ai.provider.writeCredential',
+    accountId,
+    blobLength: encryptedBlob.length,
+  })
 
   if (!accountId || !encryptedBlob || !iv) {
-    span.fail('missing required params', { accountId })
+    span.fail('missing required params', { accountId, blobLength: encryptedBlob.length })
     return {
       jsonrpc: '2.0', id,
       error: { code: AgentErrorCode.InvalidParams, message: 'Missing required params: accountId, encryptedBlob, iv' },
@@ -149,8 +157,13 @@ export async function handleReadCredential(
   config: AgentConfig,
   log: AgentLogger
 ): Promise<object> {
-  const accountId = typeof params.accountId === 'string' ? params.accountId : ''
-  const span      = credTracer.start({ method: 'ai.provider.readCredential', accountId })
+  const accountId    = typeof params.accountId    === 'string' ? params.accountId    : ''
+  // CR-TRACE-016 §5 (mirrors the parentTraceId model from CR-TRACE-017): a
+  // plain business field correlating this span with the agent:spawn span that
+  // triggered it (via buildAgentEnv() → readDecryptedKey()) — NOT Tracer.start()
+  // `resume` (CR-TRACE-000 §3.1), since that core API hasn't shipped yet.
+  const parentSpanId = typeof params.parentSpanId === 'string' ? params.parentSpanId : undefined
+  const span      = credTracer.start({ method: 'ai.provider.readCredential', accountId, parentSpanId })
 
   if (!accountId) {
     span.fail('missing accountId', { method: 'ai.provider.readCredential' })
@@ -324,9 +337,10 @@ export async function handleDeleteCredential(
 export async function readDecryptedKey(
   accountId: string,
   config:    AgentConfig,
-  log:       AgentLogger
+  log:       AgentLogger,
+  parentSpanId?: string,   // NEW — forwarded from buildAgentEnv()'s caller span
 ): Promise<string | null> {
-  const result = await handleReadCredential(null, { accountId }, config, log) as {
+  const result = await handleReadCredential(null, { accountId, parentSpanId }, config, log) as {
     result?: { encryptedBlob: string }; error?: unknown
   }
   if (result.error || !result.result) return null

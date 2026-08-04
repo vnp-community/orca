@@ -14,6 +14,7 @@ import { getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { useAppStore } from '../../store'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { formatDistanceToNow } from 'date-fns'
+import { Tracers } from '../../../../shared/trace/tracers'
 
 interface Annotation {
   id: string
@@ -64,6 +65,7 @@ export function AnnotationPanel({
   const submit = async () => {
     if (!newComment.trim() || !project || lineNumber === null) return
     setIsSaving(true)
+    const span = Tracers.codeReviewAnnotateFlow.start({ filePath, lineNumber, reviewId: reviewId ?? '' })
     try {
       const target = getActiveRuntimeTarget(useAppStore.getState().settings)
       const created = await callRuntimeRpc<Annotation>(target, 'annotation.create', {
@@ -72,11 +74,14 @@ export function AnnotationPanel({
         filePath,
         lineNumber,
         content: newComment.trim(),
+        traceId: span.id,
       })
       setAnnotations(prev => [...prev, created])
       setNewComment('')
-    } catch {
+      span.ok({ annotationId: created.id })
+    } catch (err) {
       toast.error('Failed to save comment')
+      span.fail(err, { filePath, lineNumber })
     } finally {
       setIsSaving(false)
     }

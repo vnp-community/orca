@@ -62,9 +62,9 @@ vi.mock('../providers/ssh-git-provider', () => ({
 }))
 
 vi.mock('../ipc/pty', () => ({
-  registerSshPtyProvider: vi.fn(),
-  unregisterSshPtyProvider: vi.fn(),
-  getSshPtyProvider: vi.fn().mockReturnValue({
+  registerRemotePtyProvider: vi.fn(),
+  unregisterRemotePtyProvider: vi.fn(),
+  getRemotePtyProvider: vi.fn().mockReturnValue({
     dispose: vi.fn(),
     attach: vi.fn().mockResolvedValue(undefined),
     attachForReconnect: vi.fn().mockResolvedValue({})
@@ -78,14 +78,14 @@ vi.mock('../ipc/pty', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  registerSshFilesystemProvider: vi.fn(),
-  unregisterSshFilesystemProvider: vi.fn(),
-  getSshFilesystemProvider: vi.fn().mockReturnValue({ dispose: vi.fn() })
+  registerRemoteFilesystemProvider: vi.fn(),
+  unregisterRemoteFilesystemProvider: vi.fn(),
+  getRemoteFilesystemProvider: vi.fn().mockReturnValue({ dispose: vi.fn() })
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  registerSshGitProvider: vi.fn(),
-  unregisterSshGitProvider: vi.fn()
+  registerRemoteGitProvider: vi.fn(),
+  unregisterRemoteGitProvider: vi.fn()
 }))
 
 const { deployAndLaunchRelay } = await import('./ssh-relay-deploy')
@@ -98,16 +98,16 @@ const { _resetHiddenRendererPtyDeliveryGateForTest } =
 const { execCommand } = await import('./ssh-relay-deploy-helpers')
 const { getRemoteHostPlatform } = await import('./ssh-remote-platform')
 const {
-  registerSshPtyProvider,
-  unregisterSshPtyProvider,
+  registerRemotePtyProvider,
+  unregisterRemotePtyProvider,
   getPtyIdsForConnection,
   clearProviderPtyState,
   deletePtyOwnership,
   setPtyOwnership
 } = await import('../ipc/pty')
-const { registerSshFilesystemProvider, unregisterSshFilesystemProvider } =
+const { registerRemoteFilesystemProvider, unregisterRemoteFilesystemProvider } =
   await import('../providers/ssh-filesystem-dispatch')
-const { registerSshGitProvider, unregisterSshGitProvider } =
+const { registerRemoteGitProvider, unregisterRemoteGitProvider } =
   await import('../providers/ssh-git-dispatch')
 
 describe('SshRelaySession', () => {
@@ -137,7 +137,7 @@ describe('SshRelaySession', () => {
       runtime as never
     )
     await session.establish(mockConn)
-    const ptyProvider = vi.mocked(registerSshPtyProvider).mock.calls[0]?.[1] as unknown as {
+    const ptyProvider = vi.mocked(registerRemotePtyProvider).mock.calls[0]?.[1] as unknown as {
       onData: ReturnType<typeof vi.fn>
     }
     const onData = ptyProvider.onData.mock.calls[0]?.[0] as (payload: {
@@ -194,7 +194,7 @@ describe('SshRelaySession', () => {
     }))
     const session = new SshRelaySession('target-1', getMainWindow, mockStore, mockPortForward)
     await session.establish(mockConn)
-    const ptyProvider = vi.mocked(registerSshPtyProvider).mock.calls[0]?.[1] as unknown as {
+    const ptyProvider = vi.mocked(registerRemotePtyProvider).mock.calls[0]?.[1] as unknown as {
       onData: ReturnType<typeof vi.fn>
     }
     const onData = ptyProvider.onData.mock.calls[0]?.[0] as (payload: {
@@ -226,9 +226,9 @@ describe('SshRelaySession', () => {
 
     expect(session.getState()).toBe('ready')
     expect(session.getMux()).not.toBeNull()
-    expect(registerSshPtyProvider).toHaveBeenCalledWith('target-1', expect.anything())
-    expect(registerSshFilesystemProvider).toHaveBeenCalledWith('target-1', expect.anything())
-    expect(registerSshGitProvider).toHaveBeenCalledWith('target-1', expect.anything())
+    expect(registerRemotePtyProvider).toHaveBeenCalledWith('target-1', expect.anything())
+    expect(registerRemoteFilesystemProvider).toHaveBeenCalledWith('target-1', expect.anything())
+    expect(registerRemoteGitProvider).toHaveBeenCalledWith('target-1', expect.anything())
   })
 
   it.each([
@@ -302,7 +302,7 @@ describe('SshRelaySession', () => {
       muxRequestMock.mock.invocationCallOrder[installPluginsCallIndex]
     )
     expect(muxRequestMock.mock.invocationCallOrder[installPluginsCallIndex]).toBeLessThan(
-      vi.mocked(registerSshPtyProvider).mock.invocationCallOrder[0]
+      vi.mocked(registerRemotePtyProvider).mock.invocationCallOrder[0]
     )
   })
 
@@ -381,9 +381,9 @@ describe('SshRelaySession', () => {
     resolvePluginInstall()
 
     await expect(establish).rejects.toThrow('Session disposed during establish')
-    expect(registerSshPtyProvider).not.toHaveBeenCalled()
-    expect(registerSshFilesystemProvider).not.toHaveBeenCalled()
-    expect(registerSshGitProvider).not.toHaveBeenCalled()
+    expect(registerRemotePtyProvider).not.toHaveBeenCalled()
+    expect(registerRemoteFilesystemProvider).not.toHaveBeenCalled()
+    expect(registerRemoteGitProvider).not.toHaveBeenCalled()
   })
 
   it('rejects establish when not idle', async () => {
@@ -418,10 +418,10 @@ describe('SshRelaySession', () => {
 
     expect(session.getState()).toBe('ready')
     expect(session.getMux()).not.toBe(oldMux)
-    expect(unregisterSshPtyProvider).toHaveBeenCalledWith('target-1')
-    expect(unregisterSshFilesystemProvider).toHaveBeenCalledWith('target-1')
-    expect(unregisterSshGitProvider).toHaveBeenCalledWith('target-1')
-    expect(registerSshPtyProvider).toHaveBeenCalledWith('target-1', expect.anything())
+    expect(unregisterRemotePtyProvider).toHaveBeenCalledWith('target-1')
+    expect(unregisterRemoteFilesystemProvider).toHaveBeenCalledWith('target-1')
+    expect(unregisterRemoteGitProvider).toHaveBeenCalledWith('target-1')
+    expect(registerRemotePtyProvider).toHaveBeenCalledWith('target-1', expect.anything())
   })
 
   it('installs a native Windows Orca CLI bridge without POSIX shell commands', async () => {
@@ -475,12 +475,12 @@ describe('SshRelaySession', () => {
     vi.clearAllMocks()
     mockDeploySuccess()
 
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['pty-1', 'pty-2'])
 
     await session.reconnect(mockConn)
@@ -496,12 +496,12 @@ describe('SshRelaySession', () => {
     vi.clearAllMocks()
     mockDeploySuccess()
 
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi.fn().mockResolvedValue({ replay: 'restored-output' })
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['pty-1'])
 
     await session.reconnect(mockConn)
@@ -519,12 +519,12 @@ describe('SshRelaySession', () => {
     vi.clearAllMocks()
     mockDeploySuccess()
 
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi.fn().mockResolvedValue({ replay: 'same-output' })
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['pty-1'])
 
     await session.reconnect(mockConn)
@@ -539,12 +539,12 @@ describe('SshRelaySession', () => {
 
   it('establish re-attaches owned PTYs after explicit disconnect', async () => {
     const { mockConn, mockStore, mockPortForward, getMainWindow } = createMockDeps()
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['ssh:target-1@@pty-1'])
 
     const session = new SshRelaySession('target-1', getMainWindow, mockStore, mockPortForward)
@@ -558,12 +558,12 @@ describe('SshRelaySession', () => {
 
   it('establish re-attaches durable leases after app restart', async () => {
     const { mockConn, mockStore, mockPortForward, getMainWindow } = createMockDeps()
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue([])
     vi.mocked(mockStore.getSshRemotePtyLeases).mockReturnValue([
       { targetId: 'target-1', ptyId: 'pty-live', state: 'detached' },
@@ -582,12 +582,12 @@ describe('SshRelaySession', () => {
 
   it('forwards a lease tab identity to reattach so a reset relay cannot cross-wire it', async () => {
     const { mockConn, mockStore, mockPortForward, getMainWindow } = createMockDeps()
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue([])
     vi.mocked(mockStore.getSshRemotePtyLeases).mockReturnValue([
       { targetId: 'target-1', ptyId: 'pty-1', state: 'detached', tabId: 'tab-a' }
@@ -601,12 +601,12 @@ describe('SshRelaySession', () => {
 
   it('forwards a lease pane identity when leaf identity is available', async () => {
     const { mockConn, mockStore, mockPortForward, getMainWindow } = createMockDeps()
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue([])
     const leafId = '11111111-1111-4111-8111-111111111111'
     vi.mocked(mockStore.getSshRemotePtyLeases).mockReturnValue([
@@ -629,14 +629,14 @@ describe('SshRelaySession', () => {
     vi.clearAllMocks()
     mockDeploySuccess()
 
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi
       .fn()
       .mockRejectedValueOnce(new Error('PTY "pty-1" not found (identity mismatch)'))
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue([])
     const staleLeafId = '11111111-1111-4111-8111-111111111111'
     vi.mocked(mockStore.getSshRemotePtyLeases).mockReturnValue([
@@ -666,17 +666,17 @@ describe('SshRelaySession', () => {
 
   it('rejects establish if detach wins while reattach is in flight', async () => {
     const { mockConn, mockStore, mockPortForward, getMainWindow } = createMockDeps()
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     let resolveAttach!: () => void
     const mockAttach = vi.fn().mockReturnValue(
       new Promise<void>((resolve) => {
         resolveAttach = resolve
       })
     )
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['pty-1'])
 
     const session = new SshRelaySession('target-1', getMainWindow, mockStore, mockPortForward)
@@ -701,17 +701,17 @@ describe('SshRelaySession', () => {
     vi.clearAllMocks()
     mockDeploySuccess()
 
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     let resolveAttach!: () => void
     const mockAttach = vi.fn().mockReturnValue(
       new Promise<void>((resolve) => {
         resolveAttach = resolve
       })
     )
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['pty-1'])
 
     const reconnect = session.reconnect(mockConn)
@@ -735,15 +735,15 @@ describe('SshRelaySession', () => {
     vi.clearAllMocks()
     mockDeploySuccess()
 
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi
       .fn()
       .mockRejectedValueOnce(new Error('PTY "pty-stale" not found'))
       .mockResolvedValueOnce(undefined)
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['pty-stale', 'pty-live'])
 
     await session.reconnect(mockConn)
@@ -767,12 +767,12 @@ describe('SshRelaySession', () => {
     vi.clearAllMocks()
     mockDeploySuccess()
 
-    const { getSshPtyProvider } = await import('../ipc/pty')
+    const { getRemotePtyProvider } = await import('../ipc/pty')
     const mockAttach = vi.fn().mockRejectedValue(new Error('Multiplexer disposed'))
-    vi.mocked(getSshPtyProvider).mockReturnValue({
+    vi.mocked(getRemotePtyProvider).mockReturnValue({
       attachForReconnect: mockAttach,
       dispose: vi.fn()
-    } as unknown as ReturnType<typeof getSshPtyProvider>)
+    } as unknown as ReturnType<typeof getRemotePtyProvider>)
     vi.mocked(getPtyIdsForConnection).mockReturnValue(['pty-live'])
 
     await session.reconnect(mockConn)
@@ -794,9 +794,9 @@ describe('SshRelaySession', () => {
     session.dispose()
 
     expect(session.getState()).toBe('disposed')
-    expect(unregisterSshPtyProvider).toHaveBeenCalledWith('target-1')
-    expect(unregisterSshFilesystemProvider).toHaveBeenCalledWith('target-1')
-    expect(unregisterSshGitProvider).toHaveBeenCalledWith('target-1')
+    expect(unregisterRemotePtyProvider).toHaveBeenCalledWith('target-1')
+    expect(unregisterRemoteFilesystemProvider).toHaveBeenCalledWith('target-1')
+    expect(unregisterRemoteGitProvider).toHaveBeenCalledWith('target-1')
   })
 
   it('dispose is idempotent', async () => {
@@ -917,9 +917,9 @@ describe('SshRelaySession', () => {
     await expect(session.establish(mockConn)).rejects.toThrow('store error')
     expect(session.getState()).toBe('idle')
     expect(session.getMux()).toBeNull()
-    expect(unregisterSshPtyProvider).toHaveBeenCalledWith('target-1')
-    expect(unregisterSshFilesystemProvider).toHaveBeenCalledWith('target-1')
-    expect(unregisterSshGitProvider).toHaveBeenCalledWith('target-1')
+    expect(unregisterRemotePtyProvider).toHaveBeenCalledWith('target-1')
+    expect(unregisterRemoteFilesystemProvider).toHaveBeenCalledWith('target-1')
+    expect(unregisterRemoteGitProvider).toHaveBeenCalledWith('target-1')
   })
 
   it('reconnect on idle session is a no-op', async () => {

@@ -5,6 +5,7 @@
 // summarize the prompt via the configured agent, and rename.
 import type { GlobalSettings, Repo } from '../../shared/types'
 import { getRepoIdFromWorktreeId, splitWorktreeId } from '../../shared/worktree-id'
+import { getRepoProviderConnectionKey } from '../../shared/execution-host'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import { parsePaneKey } from '../../shared/stable-pane-id'
 import {
@@ -16,7 +17,7 @@ import { getCommitMessageModelDiscoveryHostKey } from '../../shared/commit-messa
 import { computeBranchName, getConfiguredBranchPrefix } from '../ipc/worktree-logic'
 import { gitExecFileAsync } from '../git/runner'
 import { getSshGitUsername, resolveLocalGitUsername } from '../git/git-username'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import {
   probeBranchUpstream,
   renameCurrentBranch,
@@ -194,8 +195,9 @@ async function runAutoRename(
   }
   const worktreePath = parsed.worktreePath
 
-  const provider = repo.connectionId ? (getSshGitProvider(repo.connectionId) ?? null) : null
-  if (repo.connectionId && !provider) {
+  const providerConnectionId = getRepoProviderConnectionKey(repo)
+  const provider = providerConnectionId ? (getRemoteGitProvider(providerConnectionId) ?? null) : null
+  if (providerConnectionId && !provider) {
     return retry('ssh provider unavailable')
   }
   const exec: GitExec = provider
@@ -231,7 +233,7 @@ async function runAutoRename(
   }
 
   const settings = deps.getSettings()
-  const hostKey = getCommitMessageModelDiscoveryHostKey(repo.connectionId ?? null)
+  const hostKey = getCommitMessageModelDiscoveryHostKey(getRepoProviderConnectionKey(repo) ?? null)
   const resolvedParams = resolveTextGenerationParams(settings, hostKey, 'branchName', repo)
   if (!resolvedParams.ok) {
     // Why: a generation-step failure (vs a benign skip) is user-actionable, so
@@ -305,7 +307,7 @@ async function runAutoRename(
   }
 
   await (provider
-    ? provider.renameCurrentBranch(worktreePath, newBranch)
+    ? provider.renameCurrentBranch!(worktreePath, newBranch)
     : renameCurrentBranch(exec, newBranch))
 
   // resolveUniqueBranchName may have appended a collision suffix (`-2`, …), so

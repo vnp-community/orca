@@ -292,7 +292,7 @@ export async function bootstrapWebApp(options: BootstrapOptions = {}): Promise<v
   // Initialize browser trace sink — must happen before ReactDOM.createRoot
   // so trace events from initial renders are captured.
   initBrowserTrace((event) => {
-    // useAppStore.getState().addTraceEvent(event)
+    useAppStore.getState().addTraceEvent(event)
   })
 
   // Ctrl+Shift+T → toggle TracePanel

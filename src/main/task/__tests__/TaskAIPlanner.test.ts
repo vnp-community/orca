@@ -23,6 +23,13 @@ import { ALL_MIGRATIONS } from '../../db/migrations'
 import { TaskService } from '../TaskService'
 import { TaskDAGValidator } from '../TaskDAGValidator'
 import { TaskAIPlanner } from '../TaskAIPlanner'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
+}
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -284,6 +291,92 @@ describe('TaskAIPlanner', () => {
     it('throws TASK_NOT_FOUND when decomposing unknown task', async () => {
       const planner = new TaskAIPlanner(taskService, makeMockProviderService() as any, makeMockProjectRouter() as any)
       await expect(planner.decompose('bad-id', 'proj-001', 'user-001')).rejects.toThrow('TASK_NOT_FOUND')
+    })
+  })
+
+  // ── decompose tracing (TASK-BE-018.2) ────────────────────────────────────────
+  describe('decompose tracing', () => {
+    it('AI returns valid JSON → step(parse-plan, {parseOk:true, subtaskCount:N})', async () => {
+      const subtasks = JSON.stringify([
+        { title: 'Sub A', type: 'subtask' },
+        { title: 'Sub B', type: 'subtask' },
+      ])
+      const mockRouter = makeMockProjectRouter({ content: subtasks })
+      const planner = new TaskAIPlanner(taskService, makeMockProviderService() as any, mockRouter as any)
+      const task = await taskService.create({
+        title: 'T', type: 'task', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team',
+      })
+
+      const { events, stop } = captureTraceEvents()
+      await planner.decompose(task.id, 'proj-001', 'user-001')
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'taskGraph:aiPlan')
+      const parseStep = spanEvents.find((e) => e.level === 'step' && e.label === 'parse-plan')
+      expect(parseStep?.fields.parseOk).toBe(true)
+      expect(parseStep?.fields.subtaskCount).toBe(2)
+      expect(spanEvents.some((e) => e.level === 'ok')).toBe(true)
+    })
+
+    it('AI returns non-JSON text → step(parse-plan, {parseOk:false, subtaskCount:0}), still ok() (no throw)', async () => {
+      const mockRouter = makeMockProjectRouter({ content: 'I cannot help with that' })
+      const planner = new TaskAIPlanner(taskService, makeMockProviderService() as any, mockRouter as any)
+      const task = await taskService.create({
+        title: 'T', type: 'task', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team',
+      })
+
+      const { events, stop } = captureTraceEvents()
+      const proposals = await planner.decompose(task.id, 'proj-001', 'user-001')
+      stop()
+
+      expect(proposals).toEqual([])
+      const spanEvents = events.filter((e) => e.flow === 'taskGraph:aiPlan')
+      const parseStep = spanEvents.find((e) => e.level === 'step' && e.label === 'parse-plan')
+      expect(parseStep?.fields.parseOk).toBe(false)
+      expect(parseStep?.fields.subtaskCount).toBe(0)
+      expect(spanEvents.some((e) => e.level === 'ok')).toBe(true)
+      expect(spanEvents.some((e) => e.level === 'fail')).toBe(false)
+    })
+
+    it('relay.call throws (network error) → span.fail(err), NO step(parse-plan)', async () => {
+      const mockRelay = { call: vi.fn().mockRejectedValue(new Error('relay timeout')) }
+      const mockRouter = {
+        getProject: vi.fn().mockResolvedValue({ id: 'proj-001', devServerId: 'srv-001', repoPath: '/repo' }),
+        getRelayForProject: vi.fn().mockResolvedValue(mockRelay),
+      }
+      const planner = new TaskAIPlanner(taskService, makeMockProviderService() as any, mockRouter as any)
+      const task = await taskService.create({
+        title: 'T', type: 'task', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team',
+      })
+
+      const { events, stop } = captureTraceEvents()
+      await expect(planner.decompose(task.id, 'proj-001', 'user-001')).rejects.toThrow('relay timeout')
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'taskGraph:aiPlan')
+      expect(spanEvents.some((e) => e.level === 'step' && e.label === 'parse-plan')).toBe(false)
+      const failEvent = spanEvents.find((e) => e.level === 'fail')
+      expect(failEvent?.fields.err).toContain('relay timeout')
+    })
+
+    it('forwards traceId: span.id into relay.call() ai.complete params', async () => {
+      const mockRouter = makeMockProjectRouter({ content: '[]' })
+      const planner = new TaskAIPlanner(taskService, makeMockProviderService() as any, mockRouter as any)
+      const task = await taskService.create({
+        title: 'T', type: 'task', status: 'backlog', priority: 'low',
+        reporterId: 'reporter-001', visibility: 'team',
+      })
+
+      const { events, stop } = captureTraceEvents()
+      await planner.decompose(task.id, 'proj-001', 'user-001')
+      stop()
+
+      const startEvent = events.find((e) => e.flow === 'taskGraph:aiPlan' && e.level === 'start')
+      const callParams = mockRouter._mockRelay.call.mock.calls[0][1]
+      expect(callParams.traceId).toBe(startEvent?.id)
     })
   })
 })

@@ -11,7 +11,7 @@ import type { FsChangeEvent, FsChangedPayload } from '../../shared/types'
 import { isWslPath } from '../wsl'
 import { createWslWatcher } from './filesystem-watcher-wsl'
 import type { WatchedRoot } from './filesystem-watcher-wsl'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { MAX_BATCHED_WATCHER_EVENTS, queueWatcherEvents } from './filesystem-watcher-event-batch'
 import { disposeWatcherProcess, subscribeViaWatcherProcess } from './parcel-watcher-process'
 // Why: high-churn directories are suppressed at the native watcher level so
@@ -728,7 +728,7 @@ async function installRemoteWatcher(
   connectionId: string,
   worktreePath: string
 ): Promise<RemoteWatcherInstallResult> {
-  const provider = getSshFilesystemProvider(connectionId)
+  const provider = getRemoteFilesystemProvider(connectionId)
   if (!provider || sender.isDestroyed()) {
     return 'unavailable'
   }
@@ -779,7 +779,7 @@ async function installRemoteWatcher(
 }
 
 async function doInstallRemoteWatcher(
-  provider: NonNullable<ReturnType<typeof getSshFilesystemProvider>>,
+  provider: NonNullable<ReturnType<typeof getRemoteFilesystemProvider>>,
   key: string,
   worktreePath: string,
   cancelToken: RemoteWatcherInstallToken

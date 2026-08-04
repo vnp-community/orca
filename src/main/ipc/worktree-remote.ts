@@ -58,9 +58,10 @@ import {
   parseOrcaYaml,
   shouldRunSetupForCreate
 } from '../hooks'
-import { requireSshGitProvider } from '../providers/ssh-git-dispatch'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
-import type { SshGitProvider } from '../providers/ssh-git-provider'
+import { requireRemoteGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import type { IGitProvider } from '../providers/types'
+import { getRepoProviderConnectionKey } from '../../shared/execution-host'
 import { TUI_AGENT_CONFIG, isTuiAgent } from '../../shared/tui-agent-config'
 import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
 import { getSshGitUsername } from '../git/git-username'
@@ -393,15 +394,15 @@ function setBoundedSshWorktreeCreateFetchEntry(
 }
 
 function getSshWorktreeCreateBaseFetchKey(repo: Repo, base: RemoteTrackingBase): string {
-  return `${repo.connectionId ?? 'ssh'}::${repo.path}::base:${base.remote}:${base.branch}`
+  return `${getRepoProviderConnectionKey(repo) ?? 'local'}::${repo.path}::base:${base.remote}:${base.branch}`
 }
 
 function getSshWorktreeCreateRemoteFetchKey(repo: Repo, remote: string): string {
-  return `${repo.connectionId ?? 'ssh'}::${repo.path}::remote:${remote}`
+  return `${getRepoProviderConnectionKey(repo) ?? 'local'}::${repo.path}::remote:${remote}`
 }
 
 function getSshWorktreeCreateRemoteQueueKey(repo: Repo, remote: string): string {
-  return `${repo.connectionId ?? 'ssh'}::${repo.path}::queue:${remote}`
+  return `${getRepoProviderConnectionKey(repo) ?? 'local'}::${repo.path}::queue:${remote}`
 }
 
 function getSshWorktreeCreateBasePlanKey(
@@ -409,7 +410,7 @@ function getSshWorktreeCreateBasePlanKey(
   requestedBaseBranch: string | undefined
 ): string {
   const baseKey = requestedBaseBranch || repo.worktreeBaseRef || 'default'
-  return `${repo.connectionId ?? 'ssh'}::${repo.path}::plan:${baseKey}`
+  return `${getRepoProviderConnectionKey(repo) ?? 'local'}::${repo.path}::plan:${baseKey}`
 }
 
 function getFreshSshWorktreeCreateFetchCompletedAt(key: string): number | null {
@@ -475,7 +476,7 @@ async function getOrStartSshWorktreeCreateFetch(
 }
 
 async function refreshRemoteTrackingBaseForWorktreeCreate(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repo: Repo,
   base: RemoteTrackingBase
 ): Promise<void> {
@@ -484,14 +485,14 @@ async function refreshRemoteTrackingBaseForWorktreeCreate(
     getSshWorktreeCreateRemoteQueueKey(repo, base.remote),
     () =>
       // Why: the exact-base refresh gates create; unrelated repo housekeeping must not extend it.
-      provider.fetchRemoteTrackingRef(repo.path, base.remote, base.branch, base.ref, {
+      provider.fetchRemoteTrackingRef!(repo.path, base.remote, base.branch, base.ref, {
         skipAutoMaintenance: true
       })
   )
 }
 
 async function fetchRemoteForWorktreeCreate(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repo: Repo,
   remote: string
 ): Promise<void> {
@@ -510,7 +511,7 @@ export function __resetSshWorktreeCreateFetchCacheForTests(): void {
 }
 
 async function unsetRemoteWorktreeCreationBase(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   worktreePath: string,
   branchName: string
 ): Promise<void> {
@@ -547,7 +548,7 @@ async function resolveCreateBranchName(
 }
 
 async function resolveCreateBranchNameSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   branchNameOverride: string | undefined,
   sanitizedName: string,
@@ -662,7 +663,7 @@ function getLocalGitHubPrForBranch(
 }
 
 function hasRemoteCommitObject(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   ref: string
 ): Promise<boolean> {
@@ -670,7 +671,7 @@ function hasRemoteCommitObject(
 }
 
 async function hasRemoteWorktreeBaseRef(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   baseRef: string
 ): Promise<boolean> {
@@ -691,7 +692,7 @@ async function hasRemoteWorktreeBaseRef(
 // SSH creates can fall back to an existing local base ref when the refresh
 // fetch fails. Require a resolved object id: a missing ref exits non-zero.
 async function hasRemoteTrackingRefSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   ref: string
 ): Promise<boolean> {
@@ -707,7 +708,7 @@ async function hasRemoteTrackingRefSsh(
 }
 
 async function canCheckoutExistingLocalBranchSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   branchName: string,
   baseBranch: string
@@ -742,7 +743,7 @@ async function canCheckoutExistingLocalBranchSsh(
   return !worktrees.some((worktree) => normalizeLocalBranchName(worktree.branch) === branchName)
 }
 
-async function listSshRemoteNames(provider: SshGitProvider, repoPath: string): Promise<string[]> {
+async function listSshRemoteNames(provider: IGitProvider, repoPath: string): Promise<string[]> {
   try {
     const { stdout } = await provider.exec(['remote'], repoPath)
     return stdout
@@ -779,7 +780,7 @@ function resolveSshRemoteBranchName(refName: string, remoteNames: string[]): str
 }
 
 async function hasSshRemoteBranchConflict(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   branchName: string,
   allowedBaseRef: string
@@ -808,7 +809,7 @@ async function hasSshRemoteBranchConflict(
 }
 
 async function hasSshLocalBranchConflict(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   branchName: string
 ): Promise<boolean> {
@@ -824,7 +825,7 @@ async function hasSshLocalBranchConflict(
 }
 
 async function getSshBranchConflictKind(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   branchName: string,
   allowedBaseRef: string
@@ -1050,7 +1051,7 @@ export async function configureCreatedWorktreePushTarget(
 }
 
 async function findRemoteForUrlSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   remoteUrl: string
 ): Promise<string | null> {
@@ -1087,7 +1088,7 @@ async function findRemoteForUrlSsh(
 }
 
 async function ensureUniqueRemoteNameSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   preferred: string
 ): Promise<string> {
@@ -1111,7 +1112,7 @@ async function ensureUniqueRemoteNameSsh(
 }
 
 async function prepareWorktreePushTargetSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   target: GitPushTarget,
   store?: WorktreePushTargetStore,
@@ -1144,7 +1145,7 @@ async function prepareWorktreePushTargetSsh(
       remoteCreated = true
     }
   }
-  await provider.fetchRemoteTrackingRef(
+  await provider.fetchRemoteTrackingRef!(
     repoPath,
     remoteName,
     target.branchName,
@@ -1154,7 +1155,7 @@ async function prepareWorktreePushTargetSsh(
 }
 
 export async function cleanupUnusedWorktreePushTargetRemoteSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   removedWorktreeId: string,
   target: GitPushTarget | undefined,
@@ -1177,7 +1178,7 @@ export async function cleanupUnusedWorktreePushTargetRemoteSsh(
 }
 
 async function configureCreatedWorktreePushTargetSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   worktreePath: string,
   branchName: string,
   target: GitPushTarget
@@ -1213,7 +1214,7 @@ async function createRemoteSetupRunnerScript(
   repo: Repo,
   worktreePath: string,
   script: string,
-  gitProvider: SshGitProvider,
+  gitProvider: IGitProvider,
   fsProvider: IFilesystemProvider
 ): Promise<CreateWorktreeResult['setup']> {
   const useWindowsFormat = isWindowsAbsolutePathLike(worktreePath)
@@ -1241,7 +1242,7 @@ async function createRemoteSetupRunnerScript(
 }
 
 async function resolveRemoteTrackingBaseSsh(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   baseBranch: string
 ): Promise<RemoteTrackingBase | null> {
@@ -1279,7 +1280,7 @@ async function resolveRemoteTrackingBaseSsh(
 }
 
 async function resolveRemoteWorktreeCreateBasePlan(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repo: Repo,
   requestedBaseBranch: string | undefined
 ): Promise<RemoteWorktreeCreateBasePlan | null> {
@@ -1313,7 +1314,7 @@ async function resolveRemoteWorktreeCreateBasePlan(
 }
 
 function getOrStartRemoteWorktreeCreateBasePlan(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repo: Repo,
   requestedBaseBranch: string | undefined
 ): Promise<RemoteWorktreeCreateBasePlan | null> {
@@ -1334,13 +1335,13 @@ function getOrStartRemoteWorktreeCreateBasePlan(
 }
 
 export async function prefetchRemoteWorktreeCreateBase(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repo: Repo,
   args: { baseBranch?: string }
 ): Promise<void> {
   // Why: the shared base-plan probes use generic git.exec, and some relays
   // require the repo root to be registered before those probes can see refs.
-  await registerOptionalSshWorktreeCreateRoots(repo.connectionId!, [repo.path])
+  await registerOptionalSshWorktreeCreateRoots(getRepoProviderConnectionKey(repo)!, [repo.path])
   const basePlan = await getOrStartRemoteWorktreeCreateBasePlan(provider, repo, args.baseBranch)
   if (!basePlan) {
     return
@@ -1366,7 +1367,7 @@ export async function prefetchRemoteWorktreeCreateBase(
 }
 
 async function refreshLocalBaseRefForRemoteWorktreeCreate(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   remoteTrackingBase: RemoteTrackingBase
 ): Promise<LocalBaseRefRefreshResult> {
@@ -1381,7 +1382,7 @@ async function refreshLocalBaseRefForRemoteWorktreeCreate(
 
   const resultBase = { baseRef: evaluation.baseRef, localBranch: evaluation.localBranch }
   try {
-    await provider.refreshLocalBaseRefForWorktreeCreate({
+    await provider.refreshLocalBaseRefForWorktreeCreate!({
       repoPath,
       fullRef: evaluation.fullRef,
       remoteTrackingRef: evaluation.remoteTrackingRef,
@@ -1398,7 +1399,7 @@ async function refreshLocalBaseRefForRemoteWorktreeCreate(
 }
 
 async function evaluateRemoteLocalBaseRefRefreshability(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   remoteTrackingBase: RemoteTrackingBase,
   shouldInspectOwner: (behind: number) => boolean = () => true
@@ -1477,7 +1478,7 @@ async function evaluateRemoteLocalBaseRefRefreshability(
 }
 
 async function getRemoteLocalBaseRefUpdateSuggestionForWorktreeCreate(
-  provider: SshGitProvider,
+  provider: IGitProvider,
   repoPath: string,
   remoteTrackingBase: RemoteTrackingBase
 ): Promise<LocalBaseRefUpdateSuggestion | undefined> {
@@ -1491,7 +1492,7 @@ async function getRemoteLocalBaseRefUpdateSuggestionForWorktreeCreate(
     return undefined
   }
   try {
-    await provider.refreshLocalBaseRefForWorktreeCreate({
+    await provider.refreshLocalBaseRefForWorktreeCreate!({
       repoPath,
       fullRef: evaluation.fullRef,
       remoteTrackingRef: evaluation.remoteTrackingRef,
@@ -1562,8 +1563,8 @@ export async function createRemoteWorktree(
   mainWindow: BrowserWindow
 ): Promise<CreateWorktreeResult> {
   const timing = createWorktreeCreateTimingRecorder()
-  const provider = requireSshGitProvider(repo.connectionId!)
-  const fsProvider = getSshFilesystemProvider(repo.connectionId!)
+  const provider = requireRemoteGitProvider(getRepoProviderConnectionKey(repo)!)
+  const fsProvider = getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!)
 
   const settings = store.getSettings()
   const worktreePathSettings = getWorktreePathSettings(repo, settings)
@@ -1576,7 +1577,7 @@ export async function createRemoteWorktree(
 
   // Why: resolving the create base can probe repo refs through generic git.exec.
   // Register the repo root first so relays do not report a valid base as stale.
-  await registerRequiredSshWorktreeCreateRoots(repo.connectionId!, [repo.path])
+  await registerRequiredSshWorktreeCreateRoots(getRepoProviderConnectionKey(repo)!, [repo.path])
 
   // Why: explicit branches and non-username prefix modes never consume this
   // value; skipping the remote config probes preserves the exact branch name.
@@ -1707,7 +1708,7 @@ export async function createRemoteWorktree(
 
   // Why: addWorktree and setup probes run inside the new worktree path; older
   // relays need that root registered before accepting git/fs operations there.
-  await registerRequiredSshWorktreeCreateRoots(repo.connectionId!, [remotePath])
+  await registerRequiredSshWorktreeCreateRoots(getRepoProviderConnectionKey(repo)!, [remotePath])
 
   if (remoteTrackingBase) {
     const hasRemoteTrackingBaseRef = await hasRemoteTrackingRefSsh(

@@ -19,6 +19,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { createProfileMethods } from '../profile-rpc-handler'
 import type { RpcContext } from '../../runtime/rpc/core'
 import type { OrcaProfile } from '../OrcaProfile'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -242,6 +243,101 @@ describe('profile RPC handlers', () => {
       const handler = findHandler(methods, 'profile.createCompany')
       const result = await handler({ name: 'Acme Corp' }, makeCtx('admin-001'))
       expect(result).toHaveProperty('id')
+    })
+  })
+
+  // ── CR-TRACE-015: profile:updateLayer tracing (TASK-BE-015.5) ─────────────
+  describe('profile:updateLayer tracing', () => {
+    function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+      const events: TraceEvent[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+      return { events, stop: unregister }
+    }
+
+    it('profile.updateCompany → step(invalidateCache) always runs before ok()', async () => {
+      const methods = createProfileMethods(makeProfileService() as any, makeProfileResolver() as any)
+      const handler = findHandler(methods, 'profile.updateCompany')
+      const { events, stop } = captureTraceEvents()
+
+      await handler({ companyId: 'co-001', profile: {} }, makeCtx('admin-001'))
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'profile:updateLayer')
+      const invalidateIdx = spanEvents.findIndex((e) => e.level === 'step' && e.label === 'invalidateCache')
+      const okIdx = spanEvents.findIndex((e) => e.level === 'ok')
+      expect(invalidateIdx).toBeGreaterThanOrEqual(0)
+      expect(okIdx).toBeGreaterThan(invalidateIdx)
+    })
+
+    it('profile.updateDept → step(invalidateCache) always runs before ok()', async () => {
+      const methods = createProfileMethods(makeProfileService() as any, makeProfileResolver() as any)
+      const handler = findHandler(methods, 'profile.updateDept')
+      const { events, stop } = captureTraceEvents()
+
+      await handler({ deptId: 'dept-001', profile: {} }, makeCtx('admin-001'))
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'profile:updateLayer')
+      const invalidateIdx = spanEvents.findIndex((e) => e.level === 'step' && e.label === 'invalidateCache')
+      const okIdx = spanEvents.findIndex((e) => e.level === 'ok')
+      expect(invalidateIdx).toBeGreaterThanOrEqual(0)
+      expect(okIdx).toBeGreaterThan(invalidateIdx)
+    })
+
+    it('profile.updateUser → step(invalidateCache) always runs before ok()', async () => {
+      const methods = createProfileMethods(makeProfileService() as any, makeProfileResolver() as any)
+      const handler = findHandler(methods, 'profile.updateUser')
+      const { events, stop } = captureTraceEvents()
+
+      await handler({ profile: { editor: { fontSize: 14 } } }, makeCtx('user-001'))
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'profile:updateLayer')
+      const invalidateIdx = spanEvents.findIndex((e) => e.level === 'step' && e.label === 'invalidateCache')
+      const okIdx = spanEvents.findIndex((e) => e.level === 'ok')
+      expect(invalidateIdx).toBeGreaterThanOrEqual(0)
+      expect(okIdx).toBeGreaterThan(invalidateIdx)
+    })
+
+    it('profile.invalidate → step(invalidateCache) always runs before ok()', async () => {
+      const methods = createProfileMethods(makeProfileService() as any, makeProfileResolver() as any)
+      const handler = findHandler(methods, 'profile.invalidate')
+      const { events, stop } = captureTraceEvents()
+
+      await handler({ userId: 'user-001' }, makeCtx('admin-001'))
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'profile:updateLayer')
+      const invalidateIdx = spanEvents.findIndex((e) => e.level === 'step' && e.label === 'invalidateCache')
+      const okIdx = spanEvents.findIndex((e) => e.level === 'ok')
+      expect(invalidateIdx).toBeGreaterThanOrEqual(0)
+      expect(okIdx).toBeGreaterThan(invalidateIdx)
+    })
+
+    it('profile.updateUser with a security section → span.fail(PROFILE_FIELD_LOCKED)', async () => {
+      const methods = createProfileMethods(makeProfileService() as any, makeProfileResolver() as any)
+      const handler = findHandler(methods, 'profile.updateUser')
+      const { events, stop } = captureTraceEvents()
+
+      await expect(
+        handler({ profile: { security: { allowShellEscape: true } } }, makeCtx('user-001'))
+      ).rejects.toThrow('PROFILE_FIELD_LOCKED')
+      stop()
+
+      const failEvent = events.find((e) => e.flow === 'profile:updateLayer' && e.level === 'fail')
+      expect(failEvent?.fields.err).toContain('PROFILE_FIELD_LOCKED')
+    })
+
+    it('profile.updateCompany with params.traceId resumes span.id === params.traceId', async () => {
+      const methods = createProfileMethods(makeProfileService() as any, makeProfileResolver() as any)
+      const handler = findHandler(methods, 'profile.updateCompany')
+      const { events, stop } = captureTraceEvents()
+
+      await handler({ companyId: 'co-001', profile: {}, traceId: 'resume-profile-1' }, makeCtx('admin-001'))
+      stop()
+
+      const spanEvents = events.filter((e) => e.flow === 'profile:updateLayer')
+      expect(spanEvents.every((e) => e.id === 'resume-profile-1')).toBe(true)
     })
   })
 })

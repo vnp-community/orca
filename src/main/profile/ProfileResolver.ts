@@ -15,6 +15,7 @@
  * @module main/profile/ProfileResolver
  */
 
+import { Tracers } from '../../shared/trace/tracers'
 import type { ProfileService } from './ProfileService'
 import type {
   OrcaProfile,
@@ -42,19 +43,24 @@ export class ProfileResolver {
    * Returns cached result if within TTL; otherwise fetches all 3 layers in parallel.
    */
   async resolve(userId: string): Promise<ResolvedProfile> {
+    const span = Tracers.profileResolveFlow.start({ userId })
     const now = Date.now()
     const cached = this.cache.get(userId)
     if (cached && cached.expiresAt > now) {
+      span.step('cacheCheck', { cacheHit: true })
+      span.ok({ cacheHit: true })
       return cached.resolved
     }
+    span.step('cacheCheck', { cacheHit: false })
 
-    // Fetch all 3 layers in parallel
+    // Fetch all 3 layers in parallel — không step riêng cho từng SELECT (CR-TRACE-000 §5)
     const [companyProfile, deptProfile, userProfile] = await Promise.all([
       this.profileService.getCompanyProfileForUser(userId),
       this.profileService.getDeptProfileForUser(userId),
       this.profileService.getUserProfile(userId),
     ])
 
+    // merge() thuần in-memory — KHÔNG có span/step riêng (CR-TRACE-000 §5)
     const resolved = this.merge(
       companyProfile ?? {},
       deptProfile ?? {},
@@ -62,6 +68,7 @@ export class ProfileResolver {
     )
 
     this.cache.set(userId, { resolved, expiresAt: now + PROFILE_TTL_MS })
+    span.ok({ cacheHit: false, hasSecurityLock: resolved.security !== undefined })
     return resolved
   }
 
@@ -69,6 +76,10 @@ export class ProfileResolver {
    * Invalidate cache.
    * - With userId: clears that user's entry only
    * - Without args: clears the entire cache
+   *
+   * Why no tracer here: callers (profile-rpc-handler.ts) already wrap this in
+   * their own step('invalidateCache') — a second span here would double-count
+   * the same logical action (CR-TRACE-000 §4, "1 tracer = 1 sub-flow").
    */
   invalidate(userId?: string): void {
     if (userId !== undefined) {

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useAppStore } from '../store'
-import { callRuntimeRpc } from '../runtime/runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
+import { Tracers } from '../../../shared/trace/tracers'
 import { toast } from 'sonner'
 import type { WorkflowDefinition, WorkflowStep } from '@shared/workflow-types'
 
@@ -43,20 +44,49 @@ export function useWorkflow(templateId?: string) {
   }, [])
 
   const saveTemplate = useCallback(async () => {
-    if (templateId) {
-      await callRuntimeRpc('workflow.template.update', { templateId, ...local })
-    } else {
-      const created = await callRuntimeRpc('workflow.template.create', local) as WorkflowDefinition
-      useAppStore.getState().addTemplate(created)
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    // BL-WF-01: field `mode` phân biệt create/update.
+    const span = Tracers.uiWorkflowTemplateSaveFlow.start({ mode: templateId ? 'update' : 'create' })
+    try {
+      if (templateId) {
+        await callRuntimeRpc(target, 'workflow.template.update', { templateId, ...local, traceId: span.id })
+      } else {
+        const created = await callRuntimeRpc<WorkflowDefinition>(target, 'workflow.template.create', { ...local, traceId: span.id })
+        useAppStore.getState().addTemplate(created)
+      }
+      span.ok({ mode: templateId ? 'update' : 'create' })
+      toast.success('Workflow saved')
+    } catch (err) {
+      span.fail(err, { mode: templateId ? 'update' : 'create' })
+      throw err
     }
-    toast.success('Workflow saved')
   }, [templateId, local])
 
   const runWorkflow = useCallback(async (inputs?: Record<string, unknown>) => {
     if (!templateId) { toast.error('Save workflow first'); return null }
-    const result = await callRuntimeRpc('workflow.execute', { templateId, inputs }) as { id: string }
-    return result.id
-  }, [templateId])
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    // BL-WF-02: span.id CHÍNH LÀ rootTraceId của toàn bộ execution. Browser sinh
+    // id này TRƯỚC khi có executionId từ backend.
+    const span = Tracers.uiWorkflowExecuteFlow.start({ templateId })
+    try {
+      const result = await callRuntimeRpc<{ id: string }>(target, 'workflow.execute', { templateId, inputs, traceId: span.id })
+      // Lưu rootTraceId vào execution record ngay khi biết executionId.
+      useAppStore.getState().addExecution({
+        id: result.id, templateId, status: 'running', startedAt: Date.now(),
+        triggeredBy: 'me', definition: local as WorkflowDefinition, rootTraceId: span.id,
+      })
+      // KHÔNG span.ok() ở đây tới khi execution xong — ok() chỉ đánh dấu "RPC issue
+      // thành công" (ack nhận executionId), không phải "execution đã xong". Vòng đời
+      // đầy đủ do backend tự trace qua workflow:execute (resume cùng id).
+      span.ok({ executionId: result.id })
+      toast.success('Workflow started')
+      return result.id
+    } catch (err) {
+      span.fail(err, { templateId })
+      toast.error('Failed to start workflow')
+      return null
+    }
+  }, [templateId, local])
 
   return { template: local, templates, executions, addStep, removeStep, updateStep, updateTemplate, saveTemplate, runWorkflow }
 }

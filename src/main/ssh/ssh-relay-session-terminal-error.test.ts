@@ -48,9 +48,9 @@ vi.mock('../providers/ssh-git-provider', () => ({
 }))
 
 vi.mock('../ipc/pty', () => ({
-  registerSshPtyProvider: vi.fn(),
-  unregisterSshPtyProvider: vi.fn(),
-  getSshPtyProvider: vi.fn().mockReturnValue({
+  registerRemotePtyProvider: vi.fn(),
+  unregisterRemotePtyProvider: vi.fn(),
+  getRemotePtyProvider: vi.fn().mockReturnValue({
     dispose: vi.fn(),
     attach: vi.fn().mockResolvedValue(undefined)
   }),
@@ -63,14 +63,14 @@ vi.mock('../ipc/pty', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  registerSshFilesystemProvider: vi.fn(),
-  unregisterSshFilesystemProvider: vi.fn(),
-  getSshFilesystemProvider: vi.fn().mockReturnValue({ dispose: vi.fn() })
+  registerRemoteFilesystemProvider: vi.fn(),
+  unregisterRemoteFilesystemProvider: vi.fn(),
+  getRemoteFilesystemProvider: vi.fn().mockReturnValue({ dispose: vi.fn() })
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  registerSshGitProvider: vi.fn(),
-  unregisterSshGitProvider: vi.fn()
+  registerRemoteGitProvider: vi.fn(),
+  unregisterRemoteGitProvider: vi.fn()
 }))
 
 const { deployAndLaunchRelay } = await import('./ssh-relay-deploy')

@@ -258,6 +258,34 @@ ipcMain.handle('repos:fetchGithubRemote', async (_, repoId) => {
 })
 ```
 
+### 6.1 Addendum v5.0: `hostKind` cho Repo trên Dev Server — IMPLEMENTED ✅ (2026-08-02/03)
+
+`addRemoteRepoFromPath` (internal helper trong `ipc/repos.ts`, dùng bởi cả `'projectHostSetups:setupExistingFolder'` và các entry point khác) có thêm param `hostKind?: 'ssh' | 'devServer'` (default `'ssh'`):
+
+```typescript
+async function addRemoteRepoFromPath(
+  store: Store,
+  args: {
+    connectionId: string           // SSH targetId hoặc Dev Server id — cùng provider-registry key
+    hostKind?: 'ssh' | 'devServer' // NEW — quyết định persist connectionId hay devServerId
+    remotePath: string
+    displayName?: string
+    kind?: 'git' | 'folder'
+  }
+): Promise<{ repo: Repo; alreadyExisted: boolean } | { error: string }>
+```
+
+Handler `'projectHostSetups:setupExistingFolder'` branch theo `parseExecutionHostId(args.hostId)?.kind`:
+
+```typescript
+const parsedHost = parseExecutionHostId(args.hostId)
+// parsedHost.kind === 'ssh'       → addRemoteRepoFromPath({ hostKind: 'ssh', connectionId: parsedHost.targetId, ... })
+// parsedHost.kind === 'devServer' → addRemoteRepoFromPath({ hostKind: 'devServer', connectionId: parsedHost.devServerId, ... }) // NEW
+// parsedHost.kind === 'runtime'   → error: phải dùng runtime projectHostSetup RPC
+```
+
+**Clone repo mới lên Dev Server — chưa hỗ trợ.** `cloneRemoteRepo` (dùng bởi `repos:cloneRemote`) chỉ hoạt động với `IGitProvider.getHostPlatform()` — method này optional trên interface và `DevServerGitProvider` không implement (chưa có host-platform detection / remote home-path resolution / SSH-multiplexer progress-notify tương đương ở Dev Server). Gọi clone với một Dev Server connectionId sẽ throw thay vì âm thầm clone lên local filesystem của chính Orca server. Xem [TDD-13 §11.3](./13-dev-server-onboarding.md#11-provider-unification-with-ssh-registries-v50).
+
 ---
 
 ## 7. Settings Handlers (`ipc/settings.ts`) — ~9K

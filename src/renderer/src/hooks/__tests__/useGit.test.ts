@@ -2,7 +2,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
-vi.mock('../../runtime/runtime-rpc-client', () => ({ callRuntimeRpc: vi.fn() }))
+vi.mock('../../runtime/runtime-rpc-client', () => ({
+  callRuntimeRpc: vi.fn(),
+  getActiveRuntimeTarget: vi.fn().mockReturnValue({ kind: 'local' })
+}))
 vi.mock('../../runtime/runtime-rpc-stream', () => ({
   callRuntimeRpcStream: vi.fn(async function*() {
     yield 'Counting objects: 3, done.'

@@ -7,13 +7,16 @@ import {
   refreshShellPathAndDetectAgents,
   runPreflightCheck
 } from '../../../ipc/preflight'
+import { Tracers } from '../../../../shared/trace/tracers'
 
 // Why: In Web mode (ORCA_MULTI_USER=1), preflight.check routes to the relay on the
 // target Dev Server instead of running locally on the Orca Server container.
 // The optional devServerId disambiguates between local and remote execution.
 const PreflightCheck = z.object({
   force: z.boolean().optional(),
-  devServerId: z.string().optional()
+  devServerId: z.string().optional(),
+  // CR-TRACE-000 §3.2 — resume a Browser-originated span across the RPC boundary.
+  traceId: z.string().optional()
 })
 const PreflightDetectRemoteAgents = z.object({
   connectionId: z.string().min(1)
@@ -27,29 +30,49 @@ export const PREFLIGHT_METHODS: RpcMethod[] = [
     name: 'preflight.check',
     params: PreflightCheck,
     handler: async (params, ctx) => {
-      // Web mode: proxy CLI check to the relay running on the Dev Server.
-      // The relay's preflight.check runs gh/glab/git on the actual dev machine.
-      if (params.devServerId && ctx.devServerManager) {
-        const relay = ctx.devServerManager.getRelay(params.devServerId)
-        if (!relay) {
-          throw new Error(
-            `Dev server '${params.devServerId}' relay is not connected. ` +
-            `Connect to the dev server before running preflight check.`
+      const span = Tracers.remoteIntegrationPreflightFlow.start(
+        { devServerId: params.devServerId, force: params.force ?? false },
+        params.traceId ? { id: params.traceId } : undefined
+      )
+      try {
+        // Web mode: proxy CLI check to the relay running on the Dev Server.
+        // The relay's preflight.check runs gh/glab/git on the actual dev machine.
+        if (params.devServerId && ctx.devServerManager) {
+          const relay = ctx.devServerManager.getRelay(params.devServerId)
+          if (!relay) {
+            span.fail('relay-not-connected', { devServerId: params.devServerId })
+            throw new Error(
+              `Dev server '${params.devServerId}' relay is not connected. ` +
+              `Connect to the dev server before running preflight check.`
+            )
+          }
+          // Delegate the full CLI check to the relay.
+          // The relay's PreflightHandler.checkFullPreflight() returns
+          // platform + gh + glab + git status.
+          span.step('relayDelegate', { devServerId: params.devServerId })
+          const result = await relay.call<Record<string, unknown>>(
+            'preflight.check',
+            { traceId: span.id },
+            30_000
           )
+          span.ok({ devServerId: params.devServerId })
+          return result
         }
-        // Delegate the full CLI check to the relay.
-        // The relay's PreflightHandler.checkFullPreflight() returns
-        // platform + gh + glab + git status.
-        const result = await relay.call<Record<string, unknown>>(
-          'preflight.check',
-          {},
-          30_000
-        )
-        return result
-      }
 
-      // Local mode: run preflight check on the Orca Server host (Electron or local dev).
-      return runPreflightCheck(params.force)
+        // Local mode: run preflight check on the Orca Server host (Electron or local dev).
+        span.step('localCheck')
+        const result = await runPreflightCheck(params.force)
+        span.ok({ mode: 'local' })
+        return result
+      } catch (err) {
+        // Avoid double-fail: the 'relay-not-connected' branch above already
+        // called span.fail() before throwing — don't fail the span twice for
+        // the same outcome when that same error reaches this catch.
+        if (!(err instanceof Error && err.message.startsWith(`Dev server '${params.devServerId}'`))) {
+          span.fail(err, { devServerId: params.devServerId })
+        }
+        throw err
+      }
     }
   }),
   defineMethod({

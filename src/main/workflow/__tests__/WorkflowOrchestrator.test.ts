@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { WorkflowOrchestrator, type StepExecutors } from '../WorkflowOrchestrator'
 import { DAGBuilder } from '../DAGBuilder'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
 import type { IConnectionPool } from '../../db/pool'
 import type { ProjectServerRouter } from '../../project/ProjectServerRouter'
 import type { WorkflowDefinition, WorkflowStep, StepOutput } from '../WorkflowTypes'
@@ -71,6 +72,12 @@ function makeFailExecutors(): StepExecutors {
 /** Flush micro-task queue — needs many rounds for deeply nested async chains */
 async function flushPromises(rounds = 100): Promise<void> {
   for (let i = 0; i < rounds; i++) await Promise.resolve()
+}
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -313,5 +320,195 @@ describe('WorkflowOrchestrator', () => {
       c => c.sql.includes('INSERT') && c.sql.includes('orca_workflow_step_executions')
     )
     expect(stepInserts).toHaveLength(2)
+  })
+})
+
+// ── CR-TRACE-017 tracing (parentTraceId design, TASK-BE-017.2) ─────────────────
+
+describe('WorkflowOrchestrator — CR-TRACE-017 tracing (parentTraceId)', () => {
+  let dagBuilder: DAGBuilder
+
+  beforeEach(() => {
+    dagBuilder = new DAGBuilder()
+  })
+
+  // 1. execute(): creates workflow:execute span + persists its id as root_trace_id
+  it('execute(): creates workflow:execute span and persists its id as root_trace_id', async () => {
+    const { pool, calls } = makePool()
+    const { events, stop } = captureTraceEvents()
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, makeSuccessExecutors(), makeRouter())
+    const execution = await orch.execute(makeDefinition([step('A')]), {}, 'user-1')
+    await flushPromises()
+    stop()
+
+    const startEvent = events.find(
+      (e) => e.flow === 'workflow:execute' && e.level === 'start' && e.fields.executionId === execution.id
+    )
+    expect(startEvent).toBeDefined()
+
+    const insertCall = calls.find((c) => c.sql.includes('INSERT') && c.sql.includes('orca_workflow_executions'))
+    expect(insertCall?.params).toContain(startEvent!.id)
+  })
+
+  // 2. every step span in every wave carries the same parentTraceId === rootTraceId
+  it('every step span (across multiple waves) carries the same parentTraceId === rootTraceId', async () => {
+    const { pool } = makePool()
+    const { events, stop } = captureTraceEvents()
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, makeSuccessExecutors(), makeRouter())
+    // Wave 0: A. Wave 1: B, C (both depend on A) — 2 waves, 3 steps total.
+    await orch.execute(makeDefinition([step('A'), step('B', ['A']), step('C', ['A'])]), {}, 'user-1')
+    await flushPromises()
+    stop()
+
+    const rootStart = events.find((e) => e.flow === 'workflow:execute' && e.level === 'start')
+    expect(rootStart).toBeDefined()
+
+    const stepStarts = events.filter((e) => e.flow === 'workflow:stepExecute' && e.level === 'start')
+    expect(stepStarts).toHaveLength(3)
+    expect(stepStarts.every((e) => e.fields.parentTraceId === rootStart!.id)).toBe(true)
+  })
+
+  // 3. each step span has a unique id despite sharing the same parentTraceId
+  it('each step span has a unique id, even though all share the same parentTraceId', async () => {
+    const { pool } = makePool()
+    const { events, stop } = captureTraceEvents()
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, makeSuccessExecutors(), makeRouter())
+    await orch.execute(makeDefinition([step('A'), step('B', ['A'])]), {}, 'user-1')
+    await flushPromises()
+    stop()
+
+    const stepStarts = events.filter((e) => e.flow === 'workflow:stepExecute' && e.level === 'start')
+    const ids = stepStarts.map((e) => e.id)
+    expect(ids.length).toBeGreaterThanOrEqual(2)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  // 4. resumeRunningExecutions(): reads root_trace_id from DB → resumed span has the SAME id
+  it('resumeRunningExecutions(): reads root_trace_id from DB and resumes the span with the same id', async () => {
+    const definition = makeDefinition([step('A')])
+    const runningRow = {
+      id: 'exec-resume-1',
+      definitionSnapshot: JSON.stringify(definition),
+      status: 'running',
+      inputsJson: JSON.stringify({}),
+      currentWave: 0,
+      triggeredBy: 'user-1',
+      projectId: null,
+      startedAt: null,
+      completedAt: null,
+      errorMessage: null,
+      createdAt: Date.now(),
+    }
+    const preRestartRootTraceId = 'pre-restart-root-id'
+    const calls: Array<{ sql: string; params: unknown[] }> = []
+    const pool = {
+      withConnection: vi.fn().mockImplementation(
+        async (fn: (db: { query: (...args: unknown[]) => Promise<unknown[]> }) => Promise<unknown>) => {
+          const db = {
+            query: vi.fn().mockImplementation(async (sql: string, params: unknown[] = []) => {
+              calls.push({ sql, params })
+              if (sql.includes('SELECT root_trace_id')) return [{ rootTraceId: preRestartRootTraceId }]
+              if (sql.trim().startsWith('SELECT id') && sql.includes('orca_workflow_executions')) {
+                return [runningRow]
+              }
+              return []
+            }),
+          }
+          return fn(db)
+        }
+      ),
+    } as unknown as IConnectionPool
+
+    const { events, stop } = captureTraceEvents()
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, makeSuccessExecutors(), makeRouter())
+    await orch.resumeRunningExecutions()
+    await flushPromises()
+    stop()
+
+    const resumedStart = events.find((e) => e.flow === 'workflow:execute' && e.level === 'start')
+    expect(resumedStart?.id).toBe(preRestartRootTraceId)
+    expect(resumedStart?.fields.resumed).toBe(true)
+  })
+
+  // 5. markExecutionCompleted(): closes span with ok({ status: 'completed' })
+  it('markExecutionCompleted(): closes the root span with ok({ status: "completed" })', async () => {
+    const { pool } = makePool()
+    const { events, stop } = captureTraceEvents()
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, makeSuccessExecutors(), makeRouter())
+    await orch.execute(makeDefinition([step('A')]), {}, 'user-1')
+    await flushPromises()
+    stop()
+
+    const okEvent = events.find((e) => e.flow === 'workflow:execute' && e.level === 'ok')
+    expect(okEvent?.fields).toMatchObject({ status: 'completed' })
+  })
+
+  // 6. markExecutionFailed(): closes span with fail(...) and status: 'failed'
+  it('markExecutionFailed(): closes the root span with fail(...) and status: "failed"', async () => {
+    const { pool } = makePool()
+    const { events, stop } = captureTraceEvents()
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, makeFailExecutors(), makeRouter())
+    await orch.execute(makeDefinition([step('A')]), {}, 'user-1')
+    await flushPromises()
+    stop()
+
+    const failEvent = events.find((e) => e.flow === 'workflow:execute' && e.level === 'fail')
+    expect(failEvent?.fields.status).toBe('failed')
+  })
+
+  // 7. rootSpans map does not leak on the 'completed' terminal transition
+  it('rootSpans map does not leak an entry after execution completes', async () => {
+    const { pool } = makePool()
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, makeSuccessExecutors(), makeRouter())
+    const execution = await orch.execute(makeDefinition([step('A')]), {}, 'user-1')
+    await flushPromises()
+
+    const rootSpans = (orch as unknown as { rootSpans: Map<string, unknown> }).rootSpans
+    expect(rootSpans.has(execution.id)).toBe(false)
+  })
+
+  // 8. rootSpans map does not leak on the 'failed' terminal transition
+  it('rootSpans map does not leak an entry after execution fails', async () => {
+    const { pool } = makePool()
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, makeFailExecutors(), makeRouter())
+    const execution = await orch.execute(makeDefinition([step('A')]), {}, 'user-1')
+    await flushPromises()
+
+    const rootSpans = (orch as unknown as { rootSpans: Map<string, unknown> }).rootSpans
+    expect(rootSpans.has(execution.id)).toBe(false)
+  })
+
+  // 9. rootSpans map does not leak on the 'cancelled' terminal transition
+  it('rootSpans map does not leak an entry after cancel()', async () => {
+    const { pool } = makePool()
+    // Why: mock must key by step.config.type ('shell', from step()'s default config) —
+    // WorkflowOrchestrator.executeStep() looks up stepExecutors[type], not a generic
+    // 'execute' key. A never-resolving fn here keeps the execution genuinely in-flight
+    // so cancel() (not a premature UNSUPPORTED_STEP_TYPE failure) is the terminal transition.
+    const neverResolves = vi.fn().mockImplementation(() => new Promise(() => {}))
+    const executors = { shell: neverResolves } as unknown as StepExecutors
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, executors, makeRouter())
+    const execution = await orch.execute(makeDefinition([step('A')]), {}, 'user-1')
+    await flushPromises()
+    await orch.cancel(execution.id)
+
+    const rootSpans = (orch as unknown as { rootSpans: Map<string, unknown> }).rootSpans
+    expect(rootSpans.has(execution.id)).toBe(false)
+  })
+
+  // 10. cancel(): closes the root span with fail('EXECUTION_CANCELLED', { status: 'cancelled' })
+  it('cancel(): closes the root span with fail(...) and status: "cancelled"', async () => {
+    const { pool } = makePool()
+    const neverResolves = vi.fn().mockImplementation(() => new Promise(() => {}))
+    const executors = { shell: neverResolves } as unknown as StepExecutors
+    const orch = new WorkflowOrchestrator(pool, dagBuilder, executors, makeRouter())
+    const { events, stop } = captureTraceEvents()
+    const execution = await orch.execute(makeDefinition([step('A')]), {}, 'user-1')
+    await flushPromises()
+    await orch.cancel(execution.id)
+    stop()
+
+    const failEvent = events.find((e) => e.flow === 'workflow:execute' && e.level === 'fail')
+    expect(failEvent?.fields.status).toBe('cancelled')
   })
 })

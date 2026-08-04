@@ -4,6 +4,7 @@ import {
   getSettingsFocusedExecutionHostId,
   isRuntimeOwnedSshTargetId,
   parseExecutionHostId,
+  toDevServerExecutionHostId,
   toRuntimeExecutionHostId,
   toSshExecutionHostId,
   type ExecutionHostId,
@@ -14,6 +15,7 @@ import { MIN_COMPATIBLE_RUNTIME_SERVER_VERSION, RUNTIME_PROTOCOL_VERSION } from 
 import type { RuntimeStatus } from './runtime-types'
 import type { SshConnectionState, SshConnectionStatus } from './ssh-types'
 import type { RuntimeEnvironmentSource } from './runtime-environments'
+import type { DevServerStatus } from './dev-server-types'
 import type { GlobalSettings, Repo } from './types'
 
 export type ExecutionHostHealth =
@@ -53,6 +55,12 @@ type RuntimeHostStatus = {
 }
 
 type RuntimeStatusByEnvironmentId = ReadonlyMap<string, RuntimeHostStatus>
+
+export type DevServerSummary = {
+  id: string
+  name?: string | null
+  status?: DevServerStatus
+}
 
 function normalizeHostPart(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
@@ -104,6 +112,20 @@ function runtimeControlHealth(
       return null
     case undefined:
       return null
+  }
+}
+
+function devServerHealth(status: DevServerStatus | undefined): ExecutionHostHealth {
+  switch (status) {
+    case 'connected':
+      return 'available'
+    case 'connecting':
+      return 'connecting'
+    case 'error':
+      return 'error'
+    case 'disconnected':
+    case undefined:
+      return 'disconnected'
   }
 }
 
@@ -174,13 +196,29 @@ function addRuntimeHost(
   })
 }
 
+function addDevServerHost(
+  hosts: Map<ExecutionHostId, ExecutionHostRegistryEntry>,
+  devServerId: string,
+  label: string,
+  status: DevServerStatus | undefined
+): void {
+  setHost(hosts, {
+    id: toDevServerExecutionHostId(devServerId),
+    kind: 'devServer',
+    label,
+    detail: 'Dev Server',
+    health: devServerHealth(status)
+  })
+}
+
 export function buildExecutionHostRegistry(args: {
-  repos: readonly Pick<Repo, 'connectionId' | 'executionHostId'>[]
+  repos: readonly Pick<Repo, 'connectionId' | 'executionHostId' | 'devServerId'>[]
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined
   sshTargetLabels?: ReadonlyMap<string, string>
   sshConnectionStates?: ReadonlyMap<string, SshConnectionState>
   runtimeEnvironments?: readonly RuntimeEnvironmentSummary[]
   runtimeStatusByEnvironmentId?: RuntimeStatusByEnvironmentId
+  devServers?: readonly DevServerSummary[]
   // Why: user-chosen per-host display labels override the derived label so a
   // rename in the host menu/settings shows everywhere the registry feeds.
   hostLabelOverrides?: ReadonlyMap<ExecutionHostId, string>
@@ -229,6 +267,16 @@ export function buildExecutionHostRegistry(args: {
     )
   }
 
+  const devServerStatusById = new Map<string, DevServerStatus | undefined>()
+  for (const devServer of args.devServers ?? []) {
+    const devServerId = normalizeHostPart(devServer.id)
+    if (!devServerId) {
+      continue
+    }
+    devServerStatusById.set(devServerId, devServer.status)
+    addDevServerHost(hosts, devServerId, normalizeHostPart(devServer.name) ?? devServerId, devServer.status)
+  }
+
   const sshTargetIds = new Set<string>()
   for (const repo of args.repos) {
     const parsedHost = parseExecutionHostId(repo.executionHostId)
@@ -245,6 +293,16 @@ export function buildExecutionHostRegistry(args: {
     // targets are hidden, so they must not become visible SSH run-target hosts here.
     if (parsedHost?.kind === 'ssh' && !isRuntimeOwnedSshTargetId(parsedHost.targetId)) {
       sshTargetIds.add(parsedHost.targetId)
+    }
+    // Why: a repo bound to a Dev Server (no live entry in args.devServers, e.g.
+    // stale/disconnected) still needs a registry entry so "Available Hosts"
+    // can show it as disconnected rather than silently omitting it.
+    if (parsedHost?.kind === 'devServer' && !devServerStatusById.has(parsedHost.devServerId)) {
+      addDevServerHost(hosts, parsedHost.devServerId, parsedHost.devServerId, undefined)
+    }
+    const repoDevServerId = normalizeHostPart(repo.devServerId)
+    if (repoDevServerId && !devServerStatusById.has(repoDevServerId)) {
+      addDevServerHost(hosts, repoDevServerId, repoDevServerId, undefined)
     }
   }
   for (const targetId of args.sshTargetLabels?.keys() ?? []) {

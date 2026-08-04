@@ -4,6 +4,7 @@ import {
   resolveAutomationWorkspaceProvenance
 } from '../../../automations/workspace-provenance'
 import { defineMethod, type RpcMethod } from '../core'
+import { Tracers } from '../../../../shared/trace/tracers'
 import {
   WorktreeCreate,
   WorktreeDetectedListParams,
@@ -71,6 +72,10 @@ export const WORKTREE_METHODS: RpcMethod[] = [
     name: 'worktree.create',
     params: WorktreeCreate,
     handler: async (params, { runtime }) => {
+      const span = Tracers.worktreeCreate.start(
+        { repoSelector: params.repo, baseBranch: params.baseBranch ?? '' },
+        params.traceId ? { id: params.traceId } : undefined
+      )
       const repo = await runtime.showRepo(params.repo)
       const automationProvenance = resolveAutomationWorkspaceProvenance({
         authority: runtime,
@@ -81,6 +86,7 @@ export const WORKTREE_METHODS: RpcMethod[] = [
       // Why: provenance tokens are reserved before creation so retries can recover,
       // but failed create attempts must release the reservation for a safe retry.
       try {
+        span.step('resolve-repo', { repoId: repo.id })
         const result = await runtime.createManagedWorktree({
           repoSelector: params.repo,
           name: params.name ?? '',
@@ -133,6 +139,7 @@ export const WORKTREE_METHODS: RpcMethod[] = [
           }
         })
         finishAutomationWorkspaceProvenanceRequest(params.automationProvenanceRequest)
+        span.ok({ worktreeId: result.worktree?.id ?? '', path: result.worktree?.path ?? '' })
         // Why: agent callers need a stable dispatch target without traversing
         // terminal-list layout duplicates after creating the worktree.
         return params.startupAgent && result.startupTerminal?.handle
@@ -140,6 +147,7 @@ export const WORKTREE_METHODS: RpcMethod[] = [
           : result
       } catch (error) {
         releaseAutomationWorkspaceProvenanceRequest(params.automationProvenanceRequest)
+        span.fail(error, { repoSelector: params.repo })
         throw error
       }
     }
@@ -231,12 +239,22 @@ export const WORKTREE_METHODS: RpcMethod[] = [
     name: 'worktree.rm',
     params: WorktreeRemove,
     handler: async (params, { runtime }) => {
-      const result = await runtime.removeManagedWorktree(
-        params.worktree,
-        params.force === true,
-        params.runHooks === true
+      const span = Tracers.worktreeDelete.start(
+        { worktreeId: params.worktree, force: params.force === true },
+        params.traceId ? { id: params.traceId } : undefined
       )
-      return { removed: true, ...result }
+      try {
+        const result = await runtime.removeManagedWorktree(
+          params.worktree,
+          params.force === true,
+          params.runHooks === true
+        )
+        span.ok({ worktreeId: params.worktree })
+        return { removed: true, ...result }
+      } catch (error) {
+        span.fail(error, { worktreeId: params.worktree })
+        throw error
+      }
     }
   }),
   defineMethod({

@@ -13,6 +13,7 @@ import { MigrationRunner } from '../../db/migrations/runner'
 import { ALL_MIGRATIONS } from '../../db/migrations'
 import { ProjectService } from '../ProjectService'
 import type { DevServerManager } from '../../dev-server/dev-server-manager'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -254,5 +255,72 @@ describe('ProjectService', () => {
     // project is gone, members should be gone (cascade)
     const members = await service.getMembers(p.id)
     expect(members).toEqual([])
+  })
+})
+
+// ── CR-TRACE-015: ProjectService.create() tracing (TASK-BE-015.5) ──────────
+
+describe('ProjectService.create tracing (CR-TRACE-015)', () => {
+  let pool: SqliteSingleConnectionPool
+  let service: ProjectService
+
+  beforeEach(async () => {
+    const setup = await makeService()
+    pool = setup.pool
+    service = setup.service
+  })
+
+  afterEach(async () => {
+    await pool.destroy().catch(() => {})
+  })
+
+  function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    return { events, stop: unregister }
+  }
+
+  it('create() success → profile:projectRoute ok({ op: "create", projectId })', async () => {
+    await insertUser(pool, 'u-trace-1')
+    const { events, stop } = captureTraceEvents()
+
+    const project = await service.create({
+      name: 'Traced Project', devServerId: FAKE_DEV_SERVER_ID, repoPath: '/repo', createdBy: 'u-trace-1'
+    })
+    stop()
+
+    const okEvent = events.find((e) => e.flow === 'profile:projectRoute' && e.level === 'ok')
+    expect(okEvent?.fields).toMatchObject({ op: 'create', projectId: project.id })
+  })
+
+  it('create() with a non-existent devServerId → span.fail("DEV_SERVER_NOT_FOUND", { devServerId }), no project created', async () => {
+    const dsm = makeMockDSM(false)
+    const noServerService = new ProjectService(pool, dsm)
+    await insertUser(pool, 'u-trace-2')
+    const { events, stop } = captureTraceEvents()
+
+    await expect(
+      noServerService.create({ name: 'X', devServerId: 'missing-dev-server', repoPath: '/repo', createdBy: 'u-trace-2' })
+    ).rejects.toThrow('DEV_SERVER_NOT_FOUND')
+    stop()
+
+    const failEvent = events.find((e) => e.flow === 'profile:projectRoute' && e.level === 'fail')
+    expect(failEvent?.fields).toMatchObject({ devServerId: 'missing-dev-server' })
+    expect(failEvent?.fields.err).toContain('DEV_SERVER_NOT_FOUND')
+  })
+
+  it('create() emits a validateDevServer step before ok()', async () => {
+    await insertUser(pool, 'u-trace-3')
+    const { events, stop } = captureTraceEvents()
+
+    await service.create({ name: 'Y', devServerId: FAKE_DEV_SERVER_ID, repoPath: '/repo', createdBy: 'u-trace-3' })
+    stop()
+
+    const spanEvents = events.filter((e) => e.flow === 'profile:projectRoute')
+    expect(spanEvents.map((e) => (e.level === 'step' ? e.label : e.level))).toEqual([
+      'start',
+      'validateDevServer',
+      'ok'
+    ])
   })
 })

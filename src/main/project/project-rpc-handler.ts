@@ -20,6 +20,7 @@ import { defineMethod } from '../runtime/rpc/core'
 import type { RpcMethod } from '../runtime/rpc/core'
 import type { ProjectService } from './ProjectService'
 import type { ProfileAwareAgentSpawner } from './ProfileAwareAgentSpawner'
+import { Tracers } from '../../shared/trace/tracers'
 
 // ── Param schemas ─────────────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ const AgentSpawnParam = z.object({
   command: z.string().min(1),
   extraEnv: z.record(z.string(), z.string()).optional(),
   workdir: z.string().optional(),
+  traceId: z.string().optional(), // [NEW CR-TRACE-002]
 })
 
 // ── Factory ──────────────────────────────────────────────────────────────────
@@ -208,6 +210,12 @@ export function createProjectMethods(
 
     // ── project.agentSpawn ───────────────────────────────────────────────────
     // Spawn an agent in project context with profile-injected env (any member).
+    // profile:agentSpawnRoute wraps only the profile/project-domain access-check
+    // (assertAccess) BEFORE delegating to spawn() — it does NOT re-wrap spawn()
+    // itself (that's agentOrch:spawn, owned by TASK-BE-002.2). Forwarding
+    // routeSpan.id as traceId lets agentOrch:spawn RESUME the same span id,
+    // producing one continuous profile:agentSpawnRoute → agentOrch:spawn →
+    // relay:agentCall chain instead of two competing root spans.
     defineMethod({
       name: 'project.agentSpawn',
       params: AgentSpawnParam,
@@ -215,8 +223,20 @@ export function createProjectMethods(
         const userId = ctx.userId
         if (!userId) throw new Error('UNAUTHENTICATED')
         if (!agentSpawner) throw new Error('AGENT_SPAWNER_NOT_AVAILABLE')
-        await projectService.assertAccess(params.projectId, userId)
-        return agentSpawner.spawn({ ...params, userId })
+
+        const routeSpan = Tracers.profileAgentSpawnFlow.start(
+          { projectId: params.projectId, userId },
+          params.traceId ? { id: params.traceId } : undefined
+        )
+        try {
+          await projectService.assertAccess(params.projectId, userId)
+          routeSpan.ok({ projectId: params.projectId })
+        } catch (err) {
+          routeSpan.fail(err, { projectId: params.projectId })
+          throw err
+        }
+
+        return agentSpawner.spawn({ ...params, userId, traceId: routeSpan.id })
       }
     }),
   ]

@@ -5,7 +5,7 @@ import {
   normalizeHostedReviewBaseRef,
   normalizeHostedReviewHeadRef
 } from '../../shared/hosted-review-refs'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
 import {
   getHostedReviewLocalGitOptions,
@@ -98,7 +98,7 @@ async function readMergeRequestTemplate(
     '.gitlab/merge_request_template.md',
     '.gitlab/MERGE_REQUEST_TEMPLATE.md'
   ]
-  const remoteProvider = connectionId ? getSshFilesystemProvider(connectionId) : undefined
+  const remoteProvider = connectionId ? getRemoteFilesystemProvider(connectionId) : undefined
   if (connectionId && !remoteProvider) {
     return ''
   }

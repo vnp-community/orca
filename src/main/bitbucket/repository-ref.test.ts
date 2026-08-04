@@ -16,18 +16,18 @@ import {
   getBitbucketRepoRef,
   parseBitbucketRepoRef
 } from './repository-ref'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
+import { registerRemoteGitProvider, unregisterRemoteGitProvider } from '../providers/ssh-git-dispatch'
 
 describe('Bitbucket repository refs', () => {
   beforeEach(() => {
     gitExecFileAsyncMock.mockReset()
     sshExecMock.mockReset()
-    unregisterSshGitProvider('conn-1')
+    unregisterRemoteGitProvider('conn-1')
     _resetBitbucketRepoRefCache()
   })
 
   afterEach(() => {
-    unregisterSshGitProvider('conn-1')
+    unregisterRemoteGitProvider('conn-1')
   })
 
   it('parses HTTPS, SSH, and ssh:// Bitbucket remotes', () => {
@@ -146,7 +146,7 @@ describe('Bitbucket repository refs', () => {
       stdout: 'git@bitbucket.org:remote/project.git\n',
       stderr: ''
     })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getBitbucketRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toEqual({
       workspace: 'remote',
@@ -162,7 +162,7 @@ describe('Bitbucket repository refs', () => {
       stdout: 'git@bitbucket.org:remote/project.git\n',
       stderr: ''
     })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getBitbucketRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toBeNull()
     await expect(getBitbucketRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toEqual({

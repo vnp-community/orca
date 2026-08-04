@@ -17,6 +17,12 @@ import type { AgentConfig } from './agent-config'
 import type { ToolDefinition } from './agent-tool-registry'
 import { createSession } from './agent-session'
 import type { AgentLogger } from './agent-logger'
+import { createTracer } from '../shared/trace'
+import type { TraceSpan } from '../shared/trace'
+
+// agent:connectionRelay (not agentWs: — that namespace is backend/Main process;
+// keeping a distinct prefix avoids ambiguity when filtering trace logs by flow).
+const relayConnTracer = createTracer('agent:connectionRelay')
 
 export async function listenRelay(
   config: AgentConfig,
@@ -46,16 +52,24 @@ export async function listenRelay(
     })
 
     wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-      if (!authenticate(ws, req, token, log)) return
-
       const remoteAddr = req.socket.remoteAddress ?? 'unknown'
+      const span = relayConnTracer.start({ remoteAddr })
+
+      if (!authenticate(ws, req, token, log, span)) return
+
       log.info(`Orca Server connected from ${remoteAddr}`)
+      span.step('accepted', { remoteAddr })
 
       const session = createSession(config, tools, log)
       session.start(ws)
 
       ws.once('close', (code: number) => {
         session.stop()
+        if (code === 1000) {
+          span.ok({ code, remoteAddr })
+        } else {
+          span.fail(`ws close code=${code}`, { code, remoteAddr })
+        }
         log.info(`Orca Server disconnected from ${remoteAddr} (code=${code})`)
       })
     })
@@ -74,12 +88,17 @@ export async function listenRelay(
  *   2. HTTP header: Authorization: Bearer <token>
  *
  * Returns true if authenticated, false if rejected (ws already closed).
+ *
+ * `span` optional — when passed, records step('tokenAccepted')/fail('unauthorized').
+ * NEVER log the token value itself, only classify its source (query/header/none) —
+ * same "no token logging" rule as ORCH-013 above.
  */
 function authenticate(
   ws: WebSocket,
   req: IncomingMessage,
   expectedToken: string,
-  log: AgentLogger
+  log: AgentLogger,
+  span?: TraceSpan
 ): boolean {
   const rawUrl = req.url ?? ''
 
@@ -96,12 +115,15 @@ function authenticate(
   const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim()
 
   const incoming = queryToken || bearerToken
+  const source: 'query' | 'header' | 'none' = queryToken ? 'query' : bearerToken ? 'header' : 'none'
 
   if (incoming !== expectedToken) {
+    span?.fail('unauthorized', { source })
     log.warn(`Rejected unauthorized connection from ${req.socket.remoteAddress ?? 'unknown'}`)
     ws.close(1008, 'Unauthorized')
     return false
   }
 
+  span?.step('tokenAccepted', { source })
   return true
 }

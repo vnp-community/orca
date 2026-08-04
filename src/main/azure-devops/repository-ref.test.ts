@@ -15,18 +15,18 @@ import {
   getAzureDevOpsRepoRefForRemote,
   parseAzureDevOpsRepoRef
 } from './repository-ref'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
+import { registerRemoteGitProvider, unregisterRemoteGitProvider } from '../providers/ssh-git-dispatch'
 
 describe('parseAzureDevOpsRepoRef', () => {
   beforeEach(() => {
     gitExecFileAsyncMock.mockReset()
     sshExecMock.mockReset()
-    unregisterSshGitProvider('conn-1')
+    unregisterRemoteGitProvider('conn-1')
     _resetAzureDevOpsRepoRefCache()
   })
 
   afterEach(() => {
-    unregisterSshGitProvider('conn-1')
+    unregisterRemoteGitProvider('conn-1')
     _resetAzureDevOpsRepoRefCache()
   })
 
@@ -106,7 +106,7 @@ describe('parseAzureDevOpsRepoRef', () => {
       stdout: 'git@ssh.dev.azure.com:v3/acme/Project/repo\n',
       stderr: ''
     })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getAzureDevOpsRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toEqual({
       host: 'dev.azure.com',
@@ -164,7 +164,7 @@ describe('parseAzureDevOpsRepoRef', () => {
       stdout: 'git@ssh.dev.azure.com:v3/acme/Project/repo\n',
       stderr: ''
     })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     for (let i = 0; i < 513; i += 1) {
       await getAzureDevOpsRepoRefForRemote(`/repo-${i}`, 'origin', 'conn-1')
@@ -178,7 +178,7 @@ describe('parseAzureDevOpsRepoRef', () => {
       stdout: 'git@ssh.dev.azure.com:v3/acme/Project/repo\n',
       stderr: ''
     })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getAzureDevOpsRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toBeNull()
     await expect(getAzureDevOpsRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toEqual({

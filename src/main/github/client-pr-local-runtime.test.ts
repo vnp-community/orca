@@ -77,7 +77,7 @@ vi.mock('../git/runner', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: vi.fn()
+  getRemoteGitProvider: vi.fn()
 }))
 
 vi.mock('./conflict-summary', () => ({

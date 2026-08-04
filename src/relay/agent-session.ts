@@ -33,6 +33,8 @@ import {
 import { MessageType } from '../main/ssh/relay-protocol'
 import { createTracer } from '../shared/trace'
 import { cleanupAllPtys } from './agent-spawner'
+import { notifyDaemonSessionClosed } from './pty-daemon-client'
+import { cleanupAgentWatches } from './fs-agent-extensions'
 
 const sessionTracer = createTracer('agent:session')
 
@@ -104,6 +106,7 @@ export function createSession(
   async function buildCapabilities(): Promise<readonly string[]> {
     const caps: string[] = [
       'fs',
+      'fs.watch',
       'preflight',
       'ai.providers',
       'agent.spawn',
@@ -121,7 +124,10 @@ export function createSession(
       caps.push('worktrees', 'git.worktree.list', 'git.worktree.add', 'git.worktree.remove')
     }
     if (hasPty) {
-      caps.push('pty', 'pty.create', 'pty.write', 'pty.resize', 'pty.destroy', 'pty.scrollback')
+      caps.push(
+        'pty', 'pty.create', 'pty.write', 'pty.resize', 'pty.destroy', 'pty.scrollback',
+        'pty.stream', 'pty.attach'
+      )
     }
 
     log.info(`capabilities: [${caps.join(', ')}]`)
@@ -287,9 +293,19 @@ export function createSession(
         clearInterval(keepaliveTimer)
         keepaliveTimer = null
       }
-      // ORCH-011: Kill any orphaned agent PTYs so they don't linger
-      // as zombie processes on the Dev Server after WS disconnect.
+      // ORCH-011: Kill any orphaned agent-spawned (agent.spawn) PTYs — a
+      // separate PTY population from pty.create terminals, with no reattach
+      // concept, so these are still cleaned up immediately.
       cleanupAllPtys(log)
+      // Terminal (pty.create) PTYs live in the detached pty-daemon process
+      // (pty-daemon-client.ts) — tell it this WS session ended so it can arm
+      // grace-period timers itself (see pty-agent-bridge.ts). Best-effort and
+      // fire-and-forget: stop() must not block on it, and a daemon that's
+      // unreachable has no PTYs left to protect anyway. fs.watch watchers
+      // have no reattach concept and are cheap to re-establish, so those
+      // still clean up immediately.
+      void notifyDaemonSessionClosed(log)
+      cleanupAgentWatches()
     },
 
     onHandshakeOk(callback: () => void): void {

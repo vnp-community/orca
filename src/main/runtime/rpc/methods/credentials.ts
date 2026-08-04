@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { isWebCredentialMode, getWebCredentialStore } from '../../../credentials'
 import type { CredentialService } from '../../../credentials/web-credential-store'
+import { Tracers } from '../../../../shared/trace/tracers'
 
 const ServiceEnum = z.enum(['bitbucket', 'azure-devops', 'gitea', 'linear', 'jira'])
 
@@ -50,16 +51,30 @@ export const CREDENTIAL_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'credentials.set',
     params: SetTokenParams,
-    handler: async (params, _ctx) => {
+    handler: async (params, ctx) => {
+      const span = Tracers.remoteIntegrationCredentialStoreFlow.start({
+        service: params.service, userId: ctx.userId
+      })
       if (!isWebCredentialMode()) {
-        throw new Error(
+        const err = new Error(
           'credentials.set is only available in Web Server mode (ORCA_MULTI_USER=1). ' +
           'In Electron mode, use the native integration connect UI.'
         )
+        span.fail(err, { service: params.service })
+        throw err
       }
-      const store = getWebCredentialStore()
-      await store.setToken(params.service as CredentialService, params.token, params.config as Record<string, string> | undefined)
-      return { success: true }
+      try {
+        const store = getWebCredentialStore()
+        span.step('encryptWrite', { service: params.service })
+        // Security: params.token/params.config are execution arguments only —
+        // never placed into a trace field (raw config drift risk noted in task doc).
+        await store.setToken(params.service as CredentialService, params.token, params.config as Record<string, string> | undefined)
+        span.ok({ service: params.service })
+        return { success: true }
+      } catch (err) {
+        span.fail(err, { service: params.service })
+        throw err
+      }
     }
   }),
 
@@ -70,15 +85,26 @@ export const CREDENTIAL_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'credentials.revoke',
     params: ServiceParams,
-    handler: async (params, _ctx) => {
+    handler: async (params, ctx) => {
+      const span = Tracers.remoteIntegrationCredentialStoreFlow.start({
+        service: params.service, userId: ctx.userId
+      })
       if (!isWebCredentialMode()) {
-        throw new Error(
+        const err = new Error(
           'credentials.revoke is only available in Web Server mode (ORCA_MULTI_USER=1).'
         )
+        span.fail(err, { service: params.service })
+        throw err
       }
-      const store = getWebCredentialStore()
-      await store.deleteToken(params.service as CredentialService)
-      return { success: true }
+      try {
+        const store = getWebCredentialStore()
+        await store.deleteToken(params.service as CredentialService)
+        span.ok({ service: params.service })
+        return { success: true }
+      } catch (err) {
+        span.fail(err, { service: params.service })
+        throw err
+      }
     }
   }),
 

@@ -565,6 +565,9 @@ export class DevServerRelayBridge extends EventEmitter {
     timeoutMs: number
   ): Promise<T> {
     const startTime = Date.now()
+    // [NEW CR-TRACE-001] Đọc traceId do domain tracer (worktree:create, worktree:delete, ...)
+    // đính kèm vào params envelope — CR-TRACE-000 §3.3 row "relay.call()".
+    const resumeTraceId = typeof params['traceId'] === 'string' ? (params['traceId'] as string) : undefined
 
     while (true) {
       // If session is available, call immediately
@@ -592,7 +595,10 @@ export class DevServerRelayBridge extends EventEmitter {
       }
 
       if (!session) {
-        const span = relayCallTracer.start({ devServerId: this.config.id, method })
+        const span = relayCallTracer.start(
+          { devServerId: this.config.id, method },
+          resumeTraceId ? { id: resumeTraceId } : undefined
+        )
         span.fail('AGENT_NOT_CONNECTED', { method, devServerId: this.config.id })
         // TRM-001: Structured error with actionable message
         throw Object.assign(
@@ -604,7 +610,10 @@ export class DevServerRelayBridge extends EventEmitter {
         )
       }
 
-      const span = relayCallTracer.start({ devServerId: this.config.id, method })
+      const span = relayCallTracer.start(
+        { devServerId: this.config.id, method },
+        resumeTraceId ? { id: resumeTraceId } : undefined
+      )
       try {
         const result = await new Promise<T>((resolve, reject) => {
           const timer = setTimeout(

@@ -36,6 +36,7 @@ vi.mock('../dev-server-relay-bridge', () => {
     on: () => void
     off: () => void
     emit: () => void
+    onNotification: () => () => void
   }) {
     this.connect = mockBridgeConnect
     this.disconnect = mockBridgeDisconnect
@@ -43,6 +44,7 @@ vi.mock('../dev-server-relay-bridge', () => {
     this.on = () => { /* no-op */ }
     this.off = () => { /* no-op */ }
     this.emit = () => { /* no-op */ }
+    this.onNotification = () => () => { /* no-op unsubscribe */ }
   }
   return { DevServerRelayBridge: MockBridge }
 })

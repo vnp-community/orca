@@ -16,6 +16,7 @@
  */
 
 import type { WebCredentialStore } from '../credentials/web-credential-store'
+import { Tracers } from '../../shared/trace/tracers'
 
 // ── GitProviderCredentialService ──────────────────────────────────────────────
 
@@ -39,8 +40,19 @@ export class GitProviderCredentialService {
   }
 
   async getGitHubPAT(userId: string): Promise<string | null> {
+    const span = Tracers.remoteIntegrationCredentialDecryptFlow.start({ provider: 'github', userId })
     const store = this.getUserStore(userId)
-    return store.getToken('bitbucket')
+    span.step('decrypt', { provider: 'github' })
+    // Security: the decrypted token value itself must never be placed into a
+    // trace field — only `found` (boolean) may reflect the lookup outcome.
+    try {
+      const token = await store.getToken('bitbucket')
+      span.ok({ provider: 'github', found: token !== null })
+      return token
+    } catch (err) {
+      span.fail(err, { provider: 'github' })
+      throw err
+    }
   }
 
   async deleteGitHubPAT(userId: string): Promise<void> {
@@ -61,8 +73,17 @@ export class GitProviderCredentialService {
   }
 
   async getGitLabPAT(userId: string, _projectId: string): Promise<string | null> {
+    const span = Tracers.remoteIntegrationCredentialDecryptFlow.start({ provider: 'gitlab', userId })
     const store = this.getUserStore(userId)
-    return store.getToken('gitea')
+    span.step('decrypt', { provider: 'gitlab' })
+    try {
+      const token = await store.getToken('gitea')
+      span.ok({ provider: 'gitlab', found: token !== null })
+      return token
+    } catch (err) {
+      span.fail(err, { provider: 'gitlab' })
+      throw err
+    }
   }
 
   async deleteGitLabPAT(userId: string, _projectId: string): Promise<void> {

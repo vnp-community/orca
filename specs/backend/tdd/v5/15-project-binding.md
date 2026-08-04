@@ -16,6 +16,8 @@
 
 > **Status: ❌ TODO** — v5.0 proposed; migration 0007 prerequisite
 
+> **Note (2026-08-02/03):** Phần dưới đây mô tả binding ở **Project level** (`OrcaProject.devServerId`, chưa xây). Ở **Repo level**, binding Repo ↔ Dev Server đã hoạt động từ trước và vừa được liên thông đầy đủ với execution-host machinery cổ điển (`orca-runtime.ts`, provider registries) — xem [TDD-13 §11](./13-dev-server-onboarding.md#11-provider-unification-with-ssh-registries-v50) và [TDD-05 Addendum v5.0](./05-ssh-relay.md#addendum-v50-provider-registries-are-transport-agnostic). Cụ thể: `Repo.devServerId` (song song với `Repo.connectionId` cho SSH) + helper `getRepoProviderConnectionKey(repo)` (`src/shared/execution-host.ts`) resolve về đúng 1 provider-registry key bất kể Repo gắn SSH hay Dev Server; `addRemoteRepoFromPath`/`projectHostSetups:setupExistingFolder` (`src/main/ipc/repos.ts`) đã hỗ trợ tạo Repo trên Dev Server qua `hostKind: 'devServer'`. `ProjectService`/`ProjectServerRouter` ở tài liệu này vẫn là thiết kế tương lai cho binding ở cấp Project, không phải Repo.
+
 ---
 
 ## 1. Mục tiêu

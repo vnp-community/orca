@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { TaskDetail } from '../TaskDetail'
 import { useTask } from '../../../hooks/useTask'
+import { registerTraceSink, type TraceEvent } from '../../../../../shared/trace'
 
 // Mock useAppStore for activeTaskId and settings
 vi.mock('../../../store', () => ({
@@ -25,6 +26,18 @@ vi.mock('../../../runtime/runtime-rpc-client', () => ({
 }))
 import { callRuntimeRpc } from '../../../runtime/runtime-rpc-client'
 const mockRpc = vi.mocked(callRuntimeRpc)
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() }
+}))
+import { toast } from 'sonner'
+const mockToast = vi.mocked(toast)
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
+}
 
 describe('TaskDetail', () => {
   const updateTask = vi.fn()
@@ -50,10 +63,70 @@ describe('TaskDetail', () => {
     expect(screen.getByTestId('task-title-input')).toHaveValue('My Task')
   })
 
-  it('Execute with Agent button calls tasks.runAgent', async () => {
+  it('Execute with Agent button calls tasks.runAgent with taskId + traceId', async () => {
     render(<TaskDetail />)
     fireEvent.click(screen.getByTestId('run-agent-btn'))
-    expect(mockRpc).toHaveBeenCalledWith('mock-target', 'tasks.runAgent', { taskId: 't1' })
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mock-target',
+        'tasks.runAgent',
+        expect.objectContaining({ taskId: 't1', traceId: expect.any(String) })
+      )
+    })
+  })
+
+  it('click run-agent-btn → Tracers.uiTaskGraphExecuteFlow.start({taskId, entryPoint: "task-detail"}), traceId forwarded to RPC', async () => {
+    const { events, stop } = captureTraceEvents()
+    render(<TaskDetail />)
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'tasks.runAgent', expect.any(Object))
+    })
+    stop()
+
+    const flowEvents = events.filter((e) => e.flow === 'ui:taskGraph.execute')
+    const startEvent = flowEvents.find((e) => e.level === 'start')
+    expect(startEvent?.fields.taskId).toBe('t1')
+    expect(startEvent?.fields.entryPoint).toBe('task-detail')
+
+    const runAgentCall = mockRpc.mock.calls.find((c) => c[1] === 'tasks.runAgent')
+    expect((runAgentCall?.[2] as { traceId?: string }).traceId).toBe(startEvent?.id)
+  })
+
+  it('RPC success → span.ok({taskId}), toast.success shown', async () => {
+    mockRpc.mockResolvedValueOnce({ blockedBy: [], blocks: [] }) // getDependencies (mount)
+    const { events, stop } = captureTraceEvents()
+    render(<TaskDetail />)
+
+    mockRpc.mockResolvedValueOnce(undefined) // tasks.runAgent
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+
+    await waitFor(() => {
+      expect(mockToast.success).toHaveBeenCalledWith('Agent started for: My Task')
+    })
+    stop()
+
+    const okEvent = events.find((e) => e.flow === 'ui:taskGraph.execute' && e.level === 'ok')
+    expect(okEvent?.fields.taskId).toBe('t1')
+  })
+
+  it('RPC error → span.fail(err, {taskId}), toast.error shown', async () => {
+    const err = new Error('agent spawn failed')
+    render(<TaskDetail />)
+
+    mockRpc.mockRejectedValueOnce(err) // tasks.runAgent
+    const { events, stop } = captureTraceEvents()
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Failed to start agent: agent spawn failed')
+    })
+    stop()
+
+    const failEvents = events.filter((e) => e.flow === 'ui:taskGraph.execute' && e.level === 'fail')
+    expect(failEvents).toHaveLength(1)
+    expect(failEvents[0]?.fields.taskId).toBe('t1')
   })
 
   it('dependencies section renders blocked-by list', async () => {

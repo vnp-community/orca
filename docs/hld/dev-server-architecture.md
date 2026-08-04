@@ -1,7 +1,7 @@
 # Dev Server — Vai trò, Chức năng & Kết nối với Orca Backend
 
 **Nguồn:** Trích xuất từ HLD v1 (C1, C2, C3, C4)  
-**Cập nhật:** 2026-07-30 v2.0 (chi tiết hóa AI Agent CLIs & External API Connectors)
+**Cập nhật:** 2026-08-03 v3.0 (thêm §15 Execution-Host Unification — ĐÃ TRIỂN KHAI; v2.0 trở xuống là kiến trúc mục tiêu/tầm nhìn, chưa 1:1 với code thực tế)
 
 ---
 
@@ -147,6 +147,8 @@ Dev Server Agent (ReconnectManager)
 - **Auth:** agentToken (Agent tự connect về Gateway)
 - **Transport:** WebSocket binary frames
 - **Use case:** Dev Server Agent v6 — agent **chủ động** connect ra ngoài, không cần mở inbound port
+
+> **2026-08:** Chính connection này (không cần thêm connection nào khác) giờ là nền tảng cho **Execution-Host Unification** — xem §15.
 
 ---
 
@@ -303,6 +305,7 @@ User expands 📁 src/ trong Explorer
 | **Dev Server Agent** | **AI Agent CLIs** | **PTY (node-pty)** | **stdin/stdout + OSC sequences** |
 | **Dev Server Agent** | **GitHub API** | **HTTPS (gh CLI)** | **REST/GraphQL JSON** |
 | **Dev Server Agent** | **GitLab API** | **HTTPS (glab CLI)** | **REST JSON** |
+| **Dev Server Agent** | **Gateway** | **WebSocket (outbound, unsolicited push)** | **JSON-RPC 2.0 notification, không có `id` — `pty.data`/`pty.exit`/`fs.changed` (2026-08, xem §15.3)** |
 
 ---
 
@@ -639,3 +642,94 @@ Gateway → relay.call('preflight.check', { userId })
      ├── HealthReporter ───→ events → Gateway
      └── EventBus → stream all events → Gateway
 ```
+
+---
+
+## 15. Execution-Host Unification qua Provider Registry (2026-08 — ĐÃ TRIỂN KHAI)
+
+> **Phạm vi mục này:** Đây là mô tả **chính xác những gì đã code & deploy thực tế** trong session 2026-08. Nó **KHÔNG** thay thế hay viết lại phần kiến trúc mục tiêu/tầm nhìn ở §3–§14 phía trên (RpcServer, ContextVerifier, ProfileAwareAgentSpawner, SecureFs, AiCredStore...) — coi đó là một hướng phát triển khác, chưa được build, và mục này là một bổ sung tách biệt, có phạm vi rõ ràng.
+
+### 15.1 Vấn đề trước đây
+
+Trước session này, Orca có **hai con đường tách biệt** để bind một repo/project vào remote host:
+
+1. **SSH Targets/Hosts** (hệ cổ điển) — mọi thao tác file/git/terminal đều đi qua provider-registry abstraction (`IFilesystemProvider` / `IGitProvider` / `IPtyProvider`, keyed theo connection-id dạng chuỗi opaque).
+2. **Dev Server** — agent connect **outbound** qua WebSocket về Gateway (chính là mode `direct-websocket` ở §4), nhưng **vô hình** với hệ Repo/execution-host cổ điển ở trên — chỉ được wire vào một luồng onboarding riêng, hẹp.
+
+Kết quả: hai kiến trúc song song, không dùng chung interface, dù cả hai đều "chạy lệnh trên máy remote".
+
+### 15.2 Thay đổi: một execution-host abstraction duy nhất
+
+Connection outbound sẵn có của Dev Server agent giờ được đăng ký thẳng vào **cùng bộ provider registry** mà hệ SSH đã dùng từ trước. Một repo giờ có thể bind vào SSH Target **hoặc** Dev Server thông qua **một** execution-host abstraction duy nhất — Dev Server **không cần** một kết nối thứ hai/riêng biệt nào.
+
+**Ba provider class mới** (`src/main/providers/`) đóng gói RPC surface hẹp của agent (`fs.*`, `git.exec`, `pty.*`) thành đúng interface `IFilesystemProvider`/`IGitProvider`/`IPtyProvider` mà phần còn lại của Orca đã kỳ vọng ở bất kỳ execution host nào:
+
+| Provider | File | Chức năng |
+|----------|------|-----------|
+| `DevServerFilesystemProvider` | `dev-server-filesystem-provider.ts` | fs.stat/readDir/readFile/writeFile/mkdir/rmdir/glob/grep — nay có thêm fs.watch/fs.unwatch real-time (xem §15.3) |
+| `DevServerGitProvider` | `dev-server-git-provider.ts` | Một method generic đã whitelist `git.exec({ args, cwd })` + các method worktree add/remove/list riêng; tái dùng nguyên status-porcelain parser đang có, không đổi |
+| `DevServerPtyProvider` | `dev-server-pty-provider.ts` | pty.create/write/resize/destroy/scrollback/sendSignal + nhận push real-time pty.data/pty.exit |
+
+`DevServerPtyProvider` là **mảnh ghép cuối cùng** hoàn thiện trong session này. Một số method của `IPtyProvider` (`getCwd`, `hasChildProcesses`, `getForegroundProcess`, `serialize`/`revive` để persist session qua restart) không có tương đương trung thực phía agent → được implement như **approximation an toàn, có ghi chú rõ trong code**, thay vì throw (vì interface bắt buộc phải có các method này):
+
+- `getCwd()` trả về cwd tại thời điểm spawn — không có live shell-integration/OSC 7 tracking để biết cwd hiện tại thực sự.
+- `hasChildProcesses()` luôn trả `false` — permissive default thay vì đoán mò.
+- `serialize()`/`revive()` là no-op vì agent không có cross-restart session persistence.
+
+Mỗi provider được đăng ký/hủy đăng ký **tự động** bởi `wireDevServerProviders()` (`dev-server-provider-lifecycle.ts`) mỗi khi Dev Server connect/disconnect. Đây là **pure listener** trên các event lifecycle connection sẵn có (`devServer:statusChanged`, `devServer:removed`) — nó không tự quản lý connection, DevServerManager/AgentWebSocketServer vẫn giữ trách nhiệm đó.
+
+### 15.3 Notification Relay — Agent chủ động push (năng lực mới)
+
+Trước session này agent **chỉ trả lời request** — không có cách nào chủ động đẩy dữ liệu về Gateway. Session này thêm cơ chế **one-way JSON-RPC notification** (cùng wire format ở §5, chỉ khác là không có field `id`), cho phép agent push:
+
+| Notification | Ý nghĩa |
+|---------------|---------|
+| `pty.data` / `pty.exit` | Output/exit của terminal, stream real-time thay vì chỉ pollable qua scrollback buffer |
+| `fs.changed` | File-change event real-time từ `fs.watch` built-in của Node, **refcounted theo từng path** — để nhiều user cùng share 1 Dev Server không vô tình tear down watch của nhau |
+
+**Vấn đề cần giải quyết:** trong multi-user web mode, mỗi user đăng nhập được xử lý bởi **một per-user child process riêng** (`SessionManager` + `fork()` — xem [backend-server-architecture.md](./backend-server-architecture.md) §5, §7), nhưng connection Dev Server thật sự chỉ sống trong **một process cha/gateway dùng chung**. Để notification đến đúng nơi:
+
+```
+Dev Server Agent
+    │ pty.data / pty.exit / fs.changed  (JSON-RPC notification, không có id)
+    ▼
+Gateway (parent process) — DevServerManager
+    │ emit('devServer:notification', devServerId, method, params)
+    ▼
+SessionManager → broadcast tới MỌI user child process:
+    proc.process.send({ type: 'devServer:proxyNotification', devServerId, method, params })
+    │
+    ▼ mỗi child process: GatewayDevServerManagerProxy.handleNotification()
+    → dispatch tới local subscriber thực sự quan tâm devServerId đó
+      (DevServerPtyProvider đang giữ PTY đó, hoặc 1 filesystem watcher đang watch path đó)
+```
+
+Cơ chế broadcast `devServer:proxyNotification` này chạy **song song** với `devServer:event` (status broadcast: added/removed/statusChanged) vốn đã có từ trước — cùng pattern IPC, khác payload/mục đích.
+
+### 15.4 Capability Negotiation — theo dõi end-to-end
+
+Agent vốn đã luôn advertise một list `capabilities` lúc handshake (vd. `fs`, `git`, `pty`, `preflight`), nhưng trước đây **Gateway bỏ qua hoàn toàn** — không có chỗ nào parse list này. Session này thêm phần plumbing còn thiếu: handshake receiver → connection bridge → `DevServerManager` runtime state → object `DevServer` expose ra phần còn lại của hệ thống — để capabilities được track theo từng Dev Server.
+
+**Hai capability string mới:** `fs.watch` và `pty.stream` — cho phép Gateway phân biệt một agent binary cũ (chỉ hỗ trợ fs/pty theo kiểu request/response) với một agent hỗ trợ real-time push mới. Đây chính là điều kiện `wireDevServerProviders()` kiểm tra trước khi quyết định có đăng ký `DevServerPtyProvider` cho một Dev Server hay không:
+
+```typescript
+const ptyReady = capabilities.includes('pty') && capabilities.includes('pty.stream')
+```
+
+> Nếu thiếu capability này, `DevServerPtyProvider` **không được đăng ký** — khác với file-watching (có thể fallback về polling khi thiếu `fs.watch`), **không có đường fallback nào cho một terminal thiếu live output stream**.
+
+### 15.5 Yêu cầu vận hành: `node-pty` phải được cài riêng trên mỗi Dev Server
+
+PTY support trên một Dev Server cần binary native của `node-pty` — thứ này **cố tình không được bundle** vào `agent.js`, vì đa số Dev Server không cần PTY và đây là một dependency native/compiled làm nặng agent binary một cách không cần thiết.
+
+**Phát hiện thực tế khi rollout:** cả 3 Dev Server production hiện có đều ban đầu báo hoàn toàn không hỗ trợ PTY. Root cause **không phải bug code** — `node-pty` đơn giản là chưa từng được cài trên các máy đó. Khắc phục bằng cách, trên từng Dev Server:
+
+1. Cài build tools: `g++`/`gcc`/`make`
+2. `npm install node-pty` tại home directory của agent
+3. Restart agent service để nó re-detect native module vừa có sẵn
+
+> **Đây là bước bắt buộc phải lặp lại cho MỌI Dev Server mới** cần hỗ trợ terminal. Git/filesystem operations hoạt động ngay không cần cài thêm gì — riêng PTY mới cần bước cài đặt này.
+
+### 15.6 Cố ý chưa làm (không phải thiếu sót của session này)
+
+Clone một repo **hoàn toàn mới** lên Dev Server (khác với mở một folder/checkout đã có sẵn trên đó) **chưa được implement**. Code clone hiện tại phụ thuộc vào các khái niệm chỉ tồn tại ở SSH (remote host-platform detection, remote home-directory resolution) mà Dev Server chưa có tương đương. Thử thao tác này bây giờ sẽ trả về lỗi rõ ràng — thay vì rủi ro âm thầm-sai trước đây (sẽ vô tình clone vào filesystem local của chính container Gateway).

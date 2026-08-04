@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto'
 import type { IConnectionPool } from '../db/pool'
 import type { DevServerManager } from '../dev-server/dev-server-manager'
 import type { RelayConnectionPool } from '../dev-server/relay-connection-pool'
+import { Tracers } from '../../shared/trace/tracers'
 import type {
   AIProviderAccount,
   AIProviderType,
@@ -227,21 +228,46 @@ export class AIProviderService {
   async writeCredentialToDevServer(
     accountId: string,
     encryptedBlob: string,
-    iv: string
+    iv: string,
+    traceId?: string // optional — forwarded from ai-provider-rpc-handler.ts when FE sends one
   ): Promise<void> {
-    const account = await this.getAccount(accountId)
-    if (!account) throw new Error(`ACCOUNT_NOT_FOUND: ${accountId}`)
+    // SECURITY: only trace blobLength (byte count) — never encryptedBlob/iv/apiKey.
+    const span = Tracers.aiProviderWriteCredFlow.start(
+      { accountId, blobLength: encryptedBlob.length },
+      traceId ? { id: traceId } : undefined
+    )
 
-    const server = this.devServerManager.get(account.devServerId)
-    if (!server) throw new Error(`DEV_SERVER_NOT_FOUND: ${account.devServerId}`)
+    try {
+      const account = await this.getAccount(accountId)
+      if (!account) {
+        span.fail('ACCOUNT_NOT_FOUND', { accountId })
+        throw new Error(`ACCOUNT_NOT_FOUND: ${accountId}`)
+      }
 
-    const relay = await this.relayPool.getOrConnect(account.devServerId, server)
-    await relay.call('ai.provider.writeCredential', { accountId, encryptedBlob, iv })
+      const server = this.devServerManager.get(account.devServerId)
+      if (!server) {
+        span.fail('DEV_SERVER_NOT_FOUND', { accountId, devServerId: account.devServerId })
+        throw new Error(`DEV_SERVER_NOT_FOUND: ${account.devServerId}`)
+      }
+      span.step('lookup-account', { accountId, devServerId: account.devServerId })
 
-    // FIX TASK-AIP-001: Update status pending → active after successful credential write.
-    // Without this, resolveForProject() returns no candidates (it filters for status='active')
-    // and all AI features fail silently.
-    await this.updateAccount(accountId, { status: 'active' })
+      const relay = await this.relayPool.getOrConnect(account.devServerId, server)
+      span.step('relay-connect', { devServerId: account.devServerId })
+
+      // SECURITY: params sent to relay carry the real encryptedBlob/iv, but they
+      // must never be attached to trace fields.
+      span.step('agent-call', { method: 'ai.provider.writeCredential', accountId })
+      await relay.call('ai.provider.writeCredential', { accountId, encryptedBlob, iv })
+
+      // FIX TASK-AIP-001: Update status pending → active after successful credential write.
+      // Without this, resolveForProject() returns no candidates (it filters for status='active')
+      // and all AI features fail silently.
+      await this.updateAccount(accountId, { status: 'active' })
+      span.ok({ accountId, status: 'active' })
+    } catch (err) {
+      span.fail(err, { accountId })
+      throw err
+    }
   }
 
   /**

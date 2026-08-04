@@ -33,7 +33,7 @@ vi.mock('./gl-utils', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: getSshFilesystemProviderMock
+  getRemoteFilesystemProvider: getSshFilesystemProviderMock
 }))
 
 import { createGitLabMergeRequest } from './merge-request-creation'

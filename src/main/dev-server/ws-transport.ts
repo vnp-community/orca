@@ -25,7 +25,7 @@ export type WsLike = {
   on(event: 'message', listener: (data: Buffer) => void): void
   on(event: 'close', listener: () => void): void
   on(event: 'error', listener: (err: Error) => void): void
-  close(): void
+  close(code?: number, reason?: string): void
   readyState: number
 }
 

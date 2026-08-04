@@ -16,6 +16,7 @@ import {
   TERMINAL_SCROLLBACK_REPLAY_BYTE_LIMIT,
   TERMINAL_SCROLLBACK_STORE_BYTE_LIMIT
 } from '../shared/terminal-scrollback-limits'
+import { Tracers } from '../shared/trace/tracers'
 
 const SNAPSHOT_DIR_NAME = 'terminal-scrollback'
 const REF_PREFIX = 'v1'
@@ -174,47 +175,68 @@ export function migrateWorkspaceSessionTerminalScrollbackSnapshots(
   session: WorkspaceSessionState,
   storage?: TerminalScrollbackSnapshotStorage
 ): { session: WorkspaceSessionState; changed: boolean } {
-  let terminalLayoutsByTabId: WorkspaceSessionState['terminalLayoutsByTabId'] | null = null
-  for (const [tabId, layout] of Object.entries(session.terminalLayoutsByTabId ?? {})) {
-    const buffers = layout.buffersByLeafId
-    if (!buffers || Object.keys(buffers).length === 0) {
-      continue
-    }
-    const refs = { ...layout.scrollbackRefsByLeafId }
-    const remainingBuffers: Record<string, string> = {}
-    let layoutChanged = false
-    for (const [leafId, buffer] of Object.entries(buffers)) {
-      const ref = writeTerminalScrollbackSnapshotSync({ tabId, leafId, buffer, storage })
-      if (ref) {
-        refs[leafId] = ref
-        layoutChanged = true
-      } else {
-        remainingBuffers[leafId] = buffer
-        if (refs[leafId]) {
-          delete refs[leafId]
-          layoutChanged = true
-        }
-      }
-    }
-    if (!layoutChanged) {
-      continue
-    }
-    terminalLayoutsByTabId ??= { ...session.terminalLayoutsByTabId }
-    const nextLayout = { ...layout }
-    if (Object.keys(refs).length > 0) {
-      nextLayout.scrollbackRefsByLeafId = refs
-    } else {
-      delete nextLayout.scrollbackRefsByLeafId
-    }
-    if (Object.keys(remainingBuffers).length > 0) {
-      nextLayout.buffersByLeafId = remainingBuffers
-    } else {
-      delete nextLayout.buffersByLeafId
-    }
-    terminalLayoutsByTabId[tabId] = nextLayout
-  }
-  if (!terminalLayoutsByTabId) {
+  // Why (CR-TRACE-003): guard before starting a span — this runs on every
+  // Store.setWorkspaceSession()/load() call, and most calls have no pending
+  // buffer to write (already migrated). Only pay tracing overhead when sync
+  // I/O is actually about to run (CR-TRACE-000 §5 anti-over-instrumentation).
+  const hasPendingBuffers = Object.values(session.terminalLayoutsByTabId ?? {}).some(
+    (layout) => layout.buffersByLeafId && Object.keys(layout.buffersByLeafId).length > 0
+  )
+  if (!hasPendingBuffers) {
     return { session, changed: false }
   }
-  return { session: { ...session, terminalLayoutsByTabId }, changed: true }
+
+  const span = Tracers.terminalDestroy.start({ step: 'migrate-scrollback-snapshots' })
+  let bytesWritten = 0
+  try {
+    let terminalLayoutsByTabId: WorkspaceSessionState['terminalLayoutsByTabId'] | null = null
+    for (const [tabId, layout] of Object.entries(session.terminalLayoutsByTabId ?? {})) {
+      const buffers = layout.buffersByLeafId
+      if (!buffers || Object.keys(buffers).length === 0) {
+        continue
+      }
+      const refs = { ...layout.scrollbackRefsByLeafId }
+      const remainingBuffers: Record<string, string> = {}
+      let layoutChanged = false
+      for (const [leafId, buffer] of Object.entries(buffers)) {
+        span.step('write-snapshot-sync', { tabId, leafId, bufferBytes: buffer.length })
+        const ref = writeTerminalScrollbackSnapshotSync({ tabId, leafId, buffer, storage })
+        if (ref) {
+          bytesWritten += buffer.length
+          refs[leafId] = ref
+          layoutChanged = true
+        } else {
+          remainingBuffers[leafId] = buffer
+          if (refs[leafId]) {
+            delete refs[leafId]
+            layoutChanged = true
+          }
+        }
+      }
+      if (!layoutChanged) {
+        continue
+      }
+      terminalLayoutsByTabId ??= { ...session.terminalLayoutsByTabId }
+      const nextLayout = { ...layout }
+      if (Object.keys(refs).length > 0) {
+        nextLayout.scrollbackRefsByLeafId = refs
+      } else {
+        delete nextLayout.scrollbackRefsByLeafId
+      }
+      if (Object.keys(remainingBuffers).length > 0) {
+        nextLayout.buffersByLeafId = remainingBuffers
+      } else {
+        delete nextLayout.buffersByLeafId
+      }
+      terminalLayoutsByTabId[tabId] = nextLayout
+    }
+    span.ok({ bytesWritten })
+    if (!terminalLayoutsByTabId) {
+      return { session, changed: false }
+    }
+    return { session: { ...session, terminalLayoutsByTabId }, changed: true }
+  } catch (err) {
+    span.fail(err, { bytesWritten })
+    throw err
+  }
 }

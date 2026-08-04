@@ -25,11 +25,11 @@ vi.mock('./repo-worktrees', () => ({
 }))
 
 vi.mock('./providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: getSshFilesystemProviderMock
+  getRemoteFilesystemProvider: getSshFilesystemProviderMock
 }))
 
 vi.mock('./providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: getSshGitProviderMock
+  getRemoteGitProvider: getSshGitProviderMock
 }))
 
 import { analyzeWorkspaceSpace, WorkspaceSpaceScanCancelledError } from './workspace-space-analysis'

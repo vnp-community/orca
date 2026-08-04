@@ -30,6 +30,7 @@ import { useWorktreeAgentRows } from '@/components/sidebar/useWorktreeAgentRows'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
 import { translate } from '@/i18n/i18n'
+import { Tracers } from '../../../../shared/trace/tracers'
 
 type OrderedSendTarget = {
   target: NotesSendAgentTarget
@@ -152,15 +153,30 @@ export function ReviewNotesSendMenuContent({
         return
       }
 
+      // Why: span only created for the 'notes_send' source (BL-CR-03) — this
+      // component is shared with the markdown-notes send flow, which is not
+      // part of this CR.
+      const span =
+        launchSource === 'notes_send'
+          ? Tracers.codeReviewFeedbackFlow.start({ worktreeId, paneKey: target.paneKey })
+          : null
+
       runNotesSend(
         () =>
           sendNotesToActiveAgentSession({
             worktreeId,
             prompt,
             noteTarget: { tabId: target.tabId, leafId: target.leafId }
+          }).catch((err: unknown) => {
+            // Why: runNotesSend() swallows rejections into a toast instead of
+            // propagating them — fail() here on the real reject, then rethrow
+            // so runNotesSend's own catch still shows the error toast.
+            span?.fail(err, { worktreeId, paneKey: target.paneKey })
+            throw err
           }),
         () => {
           onPromptDelivered?.()
+          span?.ok({ paneKey: target.paneKey })
           // Why: mirror the sidebar send-target telemetry so dropdown-routed
           // follow-up notes show up identically on `agent_prompt_sent`.
           track('agent_prompt_sent', {

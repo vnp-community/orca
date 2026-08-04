@@ -43,6 +43,9 @@ Developer/Lead
     ├─ Load project + server:
     │   project = ProjectService.get(projectId)     ← Server DB
     │   server  = SshHostService.get(project.devServerId)  ← Server DB
+    │   (host có thể là SSH Host hoặc Dev Server — agent phone-home; nếu là Dev
+    │    Server, project phải trỏ vào thư mục/checkout đã có sẵn trên máy đó — clone
+    │    repo mới lên Dev Server chưa được hỗ trợ, xem remote-development.md BL-SSH-05)
     │
     ├─ Establish/reuse relay:
     │   relay = RelayConnectionPool.get(project.devServerId)
@@ -132,9 +135,24 @@ FILE SEARCH (ripgrep):
     ▼
 [Browser] search results panel with file/line/context
 
+LIVE FILE CHANGES (thay đổi ngoài Orca, vd: sửa trực tiếp trên server, tool khác ghi file):
+[Dev Server Agent — bản mới, hỗ trợ push] phát hiện thay đổi
+    │ relay push (không cần Browser hỏi trước): fs.changed { path, type }
+    ▼
+[Orca Web Server] forward → WebSocket push → Browser
+    │
+    ▼
+[Browser] cập nhật file tree / decorations gần như ngay lập tức
+
+FALLBACK (Dev Server Agent cũ, chưa hỗ trợ push):
+    Không có fs.changed push → Browser tiếp tục fs.readDir theo chu kỳ poll định kỳ
+    (kém tức thời hơn, nhưng không báo lỗi cho user)
+
 Luồng:
 User → Explorer click → WebSocket RPC → relay.call → Dev Server (fs ops)
                                                      → Renderer (tree update)
+File thay đổi ngoài Orca → Dev Server Agent → push (agent mới) hoặc chờ poll (agent cũ)
+                                             → Renderer (tree update)
 ```
 
 ---

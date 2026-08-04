@@ -20,14 +20,14 @@ vi.mock('./worktree-remote', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: vi.fn()
+  getRemoteFilesystemProvider: vi.fn()
 }))
 
 vi.mock('./worktree-head-identity-reader', () => ({
   readGitCommonHeadIdentities: vi.fn(async () => [])
 }))
 
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
   notifyWorktreeGitStatusMetadataChanged,
   notifyWorktreeHeadIdentitiesChanged,
@@ -93,7 +93,7 @@ describe('worktree base directory watcher', () => {
     vi.useFakeTimers()
     watcherCallbacks.clear()
     unsubscribeMocks.clear()
-    vi.mocked(getSshFilesystemProvider).mockReturnValue(undefined)
+    vi.mocked(getRemoteFilesystemProvider).mockReturnValue(undefined)
     vi.mocked(readGitCommonHeadIdentities).mockResolvedValue([])
     vi.mocked(startWorktreeBaseDirectoryPoller).mockImplementation(
       async (target, _getRepos, onEvents) => {
@@ -273,7 +273,7 @@ describe('worktree base directory watcher', () => {
       remoteCallbacks.set(root, callback)
       return vi.fn()
     })
-    vi.mocked(getSshFilesystemProvider).mockReturnValue({
+    vi.mocked(getRemoteFilesystemProvider).mockReturnValue({
       stat: vi.fn(async () => ({ type: 'directory', size: 0, mtime: 0 })),
       realpath: vi.fn(async (path: string) => path),
       readFile: vi.fn(async () => ({ content: '', isBinary: false })),
@@ -316,7 +316,7 @@ describe('worktree base directory watcher', () => {
       remoteCallbacks.set(root, callback)
       return remoteUnwatch
     })
-    vi.mocked(getSshFilesystemProvider).mockReturnValue({
+    vi.mocked(getRemoteFilesystemProvider).mockReturnValue({
       stat: vi.fn(async () => ({ type: 'directory', size: 0, mtime: 0 })),
       realpath: vi.fn(async (path: string) => path),
       readFile: vi.fn(async () => ({ content: '', isBinary: false })),
@@ -349,7 +349,7 @@ describe('worktree base directory watcher', () => {
       remoteCallbacks.set(root, callback)
       return vi.fn()
     })
-    vi.mocked(getSshFilesystemProvider).mockReturnValue({
+    vi.mocked(getRemoteFilesystemProvider).mockReturnValue({
       stat: vi.fn(async () => ({ type: 'directory', size: 0, mtime: 0 })),
       realpath: vi.fn(async (path: string) => path),
       readFile: vi.fn(async () => ({ content: '', isBinary: false })),

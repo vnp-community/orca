@@ -22,6 +22,8 @@
 | `fs.readFile` | Read file with 1MB size limit + base64 for binary |
 | `fs.grep` | Ripgrep/grep search in files |
 | `preflight.check` | Check service availability on dev server |
+| `fs.watch` | ✅ IMPLEMENTED 2026-08-03 — start pushing `fs.changed` notifications for a path (§7) |
+| `fs.unwatch` | ✅ IMPLEMENTED 2026-08-03 — stop watching a path (§7) |
 
 ---
 
@@ -292,3 +294,54 @@ tests/unit/
 `fs.readDir`, `fs.readFile`, `fs.grep` handler code trong `agent-rpc-dispatch.ts` import và gọi các functions trên.
 
 **Test files:** `src/relay/__tests__/fs-handler-*.test.ts` (nhiều file đã có!)
+
+---
+
+## 7. `fs.watch` / `fs.unwatch` — Addendum (2026-08-03)
+
+**Status: ✅ IMPLEMENTED** — `src/relay/fs-agent-extensions.ts` (primary source for these two methods; wired into `agent-rpc-dispatch.ts`'s `route()`)
+
+Push-based file-change notifications, complementing the on-demand `fs.readDir`/`fs.grep` above. Uses the `makeNotifier` one-way notification mechanism (TDD-AG-02 §5, TDD-AG-07 §9).
+
+```typescript
+// src/relay/fs-agent-extensions.ts
+
+interface AgentWatchEntry { watcher: FSWatcher; refCount: number }
+const AGENT_WATCH_MAP = new Map<string, AgentWatchEntry>()   // keyed by absolute path
+
+export async function handleFsWatch(
+  id: string | number | null,
+  params: Record<string, unknown>,
+  config: AgentConfig,
+  notify: (method: string, params: Record<string, unknown>) => void,
+): Promise<object> {
+  // resolve absPath from params.path (relative → config.workDir) ...
+  const existing = AGENT_WATCH_MAP.get(absPath)
+  if (existing) { existing.refCount++; return { jsonrpc: '2.0', id, result: { ok: true, path: absPath } } }
+
+  const watcher = fsWatchSync(absPath, { recursive: process.platform !== 'linux' }, (eventType, filename) => {
+    notify('fs.changed', { path: absPath, eventType, filename: filename ?? null })
+  })
+  AGENT_WATCH_MAP.set(absPath, { watcher, refCount: 1 })
+  return { jsonrpc: '2.0', id, result: { ok: true, path: absPath } }
+}
+
+export async function handleFsUnwatch(id, params, config): Promise<object> {
+  const entry = AGENT_WATCH_MAP.get(absPath)
+  if (entry) {
+    entry.refCount--
+    if (entry.refCount <= 0) { entry.watcher.close(); AGENT_WATCH_MAP.delete(absPath) }
+  }
+  return { jsonrpc: '2.0', id, result: { ok: true } }
+}
+
+export function cleanupAgentWatches(): void { /* closes every entry in AGENT_WATCH_MAP */ }
+```
+
+**Refcounting design:** `AGENT_WATCH_MAP` is keyed by absolute path, not by caller. A second `fs.watch` call for a path already being watched increments `refCount` instead of creating a duplicate OS-level watcher; `fs.unwatch` only actually closes the watcher when the count hits zero. This matters because multiple different Orca user processes can share one physical Dev Server and independently ask to watch the same path — one caller unwatching must not break another's subscription.
+
+**Known v1 limitation (deliberate, not a bug):** Node's `fs.watch(path, { recursive: true })` is only honored on macOS and Windows. On Linux — all 3 current Dev Servers — `recursive` is passed as `false` and only the top-level directory is observed; changes in subdirectories are not pushed via `fs.changed`. `DevServerFilesystemProvider.watch()` on the Orca (main-process) side falls back to its Phase-1 polling implementation for anything push notifications can't cover, so this is a completeness gap rather than a correctness bug.
+
+`cleanupAgentWatches()` is called from `agent-session.ts`'s `stop()` (TDD-AG-04 §8) so a dropped WebSocket doesn't leak watchers.
+
+The `fs.watch` capability string is advertised unconditionally in the handshake (TDD-AG-04 §7) — unlike `pty`, it has no native-module dependency, so it's purely a binary-freshness signal.

@@ -18,6 +18,9 @@
 
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
+import { createTracer } from '../shared/trace'
+
+const aiCompleteTracer = createTracer('agent:aiComplete')
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,9 +43,18 @@ export async function handleAIComplete(
   config:  AgentConfig,
   log:     AgentLogger,
 ): Promise<AICompleteResult> {
-  const { prompt, format = 'text' } = params
+  const { prompt, format = 'text', taskId } = params
+
+  // KHÔNG BAO GIỜ đưa nội dung prompt/response vào TraceFields — prompt thường
+  // chứa code/nội dung nghiệp vụ nội bộ (commit diff, task description, file
+  // content). Chỉ trace độ dài (promptLength) — cùng nguyên tắc bảo mật đã áp
+  // dụng cho AI credential (CR-TRACE-016 §1).
+  const span = aiCompleteTracer.start({
+    method: 'ai.complete', format, taskId, promptLength: prompt.length,
+  })
 
   if (!prompt.trim()) {
+    span.fail('empty prompt', { taskId })
     throw new Error('ai.complete: prompt must not be empty')
   }
 
@@ -55,6 +67,7 @@ export async function handleAIComplete(
   // Resolve API key
   const apiKey = resolveApiKey(model)
   if (!apiKey) {
+    span.fail('no API key for model', { model, taskId })
     throw new Error(
       `ai.complete: No API key found for model "${model}". ` +
       'Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in the agent environment, ' +
@@ -63,9 +76,24 @@ export async function handleAIComplete(
   }
 
   log.info(`ai.complete: model=${model} format=${format} promptLen=${prompt.length}`)
+  span.step('provider-call', { model, provider: providerNameFromModel(model) })
 
-  const text = await dispatch(model, apiKey, prompt, format, log)
-  return { content: text, model }
+  try {
+    const text = await dispatch(model, apiKey, prompt, format, log)
+    span.ok({ model, contentLength: text.length })
+    return { content: text, model }
+  } catch (err: unknown) {
+    span.fail(err, { model, taskId })
+    throw err
+  }
+}
+
+/** Trích tên provider chỉ để gắn field trace — KHÔNG chứa apiKey. */
+function providerNameFromModel(model: string): string {
+  if (model.startsWith('claude')) return 'anthropic'
+  if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4')) return 'openai'
+  if (model.startsWith('gemini')) return 'google'
+  return 'unknown'
 }
 
 // ── Key resolution ────────────────────────────────────────────────────────────

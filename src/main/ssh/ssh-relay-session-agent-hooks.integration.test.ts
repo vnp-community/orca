@@ -13,7 +13,7 @@ import {
   REMOTE_AGENT_HOOK_ENV
 } from '../../shared/agent-hook-relay'
 import { agentHookServer, _internals as agentHookInternals } from '../agent-hooks/server'
-import { getSshPtyProvider } from '../ipc/pty'
+import { getRemotePtyProvider } from '../ipc/pty'
 import { toAppSshPtyId } from '../providers/ssh-pty-id'
 
 const { getCohortAtEmitMock, trackMock } = vi.hoisted(() => ({
@@ -231,7 +231,7 @@ describe('SshRelaySession agent hooks over a fake relay transport', () => {
     session = createSession('conn-fake')
     await session.establish({} as SshConnection)
 
-    const provider = getSshPtyProvider('conn-fake')
+    const provider = getRemotePtyProvider('conn-fake')
     expect(provider).toBeDefined()
     const spawn = await provider!.spawn({
       cols: 120,

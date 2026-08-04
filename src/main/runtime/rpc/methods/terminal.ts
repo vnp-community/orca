@@ -7,6 +7,7 @@ import {
   type RpcAnyMethod
 } from '../core'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
+import { Tracers } from '../../../../shared/trace/tracers'
 import type { DriverState, OrcaRuntimeService } from '../../orca-runtime'
 import {
   TerminalStreamOpcode,
@@ -842,7 +843,8 @@ const TerminalCreateParams = z.object({
   activate: z.unknown().optional(),
   presentation: z.enum(['background', 'focused']).optional(),
   tabId: OptionalString,
-  leafId: OptionalString
+  leafId: OptionalString,
+  traceId: OptionalString // [NEW CR-TRACE-003] resume terminal:create span from caller-supplied trace id
 })
 
 const TerminalSplit = TerminalHandle.extend({
@@ -1285,17 +1287,25 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
     name: 'terminal.create',
     params: TerminalCreateParams,
     handler: async (params, ctx) => {
+      const span = Tracers.terminalCreate.start(
+        { worktree: params.worktree ?? '' },
+        params.traceId ? { id: params.traceId } : undefined
+      )
       // FIX TASK-TRM-006: Require authenticated userId.
       // In ORCA_MULTI_USER=1 mode, ctx.userId is set from the session cookie by WsSessionRouter.
       // Anonymous / unauthenticated connections have ctx.userId === undefined.
       // This prevents any browser without a valid session from creating terminals.
       if (!ctx.userId) {
-        throw new Error('UNAUTHORIZED: terminal.create requires an authenticated session. Please log in.')
+        const unauthorizedErr = new Error(
+          'UNAUTHORIZED: terminal.create requires an authenticated session. Please log in.'
+        )
+        span.fail(unauthorizedErr, { worktree: params.worktree ?? '' })
+        throw unauthorizedErr
       }
 
       const { runtime } = ctx
-      return {
-        terminal: await runtime.createTerminal(params.worktree, {
+      try {
+        const terminal = await runtime.createTerminal(params.worktree, {
           command: params.command,
           startupCommandDelivery: params.startupCommandDelivery,
           env: params.env,
@@ -1310,20 +1320,40 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           tabId: params.tabId,
           leafId: params.leafId
         })
+        span.ok({ ptyId: terminal.ptyId ?? undefined })
+        return { terminal }
+      } catch (err) {
+        span.fail(err, { worktree: params.worktree ?? '' })
+        throw err
       }
     }
   }),
   defineMethod({
     name: 'terminal.split',
     params: TerminalSplit,
-    handler: async (params, { runtime }) => ({
-      split: await runtime.splitTerminal(params.terminal, {
-        direction: params.direction,
-        command: params.command,
-        env: params.env,
-        telemetrySource: params.telemetrySource
+    // Why: split is fundamentally another PTY create, not a distinct flow —
+    // reuse Tracers.terminalCreate rather than minting a terminal:split tracer.
+    handler: async (params, { runtime }) => {
+      const span = Tracers.terminalCreate.start({
+        terminal: params.terminal,
+        direction: params.direction ?? ''
       })
-    })
+      try {
+        const split = await runtime.splitTerminal(params.terminal, {
+          direction: params.direction,
+          command: params.command,
+          env: params.env,
+          telemetrySource: params.telemetrySource
+        })
+        // Why: RuntimeTerminalSplit carries `handle`, not `ptyId` (that only
+        // exists on RuntimeTerminalCreate) — log the field that actually exists.
+        span.ok({ handle: split.handle })
+        return { split }
+      } catch (err) {
+        span.fail(err, { terminal: params.terminal })
+        throw err
+      }
+    }
   }),
   defineMethod({
     name: 'terminal.stop',
@@ -1343,25 +1373,33 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
     name: 'terminal.resizeForClient',
     params: TerminalResizeForClient,
     handler: async (params, { runtime }) => {
+      const span = Tracers.terminalResize.start({ terminal: params.terminal, mode: params.mode })
       // Why: guarded resolution — a stale handle (pane's PTY replaced under it)
       // must fail with terminal_handle_stale instead of resizing the wrong PTY
       // (#7718). Clients recover by re-deriving the handle.
       const leaf = runtime.resolveLiveLeafForHandle(params.terminal)
       if (!leaf?.ptyId) {
+        span.fail('no_connected_pty', { terminal: params.terminal })
         throw new Error('no_connected_pty')
       }
-      const result = await runtime.resizeForClient(
-        leaf.ptyId,
-        params.mode,
-        params.clientId,
-        params.mode === 'mobile-fit' ? params.cols : undefined,
-        params.mode === 'mobile-fit' ? params.rows : undefined
-      )
-      return {
-        terminal: {
-          handle: params.terminal,
-          ...result
+      try {
+        const result = await runtime.resizeForClient(
+          leaf.ptyId,
+          params.mode,
+          params.clientId,
+          params.mode === 'mobile-fit' ? params.cols : undefined,
+          params.mode === 'mobile-fit' ? params.rows : undefined
+        )
+        span.ok({ ptyId: leaf.ptyId })
+        return {
+          terminal: {
+            handle: params.terminal,
+            ...result
+          }
         }
+      } catch (err) {
+        span.fail(err, { terminal: params.terminal })
+        throw err
       }
     }
   }),

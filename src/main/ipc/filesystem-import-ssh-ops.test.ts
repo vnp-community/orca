@@ -35,8 +35,8 @@ vi.mock('./ssh', () => ({ getSshConnectionManager: getConnMgrMock }))
 
 import { registerFilesystemMutationHandlers } from './filesystem-mutations'
 import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
+  registerRemoteFilesystemProvider,
+  unregisterRemoteFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 
 const store = {
@@ -139,12 +139,12 @@ describe('fs:importExternalPaths — SSH operations', () => {
       close: vi.fn()
     }
     provider = createProvider(uploadSession)
-    registerSshFilesystemProvider(connId, provider)
+    registerRemoteFilesystemProvider(connId, provider)
     registerFilesystemMutationHandlers(store as never)
   })
 
   afterEach(() => {
-    unregisterSshFilesystemProvider(connId)
+    unregisterRemoteFilesystemProvider(connId)
   })
 
   it('deconflicts file names via provider stat', async () => {

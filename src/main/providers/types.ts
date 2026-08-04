@@ -19,10 +19,13 @@ import type {
 } from '../../shared/types'
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git-history'
 import type { CommitMessageDraftContext } from '../../shared/commit-message-generation'
+import type { CommitMessagePlan } from '../../shared/commit-message-plan'
+import type { RemoteCommitMessageExecResult } from '../text-generation/commit-message-text-generation'
 import type { WorkspaceSpaceDirectoryScanResult } from '../../shared/workspace-space-types'
 import type { StartupCommandDelivery } from '../../shared/codex-startup-delivery'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { TerminalGitHubPRLink } from '../../shared/terminal-github-pr-link-detector'
+import type { RemoteHostPlatform } from '../ssh/ssh-remote-platform'
 
 // ─── PTY Provider ───────────────────────────────────────────────────
 
@@ -394,6 +397,70 @@ export type IGitProvider = {
     worktreePath: string,
     options?: { includeUntracked?: boolean }
   ): Promise<{ clean: boolean; stdout?: string }>
+  /**
+   * Runs a non-interactive AI commit-message-generation binary on the
+   * provider's host. Optional: only meaningful when getStagedCommitContext
+   * is also implemented — providers that throw there (e.g.
+   * DevServerGitProvider, which has no equivalent relay method yet) never
+   * reach a call to this either, so callers use a non-null assertion rather
+   * than threading an extra existence check through every call site.
+   */
+  executeCommitMessagePlan?(
+    plan: CommitMessagePlan,
+    cwd: string,
+    timeoutMs: number,
+    operation?: string
+  ): Promise<RemoteCommitMessageExecResult>
+  /** Best-effort cancel of an in-flight executeCommitMessagePlan run. Optional
+   *  for the same reason executeCommitMessagePlan is. */
+  cancelGenerateCommitMessage?(worktreePath: string, operation?: string): Promise<void>
+  /** Lower-level non-interactive binary exec used outside the commit-message
+   *  flow (e.g. worktree-remote.ts's setup-script execution). Optional —
+   *  only providers backed by a general-purpose exec channel implement it. */
+  execNonInteractive?(
+    binary: string,
+    args: string[],
+    cwd: string,
+    timeoutMs: number,
+    signal?: AbortSignal,
+    env?: Record<string, string>
+  ): Promise<RemoteCommitMessageExecResult>
+  /** Clone a remote repo onto the provider's host. Optional — dev-server
+   *  agents don't expose a dedicated clone RPC yet (git.exec's whitelist
+   *  has no 'clone' subcommand). */
+  clone?(
+    args: string[],
+    cwd: string,
+    options?: {
+      signal?: AbortSignal
+      timeoutMs?: number
+      onProgress?: (progress: { phase: string; percent: number }) => void
+    }
+  ): Promise<{ stdout: string; stderr: string }>
+  /** Fetches a specific remote ref into a local tracking ref without merging.
+   *  Optional — used by PR/worktree-base flows; no dev-server RPC equivalent yet. */
+  fetchRemoteTrackingRef?(
+    worktreePath: string,
+    remote: string,
+    branch: string,
+    ref: string,
+    options?: { skipAutoMaintenance?: boolean }
+  ): Promise<void>
+  /** Fetches a GitLab merge request's head ref. Optional — GitLab-specific,
+   *  no dev-server RPC equivalent yet. */
+  fetchGitLabMergeRequestHead?(worktreePath: string, remote: string, mrIid: number): Promise<void>
+  /** Refreshes the local base ref cache used when creating a worktree from a
+   *  remote-tracking base. Optional — no dev-server RPC equivalent yet. */
+  refreshLocalBaseRefForWorktreeCreate?(args: {
+    repoPath: string
+    fullRef: string
+    remoteTrackingRef: string
+    ownerWorktreePath?: string
+    checkOnly?: boolean
+  }): Promise<void>
+  /** OS/arch of the provider's host, when known. Optional — SSH-specific
+   *  transport metadata; dev-server hosts don't negotiate this today. */
+  getHostPlatform?(): RemoteHostPlatform | null
 }
 
 // ─── Provider Registry ──────────────────────────────────────────────

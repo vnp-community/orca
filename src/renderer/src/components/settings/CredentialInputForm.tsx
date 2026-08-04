@@ -3,6 +3,7 @@ import { Loader2, Save, Trash2 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { Tracers } from '../../../../shared/trace/tracers'
 
 // Why: In Web Server mode (ORCA_MULTI_USER=1), users cannot configure integrations
 // via env vars (shared process). This component provides a per-user credential input
@@ -52,6 +53,9 @@ export function CredentialInputForm({
 
     setSaving(true)
     setError(null)
+    // Why: span bọc trước validate token/config để cover cả case validate fail —
+    // nhưng KHÔNG đưa token/config vào TraceFields (bảo mật, CR-TRACE-014 §4).
+    const span = Tracers.uiRemoteIntegrationCredentialStoreFlow.start({ service, op: 'set' })
     try {
       // Extract main token (first password field, or 'token' key)
       const tokenKey = fields.find(f => f.type === 'password')?.key ?? 'token'
@@ -72,8 +76,10 @@ export function CredentialInputForm({
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
       onSaved()
+      span.ok({ service })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save credentials')
+      span.fail(err, { service })
     } finally {
       setSaving(false)
     }
@@ -82,11 +88,14 @@ export function CredentialInputForm({
   const handleRevoke = async () => {
     if (!confirm(`Remove ${service} credentials? This cannot be undone.`)) return
     setRevoking(true)
+    const span = Tracers.uiRemoteIntegrationCredentialStoreFlow.start({ service, op: 'revoke' })
     try {
       await window.api.credentials.revoke(service)
       onRevoked()
+      span.ok({ service })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke credentials')
+      span.fail(err, { service })
     } finally {
       setRevoking(false)
     }

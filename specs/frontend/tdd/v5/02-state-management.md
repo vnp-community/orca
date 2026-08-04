@@ -683,3 +683,44 @@ const on = useCallback((type: WorkspaceEvent['type'], handler: (e: WorkspaceEven
 // GitPanel: on('agent.complete', refreshGitStatus); on('git.commit', refreshGitStatus)
 // TasksPanel: on('git.commit', ({ message }) => checkTaskRefs(message))
 ```
+
+---
+
+## Addendum — Dev Server as a first-class Execution Host (2026-08-03) ✅ IMPLEMENTED
+
+> Shared types, không phải store-owned — nhưng `repos` slice và các selector filter theo host phụ thuộc trực tiếp vào đây.
+
+`src/shared/execution-host.ts`:
+
+```typescript
+export type ExecutionHostKind = 'local' | 'ssh' | 'runtime' | 'devServer'
+export type ExecutionHostId =
+  | 'local'
+  | `ssh:${string}`
+  | `runtime:${string}`
+  | `devServer:${string}`   // NEW
+
+export function toDevServerExecutionHostId(devServerId: string): `devServer:${string}`
+
+// Precedence khi resolve host của một repo:
+export function getRepoExecutionHostId(repo: Repo): ExecutionHostId {
+  // executionHostId (explicit) → connectionId (SSH) → devServerId → 'local'
+}
+
+// Bare, unprefixed connection key — dùng ở những chỗ cần "opaque connection id
+// của bất kỳ transport nào đang backing repo này" thay vì typed/prefixed id
+// (vd: connection-owner-resolution.ts — xem TDD-FE-04):
+export function getRepoProviderConnectionKey(
+  repo: Pick<Repo, 'connectionId' | 'devServerId'>
+): string | null {
+  return repo.connectionId ?? repo.devServerId ?? null
+}
+```
+
+`buildExecutionHostRegistry()` (`src/shared/execution-host-registry.ts`) nhận thêm `devServers?: readonly DevServerSummary[]` và có `addDevServerHost()` map `DevServerStatus` ('connected'/'connecting'/'disconnected'/'error') → `ExecutionHostHealth`, cùng cách SSH connection state đã map từ trước.
+
+**Gotcha khi thêm một `ExecutionHostKind` mới:** ngoài `execution-host.ts`, còn 2 chỗ union hẹp dễ quên phải widen theo, nếu không sẽ compile error kiểu `Type 'devServer:${string}' is not assignable...`:
+- `WorkspaceHostScope` (`src/shared/types.ts`)
+- `Repo['executionHostId']`'s type
+
+Trước session này, Dev Servers (`Repo.devServerId`) hoàn toàn tách biệt khỏi `ExecutionHostKind` — sidebar, Available Hosts panel, và mọi routing file/git/terminal chỉ biết `connectionId`/`executionHostId` (SSH). Giờ Dev Server là một host kind thật, đi qua cùng pipeline như local/ssh/runtime — xem TDD-FE-09 §11 và TDD-FE-04 §Connection Resolution.

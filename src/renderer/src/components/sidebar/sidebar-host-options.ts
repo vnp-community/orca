@@ -6,6 +6,7 @@ import {
 } from '../../../../shared/execution-host'
 import {
   buildExecutionHostRegistry,
+  type DevServerSummary,
   type ExecutionHostHealth
 } from '../../../../shared/execution-host-registry'
 import type { RuntimeCompatVerdict } from '../../../../shared/protocol-compat'
@@ -18,7 +19,7 @@ export type SidebarHostOption = {
   id: ExecutionHostId
   label: string
   detail: string
-  kind: 'local' | 'ssh' | 'runtime'
+  kind: 'local' | 'ssh' | 'runtime' | 'devServer'
   health: ExecutionHostHealth
   presence: 'local' | 'configured' | 'project' | 'active'
   // Why: surfaced to the sidebar host-header menu so it can warn on version skew.
@@ -35,7 +36,7 @@ export type SidebarHostScopeOption = {
 }
 
 export function buildSidebarHostOptions(args: {
-  repos: readonly Pick<Repo, 'connectionId' | 'executionHostId'>[]
+  repos: readonly Pick<Repo, 'connectionId' | 'executionHostId' | 'devServerId'>[]
   sshTargetLabels: ReadonlyMap<string, string>
   sshConnectionStates?: ReadonlyMap<string, SshConnectionState>
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined
@@ -46,6 +47,7 @@ export function buildSidebarHostOptions(args: {
     { status?: RuntimeStatus | null; appVersion?: string | null }
   >
   runtimeEnvironments?: readonly Pick<PublicKnownRuntimeEnvironment, 'id' | 'name'>[]
+  devServers?: readonly DevServerSummary[]
   // Why: per-host display-label overrides rename hosts everywhere the sidebar
   // options feed (host headers, scope picker, focus menu).
   hostLabelOverrides?: ReadonlyMap<ExecutionHostId, string>
@@ -70,6 +72,7 @@ export function buildSidebarHostOptions(args: {
     sshConnectionStates: args.sshConnectionStates,
     runtimeEnvironments: args.runtimeEnvironments,
     runtimeStatusByEnvironmentId: args.runtimeStatusByEnvironmentId,
+    devServers: args.devServers,
     hostLabelOverrides: args.hostLabelOverrides
   }).map((host) => {
     if (host.kind === 'local') {

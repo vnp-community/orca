@@ -131,6 +131,8 @@ type ExecutionHostId =
 
 Mỗi **Project** có một `executionHostId`. Khi tạo worktree, Orca route tất cả operations (git, pty, file watch) qua execution host đó.
 
+> **Addendum v5.0 (2026-08-02/03):** `ExecutionHostId` thực tế còn có kind thứ 4 — `` `devServer:${string}` `` (Dev Server, xem TDD-13). Từ v5.0, file/git operations trên Dev Server route qua **cùng** provider registry (`ssh-filesystem-dispatch.ts`/`ssh-git-dispatch.ts`) mà SSH targets dùng, thay vì đường onboarding riêng biệt trước đây — xem [05-ssh-relay.md Addendum v5.0](./05-ssh-relay.md#addendum-v50-provider-registries-are-transport-agnostic) và [13-dev-server-onboarding.md §11](./13-dev-server-onboarding.md#11-provider-unification-with-ssh-registries-v50). Terminal/PTY trên Dev Server vẫn chưa route qua execution-host machinery (chưa có `DevServerPtyProvider`).
+
 ---
 
 ## 5. Data Flow: Client Request → Response

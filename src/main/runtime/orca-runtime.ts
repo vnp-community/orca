@@ -191,6 +191,7 @@ import {
 import { parsePtySessionId } from '../../shared/pty-session-id-format'
 import { clampLinearIssueListLimit } from '../../shared/linear-issue-read-limits'
 import { isFolderRepo } from '../../shared/repo-kind'
+import { getRepoProviderConnectionKey } from '../../shared/execution-host'
 import { DEFAULT_WORKSPACE_STATUS_ID } from '../../shared/workspace-statuses'
 import {
   buildSetupRunnerCommand,
@@ -726,14 +727,14 @@ import type {
   PtyProcessInfo,
   PtyTransientFact
 } from '../providers/types'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
   assertFolderWorkspacePathUsable,
   getFolderWorkspacePathStatus,
   getFolderWorkspacePathStatusForPath,
   inferFolderWorkspacePathConnection
 } from '../project-groups/folder-workspace-path-status'
-import { getSshGitProvider, requireSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider, requireRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import { detectRepoIconAndUpstream } from '../repo-icon-autodetect'
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
 import { githubAvatarIcon } from '../../shared/repo-icon'
@@ -1167,7 +1168,7 @@ type HeadlessSeedMetadata = {
   kittyKeyboardFlags?: number
 }
 
-type RuntimePtyController = {
+export type RuntimePtyController = {
   spawn?(opts: {
     cols: number
     rows: number
@@ -1418,7 +1419,8 @@ async function isRuntimeWorktreePathMissing(
   worktreePath: string,
   localWorktreeGitOptions: { wslDistro?: string } = {}
 ): Promise<boolean> {
-  if (!repo.connectionId) {
+  const providerConnectionId = getRepoProviderConnectionKey(repo)
+  if (!providerConnectionId) {
     const access = getLocalWorktreePathAccess(localWorktreeGitOptions)
     return isWorktreePathMissing(
       toLocalWorktreeRuntimePath(worktreePath, localWorktreeGitOptions),
@@ -1426,7 +1428,7 @@ async function isRuntimeWorktreePathMissing(
     )
   }
 
-  const fsProvider = getSshFilesystemProvider(repo.connectionId)
+  const fsProvider = getRemoteFilesystemProvider(providerConnectionId)
   if (!fsProvider) {
     return false
   }
@@ -5412,7 +5414,10 @@ export class OrcaRuntimeService {
     const store = this.requireStore()
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     const repo = store.getRepo(worktree.repoId)
-    const connectionId = repo?.connectionId ?? undefined
+    // Why: getRepoProviderConnectionKey (not repo.connectionId directly) so a
+    // Dev-Server-bound repo (devServerId, no SSH connectionId) also resolves
+    // through the provider registries — see dev-server-provider-lifecycle.ts.
+    const connectionId = (repo ? getRepoProviderConnectionKey(repo) : null) ?? undefined
     const localGitOptions =
       repo && !connectionId ? getLocalProjectWorktreeGitOptions(store, repo) : {}
     return { worktree, repo, connectionId, localGitOptions }
@@ -5433,7 +5438,7 @@ export class OrcaRuntimeService {
     const store = this.requireStore()
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     const repo = store.getRepo(worktree.repoId)
-    return { worktree, connectionId: repo?.connectionId ?? undefined }
+    return { worktree, connectionId: (repo ? getRepoProviderConnectionKey(repo) : null) ?? undefined }
   }
 
   onMobileSessionTabsChanged(
@@ -11516,7 +11521,7 @@ export class OrcaRuntimeService {
         projectGroups,
         repos: this.store.getRepos()
       },
-      { getSshFilesystemProvider }
+      { getRemoteFilesystemProvider }
     )
     assertFolderWorkspacePathUsable(status)
     const workspace = this.store.createFolderWorkspace(input)
@@ -11530,7 +11535,7 @@ export class OrcaRuntimeService {
     if (!this.store) {
       throw new Error('runtime_unavailable')
     }
-    return getFolderWorkspacePathStatus(this.store, request, { getSshFilesystemProvider })
+    return getFolderWorkspacePathStatus(this.store, request, { getRemoteFilesystemProvider })
   }
 
   async updateFolderWorkspace(
@@ -11577,7 +11582,7 @@ export class OrcaRuntimeService {
           projectGroups,
           repos: this.store.getRepos()
         },
-        { getSshFilesystemProvider }
+        { getRemoteFilesystemProvider }
       )
       assertFolderWorkspacePathUsable(status)
     }
@@ -12280,7 +12285,7 @@ export class OrcaRuntimeService {
     if (isFolderRepo(repo)) {
       return { defaultBaseRef: null, remoteCount: 0 }
     }
-    if (repo.connectionId) {
+    if (getRepoProviderConnectionKey(repo)) {
       return this.getRemoteRepoBaseRefDefault(repo)
     }
     const [defaultBaseRef, remoteCount] = await Promise.all([
@@ -12293,7 +12298,8 @@ export class OrcaRuntimeService {
   private async getRemoteRepoBaseRefDefault(
     repo: Repo
   ): Promise<{ defaultBaseRef: string | null; remoteCount: number }> {
-    const provider = repo.connectionId ? getSshGitProvider(repo.connectionId) : null
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    const provider = providerConnectionId ? getRemoteGitProvider(providerConnectionId) : null
     if (!provider) {
       return { defaultBaseRef: null, remoteCount: 0 }
     }
@@ -12330,7 +12336,8 @@ export class OrcaRuntimeService {
     query: string,
     limit: number
   ): Promise<BaseRefSearchResult[]> {
-    const provider = repo.connectionId ? getSshGitProvider(repo.connectionId) : null
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    const provider = providerConnectionId ? getRemoteGitProvider(providerConnectionId) : null
     if (!provider) {
       return []
     }
@@ -13571,8 +13578,9 @@ export class OrcaRuntimeService {
 
   async getRepoHooks(repoSelector: string) {
     const repo = await this.resolveRepoSelector(repoSelector)
-    if (repo.connectionId) {
-      const fsProvider = getSshFilesystemProvider(repo.connectionId)
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    if (providerConnectionId) {
+      const fsProvider = getRemoteFilesystemProvider(providerConnectionId)
       if (!fsProvider) {
         return {
           hasHooksFile: false,
@@ -13625,8 +13633,9 @@ export class OrcaRuntimeService {
       return { hasHooks: false, hooks: null, mayNeedUpdate: false }
     }
 
-    if (repo.connectionId) {
-      const fsProvider = getSshFilesystemProvider(repo.connectionId)
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    if (providerConnectionId) {
+      const fsProvider = getRemoteFilesystemProvider(providerConnectionId)
       if (!fsProvider) {
         return { hasHooks: false, hooks: null, mayNeedUpdate: false }
       }
@@ -13658,8 +13667,9 @@ export class OrcaRuntimeService {
 
     return inspectSetupScriptImportCandidates(async (relativePath) => {
       const filePath = joinWorktreeRelativePath(repo.path, relativePath)
-      if (repo.connectionId) {
-        const fsProvider = getSshFilesystemProvider(repo.connectionId)
+      const providerConnectionId = getRepoProviderConnectionKey(repo)
+      if (providerConnectionId) {
+        const fsProvider = getRemoteFilesystemProvider(providerConnectionId)
         if (!fsProvider) {
           return null
         }
@@ -13694,9 +13704,10 @@ export class OrcaRuntimeService {
       }
     }
 
-    if (repo.connectionId) {
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    if (providerConnectionId) {
       const issueCommandPath = joinWorktreeRelativePath(repo.path, '.orca/issue-command')
-      const fsProvider = getSshFilesystemProvider(repo.connectionId)
+      const fsProvider = getRemoteFilesystemProvider(providerConnectionId)
       if (!fsProvider) {
         return {
           localContent: null,
@@ -13761,9 +13772,10 @@ export class OrcaRuntimeService {
       return { ok: true }
     }
 
-    if (repo.connectionId) {
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    if (providerConnectionId) {
       const issueCommandPath = joinWorktreeRelativePath(repo.path, '.orca/issue-command')
-      const fsProvider = getSshFilesystemProvider(repo.connectionId)
+      const fsProvider = getRemoteFilesystemProvider(providerConnectionId)
       if (!fsProvider) {
         return { ok: true }
       }
@@ -14740,7 +14752,7 @@ export class OrcaRuntimeService {
     const lineageInput =
       args.lineage || args.comment ? { ...args.lineage, comment: args.comment } : undefined
     const lineageResolution = await this.resolveLineageForWorktreeCreate(lineageInput)
-    if (repo.connectionId) {
+    if (getRepoProviderConnectionKey(repo)) {
       const result = await this.createManagedRemoteWorktree(repo, {
         ...args,
         activate: args.activate,
@@ -16414,7 +16426,8 @@ export class OrcaRuntimeService {
     if (isFolderRepo(repo)) {
       return { error: 'Folder mode does not support creating worktrees.' }
     }
-    const sshGitProvider = repo.connectionId ? requireSshGitProvider(repo.connectionId) : null
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    const sshGitProvider = providerConnectionId ? requireRemoteGitProvider(providerConnectionId) : null
     const localGitExecOptions = sshGitProvider
       ? undefined
       : getLocalProjectGitExecOptions(this.requireStore(), repo)
@@ -16492,7 +16505,8 @@ export class OrcaRuntimeService {
     if (isFolderRepo(repo)) {
       return { error: 'Folder mode does not support creating worktrees.' }
     }
-    const sshGitProvider = repo.connectionId ? requireSshGitProvider(repo.connectionId) : null
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    const sshGitProvider = providerConnectionId ? requireRemoteGitProvider(providerConnectionId) : null
     const localGitExecOptions = sshGitProvider
       ? undefined
       : getLocalProjectGitExecOptions(this.requireStore(), repo)
@@ -16565,7 +16579,7 @@ export class OrcaRuntimeService {
     const compareBaseRef = targetBranch ? `refs/remotes/${remote}/${targetBranch}` : undefined
     const fetchRemoteTrackingRef = async (branch: string, ref: string): Promise<void> => {
       await (sshGitProvider
-        ? sshGitProvider.fetchRemoteTrackingRef(repo.path, remote, branch, ref)
+        ? sshGitProvider.fetchRemoteTrackingRef!(repo.path, remote, branch, ref)
         : gitExec(['fetch', remote, `+refs/heads/${branch}:${ref}`]))
     }
     // Why: the target/compare branch is optional (it only powers the diff
@@ -16597,7 +16611,7 @@ export class OrcaRuntimeService {
       // can match desktop without adding the contributor fork as a remote.
       try {
         await (sshGitProvider
-          ? sshGitProvider.fetchGitLabMergeRequestHead(repo.path, remote, args.mrIid)
+          ? sshGitProvider.fetchGitLabMergeRequestHead!(repo.path, remote, args.mrIid)
           : gitExec(['fetch', remote, mrRef]))
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -16704,7 +16718,7 @@ export class OrcaRuntimeService {
       return 'origin'
     }
     if (connectionId) {
-      const provider = requireSshGitProvider(connectionId)
+      const provider = requireRemoteGitProvider(connectionId)
       const { stdout } = await provider.exec(['remote'], repoPath)
       const remotes = stdout
         .split('\n')
@@ -16845,12 +16859,13 @@ export class OrcaRuntimeService {
       throw new Error('Folder workspaces do not have local Git branches.')
     }
 
-    if (repo.connectionId) {
-      const provider = requireSshGitProvider(repo.connectionId)
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    if (providerConnectionId) {
+      const provider = requireRemoteGitProvider(providerConnectionId)
       // Why: SSH must use the write-capable relay RPC; the shared exec-based
       // helper routes through the read-only git.exec allowlist, which rejects
       // the worktree/update-ref/config writes this delete needs.
-      await provider.forceDeletePreservedBranch(
+      await provider.forceDeletePreservedBranch!(
         repo.path,
         cleanupTarget.branchName,
         cleanupTarget.head
@@ -16935,13 +16950,14 @@ export class OrcaRuntimeService {
         this.notifyWorktreesChanged(repo.id)
         return {}
       }
-      const provider = repo.connectionId ? requireSshGitProvider(repo.connectionId) : null
-      const fsProvider = repo.connectionId ? getSshFilesystemProvider(repo.connectionId) : null
-      const localWorktreeGitOptions = repo.connectionId
+      const providerConnectionId = getRepoProviderConnectionKey(repo)
+      const provider = providerConnectionId ? requireRemoteGitProvider(providerConnectionId) : null
+      const fsProvider = providerConnectionId ? getRemoteFilesystemProvider(providerConnectionId) : null
+      const localWorktreeGitOptions = providerConnectionId
         ? {}
         : getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
       const hasLocalWorktreeGitOptions = Object.keys(localWorktreeGitOptions).length > 0
-      const registeredWorktrees = repo.connectionId
+      const registeredWorktrees = providerConnectionId
         ? await provider!.listWorktrees(repo.path)
         : hasLocalWorktreeGitOptions
           ? await listWorktreesStrict(repo.path, localWorktreeGitOptions)
@@ -16960,7 +16976,7 @@ export class OrcaRuntimeService {
             meta: removedMeta
           })
         ) {
-          if (repo.connectionId) {
+          if (providerConnectionId) {
             if (!fsProvider) {
               throw new Error('SSH filesystem provider unavailable')
             }
@@ -16990,7 +17006,7 @@ export class OrcaRuntimeService {
           if (!force) {
             throw new Error(ORPHANED_WORKTREE_DIRECTORY_MESSAGE)
           }
-          if (repo.connectionId) {
+          if (providerConnectionId) {
             await fsProvider!.deletePath(removalTarget.path, true)
             await cleanupUnusedWorktreePushTargetRemoteSsh(
               provider!,
@@ -17017,7 +17033,7 @@ export class OrcaRuntimeService {
           this.notifyWorktreesChanged(repo.id)
           return {}
         }
-        if (!repo.connectionId) {
+        if (!providerConnectionId) {
           const access = getLocalWorktreePathAccess(localWorktreeGitOptions)
           const runtimeWorktreePath = toLocalWorktreeRuntimePath(
             removalTarget.path,
@@ -17067,7 +17083,7 @@ export class OrcaRuntimeService {
           // Why: a manually deleted worktree is already gone from Git and disk.
           // Finish runtime metadata cleanup without requiring force or touching
           // any unregistered path that still exists.
-          await (repo.connectionId
+          await (providerConnectionId
             ? cleanupUnusedWorktreePushTargetRemoteSsh(
                 provider!,
                 repo.path,
@@ -17106,7 +17122,7 @@ export class OrcaRuntimeService {
       // Why: a prior forced Windows recovery can delete the directory but leave
       // Git's stale registration; recover and verify it before clearing metadata.
       if (
-        !repo.connectionId &&
+        !providerConnectionId &&
         force === true &&
         process.platform === 'win32' &&
         (isWindowsAbsolutePathLike(canonicalWorktreePath) || !!localWorktreeGitOptions.wslDistro) &&
@@ -17140,7 +17156,7 @@ export class OrcaRuntimeService {
         this.notifyWorktreesChanged(repo.id)
         return removalResult ?? {}
       }
-      if (repo.connectionId) {
+      if (providerConnectionId) {
         const remoteRemoveOptions = !deleteBranch ? { deleteBranch } : {}
         const rawRemovalResult = await (Object.keys(remoteRemoveOptions).length > 0
           ? provider!.removeWorktree(canonicalWorktreePath, force, remoteRemoveOptions)
@@ -19017,7 +19033,7 @@ export class OrcaRuntimeService {
     const status = await getFolderWorkspacePathStatus(
       this.store,
       { scope: 'folder-workspace', folderWorkspaceId: workspace.id },
-      { getSshFilesystemProvider }
+      { getRemoteFilesystemProvider }
     )
     assertFolderWorkspacePathUsable(status)
     return {
@@ -19084,7 +19100,12 @@ export class OrcaRuntimeService {
     return {
       id: worktree.id,
       path: worktree.path,
-      connectionId: repo?.connectionId ?? null,
+      // Why getRepoProviderConnectionKey (not repo.connectionId directly): a
+      // repo bound to a Dev Server may have only devServerId set, never
+      // connectionId — raw repo.connectionId silently resolved to null for
+      // those repos, making every terminal spawn reject with "no local
+      // shell" even though a real remote PTY provider was registered.
+      connectionId: (repo ? getRepoProviderConnectionKey(repo) : null) ?? null,
       repo,
       folderWorkspace: null
     }
@@ -19892,7 +19913,8 @@ export class OrcaRuntimeService {
   }
 
   private async listRepoWorktreesForResolution(repo: Repo): Promise<RuntimeWorktreeScanResult> {
-    if (!repo.connectionId) {
+    const providerConnectionId = getRepoProviderConnectionKey(repo)
+    if (!providerConnectionId) {
       return {
         ok: true,
         worktrees: await listRepoWorktrees(
@@ -19901,7 +19923,7 @@ export class OrcaRuntimeService {
         )
       }
     }
-    const provider = getSshGitProvider(repo.connectionId)
+    const provider = getRemoteGitProvider(providerConnectionId)
     if (!provider) {
       return { ok: false, worktrees: this.listStoredSshWorktreesForResolution(repo) }
     }

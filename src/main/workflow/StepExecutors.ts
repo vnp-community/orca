@@ -33,7 +33,8 @@ export class StepExecutors {
   async execute(
     step: WorkflowStep,
     inputs: Record<string, unknown>,
-    signal: AbortSignal
+    signal: AbortSignal,
+    traceId?: string // [NEW] forwarded from WorkflowOrchestrator.executeStep()'s stepSpan.id
   ): Promise<StepOutput> {
     if (signal.aborted) {
       throw new Error('EXECUTION_CANCELLED')
@@ -42,7 +43,7 @@ export class StepExecutors {
     const timeoutMs = step.timeout ?? DEFAULT_TIMEOUT_MS
 
     return Promise.race([
-      this.executeByType(step, inputs, signal),
+      this.executeByType(step, inputs, signal, traceId),
       new Promise<never>((_, reject) => {
         const timer = setTimeout(
           () => reject(new Error(`STEP_TIMEOUT: step "${step.id}" exceeded ${timeoutMs}ms`)),
@@ -59,21 +60,22 @@ export class StepExecutors {
   private async executeByType(
     step: WorkflowStep,
     inputs: Record<string, unknown>,
-    signal: AbortSignal
+    signal: AbortSignal,
+    traceId?: string
   ): Promise<StepOutput> {
     const { type } = step.config
 
     switch (type) {
       case 'agent':
-        return this.executeAgent(step, signal)
+        return this.executeAgent(step, signal, traceId)
       case 'shell':
-        return this.executeShell(step, signal)
+        return this.executeShell(step, signal, traceId)
       case 'webhook':
-        return this.executeWebhook(step, signal)
+        return this.executeWebhook(step, signal) // không qua relay — không cần traceId
       case 'notification':
-        return this.executeNotification(step, signal)
+        return this.executeNotification(step, signal, traceId)
       case 'condition':
-        return this.executeCondition(step, inputs)
+        return this.executeCondition(step, inputs) // sync, không I/O — không cần traceId
       default:
         throw new Error(`UNSUPPORTED_STEP_TYPE: "${String(type)}"`)
     }
@@ -81,7 +83,7 @@ export class StepExecutors {
 
   // ── Agent step ────────────────────────────────────────────────────────────
 
-  private async executeAgent(step: WorkflowStep, signal: AbortSignal): Promise<StepOutput> {
+  private async executeAgent(step: WorkflowStep, signal: AbortSignal, traceId?: string): Promise<StepOutput> {
     const relay = await this.getRelay(step)
     if (signal.aborted) throw new Error('EXECUTION_CANCELLED')
 
@@ -90,6 +92,7 @@ export class StepExecutors {
       prompt: step.config['prompt'],
       worktreePath: step.config['worktreePath'],
       trustPreset: step.config['trustPreset'] ?? 'default',
+      traceId, // [NEW] — relay:agentCall (dev-server-relay-bridge.ts) resume theo id này
     })) as { exitCode?: number; stdout?: string; stderr?: string }
 
     return {
@@ -101,13 +104,14 @@ export class StepExecutors {
 
   // ── Shell step ────────────────────────────────────────────────────────────
 
-  private async executeShell(step: WorkflowStep, signal: AbortSignal): Promise<StepOutput> {
+  private async executeShell(step: WorkflowStep, signal: AbortSignal, traceId?: string): Promise<StepOutput> {
     const relay = await this.getRelay(step)
     if (signal.aborted) throw new Error('EXECUTION_CANCELLED')
 
     const result = (await relay.call('shell.exec', {
       script: step.config['script'],
       env: step.config['env'] ?? {},
+      traceId, // [NEW]
     })) as { exitCode?: number; stdout?: string; stderr?: string }
 
     return {
@@ -142,13 +146,14 @@ export class StepExecutors {
 
   // ── Notification step ─────────────────────────────────────────────────────
 
-  private async executeNotification(step: WorkflowStep, signal: AbortSignal): Promise<StepOutput> {
+  private async executeNotification(step: WorkflowStep, signal: AbortSignal, traceId?: string): Promise<StepOutput> {
     const relay = await this.getRelay(step)
     if (signal.aborted) throw new Error('EXECUTION_CANCELLED')
 
     await relay.call('notification.send', {
       channel: step.config['channel'],
       message: step.config['message'],
+      traceId, // [NEW]
     })
 
     return { exitCode: 0 }

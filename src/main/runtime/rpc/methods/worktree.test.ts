@@ -4,6 +4,7 @@ import type { RpcRequest } from '../core'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { WORKTREE_METHODS } from './worktree'
 import { createAutomationDispatchToken } from '../../../automations/dispatch-tokens'
+import { registerTraceSink, type TraceEvent } from '../../../../shared/trace'
 
 const repo = {
   id: 'repo-1',
@@ -827,5 +828,174 @@ describe('worktree RPC methods', () => {
 
     expect(runtime.persistManagedWorktreeSortOrder).toHaveBeenCalledWith(['wt-1', 'wt-2'])
     expect(response).toMatchObject({ ok: true, result: { updated: 2 } })
+  })
+})
+
+// ── CR-TRACE-001: worktree.create / worktree.rm tracing (TASK-BE-001.4) ────────
+
+describe('worktree RPC tracing (CR-TRACE-001)', () => {
+  function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    return { events, stop: unregister }
+  }
+
+  it('worktree.create emits a worktree:create span with ok() containing worktreeId/path', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      showRepo: vi.fn().mockResolvedValue(repo),
+      createManagedWorktree: vi.fn().mockResolvedValue({ worktree: { id: 'wt-1', path: '/repo/wt-1' } })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+    const { events, stop } = captureTraceEvents()
+
+    await dispatcher.dispatch(makeRequest('worktree.create', { repo: 'repo-1', name: 'feature' }))
+    stop()
+
+    const created = events.filter((e) => e.flow === 'worktree:create')
+    expect(created[0]?.level).toBe('start')
+    const ok = created.find((e) => e.level === 'ok')
+    expect(ok?.fields).toMatchObject({ worktreeId: 'wt-1', path: '/repo/wt-1' })
+  })
+
+  it('worktree.create resumes the span id from params.traceId when provided', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      showRepo: vi.fn().mockResolvedValue(repo),
+      createManagedWorktree: vi.fn().mockResolvedValue({ worktree: { id: 'wt-1' } })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+    const { events, stop } = captureTraceEvents()
+
+    await dispatcher.dispatch(
+      makeRequest('worktree.create', { repo: 'repo-1', name: 'feature', traceId: 'resume-abc123' })
+    )
+    stop()
+
+    const created = events.filter((e) => e.flow === 'worktree:create')
+    expect(created.every((e) => e.id === 'resume-abc123')).toBe(true)
+  })
+
+  it('worktree.create generates a fresh span id when params.traceId is absent (backward compatible)', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      showRepo: vi.fn().mockResolvedValue(repo),
+      createManagedWorktree: vi.fn().mockResolvedValue({ worktree: { id: 'wt-1' } })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+    const { events, stop } = captureTraceEvents()
+
+    const response = await dispatcher.dispatch(makeRequest('worktree.create', { repo: 'repo-1', name: 'feature' }))
+    stop()
+
+    expect(response).toMatchObject({ ok: true })
+    const created = events.filter((e) => e.flow === 'worktree:create')
+    expect(created[0]?.id).toBeTruthy()
+  })
+
+  it('worktree.create calls span.fail() on createManagedWorktree rejection and still releases the provenance reservation', async () => {
+    const dispatchToken = createAutomationDispatchToken('automation-fail', 'run-fail')
+    const createManagedWorktree = vi.fn().mockRejectedValue(new Error('boom'))
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      showRepo: vi.fn().mockResolvedValue(repo),
+      showAutomation: vi.fn(() => ({
+        id: 'automation-fail',
+        name: 'Nightly review',
+        projectId: 'repo-1',
+        workspaceMode: 'new_per_run',
+        executionTargetType: 'ssh',
+        executionTargetId: 'ssh-target-1'
+      })),
+      listAutomationRuns: vi.fn(() => [
+        {
+          id: 'run-fail',
+          automationId: 'automation-fail',
+          title: 'Nightly review run',
+          status: 'dispatching',
+          workspaceId: null
+        }
+      ]),
+      createManagedWorktree
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+    const { events, stop } = captureTraceEvents()
+
+    const automationProvenanceRequest = {
+      automationId: 'automation-fail',
+      automationRunId: 'run-fail',
+      dispatchToken,
+      createRequestId: 'create-request-fail'
+    }
+    const failedResponse = await dispatcher.dispatch(
+      makeRequest('worktree.create', { repo: 'repo-1', name: 'feature', automationProvenanceRequest })
+    )
+    // Retry with the same dispatch request: only succeeds if the reservation was released on failure.
+    createManagedWorktree.mockResolvedValueOnce({ worktree: { id: 'wt-retry' } })
+    const retryResponse = await dispatcher.dispatch(
+      makeRequest('worktree.create', { repo: 'repo-1', name: 'feature-2', automationProvenanceRequest })
+    )
+    stop()
+
+    expect(failedResponse).toMatchObject({ ok: false })
+    expect(retryResponse).toMatchObject({ ok: true })
+    const failEvent = events.find((e) => e.flow === 'worktree:create' && e.level === 'fail')
+    expect(failEvent).toBeDefined()
+    expect(failEvent?.fields.err).toContain('boom')
+  })
+
+  it('worktree.rm emits an independent worktree:delete span, does not resume from a prior worktree.create span', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      showRepo: vi.fn().mockResolvedValue(repo),
+      createManagedWorktree: vi.fn().mockResolvedValue({ worktree: { id: 'wt-1' } }),
+      removeManagedWorktree: vi.fn().mockResolvedValue({})
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+    const { events, stop } = captureTraceEvents()
+
+    await dispatcher.dispatch(makeRequest('worktree.create', { repo: 'repo-1', name: 'feature' }))
+    await dispatcher.dispatch(makeRequest('worktree.rm', { worktree: 'id:wt-1', force: true }))
+    stop()
+
+    const createId = events.find((e) => e.flow === 'worktree:create')?.id
+    const deleteEvents = events.filter((e) => e.flow === 'worktree:delete')
+    expect(deleteEvents.length).toBeGreaterThan(0)
+    expect(deleteEvents.every((e) => e.id !== createId)).toBe(true)
+  })
+
+  it('worktree.rm resumes the span id from params.traceId and emits ok() with worktreeId', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      removeManagedWorktree: vi.fn().mockResolvedValue({ preservedBranch: undefined })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+    const { events, stop } = captureTraceEvents()
+
+    await dispatcher.dispatch(
+      makeRequest('worktree.rm', { worktree: 'id:wt-1', traceId: 'resume-delete-1' })
+    )
+    stop()
+
+    const deleteEvents = events.filter((e) => e.flow === 'worktree:delete')
+    expect(deleteEvents.every((e) => e.id === 'resume-delete-1')).toBe(true)
+    const ok = deleteEvents.find((e) => e.level === 'ok')
+    expect(ok?.fields).toMatchObject({ worktreeId: 'id:wt-1' })
+  })
+
+  it('worktree.rm calls span.fail() when removeManagedWorktree rejects, then rethrows', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      removeManagedWorktree: vi.fn().mockRejectedValue(new Error('locked'))
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+    const { events, stop } = captureTraceEvents()
+
+    const response = await dispatcher.dispatch(makeRequest('worktree.rm', { worktree: 'id:wt-1' }))
+    stop()
+
+    expect(response).toMatchObject({ ok: false })
+    const failEvent = events.find((e) => e.flow === 'worktree:delete' && e.level === 'fail')
+    expect(failEvent?.fields.err).toContain('locked')
   })
 })

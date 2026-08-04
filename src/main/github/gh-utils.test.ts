@@ -14,7 +14,7 @@ vi.mock('../git/runner', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: getSshGitProviderMock
+  getRemoteGitProvider: getSshGitProviderMock
 }))
 
 import {

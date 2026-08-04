@@ -4,6 +4,7 @@ import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rp
 import { useAppStore } from '../../store'
 import { Button } from '../ui/button'
 import { Loader2 } from 'lucide-react'
+import { Tracers } from '../../../../shared/trace/tracers'
 import type { OrcaTask } from '../../types/task-types'
 
 export function TaskPromptEditor({ task }: { task: OrcaTask }) {
@@ -13,13 +14,22 @@ export function TaskPromptEditor({ task }: { task: OrcaTask }) {
 
   const runWithAgent = async () => {
     setIsRunning(true)
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    const span = Tracers.uiTaskGraphExecuteFlow.start({ taskId: task.id, entryPoint: 'prompt-editor', promptLength: prompt.length })
     try {
-      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+      // NOTE (doc/code drift): method 'task.runAgent' (số ít) khác với 'tasks.runAgent'
+      // mà TaskDetail dùng. Giữ nguyên method name hiện tại vì sửa routing RPC không
+      // thuộc phạm vi CR tracing này — chỉ thêm traceId.
       await callRuntimeRpc(target, 'task.runAgent', {
         taskId: task.id,
         prompt: prompt || task.agentPrompt,
         projectId: project!.id,
+        traceId: span.id,
       })
+      span.ok({ taskId: task.id })
+    } catch (err) {
+      span.fail(err, { taskId: task.id })
+      throw err
     } finally {
       setIsRunning(false)
     }

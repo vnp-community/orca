@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { app } from 'electron'
 
 import { getRuntimePathBasename } from '../../shared/cross-platform-path'
-import { requireSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { requireRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
   writeFileToClipboard,
   type ClipboardFileDeps,
@@ -29,7 +29,7 @@ export async function writeRemoteFileToClipboard({
   connectionId: string
   deps: RemoteClipboardFileDeps
 }): Promise<ClipboardFileResult> {
-  const provider = requireSshFilesystemProvider(connectionId)
+  const provider = requireRemoteFilesystemProvider(connectionId)
   const remoteStat = await provider.stat(remotePath)
   if (remoteStat.type === 'directory') {
     return { ok: false, reason: 'is-directory' }

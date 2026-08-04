@@ -48,7 +48,7 @@ vi.mock('../ipc/filesystem-auth', async () => {
 })
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: getSshFilesystemProviderMock
+  getRemoteFilesystemProvider: getSshFilesystemProviderMock
 }))
 
 import { awaitRuntimeFileWatcherUnsubscribes, RuntimeFileCommands } from './orca-runtime-files'

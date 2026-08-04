@@ -15,19 +15,19 @@
 
 | # | File | Nội dung | Cập nhật |
 |---|------|---------|----------|
-| 1 | [01-architecture-overview.md](./01-architecture-overview.md) | Kiến trúc tổng thể, process model, data flow | ✅ v2.0 |
+| 1 | [01-architecture-overview.md](./01-architecture-overview.md) | Kiến trúc tổng thể, process model, data flow | ✅ v5.0 |
 | 2 | [02-main-process.md](./02-main-process.md) | Electron Main Process — startup, lifecycle, services | ✅ v2.0 |
 | 3 | [03-daemon-layer.md](./03-daemon-layer.md) | PTY Daemon — out-of-process terminal engine | v1.x (unchanged) |
 | 4 | [04-rpc-server.md](./04-rpc-server.md) | WebSocket/Unix RPC Server — API surface, auth, E2EE | ✅ v4.0 |
-| 5 | [05-ssh-relay.md](./05-ssh-relay.md) | SSH & Relay — remote connection, relay deploy, relay protocol | ✅ v4.0 |
+| 5 | [05-ssh-relay.md](./05-ssh-relay.md) | SSH & Relay — remote connection, relay deploy, relay protocol | ✅ v5.0 |
 | 6 | [06-persistence.md](./06-persistence.md) | Persistence Layer — JSON store, schema, migrations | ✅ v4.0 |
-| 7 | [07-runtime-service.md](./07-runtime-service.md) | OrcaRuntimeService — core business logic, worktrees, git | v1.x (unchanged) |
+| 7 | [07-runtime-service.md](./07-runtime-service.md) | OrcaRuntimeService — core business logic, worktrees, git | ✅ v5.0 |
 | 8 | [08-agent-orchestration.md](./08-agent-orchestration.md) | Agent Orchestration — multi-agent fan-out, hooks | v1.x (unchanged) |
-| 9 | [09-ipc-handlers.md](./09-ipc-handlers.md) | IPC Handlers — Electron + Web IPC, filesystem, PTY, SSH | ✅ v2.0 |
+| 9 | [09-ipc-handlers.md](./09-ipc-handlers.md) | IPC Handlers — Electron + Web IPC, filesystem, PTY, SSH | ✅ v5.0 |
 | 10 | [10-platform-layer.md](./10-platform-layer.md) | Platform Abstraction Layer — interfaces, adapters, stubs | ✅ v2.0 |
-| 11 | [11-web-server-mode.md](./11-web-server-mode.md) | Web Server Mode — Node.js server, HTTP, WebSocket | ✅ v4.0 |
+| 11 | [11-web-server-mode.md](./11-web-server-mode.md) | Web Server Mode — Node.js server, HTTP, WebSocket | ✅ v5.0 |
 | 12 | [12-database-layer.md](./12-database-layer.md) | **[NEW]** Database Abstraction — provider, pool, migration, repository, health | ✅ v3.0 |
-| 13 | [13-dev-server-onboarding.md](./13-dev-server-onboarding.md) | **[NEW]** Dev Server Management, Onboarding, Fleet, Web Push | ✅ v3.0 |
+| 13 | [13-dev-server-onboarding.md](./13-dev-server-onboarding.md) | **[NEW]** Dev Server Management, Onboarding, Fleet, Web Push | ✅ v5.0 |
 
 ---
 
@@ -263,6 +263,19 @@ export interface ServerBootstrapResult {
 | `src/main/ssh/__tests__/` | 29 tests |
 | `src/main/admin/__tests__/` | 44 tests |
 | **Total new** | **134 tests** |
+
+---
+
+## Addendum G: Dev Server Provider Unification — IMPLEMENTED ✅
+
+> **Date:** 2026-08-02/03  
+> **TDD refs:** [TDD-05 § Addendum v5.0](./05-ssh-relay.md#addendum-v50-provider-registries-are-transport-agnostic), [TDD-13 §11](./13-dev-server-onboarding.md#11-provider-unification-with-ssh-registries-v50)
+
+Repo có thể gắn remote host qua SSH Target (`connectionId`) **hoặc** Dev Server (`devServerId`) — 2 đường trước đây tách biệt hoàn toàn. Từ v5.0, cả 2 route qua cùng provider registry (`ssh-filesystem-dispatch.ts`/`ssh-git-dispatch.ts`, vốn đã transport-agnostic), qua 2 provider class mới `DevServerFilesystemProvider`/`DevServerGitProvider` (`src/main/providers/`) và helper `getRepoProviderConnectionKey()` (`src/shared/execution-host.ts`). Không mở connection mới; Dev Server dùng lại chính agent-WebSocket connection đã có.
+
+Kèm theo: broadcast IPC mới `devServer:proxyNotification` cho phép agent push notification (fs.watch) tới đúng per-user process trong multi-user mode ([TDD-11 § Addendum v5.0](./11-web-server-mode.md)), và nhánh `hostKind: 'devServer'` trong `addRemoteRepoFromPath`/`projectHostSetups:setupExistingFolder` ([TDD-09 §6.1](./09-ipc-handlers.md)).
+
+**Chưa làm:** Terminal/PTY qua Dev Server (`DevServerPtyProvider`), clone repo mới lên Dev Server (`cloneRemoteRepo`).
 
 ---
 

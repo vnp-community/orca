@@ -14,6 +14,7 @@ import type { ProfileResolver } from '../../profile/ProfileResolver'
 import type { AIProviderResolver } from '../ProfileAwareAgentSpawner'
 import type { OrcaProject, ProjectMember } from '../../../shared/project-types'
 import type { ResolvedProfile } from '../../profile/OrcaProfile'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -174,5 +175,139 @@ describe('ProfileAwareAgentSpawner', () => {
     const { spawner, relayCallMock } = makeSpawner()
     await spawner.spawn({ projectId: 'proj-1', userId: 'u-1', command: 'run' })
     expect(relayCallMock.mock.calls[0][1].workdir).toBe('/home/user/repo')
+  })
+
+  // ── CR-TRACE-002: agentOrch:spawn tracing (TASK-BE-002.4) ─────────────────
+
+  function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    return { events, stop: unregister }
+  }
+
+  it('spawn() emits an agentOrch:spawn span wrapping resolve-context → resolve-provider → relay-agent-exec steps in order', async () => {
+    const { spawner } = makeSpawner({}, {
+      providerId: 'anthropic',
+      modelId: 'claude-3-5-sonnet',
+      credentials: { ANTHROPIC_API_KEY: 'sk-test' }
+    })
+    const { events, stop } = captureTraceEvents()
+
+    await spawner.spawn({ projectId: 'proj-1', userId: 'u-1', command: 'echo hi' })
+    stop()
+
+    const spanEvents = events.filter((e) => e.flow === 'agentOrch:spawn')
+    expect(spanEvents.map((e) => e.level === 'step' ? e.label : e.level)).toEqual([
+      'start',
+      'resolve-context',
+      'resolve-provider',
+      'relay-agent-exec',
+      'ok'
+    ])
+  })
+
+  it('spawn() ok() field set contains sessionId only, never env/profileEnv/credentials', async () => {
+    const { spawner } = makeSpawner({}, {
+      providerId: 'anthropic',
+      modelId: 'claude-3-5-sonnet',
+      credentials: { ANTHROPIC_API_KEY: 'sk-test' }
+    })
+    const { events, stop } = captureTraceEvents()
+
+    await spawner.spawn({ projectId: 'proj-1', userId: 'u-1', command: 'echo hi' })
+    stop()
+
+    const okEvent = events.find((e) => e.flow === 'agentOrch:spawn' && e.level === 'ok')
+    expect(Object.keys(okEvent?.fields ?? {})).toEqual(['sessionId'])
+    // Guard: no event field across the whole span may leak env/profileEnv/credential keys.
+    const allSpanFields = events
+      .filter((e) => e.flow === 'agentOrch:spawn')
+      .flatMap((e) => Object.entries(e.fields))
+    for (const [key, value] of allSpanFields) {
+      expect(key.toLowerCase()).not.toContain('env')
+      expect(key.toLowerCase()).not.toContain('credential')
+      expect(String(value)).not.toContain('sk-test')
+    }
+  })
+
+  it('spawn() resumes span id from options.traceId when provided', async () => {
+    const { spawner } = makeSpawner()
+    const { events, stop } = captureTraceEvents()
+
+    await spawner.spawn({ projectId: 'proj-1', userId: 'u-1', command: 'run', traceId: 'resume-spawn-1' })
+    stop()
+
+    const spanEvents = events.filter((e) => e.flow === 'agentOrch:spawn')
+    expect(spanEvents.every((e) => e.id === 'resume-spawn-1')).toBe(true)
+  })
+
+  it('spawn() sends both traceId (flat) and _trace.id (nested) to relay.call agent.exec', async () => {
+    const { spawner, relayCallMock } = makeSpawner()
+    const { stop } = captureTraceEvents()
+
+    await spawner.spawn({ projectId: 'proj-1', userId: 'u-1', command: 'run' })
+    stop()
+
+    const callParams = relayCallMock.mock.calls[0][1] as { traceId?: string; _trace?: { id: string } }
+    expect(callParams.traceId).toBeTruthy()
+    expect(callParams._trace?.id).toBe(callParams.traceId)
+  })
+
+  it('spawn() fail() propagates original error and projectId field on getProjectContext rejection', async () => {
+    const router = {
+      getProjectContext: vi.fn().mockRejectedValue(new Error('context boom')),
+      getRelayForProject: vi.fn(),
+    } as unknown as ProjectServerRouter
+    const profileResolver = {} as unknown as ProfileResolver
+    const providerService = { resolveForProject: vi.fn() } as unknown as AIProviderResolver
+    const spawner = new ProfileAwareAgentSpawner(router, profileResolver, providerService)
+    const { events, stop } = captureTraceEvents()
+
+    await expect(
+      spawner.spawn({ projectId: 'proj-1', userId: 'u-1', command: 'run' })
+    ).rejects.toThrow('context boom')
+    stop()
+
+    const failEvent = events.find((e) => e.flow === 'agentOrch:spawn' && e.level === 'fail')
+    expect(failEvent?.fields.err).toContain('context boom')
+    expect(failEvent?.fields.projectId).toBe('proj-1')
+  })
+
+  it('spawn() fail() propagates on relay.call agent.exec rejection', async () => {
+    const { spawner, relayCallMock } = makeSpawner()
+    relayCallMock.mockRejectedValueOnce(new Error('relay unreachable'))
+    const { events, stop } = captureTraceEvents()
+
+    await expect(
+      spawner.spawn({ projectId: 'proj-1', userId: 'u-1', command: 'run' })
+    ).rejects.toThrow('relay unreachable')
+    stop()
+
+    const failEvent = events.find((e) => e.flow === 'agentOrch:spawn' && e.level === 'fail')
+    expect(failEvent?.fields.err).toContain('relay unreachable')
+  })
+
+  // ── CR-TRACE-015 (TASK-BE-015.5): getProjectContext failure short-circuits ──
+
+  it('spawn() failing at getProjectContext (resolve-context step) never reaches the relay-agent-exec step', async () => {
+    const router = {
+      getProjectContext: vi.fn().mockRejectedValue(new Error('context boom')),
+      getRelayForProject: vi.fn(),
+    } as unknown as ProjectServerRouter
+    const profileResolver = {} as unknown as ProfileResolver
+    const providerService = { resolveForProject: vi.fn() } as unknown as AIProviderResolver
+    const spawner = new ProfileAwareAgentSpawner(router, profileResolver, providerService)
+    const { events, stop } = captureTraceEvents()
+
+    await expect(
+      spawner.spawn({ projectId: 'proj-1', userId: 'u-1', command: 'run' })
+    ).rejects.toThrow('context boom')
+    stop()
+
+    const spanEvents = events.filter((e) => e.flow === 'agentOrch:spawn')
+    const labels = spanEvents.map((e) => (e.level === 'step' ? e.label : e.level))
+    expect(labels).toEqual(['start', 'resolve-context', 'fail'])
+    expect(labels).not.toContain('relay-agent-exec')
+    expect(router.getRelayForProject).not.toHaveBeenCalled()
   })
 })

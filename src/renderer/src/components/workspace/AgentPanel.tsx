@@ -17,6 +17,11 @@ import { toast } from 'sonner'
 import { useAppStore } from '../../store'
 import { useShallow } from 'zustand/react/shallow'
 import type { RemoteAgentSession } from '../../store/slices/remote-agent-sessions'
+import { Tracers } from '../../../../shared/trace/tracers'
+import {
+  registerOpenAgentOrchSpan,
+  takeOpenAgentOrchSpan
+} from '@/lib/agent-orchestration-active-spans'
 
 interface AgentPanelProps {
   worktreeId: string
@@ -75,12 +80,18 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
     setIsActing(true)
     // Optimistic update
     updateAgentStatus({ worktreeId, status: 'starting' })
+    // Why: span stays open (no ok() here) — it waits in the registry for the
+    // statusChanged push event to confirm 'running' (BL-AG-05, TASK-FE-002.3).
+    const span = Tracers.uiAgentOrchSpawnFlow.start({ worktreeId, agentType, trustPreset })
+    registerOpenAgentOrchSpan(worktreeId, span)
     try {
       const result = await window.api.agentOrchestration.start({
         worktreeId,
         agentType,
         trustPreset,
+        traceId: span.id,
       })
+      span.step('ipc-invoke-resolved', { sessionId: result.sessionId, status: result.status })
       setRemoteAgentSession(worktreeId, {
         sessionId: result.sessionId,
         worktreeId,
@@ -91,8 +102,16 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
       })
       if (result.status === 'already-running') {
         toast.info('Agent is already running')
+        // Why: 'already-running' is a terminal outcome — no statusChanged event
+        // will ever arrive to close this span, so ok() it right here.
+        takeOpenAgentOrchSpan(worktreeId)
+        span.ok({ sessionId: result.sessionId, status: result.status })
       }
+      // If result.status === 'started': span stays open, waiting for
+      // statusChanged 'running'|'error' to close it (TASK-FE-002.3).
     } catch (err: any) {
+      takeOpenAgentOrchSpan(worktreeId)
+      span.fail(err, { worktreeId, agentType })
       updateAgentStatus({ worktreeId, status: 'error', errorMessage: err.message })
       toast.error(`Failed to start agent: ${err.message}`)
     } finally {
@@ -103,10 +122,15 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
   const stopAgent = useCallback(async () => {
     if (!session?.sessionId) return
     setIsActing(true)
+    // Why: stop() is a simple request/response — unlike spawn/resume, 'starting'
+    // is never an intermediate status here, so the span closes immediately.
+    const span = Tracers.uiAgentOrchStopFlow.start({ worktreeId, sessionId: session.sessionId })
     try {
-      await window.api.agentOrchestration.stop({ sessionId: session.sessionId })
+      await window.api.agentOrchestration.stop({ sessionId: session.sessionId, traceId: span.id })
       updateAgentStatus({ worktreeId, status: 'stopped' })
+      span.ok({ worktreeId, sessionId: session.sessionId })
     } catch (err: any) {
+      span.fail(err, { worktreeId, sessionId: session.sessionId })
       toast.error(`Failed to stop agent: ${err.message}`)
     } finally {
       setIsActing(false)
@@ -117,13 +141,28 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
     if (!session?.sessionId) return
     setIsActing(true)
     updateAgentStatus({ worktreeId, status: 'starting' })
+    const span = Tracers.uiAgentOrchResumeFlow.start({ worktreeId, sessionId: session.sessionId })
+    registerOpenAgentOrchSpan(worktreeId, span)
     try {
-      const result = await window.api.agentOrchestration.resume({ sessionId: session.sessionId })
+      const result = await window.api.agentOrchestration.resume({
+        sessionId: session.sessionId,
+        traceId: span.id,
+      })
       if (!result.resumed) {
+        takeOpenAgentOrchSpan(worktreeId)
+        span.fail(new Error('resume returned resumed:false'), {
+          worktreeId,
+          sessionId: session.sessionId,
+        })
         toast.error('Could not resume agent session')
         updateAgentStatus({ worktreeId, status: 'stopped' })
+        return
       }
+      span.step('ipc-invoke-resolved', { sessionId: session.sessionId })
+      // Span stays open — statusChanged 'running' will close it (TASK-FE-002.3).
     } catch (err: any) {
+      takeOpenAgentOrchSpan(worktreeId)
+      span.fail(err, { worktreeId, sessionId: session.sessionId })
       updateAgentStatus({ worktreeId, status: 'error', errorMessage: err.message })
       toast.error(`Failed to resume agent: ${err.message}`)
     } finally {

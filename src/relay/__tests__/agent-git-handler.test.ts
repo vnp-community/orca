@@ -1,6 +1,9 @@
 // src/relay/__tests__/agent-git-handler.test.ts
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tmpdir } from 'node:os'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { execSync } from 'node:child_process'
 import {
   validateGitArgs,
   GitValidationError,
@@ -10,6 +13,7 @@ import {
   handleGitWorktreeAdd,
   handleGitWorktreeRemove,
 } from '../agent-git-handler'
+import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 import type { AgentConfig } from '../agent-config'
 import type { AgentLogger } from '../agent-logger'
 
@@ -213,6 +217,42 @@ describe('handleGitPrCreate — validation', () => {
   })
 })
 
+// ─── handleGitPrCreate — agent:git tracing (CR-TRACE-005) ─────────────────────
+describe('handleGitPrCreate — agent:git tracing', () => {
+  let events: TraceEvent[]
+  let unregister: () => void
+
+  beforeEach(() => {
+    events = []
+    unregister = registerTraceSink(e => events.push(e))
+  })
+  afterEach(() => unregister())
+
+  it('span.fail("missing title") when title is empty, does NOT reach ghExec step', async () => {
+    await handleGitPrCreate(1, { base: 'main' }, mockConfig, mockLog)
+    const fail = events.find(e => e.flow === 'agent:git' && e.level === 'fail')
+    expect(fail?.fields.err).toBe('missing title')
+    expect(events.some(e => e.flow === 'agent:git' && e.level === 'step' && e.label === 'ghExec')).toBe(false)
+  })
+
+  it('span.fail("unsafe characters in params") when title/base contains a shell metachar', async () => {
+    await handleGitPrCreate(1, { title: 'feat & evil', base: 'main' }, mockConfig, mockLog)
+    const fail = events.find(e => e.flow === 'agent:git' && e.level === 'fail')
+    expect(fail?.fields.err).toBe('unsafe characters in params')
+  })
+
+  it('emits step("ghExec") before attempting the real gh CLI call, then ok() or fail() (gh unavailable in test env — real execution, not mocked, matching this file\'s convention)', async () => {
+    await handleGitPrCreate(1,
+      { title: 'Valid Title', base: 'main', cwd: tmpdir(), userId: 'user-test-1' },
+      mockConfig, mockLog
+    )
+    const step = events.find(e => e.flow === 'agent:git' && e.level === 'step' && e.label === 'ghExec')
+    expect(step).toBeDefined()
+    const terminal = events.find(e => e.flow === 'agent:git' && (e.level === 'ok' || e.level === 'fail'))
+    expect(terminal).toBeDefined()
+  })
+})
+
 // ─── handleGitWorktreeList — validation ───────────────────────────────────────
 describe('handleGitWorktreeList', () => {
   it('returns defined response without crashing for any cwd', async () => {
@@ -302,5 +342,70 @@ describe('handleGitWorktreeRemove — validation', () => {
     ) as any
     expect(resp.jsonrpc).toBe('2.0')
     expect(resp.id).toBe(1)
+  })
+})
+
+// ─── worktree:create/worktree:delete tracing (CR-TRACE-001) ──────────────────
+describe('agent-git-handler — worktree tracing', () => {
+  let events: TraceEvent[]
+  let unregister: () => void
+  let repoDir: string
+
+  beforeEach(() => {
+    events = []
+    unregister = registerTraceSink((e) => events.push(e))
+    // Real git repo — matches this file's existing "no spawn mock, run real
+    // git" convention (see handleGitExec/handleGitWorktreeList integration tests above).
+    repoDir = mkdtempSync(join(tmpdir(), 'wt-trace-test-'))
+    execSync('git init -q', { cwd: repoDir })
+    execSync('git config user.email test@example.com', { cwd: repoDir })
+    execSync('git config user.name Test', { cwd: repoDir })
+    execSync('git commit -q --allow-empty -m init', { cwd: repoDir })
+  })
+  afterEach(() => {
+    unregister()
+    rmSync(repoDir, { recursive: true, force: true })
+  })
+
+  it('handleGitWorktreeAdd emits worktree:create span with ok() on success', async () => {
+    const wtPath = join(repoDir, 'wt1')
+    const resp = await handleGitWorktreeAdd(
+      1, { path: wtPath, branch: 'feature/x', createBranch: true, cwd: repoDir }, mockConfig, mockLog
+    ) as any
+    expect(resp.result).toBeDefined()
+    const ok = events.find(e => e.flow === 'worktree:create' && e.level === 'ok')
+    expect(ok).toBeDefined()
+    expect(ok?.fields.path).toBe(wtPath)
+  })
+
+  it('handleGitWorktreeAdd emits fail() when path/branch missing', async () => {
+    await handleGitWorktreeAdd(1, {}, mockConfig, mockLog)
+    const fail = events.find(e => e.flow === 'worktree:create' && e.level === 'fail')
+    expect(fail).toBeDefined()
+  })
+
+  it('resumes span id from params._trace.id when present', async () => {
+    await handleGitWorktreeAdd(1, { path: '/tmp/wt1', branch: 'x', _trace: { id: 'abc123' } }, mockConfig, mockLog)
+    const start = events.find(e => e.flow === 'worktree:create' && e.level === 'start')
+    expect(start?.id).toBe('abc123')
+  })
+
+  it('generates a new span id when params._trace is absent (backward-compat)', async () => {
+    await handleGitWorktreeAdd(1, { path: '/tmp/wt1', branch: 'x' }, mockConfig, mockLog)
+    const start = events.find(e => e.flow === 'worktree:create' && e.level === 'start')
+    expect(start?.id).toBeDefined()
+    expect(start?.id).not.toBe('abc123')
+  })
+
+  it('handleGitWorktreeRemove emits worktree:delete span, forwards id to nested agent:git span', async () => {
+    const wtPath = join(repoDir, 'wt2')
+    await handleGitWorktreeAdd(1, { path: wtPath, branch: 'feature/y', createBranch: true, cwd: repoDir }, mockConfig, mockLog)
+    events = []
+
+    await handleGitWorktreeRemove(2, { path: wtPath, cwd: repoDir, _trace: { id: 'xyz789' } }, mockConfig, mockLog)
+    const deleteStart = events.find(e => e.flow === 'worktree:delete' && e.level === 'start')
+    const gitStart     = events.find(e => e.flow === 'agent:git' && e.level === 'start')
+    expect(deleteStart?.id).toBe('xyz789')
+    expect(gitStart?.id).toBe('xyz789') // nối tiếp id xuống agent:git qua _trace forward
   })
 })

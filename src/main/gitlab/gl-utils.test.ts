@@ -25,18 +25,18 @@ import {
   parseGlabAuthStatusHosts,
   resolveIssueSource
 } from './gl-utils'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
+import { registerRemoteGitProvider, unregisterRemoteGitProvider } from '../providers/ssh-git-dispatch'
 
 describe('gitlab project ref resolution', () => {
   beforeEach(() => {
     gitExecFileAsyncMock.mockReset()
     sshExecMock.mockReset()
-    unregisterSshGitProvider('conn-1')
+    unregisterRemoteGitProvider('conn-1')
     _resetProjectRefCache()
   })
 
   afterEach(() => {
-    unregisterSshGitProvider('conn-1')
+    unregisterRemoteGitProvider('conn-1')
   })
 
   it('keeps getProjectRef origin-based', async () => {
@@ -151,7 +151,7 @@ describe('gitlab project ref resolution', () => {
 
   it('resolves project refs through the SSH git provider for connected repos', async () => {
     sshExecMock.mockResolvedValueOnce({ stdout: 'git@gitlab.com:remote/orca.git\n', stderr: '' })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getProjectRefForRemote('/repo', 'origin', undefined, 'conn-1')).resolves.toEqual({
       host: 'gitlab.com',
@@ -182,7 +182,7 @@ describe('gitlab project ref resolution', () => {
       stdout: 'git@gitlab.com:remote/orca.git\n',
       stderr: ''
     })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getProjectRefForRemote('/repo', 'origin', undefined, 'conn-1')).resolves.toEqual({
       host: 'gitlab.com',
@@ -194,7 +194,7 @@ describe('gitlab project ref resolution', () => {
     sshExecMock
       .mockRejectedValueOnce(new Error('ssh tunnel not ready'))
       .mockResolvedValueOnce({ stdout: 'git@gitlab.com:remote/orca.git\n', stderr: '' })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getProjectRefForRemote('/repo', 'origin', undefined, 'conn-1')).resolves.toBeNull()
     await expect(getProjectRefForRemote('/repo', 'origin', undefined, 'conn-1')).resolves.toEqual({

@@ -1016,10 +1016,50 @@ describe('closeWebRuntimeTerminal', () => {
       selector: 'web-env-1',
       method: 'terminal.close',
       params: {
-        terminal: 'terminal-1'
+        terminal: 'terminal-1',
+        // TASK-FE-003.3: traceId is forwarded alongside the RPC params.
+        traceId: expect.any(String)
       },
       timeoutMs: 15_000
     })
+  })
+
+  it('ok()s the ui:terminal.destroy span (route single-tab-close) on a successful close', async () => {
+    const { registerTraceSink } = await import('../../../shared/trace')
+    const events: { flow: string; level: string; fields: Record<string, unknown> }[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const runtimeCall = vi.fn().mockResolvedValue({
+      id: 'close',
+      ok: true,
+      result: { close: { handle: 'terminal-1', tabId: 'tab-1', ptyKilled: true } }
+    })
+    vi.stubGlobal('window', { api: { runtimeEnvironments: { call: runtimeCall } } })
+
+    expect(closeWebRuntimeTerminal('remote:web-env-1@@terminal-1')).toBe(true)
+
+    await vi.waitFor(() =>
+      expect(
+        events.some((e) => e.flow === 'ui:terminal.destroy' && e.level === 'ok')
+      ).toBe(true)
+    )
+    const startEvent = events.find((e) => e.flow === 'ui:terminal.destroy' && e.level === 'start')
+    expect(startEvent?.fields.route).toBe('single-tab-close')
+    unregister()
+  })
+
+  it('fail()s the ui:terminal.destroy span without throwing when the close RPC rejects', async () => {
+    const { registerTraceSink } = await import('../../../shared/trace')
+    const events: { flow: string; level: string }[] = []
+    const unregister = registerTraceSink((e) => events.push(e))
+    const runtimeCall = vi.fn().mockRejectedValue(new Error('relay unreachable'))
+    vi.stubGlobal('window', { api: { runtimeEnvironments: { call: runtimeCall } } })
+
+    expect(() => closeWebRuntimeTerminal('remote:web-env-1@@terminal-1')).not.toThrow()
+
+    await vi.waitFor(() =>
+      expect(events.some((e) => e.flow === 'ui:terminal.destroy' && e.level === 'fail')).toBe(true)
+    )
+    unregister()
   })
 
   it('ignores local panes but delegates remote runtime panes from desktop or web clients', async () => {

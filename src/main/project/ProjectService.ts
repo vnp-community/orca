@@ -12,6 +12,7 @@
 import { randomUUID } from 'node:crypto'
 import type { IConnectionPool } from '../db/pool'
 import type { DevServerManager } from '../dev-server/dev-server-manager'
+import { Tracers } from '../../shared/trace/tracers'
 import type {
   OrcaProject,
   ProjectMember,
@@ -79,9 +80,15 @@ export class ProjectService {
    * @throws 'DEV_SERVER_NOT_FOUND' if devServerId is unknown
    */
   async create(params: CreateProjectParams): Promise<OrcaProject> {
+    const span = Tracers.profileProjectRouteFlow.start({
+      op: 'create', devServerId: params.devServerId, memberCount: 1 // creator luôn là owner đầu tiên
+    })
+
     // Validate devServerId
     const server = this.devServerManager.get(params.devServerId)
+    span.step('validateDevServer', { devServerId: params.devServerId })
     if (!server) {
+      span.fail('DEV_SERVER_NOT_FOUND', { devServerId: params.devServerId })
       throw new Error(`DEV_SERVER_NOT_FOUND: devServerId '${params.devServerId}' does not exist`)
     }
 
@@ -113,6 +120,7 @@ export class ProjectService {
     // Auto-add creator as owner
     await this.addMember(id, params.createdBy, 'owner')
 
+    span.ok({ op: 'create', projectId: id, devServerId: params.devServerId })
     return {
       id,
       name: params.name,

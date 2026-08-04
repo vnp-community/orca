@@ -39,7 +39,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { sliceCheckLogTail } from './check-job-log-tail-slice'
 import { getPRConflictSummary } from './conflict-summary'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
 import { splitRemoteBranchName } from '../../shared/git-effective-upstream'
 import {
@@ -66,7 +66,7 @@ import {
   isCommitPartOfMergedPR,
   type MergedPRCommitMembership
 } from './merged-pr-commit-membership'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import {
   hasHostedReviewLocalGitOptions,
   getHostedReviewLocalGitOptions,
@@ -1807,7 +1807,7 @@ async function readPullRequestTemplate(
     'docs/pull_request_template.md',
     'docs/PULL_REQUEST_TEMPLATE.md'
   ]
-  const remoteProvider = connectionId ? getSshFilesystemProvider(connectionId) : undefined
+  const remoteProvider = connectionId ? getRemoteFilesystemProvider(connectionId) : undefined
   if (connectionId && !remoteProvider) {
     return ''
   }
@@ -2160,7 +2160,7 @@ async function getCurrentHeadOid(
   localGitOptions: { wslDistro?: string } = {}
 ): Promise<string | null> {
   try {
-    const provider = connectionId ? getSshGitProvider(connectionId) : null
+    const provider = connectionId ? getRemoteGitProvider(connectionId) : null
     const result = provider
       ? await provider.exec(['rev-parse', 'HEAD'], repoPath)
       : await gitExecFileAsync(['rev-parse', 'HEAD'], {
@@ -2653,7 +2653,7 @@ async function probeTrackedUpstreamBranches(
 }> {
   const args = ['for-each-ref', '--format=%(refname)%00%(upstream)', 'refs/heads']
   try {
-    const provider = connectionId ? getSshGitProvider(connectionId) : null
+    const provider = connectionId ? getRemoteGitProvider(connectionId) : null
     const result = provider
       ? await provider.exec(args, repoPath)
       : await gitExecFileAsync(args, {

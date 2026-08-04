@@ -722,6 +722,86 @@ describe('createRemoteRuntimePtyTransport', () => {
     })
   })
 
+  it('retries terminal.create after a brief delay when the agent is mid-reconnect', async () => {
+    // Regression: "Dev Server agent not connected" fires for any request that
+    // lands in the ~1-2s window while a Dev Server's agent WS is reconnecting
+    // after a normal network blip (see agent-connection-direct.ts's
+    // proactive-renew-on-drop fix) — a transient race, not a real outage. The
+    // terminal should retry once instead of surfacing this to the user.
+    vi.useFakeTimers()
+    try {
+      let callCount = 0
+      runtimeCall.mockImplementation(async (args: { method: string }) => {
+        if (args.method !== 'terminal.create') {
+          return { ok: true, result: {} }
+        }
+        callCount += 1
+        if (callCount === 1) {
+          return {
+            ok: false,
+            error: {
+              code: 'AGENT_NOT_CONNECTED',
+              message:
+                'Dev Server agent not connected (devServerId=dev-01). Ensure the Orca agent is running on the Dev Server.'
+            }
+          }
+        }
+        return { ok: true, result: { terminal: { handle: 'terminal-1' } } }
+      })
+
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const onError = vi.fn()
+      const transport = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'wt-1',
+        tabId: 'tab-1',
+        leafId: 'pane:1'
+      })
+
+      const connectPromise = transport.connect({ url: '', callbacks: { onError } })
+      await vi.advanceTimersByTimeAsync(2_000)
+      await connectPromise
+
+      expect(callCount).toBe(2)
+      expect(onError).not.toHaveBeenCalled()
+      expect(transport.getPtyId()).toBe('remote:env-1@@terminal-1')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not retry terminal.create forever when the agent stays disconnected', async () => {
+    vi.useFakeTimers()
+    try {
+      const failure = {
+        ok: false,
+        error: {
+          code: 'AGENT_NOT_CONNECTED',
+          message: 'Dev Server agent not connected (devServerId=dev-01).'
+        }
+      }
+      runtimeCall.mockImplementation(async (args: { method: string }) =>
+        args.method === 'terminal.create' ? failure : { ok: true, result: {} }
+      )
+
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const onError = vi.fn()
+      const transport = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'wt-1',
+        tabId: 'tab-1',
+        leafId: 'pane:1'
+      })
+
+      const connectPromise = transport.connect({ url: '', callbacks: { onError } })
+      await vi.advanceTimersByTimeAsync(2_000)
+      await connectPromise
+
+      expect(runtimeCall.mock.calls.filter((c) => c[0].method === 'terminal.create')).toHaveLength(2)
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining('agent not connected'))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('passes activation intent when creating the remote runtime terminal', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const transport = createRemoteRuntimePtyTransport('env-1', {

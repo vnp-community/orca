@@ -23,6 +23,7 @@ import { recordWebSessionFocusIntent } from './web-session-focus-intent'
 import { recordWebSessionCloseIntent } from './web-session-close-intent'
 import { recordWebSessionReorderIntent } from './web-session-reorder-intent'
 import { isWebTerminalSurfaceTabId, toHostSessionTabId } from './web-terminal-surface-id'
+import { Tracers } from '../../../shared/trace/tracers'
 
 export {
   HOST_TERMINAL_SURFACE_SEPARATOR,
@@ -632,19 +633,23 @@ export function closeWebRuntimeTerminal(ptyId: string | null | undefined): boole
   // Why: host-session mirror panes are detached locally in the browser, but
   // the host owns the real pane graph. Close the host terminal first so later
   // session snapshots cannot resurrect the locally removed pane.
+  const span = Tracers.uiTerminalDestroyFlow.start({ ptyId, route: 'single-tab-close' })
   void window.api.runtimeEnvironments
     .call({
       selector: environmentId,
       method: 'terminal.close',
       params: {
-        terminal: remote.handle
+        terminal: remote.handle,
+        traceId: span.id
       },
       timeoutMs: 15_000
     })
     .then((response) => {
       unwrapRuntimeRpcResult(response as RuntimeRpcResponse<{ close: RuntimeTerminalClose }>)
+      span.ok({ ptyId })
     })
     .catch((error) => {
+      span.fail(error, { ptyId })
       console.warn(
         '[web-runtime-session] failed to close terminal pane:',
         error instanceof Error ? error.message : String(error)

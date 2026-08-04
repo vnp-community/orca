@@ -24,7 +24,7 @@ const {
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: getSshFilesystemProviderMock
+  getRemoteFilesystemProvider: getSshFilesystemProviderMock
 }))
 
 vi.mock('./gh-utils', () => ({

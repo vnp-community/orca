@@ -14,6 +14,26 @@ import { ALL_MIGRATIONS } from '../../db/migrations'
 import { AIProviderService } from '../AIProviderService'
 import type { DevServerManager } from '../../dev-server/dev-server-manager'
 import type { RelayConnectionPool } from '../../dev-server/relay-connection-pool'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
+
+// Asserts a real secret value never appears in any field of any captured event.
+function expectNoCredentialLeak(events: TraceEvent[], ...secrets: string[]): void {
+  for (const event of events) {
+    const serialized = JSON.stringify(event.fields)
+    expect(serialized).not.toContain('encryptedBlob')
+    expect(serialized).not.toContain('"iv"')
+    expect(serialized).not.toContain('apiKey')
+    for (const secret of secrets) {
+      expect(serialized).not.toContain(secret)
+    }
+  }
+}
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
+}
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -249,5 +269,92 @@ describe('AIProviderService', () => {
     const fetched = await service.getAccount(account.id)
     expect(fetched?.model).toBe('claude-3-5-sonnet')
     expect(fetched?.baseUrl).toBe('https://api.anthropic.com')
+  })
+
+  // ── TASK-BE-016.1: writeCredentialToDevServer() tracing (aiProvider:writeCredential) ──
+
+  describe('writeCredentialToDevServer tracing', () => {
+    it('success → span covers lookup-account/relay-connect/agent-call, ok({accountId, status:"active"})', async () => {
+      const account = await service.createAccount(BASE_PARAMS)
+      const { events, stop } = captureTraceEvents()
+
+      await service.writeCredentialToDevServer(account.id, 'encrypted-blob-value', 'iv-value-12345')
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:writeCredential')
+      expect(flowEvents.some((e) => e.level === 'start' && e.fields.accountId === account.id)).toBe(true)
+      expect(flowEvents.some((e) => e.level === 'step' && e.label === 'lookup-account')).toBe(true)
+      expect(flowEvents.some((e) => e.level === 'step' && e.label === 'relay-connect')).toBe(true)
+      expect(flowEvents.some((e) => e.level === 'step' && e.label === 'agent-call')).toBe(true)
+      const okEvent = flowEvents.find((e) => e.level === 'ok')
+      expect(okEvent?.fields).toMatchObject({ accountId: account.id, status: 'active' })
+    })
+
+    // ── Security-critical: no credential value ever lands in a trace field ──
+    it('NEVER emits encryptedBlob/iv/apiKey in any trace event field', async () => {
+      const account = await service.createAccount(BASE_PARAMS)
+      const secretBlob = 'super-secret-encrypted-blob-payload'
+      const secretIv = 'super-secret-iv-value'
+      const { events, stop } = captureTraceEvents()
+
+      await service.writeCredentialToDevServer(account.id, secretBlob, secretIv)
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:writeCredential')
+      expect(flowEvents.length).toBeGreaterThan(0)
+      expectNoCredentialLeak(flowEvents, secretBlob, secretIv)
+      // blobLength (a count, not the content) is the only blob-derived field allowed
+      const startEvent = flowEvents.find((e) => e.level === 'start')
+      expect(startEvent?.fields.blobLength).toBe(secretBlob.length)
+    })
+
+    it('accountId not found → span.fail("ACCOUNT_NOT_FOUND", {accountId}) before throw', async () => {
+      const { events, stop } = captureTraceEvents()
+
+      await expect(
+        service.writeCredentialToDevServer('no-such-account', 'blob', 'iv')
+      ).rejects.toThrow('ACCOUNT_NOT_FOUND')
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:writeCredential')
+      const failEvent = flowEvents.find((e) => e.level === 'fail' && e.fields.accountId === 'no-such-account')
+      expect(failEvent).toBeDefined()
+      expectNoCredentialLeak(flowEvents)
+    })
+
+    it('devServerId not found → span.fail("DEV_SERVER_NOT_FOUND", {accountId, devServerId}) before throw', async () => {
+      const noServerDsm = {
+        get: vi.fn().mockReturnValue(null),
+      } as unknown as DevServerManager
+      const relayPool = makeRelayPool()
+      const svc = new AIProviderService(pool, noServerDsm, relayPool)
+      const account = await svc.createAccount(BASE_PARAMS)
+      const { events, stop } = captureTraceEvents()
+
+      await expect(svc.writeCredentialToDevServer(account.id, 'blob', 'iv')).rejects.toThrow(
+        'DEV_SERVER_NOT_FOUND'
+      )
+      stop()
+
+      const failEvent = events.find(
+        (e) => e.flow === 'aiProvider:writeCredential' && e.level === 'fail'
+      )
+      expect(failEvent?.fields.accountId).toBe(account.id)
+      expect(failEvent?.fields.devServerId).toBe(DS_ID)
+    })
+
+    it('with traceId param → resumes the same span id instead of minting a new one', async () => {
+      const account = await service.createAccount(BASE_PARAMS)
+      const { events, stop } = captureTraceEvents()
+
+      await service.writeCredentialToDevServer(account.id, 'blob', 'iv', 'parent-trace-id-123')
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:writeCredential')
+      expect(flowEvents.length).toBeGreaterThan(0)
+      for (const event of flowEvents) {
+        expect(event.id).toBe('parent-trace-id-123')
+      }
+    })
   })
 })

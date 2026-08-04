@@ -20,8 +20,9 @@ import type {
 } from '../shared/workspace-space-types'
 import { compactWorkspaceSpaceItems } from '../shared/workspace-space-compaction'
 import type { IFilesystemProvider } from './providers/types'
-import { getSshFilesystemProvider } from './providers/ssh-filesystem-dispatch'
-import { getSshGitProvider } from './providers/ssh-git-dispatch'
+import { getRemoteFilesystemProvider } from './providers/ssh-filesystem-dispatch'
+import { getRemoteGitProvider } from './providers/ssh-git-dispatch'
+import { getRepoProviderConnectionKey } from '../shared/execution-host'
 import { createFolderWorktree, listRepoWorktrees } from './repo-worktrees'
 import { mergeWorktree } from './ipc/worktree-logic'
 
@@ -305,7 +306,7 @@ function createBaseWorktreeRow(
     path: worktree.path,
     branch: worktree.branch,
     isMainWorktree: worktree.isMainWorktree,
-    isRemote: Boolean(repo.connectionId),
+    isRemote: Boolean(getRepoProviderConnectionKey(repo)),
     isSparse: worktree.isSparse === true,
     canDelete,
     lastActivityAt: worktree.lastActivityAt,
@@ -771,13 +772,13 @@ async function listWorktreesForSpaceScan(
     if (isFolderRepo(repo)) {
       return { ok: true, worktrees: [createFolderWorktree(repo)] }
     }
-    if (repo.connectionId) {
-      const provider = getSshGitProvider(repo.connectionId)
+    if (getRepoProviderConnectionKey(repo)) {
+      const provider = getRemoteGitProvider(getRepoProviderConnectionKey(repo)!)
       if (!provider) {
         return {
           ok: false,
           status: 'unavailable',
-          error: `SSH connection "${repo.connectionId}" is not connected.`
+          error: `SSH connection "${getRepoProviderConnectionKey(repo)}" is not connected.`
         }
       }
       const worktrees = await provider.listWorktrees(repo.path, { signal })
@@ -839,7 +840,7 @@ async function scanRepo(
         repoId: repo.id,
         displayName: repo.displayName,
         path: repo.path,
-        isRemote: Boolean(repo.connectionId),
+        isRemote: Boolean(getRepoProviderConnectionKey(repo)),
         worktreeCount: 0,
         scannedWorktreeCount: 0,
         unavailableWorktreeCount: 1,
@@ -858,7 +859,7 @@ async function scanRepo(
     { totalWorktreeCount: progress.totalWorktreeCount + worktrees.length },
     options.onProgress
   )
-  const remoteProvider = repo.connectionId ? getSshFilesystemProvider(repo.connectionId) : undefined
+  const remoteProvider = getRepoProviderConnectionKey(repo) ? getRemoteFilesystemProvider(getRepoProviderConnectionKey(repo)!) : undefined
   const rows = await mapLimit(worktrees, WORKTREE_SCAN_CONCURRENCY, async (worktree) => {
     throwIfAborted(options.signal)
     reportProgress(
@@ -869,7 +870,7 @@ async function scanRepo(
       },
       options.onProgress
     )
-    const row: WorkspaceSpaceWorktree = repo.connectionId
+    const row: WorkspaceSpaceWorktree = getRepoProviderConnectionKey(repo)
       ? remoteProvider
         ? await scanRemoteWorktree(repo, worktree, scannedAt, remoteProvider, options.signal)
         : createUnavailableWorktreeRow(
@@ -877,7 +878,7 @@ async function scanRepo(
             worktree,
             scannedAt,
             'unavailable',
-            `SSH filesystem for "${repo.connectionId}" is not connected.`
+            `SSH filesystem for "${getRepoProviderConnectionKey(repo)}" is not connected.`
           )
       : await scanLocalWorktree(repo, worktree, scannedAt, options.signal)
     reportProgress(
@@ -903,7 +904,7 @@ async function scanRepo(
       repoId: repo.id,
       displayName: repo.displayName,
       path: repo.path,
-      isRemote: Boolean(repo.connectionId),
+      isRemote: Boolean(getRepoProviderConnectionKey(repo)),
       worktreeCount: rows.length,
       scannedWorktreeCount: rows.filter((row) => row.status === 'ok').length,
       unavailableWorktreeCount: rows.filter((row) => row.status !== 'ok').length,

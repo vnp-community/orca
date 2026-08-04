@@ -124,3 +124,50 @@ tools: discoveredTools.map(t => t.name)
 Orca Server lưu danh sách này vào `DevServerManager` → UI hiển thị tools available cho dev server.
 
 Khi server gọi `tools/list` → agent trả lại danh sách đầy đủ với `inputSchema`.
+
+---
+
+## 7. Capabilities Advertisement — Addendum (2026-08-03)
+
+**Status: ✅ IMPLEMENTED** — `src/relay/agent-session.ts`'s `buildCapabilities()`
+
+Two capabilities were added to the handshake's `capabilities` list:
+
+| Capability | Gated by | Meaning |
+|------------|----------|---------|
+| `fs.watch` | none — always advertised | The agent binary is new enough to support `fs.watch`/`fs.unwatch` (TDD-AG-07 §9.3). Unconditional because, unlike PTY, it has no native-module dependency — it's purely about binary freshness, not host support. |
+| `pty.stream` | `checkPtyAvailable()` (same gate as `pty`) | The agent will also push live `pty.data`/`pty.exit` notifications (TDD-AG-07 §9.2), not just respond to `pty.create`/`pty.write`/etc. Kept as a separate string from `pty` so Orca can distinguish an old agent binary (`pty` only, request/response polling via `pty.scrollback`) from a new one (`pty` + `pty.stream`) — in practice the two are almost always both-or-neither, since both depend on the same `node-pty` availability and this session's code being deployed.
+
+```typescript
+// src/relay/agent-session.ts
+async function buildCapabilities(): Promise<readonly string[]> {
+  const caps: string[] = ['fs', 'fs.watch', 'preflight', 'ai.providers', 'agent.spawn', 'agent.exec', 'agent.sendInput', 'agent.kill']
+  const [hasGit, hasPty] = await Promise.all([checkGitAvailable(), checkPtyAvailable()])
+  if (hasGit) caps.push('git', 'git.exec', 'git.execStream', 'worktrees', 'git.worktree.list', 'git.worktree.add', 'git.worktree.remove')
+  if (hasPty) caps.push('pty', 'pty.create', 'pty.write', 'pty.resize', 'pty.destroy', 'pty.scrollback', 'pty.stream')
+  return caps
+}
+```
+
+`STATIC_CAPABILITIES_FALLBACK` (used only when the 5s capability-check race in `sendHandshake()` times out) was deliberately **not** updated to include `fs.watch`/`pty.stream` — a slow/uncertain check should conservatively report the older, narrower surface rather than promise streaming it can't confirm.
+
+**Known doc/type gap:** `AgentCapability` in `src/shared/agent-wire-protocol.ts` (see TDD-AG-02 §1) is typed as `'pty' | 'fs' | 'git' | 'preflight'` — a 4-value union that was already stale before this session (`buildCapabilities()` has long returned a plain `string[]` with many more values, e.g. `agent.spawn`, `worktrees`, `git.execStream`). This addendum does not fix that type; flagging it here so it isn't mistaken for an authoritative capability list.
+
+---
+
+## 8. Session Cleanup on `stop()` — Addendum (2026-08-03)
+
+**Status: ✅ IMPLEMENTED**
+
+`stop()` previously only cleared the keepalive timer and called `cleanupAllPtys(log)` (from `agent-spawner.ts` — kills `agent.spawn`-launched AI-agent PTYs, a different concern from terminal PTYs). Two calls were added, both fixing resources that would otherwise outlive a dropped WebSocket:
+
+```typescript
+stop(): void {
+  if (keepaliveTimer !== null) { clearInterval(keepaliveTimer); keepaliveTimer = null }
+  cleanupAllPtys(log)        // agent-spawner.ts — AI-agent CLI PTYs (unchanged, TDD-AG-12)
+  cleanupAgentPtys(log)      // pty-agent-bridge.ts — terminal (pty.create) PTYs (NEW wiring)
+  cleanupAgentWatches()      // fs-agent-extensions.ts — fs.watch watchers (NEW wiring)
+}
+```
+
+`cleanupAgentPtys()` was pre-existing (documented in its own file header as "must be called on session termination") but had never actually been wired into `stop()` — a dormant bug. `cleanupAgentWatches()` is new alongside `fs.watch` itself. See TDD-AG-07 §9 for what each cleans up.

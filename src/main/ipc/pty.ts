@@ -154,18 +154,20 @@ import {
   assertFolderWorkspacePathUsable,
   getFolderWorkspacePathStatus
 } from '../project-groups/folder-workspace-path-status'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { resolveLocalProjectRuntimeForWorktreeId } from '../local-project-runtime-resolution'
 
 // ─── Provider Registry ──────────────────────────────────────────────
 // Routes PTY operations by connectionId. null = local provider.
-// SSH providers will be registered here in Phase 1.
+// Holds both SshPtyProvider and DevServerPtyProvider instances, keyed by
+// connectionId (an SSH target id or a devServerId — see
+// getRepoProviderConnectionKey) interchangeably via IPtyProvider.
 
 let localProvider: IPtyProvider = new LocalPtyProvider()
 type FreshLocalFallbackProvider = IPtyProvider & {
   routesFreshSpawnsToLocalProvider?: true
 }
-const sshProviders = new Map<string, IPtyProvider>()
+const ptyConnectionProviders = new Map<string, IPtyProvider>()
 const SYNTHETIC_KILL_EXIT_DUPLICATE_WINDOW_MS = 30_000
 // Why: producer flow control changes terminal physics — a flooding shell now
 // blocks on write instead of buffering in main. Kill switch: flip this one
@@ -382,7 +384,7 @@ function getProvider(connectionId: string | null | undefined): IPtyProvider {
   if (!connectionId) {
     return localProvider
   }
-  const provider = sshProviders.get(connectionId)
+  const provider = ptyConnectionProviders.get(connectionId)
   if (!provider) {
     throw new Error(`No PTY provider for connection "${connectionId}"`)
   }
@@ -401,7 +403,7 @@ function hasPtyProviderForInspection(ptyId: string): boolean {
   // Why: process inspection is background polling; disconnected SSH hosts should
   // read as idle instead of surfacing repeated IPC errors.
   const connectionId = ptyOwnership.get(ptyId)
-  return connectionId == null || sshProviders.has(connectionId)
+  return connectionId == null || ptyConnectionProviders.has(connectionId)
 }
 
 function getAppPtyId(connectionId: string | null | undefined, ptyId: string): string {
@@ -1044,19 +1046,19 @@ function routesFreshSpawnsToLocalProvider(
   return (provider as FreshLocalFallbackProvider).routesFreshSpawnsToLocalProvider === true
 }
 
-/** Register an SSH PTY provider for a connection. */
-export function registerSshPtyProvider(connectionId: string, provider: IPtyProvider): void {
-  sshProviders.set(connectionId, provider)
+/** Register a remote (SSH or Dev Server) PTY provider for a connection. */
+export function registerRemotePtyProvider(connectionId: string, provider: IPtyProvider): void {
+  ptyConnectionProviders.set(connectionId, provider)
 }
 
-/** Remove an SSH PTY provider when a connection is closed. */
-export function unregisterSshPtyProvider(connectionId: string): void {
-  sshProviders.delete(connectionId)
+/** Remove a remote PTY provider when a connection is closed. */
+export function unregisterRemotePtyProvider(connectionId: string): void {
+  ptyConnectionProviders.delete(connectionId)
 }
 
-/** Get the SSH PTY provider for a connection (for dispose on cleanup). */
-export function getSshPtyProvider(connectionId: string): IPtyProvider | undefined {
-  return sshProviders.get(connectionId)
+/** Get the remote PTY provider for a connection (for dispose on cleanup). */
+export function getRemotePtyProvider(connectionId: string): IPtyProvider | undefined {
+  return ptyConnectionProviders.get(connectionId)
 }
 
 /** Get the installed PTY provider (for direct access in tests/runtime).
@@ -2881,7 +2883,7 @@ export function registerPtyHandlers(
     const status = await getFolderWorkspacePathStatus(
       store,
       { scope: 'folder-workspace', folderWorkspaceId: workspaceScope.folderWorkspaceId },
-      { getSshFilesystemProvider }
+      { getRemoteFilesystemProvider }
     )
     assertFolderWorkspacePathUsable(status)
   }
@@ -3448,7 +3450,7 @@ export function registerPtyHandlers(
     listProcesses: async () => {
       const providerSessions = await Promise.all([
         localProvider.listProcesses(),
-        ...Array.from(sshProviders.values(), (provider) => provider.listProcesses())
+        ...Array.from(ptyConnectionProviders.values(), (provider) => provider.listProcesses())
       ])
       return providerSessions.flat()
     },
@@ -4942,7 +4944,7 @@ export function registerPtyHandlers(
     const ownedConnectionId = ptyOwnership.get(args.id)
     const parsedSshId = ownedConnectionId === undefined ? parseAppSshPtyId(args.id) : null
     const connectionId = ownedConnectionId ?? parsedSshId?.connectionId
-    const provider = connectionId ? sshProviders.get(connectionId) : tryGetProviderForPty(args.id)
+    const provider = connectionId ? ptyConnectionProviders.get(connectionId) : tryGetProviderForPty(args.id)
     if (!provider && connectionId) {
       // Why: detached SSH PTYs intentionally keep ownership after their
       // provider is unregistered; hydrated app-scoped ids can also arrive
@@ -4987,7 +4989,7 @@ export function registerPtyHandlers(
           connectionId: null as string | null,
           sessions: await localProvider.listProcesses()
         }),
-        ...Array.from(sshProviders.entries(), async ([connectionId, provider]) => ({
+        ...Array.from(ptyConnectionProviders.entries(), async ([connectionId, provider]) => ({
           connectionId,
           sessions: await provider.listProcesses().catch(() => [])
         }))
@@ -5010,7 +5012,7 @@ export function registerPtyHandlers(
     const ownedConnectionId = ptyOwnership.get(args.id)
     const parsedSshId = ownedConnectionId === undefined ? parseAppSshPtyId(args.id) : null
     const provider = parsedSshId
-      ? sshProviders.get(parsedSshId.connectionId)
+      ? ptyConnectionProviders.get(parsedSshId.connectionId)
       : tryGetProviderForPty(args.id)
     if (!provider?.hasPty) {
       return null

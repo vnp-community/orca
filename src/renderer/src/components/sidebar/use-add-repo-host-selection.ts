@@ -113,16 +113,16 @@ export function useAddRepoHostSelection({
         return
       }
 
-      // Web mode: devserver:<id> host — record in store and proceed
-      if (hostId.startsWith('devserver:')) {
-        const devServerId = hostId.slice('devserver:'.length)
-        setActiveDevServerId(devServerId)
+      const parsed = parseExecutionHostId(hostId)
+
+      // Web mode: devServer host — record in store and proceed
+      if (parsed?.kind === 'devServer') {
+        setActiveDevServerId(parsed.devServerId)
         setSelectedAddProjectHostId(hostId)
         setStep('add')
         return
       }
 
-      const parsed = parseExecutionHostId(hostId)
       if (parsed?.kind === 'runtime') {
         const switched = await switchRuntimeEnvironment(parsed.environmentId)
         if (!switched) {

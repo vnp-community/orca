@@ -24,6 +24,7 @@ import type { IConnectionPool } from '../db/pool'
 import type { TaskService } from './TaskService'
 import type { TaskGrant, TaskPermission } from '../../shared/task-types'
 import { TASK_PERMISSION_ORDER } from '../../shared/task-types'
+import { Tracers } from '../../shared/trace/tracers'
 
 // ── DB row types ──────────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ export class TaskGrantService {
    * 3. Return the HIGHEST permission found; null if none
    */
   async resolvePermission(userId: string, taskId: string): Promise<TaskPermission | null> {
+    const span = Tracers.taskGraphGrantFlow.start({ userId, taskId })
     const now = Date.now()
 
     // Collect candidate task IDs: the task itself + ancestors
@@ -119,6 +121,8 @@ export class TaskGrantService {
     ]
 
     let highest: TaskPermission | null = null
+    let matchedScope: string | undefined
+    let matchedDirect: boolean | undefined
 
     for (const { taskId: tid, requireApplyTree } of candidates) {
       const grants = await this.getGrantsForTask(tid, requireApplyTree)
@@ -134,10 +138,21 @@ export class TaskGrantService {
         const currentLevel = highest ? (TASK_PERMISSION_ORDER[highest] ?? 0) : -1
         if (level > currentLevel) {
           highest = grant.permission
+          matchedScope = grant.scope
+          matchedDirect = tid === taskId
         }
       }
     }
 
+    if (highest === null) {
+      span.fail('NO_GRANT_FOUND', { userId, taskId, ancestorCount: ancestorIds.length })
+      return null
+    }
+
+    // Exactly 1 summary step per call — no step per-candidate/per-grant in the nested
+    // loop above (this runs on every permission check, avoid hot-path noise).
+    span.step('grant-match', { matchedScope, direct: matchedDirect })
+    span.ok({ permission: highest, matchedScope, direct: matchedDirect })
     return highest
   }
 

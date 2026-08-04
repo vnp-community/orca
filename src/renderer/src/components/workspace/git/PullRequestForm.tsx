@@ -14,6 +14,7 @@ import { useState, useCallback } from 'react'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../../runtime/runtime-rpc-client'
 import { useAppStore } from '../../../store'
 import { useWorkspace } from '../../../context/WorkspaceContext'
+import { Tracers } from '../../../../../shared/trace/tracers'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ export function PullRequestForm({
     }
     setIsSubmitting(true)
     setError(null)
+    const span = Tracers.codeReviewCreatePrFlow.start({ projectId, base, draft })
     try {
       const result = await callRuntimeRpc<PrCreateResult>(rpcTarget(), 'git.pr.create', {
         projectId,
@@ -174,11 +176,14 @@ export function PullRequestForm({
         base,
         draft,
         head: currentBranch,
+        traceId: span.id,
       })
       setPrUrl(result.url)
       emit('git.pr.created', { projectId, url: result.url, title })
+      span.ok({ prUrl: result.url, exitCode: result.exitCode })
     } catch (err) {
       setError((err as Error).message)
+      span.fail(err, { projectId, base })
     } finally {
       setIsSubmitting(false)
     }

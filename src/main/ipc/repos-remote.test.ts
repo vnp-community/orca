@@ -128,7 +128,7 @@ vi.mock('../worktree-root-preparation', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: vi.fn().mockImplementation((id: string) => {
+  getRemoteGitProvider: vi.fn().mockImplementation((id: string) => {
     if (id === 'conn-1') {
       return mockGitProvider
     }
@@ -137,7 +137,7 @@ vi.mock('../providers/ssh-git-dispatch', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: vi.fn().mockImplementation((id: string) => {
+  getRemoteFilesystemProvider: vi.fn().mockImplementation((id: string) => {
     if (id === 'conn-1') {
       return mockFilesystemProvider
     }

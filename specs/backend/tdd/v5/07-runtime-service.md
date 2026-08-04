@@ -282,6 +282,20 @@ resolveExecutionHost(hostId: ExecutionHostId): ExecutionHost {
 }
 ```
 
+### Addendum v5.0: `getRepoProviderConnectionKey` — IMPLEMENTED ✅ (2026-08-02/03)
+
+`Repo` giờ có thể gắn remote host qua `connectionId` (SSH target) **hoặc** `devServerId` (Dev Server, xem TDD-13 §11) — 2 field loại trừ nhau. Helper `getRepoProviderConnectionKey(repo)` (`src/shared/execution-host.ts`) trả về bare provider-registry key dùng chung cho cả 2:
+
+```typescript
+function getRepoProviderConnectionKey(
+  repo: Pick<Repo, 'connectionId' | 'devServerId'>
+): string | null {
+  return repo.connectionId ?? repo.devServerId ?? null
+}
+```
+
+Khác với `ExecutionHostId` ở trên (dạng prefix `ssh:<id>` / `devServer:<id>`, dùng cho UI/host-scope selection), key này là raw id truyền thẳng vào `getSshGitProvider`/`getSshFilesystemProvider` — 2 registry giờ transport-agnostic, chứa cả provider SSH-backed lẫn Dev-Server-backed (xem [05-ssh-relay.md Addendum v5.0](./05-ssh-relay.md#addendum-v50-provider-registries-are-transport-agnostic)). Áp dụng tại choke-point `resolveRuntimeGitTarget`/`resolveRuntimeFileTarget` trong `orca-runtime.ts`, fix ~45 call site downstream (orca-runtime-git.ts/orca-runtime-files.ts) miễn phí, cùng ~24 hàm trong `worktree-remote.ts` và 53 call site trong `worktrees.ts`.
+
 ---
 
 ## 11. Clone và Setup Flow

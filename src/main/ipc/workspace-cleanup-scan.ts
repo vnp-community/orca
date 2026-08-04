@@ -1,7 +1,8 @@
 import type { Store } from '../persistence'
 import { listRepoWorktrees, createFolderWorktree } from '../repo-worktrees'
-import { getSshGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import type { IGitProvider } from '../providers/types'
+import { getRepoProviderConnectionKey } from '../../shared/execution-host'
 import { isFolderRepo } from '../../shared/repo-kind'
 import type { GitWorktreeInfo, Repo, Worktree } from '../../shared/types'
 import { mergeWorktree } from './worktree-logic'
@@ -118,7 +119,7 @@ async function scanRepoWorkspaces(
     return handleRepoWorktreeListError({ repo, targetWorktreeId, scannedAt, error, onErrors })
   }
 
-  if (repo.connectionId && !provider) {
+  if (getRepoProviderConnectionKey(repo) && !provider) {
     const candidates = targetWorktreeId
       ? synthesizeDisconnectedSshCleanupCandidates(store, repo, scannedAt, targetWorktreeId)
       : []
@@ -222,8 +223,9 @@ async function listCleanupGitWorktrees(
   if (repoIsFolder) {
     return { provider: null, gitWorktrees: [createFolderWorktree(repo)] }
   }
-  if (repo.connectionId) {
-    const provider = getSshGitProvider(repo.connectionId) ?? null
+  const providerConnectionId = getRepoProviderConnectionKey(repo)
+  if (providerConnectionId) {
+    const provider = getRemoteGitProvider(providerConnectionId) ?? null
     if (!provider) {
       // Why: cleanup should reflect only workspaces Orca can currently inspect.
       return { provider: null, gitWorktrees: [] }
@@ -256,7 +258,7 @@ function handleRepoWorktreeListError(args: {
 }): WorkspaceCleanupScanResult {
   const { repo, targetWorktreeId, scannedAt, error, onErrors } = args
   console.error('Workspace cleanup repo scan failed', error)
-  if (repo.connectionId && !targetWorktreeId) {
+  if (getRepoProviderConnectionKey(repo) && !targetWorktreeId) {
     // Why: broad cleanup only shows remote workspaces Orca can inspect now.
     // A connected SSH repo that fails mid-scan is omitted, not bannered.
     return { scannedAt, candidates: [], errors: [] }

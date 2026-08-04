@@ -16,18 +16,18 @@ import {
   getGiteaRepoRefForRemote,
   parseGiteaRepoRef
 } from './repository-ref'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
+import { registerRemoteGitProvider, unregisterRemoteGitProvider } from '../providers/ssh-git-dispatch'
 
 describe('Gitea repository ref parsing', () => {
   beforeEach(() => {
     gitExecFileAsyncMock.mockReset()
     sshExecMock.mockReset()
-    unregisterSshGitProvider('conn-1')
+    unregisterRemoteGitProvider('conn-1')
     _resetGiteaRepoRefCache()
   })
 
   afterEach(() => {
-    unregisterSshGitProvider('conn-1')
+    unregisterRemoteGitProvider('conn-1')
   })
 
   it('parses HTTPS remotes and derives the API base URL', () => {
@@ -177,7 +177,7 @@ describe('Gitea repository ref parsing', () => {
       stdout: 'git@gitea.example.test:remote/project.git\n',
       stderr: ''
     })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getGiteaRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toMatchObject({
       host: 'gitea.example.test',
@@ -194,7 +194,7 @@ describe('Gitea repository ref parsing', () => {
       stdout: 'git@gitea.example.test:remote/project.git\n',
       stderr: ''
     })
-    registerSshGitProvider('conn-1', { exec: sshExecMock } as never)
+    registerRemoteGitProvider('conn-1', { exec: sshExecMock } as never)
 
     await expect(getGiteaRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toBeNull()
     await expect(getGiteaRepoRefForRemote('/repo', 'origin', 'conn-1')).resolves.toMatchObject({

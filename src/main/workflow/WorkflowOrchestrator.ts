@@ -16,6 +16,8 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { Tracers } from '../../shared/trace/tracers'
+import type { TraceSpan } from '../../shared/trace'
 import type { IConnectionPool } from '../db/pool'
 import type { ProjectServerRouter } from '../project/ProjectServerRouter'
 import type { DAGBuilder } from './DAGBuilder'
@@ -32,7 +34,8 @@ import type {
 export type StepExecutorFn = (
   step: WorkflowStep,
   inputs: Record<string, unknown>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  traceId?: string
 ) => Promise<StepOutput>
 
 export type StepExecutors = Record<string, StepExecutorFn>
@@ -74,6 +77,9 @@ function rowToExecution(r: ExecutionRow): WorkflowExecution {
 export class WorkflowOrchestrator {
   /** Active abort controllers keyed by executionId */
   private readonly abortControllers = new Map<string, AbortController>()
+  /** Span cha `workflow:execute` keyed by executionId — closed (ok/fail) on the
+   *  3 terminal transitions (completed/failed/cancelled), then deleted. */
+  private readonly rootSpans = new Map<string, TraceSpan>()
 
   constructor(
     private readonly pool: IConnectionPool,
@@ -99,6 +105,11 @@ export class WorkflowOrchestrator {
     const id = randomUUID()
     const now = Date.now()
 
+    // Span CHA — sống suốt vòng đời execution, id persist làm root_trace_id để
+    // resumeRunningExecutions() tái tạo đúng span cha qua restart (CR-TRACE-000 §3.1 resume).
+    const span = Tracers.workflowExecuteFlow.start({ executionId: id, projectId, triggeredBy })
+    this.rootSpans.set(id, span)
+
     await this.persistExecution({
       id,
       definition,
@@ -106,6 +117,7 @@ export class WorkflowOrchestrator {
       triggeredBy,
       projectId,
       now,
+      rootTraceId: span.id,
     })
 
     const execution: WorkflowExecution = {
@@ -120,7 +132,8 @@ export class WorkflowOrchestrator {
     }
 
     // Run asynchronously — caller gets the pending execution immediately
-    void this.runExecution(execution)
+    // rootTraceId truyền xuống runExecution() để mọi step span mang đúng parentTraceId
+    void this.runExecution(execution, 0, span.id)
 
     return execution
   }
@@ -209,6 +222,13 @@ export class WorkflowOrchestrator {
         [Date.now(), executionId]
       )
     )
+    // 3rd terminal transition (with completed/failed) that must close+delete rootSpans —
+    // otherwise a cancelled execution's parent span never closes and the map leaks.
+    const span = this.rootSpans.get(executionId)
+    if (span) {
+      span.fail('EXECUTION_CANCELLED', { status: 'cancelled' })
+      this.rootSpans.delete(executionId)
+    }
   }
 
   /**
@@ -219,13 +239,30 @@ export class WorkflowOrchestrator {
     const running = await this.listExecutions({ status: 'running' })
     for (const execution of running) {
       console.log(`[WorkflowOrchestrator] Resuming execution ${execution.id} from wave ${execution.currentWave}`)
-      void this.runExecution(execution, execution.currentWave)
+      // Đọc lại root_trace_id đã persist — resume() giữ nguyên id cha qua restart
+      // (CR-TRACE-000 §3.1), để step span cũ (trước restart) và mới nhóm chung 1 execution.
+      const rows = await this.pool.withConnection((db) =>
+        db.query(`SELECT root_trace_id as rootTraceId FROM orca_workflow_executions WHERE id = ?`, [
+          execution.id,
+        ])
+      )
+      const rootTraceId = (rows[0] as { rootTraceId: string | null } | undefined)?.rootTraceId ?? undefined
+      const span = Tracers.workflowExecuteFlow.start(
+        { executionId: execution.id, projectId: execution.projectId, resumed: true },
+        rootTraceId ? { id: rootTraceId } : undefined
+      )
+      this.rootSpans.set(execution.id, span)
+      void this.runExecution(execution, execution.currentWave, span.id)
     }
   }
 
   // ── Private: execution engine ─────────────────────────────────────────────
 
-  private async runExecution(execution: WorkflowExecution, startWave = 0): Promise<void> {
+  private async runExecution(
+    execution: WorkflowExecution,
+    startWave = 0,
+    rootTraceId?: string // [NEW] id của span cha workflow:execute — dùng làm parentTraceId cho mọi step
+  ): Promise<void> {
     const controller = new AbortController()
     this.abortControllers.set(execution.id, controller)
 
@@ -262,7 +299,7 @@ export class WorkflowOrchestrator {
                 return { exitCode: 0, data: { skippedOnResume: true } }
               }
             }
-            return this.executeStep(step, execution, controller.signal)
+            return this.executeStep(step, execution, controller.signal, rootTraceId)
           })
         )
 
@@ -307,7 +344,8 @@ export class WorkflowOrchestrator {
   private async executeStep(
     step: WorkflowStep,
     execution: WorkflowExecution,
-    signal: AbortSignal
+    signal: AbortSignal,
+    rootTraceId?: string // [NEW] id của span cha workflow:execute — dùng làm parentTraceId
   ): Promise<StepOutput> {
     const interpolatedStep = this.interpolateStep(step, execution.inputs)
     const executor = this.stepExecutors[interpolatedStep.config.type as string]
@@ -316,13 +354,28 @@ export class WorkflowOrchestrator {
       throw new Error(`UNSUPPORTED_STEP_TYPE: ${interpolatedStep.config.type}`)
     }
 
-    await this.persistStepStart(execution.id, step.id)
+    // Span CON độc lập — id riêng (không resume), mang field parentTraceId để
+    // TracePanel group N step song song dưới cùng 1 execution (BL-WF-02 design).
+    const stepSpan = Tracers.workflowStepFlow.start({
+      parentTraceId: rootTraceId,
+      executionId: execution.id,
+      stepId: step.id,
+      stepType: interpolatedStep.config.type as string,
+    })
 
-    const output = await executor(interpolatedStep, execution.inputs, signal)
+    try {
+      await this.persistStepStart(execution.id, step.id)
 
-    await this.persistStepComplete(execution.id, step.id, output)
+      const output = await executor(interpolatedStep, execution.inputs, signal, stepSpan.id)
 
-    return output
+      await this.persistStepComplete(execution.id, step.id, output)
+
+      stepSpan.ok({ exitCode: output.exitCode })
+      return output
+    } catch (err) {
+      stepSpan.fail(err, { stepId: step.id })
+      throw err
+    }
   }
 
   // ── Input interpolation ───────────────────────────────────────────────────
@@ -372,12 +425,13 @@ export class WorkflowOrchestrator {
     triggeredBy: string
     projectId?: string
     now: number
+    rootTraceId?: string
   }): Promise<void> {
     await this.pool.withConnection((db) =>
       db.query(
         `INSERT INTO orca_workflow_executions
-           (id, definition_snapshot, status, inputs_json, current_wave, triggered_by, project_id, created_at)
-         VALUES (?, ?, 'pending', ?, 0, ?, ?, ?)`,
+           (id, definition_snapshot, status, inputs_json, current_wave, triggered_by, project_id, created_at, root_trace_id)
+         VALUES (?, ?, 'pending', ?, 0, ?, ?, ?, ?)`,
         [
           params.id,
           JSON.stringify(params.definition),
@@ -385,6 +439,7 @@ export class WorkflowOrchestrator {
           params.triggeredBy,
           params.projectId ?? null,
           params.now,
+          params.rootTraceId ?? null,
         ]
       )
     )
@@ -406,6 +461,11 @@ export class WorkflowOrchestrator {
         [Date.now(), executionId]
       )
     )
+    const span = this.rootSpans.get(executionId)
+    if (span) {
+      span.ok({ status: 'completed' })
+      this.rootSpans.delete(executionId)
+    }
   }
 
   private async markExecutionFailed(executionId: string, errorMessage: string): Promise<void> {
@@ -416,6 +476,11 @@ export class WorkflowOrchestrator {
         [Date.now(), errorMessage, executionId]
       )
     )
+    const span = this.rootSpans.get(executionId)
+    if (span) {
+      span.fail(errorMessage, { status: 'failed' })
+      this.rootSpans.delete(executionId)
+    }
   }
 
   private async updateCurrentWave(executionId: string, wave: number): Promise<void> {

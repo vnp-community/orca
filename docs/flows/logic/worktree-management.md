@@ -8,7 +8,9 @@
 > HLD cũ mô tả `Main Process → Git CLI local → Daemon`. Thực tế trong **Web/Server mode**:  
 > - Git operations chạy trên **Dev Server** qua `relay.call('git.exec')`, `relay.call('git.worktree.add')`, v.v.  
 > - PTY sessions chạy trên Dev Server qua `relay.call('pty.create')` (xem terminal-management.md)  
-> - Orca Server là **orchestrator**, không chạy git CLI local (trừ local dev scenario)
+> - Orca Server là **orchestrator**, không chạy git CLI local (trừ local dev scenario)  
+> - Điều kiện: repo trên Dev Server phải là checkout đã có sẵn — Orca chưa hỗ trợ
+>   clone mới một repo lên Dev Server (xem project-workspace.md, remote-development.md BL-SSH-05)
 
 ---
 

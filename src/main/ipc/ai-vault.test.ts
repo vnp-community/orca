@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   listClaudeSubagentSessions: vi.fn(),
   scanRuntimeAiVaultSessions: vi.fn(),
   getAiVaultWslHomeDirs: vi.fn(),
-  getSshFilesystemProvider: vi.fn(),
+  getRemoteFilesystemProvider: vi.fn(),
   getActiveSshAiVaultHostInfo: vi.fn(),
   getActiveSshAiVaultHostInfos: vi.fn()
 }))
@@ -39,9 +39,9 @@ vi.mock('../wsl', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE:
+  REMOTE_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE:
     'Remote connection dropped. Click Reconnect on the SSH target before retrying.',
-  getSshFilesystemProvider: mocks.getSshFilesystemProvider
+  getRemoteFilesystemProvider: mocks.getRemoteFilesystemProvider
 }))
 
 vi.mock('./ssh', () => ({
@@ -64,7 +64,7 @@ beforeEach(() => {
   mocks.scanRuntimeAiVaultSessions.mockResolvedValue(
     result([session('runtime:remote-server', 'runtime-session')])
   )
-  mocks.getSshFilesystemProvider.mockReturnValue(provider)
+  mocks.getRemoteFilesystemProvider.mockReturnValue(provider)
   mocks.getActiveSshAiVaultHostInfo.mockReturnValue(hostInfo('dev-box'))
   mocks.getActiveSshAiVaultHostInfos.mockReturnValue([hostInfo('dev-box')])
 })
@@ -181,7 +181,7 @@ describe('listAiVaultSessions host routing', () => {
 
   it('returns a scan issue for a disconnected SSH target', async () => {
     mocks.getActiveSshAiVaultHostInfo.mockReturnValue(null)
-    mocks.getSshFilesystemProvider.mockReturnValue(undefined)
+    mocks.getRemoteFilesystemProvider.mockReturnValue(undefined)
 
     const result = await _internals.listAiVaultSessions({
       executionHostScope: 'ssh:disconnected'

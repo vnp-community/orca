@@ -30,6 +30,7 @@ import type {
   TaskEdgeType,
 } from '../../shared/task-types'
 import { TASK_STATUS_PROGRESS } from '../../shared/task-types'
+import { Tracers } from '../../shared/trace/tracers'
 
 // ── DB row type ────────────────────────────────────────────────────────────────
 
@@ -229,11 +230,20 @@ export class TaskService {
   // ── DAG edges ─────────────────────────────────────────────────────────────
 
   async addEdge(fromTaskId: string, toTaskId: string, edgeType: TaskEdgeType): Promise<void> {
-    // Validate no cycle would be created
+    const span = Tracers.taskGraphEdgeFlow.start({ fromTaskId, toTaskId, edgeType })
+
+    // wouldCreateCycle() is DFS (stack-based, see TaskDAGValidator docstring) — NOT BFS as
+    // some earlier flow docs described. Still worth a dedicated step() per CR-TRACE-000 §5
+    // rule 1+3: can be slow on large graphs (N sequential SELECTs along DFS depth) and is
+    // the key branch point for troubleshooting "why was this edge rejected".
     const wouldCycle = await this.dagValidator.wouldCreateCycle(fromTaskId, toTaskId, edgeType)
+    span.step('cycle-check', { wouldCycle })
+
     if (wouldCycle) {
+      span.fail('TASK_DEPENDENCY_CYCLE', { fromTaskId, toTaskId, edgeType })
       throw new Error(`TASK_DAG_CYCLE: adding edge ${fromTaskId} → ${toTaskId} (${edgeType}) would create a cycle`)
     }
+
     await this.pool.withConnection((db) =>
       db.query(
         `INSERT OR IGNORE INTO orca_task_edges (from_task_id, to_task_id, edge_type, created_at)
@@ -241,6 +251,7 @@ export class TaskService {
         [fromTaskId, toTaskId, edgeType, Date.now()]
       )
     )
+    span.ok({ fromTaskId, toTaskId, edgeType })
   }
 
   async removeEdge(fromTaskId: string, toTaskId: string, edgeType: TaskEdgeType): Promise<void> {

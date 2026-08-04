@@ -5,7 +5,7 @@ import {
   getConnectionIdFromState
 } from './connection-owner-resolution'
 
-export { getConnectionIdFromState } from './connection-owner-resolution'
+export { getConnectionIdFromState, getSshConnectionIdFromState } from './connection-owner-resolution'
 
 /**
  * Resolve the SSH connectionId for a worktree. Returns null for local repos,

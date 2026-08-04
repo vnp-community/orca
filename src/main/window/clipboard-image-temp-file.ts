@@ -3,7 +3,7 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 import { app } from 'electron'
-import { requireSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { requireRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
 import { assertClipboardImageByteLengthWithinLimit } from '../../shared/clipboard-image'
 
@@ -30,7 +30,7 @@ export async function saveClipboardImageBufferAsTempFile(
   const fileName = `orca-paste-${Date.now()}-${randomUUID()}.png`
 
   if (args?.connectionId) {
-    const provider = requireSshFilesystemProvider(args.connectionId)
+    const provider = requireRemoteFilesystemProvider(args.connectionId)
     const remoteTempDir = (await provider.getTempDir?.()) ?? REMOTE_CLIPBOARD_IMAGE_TEMP_DIR
     const remotePath = joinRemotePath(remoteTempDir, fileName)
     // Why: SSH terminal agents run on the remote host, so the pasted path must

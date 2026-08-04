@@ -22,6 +22,16 @@ export function ExecutionMonitor({ executionId }: { executionId: string }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {execution.rootTraceId && (
+            <button
+              className="text-[10px] font-mono text-muted-foreground hover:text-foreground"
+              title="Copy trace ID — paste into TracePanel filter (Ctrl+Shift+T) to see all steps"
+              onClick={() => navigator.clipboard.writeText(execution.rootTraceId!)}
+              data-testid="root-trace-id-badge"
+            >
+              trace:{execution.rootTraceId}
+            </button>
+          )}
           <StepStatusBadge status={execution.status as any} />
           {execution.status === 'running' && (
             <Button size="sm" variant="outline" onClick={cancelExecution} data-testid="cancel-btn">

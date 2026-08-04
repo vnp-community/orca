@@ -4,7 +4,7 @@
 //   - SubAgentSpawner, resolveAgentSpec, buildAgentEnv: pure unit tests (no PTY)
 //   - handleAgentKill: pure unit (in-process PTY_REGISTRY check)
 //   - handleAgentSpawn: validation-only tests (stop before actual node-pty spawn)
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tmpdir } from 'node:os'
 import type WebSocket from 'ws'
 import type { WireState } from '../agent-wire'
@@ -14,9 +14,44 @@ import {
   buildAgentEnv,
   handleAgentKill,
   handleAgentSpawn,
+  handleAgentSendInput,
 } from '../agent-spawner'
 import type { AgentConfig } from '../agent-config'
 import type { AgentLogger } from '../agent-logger'
+import { registerTraceSink, type TraceEvent } from '../../shared/trace'
+
+// ── Mock agent-credential-store (CR-TRACE-016 parentSpanId threading test) ───
+const readDecryptedKeyMock = vi.hoisted(() => vi.fn(async () => 'decrypted-blob'))
+vi.mock('../agent-credential-store', () => ({ readDecryptedKey: readDecryptedKeyMock }))
+
+// ── Fake node-pty (CR-TRACE-002 agentOrch tracing tests) ─────────────────────
+// Mirrors the FakePty helper already established in pty-agent-bridge.test.ts.
+type FakeAgentPty = {
+  onData: (cb: (data: string) => void) => void
+  onExit: (cb: (e: { exitCode: number }) => void) => void
+  kill: ReturnType<typeof vi.fn>
+  write: ReturnType<typeof vi.fn>
+  emitData: (data: string) => void
+  emitExit: (exitCode: number) => void
+}
+function makeFakeAgentPty(): FakeAgentPty {
+  let dataCb: ((data: string) => void) | null = null
+  let exitCb: ((e: { exitCode: number }) => void) | null = null
+  return {
+    onData: (cb) => { dataCb = cb },
+    onExit: (cb) => { exitCb = cb },
+    kill: vi.fn(),
+    write: vi.fn(),
+    emitData: (data) => dataCb?.(data),
+    emitExit: (exitCode) => exitCb?.({ exitCode }),
+  }
+}
+let lastSpawnedAgentPty: FakeAgentPty | null = null
+const agentSpawnMock = vi.fn((..._args: unknown[]) => {
+  lastSpawnedAgentPty = makeFakeAgentPty()
+  return lastSpawnedAgentPty
+})
+vi.mock('node-pty', () => ({ spawn: agentSpawnMock }))
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -51,6 +86,11 @@ const MOCK_WIRE = {
   recvSeq: 0,
   frameKey: Buffer.alloc(32),
 } as unknown as WireState
+
+// toolPath: '' → toolPathDirs.length === 0 → binaryExists check short-circuits
+// true regardless of spec.binary, letting these tests reach the (mocked)
+// node-pty.spawn() call instead of failing at the pre-spawn existence check.
+const SPAWNABLE_CONFIG: AgentConfig = { ...MOCK_CONFIG, toolPath: '' }
 
 // ─── SubAgentSpawner ─────────────────────────────────────────────────────────
 describe('SubAgentSpawner', () => {
@@ -272,6 +312,17 @@ describe('buildAgentEnv', () => {
     const env = await buildAgentEnv(baseReq, claudeSpec, MOCK_CONFIG, null)
     expect(env.PATH).toContain('/usr/bin')
   })
+
+  // CR-TRACE-016: correlates the fallback credential-read span with the
+  // agent:spawn span that triggered it, via a plain parentSpanId param.
+  it('threads parentSpanId through to readDecryptedKey (mocked)', async () => {
+    readDecryptedKeyMock.mockClear()
+    const specWithApiKeyEnvVar = { binary: 'claude', buildArgs: () => [], apiKeyEnvVar: 'ANTHROPIC_API_KEY' }
+    await buildAgentEnv(baseReq, specWithApiKeyEnvVar, MOCK_CONFIG, null, MOCK_LOG, 'parent-span-xyz')
+    expect(readDecryptedKeyMock).toHaveBeenCalledWith(
+      baseReq.accountId, MOCK_CONFIG, expect.anything(), 'parent-span-xyz'
+    )
+  })
 })
 
 // ─── handleAgentKill — validation ────────────────────────────────────────────
@@ -356,5 +407,169 @@ describe('handleAgentSpawn — validation', () => {
     const resp = await handleAgentSpawn(1, {}, MOCK_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE) as any
     expect(resp.jsonrpc).toBe('2.0')
     expect(resp.id).toBe(1)
+  })
+})
+
+// ─── handleAgentSpawn — agentOrch tracing (CR-TRACE-002) ─────────────────────
+describe('handleAgentSpawn — agentOrch tracing', () => {
+  let events: TraceEvent[]
+  let unregister: () => void
+
+  beforeEach(() => {
+    events = []
+    unregister = registerTraceSink((e) => events.push(e))
+    lastSpawnedAgentPty = null
+  })
+  afterEach(() => unregister())
+
+  it('emits agentOrch:spawn when resumeId is absent (BL-AG-01)', async () => {
+    await handleAgentSpawn(1, {
+      model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(),
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE)
+    expect(events.some(e => e.flow === 'agentOrch:spawn' && e.level === 'start')).toBe(true)
+    expect(events.some(e => e.flow === 'agentOrch:resume')).toBe(false)
+  })
+
+  it('emits agentOrch:resume instead of agentOrch:spawn when resumeId is present (BL-AG-03)', async () => {
+    await handleAgentSpawn(1, {
+      model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(), resumeId: 'sess-abc',
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE)
+    expect(events.some(e => e.flow === 'agentOrch:resume' && e.level === 'start')).toBe(true)
+    expect(events.some(e => e.flow === 'agentOrch:spawn')).toBe(false)
+  })
+
+  it('does not emit a new span per pty.onData frame (BL-AG-05) — only one "first-output" step', async () => {
+    await handleAgentSpawn(1, {
+      model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(),
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE)
+
+    for (let i = 0; i < 50; i++) lastSpawnedAgentPty!.emitData(`chunk-${i}\n`)
+
+    const firstOutputSteps = events.filter(
+      e => e.flow === 'agentOrch:spawn' && e.level === 'step' && e.label === 'first-output'
+    )
+    expect(firstOutputSteps).toHaveLength(1)
+  })
+
+  it('resumes span id from params._trace.id', async () => {
+    await handleAgentSpawn(1, {
+      model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(), _trace: { id: 'resumed-spawn-1' },
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE)
+    const start = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'start')
+    expect(start?.id).toBe('resumed-spawn-1')
+  })
+
+  it('emits ok() with exitCode on pty exit', async () => {
+    await handleAgentSpawn(1, {
+      model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(),
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE)
+    lastSpawnedAgentPty!.emitExit(0)
+    const ok = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'ok')
+    expect(ok?.fields.exitCode).toBe(0)
+  })
+})
+
+// ─── handleAgentKill — agentOrch:stop ─────────────────────────────────────────
+describe('handleAgentKill — agentOrch:stop', () => {
+  let events: TraceEvent[]
+  let unregister: () => void
+
+  beforeEach(() => {
+    events = []
+    unregister = registerTraceSink((e) => events.push(e))
+  })
+  afterEach(() => unregister())
+
+  it('emits agentOrch:stop span with ok() when pty found and killed', async () => {
+    await handleAgentSpawn(1, {
+      model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(),
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE)
+    const spawnOk = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'ok')
+    events = []
+    const ptyId = (await handleAgentSpawn(2, {
+      model: 'claude', taskId: 'task-2', userId: 'user-1', cwd: tmpdir(),
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE) as { result: { ptyId: string } }).result.ptyId
+    events = []
+
+    await handleAgentKill(3, { ptyId, signal: 'SIGTERM' }, SPAWNABLE_CONFIG, MOCK_LOG)
+    const ok = events.find(e => e.flow === 'agentOrch:stop' && e.level === 'ok')
+    expect(ok?.fields.ptyId).toBe(ptyId)
+    expect(ok?.fields.signal).toBe('SIGTERM')
+    void spawnOk
+  })
+
+  it('emits ok() with note=already dead when ptyId not in registry', async () => {
+    await handleAgentKill(1, { ptyId: 'pty-nonexistent-xyz' }, MOCK_CONFIG, MOCK_LOG)
+    const ok = events.find(e => e.flow === 'agentOrch:stop' && e.level === 'ok')
+    expect(ok?.fields.note).toBe('already dead')
+  })
+})
+
+// ─── handleAgentSendInput — agentOrch:stop (Ctrl+C only) ─────────────────────
+describe('handleAgentSendInput — agentOrch:stop (Ctrl+C only)', () => {
+  let events: TraceEvent[]
+  let unregister: () => void
+  let ptyId: string
+
+  beforeEach(async () => {
+    events = []
+    unregister = registerTraceSink((e) => events.push(e))
+    const resp = await handleAgentSpawn(1, {
+      model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(),
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE) as { result: { ptyId: string } }
+    ptyId = resp.result.ptyId
+    events = []
+  })
+  afterEach(() => unregister())
+
+  it('emits agentOrch:stop span when data === "\\x03"', async () => {
+    await handleAgentSendInput(2, { ptyId, data: '\x03' }, MOCK_CONFIG, MOCK_LOG)
+    expect(events.some(e => e.flow === 'agentOrch:stop' && e.level === 'ok')).toBe(true)
+  })
+
+  it('does NOT emit any span for arbitrary interactive keystrokes', async () => {
+    await handleAgentSendInput(2, { ptyId, data: 'a' }, MOCK_CONFIG, MOCK_LOG)
+    expect(events.filter(e => e.flow === 'agentOrch:stop')).toHaveLength(0)
+  })
+})
+
+// ─── handleAgentSendInput — agent:spawn tracing (CR-TRACE-005) ───────────────
+// Distinct from agentOrch:stop above — this span (spawnerTracer, reused, not a
+// new tracer) fires on EVERY call, not just Ctrl+C, so BL-CR-02/03 remote
+// feedback into a PTY is traceable even for non-Ctrl+C data.
+describe('handleAgentSendInput — agent:spawn tracing', () => {
+  let events: TraceEvent[]
+  let unregister: () => void
+  let ptyId: string
+
+  beforeEach(async () => {
+    events = []
+    unregister = registerTraceSink((e) => events.push(e))
+    const resp = await handleAgentSpawn(1, {
+      model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(),
+    }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE) as { result: { ptyId: string } }
+    ptyId = resp.result.ptyId
+    events = []
+  })
+  afterEach(() => unregister())
+
+  it('span.fail("missing ptyId") when ptyId is empty', async () => {
+    await handleAgentSendInput(2, { data: 'x' }, MOCK_CONFIG, MOCK_LOG)
+    const fail = events.find(e => e.flow === 'agent:spawn' && e.level === 'fail')
+    expect(fail?.fields.err).toBe('missing ptyId')
+  })
+
+  it('span.fail("pty-not-found") when ptyId is not in PTY_REGISTRY', async () => {
+    await handleAgentSendInput(2, { ptyId: 'pty-does-not-exist', data: 'x' }, MOCK_CONFIG, MOCK_LOG)
+    const fail = events.find(e => e.flow === 'agent:spawn' && e.level === 'fail')
+    expect(fail?.fields.err).toBe('pty-not-found')
+  })
+
+  it('span.ok({ptyId, bytes}) on successful write — never contains the data content', async () => {
+    await handleAgentSendInput(2, { ptyId, data: 'secret keystroke content' }, MOCK_CONFIG, MOCK_LOG)
+    const ok = events.find(e => e.flow === 'agent:spawn' && e.level === 'ok')
+    expect(ok?.fields.ptyId).toBe(ptyId)
+    expect(ok?.fields.bytes).toBe('secret keystroke content'.length)
+    expect(JSON.stringify(events)).not.toContain('secret keystroke content')
   })
 })

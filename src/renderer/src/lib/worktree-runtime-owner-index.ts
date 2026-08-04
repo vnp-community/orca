@@ -1,7 +1,7 @@
 import type { FolderWorkspace, ProjectGroup, Repo, Worktree } from '../../../shared/types'
 
 type WorktreeOwnerRecord = Pick<Worktree, 'id' | 'repoId' | 'hostId'>
-type RepoOwnerRecord = Pick<Repo, 'id' | 'connectionId' | 'executionHostId'>
+type RepoOwnerRecord = Pick<Repo, 'id' | 'connectionId' | 'executionHostId' | 'devServerId'>
 type FolderWorkspaceOwnerRecord = Pick<FolderWorkspace, 'id' | 'projectGroupId' | 'connectionId'>
 type ProjectGroupOwnerRecord = Pick<ProjectGroup, 'id' | 'connectionId' | 'executionHostId'>
 

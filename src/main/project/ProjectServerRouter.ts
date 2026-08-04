@@ -13,6 +13,7 @@ import type { RelayConnectionPool } from '../dev-server/relay-connection-pool'
 import type { ProfileResolver } from '../profile/ProfileResolver'
 import type { ProjectContext, OrcaProject } from '../../shared/project-types'
 import type { DevServerRelayBridge } from '../dev-server/dev-server-relay-bridge'
+import { Tracers } from '../../shared/trace/tracers'
 
 export class ProjectServerRouter {
   constructor(
@@ -30,12 +31,26 @@ export class ProjectServerRouter {
    * @throws PROJECT_ACCESS_DENIED — userId is not a member (from assertAccess)
    */
   async getRelayForProject(projectId: string, userId: string): Promise<DevServerRelayBridge> {
-    await this.projectService.assertAccess(projectId, userId)
-    const project = await this.projectService.get(projectId)
-    if (!project) throw new Error('PROJECT_NOT_FOUND')
-    const server = this.devServerManager.get(project.devServerId)
-    if (!server) throw new Error('DEV_SERVER_NOT_FOUND')
-    return this.relayPool.getOrConnect(project.devServerId, server)
+    const span = Tracers.profileProjectRouteFlow.start({ op: 'getRelay', projectId })
+    try {
+      await this.projectService.assertAccess(projectId, userId)
+      const project = await this.projectService.get(projectId)
+      if (!project) {
+        span.fail('PROJECT_NOT_FOUND', { op: 'getRelay', projectId })
+        throw new Error('PROJECT_NOT_FOUND')
+      }
+      const server = this.devServerManager.get(project.devServerId)
+      if (!server) {
+        span.fail('DEV_SERVER_NOT_FOUND', { op: 'getRelay', projectId })
+        throw new Error('DEV_SERVER_NOT_FOUND')
+      }
+      const relay = this.relayPool.getOrConnect(project.devServerId, server)
+      span.ok({ op: 'getRelay', projectId, devServerId: project.devServerId })
+      return relay
+    } catch (err) {
+      span.fail(err, { op: 'getRelay', projectId })
+      throw err
+    }
   }
 
   /**

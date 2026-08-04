@@ -8,6 +8,7 @@ import {
   localPreflightContextKey,
   type LocalPreflightContext
 } from '@/lib/local-preflight-context'
+import { Tracers } from '../../../../shared/trace/tracers'
 
 export type PreflightSlice = {
   preflightStatus: PreflightStatus | null
@@ -100,6 +101,10 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
       preflightStatusError: null
     })
 
+    // Why: span bọc toàn bộ request kể cả khi bị coalesce bởi 3 guard phía trên —
+    // mỗi request THẬT (không return sớm) là 1 user-perceived "check" action.
+    const span = Tracers.uiRemoteIntegrationPreflightFlow.start({ force, mode: runtimeTarget.kind })
+
     const request = (
       runtimeTarget.kind === 'environment'
         ? (() => {
@@ -109,12 +114,18 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
             const activeDevServerId = get().activeDevServerId
             const params: Record<string, unknown> = force ? { force } : {}
             if (activeDevServerId) params.devServerId = activeDevServerId
+            // Why: traceId forwarded only over WS RPC so the Dev Server relay's
+            // remoteIntegration:preflight span can resume this same trace id —
+            // Electron IPC below is same-machine and has no downstream hop to resume.
+            params.traceId = span.id
+            span.step('relayDelegate', { devServerId: activeDevServerId ?? '' })
             return callRuntimeRpc<PreflightStatus>(runtimeTarget, 'preflight.check', params)
           })()
         : window.api.preflight.check(preflightArgs)
     )
       .then((status) => {
         if (requestId !== latestPreflightRequestId) {
+          span.ok({ stale: true })
           return
         }
         set({
@@ -124,9 +135,17 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
           preflightStatusLoading: false,
           preflightStatusError: null
         })
+        // Why: field names match the real `PreflightStatus` shape (`gh`/`glab`,
+        // not `ghStatus`/`glabStatus` as the original spec sample assumed —
+        // see api-types.ts:592-598).
+        span.ok({
+          ghAuthenticated: Boolean(status?.gh?.authenticated),
+          glabAuthenticated: Boolean(status?.glab?.authenticated)
+        })
       })
       .catch((error) => {
         if (requestId !== latestPreflightRequestId) {
+          span.fail(error, { stale: true })
           return
         }
         set({
@@ -135,6 +154,7 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
           preflightStatusLoading: false,
           preflightStatusError: getErrorMessage(error)
         })
+        span.fail(error, { force, mode: runtimeTarget.kind })
       })
       .finally(() => {
         if (!force && nonForcedPreflightRequest?.promise === request) {

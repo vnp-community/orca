@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
+import { Tracers } from '../../../shared/trace/tracers'
 import type { AIProviderAccount, AIProviderStatus } from '../types/ai-provider-types'
 
 export interface AIProvidersFilter {
@@ -60,16 +61,21 @@ export function useAIProviders(devServerIdOrFilter?: string | AIProvidersFilter)
     const target       = getActiveRuntimeTarget(useAppStore.getState().settings)
     const store        = useAppStore.getState() as any
     const updateStatus = store.updateAIAccountStatus ?? store.updateAccountStatus
+    // BL-AIP-03: field `trigger: 'manual'` phân biệt với cron backend
+    // (aiProvider:healthCheck không có field này vì nó luôn là background).
+    const span = Tracers.uiAiProviderTestConnFlow.start({ accountId, trigger: 'manual' })
     try {
       const result = await callRuntimeRpc<{
         ok: boolean; latencyMs: number; error?: string
-      }>(target, 'aiProvider.testConnection', { accountId })
+      }>(target, 'aiProvider.testConnection', { accountId, traceId: span.id })
 
       // TDD-FE-13: use 'healthy' on success (store compatible with 'active' fallback in slice)
       if (updateStatus) updateStatus(accountId, result.ok ? 'healthy' : 'invalid')
+      span.ok({ accountId, ok: result.ok, latencyMs: result.latencyMs })
       return result
-    } catch {
+    } catch (err) {
       if (updateStatus) updateStatus(accountId, 'invalid')
+      span.fail(err, { accountId })
       throw new Error('Connection test failed')
     }
   }, [])

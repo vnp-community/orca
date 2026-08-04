@@ -34,9 +34,9 @@ import {
 import { _internals as openCodeInternals } from '../opencode/hook-service'
 import { getPiAgentStatusExtensionSource } from '../pi/agent-status-extension-source'
 import {
-  registerSshPtyProvider,
-  unregisterSshPtyProvider,
-  getSshPtyProvider,
+  registerRemotePtyProvider,
+  unregisterRemotePtyProvider,
+  getRemotePtyProvider,
   getPtyIdsForConnection,
   clearPtyOwnershipForConnection,
   clearProviderPtyState,
@@ -50,11 +50,11 @@ import {
 } from '../ipc/pty-hidden-delivery-gate'
 import type { PtyModelRestoreNeededEvent } from '../../shared/pty-model-restore-marker'
 import {
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider,
-  getSshFilesystemProvider
+  registerRemoteFilesystemProvider,
+  unregisterRemoteFilesystemProvider,
+  getRemoteFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
-import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
+import { registerRemoteGitProvider, unregisterRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import { notifyRemoteWorkspaceHandlers } from '../ipc/remote-workspace-events'
 import { PortScanner } from './ssh-port-scanner'
 import { isMainWindowVisible, onMainWindowBecameVisible } from '../window/main-window-visibility'
@@ -672,7 +672,7 @@ export class SshRelaySession {
     this.wireUpRemoteOrcaCli(mux)
 
     const ptyProvider = new SshPtyProvider(this.targetId, mux, this.remoteCliBridgeEnv ?? undefined)
-    registerSshPtyProvider(this.targetId, ptyProvider)
+    registerRemotePtyProvider(this.targetId, ptyProvider)
 
     const fsProvider = new SshFilesystemProvider(
       this.targetId,
@@ -695,14 +695,14 @@ export class SshRelaySession {
           })
       }
     )
-    registerSshFilesystemProvider(this.targetId, fsProvider)
+    registerRemoteFilesystemProvider(this.targetId, fsProvider)
 
     const gitProvider = new SshGitProvider(
       this.targetId,
       mux,
       this.remoteCliBridgeEnv?.hostPlatform ?? null
     )
-    registerSshGitProvider(this.targetId, gitProvider)
+    registerRemoteGitProvider(this.targetId, gitProvider)
 
     this.wireUpPtyEvents(ptyProvider)
     this.wireUpAgentHookEvents(mux)
@@ -1006,18 +1006,18 @@ export class SshRelaySession {
       clearPtyOwnershipForConnection(this.targetId)
     }
 
-    const ptyProvider = getSshPtyProvider(this.targetId)
+    const ptyProvider = getRemotePtyProvider(this.targetId)
     if (ptyProvider && 'dispose' in ptyProvider) {
       ;(ptyProvider as { dispose: () => void }).dispose()
     }
-    const fsProvider = getSshFilesystemProvider(this.targetId)
+    const fsProvider = getRemoteFilesystemProvider(this.targetId)
     if (fsProvider && 'dispose' in fsProvider) {
       ;(fsProvider as { dispose: () => void }).dispose()
     }
 
-    unregisterSshPtyProvider(this.targetId)
-    unregisterSshFilesystemProvider(this.targetId)
-    unregisterSshGitProvider(this.targetId)
+    unregisterRemotePtyProvider(this.targetId)
+    unregisterRemoteFilesystemProvider(this.targetId)
+    unregisterRemoteGitProvider(this.targetId)
   }
 
   // Why: kept for back-compat with old relay binaries during the upgrade
@@ -1210,7 +1210,7 @@ export class SshRelaySession {
         ...leasedPtyIds
       ])
     )
-    const ptyProvider = getSshPtyProvider(this.targetId) as SshPtyProvider | undefined
+    const ptyProvider = getRemotePtyProvider(this.targetId) as SshPtyProvider | undefined
     if (!ptyProvider) {
       return
     }

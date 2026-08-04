@@ -1,7 +1,7 @@
 # Orca Backend Server — Vai trò, Chức năng & Kết nối
 
 **Nguồn:** Trích xuất từ HLD v1 (C1, C2, C3, C4)  
-**Cập nhật:** 2026-07-30
+**Cập nhật:** 2026-08-03 (thêm §7.1 — Dev Server provider registry qua IPC & `devServer:proxyNotification`)
 
 ---
 
@@ -230,6 +230,19 @@ User đăng nhập → POST /auth/local → set cookie
     └── Mọi RPC call trong session đều isolated trong process riêng
 ```
 
+### 7.1 Dev Server Provider Registry qua IPC (2026-08)
+
+Provider registry (`IFilesystemProvider`/`IGitProvider`/`IPtyProvider`, dùng chung với SSH Targets — xem [dev-server-architecture.md](./dev-server-architecture.md) §15) là **transport-agnostic đối với process nào giữ connection thật**: connection WebSocket outbound của một Dev Server luôn sống trong **process cha (Gateway)**, không phải trong per-user child process — nhưng mọi user (ở mọi child process) đều phải gọi được provider của Dev Server đó, và giờ còn phải **nhận được** notification agent chủ động push (`pty.data`, `pty.exit`, `fs.changed` — xem dev-server-architecture.md §15.3).
+
+`GatewayDevServerManagerProxy` (chạy trong mỗi child process) forward mọi RPC call của provider qua IPC (`process.send`) về `SessionManager` ở process cha, và ngược lại nhận 2 loại broadcast từ `SessionManager`:
+
+| IPC message type | Nguồn phát | Mục đích |
+|-------------------|-----------|----------|
+| `devServer:event` | `devServerManager.on('devServer:added' \| 'removed' \| 'statusChanged')` | Đồng bộ trạng thái Dev Server (connect/disconnect) tới mọi child process |
+| `devServer:proxyNotification` *(2026-08, mới)* | `devServerManager.on('devServer:notification')` | Relay notification agent chủ động push (`pty.data`/`pty.exit`/`fs.changed`) tới mọi child process; mỗi child tự lọc theo `devServerId` nó đang quan tâm |
+
+`devServer:proxyNotification` chạy **song song** với `devServer:event` đã có từ trước — cùng cơ chế broadcast (`SessionManager` lặp `this.processes` và `proc.process.send(...)`), khác payload và mục đích.
+
 ---
 
 ## 8. Communication Matrix đầy đủ
@@ -248,6 +261,7 @@ User đăng nhập → POST /auth/local → set cookie
 | Orca | Mobile | WebSocket | dynamic | TweetNaCl encrypted JSON |
 | CLI | Daemon | Unix Socket | `~/.orca/daemon.sock` | NDJSON |
 | Daemon | AI Agents | PTY | — | Text |
+| Gateway (parent) | User child process | IPC (`fork()` channel) | — | `devServer:event` / `devServer:proxyNotification` (2026-08, xem §7.1) |
 
 ---
 

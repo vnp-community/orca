@@ -1,6 +1,6 @@
 import { deriveGitRemoteIdentity, type GitRemoteIdentity } from '../shared/git-remote-identity'
 import { gitExecFileAsync } from './git/runner'
-import { getSshGitProvider } from './providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from './providers/ssh-git-dispatch'
 
 export async function detectGitRemoteIdentity(
   repoPath: string,
@@ -8,7 +8,7 @@ export async function detectGitRemoteIdentity(
 ): Promise<GitRemoteIdentity | null> {
   try {
     const result = connectionId
-      ? await getSshGitProvider(connectionId)?.exec(['remote', '-v'], repoPath)
+      ? await getRemoteGitProvider(connectionId)?.exec(['remote', '-v'], repoPath)
       : await gitExecFileAsync(['remote', '-v'], { cwd: repoPath })
     return result ? deriveGitRemoteIdentity(result.stdout) : null
   } catch {

@@ -155,10 +155,10 @@ vi.mock('../source-control/hosted-review', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: getSshGitProviderMock,
-  SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE:
+  getRemoteGitProvider: getSshGitProviderMock,
+  REMOTE_GIT_PROVIDER_UNAVAILABLE_MESSAGE:
     'Remote connection dropped. Click Reconnect on the SSH target before retrying.',
-  requireSshGitProvider: (connectionId: string) => {
+  requireRemoteGitProvider: (connectionId: string) => {
     const provider = getSshGitProviderMock(connectionId)
     if (!provider) {
       throw new Error(
@@ -170,7 +170,7 @@ vi.mock('../providers/ssh-git-dispatch', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: getSshFilesystemProviderMock
+  getRemoteFilesystemProvider: getSshFilesystemProviderMock
 }))
 
 vi.mock('./worktree-symlinks', () => ({

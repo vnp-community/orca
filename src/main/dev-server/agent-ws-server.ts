@@ -119,13 +119,22 @@ export class AgentWebSocketServer {
   }
 
   private handleConnection(ws: WebSocket): void {
+    // [FIX CR-TRACE-013] span mở NGAY khi socket upgrade thành công, TRƯỚC
+    // khi biết kết quả handshake — thay vì tạo span mồ côi ngẫu nhiên trong
+    // .catch() như trước (id không liên kết được với attempt connect nào).
+    const span = Tracers.agentWsTokenVerifyFlow.start()
+
     // FIX TASK-AWS-002: Validate against SHA-256 hash of incoming token.
     // The validator receives the plaintext token from the handshake, hashes it,
     // and checks the hashed map — so plaintext is only held in the transient
     // handshake stack frame, never in the long-lived pendingSlots map.
     runOrcaReceiverHandshake(
       ws,
-      (token) => this.pendingSlots.has(hashToken(token)),
+      (token) => {
+        // KHÔNG log token đầy đủ — chỉ 12 ký tự đầu, theo tiền lệ dòng log hiện có.
+        span.step('tokenLookup', { tokenPrefix: token.slice(0, 12) + '...' })
+        return this.pendingSlots.has(hashToken(token))
+      },
       this.orcaVersion
     )
       .then((info) => {
@@ -135,14 +144,17 @@ export class AgentWebSocketServer {
 
         if (!slot) {
           // Race condition: slot expired between validate check and resolve
+          span.fail('slot-expired', { devServerId: info.devServerId ?? 'unknown' })
           ws.close(1008, 'Slot expired — agent token is no longer registered')
           return
         }
 
         // FIX TASK-AWS-002: Consume slot by hash
         this.removeSlotByHash(tokenHash)
+        span.ok({ devServerId: info.devServerId ?? 'unknown', sessionId: info.sessionId })
 
-        const span = Tracers.agentWsFlow.start({
+        // agentWs:lifecycle (KHÔNG ĐỔI — vẫn là span riêng cho connect→disconnect)
+        const lifecycleSpan = Tracers.agentWsFlow.start({
           devServerId: info.devServerId ?? 'unknown',
           platform: info.platform ?? 'unknown',
           node: info.nodeVersion ?? 'unknown'
@@ -160,15 +172,17 @@ export class AgentWebSocketServer {
         // Track disconnect for tracing
         ws.once('close', (code, reason) => {
           const reasonStr = reason?.toString() || '(none)'
-          span.step('disconnect', { code, reason: reasonStr })
+          lifecycleSpan.step('disconnect', { code, reason: reasonStr })
         })
 
-        span.step('connected', { token: agentToken.slice(0, 12) + '...' })
+        lifecycleSpan.step('connected', { token: agentToken.slice(0, 12) + '...' })
         slot.callback(mux, info)
       })
       .catch((err: Error) => {
-        // ws is already closed by runOrcaReceiverHandshake on failure
-        Tracers.agentWsFlow.start().fail(err, { phase: 'handshake' })
+        // [FIX CR-TRACE-013] dùng lại `span` đã mở từ đầu handleConnection()
+        // thay vì tạo span mồ côi mới — nay liên kết được "socket X connect
+        // lúc nào → fail ở bước nào". ws đã được đóng bởi runOrcaReceiverHandshake.
+        span.fail(err, { reason: 'invalid-token' })
         console.warn('[AgentWsServer] Handshake rejected:', err.message)
       })
   }

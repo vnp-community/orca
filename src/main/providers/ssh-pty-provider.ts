@@ -2,6 +2,7 @@ import type { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
 import type { IPtyProvider, PtyProcessInfo, PtySpawnOptions, PtySpawnResult } from './types'
 import { toAppSshPtyId, toRelaySshPtyId } from './ssh-pty-id'
 import { seedPowerlevel10kWizardEnv } from '../pty/powerlevel10k-wizard-env'
+import { Tracers } from '../../shared/trace/tracers'
 
 type DataCallback = (payload: { id: string; data: string }) => void
 type ReplayCallback = (payload: { id: string; data: string }) => void
@@ -98,80 +99,97 @@ export class SshPtyProvider implements IPtyProvider {
   }
 
   async spawn(opts: PtySpawnOptions): Promise<PtySpawnResult> {
-    // Why: when sessionId is present, the caller is requesting reattach to an
-    // existing relay PTY (persisted across app restart). pty.attach replays
-    // the buffered output the relay kept alive during the grace window.
-    if (opts.sessionId) {
-      const relaySessionId = this.toRelayPtyId(opts.sessionId)
-      console.warn(
-        `[ssh-pty] spawn() called with sessionId=${opts.sessionId}, attempting pty.attach`
-      )
-      try {
-        // Why: pass the pane's expected identity so the relay can reject a
-        // cross-generation id collision (see pty-handler attach) instead of
-        // replaying the wrong shell into this pane. ORCA_PANE_KEY is the
-        // renderer's per-pane identity; ORCA_TAB_ID is the coarser fallback.
-        const expectedPaneKey = opts.paneKey ?? opts.env?.ORCA_PANE_KEY
-        const expectedTabId = opts.tabId ?? opts.env?.ORCA_TAB_ID
-        const attachResult = (await this.mux.request('pty.attach', {
-          id: relaySessionId,
-          cols: opts.cols,
-          rows: opts.rows,
-          suppressReplayNotification: true,
-          ...(expectedPaneKey ? { expectedPaneKey } : {}),
-          ...(expectedTabId ? { expectedTabId } : {})
-        })) as { replay?: string }
+    // Why: theo CR-TRACE-000 §3.3 dòng cuối — traceId KHÔNG lan vào remote shell.
+    // Span này chỉ đo phía Main (mux.request('pty.attach'/'pty.spawn', ...)
+    // round-trip qua SshChannelMultiplexer), không kỳ vọng resume tiếp bên
+    // trong remote host.
+    const span = Tracers.terminalCreate.start({ providerType: 'ssh', step: 'provider-spawn' })
+    try {
+      // Why: when sessionId is present, the caller is requesting reattach to an
+      // existing relay PTY (persisted across app restart). pty.attach replays
+      // the buffered output the relay kept alive during the grace window.
+      if (opts.sessionId) {
+        const relaySessionId = this.toRelayPtyId(opts.sessionId)
         console.warn(
-          `[ssh-pty] pty.attach succeeded for ${opts.sessionId}, replay=${!!attachResult.replay}`
+          `[ssh-pty] spawn() called with sessionId=${opts.sessionId}, attempting pty.attach`
         )
-        return {
-          id: this.toAppPtyId(relaySessionId),
-          isReattach: true,
-          ...(attachResult.replay ? { replay: attachResult.replay } : {})
+        try {
+          // Why: pass the pane's expected identity so the relay can reject a
+          // cross-generation id collision (see pty-handler attach) instead of
+          // replaying the wrong shell into this pane. ORCA_PANE_KEY is the
+          // renderer's per-pane identity; ORCA_TAB_ID is the coarser fallback.
+          const expectedPaneKey = opts.paneKey ?? opts.env?.ORCA_PANE_KEY
+          const expectedTabId = opts.tabId ?? opts.env?.ORCA_TAB_ID
+          const attachResult = (await this.mux.request('pty.attach', {
+            id: relaySessionId,
+            cols: opts.cols,
+            rows: opts.rows,
+            suppressReplayNotification: true,
+            ...(expectedPaneKey ? { expectedPaneKey } : {}),
+            ...(expectedTabId ? { expectedTabId } : {})
+          })) as { replay?: string }
+          console.warn(
+            `[ssh-pty] pty.attach succeeded for ${opts.sessionId}, replay=${!!attachResult.replay}`
+          )
+          const appPtyId = this.toAppPtyId(relaySessionId)
+          span.ok({ providerType: 'ssh', ptyId: appPtyId })
+          return {
+            id: appPtyId,
+            isReattach: true,
+            ...(attachResult.replay ? { replay: attachResult.replay } : {})
+          }
+        } catch (err) {
+          // Why: pty.attach fails when the relay grace window has elapsed.
+          // Surface the exact condition so the renderer can clear the stale
+          // binding before replacing the dead relay PTY in the same pane.
+          console.warn(`[ssh-pty] pty.attach FAILED for ${opts.sessionId}:`, err)
+          if (isSshPtyNotFoundError(err)) {
+            const mismatchMarker = isSshPtyIdentityMismatchError(err)
+              ? ` ${SSH_PTY_IDENTITY_MISMATCH_ERROR}`
+              : ''
+            // Why: rethrow the transformed error and let the outer catch below
+            // emit the single span.fail() for this spawn() call — avoids a
+            // duplicate 'fail' trace event for the same span id.
+            throw new Error(`${SSH_SESSION_EXPIRED_ERROR}: ${relaySessionId}${mismatchMarker}`)
+          }
+          throw err
         }
-      } catch (err) {
-        // Why: pty.attach fails when the relay grace window has elapsed.
-        // Surface the exact condition so the renderer can clear the stale
-        // binding before replacing the dead relay PTY in the same pane.
-        console.warn(`[ssh-pty] pty.attach FAILED for ${opts.sessionId}:`, err)
-        if (isSshPtyNotFoundError(err)) {
-          const mismatchMarker = isSshPtyIdentityMismatchError(err)
-            ? ` ${SSH_PTY_IDENTITY_MISMATCH_ERROR}`
-            : ''
-          throw new Error(`${SSH_SESSION_EXPIRED_ERROR}: ${relaySessionId}${mismatchMarker}`)
-        }
-        throw err
       }
-    }
 
-    const result = await this.mux.request('pty.spawn', {
-      cols: opts.cols,
-      rows: opts.rows,
-      cwd: opts.cwd,
-      env: this.withRemoteCliBridgeEnv(opts.env, opts.envToDelete),
-      ...(opts.envToDelete?.length ? { envToDelete: opts.envToDelete } : {}),
-      // Why: the relay's plugin-overlay env augmenter needs to know which
-      // Pi-compatible agent is being launched, while commandDelivery tells it
-      // whether to submit the command itself for runtime-owned background PTYs.
-      ...(opts.command ? { command: opts.command } : {}),
-      ...(opts.shellOverride !== undefined ? { shellOverride: opts.shellOverride } : {}),
-      ...(opts.terminalWindowsWslDistro !== undefined
-        ? { terminalWindowsWslDistro: opts.terminalWindowsWslDistro }
-        : {}),
-      ...(opts.commandDelivery ? { commandDelivery: opts.commandDelivery } : {}),
-      ...(opts.startupCommandDelivery
-        ? { startupCommandDelivery: opts.startupCommandDelivery }
-        : {}),
-      // Why: main may strip ORCA_PANE_KEY/ORCA_TAB_ID from the shell env when
-      // remote hooks are disabled, but the relay still needs attach identity
-      // metadata to reject cross-generation PTY id collisions.
-      ...(opts.paneKey ? { paneKey: opts.paneKey } : {}),
-      ...(opts.tabId ? { tabId: opts.tabId } : {})
-    })
-    return {
-      ...(result as PtySpawnResult),
-      id: this.toAppPtyId((result as PtySpawnResult).id),
-      ...(opts.sessionId ? { sessionExpired: true } : {})
+      const result = await this.mux.request('pty.spawn', {
+        cols: opts.cols,
+        rows: opts.rows,
+        cwd: opts.cwd,
+        env: this.withRemoteCliBridgeEnv(opts.env, opts.envToDelete),
+        ...(opts.envToDelete?.length ? { envToDelete: opts.envToDelete } : {}),
+        // Why: the relay's plugin-overlay env augmenter needs to know which
+        // Pi-compatible agent is being launched, while commandDelivery tells it
+        // whether to submit the command itself for runtime-owned background PTYs.
+        ...(opts.command ? { command: opts.command } : {}),
+        ...(opts.shellOverride !== undefined ? { shellOverride: opts.shellOverride } : {}),
+        ...(opts.terminalWindowsWslDistro !== undefined
+          ? { terminalWindowsWslDistro: opts.terminalWindowsWslDistro }
+          : {}),
+        ...(opts.commandDelivery ? { commandDelivery: opts.commandDelivery } : {}),
+        ...(opts.startupCommandDelivery
+          ? { startupCommandDelivery: opts.startupCommandDelivery }
+          : {}),
+        // Why: main may strip ORCA_PANE_KEY/ORCA_TAB_ID from the shell env when
+        // remote hooks are disabled, but the relay still needs attach identity
+        // metadata to reject cross-generation PTY id collisions.
+        ...(opts.paneKey ? { paneKey: opts.paneKey } : {}),
+        ...(opts.tabId ? { tabId: opts.tabId } : {})
+      })
+      const spawnedPtyId = this.toAppPtyId((result as PtySpawnResult).id)
+      span.ok({ providerType: 'ssh', ptyId: spawnedPtyId })
+      return {
+        ...(result as PtySpawnResult),
+        id: spawnedPtyId,
+        ...(opts.sessionId ? { sessionExpired: true } : {})
+      }
+    } catch (err) {
+      span.fail(err, { providerType: 'ssh' })
+      throw err
     }
   }
 

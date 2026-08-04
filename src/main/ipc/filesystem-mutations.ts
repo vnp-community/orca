@@ -18,7 +18,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { pipeline } from 'node:stream/promises'
 import type { Store } from '../persistence'
 import { authorizeExternalPath, resolveAuthorizedPath, isENOENT } from './filesystem-auth'
-import { requireSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { requireRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { resolveLocalDroppedPathsForAgent } from './dropped-path-resolution'
 import { importExternalPathsSsh } from './filesystem-import-ssh'
 import { assertNoClobberRenameDestinationAvailable } from '../../shared/filesystem-rename-collision'
@@ -72,7 +72,7 @@ export function registerFilesystemMutationHandlers(store: Store): void {
     'fs:createFile',
     async (_event, args: { filePath: string; connectionId?: string }): Promise<void> => {
       if (args.connectionId) {
-        const provider = requireSshFilesystemProvider(args.connectionId)
+        const provider = requireRemoteFilesystemProvider(args.connectionId)
         return provider.createFile(args.filePath)
       }
       const filePath = await resolveAuthorizedPath(args.filePath, store)
@@ -90,7 +90,7 @@ export function registerFilesystemMutationHandlers(store: Store): void {
     'fs:createDir',
     async (_event, args: { dirPath: string; connectionId?: string }): Promise<void> => {
       if (args.connectionId) {
-        const provider = requireSshFilesystemProvider(args.connectionId)
+        const provider = requireRemoteFilesystemProvider(args.connectionId)
         return provider.createDir(args.dirPath)
       }
       const dirPath = await resolveAuthorizedPath(args.dirPath, store)
@@ -109,7 +109,7 @@ export function registerFilesystemMutationHandlers(store: Store): void {
       args: { oldPath: string; newPath: string; connectionId?: string }
     ): Promise<void> => {
       if (args.connectionId) {
-        const provider = requireSshFilesystemProvider(args.connectionId)
+        const provider = requireRemoteFilesystemProvider(args.connectionId)
         return provider.renameNoClobber(args.oldPath, args.newPath)
       }
       // Why: rename() operates on directory entries, not file contents. If
@@ -132,7 +132,7 @@ export function registerFilesystemMutationHandlers(store: Store): void {
       args: { sourcePath: string; destinationPath: string; connectionId?: string }
     ): Promise<void> => {
       if (args.connectionId) {
-        const provider = requireSshFilesystemProvider(args.connectionId)
+        const provider = requireRemoteFilesystemProvider(args.connectionId)
         return provider.copy(args.sourcePath, args.destinationPath)
       }
       const sourcePath = await resolveAuthorizedPath(args.sourcePath, store, {

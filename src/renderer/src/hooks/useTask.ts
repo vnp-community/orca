@@ -1,5 +1,6 @@
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
+import { Tracers } from '../../../shared/trace/tracers'
 import type { OrcaTask } from '../types/task-types'
 
 export function useTask(taskId: string) {
@@ -19,11 +20,24 @@ export function useTask(taskId: string) {
 
   const aiDecompose = async (instruction?: string) => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    // Corrected to tasks.aiPlan per TASK-FE-015
-    const result = await callRuntimeRpc(target, 'tasks.aiPlan', { taskId, instruction }) as {
-      subtasks: Partial<OrcaTask>[]
+    // BL-TG-02: field `promptLength` thay vì instruction đầy đủ — tránh log nội
+    // dung hướng dẫn AI dài, đúng tinh thần "chỉ trace field cần cho debug".
+    const span = Tracers.uiTaskGraphAiPlanFlow.start({
+      taskId,
+      hasInstruction: !!instruction,
+      promptLength: instruction?.length ?? 0
+    })
+    try {
+      // Corrected to tasks.aiPlan per TASK-FE-015
+      const result = await callRuntimeRpc(target, 'tasks.aiPlan', { taskId, instruction, traceId: span.id }) as {
+        subtasks: Partial<OrcaTask>[]
+      }
+      span.ok({ taskId, subtaskCount: result.subtasks.length })
+      return result.subtasks
+    } catch (err) {
+      span.fail(err, { taskId })
+      throw err
     }
-    return result.subtasks
   }
 
   const acceptSubtasks = async (subtasks: Partial<OrcaTask>[], projectId: string) => {

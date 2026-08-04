@@ -12,6 +12,8 @@ import {
   handleFsWriteFile,
 } from '../fs-agent-extensions'
 import type { AgentConfig } from '../agent-config'
+import { registerTraceSink } from '../../shared/trace'
+import type { TraceEvent } from '../../shared/trace'
 
 // Mock the two imported helpers to keep tests unit-level
 vi.mock('../fs-handler-utils', () => ({
@@ -169,6 +171,41 @@ describe('handlePreflightCheck', () => {
       makeConfig()
     ) as any
     expect(Object.keys(resp.result)).toHaveLength(4)
+  })
+})
+
+// ─── handlePreflightCheck — agent:preflight tracing (TASK-AG-014.2) ─────────
+describe('handlePreflightCheck — agent:preflight tracing', () => {
+  it('span.ok({checkedCount}) khi tất cả services khả dụng (empty list = vacuously all-ok)', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    await handlePreflightCheck(1, { services: [] }, makeConfig())
+    unregister()
+
+    const ok = events.find(e => e.flow === 'agent:preflight' && e.level === 'ok')
+    expect(ok).toBeDefined()
+    expect(ok?.fields.checkedCount).toBe(0)
+  })
+
+  it('span.fail("unavailable: ...") khi có service không cài đặt', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    await handlePreflightCheck(1, { services: ['not-a-real-binary-xyz'] }, makeConfig())
+    unregister()
+
+    const fail = events.find(e => e.flow === 'agent:preflight' && e.level === 'fail')
+    expect(fail).toBeDefined()
+    expect(fail?.fields.failedCount).toBe(1)
+  })
+
+  it('phân biệt agent:preflight với agent:fs (khác flow name)', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    await handlePreflightCheck(1, { services: ['ripgrep'] }, makeConfig())
+    unregister()
+
+    expect(events.every(e => e.flow !== 'agent:fs')).toBe(true)
+    expect(events.some(e => e.flow === 'agent:preflight')).toBe(true)
   })
 })
 

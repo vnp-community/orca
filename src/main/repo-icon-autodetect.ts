@@ -7,7 +7,7 @@ import {
   type RepoIcon
 } from '../shared/repo-icon'
 import { getRepoSlug, getRepoUpstream } from './github/client'
-import { getSshFilesystemProvider } from './providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from './providers/ssh-filesystem-dispatch'
 import type { IFilesystemProvider } from './providers/types'
 import { detectGitRemoteIdentity } from './repo-git-remote-identity'
 import { iconHrefCandidates } from './repo-icon-href-candidates'
@@ -283,7 +283,7 @@ export async function detectRepoIcon({
   upstream?: GitHubRepositoryIdentity | null
 }): Promise<RepoIcon | undefined> {
   try {
-    const fsProvider = connectionId ? getSshFilesystemProvider(connectionId) : undefined
+    const fsProvider = connectionId ? getRemoteFilesystemProvider(connectionId) : undefined
     const fileIcon = fsProvider
       ? await detectRemotePngIcon(repoPath, fsProvider)
       : await detectLocalPngIcon(repoPath)

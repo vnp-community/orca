@@ -7,10 +7,17 @@
  * @module main/ai-providers/__tests__/ProviderResolver.test
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { ProviderResolver } from '../ProviderResolver'
 import type { AIProviderService } from '../AIProviderService'
 import type { AIProviderAccount } from '../../../shared/ai-provider-types'
+import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
+
+function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
+  const events: TraceEvent[] = []
+  const unregister = registerTraceSink((e) => events.push(e))
+  return { events, stop: unregister }
+}
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -216,5 +223,109 @@ describe('ProviderResolver', () => {
     const result = await resolver.resolve({ ...BASE_OPTIONS })
     // Both are server-scope with no modelHint — first one in the list wins
     expect(result.label).toBe('First')
+  })
+
+  // ── TASK-BE-016.2: resolve() tracing (aiProvider:resolve) ─────────────────────
+
+  describe('resolve tracing', () => {
+    it('no accounts within quota → span.fail("NO_PROVIDER_AVAILABLE", {reason:"quota-or-inactive"})', async () => {
+      const resolver = new ProviderResolver(makeService([]))
+      const { events, stop } = captureTraceEvents()
+
+      await expect(resolver.resolve(BASE_OPTIONS)).rejects.toThrow('NO_PROVIDER_AVAILABLE')
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:resolve')
+      const failEvent = flowEvents.find((e) => e.level === 'fail')
+      expect(failEvent?.fields.reason).toBe('quota-or-inactive')
+      // Only 1 fail() emitted for this branch — no double-fail.
+      expect(flowEvents.filter((e) => e.level === 'fail')).toHaveLength(1)
+    })
+
+    it('accounts exist but none match any scope → span.fail("NO_PROVIDER_AVAILABLE", {reason:"no-scope-match"})', async () => {
+      // Active, within quota, but scope='user' with a scopeRefId that isn't userId —
+      // and no server-scope account present (server never checks scopeRefId, so a
+      // server-scope account would always match). This is the only way to reach
+      // "accounts exist but none match" across both passes.
+      const orphanScopeAccount = makeAccount({ scope: 'user', scopeRefId: 'someone-else', label: 'Orphan' })
+      const resolver = new ProviderResolver(makeService([orphanScopeAccount]))
+      const { events, stop } = captureTraceEvents()
+
+      await expect(resolver.resolve(BASE_OPTIONS)).rejects.toThrow('NO_PROVIDER_AVAILABLE')
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:resolve')
+      const failEvent = flowEvents.find((e) => e.level === 'fail')
+      expect(failEvent?.fields.reason).toBe('no-scope-match')
+      expect(flowEvents.filter((e) => e.level === 'fail')).toHaveLength(1)
+    })
+
+    it('match found in pass 1 (modelHint) → step("scope-match", {usedModelHint:true}), ok({accountId, scope})', async () => {
+      const withModel = makeAccount({ scope: 'server', label: 'WithModel', model: 'claude-3-5' })
+      const resolver = new ProviderResolver(makeService([withModel]))
+      const { events, stop } = captureTraceEvents()
+
+      const result = await resolver.resolve({ ...BASE_OPTIONS, modelHint: 'claude-3-5' })
+      stop()
+
+      expect(result.label).toBe('WithModel')
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:resolve')
+      const matchStep = flowEvents.find((e) => e.level === 'step' && e.label === 'scope-match')
+      expect(matchStep?.fields).toMatchObject({ matchedScope: 'server', usedModelHint: true })
+      const okEvent = flowEvents.find((e) => e.level === 'ok')
+      expect(okEvent?.fields).toMatchObject({ accountId: withModel.id, scope: 'server' })
+    })
+
+    it('match found only in pass 2 (fallback, no modelHint) → step("scope-match", {usedModelHint:false})', async () => {
+      const noModel = makeAccount({ scope: 'server', label: 'NoModel' })
+      const resolver = new ProviderResolver(makeService([noModel]))
+      const { events, stop } = captureTraceEvents()
+
+      const result = await resolver.resolve({ ...BASE_OPTIONS, modelHint: 'nonexistent-model' })
+      stop()
+
+      expect(result.label).toBe('NoModel')
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:resolve')
+      const matchStep = flowEvents.find((e) => e.level === 'step' && e.label === 'scope-match')
+      expect(matchStep?.fields).toMatchObject({ matchedScope: 'server', usedModelHint: false })
+    })
+
+    it('quota-filter step reports totalAccounts/activeCount/overQuotaCount', async () => {
+      const quotaAcc = makeAccount({ scope: 'server', label: 'Quota', quotaLimitDay: 1000 })
+      const unlimited = makeAccount({ scope: 'server', label: 'Unlimited', quotaLimitDay: 0 })
+      const pending = makeAccount({ scope: 'server', label: 'Pending', status: 'pending' })
+      const service = {
+        listAccounts: vi.fn().mockResolvedValue([quotaAcc, unlimited, pending]),
+        getUsageToday: vi.fn().mockImplementation((id: string) =>
+          Promise.resolve({ tokens: id === quotaAcc.id ? 1500 : 0, requests: 0, costUsd: 0 })
+        ),
+      } as unknown as AIProviderService
+      const resolver = new ProviderResolver(service)
+      const { events, stop } = captureTraceEvents()
+
+      await resolver.resolve(BASE_OPTIONS)
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:resolve')
+      const quotaStep = flowEvents.find((e) => e.level === 'step' && e.label === 'quota-filter')
+      expect(quotaStep?.fields).toMatchObject({ totalAccounts: 3, activeCount: 2, overQuotaCount: 1 })
+    })
+
+    it('infrastructure error (listAccounts throws) → span.fail(err) exactly once, no NO_PROVIDER_AVAILABLE double-fail', async () => {
+      const service = {
+        listAccounts: vi.fn().mockRejectedValue(new Error('DB connection lost')),
+        getUsageToday: vi.fn(),
+      } as unknown as AIProviderService
+      const resolver = new ProviderResolver(service)
+      const { events, stop } = captureTraceEvents()
+
+      await expect(resolver.resolve(BASE_OPTIONS)).rejects.toThrow('DB connection lost')
+      stop()
+
+      const flowEvents = events.filter((e) => e.flow === 'aiProvider:resolve')
+      const failEvents = flowEvents.filter((e) => e.level === 'fail')
+      expect(failEvents).toHaveLength(1)
+      expect(failEvents[0]?.fields.err).toContain('DB connection lost')
+    })
   })
 })

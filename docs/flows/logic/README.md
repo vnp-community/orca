@@ -15,7 +15,7 @@ Thư mục này chứa **luồng dữ liệu chi tiết** cho từng nhóm nghi�
 | [worktree-management.md](./worktree-management.md) | Worktree Management | BL-WT-01 → 05 | Main, Git CLI, Daemon, SQLite |
 | [agent-orchestration.md](./agent-orchestration.md) | Agent Orchestration | BL-AG-01 → 05 | Main, Daemon, PTY, AI Agent |
 | [terminal-management.md](./terminal-management.md) | Terminal Management | BL-TM-01 → 04 | Daemon, node-pty, xterm.js, SQLite |
-| [remote-development.md](./remote-development.md) | Remote Development | BL-SSH-01 → 04 | SSH (ssh2), Relay Binary, Port Fwd |
+| [remote-development.md](./remote-development.md) | Remote Development | BL-SSH-01 → 05 | SSH (ssh2), Relay Binary, Port Fwd, Dev Server |
 | [code-review.md](./code-review.md) | Code Review | BL-CR-01 → 05 | Git CLI, GitHub API, AI Agent |
 | [project-integration.md](./project-integration.md) | Project Integration | BL-PI-01 → 04 | GitHub/GitLab/Linear API, Credential |
 | [mobile-companion.md](./mobile-companion.md) | Mobile Companion | BL-MB-01 → 04 | TweetNaCl WS, APNs/FCM |

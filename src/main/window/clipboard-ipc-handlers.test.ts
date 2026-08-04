@@ -106,8 +106,8 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: getSshFilesystemProviderMock,
-  requireSshFilesystemProvider: (connectionId: string) => {
+  getRemoteFilesystemProvider: getSshFilesystemProviderMock,
+  requireRemoteFilesystemProvider: (connectionId: string) => {
     const provider = getSshFilesystemProviderMock(connectionId)
     if (!provider) {
       throw new Error(

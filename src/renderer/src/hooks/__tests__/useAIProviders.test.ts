@@ -24,6 +24,21 @@ vi.mock('../../store', () => ({
   ),
 }))
 
+// Mock span exposes id/step/ok/fail so tests can assert the manual-trigger
+// `trigger: 'manual'` field and the ok/fail lifecycle with latencyMs.
+const { testConnSpan, uiAiProviderTestConnFlowStart } = vi.hoisted(() => {
+  const testConnSpan = { id: 'test-conn-span-id', step: vi.fn(), ok: vi.fn(), fail: vi.fn() }
+  return {
+    testConnSpan,
+    uiAiProviderTestConnFlowStart: vi.fn(() => testConnSpan),
+  }
+})
+vi.mock('../../../../shared/trace/tracers', () => ({
+  Tracers: {
+    uiAiProviderTestConnFlow: { start: uiAiProviderTestConnFlowStart },
+  }
+}))
+
 import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
 const mockRpc = vi.mocked(callRuntimeRpc)
 
@@ -75,5 +90,43 @@ describe('useAIProviders', () => {
     const { result } = renderHook(() => useAIProviders())
     await act(async () => { await result.current.refresh() })
     expect(mockRpc).toHaveBeenCalledTimes(2)  // mount + manual refresh
+  })
+
+  // --- TASK-FE-016.2: ui:aiProvider.testConnection tracer coverage ---
+
+  it('testConnection starts uiAiProviderTestConnFlow span with trigger=manual', async () => {
+    mockRpc.mockResolvedValueOnce([])
+    mockRpc.mockResolvedValueOnce({ ok: true, latencyMs: 120 })
+    const { useAIProviders } = await import('../useAIProviders')
+    const { result } = renderHook(() => useAIProviders())
+    await act(async () => { await result.current.testConnection('acc1') })
+
+    expect(uiAiProviderTestConnFlowStart).toHaveBeenCalledWith({ accountId: 'acc1', trigger: 'manual' })
+    expect(mockRpc).toHaveBeenCalledWith(
+      'mock-target', 'aiProvider.testConnection', { accountId: 'acc1', traceId: 'test-conn-span-id' }
+    )
+  })
+
+  it('testConnection ok → span.ok with accountId/ok/latencyMs', async () => {
+    mockRpc.mockResolvedValueOnce([])
+    mockRpc.mockResolvedValueOnce({ ok: true, latencyMs: 120 })
+    const { useAIProviders } = await import('../useAIProviders')
+    const { result } = renderHook(() => useAIProviders())
+    await act(async () => { await result.current.testConnection('acc1') })
+
+    expect(testConnSpan.ok).toHaveBeenCalledWith({ accountId: 'acc1', ok: true, latencyMs: 120 })
+  })
+
+  it('testConnection reject → span.fail(err, { accountId }) and status invalid', async () => {
+    const err = new Error('relay unreachable')
+    mockRpc.mockResolvedValueOnce([])
+    mockRpc.mockRejectedValueOnce(err)
+    const { useAIProviders } = await import('../useAIProviders')
+    const { result } = renderHook(() => useAIProviders())
+
+    await expect(result.current.testConnection('acc1')).rejects.toThrow('Connection test failed')
+
+    expect(testConnSpan.fail).toHaveBeenCalledWith(err, { accountId: 'acc1' })
+    expect(mockStore.updateAIAccountStatus).toHaveBeenCalledWith('acc1', 'invalid')
   })
 })

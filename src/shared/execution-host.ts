@@ -3,8 +3,12 @@ import type { GlobalSettings, Repo } from './types'
 export const LOCAL_EXECUTION_HOST_ID = 'local'
 export const ALL_EXECUTION_HOSTS_SCOPE = 'all'
 
-export type ExecutionHostKind = 'local' | 'ssh' | 'runtime'
-export type ExecutionHostId = typeof LOCAL_EXECUTION_HOST_ID | `ssh:${string}` | `runtime:${string}`
+export type ExecutionHostKind = 'local' | 'ssh' | 'runtime' | 'devServer'
+export type ExecutionHostId =
+  | typeof LOCAL_EXECUTION_HOST_ID
+  | `ssh:${string}`
+  | `runtime:${string}`
+  | `devServer:${string}`
 
 export type ExecutionHostScope = typeof ALL_EXECUTION_HOSTS_SCOPE | ExecutionHostId
 
@@ -12,6 +16,7 @@ export type ParsedExecutionHost =
   | { kind: 'local'; id: typeof LOCAL_EXECUTION_HOST_ID }
   | { kind: 'ssh'; id: `ssh:${string}`; targetId: string }
   | { kind: 'runtime'; id: `runtime:${string}`; environmentId: string }
+  | { kind: 'devServer'; id: `devServer:${string}`; devServerId: string }
 
 function getCurrentLocalPlatform(): NodeJS.Platform | null {
   const globalNavigator = (globalThis as { navigator?: { userAgent?: string; platform?: string } })
@@ -56,6 +61,10 @@ export function toRuntimeExecutionHostId(environmentId: string): `runtime:${stri
   return `runtime:${encodeURIComponent(environmentId)}`
 }
 
+export function toDevServerExecutionHostId(devServerId: string): `devServer:${string}` {
+  return `devServer:${encodeURIComponent(devServerId)}`
+}
+
 // Why: runtime-owned (ephemeral-VM) SSH targets are hidden from user-facing
 // SSH/run-target surfaces. The renderer can't read the target.owner field, so it
 // recognizes them by their deterministic id prefix. getRuntimeOwnedSshTargetId
@@ -94,6 +103,18 @@ export function parseExecutionHostId(value: string | null | undefined): ParsedEx
     try {
       const environmentId = decodeURIComponent(encoded)
       return environmentId ? { kind: 'runtime', id: `runtime:${encoded}`, environmentId } : null
+    } catch {
+      return null
+    }
+  }
+  if (normalized.startsWith('devServer:')) {
+    const encoded = normalized.slice('devServer:'.length)
+    if (!encoded) {
+      return null
+    }
+    try {
+      const devServerId = decodeURIComponent(encoded)
+      return devServerId ? { kind: 'devServer', id: `devServer:${encoded}`, devServerId } : null
     } catch {
       return null
     }
@@ -140,14 +161,34 @@ export function normalizeExecutionHostOrder(
 }
 
 export function getRepoExecutionHostId(
-  repo: Pick<Repo, 'connectionId' | 'executionHostId'>
+  repo: Pick<Repo, 'connectionId' | 'executionHostId' | 'devServerId'>
 ): ExecutionHostId {
   const executionHostId = normalizeExecutionHostId(repo.executionHostId)
   if (executionHostId) {
     return executionHostId
   }
   const connectionId = normalizeHostPart(repo.connectionId)
-  return connectionId ? toSshExecutionHostId(connectionId) : LOCAL_EXECUTION_HOST_ID
+  if (connectionId) {
+    return toSshExecutionHostId(connectionId)
+  }
+  const devServerId = normalizeHostPart(repo.devServerId)
+  return devServerId ? toDevServerExecutionHostId(devServerId) : LOCAL_EXECUTION_HOST_ID
+}
+
+/**
+ * The bare opaque key orca-runtime.ts's provider registries (ssh-filesystem-
+ * dispatch.ts / ssh-git-dispatch.ts) are keyed by — distinct from the
+ * prefixed, UI-facing ExecutionHostId. Those registries are transport-
+ * agnostic (see dev-server-provider-lifecycle.ts): an SSH target id and a
+ * Dev Server id both resolve through the same lookup, so a repo bound to
+ * either one works without the ~40 call sites that read this key knowing
+ * which transport backs it. Precedence matches getRepoExecutionHostId:
+ * an explicit connectionId (SSH) wins over devServerId.
+ */
+export function getRepoProviderConnectionKey(
+  repo: Pick<Repo, 'connectionId' | 'devServerId'>
+): string | null {
+  return normalizeHostPart(repo.connectionId) ?? normalizeHostPart(repo.devServerId) ?? null
 }
 
 export function getSettingsFocusedExecutionHostId(
@@ -174,5 +215,7 @@ export function getExecutionHostLabel(id: ExecutionHostScope): string {
       return parsed.targetId
     case 'runtime':
       return parsed.environmentId
+    case 'devServer':
+      return parsed.devServerId
   }
 }

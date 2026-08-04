@@ -481,3 +481,74 @@ Phase 3 deferred: OIDC/SSO handler (`src/main/auth/oidc-handler.ts`)
 | `src/main/ssh/fleet-health-monitor.ts` | RS-005 | Periodic health + alerts |
 | `src/main/audit/audit-log.ts` | RS-006 | NDJSON audit trail |
 | `src/shared/rbac-types.ts` | RS-006 | RBAC types |
+
+---
+
+## 11. Provider Unification with SSH Registries (v5.0) — IMPLEMENTED ✅
+
+> **Date:** 2026-08-02/03 | **TDD-05:** [05-ssh-relay.md § Addendum v5.0](./05-ssh-relay.md#addendum-v50-provider-registries-are-transport-agnostic)
+
+### 11.1 Vấn đề
+
+Trước v5.0, một Repo có thể gắn với remote host theo 2 cách **không liên quan gì nhau**:
+
+1. Classic **SSH Targets/Hosts** — `Repo.connectionId` / `Repo.executionHostId`, mọi file/git/terminal op đi qua `orca-runtime.ts` lookup trong `ssh-filesystem-dispatch.ts`/`ssh-git-dispatch.ts`.
+2. **Dev Servers** — `Repo.devServerId`, agent kết nối OUTBOUND qua WebSocket tới Orca server (§2-§3 ở trên), nhưng trước đây chỉ được wire vào flow onboarding/project hẹp — **vô hình** với machinery `Repo`/`orca-runtime.ts` cổ điển.
+
+### 11.2 Giải pháp
+
+Vì `ssh-filesystem-dispatch.ts`/`ssh-git-dispatch.ts` vốn đã keyed bằng 1 opaque connection-id string và transport-agnostic, Dev Server's agent connection sẵn có được đăng ký vào **CÙNG registry** — không mở connection mới, gần như zero-change cho ~40+ call site đọc từ registry. Chi tiết provider class + registry widening: xem [05-ssh-relay.md § Addendum v5.0](./05-ssh-relay.md#addendum-v50-provider-registries-are-transport-agnostic).
+
+Helper hợp nhất `getRepoProviderConnectionKey(repo)` (`src/shared/execution-host.ts`):
+
+```typescript
+export function getRepoProviderConnectionKey(
+  repo: Pick<Repo, 'connectionId' | 'devServerId'>
+): string | null {
+  return normalizeHostPart(repo.connectionId) ?? normalizeHostPart(repo.devServerId) ?? null
+}
+```
+
+Đây là bare provider-registry lookup key — khác với `ExecutionHostId` dạng prefix (`ssh:<id>` / `devServer:<id>`) dùng ở UI. Áp dụng xuyên suốt `orca-runtime.ts` (choke-point `resolveRuntimeGitTarget`/`resolveRuntimeFileTarget`, fix ~45 call site downstream miễn phí), `worktree-remote.ts` (~24 hàm retype từ `SshGitProvider` sang `IGitProvider`), `worktrees.ts` (53 call site), `repos.ts`, `git-username.ts`, `pr-head-tracking-ref.ts`, `first-work-generation-target.ts`, `first-work-branch-rename.ts`, `workspace-cleanup-scan.ts`, `repo-worktrees.ts`, `workspace-space-analysis.ts`.
+
+**Ngoài phạm vi (giữ nguyên SSH-only):** GitHub/GitLab/Gitea/Bitbucket/Azure DevOps-specific `connectionId` usages — muốn hỗ trợ Dev Server sẽ cần extension riêng.
+
+### 11.3 Repo / Host-Setup IPC (`src/main/ipc/repos.ts`)
+
+`addRemoteRepoFromPath` có thêm param `hostKind?: 'ssh' | 'devServer'` (default `'ssh'`); repo persistence ghi `connectionId` (ssh) hoặc `devServerId` (devServer) tuỳ `hostKind`. Handler `'projectHostSetups:setupExistingFolder'` branch theo `parseExecutionHostId(args.hostId)?.kind === 'devServer'` → gọi `addRemoteRepoFromPath({ hostKind: 'devServer', ... })` — full flow "set up existing folder as project on Dev Server" hoạt động end-to-end.
+
+**Chưa làm:** Clone repo MỚI lên Dev Server (`cloneRemoteRepo`/`repos:cloneRemote`) — hàm này phụ thuộc khái niệm SSH-only (`getHostPlatform()`, remote home-path resolution, SSH multiplexer progress notify) chưa có tương đương ở Dev Server. Guard mới throw rõ ràng thay vì âm thầm clone lên local filesystem của chính Orca server (rủi ro bug thật trước khi fix).
+
+### 11.4 Realtime Notification Relay (Multi-User / Web Mode)
+
+**Vấn đề:** `GatewayDevServerManagerProxy` (per-user child-process proxy tới `DevServerManager` thật sống ở parent/gateway process) trước đây chỉ hỗ trợ request/response `call()` — không có đường cho agent PUSH notification (pty output, file-change event) vào child process của đúng user.
+
+**Giải pháp:** Broadcast message type mới `devServer:proxyNotification`, song song với `devServer:event` đã có:
+
+```
+DevServerRelayBridge (parent, wrap agent connection — cả 3 mode relay-ssh/relay-websocket/direct-websocket)
+  └── public onNotification(handler): unsubscribe
+        // Subscriber lưu độc lập với session hiện tại, tự rewire vào mỗi
+        // SshChannelMultiplexer session mới khi reconnect — sống sót qua
+        // reconnect, khác với subscribe thẳng vào mux (chết theo mux)
+
+DevServerManager.connect() / .connectDaemonAgent()
+  └── bridge.onNotification((method, params) => this.emit('devServer:notification', id, method, params))
+
+SessionManager (parent process)
+  └── on('devServer:notification') → proc.process.send({
+        type: 'devServer:proxyNotification', devServerId, method, params
+      })  // tới mọi live user child process
+
+GatewayDevServerManagerProxy (child process)
+  └── process.on('message') nhận 'devServer:proxyNotification'
+        → re-dispatch tới subscriber đăng ký qua getRelay(id).onNotification(handler)
+```
+
+### 11.5 Rollout Process (operational note)
+
+Agent binary mới (`agent.js`) được deploy tới `test-01` trước qua `deploy/dev/scripts/deploy-agents.sh --server TEST01`, verify qua log (reconnect sạch, capability mới `fs.watch`/`pty.stream` advertise đúng, capability `git`/`worktrees` không đổi, 0 lỗi trong log orca-server) — rồi mới rollout tiếp `dev-01`/`dev-ai` (`--server DEV01`/`--server DEV02`). Pattern staged-rollout này là cách an toàn để ship thay đổi agent-wire-protocol mà không phá vỡ Dev Server đang connect.
+
+### 11.6 Explicitly Deferred
+
+`DevServerPtyProvider` (`IPtyProvider` cho Dev Server agent) **chưa xây**. `IPtyProvider` cần ~8 method (getCwd, hasChildProcesses, getForegroundProcess, serialize, revive, clearBuffer, acknowledgeDataEvent) không có equivalent trung thực ở phía agent nếu không lossy-approximate; đồng thời chưa Dev Server nào report `pty=true` ở handshake (node-pty native binary fail load ở deployment hiện tại) — nên terminal-over-Dev-Server vẫn unavailable end-to-end bất kể provider có hoàn chỉnh hay không. `pty.create` mới ở agent-side với push notification `pty.data`/`pty.exit` real-time, và fix `normalizeConnectionId()` trong `ssh-pty-id.ts` (giờ unwrap cả `kind === 'devServer'`, không chỉ `kind === 'ssh'`) là groundwork cho việc này, nhưng provider class là future work.

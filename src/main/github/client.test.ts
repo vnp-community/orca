@@ -91,7 +91,7 @@ vi.mock('../git/runner', () => ({
 }))
 
 vi.mock('../providers/ssh-git-dispatch', () => ({
-  getSshGitProvider: getSshGitProviderMock
+  getRemoteGitProvider: getSshGitProviderMock
 }))
 
 vi.mock('./local-git-config-signature', () => ({

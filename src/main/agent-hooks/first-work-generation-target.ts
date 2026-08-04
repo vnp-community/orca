@@ -1,4 +1,4 @@
-import type { SshGitProvider } from '../providers/ssh-git-provider'
+import type { IGitProvider } from '../providers/types'
 import type { CommitMessageGenerationTarget } from '../text-generation/commit-message-text-generation'
 import {
   prepareLocalCommitMessageAgentEnv,
@@ -10,7 +10,7 @@ import {
 export async function resolveGenerationTarget(
   worktreePath: string,
   agentId: string,
-  provider: SshGitProvider | null,
+  provider: IGitProvider | null,
   deps: { getAgentEnvResolvers: () => CommitMessageAgentEnvironmentResolvers | undefined }
 ): Promise<CommitMessageGenerationTarget | null> {
   if (provider) {
@@ -18,7 +18,7 @@ export async function resolveGenerationTarget(
       kind: 'remote',
       cwd: worktreePath,
       execute: (plan, cwd, timeoutMs, operation) =>
-        provider.executeCommitMessagePlan(plan, cwd, timeoutMs, operation),
+        provider.executeCommitMessagePlan!(plan, cwd, timeoutMs, operation),
       missingBinaryLocation: 'remote PATH'
     }
   }

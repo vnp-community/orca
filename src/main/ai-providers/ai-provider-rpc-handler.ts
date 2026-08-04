@@ -58,6 +58,7 @@ const WriteCredentialParam = z.object({
   accountId: z.string().min(1),
   encryptedBlob: z.string().min(1),
   iv: z.string().min(1),
+  traceId: z.string().optional(), // CR-TRACE-000 §3.3 — WS RPC row
 })
 
 const ResolveParam = z.object({
@@ -143,7 +144,13 @@ export function createAIProviderMethods(
       handler: async (params, ctx) => {
         if (!ctx.userId) throw new Error('UNAUTHENTICATED')
         await assertAccountAccess(service, params.accountId, ctx.userId)
-        await service.writeCredentialToDevServer(params.accountId, params.encryptedBlob, params.iv)
+        // traceId resume happens INSIDE writeCredentialToDevServer() via the traceId? overload above.
+        await service.writeCredentialToDevServer(
+          params.accountId,
+          params.encryptedBlob,
+          params.iv,
+          params.traceId
+        )
         return { success: true }
       }
     }),

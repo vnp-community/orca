@@ -36,7 +36,7 @@ import {
   clearProviderPtyState,
   deletePtyOwnership,
   getPtyIdsForConnection,
-  getSshPtyProvider
+  getRemotePtyProvider
 } from './pty'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 
@@ -1171,7 +1171,7 @@ export function registerSshHandlers(
 
   ipcMain.handle('ssh:terminateSessions', async (_event, args: { targetId: string }) => {
     const session = activeSessions.get(args.targetId)
-    const provider = getSshPtyProvider(args.targetId)
+    const provider = getRemotePtyProvider(args.targetId)
     const leasedIds = persistedStore!
       .getSshRemotePtyLeases(args.targetId)
       .filter((lease) => lease.state !== 'terminated' && lease.state !== 'expired')

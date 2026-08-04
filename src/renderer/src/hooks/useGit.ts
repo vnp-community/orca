@@ -1,9 +1,10 @@
 import { useCallback, useEffect } from 'react'
 import { useWorkspace } from '../context/WorkspaceContext'
 import { useAppStore } from '../store'
-import { callRuntimeRpc } from '../runtime/runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
 import { callRuntimeRpcStream } from '../runtime/runtime-rpc-stream'
 import type { GitFileChange } from '../store/slices/git-panel'
+import { Tracers } from '../../../shared/trace/tracers'
 
 export function useGit() {
   const { project, currentWorktree, emit, refreshGitStatus } = useWorkspace()
@@ -99,10 +100,23 @@ export function useGit() {
 
   const aiCommitMessage = useCallback(async () => {
     if (!project) return ''
-    const result = await callRuntimeRpc('git.aiCommitMessage', { projectId: project.id }) as {
-      message: string
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    const span = Tracers.codeReviewAiCommitFlow.start({ projectId: project.id, entry: 'commit-form' })
+    try {
+      // Why: callRuntimeRpc's real signature requires `target` as the first
+      // argument — the original call site here omitted it (pre-existing bug,
+      // out of scope for this CR); fixed to match the real signature instead
+      // of repeating the mismatch while adding tracing.
+      const result = await callRuntimeRpc<{ message: string }>(target, 'git.aiCommitMessage', {
+        projectId: project.id,
+        traceId: span.id
+      })
+      span.ok({ messageChars: result.message.length })
+      return result.message
+    } catch (err) {
+      span.fail(err, { projectId: project.id })
+      throw err
     }
-    return result.message
   }, [project])
 
   return {

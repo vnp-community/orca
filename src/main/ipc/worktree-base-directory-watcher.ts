@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import type { Store } from '../persistence'
 import { notifyWorktreeGitStatusMetadataChanged, notifyWorktreesChanged } from './worktree-remote'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
   createWorktreeHeadIdentityRefreshState,
   refreshWorktreeHeadIdentities,
@@ -137,7 +137,7 @@ async function subscribeTarget(
 ): Promise<ActiveWatch> {
   let activeWatch: ActiveWatch | null = null
   if (target.connectionId) {
-    const provider = getSshFilesystemProvider(target.connectionId)
+    const provider = getRemoteFilesystemProvider(target.connectionId)
     if (!provider) {
       throw new Error(`SSH filesystem provider unavailable for ${target.connectionId}`)
     }

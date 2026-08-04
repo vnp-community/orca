@@ -22,6 +22,7 @@ import {
   logHistoryInjection
 } from '../terminal-history'
 import type { IPtyProvider, PtyProcessInfo, PtySpawnOptions, PtySpawnResult } from './types'
+import { Tracers } from '../../shared/trace/tracers'
 import {
   ensureNodePtySpawnHelperExecutable,
   validateWorkingDirectory,
@@ -328,513 +329,527 @@ export class LocalPtyProvider implements IPtyProvider {
    * method preserves that state so the stdin fallback only runs when needed.
    */
   async spawn(args: PtySpawnOptions): Promise<PtySpawnResult> {
-    const reattachId = normalizeLocalCallerSessionId(args.sessionId)
-    if (reattachId) {
-      const existing = ptyProcesses.get(reattachId)
-      if (existing) {
-        try {
-          existing.resize(args.cols, args.rows)
-        } catch {
-          /* Existing PTY may reject resize during teardown; still return the live handle. */
+    // Why: span is independent from the RPC-layer terminal:create span — no
+    // traceId threads through PtySpawnOptions (shared interface, wide blast
+    // radius to change). Join via ptyId in TracePanel instead (SOL-BE-TRACE-003).
+    const span = Tracers.terminalCreate.start({ providerType: 'local', step: 'provider-spawn' })
+    try {
+      const reattachId = normalizeLocalCallerSessionId(args.sessionId)
+      if (reattachId) {
+        const existing = ptyProcesses.get(reattachId)
+        if (existing) {
+          try {
+            existing.resize(args.cols, args.rows)
+          } catch {
+            /* Existing PTY may reject resize during teardown; still return the live handle. */
+          }
+          span.ok({ providerType: 'local', ptyId: reattachId })
+          return { id: reattachId, pid: existing.pid, isReattach: true }
         }
-        return { id: reattachId, pid: existing.pid, isReattach: true }
       }
-    }
-    const id = allocatePtyId(reattachId ?? undefined)
+      const id = allocatePtyId(reattachId ?? undefined)
 
-    const startupAgentRecognition = args.command
-      ? recognizeAgentProcessFromCommandLine(args.command)
-      : null
+      const startupAgentRecognition = args.command
+        ? recognizeAgentProcessFromCommandLine(args.command)
+        : null
 
-    const defaultCwd = getDefaultCwd()
-    const cwd = args.cwd || defaultCwd
-    // Why: gate on the effective cwd (post default-cwd fallback), not the raw
-    // args.cwd — an omitted cwd resolves to a safe default and must not be
-    // rejected as if it were a root-like path.
-    if (args.command && startupAgentRecognition) {
-      assertSafeAgentStartupCwd(cwd, args.command)
-    }
-    const wslInfo = process.platform === 'win32' ? parseWslPath(cwd) : null
-    const worktreeWslContext =
-      process.platform === 'win32' ? getWslContextFromWorktreeId(args.worktreeId) : undefined
-    const preferredWslContext =
-      process.platform === 'win32'
-        ? getWslContextFromPreferredDistro(args.terminalWindowsWslDistro)
-        : undefined
-
-    let shellPath: string
-    let shellArgs: string[]
-    let effectiveCwd: string
-    let validationCwd: string
-    let startupCommandDeliveredInShellArgs = false
-    let windowsFallbackAttempts: ReturnType<typeof buildWindowsPowerShellSpawnAttempts> = []
-    let shellReadyLaunch: ReturnType<typeof getShellReadyLaunchConfig> | null = null
-    let getFallbackShellReadyConfig:
-      | ((shell: string) => ReturnType<typeof getShellReadyLaunchConfig>)
-      | undefined
-    if (wslInfo) {
-      shellPath = 'wsl.exe'
-      const resolved = resolveWindowsShellLaunchArgs(shellPath, cwd, defaultCwd)
-      shellArgs = resolved.shellArgs
-      effectiveCwd = resolved.effectiveCwd
-      validationCwd = resolved.validationCwd
-    } else if (process.platform === 'win32') {
-      // Why: shellOverride lets a single tab open in a different shell than the
-      // persisted default (e.g. "New WSL terminal" from the "+" submenu) without
-      // changing the user's setting. It takes priority over the setting.
-      const requestedShellFamily =
-        args.shellOverride ||
-        this.opts.getWindowsShell?.() ||
-        process.env.COMSPEC ||
-        'powershell.exe'
-      const shellFamily = worktreeWslContext ? 'wsl.exe' : requestedShellFamily
-      const normalizedShellFamily = pathWin32.basename(shellFamily).toLowerCase()
-      const resolvedGitBashPath = resolveWindowsGitBashShellPath(shellFamily)
-      // Why: shell selection can arrive either as a canonical setting value
-      // ('powershell.exe') or as a concrete PowerShell executable path from a
-      // one-off override. Normalize both forms back to the PowerShell family so
-      // the shared resolver can still fall back to inbox powershell.exe when
-      // pwsh.exe was requested but is unavailable.
-      const powerShellImplementation = this.opts.getWindowsPowerShellImplementation?.()
-      const resolvedShellFamily: WindowsPowerShellShellFamily =
-        normalizedShellFamily === 'powershell.exe' || normalizedShellFamily === 'pwsh.exe'
-          ? normalizedShellFamily
-          : normalizedShellFamily === 'cmd.exe' || normalizedShellFamily === 'wsl.exe'
-            ? normalizedShellFamily
-            : undefined
-      const shouldProbePwsh = shouldProbeWindowsPowerShellAvailability({
-        shellFamily: resolvedShellFamily,
-        implementation: powerShellImplementation
-      })
-      const shouldResolvePowerShellFamily =
-        powerShellImplementation !== undefined || pathWin32.basename(shellFamily) === shellFamily
-      if (resolvedGitBashPath) {
-        shellPath = resolvedGitBashPath
-      } else if (shellFamily === WINDOWS_GIT_BASH_SHELL) {
-        shellPath = 'powershell.exe'
-      } else {
-        shellPath = shouldResolvePowerShellFamily
-          ? (resolveEffectiveWindowsPowerShell({
-              shellFamily: resolvedShellFamily,
-              implementation: powerShellImplementation,
-              pwshAvailable: shouldProbePwsh ? (this.opts.pwshAvailable?.() ?? false) : false
-            }) ?? shellFamily)
-          : shellFamily
+      const defaultCwd = getDefaultCwd()
+      const cwd = args.cwd || defaultCwd
+      // Why: gate on the effective cwd (post default-cwd fallback), not the raw
+      // args.cwd — an omitted cwd resolves to a safe default and must not be
+      // rejected as if it were a root-like path.
+      if (args.command && startupAgentRecognition) {
+        assertSafeAgentStartupCwd(cwd, args.command)
       }
-      // Why: when the selected shell is a PowerShell family, resolve it to a
-      // real absolute executable and build a PowerShell -> cmd.exe fallback
-      // chain. Handing ConPTY a bare `pwsh.exe` lets Windows resolve it to the
-      // Store App Execution Alias stub, whose spawn fails with error code 5.
-      // The shared launch-args helper inside keeps both this path and the
-      // daemon path producing identical args (chcp 65001 / $PROFILE / wsl cwd).
-      windowsFallbackAttempts = buildWindowsPowerShellSpawnAttempts({
-        shellPath,
-        cwd,
-        defaultCwd,
-        wslContext: worktreeWslContext ?? preferredWslContext,
-        startupCommand: args.command
-      })
-      const primaryAttempt = windowsFallbackAttempts[0]
-      if (primaryAttempt) {
-        shellPath = primaryAttempt.shellPath
-        shellArgs = primaryAttempt.shellArgs
-        effectiveCwd = primaryAttempt.effectiveCwd
-        validationCwd = primaryAttempt.validationCwd
-        startupCommandDeliveredInShellArgs = primaryAttempt.startupCommandDeliveredInShellArgs
-      } else {
-        const resolved = resolveWindowsShellLaunchArgs(
-          shellPath,
-          cwd,
-          defaultCwd,
-          worktreeWslContext ?? preferredWslContext,
-          args.command
-        )
+      const wslInfo = process.platform === 'win32' ? parseWslPath(cwd) : null
+      const worktreeWslContext =
+        process.platform === 'win32' ? getWslContextFromWorktreeId(args.worktreeId) : undefined
+      const preferredWslContext =
+        process.platform === 'win32'
+          ? getWslContextFromPreferredDistro(args.terminalWindowsWslDistro)
+          : undefined
+
+      let shellPath: string
+      let shellArgs: string[]
+      let effectiveCwd: string
+      let validationCwd: string
+      let startupCommandDeliveredInShellArgs = false
+      let windowsFallbackAttempts: ReturnType<typeof buildWindowsPowerShellSpawnAttempts> = []
+      let shellReadyLaunch: ReturnType<typeof getShellReadyLaunchConfig> | null = null
+      let getFallbackShellReadyConfig:
+        | ((shell: string) => ReturnType<typeof getShellReadyLaunchConfig>)
+        | undefined
+      if (wslInfo) {
+        shellPath = 'wsl.exe'
+        const resolved = resolveWindowsShellLaunchArgs(shellPath, cwd, defaultCwd)
         shellArgs = resolved.shellArgs
         effectiveCwd = resolved.effectiveCwd
         validationCwd = resolved.validationCwd
-        startupCommandDeliveredInShellArgs = resolved.startupCommandDeliveredInShellArgs === true
-      }
-    } else {
-      shellPath = args.env?.SHELL || process.env.SHELL || '/bin/zsh'
-      shellArgs = ['-l']
-      effectiveCwd = cwd
-      validationCwd = cwd
-    }
-
-    ensureNodePtySpawnHelperExecutable()
-    validateWorkingDirectory(validationCwd)
-
-    const spawnEnv: Record<string, string> = {
-      ...process.env,
-      ...args.env,
-      TERM: 'xterm-256color',
-      COLORTERM: 'truecolor',
-      TERM_PROGRAM: 'Orca',
-      // Why: TUIs feature-gate on TERM_PROGRAM_VERSION (Neovim's termcap
-      // autodetection, bat/delta paging hints). Sourced from ORCA_APP_VERSION
-      // which main/index.ts seeds from app.getVersion() at startup; the
-      // fallback keeps tests and non-Electron runs working.
-      TERM_PROGRAM_VERSION: process.env.ORCA_APP_VERSION ?? '0.0.0-dev',
-      // Why: opt tools (Claude Code, ls --hyperlink, etc.) into emitting OSC 8
-      // hyperlinks. The `supports-hyperlinks` npm package gates on a hard-coded
-      // TERM_PROGRAM allowlist (iTerm.app / WezTerm / vscode) and returns false
-      // for TERM_PROGRAM=Orca, so callers drop OSC 8 output entirely and emit
-      // bare text instead. xterm.js in Orca parses OSC 8 and the pane's
-      // linkHandler routes clicks, so forcing the advertisement is safe and
-      // restores clickable refs like `owner/repo#123` / `PR#123`.
-      FORCE_HYPERLINK: '1'
-    } as Record<string, string>
-    // Why: Orca can be launched from an Orca terminal while developing. Pane
-    // identity belongs to the child PTY, not the parent shell that spawned app.
-    removeUnspecifiedPaneIdentityEnv(spawnEnv, args.env)
-    removeAppImageRuntimeEnv(spawnEnv)
-    removeInheritedNoColor(spawnEnv)
-    for (const key of args.envToDelete ?? []) {
-      delete spawnEnv[key]
-    }
-    if (args.env?.TERM) {
-      spawnEnv.TERM = args.env.TERM
-    }
-
-    spawnEnv.LANG ??= 'en_US.UTF-8'
-
-    // Why: On Windows, LANG alone does not control the console code page.
-    // Programs like Python and Node.js check their own encoding env vars
-    // independently. PYTHONUTF8=1 makes Python use UTF-8 for stdio regardless
-    // of the Windows console code page, preventing garbled CJK output from
-    // Python scripts run inside the terminal.
-    if (process.platform === 'win32') {
-      spawnEnv.PYTHONUTF8 ??= '1'
-      if (isWindowsGitBashShellPath(shellPath)) {
-        // Why: Git for Windows login startup files otherwise cd to $HOME,
-        // ignoring node-pty's cwd for repo-scoped terminals.
-        spawnEnv.CHERE_INVOKING ??= '1'
-      }
-    }
-
-    const isWslShell = Boolean(wslInfo) || pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe'
-    const launchWslDistro =
-      wslInfo?.distro ?? worktreeWslContext?.distro ?? preferredWslContext?.distro ?? null
-    const finalEnv = this.opts.buildSpawnEnv
-      ? this.opts.buildSpawnEnv(id, spawnEnv, {
-          command: args.command,
-          shellPath,
-          isWsl: isWslShell,
-          wslDistro: launchWslDistro
+      } else if (process.platform === 'win32') {
+        // Why: shellOverride lets a single tab open in a different shell than the
+        // persisted default (e.g. "New WSL terminal" from the "+" submenu) without
+        // changing the user's setting. It takes priority over the setting.
+        const requestedShellFamily =
+          args.shellOverride ||
+          this.opts.getWindowsShell?.() ||
+          process.env.COMSPEC ||
+          'powershell.exe'
+        const shellFamily = worktreeWslContext ? 'wsl.exe' : requestedShellFamily
+        const normalizedShellFamily = pathWin32.basename(shellFamily).toLowerCase()
+        const resolvedGitBashPath = resolveWindowsGitBashShellPath(shellFamily)
+        // Why: shell selection can arrive either as a canonical setting value
+        // ('powershell.exe') or as a concrete PowerShell executable path from a
+        // one-off override. Normalize both forms back to the PowerShell family so
+        // the shared resolver can still fall back to inbox powershell.exe when
+        // pwsh.exe was requested but is unavailable.
+        const powerShellImplementation = this.opts.getWindowsPowerShellImplementation?.()
+        const resolvedShellFamily: WindowsPowerShellShellFamily =
+          normalizedShellFamily === 'powershell.exe' || normalizedShellFamily === 'pwsh.exe'
+            ? normalizedShellFamily
+            : normalizedShellFamily === 'cmd.exe' || normalizedShellFamily === 'wsl.exe'
+              ? normalizedShellFamily
+              : undefined
+        const shouldProbePwsh = shouldProbeWindowsPowerShellAvailability({
+          shellFamily: resolvedShellFamily,
+          implementation: powerShellImplementation
         })
-      : spawnEnv
-    // Why: app-level env hooks can reintroduce vars that special launch modes
-    // explicitly scrubbed. Apply deletions last so shims like Claude Agent
-    // Teams keep their PATH and terminal-detection contract.
-    for (const key of args.envToDelete ?? []) {
-      delete finalEnv[key]
-    }
-    if (args.env?.TERM) {
-      finalEnv.TERM = args.env.TERM
-    }
-    if (process.platform === 'win32') {
-      const codexHomeWslInfo = finalEnv.CODEX_HOME ? parseWslPath(finalEnv.CODEX_HOME) : null
-      if (pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe') {
-        if (codexHomeWslInfo) {
-          if (launchWslDistro && launchWslDistro !== codexHomeWslInfo.distro) {
+        const shouldResolvePowerShellFamily =
+          powerShellImplementation !== undefined || pathWin32.basename(shellFamily) === shellFamily
+        if (resolvedGitBashPath) {
+          shellPath = resolvedGitBashPath
+        } else if (shellFamily === WINDOWS_GIT_BASH_SHELL) {
+          shellPath = 'powershell.exe'
+        } else {
+          shellPath = shouldResolvePowerShellFamily
+            ? (resolveEffectiveWindowsPowerShell({
+                shellFamily: resolvedShellFamily,
+                implementation: powerShellImplementation,
+                pwshAvailable: shouldProbePwsh ? (this.opts.pwshAvailable?.() ?? false) : false
+              }) ?? shellFamily)
+            : shellFamily
+        }
+        // Why: when the selected shell is a PowerShell family, resolve it to a
+        // real absolute executable and build a PowerShell -> cmd.exe fallback
+        // chain. Handing ConPTY a bare `pwsh.exe` lets Windows resolve it to the
+        // Store App Execution Alias stub, whose spawn fails with error code 5.
+        // The shared launch-args helper inside keeps both this path and the
+        // daemon path producing identical args (chcp 65001 / $PROFILE / wsl cwd).
+        windowsFallbackAttempts = buildWindowsPowerShellSpawnAttempts({
+          shellPath,
+          cwd,
+          defaultCwd,
+          wslContext: worktreeWslContext ?? preferredWslContext,
+          startupCommand: args.command
+        })
+        const primaryAttempt = windowsFallbackAttempts[0]
+        if (primaryAttempt) {
+          shellPath = primaryAttempt.shellPath
+          shellArgs = primaryAttempt.shellArgs
+          effectiveCwd = primaryAttempt.effectiveCwd
+          validationCwd = primaryAttempt.validationCwd
+          startupCommandDeliveredInShellArgs = primaryAttempt.startupCommandDeliveredInShellArgs
+        } else {
+          const resolved = resolveWindowsShellLaunchArgs(
+            shellPath,
+            cwd,
+            defaultCwd,
+            worktreeWslContext ?? preferredWslContext,
+            args.command
+          )
+          shellArgs = resolved.shellArgs
+          effectiveCwd = resolved.effectiveCwd
+          validationCwd = resolved.validationCwd
+          startupCommandDeliveredInShellArgs = resolved.startupCommandDeliveredInShellArgs === true
+        }
+      } else {
+        shellPath = args.env?.SHELL || process.env.SHELL || '/bin/zsh'
+        shellArgs = ['-l']
+        effectiveCwd = cwd
+        validationCwd = cwd
+      }
+
+      ensureNodePtySpawnHelperExecutable()
+      validateWorkingDirectory(validationCwd)
+
+      const spawnEnv: Record<string, string> = {
+        ...process.env,
+        ...args.env,
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor',
+        TERM_PROGRAM: 'Orca',
+        // Why: TUIs feature-gate on TERM_PROGRAM_VERSION (Neovim's termcap
+        // autodetection, bat/delta paging hints). Sourced from ORCA_APP_VERSION
+        // which main/index.ts seeds from app.getVersion() at startup; the
+        // fallback keeps tests and non-Electron runs working.
+        TERM_PROGRAM_VERSION: process.env.ORCA_APP_VERSION ?? '0.0.0-dev',
+        // Why: opt tools (Claude Code, ls --hyperlink, etc.) into emitting OSC 8
+        // hyperlinks. The `supports-hyperlinks` npm package gates on a hard-coded
+        // TERM_PROGRAM allowlist (iTerm.app / WezTerm / vscode) and returns false
+        // for TERM_PROGRAM=Orca, so callers drop OSC 8 output entirely and emit
+        // bare text instead. xterm.js in Orca parses OSC 8 and the pane's
+        // linkHandler routes clicks, so forcing the advertisement is safe and
+        // restores clickable refs like `owner/repo#123` / `PR#123`.
+        FORCE_HYPERLINK: '1'
+      } as Record<string, string>
+      // Why: Orca can be launched from an Orca terminal while developing. Pane
+      // identity belongs to the child PTY, not the parent shell that spawned app.
+      removeUnspecifiedPaneIdentityEnv(spawnEnv, args.env)
+      removeAppImageRuntimeEnv(spawnEnv)
+      removeInheritedNoColor(spawnEnv)
+      for (const key of args.envToDelete ?? []) {
+        delete spawnEnv[key]
+      }
+      if (args.env?.TERM) {
+        spawnEnv.TERM = args.env.TERM
+      }
+
+      spawnEnv.LANG ??= 'en_US.UTF-8'
+
+      // Why: On Windows, LANG alone does not control the console code page.
+      // Programs like Python and Node.js check their own encoding env vars
+      // independently. PYTHONUTF8=1 makes Python use UTF-8 for stdio regardless
+      // of the Windows console code page, preventing garbled CJK output from
+      // Python scripts run inside the terminal.
+      if (process.platform === 'win32') {
+        spawnEnv.PYTHONUTF8 ??= '1'
+        if (isWindowsGitBashShellPath(shellPath)) {
+          // Why: Git for Windows login startup files otherwise cd to $HOME,
+          // ignoring node-pty's cwd for repo-scoped terminals.
+          spawnEnv.CHERE_INVOKING ??= '1'
+        }
+      }
+
+      const isWslShell =
+        Boolean(wslInfo) || pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe'
+      const launchWslDistro =
+        wslInfo?.distro ?? worktreeWslContext?.distro ?? preferredWslContext?.distro ?? null
+      const finalEnv = this.opts.buildSpawnEnv
+        ? this.opts.buildSpawnEnv(id, spawnEnv, {
+            command: args.command,
+            shellPath,
+            isWsl: isWslShell,
+            wslDistro: launchWslDistro
+          })
+        : spawnEnv
+      // Why: app-level env hooks can reintroduce vars that special launch modes
+      // explicitly scrubbed. Apply deletions last so shims like Claude Agent
+      // Teams keep their PATH and terminal-detection contract.
+      for (const key of args.envToDelete ?? []) {
+        delete finalEnv[key]
+      }
+      if (args.env?.TERM) {
+        finalEnv.TERM = args.env.TERM
+      }
+      if (process.platform === 'win32') {
+        const codexHomeWslInfo = finalEnv.CODEX_HOME ? parseWslPath(finalEnv.CODEX_HOME) : null
+        if (pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe') {
+          if (codexHomeWslInfo) {
+            if (launchWslDistro && launchWslDistro !== codexHomeWslInfo.distro) {
+              delete finalEnv.CODEX_HOME
+              delete finalEnv.ORCA_CODEX_HOME
+            } else {
+              finalEnv.CODEX_HOME = codexHomeWslInfo.linuxPath
+              finalEnv.ORCA_CODEX_HOME = codexHomeWslInfo.linuxPath
+              // Why: wsl.exe only imports non-default env vars named in WSLENV.
+              addWslEnvKeys(finalEnv, ['CODEX_HOME', 'ORCA_CODEX_HOME'])
+              if (!launchWslDistro) {
+                const resolved = resolveWindowsShellLaunchArgs(shellPath, cwd, defaultCwd, {
+                  distro: codexHomeWslInfo.distro
+                })
+                shellArgs = resolved.shellArgs
+                effectiveCwd = resolved.effectiveCwd
+                validationCwd = resolved.validationCwd
+                startupCommandDeliveredInShellArgs =
+                  resolved.startupCommandDeliveredInShellArgs === true
+              }
+            }
+          } else if (isHostCodexHomeForWsl(finalEnv.CODEX_HOME)) {
+            // Why: Orca's selected Codex runtime home is host-local. WSL Codex
+            // must use its Linux-side ~/.codex instead of a Windows path.
             delete finalEnv.CODEX_HOME
             delete finalEnv.ORCA_CODEX_HOME
-          } else {
-            finalEnv.CODEX_HOME = codexHomeWslInfo.linuxPath
-            finalEnv.ORCA_CODEX_HOME = codexHomeWslInfo.linuxPath
-            // Why: wsl.exe only imports non-default env vars named in WSLENV.
+          } else if (finalEnv.CODEX_HOME) {
             addWslEnvKeys(finalEnv, ['CODEX_HOME', 'ORCA_CODEX_HOME'])
-            if (!launchWslDistro) {
-              const resolved = resolveWindowsShellLaunchArgs(shellPath, cwd, defaultCwd, {
-                distro: codexHomeWslInfo.distro
-              })
-              shellArgs = resolved.shellArgs
-              effectiveCwd = resolved.effectiveCwd
-              validationCwd = resolved.validationCwd
-              startupCommandDeliveredInShellArgs =
-                resolved.startupCommandDeliveredInShellArgs === true
-            }
           }
-        } else if (isHostCodexHomeForWsl(finalEnv.CODEX_HOME)) {
-          // Why: Orca's selected Codex runtime home is host-local. WSL Codex
-          // must use its Linux-side ~/.codex instead of a Windows path.
+          if (finalEnv.CLAUDE_CONFIG_DIR) {
+            // Why: managed WSL Claude accounts pass a Linux CLAUDE_CONFIG_DIR
+            // through Windows wsl.exe; non-default env vars need WSLENV import.
+            addWslEnvKeys(finalEnv, ['CLAUDE_CONFIG_DIR'])
+          }
+          if (finalEnv[ORCA_HERMES_STARTUP_QUERY_ENV] !== undefined) {
+            // Why: the startup wrapper expands this only inside WSL; wsl.exe
+            // otherwise drops custom Windows environment variables.
+            addWslEnvKeys(finalEnv, [ORCA_HERMES_STARTUP_QUERY_ENV])
+          }
+        } else if (codexHomeWslInfo || isWslCodexHomeForHost(finalEnv.CODEX_HOME)) {
+          // Why: WSL-managed Codex homes are Linux paths. Windows Codex cannot use
+          // them. ORCA_CODEX_HOME must go too because shell-ready scripts restore
+          // CODEX_HOME from it after user profiles run.
           delete finalEnv.CODEX_HOME
           delete finalEnv.ORCA_CODEX_HOME
-        } else if (finalEnv.CODEX_HOME) {
-          addWslEnvKeys(finalEnv, ['CODEX_HOME', 'ORCA_CODEX_HOME'])
         }
-        if (finalEnv.CLAUDE_CONFIG_DIR) {
-          // Why: managed WSL Claude accounts pass a Linux CLAUDE_CONFIG_DIR
-          // through Windows wsl.exe; non-default env vars need WSLENV import.
-          addWslEnvKeys(finalEnv, ['CLAUDE_CONFIG_DIR'])
+      }
+      seedPowerlevel10kWizardEnv(finalEnv, { envToDelete: args.envToDelete })
+      if (
+        finalEnv[POWERLEVEL10K_WIZARD_DISABLE_ENV] !== undefined &&
+        process.platform === 'win32' &&
+        pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe'
+      ) {
+        addWslEnvKeys(finalEnv, [POWERLEVEL10K_WIZARD_DISABLE_ENV])
+      }
+      if (!wslInfo && process.platform !== 'win32') {
+        // Why: OpenCode/Codex path restoration and OMP's typed-command status
+        // wrapper need shell-ready code after user startup files run.
+        const needsNoMarkerWrapper =
+          finalEnv.ORCA_ATTRIBUTION_SHIM_DIR ||
+          finalEnv.ORCA_OPENCODE_CONFIG_DIR ||
+          finalEnv.ORCA_MIMOCODE_HOME ||
+          finalEnv.ORCA_OMP_STATUS_EXTENSION ||
+          finalEnv.ORCA_CODEX_HOME ||
+          finalEnv.ORCA_AGENT_TEAMS_SHIM_DIR
+        const isCodexStartupCommand = startupAgentRecognition?.agent === 'codex'
+        let shellLaunch: ReturnType<typeof getShellReadyLaunchConfig> | null = null
+        if (args.command && isCodexStartupCommand) {
+          const shouldWaitForShellReady = shouldUseShellReadyStartupDelivery({
+            command: args.command,
+            startupCommandDelivery: args.startupCommandDelivery
+          })
+          // Why: payload-bearing Codex startup text can be dropped by rc-file noise;
+          // plain Codex stays markerless to preserve the startup-speed path.
+          getFallbackShellReadyConfig = (shell) =>
+            shouldWaitForShellReady
+              ? getShellReadyLaunchConfig(shell)
+              : getAttributionShellLaunchConfig(shell)
+          shellLaunch = shouldWaitForShellReady
+            ? getShellReadyLaunchConfig(shellPath)
+            : getAttributionShellLaunchConfig(shellPath)
+        } else if (args.command) {
+          getFallbackShellReadyConfig = (shell) => getShellReadyLaunchConfig(shell)
+          shellLaunch = getShellReadyLaunchConfig(shellPath)
+        } else if (needsNoMarkerWrapper) {
+          getFallbackShellReadyConfig = (shell) => getAttributionShellLaunchConfig(shell)
+          shellLaunch = getAttributionShellLaunchConfig(shellPath)
+        } else {
+          getFallbackShellReadyConfig = undefined
         }
-        if (finalEnv[ORCA_HERMES_STARTUP_QUERY_ENV] !== undefined) {
-          // Why: the startup wrapper expands this only inside WSL; wsl.exe
-          // otherwise drops custom Windows environment variables.
-          addWslEnvKeys(finalEnv, [ORCA_HERMES_STARTUP_QUERY_ENV])
+        if (shellLaunch) {
+          Object.assign(finalEnv, shellLaunch.env)
+          shellArgs = shellLaunch.args ?? shellArgs
+          shellReadyLaunch = args.command ? shellLaunch : null
         }
-      } else if (codexHomeWslInfo || isWslCodexHomeForHost(finalEnv.CODEX_HOME)) {
-        // Why: WSL-managed Codex homes are Linux paths. Windows Codex cannot use
-        // them. ORCA_CODEX_HOME must go too because shell-ready scripts restore
-        // CODEX_HOME from it after user profiles run.
-        delete finalEnv.CODEX_HOME
-        delete finalEnv.ORCA_CODEX_HOME
       }
-    }
-    seedPowerlevel10kWizardEnv(finalEnv, { envToDelete: args.envToDelete })
-    if (
-      finalEnv[POWERLEVEL10K_WIZARD_DISABLE_ENV] !== undefined &&
-      process.platform === 'win32' &&
-      pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe'
-    ) {
-      addWslEnvKeys(finalEnv, [POWERLEVEL10K_WIZARD_DISABLE_ENV])
-    }
-    if (!wslInfo && process.platform !== 'win32') {
-      // Why: OpenCode/Codex path restoration and OMP's typed-command status
-      // wrapper need shell-ready code after user startup files run.
-      const needsNoMarkerWrapper =
-        finalEnv.ORCA_ATTRIBUTION_SHIM_DIR ||
-        finalEnv.ORCA_OPENCODE_CONFIG_DIR ||
-        finalEnv.ORCA_MIMOCODE_HOME ||
-        finalEnv.ORCA_OMP_STATUS_EXTENSION ||
-        finalEnv.ORCA_CODEX_HOME ||
-        finalEnv.ORCA_AGENT_TEAMS_SHIM_DIR
-      const isCodexStartupCommand = startupAgentRecognition?.agent === 'codex'
-      let shellLaunch: ReturnType<typeof getShellReadyLaunchConfig> | null = null
-      if (args.command && isCodexStartupCommand) {
-        const shouldWaitForShellReady = shouldUseShellReadyStartupDelivery({
-          command: args.command,
-          startupCommandDelivery: args.startupCommandDelivery
-        })
-        // Why: payload-bearing Codex startup text can be dropped by rc-file noise;
-        // plain Codex stays markerless to preserve the startup-speed path.
-        getFallbackShellReadyConfig = (shell) =>
-          shouldWaitForShellReady
-            ? getShellReadyLaunchConfig(shell)
-            : getAttributionShellLaunchConfig(shell)
-        shellLaunch = shouldWaitForShellReady
-          ? getShellReadyLaunchConfig(shellPath)
-          : getAttributionShellLaunchConfig(shellPath)
-      } else if (args.command) {
-        getFallbackShellReadyConfig = (shell) => getShellReadyLaunchConfig(shell)
-        shellLaunch = getShellReadyLaunchConfig(shellPath)
-      } else if (needsNoMarkerWrapper) {
-        getFallbackShellReadyConfig = (shell) => getAttributionShellLaunchConfig(shell)
-        shellLaunch = getAttributionShellLaunchConfig(shellPath)
-      } else {
-        getFallbackShellReadyConfig = undefined
-      }
-      if (shellLaunch) {
-        Object.assign(finalEnv, shellLaunch.env)
-        shellArgs = shellLaunch.args ?? shellArgs
-        shellReadyLaunch = args.command ? shellLaunch : null
-      }
-    }
-    promoteAgentTeamsShimPath(finalEnv, args.env?.PATH)
+      promoteAgentTeamsShimPath(finalEnv, args.env?.PATH)
 
-    // ── Worktree-scoped shell history (§7–§10 of terminal-history-scope-design) ──
-    // Why: without this, all worktree terminals share a single global HISTFILE
-    // so ArrowUp in worktree B surfaces commands from worktree A.
-    const worktreeId = args.worktreeId
-    const historyEnabled = worktreeId && (this.opts.isHistoryEnabled?.() ?? true)
-    // Resolve the effective shell kind for history injection. For WSL, the
-    // outer executable is wsl.exe but the inner login shell is bash.
-    const isWslTerminal =
-      Boolean(wslInfo || worktreeWslContext || preferredWslContext) ||
-      pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe'
-    const effectiveShellPath = isWslTerminal ? 'bash' : shellPath
-    let historyResult: ReturnType<typeof injectHistoryEnv> | null = null
-    if (historyEnabled) {
-      historyResult = injectHistoryEnv(finalEnv, worktreeId, effectiveShellPath, cwd, {
-        wslDistro: preferredWslContext?.distro ?? worktreeWslContext?.distro ?? null
+      // ── Worktree-scoped shell history (§7–§10 of terminal-history-scope-design) ──
+      // Why: without this, all worktree terminals share a single global HISTFILE
+      // so ArrowUp in worktree B surfaces commands from worktree A.
+      const worktreeId = args.worktreeId
+      const historyEnabled = worktreeId && (this.opts.isHistoryEnabled?.() ?? true)
+      // Resolve the effective shell kind for history injection. For WSL, the
+      // outer executable is wsl.exe but the inner login shell is bash.
+      const isWslTerminal =
+        Boolean(wslInfo || worktreeWslContext || preferredWslContext) ||
+        pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe'
+      const effectiveShellPath = isWslTerminal ? 'bash' : shellPath
+      let historyResult: ReturnType<typeof injectHistoryEnv> | null = null
+      if (historyEnabled) {
+        historyResult = injectHistoryEnv(finalEnv, worktreeId, effectiveShellPath, cwd, {
+          wslDistro: preferredWslContext?.distro ?? worktreeWslContext?.distro ?? null
+        })
+        logHistoryInjection(worktreeId, historyResult)
+      }
+
+      const spawnResult = spawnShellWithFallback({
+        shellPath,
+        shellArgs,
+        cols: args.cols,
+        rows: args.rows,
+        cwd: effectiveCwd,
+        env: finalEnv,
+        termName: finalEnv.TERM,
+        ptySpawn: pty.spawn,
+        getShellReadyConfig: getFallbackShellReadyConfig,
+        // Why: if zsh failed and bash took over, HISTFILE still points to
+        // zsh_history. Update it *before* spawn so the child inherits the
+        // correct filename (see design doc §8).
+        onBeforeFallbackSpawn: historyResult?.histFile
+          ? (env, fallbackShell) => updateHistFileForFallback(env, fallbackShell)
+          : undefined,
+        windowsFallbackAttempts
       })
-      logHistoryInjection(worktreeId, historyResult)
-    }
+      shellPath = spawnResult.shellPath
+      // Why: a Windows fallback (e.g. cmd.exe) embeds its own startup command in
+      // argv, so honor the winning shell's delivery flag to avoid a double write.
+      if (spawnResult.startupCommandDeliveredInShellArgs !== undefined) {
+        startupCommandDeliveredInShellArgs = spawnResult.startupCommandDeliveredInShellArgs
+      }
+      if (args.command && getFallbackShellReadyConfig) {
+        shellReadyLaunch = getFallbackShellReadyConfig(shellPath)
+      }
 
-    const spawnResult = spawnShellWithFallback({
-      shellPath,
-      shellArgs,
-      cols: args.cols,
-      rows: args.rows,
-      cwd: effectiveCwd,
-      env: finalEnv,
-      termName: finalEnv.TERM,
-      ptySpawn: pty.spawn,
-      getShellReadyConfig: getFallbackShellReadyConfig,
-      // Why: if zsh failed and bash took over, HISTFILE still points to
-      // zsh_history. Update it *before* spawn so the child inherits the
-      // correct filename (see design doc §8).
-      onBeforeFallbackSpawn: historyResult?.histFile
-        ? (env, fallbackShell) => updateHistFileForFallback(env, fallbackShell)
-        : undefined,
-      windowsFallbackAttempts
-    })
-    shellPath = spawnResult.shellPath
-    // Why: a Windows fallback (e.g. cmd.exe) embeds its own startup command in
-    // argv, so honor the winning shell's delivery flag to avoid a double write.
-    if (spawnResult.startupCommandDeliveredInShellArgs !== undefined) {
-      startupCommandDeliveredInShellArgs = spawnResult.startupCommandDeliveredInShellArgs
-    }
-    if (args.command && getFallbackShellReadyConfig) {
-      shellReadyLaunch = getFallbackShellReadyConfig(shellPath)
-    }
+      if (process.platform !== 'win32') {
+        finalEnv.SHELL = shellPath
+      }
 
-    if (process.platform !== 'win32') {
-      finalEnv.SHELL = shellPath
-    }
+      const proc = spawnResult.process
+      ptyProcesses.set(id, proc)
+      ptyShellName.set(id, getSpawnedShellName(shellPath))
+      if (finalEnv.ORCA_TERMINAL_HANDLE) {
+        ptyTerminalHandle.set(id, finalEnv.ORCA_TERMINAL_HANDLE)
+      }
+      ptyAgentForegroundContextPaths.set(
+        id,
+        getAgentForegroundContextPaths({ cwd: args.cwd, worktreeId: args.worktreeId })
+      )
+      ptyLoadGeneration.set(id, loadGeneration)
+      this.opts.onSpawned?.(id)
 
-    const proc = spawnResult.process
-    ptyProcesses.set(id, proc)
-    ptyShellName.set(id, getSpawnedShellName(shellPath))
-    if (finalEnv.ORCA_TERMINAL_HANDLE) {
-      ptyTerminalHandle.set(id, finalEnv.ORCA_TERMINAL_HANDLE)
-    }
-    ptyAgentForegroundContextPaths.set(
-      id,
-      getAgentForegroundContextPaths({ cwd: args.cwd, worktreeId: args.worktreeId })
-    )
-    ptyLoadGeneration.set(id, loadGeneration)
-    this.opts.onSpawned?.(id)
-
-    // Shell-ready startup command support
-    let resolveShellReady: ((signal: ShellReadySignal) => void) | null = null
-    let shellReadyTimeout: ReturnType<typeof setTimeout> | null = null
-    const shellReadyScanState = shellReadyLaunch?.supportsReadyMarker
-      ? createShellReadyScanState()
-      : null
-    const shellReadyPromise = args.command
-      ? new Promise<ShellReadySignal>((resolve) => {
-          resolveShellReady = resolve
-        })
-      : Promise.resolve({ postMarkerBytesObserved: false })
-    const finishShellReady = (signal: ShellReadySignal): void => {
-      if (!resolveShellReady) {
-        return
-      }
-      if (shellReadyTimeout) {
-        clearTimeout(shellReadyTimeout)
-        shellReadyTimeout = null
-      }
-      const resolve = resolveShellReady
-      resolveShellReady = null
-      resolve(signal)
-    }
-    const releaseHeldShellReadyBytes = (): void => {
-      if (!shellReadyScanState) {
-        return
-      }
-      const heldBytes = drainShellReadyHeldBytes(shellReadyScanState)
-      if (heldBytes.length === 0) {
-        return
-      }
-      this.opts.onData?.(id, heldBytes, Date.now())
-      for (const cb of dataListeners) {
-        cb({ id, data: heldBytes })
-      }
-    }
-    if (args.command) {
-      if (shellReadyLaunch?.supportsReadyMarker) {
-        shellReadyTimeout = setTimeout(() => {
-          releaseHeldShellReadyBytes()
-          finishShellReady({ postMarkerBytesObserved: false })
-        }, STARTUP_COMMAND_READY_MAX_WAIT_MS)
-      } else {
-        finishShellReady({ postMarkerBytesObserved: false })
-      }
-    }
-    let startupCommandCleanup: (() => void) | null = null
-    if (args.command) {
-      ptyCleanupCallbacks.set(id, () => {
+      // Shell-ready startup command support
+      let resolveShellReady: ((signal: ShellReadySignal) => void) | null = null
+      let shellReadyTimeout: ReturnType<typeof setTimeout> | null = null
+      const shellReadyScanState = shellReadyLaunch?.supportsReadyMarker
+        ? createShellReadyScanState()
+        : null
+      const shellReadyPromise = args.command
+        ? new Promise<ShellReadySignal>((resolve) => {
+            resolveShellReady = resolve
+          })
+        : Promise.resolve({ postMarkerBytesObserved: false })
+      const finishShellReady = (signal: ShellReadySignal): void => {
+        if (!resolveShellReady) {
+          return
+        }
         if (shellReadyTimeout) {
           clearTimeout(shellReadyTimeout)
           shellReadyTimeout = null
         }
-        releaseHeldShellReadyBytes()
-        startupCommandCleanup?.()
-        startupCommandCleanup = null
+        const resolve = resolveShellReady
         resolveShellReady = null
-      })
-    }
-
-    const disposables: { dispose: () => void }[] = []
-    const onDataDisposable = proc.onData((rawData) => {
-      let data = rawData
-      if (shellReadyScanState && resolveShellReady) {
-        const scanned = scanForShellReady(shellReadyScanState, rawData)
-        data = scanned.output
-        if (scanned.matched) {
-          finishShellReady({ postMarkerBytesObserved: scanned.postMarkerBytesObserved })
+        resolve(signal)
+      }
+      const releaseHeldShellReadyBytes = (): void => {
+        if (!shellReadyScanState) {
+          return
+        }
+        const heldBytes = drainShellReadyHeldBytes(shellReadyScanState)
+        if (heldBytes.length === 0) {
+          return
+        }
+        this.opts.onData?.(id, heldBytes, Date.now())
+        for (const cb of dataListeners) {
+          cb({ id, data: heldBytes })
         }
       }
-      if (data.length === 0) {
-        return
+      if (args.command) {
+        if (shellReadyLaunch?.supportsReadyMarker) {
+          shellReadyTimeout = setTimeout(() => {
+            releaseHeldShellReadyBytes()
+            finishShellReady({ postMarkerBytesObserved: false })
+          }, STARTUP_COMMAND_READY_MAX_WAIT_MS)
+        } else {
+          finishShellReady({ postMarkerBytesObserved: false })
+        }
       }
-      this.opts.onData?.(id, data, Date.now())
-      for (const cb of dataListeners) {
-        cb({ id, data })
+      let startupCommandCleanup: (() => void) | null = null
+      if (args.command) {
+        ptyCleanupCallbacks.set(id, () => {
+          if (shellReadyTimeout) {
+            clearTimeout(shellReadyTimeout)
+            shellReadyTimeout = null
+          }
+          releaseHeldShellReadyBytes()
+          startupCommandCleanup?.()
+          startupCommandCleanup = null
+          resolveShellReady = null
+        })
       }
-    })
-    if (onDataDisposable) {
-      disposables.push(onDataDisposable)
-    }
 
-    const onExitDisposable = proc.onExit(({ exitCode }) => {
-      // Why: neutralize proc.kill the instant the child is reaped, before any
-      // other work in this callback. node-pty's UnixTerminal installs a
-      // `_socket.once('close', () => this.kill('SIGHUP'))` handler at destroy
-      // time, but the master socket can also emit 'close' on natural exit
-      // between this onExit callback starting and destroyPtyProcess() running
-      // below. If 'close' wins, SIGHUP is dispatched to proc.pid — which on
-      // POSIX has already been reaped and may have been recycled to an
-      // unrelated process. Synchronous neutralization here closes that window.
-      // Windows is exempt: WindowsTerminal.destroy is implemented via kill().
-      if (process.platform !== 'win32') {
-        ;(proc as unknown as { kill: (sig?: string) => void }).kill = () => {}
+      const disposables: { dispose: () => void }[] = []
+      const onDataDisposable = proc.onData((rawData) => {
+        let data = rawData
+        if (shellReadyScanState && resolveShellReady) {
+          const scanned = scanForShellReady(shellReadyScanState, rawData)
+          data = scanned.output
+          if (scanned.matched) {
+            finishShellReady({ postMarkerBytesObserved: scanned.postMarkerBytesObserved })
+          }
+        }
+        if (data.length === 0) {
+          return
+        }
+        this.opts.onData?.(id, data, Date.now())
+        for (const cb of dataListeners) {
+          cb({ id, data })
+        }
+      })
+      if (onDataDisposable) {
+        disposables.push(onDataDisposable)
       }
-      if (shellReadyTimeout) {
-        clearTimeout(shellReadyTimeout)
-        shellReadyTimeout = null
-      }
-      startupCommandCleanup?.()
-      clearPtyState(id)
-      // Why: release the master ptmx fd on the natural-exit path — without
-      // this, a shell that exits cleanly (the common case) never releases its
-      // fd until the next GC. See docs/fix-pty-fd-leak.md.
-      destroyPtyProcess(proc)
-      this.opts.onExit?.(id, exitCode)
-      for (const cb of exitListeners) {
-        cb({ id, code: exitCode })
-      }
-    })
-    if (onExitDisposable) {
-      disposables.push(onExitDisposable)
-    }
-    ptyDisposables.set(id, disposables)
 
-    if (args.command && !startupCommandDeliveredInShellArgs) {
-      // Why: only Orca-wrapped POSIX bash/zsh have bracketed-paste mode armed
-      // (bash via `bind`, zsh on by default), so multiline startup prompts can
-      // be pasted literally there; other shells keep the raw submit path.
-      const spawnedShellName = getSpawnedShellName(shellPath).toLowerCase()
-      const bracketedPasteSafe =
-        process.platform !== 'win32' && (spawnedShellName === 'bash' || spawnedShellName === 'zsh')
-      writeStartupCommandWhenShellReady(
-        shellReadyPromise,
-        proc,
-        args.command,
-        (cleanup) => {
-          startupCommandCleanup = cleanup
-        },
-        { bracketedPasteSafe }
-      )
-    }
+      const onExitDisposable = proc.onExit(({ exitCode }) => {
+        // Why: neutralize proc.kill the instant the child is reaped, before any
+        // other work in this callback. node-pty's UnixTerminal installs a
+        // `_socket.once('close', () => this.kill('SIGHUP'))` handler at destroy
+        // time, but the master socket can also emit 'close' on natural exit
+        // between this onExit callback starting and destroyPtyProcess() running
+        // below. If 'close' wins, SIGHUP is dispatched to proc.pid — which on
+        // POSIX has already been reaped and may have been recycled to an
+        // unrelated process. Synchronous neutralization here closes that window.
+        // Windows is exempt: WindowsTerminal.destroy is implemented via kill().
+        if (process.platform !== 'win32') {
+          ;(proc as unknown as { kill: (sig?: string) => void }).kill = () => {}
+        }
+        if (shellReadyTimeout) {
+          clearTimeout(shellReadyTimeout)
+          shellReadyTimeout = null
+        }
+        startupCommandCleanup?.()
+        clearPtyState(id)
+        // Why: release the master ptmx fd on the natural-exit path — without
+        // this, a shell that exits cleanly (the common case) never releases its
+        // fd until the next GC. See docs/fix-pty-fd-leak.md.
+        destroyPtyProcess(proc)
+        this.opts.onExit?.(id, exitCode)
+        for (const cb of exitListeners) {
+          cb({ id, code: exitCode })
+        }
+      })
+      if (onExitDisposable) {
+        disposables.push(onExitDisposable)
+      }
+      ptyDisposables.set(id, disposables)
 
-    // Why: publish the OS pid so ipc/pty can register the PTY with the memory
-    // collector without reaching back into the provider. `proc.pid` may be
-    // briefly 0/undefined if node-pty hasn't observed the forked child yet.
-    const rawPid = proc.pid
-    const pid = typeof rawPid === 'number' && Number.isFinite(rawPid) && rawPid > 0 ? rawPid : null
-    return { id, pid }
+      if (args.command && !startupCommandDeliveredInShellArgs) {
+        // Why: only Orca-wrapped POSIX bash/zsh have bracketed-paste mode armed
+        // (bash via `bind`, zsh on by default), so multiline startup prompts can
+        // be pasted literally there; other shells keep the raw submit path.
+        const spawnedShellName = getSpawnedShellName(shellPath).toLowerCase()
+        const bracketedPasteSafe =
+          process.platform !== 'win32' &&
+          (spawnedShellName === 'bash' || spawnedShellName === 'zsh')
+        writeStartupCommandWhenShellReady(
+          shellReadyPromise,
+          proc,
+          args.command,
+          (cleanup) => {
+            startupCommandCleanup = cleanup
+          },
+          { bracketedPasteSafe }
+        )
+      }
+
+      // Why: publish the OS pid so ipc/pty can register the PTY with the memory
+      // collector without reaching back into the provider. `proc.pid` may be
+      // briefly 0/undefined if node-pty hasn't observed the forked child yet.
+      const rawPid = proc.pid
+      const pid =
+        typeof rawPid === 'number' && Number.isFinite(rawPid) && rawPid > 0 ? rawPid : null
+      span.ok({ providerType: 'local', ptyId: id })
+      return { id, pid }
+    } catch (err) {
+      span.fail(err, { providerType: 'local' })
+      throw err
+    }
   }
 
   // Local PTYs are always attached -- no-op. Remote providers use this to resubscribe.

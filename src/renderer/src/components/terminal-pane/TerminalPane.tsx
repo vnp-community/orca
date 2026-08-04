@@ -23,7 +23,11 @@ import type {
 import TerminalSearch from '@/components/TerminalSearch'
 import type { PtyTransport } from './pty-transport'
 import { fitPanes, isWindowsUserAgent } from './pane-helpers'
-import { getConnectionId, getConnectionIdFromState } from '@/lib/connection-context'
+import {
+  getConnectionId,
+  getConnectionIdFromState,
+  getSshConnectionIdFromState
+} from '@/lib/connection-context'
 import {
   getExplicitRuntimeEnvironmentIdForWorktree,
   getRuntimeEnvironmentIdForWorktree
@@ -318,7 +322,7 @@ export default function TerminalPane({
   const isVisibleRef = useRef(isRendererVisible)
   isVisibleRef.current = isRendererVisible
   const sshReconnectTargetId = useAppStore((store) => {
-    const connectionId = getConnectionIdFromState(store, worktreeId)
+    const connectionId = getSshConnectionIdFromState(store, worktreeId)
     // Why: runtime-owned SSH targets are internal plumbing users can't connect
     // to directly, so a reconnect prompt would offer a misleading action.
     if (!connectionId || isRuntimeOwnedSshTargetId(connectionId)) {

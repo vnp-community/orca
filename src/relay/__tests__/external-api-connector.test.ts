@@ -21,6 +21,8 @@ import {
 } from '../external-api-connector'
 import type { AgentConfig } from '../agent-config'
 import type { AgentLogger } from '../agent-logger'
+import { registerTraceSink } from '../../shared/trace'
+import type { TraceEvent } from '../../shared/trace'
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -365,5 +367,61 @@ describe('handleGitLabAuthStatus', () => {
     } else {
       expect(resp.error).toBeDefined()
     }
+  })
+})
+
+// ─── handleGitHubAuthStatus — agent:ext-api tracing (TASK-AG-014.1) ─────────
+// gh is not authenticated in the test sandbox, so the terminal event may be
+// ok or fail depending on `gh auth status` exit code — assert on whichever
+// terminal event actually fires rather than a fixed outcome.
+describe('handleGitHubAuthStatus — agent:ext-api tracing', () => {
+  it('emits a terminal agent:ext-api event tagged cli:"gh"', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    await handleGitHubAuthStatus(1, { userId: 'user-1' }, MOCK_CONFIG, MOCK_LOG)
+    unregister()
+
+    const extApiEvents = events.filter(e => e.flow === 'agent:ext-api')
+    expect(extApiEvents.length).toBeGreaterThan(0)
+    const terminal = extApiEvents.find(e => e.level === 'ok' || e.level === 'fail')
+    expect(terminal?.fields.cli).toBe('gh')
+  })
+
+  it('KHÔNG có field nào trong agent:ext-api chứa nội dung stdout/stderr của gh auth status', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    await handleGitHubAuthStatus(1, { userId: 'user-1' }, MOCK_CONFIG, MOCK_LOG)
+    unregister()
+
+    const fields = events.filter(e => e.flow === 'agent:ext-api').flatMap(e => Object.keys(e.fields))
+    expect(fields).not.toContain('stdout')
+    expect(fields).not.toContain('stderr')
+  })
+})
+
+// ─── handleGitLabAuthStatus — agent:ext-api tracing (TASK-AG-014.1) ─────────
+// glab is not installed in the test sandbox, so execFileCaptured always
+// resolves a non-zero exitCode via its spawn-error path — deterministic fail.
+describe('handleGitLabAuthStatus — agent:ext-api tracing', () => {
+  it('span.fail(..., {cli:"glab", exitCode}) khi glab auth status exit != 0', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    await handleGitLabAuthStatus(1, { userId: 'user-1' }, MOCK_CONFIG, MOCK_LOG)
+    unregister()
+
+    const fail = events.find(e => e.flow === 'agent:ext-api' && e.level === 'fail')
+    expect(fail?.fields.cli).toBe('glab')
+    expect(fail?.fields.exitCode).toBeDefined()
+  })
+
+  it('KHÔNG có field nào trong agent:ext-api chứa nội dung stdout/stderr của glab auth status', async () => {
+    const events: TraceEvent[] = []
+    const unregister = registerTraceSink(e => events.push(e))
+    await handleGitLabAuthStatus(1, { userId: 'user-1' }, MOCK_CONFIG, MOCK_LOG)
+    unregister()
+
+    const fields = events.filter(e => e.flow === 'agent:ext-api').flatMap(e => Object.keys(e.fields))
+    expect(fields).not.toContain('stdout')
+    expect(fields).not.toContain('stderr')
   })
 })

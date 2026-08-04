@@ -19,6 +19,7 @@
  */
 
 import type { AIProviderService } from './AIProviderService'
+import { Tracers } from '../../shared/trace/tracers'
 
 const HEALTH_CHECK_INTERVAL_MS = 15 * 60 * 1000 // 15 minutes
 
@@ -79,12 +80,19 @@ export class ProviderHealthChecker {
       accounts = await service.getAllAccounts()
     } catch (err) {
       console.warn('[ProviderHealthChecker] Failed to fetch accounts:', err)
-      return
+      return // no span — nothing to measure if the account list itself never loaded
     }
+
+    const span = Tracers.aiProviderHealthFlow.start({ accountCount: accounts.length })
+    let activeCount = 0
+    let quotaExceededCount = 0
+    let invalidCount = 0
+    let errorCount = 0
 
     for (const account of accounts) {
       try {
         const oldStatus = account.status
+        span.step('ping-account', { accountId: account.id, provider: account.provider })
         const result = await service.testConnection(account.id)
 
         let newStatus: 'active' | 'quota_exceeded' | 'invalid'
@@ -95,12 +103,22 @@ export class ProviderHealthChecker {
         } else {
           newStatus = 'invalid'
         }
+        span.step('ping-result', {
+          accountId: account.id,
+          ok: result.ok,
+          latencyMs: result.latencyMs,
+          newStatus,
+        })
 
         const checkedAt = new Date()
         await service.updateAccount(account.id, {
           status: newStatus,
           lastHealthCheck: checkedAt,
         })
+
+        if (newStatus === 'active') activeCount++
+        else if (newStatus === 'quota_exceeded') quotaExceededCount++
+        else invalidCount++
 
         // FIX BUG-AIP-003: Emit status change event when status transitions
         if (oldStatus !== newStatus && this.onStatusChanged) {
@@ -113,8 +131,13 @@ export class ProviderHealthChecker {
           })
         }
       } catch (err) {
+        // Per-account failure — does NOT fail the whole cycle (existing behavior,
+        // see CR-TRACE-016 §4). Counted separately from provider-reported invalid.
+        errorCount++
         console.warn(`[ProviderHealthChecker] Failed to check account ${account.id}:`, err)
       }
     }
+
+    span.ok({ activeCount, quotaExceededCount, invalidCount, errorCount })
   }
 }

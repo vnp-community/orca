@@ -14,7 +14,7 @@ import {
   resolveRuntimePath
 } from '../../shared/cross-platform-path'
 import { isWslUncPath } from '../../shared/wsl-paths'
-import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
   computeWorkspaceRoot,
   getWorktreePathSettings,
@@ -40,7 +40,7 @@ async function canonicalizeExistingPath(
   connectionId: string | undefined
 ): Promise<string> {
   if (connectionId) {
-    const provider = getSshFilesystemProvider(connectionId)
+    const provider = getRemoteFilesystemProvider(connectionId)
     if (!provider) {
       return normalize(pathValue)
     }
@@ -88,7 +88,7 @@ async function addTarget(
 }
 
 function getRemoteProvider(connectionId: string | undefined): IFilesystemProvider | undefined {
-  return connectionId ? getSshFilesystemProvider(connectionId) : undefined
+  return connectionId ? getRemoteFilesystemProvider(connectionId) : undefined
 }
 
 function isRuntimePathAbsoluteForRepo(repoPath: string, pathValue: string): boolean {

@@ -23,7 +23,7 @@ vi.mock('./filesystem-watcher-wsl', () => ({
 }))
 
 vi.mock('../providers/ssh-filesystem-dispatch', () => ({
-  getSshFilesystemProvider: vi.fn()
+  getRemoteFilesystemProvider: vi.fn()
 }))
 
 import {

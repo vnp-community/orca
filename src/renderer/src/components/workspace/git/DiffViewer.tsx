@@ -9,6 +9,7 @@ import { getActiveRuntimeTarget } from '../../../runtime/runtime-rpc-client'
 import { Skeleton } from '../../ui/skeleton'
 import { Badge } from '../../ui/badge'
 import { FileCode } from 'lucide-react'
+import { Tracers } from '../../../../../shared/trace/tracers'
 
 interface DiffViewerProps {
   filePath:      string
@@ -46,6 +47,7 @@ export function DiffViewer({ filePath, worktreePath, staged = false }: DiffViewe
     setError(null)
 
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    const span = Tracers.codeReviewDiffFlow.start({ filePath, staged, mode: target.kind })
 
     // Use git.getDiff if staged mode; otherwise load HEAD + working tree separately
     if (staged) {
@@ -54,17 +56,23 @@ export function DiffViewer({ filePath, worktreePath, staged = false }: DiffViewe
         projectId: project.id,
         path: filePath,
         staged: true,
+        traceId: span.id,
       })
         .then(diff => {
           // For staged diff we show the raw diff text as context; split at first @@
           const idx = diff.indexOf('@@')
           setOriginal(idx >= 0 ? diff.slice(0, idx) : '')
           setModified(diff)
+          span.ok({ staged: true })
         })
-        .catch(err => setError(err?.message ?? 'Failed to load diff'))
+        .catch(err => {
+          setError(err?.message ?? 'Failed to load diff')
+          span.fail(err, { staged: true })
+        })
         .finally(() => setIsLoading(false))
     } else {
       // Unstaged diff: load HEAD version and working tree version side-by-side
+      span.step('parallelFetch', { staged: false })
       Promise.all([
         // Original: HEAD version (empty string for new/untracked files)
         callRuntimeRpc<string>(target, 'git.getDiff', {
@@ -72,6 +80,7 @@ export function DiffViewer({ filePath, worktreePath, staged = false }: DiffViewe
           path: filePath,
           staged: false,
           side: 'original',   // returns HEAD content
+          traceId: span.id,
         }).catch(() => ''),
 
         // Modified: current working tree content
@@ -79,13 +88,18 @@ export function DiffViewer({ filePath, worktreePath, staged = false }: DiffViewe
           projectId: project.id,
           path: filePath,
           encoding: 'utf-8',
+          traceId: span.id,
         }).then(r => r.content).catch(() => ''),
       ])
         .then(([original, modified]) => {
           setOriginal(original)
           setModified(modified)
+          span.ok({ staged: false })
         })
-        .catch(err => setError(err?.message ?? 'Failed to load diff'))
+        .catch(err => {
+          setError(err?.message ?? 'Failed to load diff')
+          span.fail(err, { staged: false })
+        })
         .finally(() => setIsLoading(false))
     }
   }, [filePath, worktreePath, project, staged])

@@ -3,6 +3,7 @@ import { getIndexedRepoMap, getIndexedWorktreeMap } from '@/store/worktree-repo-
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 import { getRepoIdFromWorktreeId } from '../../../shared/worktree-id'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
+import { getRepoProviderConnectionKey } from '../../../shared/execution-host'
 import {
   isPathInsideOrEqual,
   normalizeRuntimePathForComparison
@@ -63,6 +64,33 @@ export function getConnectionIdFromState(
   const worktree = getIndexedWorktreeMap(state.worktreesByRepo).get(worktreeId)
   const repoId = worktree?.repoId ?? getRepoIdFromWorktreeId(worktreeId)
   const repo = getIndexedRepoMap(state.repos).get(repoId)
+  return repo ? getRepoProviderConnectionKey(repo) : undefined
+}
+
+/**
+ * SSH-target-only variant of getConnectionIdFromState — returns the repo's
+ * `connectionId` (a real, configured SSH Target) and never `devServerId`.
+ * Why a separate function: getConnectionIdFromState's generic provider key is
+ * correct for IPC/PTY routing (SSH and Dev Server both resolve through the
+ * same provider registries), but SSH-specific UI (the reconnect overlay,
+ * "SSH host removed" detection) must not mistake a devServerId for a
+ * ghost/removed SSH target — a Dev Server was never in the SSH targets list
+ * to begin with.
+ */
+export function getSshConnectionIdFromState(
+  state: ConnectionOwnerState,
+  worktreeId: string | null
+): string | null | undefined {
+  if (!worktreeId || worktreeId === FLOATING_TERMINAL_WORKTREE_ID) {
+    return null
+  }
+  const parsedWorkspaceKey = parseWorkspaceKey(worktreeId)
+  if (parsedWorkspaceKey?.type === 'folder') {
+    return getFolderWorkspaceConnectionId(state, parsedWorkspaceKey.folderWorkspaceId)
+  }
+  const worktree = getIndexedWorktreeMap(state.worktreesByRepo).get(worktreeId)
+  const repoId = worktree?.repoId ?? getRepoIdFromWorktreeId(worktreeId)
+  const repo = getIndexedRepoMap(state.repos).get(repoId)
   return repo ? (repo.connectionId ?? null) : undefined
 }
 
@@ -94,7 +122,7 @@ export function getConnectionIdForFileFromState(
   const connectionIds = new Set(
     matchingRepos
       .filter((candidate) => candidate.normalizedPath.length === longestPathLength)
-      .map(({ repo }) => repo.connectionId ?? null)
+      .map(({ repo }) => getRepoProviderConnectionKey(repo))
   )
   return connectionIds.size === 1 ? ([...connectionIds][0] ?? null) : undefined
 }

@@ -31,6 +31,11 @@ export type WsHandshakeInfo = {
   sessionId: string
   agentToken?: string  // set by receiver handshake; used by AgentWebSocketServer to find slot
   devServerId?: string // set by DevServerRelayBridge when it claims the connection (for tracing)
+  /** Capabilities the agent advertised (e.g. 'pty', 'pty.stream', 'fs.watch').
+   *  Read loosely as string[] — AgentHandshakeParams.capabilities is typed
+   *  against a narrower, stale AgentCapability union that predates most of
+   *  the values agent-session.ts actually sends. */
+  capabilities?: readonly string[]
 }
 
 // ─── Initiator Handshake (relay-websocket) ────────────────────────────────────
@@ -82,12 +87,14 @@ export function runOrcaInitiatorHandshake(
       }
 
       const result = (msg as { result?: Record<string, unknown> }).result ?? {}
+      const resultCapabilities = result['capabilities']
       resolve({
         platform:     (result['platform'] as string)     ?? 'linux',
         arch:         (result['arch'] as string)          ?? 'x64',
         nodeVersion:  (result['nodeVersion'] as string)   ?? 'unknown',
         agentVersion: (result['agentVersion'] as string)  ?? 'unknown',
         sessionId:    (result['sessionId'] as string)     ?? `sess-${Date.now()}`,
+        capabilities: Array.isArray(resultCapabilities) ? resultCapabilities : undefined,
       })
     })
 
@@ -185,7 +192,12 @@ export function runOrcaReceiverHandshake(
           0
         )
         ws.send(errFrame)
-        ws.close()
+        // FIX BUG-DS-AWS: explicit 1008 (Policy Violation) close code so the agent's
+        // reconnect logic (agent-connection-direct.ts) can distinguish "token rejected"
+        // from a generic drop and force a token renewal instead of retrying the same
+        // dead token forever. A bare ws.close() surfaces as code 1005 on the client,
+        // which was never treated as an auth failure.
+        ws.close(1008, 'Authentication failed: invalid or unregistered agent token')
         reject(new Error('Agent authentication failed: token not registered'))
         return
       }
@@ -211,6 +223,7 @@ export function runOrcaReceiverHandshake(
         agentVersion: params?.agentVersion ?? 'unknown',
         sessionId,
         agentToken,
+        capabilities: Array.isArray(params?.capabilities) ? params.capabilities : undefined,
       })
     })
 

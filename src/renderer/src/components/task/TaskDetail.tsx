@@ -9,6 +9,7 @@ import { TaskPromptEditor } from './TaskPromptEditor'
 import { Button } from '../ui/button'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { toast } from 'sonner'
+import { Tracers } from '../../../../shared/trace/tracers'
 import type { OrcaTask } from '../../types/task-types'
 
 // Right-panel detail view for active task
@@ -37,12 +38,17 @@ export function TaskDetail() {
 
   const handleRunAgent = async () => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    // field `entryPoint: 'task-detail'` phân biệt với TaskPromptEditor (TASK-FE-018.3) —
+    // 2 nút UI khác nhau cùng dẫn vào 1 tracer chung (BL-TG-04).
+    const span = Tracers.uiTaskGraphExecuteFlow.start({ taskId: task.id, entryPoint: 'task-detail' })
     try {
-      await callRuntimeRpc(target, 'tasks.runAgent', { taskId: task.id })
+      await callRuntimeRpc(target, 'tasks.runAgent', { taskId: task.id, traceId: span.id })
+      span.ok({ taskId: task.id })
       toast.success(`Agent started for: ${task.title}`)
       // Optionally emit workspace event:
       // emit('agent.started', { taskId: task.id })
     } catch (err: any) {
+      span.fail(err, { taskId: task.id })
       toast.error('Failed to start agent: ' + err.message)
     }
   }
