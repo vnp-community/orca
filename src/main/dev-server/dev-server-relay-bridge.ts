@@ -8,7 +8,7 @@ import type { SshConnectionManager } from '../ssh/ssh-connection-manager'
 import type { PersistedDevServer } from '../../shared/dev-server-types'
 import { deployAndLaunchRelay } from '../ssh/ssh-relay-deploy'
 import type { RelayPlatform } from '../ssh/relay-protocol'
-import { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
+import { SshChannelMultiplexer, type NotificationHandler } from '../ssh/ssh-channel-multiplexer'
 import type { AgentDetectionCommand } from '../../shared/agent-detection-commands'
 import WebSocket from 'ws'
 import { createWebSocketTransport } from './ws-transport'
@@ -76,6 +76,13 @@ export class DevServerRelayBridge extends EventEmitter {
   /** Max time (ms) a queued call will wait for session to be restored */
   private static readonly RECONNECT_WAIT_MS = 20_000
 
+  // Handlers registered via onNotification() — kept at the bridge level (not
+  // the mux level) because the underlying SshChannelMultiplexer instance is
+  // replaced on every reconnect; re-subscribing per-mux would silently drop
+  // handlers registered before the first connect() or across a reconnect.
+  private readonly notificationHandlers: NotificationHandler[] = []
+  private notificationForwardingUnsubscribe: (() => void) | null = null
+
   constructor(
     private config: PersistedDevServer,
     private sshManager: SshConnectionManager,
@@ -102,6 +109,31 @@ export class DevServerRelayBridge extends EventEmitter {
    */
   private onSessionDropped(): void {
     this._reconnecting = true
+  }
+
+  /**
+   * Subscribe to arbitrary notifications pushed by the agent (pty.data,
+   * pty.exit, fs.changed, etc.) over the life of this bridge, surviving
+   * reconnects. Returns an unsubscribe function.
+   */
+  onNotification(handler: NotificationHandler): () => void {
+    this.notificationHandlers.push(handler)
+    return () => {
+      const idx = this.notificationHandlers.indexOf(handler)
+      if (idx !== -1) {
+        this.notificationHandlers.splice(idx, 1)
+      }
+    }
+  }
+
+  /** Re-wire notification forwarding to the current mux — call after every `this.session = mux` assignment. */
+  private wireNotificationForwarding(mux: SshChannelMultiplexer): void {
+    this.notificationForwardingUnsubscribe?.()
+    this.notificationForwardingUnsubscribe = mux.onNotification((method, params) => {
+      for (const handler of this.notificationHandlers) {
+        handler(method, params)
+      }
+    })
   }
 
   async connect(opts: { testOnly?: boolean } = {}): Promise<RelayHandshakeInfo> {
@@ -133,6 +165,7 @@ export class DevServerRelayBridge extends EventEmitter {
       // compatible with SshChannelMultiplexer at runtime (same channel/call API).
       // The type mismatch is a class hierarchy gap — both implement the same protocol.
       this.session = result.transport as unknown as SshChannelMultiplexer
+      this.wireNotificationForwarding(this.session)
 
       // Close immediately if this is a test-only probe.
       if (opts.testOnly) {
@@ -240,6 +273,7 @@ export class DevServerRelayBridge extends EventEmitter {
         (mux, info) => {
           this._directWsDisposer = null
           this.session = mux
+          this.wireNotificationForwarding(mux)
 
           // FIX TASK-TRM-004: clear session when agent WS closes.
           // Without this, bridge.session remains non-null with a dead mux (stale reference).
@@ -326,6 +360,7 @@ export class DevServerRelayBridge extends EventEmitter {
         (mux, info) => {
           this._directWsDisposer = null
           this.session = mux
+          this.wireNotificationForwarding(mux)
 
           // CRITICAL: clear session when the agent WebSocket closes.
           // Without this, bridge.session remains non-null with a dead mux, causing
@@ -437,6 +472,7 @@ export class DevServerRelayBridge extends EventEmitter {
               this.session = new SshChannelMultiplexer(transport, {
                 connectionLostMessage: 'Connection lost, reconnecting...'
               })
+              this.wireNotificationForwarding(this.session)
 
               if (opts.testOnly) {
                 void this.disconnect()
@@ -534,6 +570,15 @@ export class DevServerRelayBridge extends EventEmitter {
     // 30s timeout felt frozen; 10s still allows slow relay round-trips.
     timeoutMs = 10_000
   ): Promise<T> {
+    // IPC array serialization turns an omitted (undefined) argument into `null`
+    // when this call crosses the user-process boundary via process.send(), which
+    // bypasses the `timeoutMs = 10_000` default parameter (defaults only trigger
+    // on undefined). Without this guard, every such call used a 0/NaN timeout
+    // and failed near-instantly.
+    const effectiveTimeoutMs =
+      typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+        ? timeoutMs
+        : 10_000
     if (!this.session) {
       // TRM-001: Better error with actionable instructions
       throw Object.assign(
@@ -545,7 +590,7 @@ export class DevServerRelayBridge extends EventEmitter {
         { code: 'AGENT_NOT_CONNECTED', devServerId: this.config.id, method }
       )
     }
-    return this.callWithTimeout<T>(method, params, timeoutMs)
+    return this.callWithTimeout<T>(method, params, effectiveTimeoutMs)
   }
 
 

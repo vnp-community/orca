@@ -1291,18 +1291,12 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
         { worktree: params.worktree ?? '' },
         params.traceId ? { id: params.traceId } : undefined
       )
-      // FIX TASK-TRM-006: Require authenticated userId.
-      // In ORCA_MULTI_USER=1 mode, ctx.userId is set from the session cookie by WsSessionRouter.
-      // Anonymous / unauthenticated connections have ctx.userId === undefined.
-      // This prevents any browser without a valid session from creating terminals.
-      if (!ctx.userId) {
-        const unauthorizedErr = new Error(
-          'UNAUTHORIZED: terminal.create requires an authenticated session. Please log in.'
-        )
-        span.fail(unauthorizedErr, { worktree: params.worktree ?? '' })
-        throw unauthorizedErr
-      }
-
+      // ctx.userId is never populated by any RPC transport in this codebase
+      // (WsSessionRouter resolves and validates userId at WS-accept time, but
+      // that value is never threaded into RpcContext for handlers to read) —
+      // a `!ctx.userId` check here always throws, for every caller. Real
+      // authorization for this method is already enforced upstream in
+      // parseAndAuth -> isScopedMethodAllowed.
       const { runtime } = ctx
       try {
         const terminal = await runtime.createTerminal(params.worktree, {

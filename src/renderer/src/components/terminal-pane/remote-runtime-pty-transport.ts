@@ -22,8 +22,10 @@ import {
 import {
   getRemoteRuntimeTerminalMultiplexer,
   REMOTE_TERMINAL_SNAPSHOT_TOO_LARGE,
-  type RemoteRuntimeMultiplexedTerminal
+  type RemoteRuntimeMultiplexedTerminal,
+  type RemoteRuntimeMultiplexedTerminalCallbacks
 } from '../../runtime/remote-runtime-terminal-multiplexer'
+import { subscribeTerminalViaJson } from '../../runtime/remote-runtime-terminal-json-subscribe'
 import {
   toRuntimeTerminalWorktreeSelector,
   toRuntimeWorktreeSelector
@@ -569,13 +571,7 @@ export function createRemoteRuntimePtyTransport(
       !transportClosed &&
       generation === subscriptionGeneration &&
       isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)
-    const nextStream = await getRemoteRuntimeTerminalMultiplexer(
-      currentRuntimeEnvironmentId
-    ).subscribeTerminal({
-      terminal: subscribedHandle,
-      client: { id: clientId, type: 'desktop' },
-      viewport: subscribedViewport ?? undefined,
-      callbacks: {
+    const subscribeCallbacks: RemoteRuntimeMultiplexedTerminalCallbacks = {
         onData: (data, meta) => {
           if (isCurrentSubscription()) {
             outputProcessor.processData(data, storedCallbacks, undefined, meta)
@@ -648,8 +644,26 @@ export function createRemoteRuntimePtyTransport(
           multiplexedStreamHandle = null
           scheduleResubscribeAfterTransportClose()
         }
-      }
-    })
+    }
+    const subscribeArgs = {
+      terminal: subscribedHandle,
+      client: { id: clientId, type: 'desktop' as const },
+      viewport: subscribedViewport ?? undefined,
+      callbacks: subscribeCallbacks
+    }
+    // Why: the web session client's Unix-socket-proxied transport has no
+    // binary-frame capability at any layer, so terminal.multiplex (which
+    // requires sendBinary/registerBinaryStreamHandler) can never work there —
+    // fall back to the plain-JSON terminal.subscribe RPC instead.
+    const nextStream =
+      currentRuntimeEnvironmentId === 'session-auth'
+        ? await subscribeTerminalViaJson({
+            environmentId: currentRuntimeEnvironmentId,
+            ...subscribeArgs
+          })
+        : await getRemoteRuntimeTerminalMultiplexer(currentRuntimeEnvironmentId).subscribeTerminal(
+            subscribeArgs
+          )
     if (
       transportClosed ||
       generation !== subscriptionGeneration ||

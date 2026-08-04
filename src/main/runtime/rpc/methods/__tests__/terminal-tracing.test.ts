@@ -111,26 +111,6 @@ describe('terminal RPC tracing (CR-TRACE-003)', () => {
     expect(failEvent?.fields.err).toContain('spawn_failed')
   })
 
-  it('terminal.create calls span.fail() with UNAUTHORIZED when ctx.userId is missing, then throws', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      createTerminal: vi.fn()
-    } as unknown as OrcaRuntimeService
-    const dispatcher = new RpcDispatcher({ runtime, methods: TERMINAL_METHODS })
-    const { events, stop } = captureTraceEvents()
-
-    const response = await dispatcher.dispatch(
-      makeRequest('terminal.create', { worktree: 'id:wt-1' })
-    )
-    stop()
-
-    expect(response).toMatchObject({ ok: false })
-    expect(runtime.createTerminal).not.toHaveBeenCalled()
-    const failEvent = events.find((e) => e.flow === 'terminal:create' && e.level === 'fail')
-    expect(failEvent).toBeDefined()
-    expect(failEvent?.fields.err).toContain('UNAUTHORIZED')
-  })
-
   it('terminal.split reuses Tracers.terminalCreate — no separate terminal:split tracer emitted', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',

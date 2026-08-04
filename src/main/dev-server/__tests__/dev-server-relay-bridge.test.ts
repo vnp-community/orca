@@ -188,3 +188,93 @@ describe('DevServerRelayBridge.callWithTimeout — relay:agentCall span resume',
     expect(Object.keys(okEvent?.fields ?? {})).not.toContain('_trace')
   })
 })
+
+// ── onNotification regression ──────────────────────────────────────────────
+// A prior version wired `bridge.onNotification(handler)` in DevServerManager
+// against this class before it ever defined that method — every call threw
+// synchronously (`bridge.onNotification is not a function`), aborting
+// connect()/connectDaemonAgent() before the agent token was ever wired.
+// These tests lock in a real, reconnect-safe implementation: DevServerManager
+// depends on this to forward pty.data/pty.exit/fs.changed pushes from the
+// agent up through devServer:notification to every per-user child process.
+
+function makeMockMux(): { onNotification: ReturnType<typeof vi.fn>; fire: (method: string, params: Record<string, unknown>) => void } {
+  let handler: ((method: string, params: Record<string, unknown>) => void) | null = null
+  const unsubscribe = vi.fn(() => {
+    handler = null
+  })
+  return {
+    onNotification: vi.fn((h: (method: string, params: Record<string, unknown>) => void) => {
+      handler = h
+      return unsubscribe
+    }),
+    fire: (method: string, params: Record<string, unknown>) => handler?.(method, params)
+  }
+}
+
+describe('DevServerRelayBridge.onNotification', () => {
+  function wireForwarding(bridge: DevServerRelayBridge, mux: unknown): void {
+    ;(bridge as unknown as { wireNotificationForwarding: (m: unknown) => void }).wireNotificationForwarding(mux)
+  }
+
+  it('does not throw when registered — the original regression', () => {
+    const bridge = new DevServerRelayBridge(makeConfig(), {} as SshConnectionManager, null)
+    expect(() => bridge.onNotification(() => {})).not.toThrow()
+  })
+
+  it('forwards a notification pushed by the wired mux to the registered handler', () => {
+    const bridge = new DevServerRelayBridge(makeConfig(), {} as SshConnectionManager, null)
+    const received: Array<[string, Record<string, unknown>]> = []
+    bridge.onNotification((method, params) => received.push([method, params]))
+
+    const mux = makeMockMux()
+    wireForwarding(bridge, mux)
+    mux.fire('pty.data', { id: 'pty-1', data: 'hello' })
+
+    expect(received).toEqual([['pty.data', { id: 'pty-1', data: 'hello' }]])
+  })
+
+  it('keeps forwarding to a handler registered before any mux ever connected', () => {
+    const bridge = new DevServerRelayBridge(makeConfig(), {} as SshConnectionManager, null)
+    const received: string[] = []
+    bridge.onNotification((method) => received.push(method))
+
+    // Handler registered first, mux "connects" later — mirrors connectWithExternalToken.
+    const mux = makeMockMux()
+    wireForwarding(bridge, mux)
+    mux.fire('fs.changed', {})
+
+    expect(received).toEqual(['fs.changed'])
+  })
+
+  it('re-wires to a new mux on reconnect without duplicating delivery from the old one', () => {
+    const bridge = new DevServerRelayBridge(makeConfig(), {} as SshConnectionManager, null)
+    const received: string[] = []
+    bridge.onNotification((method) => received.push(method))
+
+    const firstMux = makeMockMux()
+    wireForwarding(bridge, firstMux)
+    firstMux.fire('pty.data', {})
+
+    const secondMux = makeMockMux()
+    wireForwarding(bridge, secondMux)
+    firstMux.fire('pty.data', {}) // old mux — must not still be wired
+    secondMux.fire('pty.exit', {})
+
+    expect(received).toEqual(['pty.data', 'pty.exit'])
+  })
+
+  it('unsubscribe stops further delivery to that handler', () => {
+    const bridge = new DevServerRelayBridge(makeConfig(), {} as SshConnectionManager, null)
+    const received: string[] = []
+    const unsubscribe = bridge.onNotification((method) => received.push(method))
+
+    const mux = makeMockMux()
+    wireForwarding(bridge, mux)
+    mux.fire('pty.data', {})
+    unsubscribe()
+    mux.fire('pty.data', {})
+
+    expect(received).toEqual(['pty.data'])
+  })
+})
