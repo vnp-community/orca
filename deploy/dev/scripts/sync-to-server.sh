@@ -66,7 +66,11 @@ echo ""
 echo "[2/3] Building and Deploying via Docker Compose on server..."
 # Why: CACHE_BUST=$(date +%s) invalidates the 'COPY . .' layer in Dockerfile so
 # pnpm build steps always run with the latest synced source code.
-ssh_cmd "cd ${SERVER_DEPLOY}/deploy/dev && CACHE_BUST=\$(date +%s) docker compose -f docker-compose.orca.yml build --build-arg CACHE_BUST=\${CACHE_BUST} orca && docker compose -f docker-compose.orca.yml up -d --force-recreate"
+# Assignment and use MUST be on separate statements: `VAR=$(cmd) other --arg ${VAR}`
+# expands ${VAR} from the shell's existing (unset) value before the prefix
+# assignment takes effect for `other`, so --build-arg silently got an empty
+# value and Docker's build cache was never actually invalidated.
+ssh_cmd "cd ${SERVER_DEPLOY}/deploy/dev && CACHE_BUST=\$(date +%s); docker compose -f docker-compose.orca.yml build --build-arg CACHE_BUST=\${CACHE_BUST} orca && docker compose -f docker-compose.orca.yml up -d --force-recreate"
 
 echo ""
 echo "[3/3] Health check (waiting 20s for startup)..."
