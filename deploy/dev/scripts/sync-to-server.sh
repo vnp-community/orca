@@ -6,10 +6,21 @@
 # Trên server, Docker sẽ tự động build từ source thành container.
 #
 # Usage:
-#   ./deploy/dev/scripts/sync-to-server.sh
+#   ./deploy/dev/scripts/sync-to-server.sh <version>
+# Example:
+#   ./deploy/dev/scripts/sync-to-server.sh 1.4.138
 # ============================================================
 
 set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+    echo "ERROR: Version argument is required to prevent accidental untracked deployments."
+    echo "Usage: $0 <version>"
+    echo "Example: $0 1.4.138"
+    exit 1
+fi
+
+ORCA_VERSION="$1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="${SCRIPT_DIR}/.."
@@ -32,6 +43,7 @@ echo "======================================================"
 echo "  Server: ${SERVER_USER}@${SERVER_HOST}:${SERVER_PORT}"
 echo "  Deploy: ${SERVER_DEPLOY}"
 echo "  Mode:   server (Node.js + Web SPA, no Electron)"
+echo "  Version: ${ORCA_VERSION}"
 echo "======================================================"
 echo ""
 
@@ -70,7 +82,7 @@ echo "[2/3] Building and Deploying via Docker Compose on server..."
 # expands ${VAR} from the shell's existing (unset) value before the prefix
 # assignment takes effect for `other`, so --build-arg silently got an empty
 # value and Docker's build cache was never actually invalidated.
-ssh_cmd "cd ${SERVER_DEPLOY}/deploy/dev && CACHE_BUST=\$(date +%s); docker compose -f docker-compose.orca.yml build --build-arg CACHE_BUST=\${CACHE_BUST} orca && docker compose -f docker-compose.orca.yml up -d --force-recreate"
+ssh_cmd "cd ${SERVER_DEPLOY}/deploy/dev && ORCA_VERSION=${ORCA_VERSION} CACHE_BUST=\$(date +%s); ORCA_VERSION=\${ORCA_VERSION} docker compose -f docker-compose.orca.yml build --build-arg CACHE_BUST=\${CACHE_BUST} orca && ORCA_VERSION=\${ORCA_VERSION} docker compose -f docker-compose.orca.yml up -d --force-recreate"
 
 echo ""
 echo "[3/3] Health check (waiting 20s for startup)..."

@@ -22,14 +22,11 @@ import {
   decodeFrame,
   encodeDataFrame,
   encodeKeepaliveFrame,
-  parseJsonPayload,
+  parseJsonPayload
 } from './agent-wire'
 import { createRpcDispatcher } from './agent-rpc-dispatch'
 import type { JsonRpcRequest } from './agent-rpc-dispatch'
-import {
-  AGENT_HANDSHAKE_METHOD,
-  AGENT_KEEPALIVE_INTERVAL_MS,
-} from '../shared/agent-wire-protocol'
+import { AGENT_HANDSHAKE_METHOD, AGENT_KEEPALIVE_INTERVAL_MS } from '../shared/agent-wire-protocol'
 import { MessageType } from '../main/ssh/relay-protocol'
 import { createTracer } from '../shared/trace'
 import { cleanupAllPtys } from './agent-spawner'
@@ -38,7 +35,7 @@ import { cleanupAgentWatches } from './fs-agent-extensions'
 
 const sessionTracer = createTracer('agent:session')
 
-export interface AgentSession {
+export type AgentSession = {
   /** Attach session logic to an already-constructed WebSocket (may or may not be open yet). */
   start(ws: WebSocket): void
   /** Clear keepalive interval. Call from ws 'close' handler. */
@@ -58,7 +55,7 @@ export function createSession(
 ): AgentSession {
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null
   let handshakeDone = false
-  const handshakeOkCallbacks: Array<() => void> = []
+  const handshakeOkCallbacks: (() => void)[] = []
   const dispatcher = createRpcDispatcher(tools, config, log)
 
   // ── WT-Issue-2: Dynamic capability detection ─────────────────────────────
@@ -74,7 +71,9 @@ export function createSession(
       try {
         await fsAccess(join(dir, 'git'), constants.X_OK)
         return true
-      } catch { /* continue to next dir */ }
+      } catch {
+        /* continue to next dir */
+      }
     }
     // Fallback: try running git --version (works on Windows too)
     const { execFile } = await import('node:child_process')
@@ -112,7 +111,7 @@ export function createSession(
       'agent.spawn',
       'agent.exec',
       'agent.sendInput',
-      'agent.kill',
+      'agent.kill'
     ]
 
     const [hasGit, hasPty] = await Promise.all([checkGitAvailable(), checkPtyAvailable()])
@@ -125,8 +124,14 @@ export function createSession(
     }
     if (hasPty) {
       caps.push(
-        'pty', 'pty.create', 'pty.write', 'pty.resize', 'pty.destroy', 'pty.scrollback',
-        'pty.stream', 'pty.attach'
+        'pty',
+        'pty.create',
+        'pty.write',
+        'pty.resize',
+        'pty.destroy',
+        'pty.scrollback',
+        'pty.stream',
+        'pty.attach'
       )
     }
 
@@ -134,11 +139,40 @@ export function createSession(
     return caps
   }
 
+  // Why: this fallback is used when buildCapabilities() times out (>5 s) or
+  // throws. It must mirror what buildCapabilities() pushes when both git and
+  // node-pty are available, otherwise the server-side ptyReady gate
+  // (dev-server-provider-lifecycle.ts: `caps.includes('pty') && caps.includes('pty.stream')`)
+  // will always fail and no PTY provider is ever registered for this connection
+  // — producing "No PTY provider registered for connection 'dev-01'" on every
+  // terminal.create call.
   const STATIC_CAPABILITIES_FALLBACK = [
-    'fs', 'git', 'preflight', 'ai.providers', 'agent.spawn', 'worktrees', 'pty',
+    'fs',
+    'fs.watch',
+    'git',
+    'preflight',
+    'ai.providers',
+    'agent.spawn',
+    'worktrees',
+    'git.exec',
+    'git.execStream',
+    'git.worktree.list',
+    'git.worktree.add',
+    'git.worktree.remove',
+    'pty',
+    'pty.create',
+    'pty.write',
+    'pty.resize',
+    'pty.destroy',
+    'pty.scrollback',
+    'pty.stream',
+    'pty.attach'
   ] as const
 
-  async function sendHandshake(ws: WebSocket, wireState: ReturnType<typeof createWireState>): Promise<void> {
+  async function sendHandshake(
+    ws: WebSocket,
+    wireState: ReturnType<typeof createWireState>
+  ): Promise<void> {
     // WT-Issue-2: Use dynamic capabilities with 5s timeout fallback
     // If _prebuiltCapabilities is provided (e.g. in tests), skip the async check entirely.
     let capabilities: readonly string[]
@@ -150,7 +184,7 @@ export function createSession(
           buildCapabilities(),
           new Promise<readonly string[]>((_res, reject) =>
             setTimeout(() => reject(new Error('capability check timeout')), 5000)
-          ),
+          )
         ])
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -164,20 +198,24 @@ export function createSession(
       id: 1,
       method: AGENT_HANDSHAKE_METHOD,
       params: {
-        agentVersion:  '5.0.0',
-        platform:      process.platform,
-        arch:          process.arch,
-        nodeVersion:   process.version,
+        agentVersion: '5.0.0',
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.version,
         capabilities,
         // agentToken is only sent in direct-websocket mode; empty string = omit.
         // tokenOverride takes precedence so renewed tokens are used transparently.
-        ...((tokenOverride || config.agentToken) ? { agentToken: tokenOverride ?? config.agentToken } : {}),
-        devServerId:   config.devServerId,
-        tools:         tools.map(t => t.name),
-      },
+        ...(tokenOverride || config.agentToken
+          ? { agentToken: tokenOverride ?? config.agentToken }
+          : {}),
+        devServerId: config.devServerId,
+        tools: tools.map((t) => t.name)
+      }
     }
     ws.send(encodeDataFrame(wireState, JSON.stringify(rpc)))
-    log.info(`Handshake sent: devServerId=${config.devServerId} tools=[${tools.map(t => t.name).join(',')}]`)
+    log.info(
+      `Handshake sent: devServerId=${config.devServerId} tools=[${tools.map((t) => t.name).join(',')}]`
+    )
   }
 
   function startKeepalive(ws: WebSocket, wireState: ReturnType<typeof createWireState>): void {
@@ -196,15 +234,17 @@ export function createSession(
 
       // sendHandshake is async (builds dynamic capabilities) — wrap in a local helper
       const doHandshake = (): void => {
-        void sendHandshake(ws, wireState).then(() => {
-          span.step('handshake-sent')
-          startKeepalive(ws, wireState)
-        }).catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : String(err)
-          log.error(`sendHandshake failed: ${msg}`)
-          span.fail(err, { phase: 'handshake' })
-          ws.close(1011, 'Handshake error')
-        })
+        void sendHandshake(ws, wireState)
+          .then(() => {
+            span.step('handshake-sent')
+            startKeepalive(ws, wireState)
+          })
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err)
+            log.error(`sendHandshake failed: ${msg}`)
+            span.fail(err, { phase: 'handshake' })
+            ws.close(1011, 'Handshake error')
+          })
       }
 
       if (ws.readyState === 1 /* WebSocket.OPEN */) {
@@ -218,7 +258,9 @@ export function createSession(
 
       ws.on('message', (data: Buffer | string) => {
         // Agent protocol uses binary frames only
-        if (!Buffer.isBuffer(data)) return
+        if (!Buffer.isBuffer(data)) {
+          return
+        }
 
         const frame = decodeFrame(wireState, data)
         if (!frame) {
@@ -228,12 +270,16 @@ export function createSession(
 
         // Respond to KeepAlive frames immediately to maintain ACK progress
         if (frame.type === MessageType.KeepAlive) {
-          if (ws.readyState === 1) ws.send(encodeKeepaliveFrame(wireState))
+          if (ws.readyState === 1) {
+            ws.send(encodeKeepaliveFrame(wireState))
+          }
           return
         }
 
         // Empty data frame — ignore
-        if (frame.payload.length === 0) return
+        if (frame.payload.length === 0) {
+          return
+        }
 
         const rpc = parseJsonPayload<{
           id: string | number | null
@@ -256,7 +302,7 @@ export function createSession(
             const orcaVersion = rpc.result.orcaVersion ?? 'unknown'
             log.info(`Handshake OK: sessionId=${sessionId} orcaVersion=${orcaVersion}`)
             span.step('handshake-ok', { sessionId, orcaVersion })
-            handshakeOkCallbacks.forEach(cb => cb())
+            handshakeOkCallbacks.forEach((cb) => cb())
           } else if (rpc.error) {
             log.error(`Handshake failed: code=${rpc.error.code} message=${rpc.error.message}`)
             span.fail(`handshake: ${rpc.error.message}`, { code: rpc.error.code })
@@ -310,6 +356,6 @@ export function createSession(
 
     onHandshakeOk(callback: () => void): void {
       handshakeOkCallbacks.push(callback)
-    },
+    }
   }
 }

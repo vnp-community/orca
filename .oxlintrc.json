@@ -97,6 +97,12 @@
       "rules": {
         "max-lines": ["error", { "max": 800, "skipBlankLines": true, "skipComments": true }]
       }
+    },
+    {
+      "files": ["**/dev-server/dev-server-relay-bridge.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 700, "skipBlankLines": true, "skipComments": true }]
+      }
     }
   ],
   "ignorePatterns": ["**/node_modules", "**/dist", "**/out"]

@@ -18,11 +18,11 @@ const wsRouter = createTracer('wsSession:route')
 
 export class WsSessionRouter {
   private readonly sessionManager: SessionManager
-  private readonly authManager:    AuthManager
+  private readonly authManager: AuthManager
 
   constructor(opts: { sessionManager: SessionManager; authManager: AuthManager }) {
     this.sessionManager = opts.sessionManager
-    this.authManager    = opts.authManager
+    this.authManager = opts.authManager
   }
 
   /**
@@ -32,8 +32,9 @@ export class WsSessionRouter {
    * For WS routing we use a fast path via extractSessionCookie (sync).
    */
   resolveUserFromRequest(req: IncomingMessage): Promise<string | null> {
-    return this.authManager.validateRequest(req.headers.cookie)
-      .then(session => session?.userId ?? null)
+    return this.authManager
+      .validateRequest(req.headers.cookie)
+      .then((session) => session?.userId ?? null)
   }
 
   /**
@@ -73,7 +74,7 @@ export class WsSessionRouter {
     // instead, which SessionManager stores in UserProcess. Reading from proc
     // eliminates the race where the socket exists but the metadata file doesn't.
     const socketPath = proc.socketPath
-    const authToken  = proc.authToken
+    const authToken = proc.authToken
 
     if (!socketPath) {
       span.fail('no socket path', { userId })
@@ -96,8 +97,10 @@ export class WsSessionRouter {
     upstream.on('error', (err) => {
       span.fail(err, { userId, phase: 'upstream' })
       console.error(`[WsSessionRouter] Upstream error: userId=${userId}`, err)
-      if ((ws as unknown as { readyState: number; OPEN: number }).readyState ===
-          (ws as unknown as { readyState: number; OPEN: number }).OPEN) {
+      if (
+        (ws as unknown as { readyState: number; OPEN: number }).readyState ===
+        (ws as unknown as { readyState: number; OPEN: number }).OPEN
+      ) {
         ws.close(1011, 'User session unavailable')
       }
     })
@@ -105,16 +108,24 @@ export class WsSessionRouter {
     // FIX TASK-TRM-001: Removed bare-\n keepalive — Unix domain sockets are local IPC,
     // they do not have TCP NAT timeouts and do not need application-level keepalive.
     // The bare \n caused JSON-RPC parse errors in the user process every 15 seconds.
+    // INSTEAD, we use native WebSocket ping/pong frames to keep the network connection
+    // alive through external proxies (Nginx, ALB, Cloudflare), without polluting the Unix socket.
+    const wsAnyPing = ws as unknown as { isAlive: boolean; ping: () => void; terminate: () => void }
+    const _keepAliveInterval = setInterval(() => {
+      wsAnyPing.ping()
+    }, 30_000)
 
     ws.on('message', (data: Buffer | string, isBinary: boolean) => {
-      if (!upstream.writable) return
+      if (!upstream.writable) {
+        return
+      }
       if (!isBinary) {
         try {
           const raw = (data as string | Buffer).toString('utf8')
           const parsed = JSON.parse(raw)
           if (parsed && typeof parsed === 'object' && parsed.authToken === 'cookie-auth') {
             parsed.authToken = authToken
-            upstream.write(JSON.stringify(parsed) + '\n')
+            upstream.write(`${JSON.stringify(parsed)}\n`)
             return
           }
         } catch {
@@ -134,7 +145,9 @@ export class WsSessionRouter {
         OPEN: number
         send: (d: string | Buffer, opts?: { binary: boolean }) => void
       }
-      if (wsAny.readyState !== wsAny.OPEN) return
+      if (wsAny.readyState !== wsAny.OPEN) {
+        return
+      }
 
       // Detect binary wire-protocol frames (type byte 0x01–0x09).
       // Forward them as binary WS frames without UTF-8 coercion.
@@ -165,8 +178,14 @@ export class WsSessionRouter {
 
     upstream.on('close', () => {
       // FIX TASK-TRM-001: keepaliveTimer removed — clearInterval no longer needed
-      const wsAny = ws as unknown as { readyState: number; OPEN: number; close: (code: number, reason: string) => void }
-      if (wsAny.readyState === wsAny.OPEN) wsAny.close(1011, 'User session ended')
+      const wsAny = ws as unknown as {
+        readyState: number
+        OPEN: number
+        close: (code: number, reason: string) => void
+      }
+      if (wsAny.readyState === wsAny.OPEN) {
+        wsAny.close(1011, 'User session ended')
+      }
     })
   }
 }

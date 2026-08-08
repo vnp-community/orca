@@ -7191,7 +7191,14 @@ export function connectPanePty(
           callbacks: {
             onData: dataCallback,
             onReplayData: replayDataCallback,
-            onError: reportError
+            onError: (message) => {
+              if (isSshSessionExpiredError(message)) {
+                deps.clearTabPtyId(deps.tabId, attachPtyId)
+                startFreshSpawn()
+                return
+              }
+              reportError(message)
+            }
           }
         })
         const attachedPtyId = transport.getPtyId() ?? attachPtyId
@@ -7203,7 +7210,10 @@ export function connectPanePty(
           registerPaneSerializerFor(attachedPtyId)
         }
       } catch (err) {
-        reportError(err instanceof Error ? err.message : String(err))
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!isSshSessionExpiredError(msg)) {
+          reportError(msg)
+        }
         deps.clearTabPtyId(deps.tabId, attachPtyId)
         startFreshSpawn()
       }
@@ -7247,7 +7257,14 @@ export function connectPanePty(
               callbacks: {
                 onData: dataCallback,
                 onReplayData: replayDataCallback,
-                onError: reportError
+                onError: (message) => {
+                  if (isSshSessionExpiredError(message)) {
+                    deps.clearTabPtyId(deps.tabId, spawnedPtyId)
+                    startFreshSpawn()
+                    return
+                  }
+                  reportError(message)
+                }
               }
             })
             const attachedPtyId = transport.getPtyId() ?? spawnedPtyId

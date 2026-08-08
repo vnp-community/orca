@@ -41,8 +41,14 @@ import type { DevServerRelayConnection } from './dev-server-relay-connection'
 import { DevServerFilesystemProvider } from './dev-server-filesystem-provider'
 import { DevServerGitProvider } from './dev-server-git-provider'
 import { DevServerPtyProvider } from './dev-server-pty-provider'
-import { createServerPtyController, type ServerPtyController } from '../runtime/server-pty-controller'
-import { registerRemoteFilesystemProvider, unregisterRemoteFilesystemProvider } from './ssh-filesystem-dispatch'
+import {
+  createServerPtyController,
+  type ServerPtyController
+} from '../runtime/server-pty-controller'
+import {
+  registerRemoteFilesystemProvider,
+  unregisterRemoteFilesystemProvider
+} from './ssh-filesystem-dispatch'
 import { registerRemoteGitProvider, unregisterRemoteGitProvider } from './ssh-git-dispatch'
 import { registerRemotePtyProvider, unregisterRemotePtyProvider } from '../ipc/pty'
 
@@ -50,11 +56,13 @@ export type DevServerProviderLifecycle = {
   attachRuntime(runtime: OrcaRuntimeService): void
 }
 
-export function wireDevServerProviders(devServerManager: DevServerManager): DevServerProviderLifecycle {
+export function wireDevServerProviders(
+  devServerManager: DevServerManager
+): DevServerProviderLifecycle {
   let attachedRuntime: OrcaRuntimeService | null = null
   let serverPtyController: ServerPtyController | null = null
   const readyPtyProvidersById = new Map<string, DevServerPtyProvider>()
-  const ptyUnsubscribersByDevServerId = new Map<string, Array<() => void>>()
+  const ptyUnsubscribersByDevServerId = new Map<string, (() => void)[]>()
 
   const wireRelayFor = (id: string, ptyProvider: DevServerPtyProvider): void => {
     if (!attachedRuntime || !serverPtyController || ptyUnsubscribersByDevServerId.has(id)) {
@@ -82,7 +90,9 @@ export function wireDevServerProviders(devServerManager: DevServerManager): DevS
 
   const registerFor = async (id: string): Promise<void> => {
     const relay = devServerManager.getRelay(id) as unknown as DevServerRelayConnection | null
-    if (!relay) return
+    if (!relay) {
+      return
+    }
     registerRemoteFilesystemProvider(id, new DevServerFilesystemProvider(id, relay))
     registerRemoteGitProvider(id, new DevServerGitProvider(id, relay))
 
@@ -92,7 +102,17 @@ export function wireDevServerProviders(devServerManager: DevServerManager): DevS
     // await is a no-op) and every per-user child process (real IPC round-trip).
     const servers = await devServerManager.list()
     const capabilities = servers.find((ds) => ds.id === id)?.capabilities ?? []
-    const ptyReady = capabilities.includes('pty') && capabilities.includes('pty.stream')
+    // Why check both 'pty' AND 'pty.stream': 'pty' alone means the agent has
+    // node-pty installed; 'pty.stream' means the agent's RPC dispatcher also
+    // exposes pty.attach/pty.data/pty.exit push notifications — both are
+    // required for DevServerPtyProvider to work end-to-end.
+    // 'pty.stream' was accidentally omitted from STATIC_CAPABILITIES_FALLBACK
+    // in agent-session.ts before the 2026-08 fix; we now also accept agents
+    // that advertise 'pty' without 'pty.stream' to be backward compatible with
+    // any older agents still running in the fleet.
+    const hasPty = capabilities.includes('pty')
+    const hasPtyStream = capabilities.includes('pty.stream')
+    const ptyReady = hasPty
     if (ptyReady) {
       const ptyProvider = new DevServerPtyProvider(id, relay)
       registerRemotePtyProvider(id, ptyProvider)
@@ -100,11 +120,19 @@ export function wireDevServerProviders(devServerManager: DevServerManager): DevS
       // No-op until attachRuntime() runs if runtime isn't ready yet — that
       // call's own catch-up pass finds this provider via readyPtyProvidersById.
       wireRelayFor(id, ptyProvider)
-      console.log(`[DevServerProviders] Registered fs/git/pty providers for devServerId=${id}`)
+      console.log(
+        `[DevServerProviders] Registered fs/git/pty providers for devServerId=${id}${hasPtyStream ? '' : ' (pty.stream not advertised — streaming may be limited)'}`
+      )
     } else {
+      console.warn(
+        `[DevServerProviders] PTY unavailable for devServerId=${id} — ` +
+          `capabilities: [${capabilities.join(', ')}]. ` +
+          `Terminal features will be disabled. ` +
+          `Check that node-pty is installed on the agent host and the agent version supports PTY.`
+      )
       console.log(
         `[DevServerProviders] Registered fs/git providers for devServerId=${id} ` +
-        `(pty unavailable — capabilities: [${capabilities.join(', ')}])`
+          `(pty unavailable — capabilities: [${capabilities.join(', ')}])`
       )
     }
   }
@@ -131,6 +159,20 @@ export function wireDevServerProviders(devServerManager: DevServerManager): DevS
   devServerManager.on('devServer:removed', (id: string) => {
     unregisterFor(id)
   })
+
+  // FIX: Pre-seed any already connected dev servers.
+  // In multi-user mode, a User Process might start *after* the Daemon Agent has
+  // already connected to the Main Process. The 'devServer:statusChanged' event
+  // would have already fired and been missed.
+  Promise.resolve(devServerManager.list())
+    .then((servers) => {
+      for (const server of servers) {
+        if (server.status === 'connected') {
+          void registerFor(server.id)
+        }
+      }
+    })
+    .catch((err) => console.error('[DevServerProviders] Failed to pre-seed servers:', err))
 
   return {
     attachRuntime(runtime: OrcaRuntimeService): void {
