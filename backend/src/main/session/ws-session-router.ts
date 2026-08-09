@@ -105,15 +105,43 @@ export class WsSessionRouter {
       }
     })
 
-    // FIX TASK-TRM-001: Removed bare-\n keepalive — Unix domain sockets are local IPC,
-    // they do not have TCP NAT timeouts and do not need application-level keepalive.
-    // The bare \n caused JSON-RPC parse errors in the user process every 15 seconds.
-    // INSTEAD, we use native WebSocket ping/pong frames to keep the network connection
-    // alive through external proxies (Nginx, ALB, Cloudflare), without polluting the Unix socket.
-    const wsAnyPing = ws as unknown as { isAlive: boolean; ping: () => void; terminate: () => void }
-    const _keepAliveInterval = setInterval(() => {
-      wsAnyPing.ping()
+    // Why: native WebSocket ping/pong frames keep the browser-facing connection
+    // alive through external proxies (Nginx, ALB, Cloudflare).
+    const wsAnyPing = ws as unknown as {
+      readyState: number
+      OPEN: number
+      isAlive: boolean
+      ping: () => void
+      terminate: () => void
+    }
+    const keepAliveInterval = setInterval(() => {
+      // Why: ping() throws if the socket isn't OPEN — guard instead of letting
+      // a leaked/late-firing tick crash the interval callback.
+      if (wsAnyPing.readyState === wsAnyPing.OPEN) {
+        wsAnyPing.ping()
+      }
     }, 30_000)
+
+    // FIX BUG-BE-WS-021: UnixSocketTransport (the per-user process's RPC
+    // server this proxies to) arms socket.setTimeout(RUNTIME_RPC_SOCKET_IDLE_TIMEOUT_MS
+    // = 30s, unix-socket-transport.ts) per connection and destroys the socket
+    // on inactivity — in EITHER direction. TASK-TRM-001 removed the previous
+    // bare-\n keepalive believing Unix sockets need none (true for TCP NAT,
+    // false for this transport's own idle timer), which regressed into a
+    // silent disconnect every ~30s whenever the browser session sits idle
+    // (no RPC calls, no push traffic): upstream's idle timer fires →
+    // socket.destroy() → upstream.on('close') below → ws.close(1011).
+    // A bare '\n' is the safe keepalive shape here — UnixSocketTransport's
+    // data handler trims each line and only dispatches non-empty ones
+    // (unix-socket-transport.ts: `if (rawMessage) { dispatchMessage(...) }`),
+    // so this never reaches messageHandler/produces a reply, it only counts
+    // as socket activity for the idle timer. Interval must stay comfortably
+    // under the 30s idle timeout — reuses DEFAULT_KEEPALIVE_INTERVAL_MS (10s).
+    const upstreamKeepAliveInterval = setInterval(() => {
+      if (upstream.writable) {
+        upstream.write('\n')
+      }
+    }, 10_000)
 
     ws.on('message', (data: Buffer | string, isBinary: boolean) => {
       if (!upstream.writable) {
@@ -171,13 +199,20 @@ export class WsSessionRouter {
     })
 
     ws.on('close', () => {
-      // FIX TASK-TRM-001: keepaliveTimer removed — clearInterval no longer needed
+      // Why: both interval timers leak forever if not cleared here — the WS
+      // ping (browser-facing) and the upstream '\n' keepalive (BUG-BE-WS-021,
+      // above) would otherwise keep firing against already-closed sockets.
+      clearInterval(keepAliveInterval)
+      clearInterval(upstreamKeepAliveInterval)
       upstream.end()
       this.sessionManager.touch(userId)
     })
 
     upstream.on('close', () => {
-      // FIX TASK-TRM-001: keepaliveTimer removed — clearInterval no longer needed
+      // Why: upstream can close before the client ws does (e.g. user process exit)
+      // — stop both leaked timers here too, not just in ws.on('close').
+      clearInterval(keepAliveInterval)
+      clearInterval(upstreamKeepAliveInterval)
       const wsAny = ws as unknown as {
         readyState: number
         OPEN: number
