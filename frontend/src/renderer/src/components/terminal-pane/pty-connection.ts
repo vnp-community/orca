@@ -7276,6 +7276,17 @@ export function connectPanePty(
             })
           })
           .catch((err) => {
+            // FIX BUG-FE-PTY-001: mirror every sibling reattach handler in this
+            // file (the deferred-reattach .catch() and the detachedRemoteLeafPtyId
+            // try/catch above) — a session-expired failure here means the PTY
+            // this pending spawn resolved to is already gone (grace period
+            // elapsed, agent restart, or the race this bug's transport-level fix
+            // narrows but doesn't fully eliminate). Retry with a fresh spawn
+            // instead of surfacing the raw backend error as a dead-end toast.
+            if (isSshSessionExpiredError(err)) {
+              startFreshSpawn()
+              return
+            }
             reportError(err instanceof Error ? err.message : String(err))
           })
       } else {
