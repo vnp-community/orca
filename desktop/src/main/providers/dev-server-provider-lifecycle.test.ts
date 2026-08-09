@@ -59,7 +59,7 @@ class FakeDevServerManager extends EventEmitter {
     return this.relaysById.get(id) ?? null
   }
 
-  async list(): Promise<Array<{ id: string; capabilities: string[] }>> {
+  async list(): Promise<{ id: string; capabilities: string[] }[]> {
     return [...this.serversById.values()]
   }
 }
@@ -105,7 +105,7 @@ describe('wireDevServerProviders', () => {
     lifecycle.attachRuntime(runtime as never)
     manager.emit('devServer:statusChanged', 'dev-01', 'connected')
     await vi.waitFor(() => {
-      if (registerRemotePtyProviderMock.mock.calls.length === 0) throw new Error('not yet')
+      if (registerRemotePtyProviderMock.mock.calls.length === 0) {throw new Error('not yet')}
     })
 
     relay.emit('pty.data', { id: 'agent-pty-1', data: 'hello\n' })
@@ -130,7 +130,7 @@ describe('wireDevServerProviders', () => {
     const lifecycle = wireDevServerProviders(manager as never)
     manager.emit('devServer:statusChanged', 'dev-01', 'connected')
     await vi.waitFor(() => {
-      if (registerRemotePtyProviderMock.mock.calls.length === 0) throw new Error('not yet')
+      if (registerRemotePtyProviderMock.mock.calls.length === 0) {throw new Error('not yet')}
     })
 
     // Runtime only becomes available well after the provider already registered.
@@ -171,7 +171,7 @@ describe('wireDevServerProviders', () => {
     lifecycle.attachRuntime(runtime as never)
     manager.emit('devServer:statusChanged', 'dev-01', 'connected')
     await vi.waitFor(() => {
-      if (registerRemotePtyProviderMock.mock.calls.length === 0) throw new Error('not yet')
+      if (registerRemotePtyProviderMock.mock.calls.length === 0) {throw new Error('not yet')}
     })
 
     manager.emit('devServer:statusChanged', 'dev-01', 'disconnected')

@@ -46,7 +46,7 @@ import {
   ensureTerminalVisible
 } from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
-import { PTY_SESSION_ID_SEPARATOR } from '../../src/shared/pty-session-id-format'
+import { PTY_SESSION_ID_SEPARATOR } from '../vendor-shared/shared/pty-session-id-format'
 
 // Why: each test in this file does a full quit→relaunch cycle, which spawns
 // two Electron instances back-to-back. Running in serial keeps the isolated

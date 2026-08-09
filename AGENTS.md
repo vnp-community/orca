@@ -14,6 +14,8 @@ Keep comments short — one or two lines. Capture only the non-obvious reason (s
 
 Never add a `max-lines` disable (`eslint-disable max-lines`, `oxlint-disable max-lines`, or line-specific variants), and never add a per-file `max-lines` bump in `mobile/.oxlintrc.json`.
 
+Ngoại lệ phải qua `config/max-lines-baseline.txt` (được review + có lý do ghi trong PR description), không được thêm bằng inline disable comment. `config/scripts/check-max-lines-ratchet.mjs` (`pnpm check:max-lines-ratchet`) chạy trong `pnpm lint` để chặn file mới thêm inline disable ngoài baseline này.
+
 ## File and Module Naming
 
 Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuff` for files, folders, or modules. They carry zero info and tend to become dumping grounds. Name files after what they _actually_ contain — prefer the concrete domain concept (e.g. `tab-group-state.ts`, `terminal-orphan-cleanup.ts`) over the generic role (`tabs-helpers.ts`, `terminal-utils.ts`). If you find yourself reaching for `helpers`, the file probably has more than one responsibility and should be split, or there's a better name hiding in the code that describes what the functions operate on.
@@ -78,7 +80,7 @@ To minimize context window usage and prevent token waste, you MUST strictly foll
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **orca** (106410 symbols, 262483 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **orca** (165761 symbols, 422267 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

@@ -43,7 +43,7 @@ function makeCtx(userId = 'user-1'): RpcContext {
 
 function findMethod(methods: RpcMethod[], name: string): RpcMethod {
   const m = methods.find((m) => m.name === name)
-  if (!m) throw new Error(`Method ${name} not found`)
+  if (!m) {throw new Error(`Method ${name} not found`)}
   return m
 }
 

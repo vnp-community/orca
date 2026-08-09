@@ -224,7 +224,7 @@ describe('DevServerRelayBridge.onNotification', () => {
 
   it('forwards a notification pushed by the wired mux to the registered handler', () => {
     const bridge = new DevServerRelayBridge(makeConfig(), {} as SshConnectionManager, null)
-    const received: Array<[string, Record<string, unknown>]> = []
+    const received: [string, Record<string, unknown>][] = []
     bridge.onNotification((method, params) => received.push([method, params]))
 
     const mux = makeMockMux()

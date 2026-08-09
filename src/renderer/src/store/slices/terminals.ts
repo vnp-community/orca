@@ -75,6 +75,7 @@ import { parseRemoteRuntimePtyId, toRemoteRuntimePtyId } from '@/runtime/runtime
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { getFolderWorkspaceConnectionId } from '@/lib/folder-workspace-connection'
+import { Tracers } from '../../../../shared/trace/tracers'
 import { hasWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import { Tracers } from '../../../../shared/trace/tracers'
 import { sanitizeTerminalLayoutPaneTitles } from '@/lib/terminal-pane-title-sanitization'

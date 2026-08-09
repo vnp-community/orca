@@ -67,7 +67,7 @@ export function runOrcaInitiatorHandshake(
     }, AGENT_TIMEOUT_MS)
 
     const decoder = new FrameDecoder((frame) => {
-      if (frame.type !== MessageType.Regular) return  // ignore keepalives
+      if (frame.type !== MessageType.Regular) {return}  // ignore keepalives
 
       let msg: ReturnType<typeof parseJsonRpcMessage>
       try {
@@ -77,7 +77,7 @@ export function runOrcaInitiatorHandshake(
       }
 
       // Only process response to our handshake (must have id field, no method)
-      if (!('id' in msg) || 'method' in msg) return
+      if (!('id' in msg) || 'method' in msg) {return}
       clearTimeout(timer)
 
       if ('error' in msg && msg.error) {
@@ -150,7 +150,7 @@ export function runOrcaReceiverHandshake(
     let outSeq = 0
 
     const decoder = new FrameDecoder((frame) => {
-      if (frame.type !== MessageType.Regular) return  // ignore keepalives
+      if (frame.type !== MessageType.Regular) {return}  // ignore keepalives
 
       let msg: ReturnType<typeof parseJsonRpcMessage>
       try {

@@ -9,7 +9,7 @@ import { join } from 'node:path'
 export type AgentConnectionMode = 'direct-websocket' | 'relay-websocket'
 export type AgentLogLevel = 'info' | 'debug' | 'warn' | 'error'
 
-export interface AgentConfig {
+export type AgentConfig = {
   readonly mode: AgentConnectionMode
   /** WebSocket URL for direct-websocket mode (ORCA_URL env var) */
   readonly orcaUrl: string
@@ -94,7 +94,7 @@ export function loadAgentConfig(): AgentConfig {
     orcaHttpUrl,
     agentToken:  process.env.AGENT_TOKEN        ?? '',
     apiSecret:   process.env.ORCA_AGENT_API_SECRET ?? '',
-    agentPort:   parseInt(process.env.AGENT_PORT || '6799', 10),
+    agentPort:   Number.parseInt(process.env.AGENT_PORT || '6799', 10),
     devServerId: process.env.DEV_SERVER_ID || 'dev-local',
     logLevel:    (process.env.LOG_LEVEL    || 'info') as AgentLogLevel,
     workDir:     process.env.AGENT_WORK_DIR || process.cwd(),

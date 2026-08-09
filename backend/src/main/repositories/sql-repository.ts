@@ -64,7 +64,7 @@ export class SqlStateRepository implements IStateRepository {
           db.query('SELECT data FROM orca_projects WHERE id = ?', [id])
         )
         const existing = rows[0] ? (JSON.parse(rows[0]['data'] as string) as Project) : null
-        if (!existing) throw new Error(`Project not found: ${id}`)
+        if (!existing) {throw new Error(`Project not found: ${id}`)}
         const updated = { ...existing, ...(patch as Partial<Project>) }
         await pool.withConnection((db) =>
           db.query(
@@ -132,7 +132,7 @@ export class SqlStateRepository implements IStateRepository {
           db.query('SELECT data FROM orca_repos WHERE id = ?', [id])
         )
         const existing = rows[0] ? (JSON.parse(rows[0]['data'] as string) as Repo) : null
-        if (!existing) throw new Error(`Repo not found: ${id}`)
+        if (!existing) {throw new Error(`Repo not found: ${id}`)}
         const updated = { ...existing, ...(patch as Partial<Repo>) }
         await pool.withConnection((db) =>
           db.query('UPDATE orca_repos SET data = ? WHERE id = ?', [JSON.stringify(updated), id])
@@ -191,7 +191,7 @@ export class SqlStateRepository implements IStateRepository {
           db.query('SELECT data FROM orca_ssh_targets WHERE id = ?', [id])
         )
         const existing = rows[0] ? (JSON.parse(rows[0]['data'] as string) as SshTarget) : null
-        if (!existing) throw new Error(`SshTarget not found: ${id}`)
+        if (!existing) {throw new Error(`SshTarget not found: ${id}`)}
         const updated = { ...existing, ...(patch as Partial<SshTarget>) }
         await pool.withConnection((db) =>
           db.query('UPDATE orca_ssh_targets SET data = ? WHERE id = ?', [JSON.stringify(updated), id])
@@ -216,7 +216,7 @@ export class SqlStateRepository implements IStateRepository {
         const rows = await pool.withConnection((db) =>
           db.query("SELECT value FROM orca_global_settings WHERE key = 'app_settings'")
         )
-        if (!rows[0]) return {} as GlobalSettings
+        if (!rows[0]) {return {} as GlobalSettings}
         return JSON.parse(rows[0]['value'] as string) as GlobalSettings
       },
 

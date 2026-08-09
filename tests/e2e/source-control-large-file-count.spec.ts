@@ -21,7 +21,7 @@ import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
 import { createLargeFileCountRepo, removeLargeFileCountRepo } from './large-file-count-fixtures'
-import { DEFAULT_GIT_STATUS_LIMIT } from '../../src/shared/git-status-limit'
+import { DEFAULT_GIT_STATUS_LIMIT } from '../vendor-shared/shared/git-status-limit'
 
 // Matches the large-diff freeze budget: a blocking stall past 1s is the
 // "UI becomes unresponsive" symptom reported in #8013.

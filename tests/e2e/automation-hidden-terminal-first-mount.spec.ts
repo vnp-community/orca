@@ -8,7 +8,7 @@ import {
   waitForSessionReady
 } from './helpers/store'
 import { getTerminalContent, waitForActiveTerminalManager } from './helpers/terminal'
-import { BACKGROUND_MOUNT_TERMINAL_WORKTREE_EVENT } from '../../src/renderer/src/constants/terminal'
+import { BACKGROUND_MOUNT_TERMINAL_WORKTREE_EVENT } from '../vendor-shared/renderer/src/constants/terminal'
 
 async function waitForHiddenTabPtyId(
   page: Parameters<typeof waitForSessionReady>[0],

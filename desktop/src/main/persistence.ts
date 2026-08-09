@@ -1300,8 +1300,8 @@ export function sanitizeOnboardingUpdate(
         if (key in rc && typeof rc[key] === 'boolean') {
           // Why: perServer is Record<...>, not boolean — skip non-boolean keys
           // so we only copy boolean checklist flags here.
-          if (typeof defaults[key] !== 'boolean') continue
-          ;(checklist as Record<string, unknown>)[key] = rc[key] as boolean
+          if (typeof defaults[key] !== 'boolean') {continue
+          ;}(checklist as Record<string, unknown>)[key] = rc[key] as boolean
         }
       }
       out.checklist = checklist
@@ -1371,7 +1371,7 @@ function normalizeLoadedOnboardingState(
 function migrateOnboardingChecklist(onboarding: OnboardingState): OnboardingState {
   const cl = onboarding.checklist
   // Already migrated, or no checklist yet.
-  if (!cl || cl.perServer !== undefined) return onboarding
+  if (!cl || cl.perServer !== undefined) {return onboarding}
 
   const PER_SERVER_KEYS: (keyof PerServerChecklistState)[] = [
     'addedRepo',

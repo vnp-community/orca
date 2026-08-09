@@ -23,7 +23,7 @@ export const HEADER_SIZE = 13  // 1 (type) + 4 (seq) + 4 (ack) + 4 (length)
  * Per-connection mutable state.
  * Call createWireState() at the start of each new WebSocket connection.
  */
-export interface WireState {
+export type WireState = {
   /** Incremented before each outgoing frame (starts at 0, so first frame has seq=1) */
   seqCounter: number
   /** Highest SEQ received from peer — sent as ACK field in our outgoing frames */
@@ -60,11 +60,11 @@ function encodeFrame(state: WireState, type: number, payload: string | Buffer): 
   frame.writeUInt32BE(seq, 1)
   frame.writeUInt32BE(state.highestAck, 5)
   frame.writeUInt32BE(payloadBuf.length, 9)
-  if (payloadBuf.length > 0) payloadBuf.copy(frame, HEADER_SIZE)
+  if (payloadBuf.length > 0) {payloadBuf.copy(frame, HEADER_SIZE)}
   return frame
 }
 
-export interface DecodedFrame {
+export type DecodedFrame = {
   type: number
   seq: number
   ack: number
@@ -78,14 +78,14 @@ export interface DecodedFrame {
  * Returns null if buf is shorter than HEADER_SIZE (malformed frame — caller should ignore it).
  */
 export function decodeFrame(state: WireState, buf: Buffer): DecodedFrame | null {
-  if (buf.length < HEADER_SIZE) return null
+  if (buf.length < HEADER_SIZE) {return null}
   const type   = buf.readUInt8(0)
   const seq    = buf.readUInt32BE(1)
   const ack    = buf.readUInt32BE(5)
   const length = buf.readUInt32BE(9)
   const payload = buf.subarray(HEADER_SIZE, HEADER_SIZE + length)
   // Track highest peer SEQ so our outgoing ACK field stays current
-  if (seq > state.highestAck) state.highestAck = seq
+  if (seq > state.highestAck) {state.highestAck = seq}
   return { type, seq, ack, length, payload }
 }
 
@@ -94,7 +94,7 @@ export function decodeFrame(state: WireState, buf: Buffer): DecodedFrame | null 
  * Returns null on malformed JSON or empty buffer (never throws).
  */
 export function parseJsonPayload<T = unknown>(payload: Buffer): T | null {
-  if (payload.length === 0) return null
+  if (payload.length === 0) {return null}
   try {
     return JSON.parse(payload.toString('utf8')) as T
   } catch {

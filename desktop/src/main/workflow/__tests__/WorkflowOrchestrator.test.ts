@@ -33,8 +33,8 @@ function makeDefinition(steps: WorkflowStep[], inputs?: Record<string, unknown>)
 }
 
 /** Build a mock pool that tracks all SQL calls */
-function makePool(): { pool: IConnectionPool; calls: Array<{ sql: string; params: unknown[] }> } {
-  const calls: Array<{ sql: string; params: unknown[] }> = []
+function makePool(): { pool: IConnectionPool; calls: { sql: string; params: unknown[] }[] } {
+  const calls: { sql: string; params: unknown[] }[] = []
   const pool = {
     withConnection: vi.fn().mockImplementation(
       async (fn: (db: { query: (...args: unknown[]) => Promise<unknown[]> }) => Promise<unknown>) => {
@@ -71,7 +71,7 @@ function makeFailExecutors(): StepExecutors {
 
 /** Flush micro-task queue — needs many rounds for deeply nested async chains */
 async function flushPromises(rounds = 100): Promise<void> {
-  for (let i = 0; i < rounds; i++) await Promise.resolve()
+  for (let i = 0; i < rounds; i++) {await Promise.resolve()}
 }
 
 function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
@@ -241,7 +241,7 @@ describe('WorkflowOrchestrator', () => {
   it('continueOnError=true: next wave still executes after step failure', async () => {
     const { pool, calls } = makePool()
     const fn = vi.fn().mockImplementation(async (s: WorkflowStep) => {
-      if (s.id === 'A') return { exitCode: 1 } // non-zero, no throw
+      if (s.id === 'A') {return { exitCode: 1 }} // non-zero, no throw
       return { exitCode: 0 }
     })
     const executors = { shell: fn, agent: fn, webhook: fn, notification: fn, condition: fn } as unknown as StepExecutors
@@ -261,7 +261,7 @@ describe('WorkflowOrchestrator', () => {
   it('continueOnError=false: step failure stops execution with failed status', async () => {
     const { pool, calls } = makePool()
     const fn2 = vi.fn().mockImplementation((s: WorkflowStep) => {
-      if (s.id === 'A') return Promise.resolve({ exitCode: 1 }) // failure
+      if (s.id === 'A') {return Promise.resolve({ exitCode: 1 })} // failure
       return Promise.resolve({ exitCode: 0 })
     })
     const executors = { shell: fn2, agent: fn2, webhook: fn2, notification: fn2, condition: fn2 } as unknown as StepExecutors
@@ -400,14 +400,14 @@ describe('WorkflowOrchestrator — CR-TRACE-017 tracing (parentTraceId)', () => 
       createdAt: Date.now(),
     }
     const preRestartRootTraceId = 'pre-restart-root-id'
-    const calls: Array<{ sql: string; params: unknown[] }> = []
+    const calls: { sql: string; params: unknown[] }[] = []
     const pool = {
       withConnection: vi.fn().mockImplementation(
         async (fn: (db: { query: (...args: unknown[]) => Promise<unknown[]> }) => Promise<unknown>) => {
           const db = {
             query: vi.fn().mockImplementation(async (sql: string, params: unknown[] = []) => {
               calls.push({ sql, params })
-              if (sql.includes('SELECT root_trace_id')) return [{ rootTraceId: preRestartRootTraceId }]
+              if (sql.includes('SELECT root_trace_id')) {return [{ rootTraceId: preRestartRootTraceId }]}
               if (sql.trim().startsWith('SELECT id') && sql.includes('orca_workflow_executions')) {
                 return [runningRow]
               }

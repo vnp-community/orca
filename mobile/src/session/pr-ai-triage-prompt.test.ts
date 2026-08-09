@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PRCheckDetail } from '../../../src/shared/types'
+import type { PRCheckDetail } from '../vendor-shared/shared/types'
 import {
   buildFixChecksPrompt,
   buildResolveConflictsPrompt,

@@ -13,7 +13,7 @@ import type { IConnectionPool } from '../db/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface AuditEntry {
+export type AuditEntry = {
   /** Dot-separated action code, e.g. 'auth.login.success', 'auth.login.failed' */
   action:     string
   /** User ID for successful auth; 'unknown' for failed/unauthenticated attempts */

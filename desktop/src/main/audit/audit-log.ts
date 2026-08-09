@@ -41,7 +41,7 @@ export class AuditLog {
   /** Append a single audit event as a JSON line. */
   async record(event: AuditEvent): Promise<void> {
     const line = JSON.stringify({ ...event, timestamp: event.timestamp ?? Date.now() })
-    await fs.appendFile(this.logPath, line + '\n', 'utf-8')
+    await fs.appendFile(this.logPath, `${line  }\n`, 'utf-8')
   }
 
   /**
@@ -66,9 +66,9 @@ export class AuditLog {
     for (let i = lines.length - 1; i >= 0 && events.length < limit; i--) {
       try {
         const event: AuditEvent = JSON.parse(lines[i])
-        if (filter.eventType && event.eventType !== filter.eventType) continue
-        if (filter.userId && event.userId !== filter.userId) continue
-        if (filter.targetId && event.targetId !== filter.targetId) continue
+        if (filter.eventType && event.eventType !== filter.eventType) {continue}
+        if (filter.userId && event.userId !== filter.userId) {continue}
+        if (filter.targetId && event.targetId !== filter.targetId) {continue}
         events.push(event)
       } catch {
         // Skip malformed lines

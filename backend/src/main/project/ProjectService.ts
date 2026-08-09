@@ -22,7 +22,7 @@ import type {
 } from '../../shared/project-types'
 
 /** Raw DB row for orca_v5_projects */
-interface ProjectRow {
+type ProjectRow = {
   id: string
   name: string
   description: string | null
@@ -36,7 +36,7 @@ interface ProjectRow {
 }
 
 /** Raw DB row for orca_v5_project_members */
-interface MemberRow {
+type MemberRow = {
   projectId: string
   userId: string
   role: string
@@ -152,7 +152,7 @@ export class ProjectService {
         [projectId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return rowToProject(rows[0])
   }
 
@@ -312,7 +312,7 @@ export class ProjectService {
         [projectId, userId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return rowToMember(rows[0])
   }
 

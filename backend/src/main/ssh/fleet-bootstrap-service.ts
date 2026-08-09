@@ -76,10 +76,10 @@ export async function bootstrapServer(
 
     // ── Resolve target ─────────────────────────────────────────
     const store = getSshConnectionStore()
-    if (!store) throw new Error('SSH store not initialized')
+    if (!store) {throw new Error('SSH store not initialized')}
 
     const target = store.getTarget(targetId)
-    if (!target) throw new Error(`SSH target not found: ${targetId}`)
+    if (!target) {throw new Error(`SSH target not found: ${targetId}`)}
 
     // Find matching fleet config server entry
     const serverConfig = fleetConfig?.servers.find(
@@ -98,7 +98,7 @@ export async function bootstrapServer(
 
     // Get the SshConnection instance for executing commands
     const manager = getSshConnectionManager()
-    if (!manager) throw new Error('SSH connection manager not initialized')
+    if (!manager) {throw new Error('SSH connection manager not initialized')}
 
     const conn = manager.getConnection(targetId)
     if (!conn) {

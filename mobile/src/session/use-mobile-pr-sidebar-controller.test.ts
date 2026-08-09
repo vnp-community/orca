@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { GitHubWorkItemDetails, PRCheckDetail, PRInfo } from '../../../src/shared/types'
-import type { HostedReviewInfo } from '../../../src/shared/hosted-review'
+import type { GitHubWorkItemDetails, PRCheckDetail, PRInfo } from '../vendor-shared/shared/types'
+import type { HostedReviewInfo } from '../vendor-shared/shared/hosted-review'
 import type { GitHubPrReadOutcome } from './github-pr-rpc'
 import {
   classifyPrSidebarFailure,

@@ -60,12 +60,12 @@ export type SshTarget = {
   /** Free-form tags for flexible grouping */
   tags?: string[]
   /** Repos available on this server */
-  repos?: Array<{
+  repos?: {
     path: string    // e.g. /srv/projects/vnp-blc
     name: string    // e.g. vnp-blc
     url?: string    // git remote URL (optional)
     branch?: string // default branch
-  }>
+  }[]
   /** Path to the fleet config file that imported this target */
   fleetConfigSource?: string
   /** Stable ID from fleet config (used to detect re-imports and avoid duplicates) */

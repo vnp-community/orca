@@ -48,7 +48,7 @@ function requestOnce(
   return new Promise((resolve, reject) => {
     const socket = net.createConnection(socketPath)
     const decoder = new DaemonMessageDecoder((msg) => {
-      if ('id' in msg && msg.id === id) resolve({ socket, response: msg })
+      if ('id' in msg && msg.id === id) {resolve({ socket, response: msg })}
     })
     socket.on('data', (chunk) => decoder.feed(chunk.toString('utf8')))
     socket.once('error', reject)
@@ -76,7 +76,7 @@ describe('pty-daemon-server', () => {
     const { runPtyDaemon } = await import('./pty-daemon-server')
     const socketPath = socketPathFor('ping')
     void runPtyDaemon(socketPath, log)
-    await vi.waitFor(() => { if (!fs.existsSync(socketPath)) throw new Error('socket not ready') } )
+    await vi.waitFor(() => { if (!fs.existsSync(socketPath)) {throw new Error('socket not ready')} } )
 
     const { socket, response } = await requestOnce(socketPath, 1, 'daemon.ping')
     expect(response).toMatchObject({ id: 1, result: { ok: true, ptys: 0 } })
@@ -87,7 +87,7 @@ describe('pty-daemon-server', () => {
     const { runPtyDaemon } = await import('./pty-daemon-server')
     const socketPath = socketPathFor('create')
     void runPtyDaemon(socketPath, log)
-    await vi.waitFor(() => { if (!fs.existsSync(socketPath)) throw new Error('socket not ready') } )
+    await vi.waitFor(() => { if (!fs.existsSync(socketPath)) {throw new Error('socket not ready')} } )
 
     const created = await requestOnce(socketPath, 1, 'pty.create', { cols: 80, rows: 24 })
     expect(spawnMock).toHaveBeenCalledTimes(1)
@@ -103,7 +103,7 @@ describe('pty-daemon-server', () => {
     const { runPtyDaemon } = await import('./pty-daemon-server')
     const socketPath = socketPathFor('unknown-method')
     void runPtyDaemon(socketPath, log)
-    await vi.waitFor(() => { if (!fs.existsSync(socketPath)) throw new Error('socket not ready') } )
+    await vi.waitFor(() => { if (!fs.existsSync(socketPath)) {throw new Error('socket not ready')} } )
 
     const { socket, response } = await requestOnce(socketPath, 1, 'not.a.real.method')
     expect(response).toMatchObject({ id: 1, error: { message: expect.stringContaining('Unknown daemon method') } })
@@ -116,7 +116,7 @@ describe('pty-daemon-server', () => {
 
     // First instance binds for real.
     void runPtyDaemon(socketPath, log)
-    await vi.waitFor(() => { if (!fs.existsSync(socketPath)) throw new Error('socket not ready') } )
+    await vi.waitFor(() => { if (!fs.existsSync(socketPath)) {throw new Error('socket not ready')} } )
     exitSpy.mockClear()
 
     // Real process.exit(0) never returns — simulate that here so the mocked call
@@ -143,7 +143,7 @@ describe('pty-daemon-server', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
 
     const created = await requestOnce(socketPath, 1, 'pty.create', {})
-    const pty = spawnMock.mock.results[spawnMock.mock.results.length - 1]!.value as FakePty
+    const pty = spawnMock.mock.results.at(-1)!.value as FakePty
 
     const closed = await requestOnce(socketPath, 2, 'daemon.sessionClosed')
     expect(closed.response).toMatchObject({ id: 2, result: { ok: true } })

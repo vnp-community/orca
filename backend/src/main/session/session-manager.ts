@@ -47,7 +47,7 @@ function calcRespawnBackoffDelay(attempt: number): number {
  */
 export function resolveIdleTimeoutMsFromEnv(env: NodeJS.ProcessEnv = process.env): number | undefined {
   const raw = env['SESSION_IDLE_TIMEOUT_MS']
-  if (raw === undefined || raw.trim() === '') return undefined
+  if (raw === undefined || raw.trim() === '') {return undefined}
 
   const parsed = Number(raw)
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -104,7 +104,7 @@ export class SessionManager {
 
     // Periodic idle-process sweep — unref so it won't prevent process exit
     this.idleTimer = setInterval(() => this.sweepIdleProcesses(), IDLE_CHECK_INTERVAL_MS)
-    if (this.idleTimer.unref) this.idleTimer.unref()
+    if (this.idleTimer.unref) {this.idleTimer.unref()}
   }
 
   /**
@@ -209,7 +209,7 @@ export class SessionManager {
 
       // FIX BUG-BE-HLD-011: idle-sweep / shutdown kills are intentional — do not
       // auto-respawn those. Only unexpected crashes get a bounded auto-respawn.
-      if (this.intentionalExitUserIds.delete(userId)) return
+      if (this.intentionalExitUserIds.delete(userId)) {return}
       this.scheduleRespawn(userId, proc)
     })
 
@@ -250,21 +250,21 @@ export class SessionManager {
       this.respawnTimers.delete(userId)
       // A new WS connection may have already respawned this user via
       // getOrSpawnUserProcess() while we were waiting — don't double-spawn.
-      if (this.processes.has(userId)) return
+      if (this.processes.has(userId)) {return}
       this.spawnUserProcess(userId)
         .then((respawned) => { respawned.respawnCount = nextRespawnCount })
         .catch((err) => {
           console.warn(`[SessionManager] Auto-respawn failed: userId=${userId}`, (err as Error)?.message)
         })
     }, delayMs)
-    if (timer.unref) timer.unref()
+    if (timer.unref) {timer.unref()}
     this.respawnTimers.set(userId, timer)
   }
 
   /** Update lastSeenAt for a user process — call on any WS activity */
   touch(userId: string): void {
     const proc = this.processes.get(userId)
-    if (proc) proc.lastSeenAt = Date.now()
+    if (proc) {proc.lastSeenAt = Date.now()}
   }
 
   /** Get a process by userId (null if not running) */
@@ -339,7 +339,7 @@ export class SessionManager {
 
   private killUserProcess(userId: string): void {
     const proc = this.processes.get(userId)
-    if (!proc) return
+    if (!proc) {return}
     // FIX BUG-BE-HLD-011: mark intentional so the exit handler skips auto-respawn.
     this.intentionalExitUserIds.add(userId)
     try { proc.process.kill('SIGTERM') } catch { /* already exited */ }
@@ -355,7 +355,7 @@ export class SessionManager {
     }
     // FIX BUG-BE-HLD-011: cancel pending auto-respawn timers so shutdown doesn't
     // fork new user processes after the server has started tearing down.
-    for (const timer of this.respawnTimers.values()) clearTimeout(timer)
+    for (const timer of this.respawnTimers.values()) {clearTimeout(timer)}
     this.respawnTimers.clear()
 
     const userIds = [...this.processes.keys()]
@@ -383,22 +383,22 @@ export class SessionManager {
       // Bitbucket — App Password auth
       const bitbucketToken = await store.getToken('bitbucket')
       const bitbucketConfig = await store.getConfig('bitbucket')
-      if (bitbucketToken) env['ORCA_BITBUCKET_ACCESS_TOKEN'] = bitbucketToken
-      if (bitbucketConfig?.email) env['ORCA_BITBUCKET_EMAIL'] = bitbucketConfig.email
-      if (bitbucketConfig?.apiBaseUrl) env['ORCA_BITBUCKET_API_BASE_URL'] = bitbucketConfig.apiBaseUrl
+      if (bitbucketToken) {env['ORCA_BITBUCKET_ACCESS_TOKEN'] = bitbucketToken}
+      if (bitbucketConfig?.email) {env['ORCA_BITBUCKET_EMAIL'] = bitbucketConfig.email}
+      if (bitbucketConfig?.apiBaseUrl) {env['ORCA_BITBUCKET_API_BASE_URL'] = bitbucketConfig.apiBaseUrl}
 
       // Azure DevOps — Personal Access Token
       const azureToken = await store.getToken('azure-devops')
       const azureConfig = await store.getConfig('azure-devops')
-      if (azureToken) env['ORCA_AZURE_DEVOPS_TOKEN'] = azureToken
-      if (azureConfig?.apiBaseUrl) env['ORCA_AZURE_DEVOPS_API_BASE_URL'] = azureConfig.apiBaseUrl
-      if (azureConfig?.username) env['ORCA_AZURE_DEVOPS_USERNAME'] = azureConfig.username
+      if (azureToken) {env['ORCA_AZURE_DEVOPS_TOKEN'] = azureToken}
+      if (azureConfig?.apiBaseUrl) {env['ORCA_AZURE_DEVOPS_API_BASE_URL'] = azureConfig.apiBaseUrl}
+      if (azureConfig?.username) {env['ORCA_AZURE_DEVOPS_USERNAME'] = azureConfig.username}
 
       // Gitea — API token
       const giteaToken = await store.getToken('gitea')
       const giteaConfig = await store.getConfig('gitea')
-      if (giteaToken) env['ORCA_GITEA_TOKEN'] = giteaToken
-      if (giteaConfig?.apiBaseUrl) env['ORCA_GITEA_API_BASE_URL'] = giteaConfig.apiBaseUrl
+      if (giteaToken) {env['ORCA_GITEA_TOKEN'] = giteaToken}
+      if (giteaConfig?.apiBaseUrl) {env['ORCA_GITEA_API_BASE_URL'] = giteaConfig.apiBaseUrl}
     } catch (err) {
       // Non-fatal: integration tokens not yet configured or store not initialised
       console.warn(`[SessionManager] Could not load credentials for user ${userId} (non-fatal):`, (err as Error)?.message)

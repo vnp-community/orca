@@ -24,7 +24,7 @@ import type { DatabaseConfig } from './db/config'
 import type { IConnectionPool } from './db/pool'
 import { AgentWebSocketServer } from './dev-server/agent-ws-server'
 
-export interface ServerBootstrapResult {
+export type ServerBootstrapResult = {
   /** Shutdown function — call to cleanly stop all services */
   shutdown(): Promise<void>
   /** DevServerManager — exposed for http-server and downstream services */
@@ -88,7 +88,7 @@ export interface ServerBootstrapResult {
 }
 
 
-export interface ServerBootstrapOptions {
+export type ServerBootstrapOptions = {
   platform: IPlatformServices
   /** Port for RPC WebSocket. Default: 6768. Pass 0 to disable TCP WebSocket (user-process mode). */
   port?: number
@@ -562,7 +562,7 @@ export async function initializeOrcaServices(
         console.warn('[ServerBootstrap] AgentWebSocketServer stop error:', err)
       }
       try {
-        if (authManager) authManager.destroy()
+        if (authManager) {authManager.destroy()}
         console.log('[ServerBootstrap] ✅ AuthManager destroyed')
       } catch (err) {
         console.warn('[ServerBootstrap] AuthManager destroy error:', err)
@@ -573,7 +573,7 @@ export async function initializeOrcaServices(
         console.warn('[ServerBootstrap] RPC server stop error:', err)
       }
       try {
-        if (daemonShutdown) await daemonShutdown()
+        if (daemonShutdown) {await daemonShutdown()}
       } catch (err) {
         console.warn('[ServerBootstrap] Daemon shutdown error:', err)
       }
@@ -585,7 +585,7 @@ export async function initializeOrcaServices(
         console.warn('[ServerBootstrap] Pool drain error:', err)
       }
       try {
-        if (sessionManager) await sessionManager.shutdown()
+        if (sessionManager) {await sessionManager.shutdown()}
         console.log('[ServerBootstrap] ✅ SessionManager shutdown complete')
       } catch (err) {
         console.warn('[ServerBootstrap] SessionManager shutdown error:', err)

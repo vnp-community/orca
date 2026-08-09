@@ -30,7 +30,7 @@ services:
   orca:
     build:
       context: ../../
-      dockerfile: deploy/dev/docker/orca/Dockerfile
+      dockerfile: deploy/dev/docker/backend/Dockerfile
       # Why: frontend Vite build needs ~2-3GB RAM. Without shm-size, Docker
       # defaults to 64MB shared memory which causes build OOM crashes.
       shm_size: '2gb'
@@ -94,7 +94,7 @@ services:
       # Multi-user mode: orca-data/users/<userId>/ per user (auto-created)
       - orca-data:/data/orca
       # SSH key để Orca Server SSH vào các Dev Servers
-      - ./docker/orca/ssh:/home/orca/.ssh:ro
+      - ./docker/backend/ssh:/home/orca/.ssh:ro
       # Project repos
       - orca-projects:/srv/projects
 

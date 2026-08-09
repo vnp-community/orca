@@ -1,5 +1,5 @@
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
-import type { SkillDiscoveryResult } from '../../src/shared/skills'
+import type { SkillDiscoveryResult } from '../vendor-shared/shared/skills'
 import { test, expect } from './helpers/orca-app'
 import { getStoreState, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 

@@ -39,16 +39,16 @@ async function autoAdvanceTasks(
   userId: string
 ): Promise<void> {
   const refs = [...message.matchAll(TASK_REF_RE)].map(m => m[1]!)
-  if (refs.length === 0) return
+  if (refs.length === 0) {return}
 
   await Promise.allSettled(
     refs.map(async (ref) => {
       try {
         const perm = await taskGrantService.resolvePermission(userId, ref)
-        if (!perm || !['edit', 'execute', 'manage'].includes(perm)) return
+        if (!perm || !['edit', 'execute', 'manage'].includes(perm)) {return}
         const task = await taskService.get(ref)
-        if (!task) return
-        if (['done', 'cancelled'].includes(task.status)) return
+        if (!task) {return}
+        if (['done', 'cancelled'].includes(task.status)) {return}
         await taskService.update(ref, { status: 'review' })
         await taskService.addComment(
           ref, userId,
@@ -107,11 +107,27 @@ export function registerRemoteGitRpcMethods(
         files: z.array(z.string()).optional(),
       }),
       handler: async (params, ctx) => {
-        const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
-        const args = ['diff']
-        if (params.staged) args.push('--staged')
-        if (params.files?.length) args.push('--', ...params.files)
-        return relay.call('git.exec', { cwd: params.worktreePath, args }) as Promise<GitExecResult>
+        const span = Tracers.codeReviewDiff.start(
+          { worktreeId: params.worktreePath, mode: 'remote' },
+          params.traceId ? { id: params.traceId } : undefined
+        )
+        try {
+          const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
+          span.step('routeRelay', { projectId: params.projectId })
+          const args = ['diff']
+          if (params.staged) {args.push('--staged')}
+          if (params.files?.length) {args.push('--', ...params.files)}
+          const result = (await relay.call('git.exec', {
+            cwd: params.worktreePath,
+            args,
+            traceId: span.id, // forward theo CR-TRACE-000 §3.3
+          })) as GitExecResult
+          span.ok({ mode: 'remote', fileCount: result.stdout ? result.stdout.split('\n').length : 0 })
+          return result
+        } catch (err) {
+          span.fail(err, { mode: 'remote' })
+          throw err
+        }
       },
     }),
 
@@ -177,9 +193,9 @@ export function registerRemoteGitRpcMethods(
       handler: async (params, ctx) => {
         const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
         const args = ['push']
-        if (params.force) args.push('--force-with-lease')
-        if (params.remote) args.push(params.remote)
-        if (params.branch) args.push(params.branch)
+        if (params.force) {args.push('--force-with-lease')}
+        if (params.remote) {args.push(params.remote)}
+        if (params.branch) {args.push(params.branch)}
         return relay.call('git.execStream', { cwd: params.worktreePath, args }) as Promise<GitExecResult>
       },
     }),
@@ -196,9 +212,9 @@ export function registerRemoteGitRpcMethods(
       handler: async (params, ctx) => {
         const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
         const args = ['pull']
-        if (params.rebase) args.push('--rebase')
-        if (params.remote) args.push(params.remote)
-        if (params.branch) args.push(params.branch)
+        if (params.rebase) {args.push('--rebase')}
+        if (params.remote) {args.push(params.remote)}
+        if (params.branch) {args.push(params.branch)}
         return relay.call('git.execStream', { cwd: params.worktreePath, args }) as Promise<GitExecResult>
       },
     }),
@@ -214,8 +230,8 @@ export function registerRemoteGitRpcMethods(
       handler: async (params, ctx) => {
         const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
         const args = ['fetch']
-        if (params.prune) args.push('--prune')
-        if (params.remote) args.push(params.remote)
+        if (params.prune) {args.push('--prune')}
+        if (params.remote) {args.push(params.remote)}
         return relay.call('git.exec', { cwd: params.worktreePath, args }) as Promise<GitExecResult>
       },
     }),
@@ -230,7 +246,7 @@ export function registerRemoteGitRpcMethods(
       handler: async (params, ctx) => {
         const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
         const args = ['branch', '--format=%(refname:short)|%(upstream:short)|%(HEAD)|%(objectname:short)']
-        if (params.all) args.splice(1, 0, '-a')
+        if (params.all) {args.splice(1, 0, '-a')}
         return relay.call('git.exec', { cwd: params.worktreePath, args }) as Promise<GitExecResult>
       },
     }),
@@ -246,7 +262,7 @@ export function registerRemoteGitRpcMethods(
       handler: async (params, ctx) => {
         const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
         const args = ['branch', params.name]
-        if (params.from) args.push(params.from)
+        if (params.from) {args.push(params.from)}
         return relay.call('git.exec', { cwd: params.worktreePath, args }) as Promise<GitExecResult>
       },
     }),
@@ -280,7 +296,7 @@ export function registerRemoteGitRpcMethods(
       handler: async (params, ctx) => {
         const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
         const args = ['checkout']
-        if (params.create) args.push('-b')
+        if (params.create) {args.push('-b')}
         args.push(params.branch)
         return relay.call('git.exec', { cwd: params.worktreePath, args }) as Promise<GitExecResult>
       },
@@ -363,7 +379,7 @@ export function registerRemoteGitRpcMethods(
         try {
           const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
           const args = ['worktree', 'remove', params.path]
-          if (params.force) args.push('--force')
+          if (params.force) {args.push('--force')}
           span.step('relay-git-worktree-remove', { devServerId: params.projectId })
           const result = (await relay.call('git.exec', {
             cwd: params.worktreePath,
@@ -390,15 +406,22 @@ export function registerRemoteGitRpcMethods(
       }),
       handler: async (params, ctx) => {
         const userId = params.userId ?? ctx.userId ?? ''
+        const span = Tracers.codeReviewAiCommit.start(
+          { worktreeId: params.worktreePath, mode: 'remote' },
+          params.traceId ? { id: params.traceId } : undefined
+        )
         const relay = await router.getRelayForProject(params.projectId, userId)
 
         // Get staged diff
         const diffResult = await relay.call('git.exec', {
           cwd: params.worktreePath,
           args: ['diff', '--staged', '--no-color'],
+          traceId: span.id,
         }) as GitExecResult
+        span.step('diffStaged', { mode: 'remote', hasChanges: diffResult.stdout.trim().length > 0 })
 
         if (!diffResult.stdout.trim()) {
+          span.fail('GIT_NO_STAGED_CHANGES', { mode: 'remote' })
           throw new Error('GIT_NO_STAGED_CHANGES')
         }
 
@@ -412,10 +435,23 @@ export function registerRemoteGitRpcMethods(
           diffResult.stdout.slice(0, 8000), // limit context
         ].join('\n')
 
-        const aiResult = await relay.call('ai.complete', { prompt, format: 'text' }) as { content?: string; text?: string }
+        // Why: no double-fail catch-all here — the 2 business-outcome fail()
+        // calls above/below are the only ones this span emits; an unexpected
+        // relay.call() rejection propagates unlabeled (relay:agentCall logs
+        // its own fail — SOL-BE-TRACE-005 §2.3 accepted gap).
+        span.step('aiComplete', { mode: 'remote', promptChars: prompt.length })
+        const aiResult = await relay.call('ai.complete', {
+          prompt,
+          format: 'text',
+          traceId: span.id,
+        }) as { content?: string; text?: string }
         const message = (aiResult.content ?? aiResult.text ?? '').trim()
-        if (!message) throw new Error('GIT_AI_EMPTY_RESPONSE')
+        if (!message) {
+          span.fail('GIT_AI_EMPTY_RESPONSE', { mode: 'remote' })
+          throw new Error('GIT_AI_EMPTY_RESPONSE')
+        }
 
+        span.ok({ mode: 'remote', messageChars: message.length })
         return { message }
       },
     }),
@@ -432,27 +468,44 @@ export function registerRemoteGitRpcMethods(
         head: z.string().optional(),
       }),
       handler: async (params, ctx) => {
-        const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
+        const span = Tracers.codeReviewCreatePr.start(
+          { worktreeId: params.worktreePath, mode: 'remote' },
+          params.traceId ? { id: params.traceId } : undefined
+        )
+        try {
+          const relay = await router.getRelayForProject(params.projectId, ctx.userId ?? '')
 
-        // Use gh CLI via git.exec wrapper
-        const ghArgs = [
-          'pr', 'create',
-          '--title', params.title,
-          '--base', params.base,
-        ]
-        if (params.body) { ghArgs.push('--body', params.body) }
-        if (params.draft) ghArgs.push('--draft')
-        if (params.head) { ghArgs.push('--head', params.head) }
+          // Use gh CLI via git.exec wrapper
+          const ghArgs = [
+            'pr', 'create',
+            '--title', params.title,
+            '--base', params.base,
+          ]
+          if (params.body) { ghArgs.push('--body', params.body) }
+          if (params.draft) {ghArgs.push('--draft')}
+          if (params.head) { ghArgs.push('--head', params.head) }
 
-        // NOTE: gh is not a git subcommand, so we use a separate relay call
-        const result = await relay.call('shell.exec', {
-          cwd: params.worktreePath,
-          cmd: 'gh',
-          args: ghArgs,
-        }) as { stdout?: string; stderr?: string; exitCode?: number }
+          // NOTE: gh is not a git subcommand, so we use a separate relay call
+          span.step('ghExec', { mode: 'remote', base: params.base })
+          const result = await relay.call('shell.exec', {
+            cwd: params.worktreePath,
+            cmd: 'gh',
+            args: ghArgs,
+            traceId: span.id,
+          }) as { stdout?: string; stderr?: string; exitCode?: number }
 
-        const prUrl = (result.stdout ?? '').trim()
-        return { url: prUrl, exitCode: result.exitCode ?? 0 }
+          const prUrl = (result.stdout ?? '').trim()
+          const exitCode = result.exitCode ?? 0
+          if (exitCode !== 0) {
+            span.fail(result.stderr ?? 'gh pr create failed', { mode: 'remote', exitCode })
+          } else {
+            span.ok({ mode: 'remote', prUrl, exitCode })
+          }
+          return { url: prUrl, exitCode }
+        } catch (err) {
+          span.fail(err, { mode: 'remote' })
+          throw err
+        }
       },
     }),
   ]

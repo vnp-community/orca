@@ -25,7 +25,7 @@ const HEALTH_CHECK_INTERVAL_MS = 15 * 60 * 1000 // 15 minutes
 
 // ── Status change event ───────────────────────────────────────────────────────
 
-export interface ProviderStatusChange {
+export type ProviderStatusChange = {
   accountId:  string
   oldStatus:  string
   newStatus:  string
@@ -116,9 +116,9 @@ export class ProviderHealthChecker {
           lastHealthCheck: checkedAt,
         })
 
-        if (newStatus === 'active') activeCount++
-        else if (newStatus === 'quota_exceeded') quotaExceededCount++
-        else invalidCount++
+        if (newStatus === 'active') {activeCount++}
+        else if (newStatus === 'quota_exceeded') {quotaExceededCount++}
+        else {invalidCount++}
 
         // FIX BUG-AIP-003: Emit status change event when status transitions
         if (oldStatus !== newStatus && this.onStatusChanged) {

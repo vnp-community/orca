@@ -48,7 +48,7 @@ export class GatewayDevServerManagerProxy {
 
   private handleNotification(message: IpcNotificationMessage): void {
     const handlers = this.notificationHandlers.get(message.devServerId)
-    if (!handlers) return
+    if (!handlers) {return}
     for (const handler of handlers) {
       handler(message.method, message.params)
     }
@@ -56,7 +56,7 @@ export class GatewayDevServerManagerProxy {
 
   private handleResponse(message: IpcResponseMessage) {
     const pending = this.pendingRequests.get(message.requestId)
-    if (!pending) return
+    if (!pending) {return}
 
     this.pendingRequests.delete(message.requestId)
     if (message.error) {

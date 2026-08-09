@@ -65,15 +65,15 @@ function buildFromEnv(dialect: string): DatabaseConfig | null {
     return null
   }
 
-  const port = portStr ? parseInt(portStr, 10) : undefined
+  const port = portStr ? Number.parseInt(portStr, 10) : undefined
 
   const poolMax = process.env['ORCA_DB_POOL_MAX']
   const poolMin = process.env['ORCA_DB_POOL_MIN']
   const pool =
     poolMax || poolMin
       ? {
-          ...(poolMax ? { max: parseInt(poolMax, 10) } : {}),
-          ...(poolMin ? { min: parseInt(poolMin, 10) } : {})
+          ...(poolMax ? { max: Number.parseInt(poolMax, 10) } : {}),
+          ...(poolMin ? { min: Number.parseInt(poolMin, 10) } : {})
         }
       : undefined
 

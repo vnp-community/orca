@@ -1,7 +1,7 @@
-import { isPathInsideOrEqual } from '../../../src/shared/cross-platform-path'
-import { latestSessionConversationTurn } from '../../../src/shared/ai-vault-session-display'
-import { aiVaultAgentLabel } from '../../../src/shared/ai-vault-types'
-import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
+import { isPathInsideOrEqual } from '../vendor-shared/shared/cross-platform-path'
+import { latestSessionConversationTurn } from '../vendor-shared/shared/ai-vault-session-display'
+import { aiVaultAgentLabel } from '../vendor-shared/shared/ai-vault-types'
+import type { AiVaultSession } from '../vendor-shared/shared/ai-vault-types'
 import { formatTimeAgo } from '../worktree/agent-row-display'
 
 export type MobileAgentHistoryCard = {

@@ -128,10 +128,10 @@ export const FLEET_HANDLERS: Record<string, CommandHandler> = {
     }
 
     console.log(
-      '\n' +
+      `\n${ 
         [col('ID', 20), col('LABEL', 28), col('PROJECT', 16), col('HOST', 26), col('STATUS', 18)].join(
           '  '
-        )
+        )}`
     )
     console.log('─'.repeat(114))
     for (const t of targets) {
@@ -167,9 +167,9 @@ export const FLEET_HANDLERS: Record<string, CommandHandler> = {
     }
 
     const formatUptime = (seconds: number): string => {
-      if (!seconds) return '—'
-      if (seconds < 60) return `${seconds}s`
-      if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
+      if (!seconds) {return '—'}
+      if (seconds < 60) {return `${seconds}s`}
+      if (seconds < 3600) {return `${Math.floor(seconds / 60)}m`}
       return `${Math.floor(seconds / 3600)}h${Math.floor((seconds % 3600) / 60)}m`
     }
 
@@ -201,7 +201,7 @@ export const FLEET_HANDLERS: Record<string, CommandHandler> = {
     const serverFilter = getOptionalStringFlag(flags, 'server')
     const dryRun = flags.get('dry-run') === true
     const rawConcurrency = flags.get('concurrency')
-    const concurrency = typeof rawConcurrency === 'string' ? parseInt(rawConcurrency, 10) : 3
+    const concurrency = typeof rawConcurrency === 'string' ? Number.parseInt(rawConcurrency, 10) : 3
 
     if (!all && !project && !serverFilter) {
       throw new RuntimeClientError('invalid_argument', 'Specify --all, --project <name>, or --server <id>')
@@ -224,7 +224,7 @@ export const FLEET_HANDLERS: Record<string, CommandHandler> = {
     }
 
     const limit = pLimit(concurrency)
-    const results: Array<{ id: string; label: string; success: boolean; error?: string; ms: number }> = []
+    const results: { id: string; label: string; success: boolean; error?: string; ms: number }[] = []
 
     console.log(`\nProvisioning ${targets.length} servers (concurrency: ${concurrency})...\n`)
 
@@ -262,8 +262,8 @@ export const FLEET_HANDLERS: Record<string, CommandHandler> = {
     console.log(`\n${'─'.repeat(60)}`)
     console.log(`Summary: ${succeeded}/${targets.length} provisioned | ${failed} failed`)
 
-    if (json) console.log(JSON.stringify(results, null, 2))
-    if (failed > 0) process.exit(1)
+    if (json) {console.log(JSON.stringify(results, null, 2))}
+    if (failed > 0) {process.exit(1)}
   },
 
   // ── fleet bootstrap ───────────────────────────────────────────
@@ -319,7 +319,7 @@ export const FLEET_HANDLERS: Record<string, CommandHandler> = {
             console.log(`  ⚠️  Bootstrap failed: ${result.error ?? 'unknown error'}`)
           }
 
-          if (json) console.log(JSON.stringify(result, null, 2))
+          if (json) {console.log(JSON.stringify(result, null, 2))}
         })
       )
     )

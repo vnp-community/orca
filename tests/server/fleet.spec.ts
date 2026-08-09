@@ -100,7 +100,7 @@ describe('F28 — Dev Server Onboarding: Web Push API', () => {
 
 describe('F27 — Fleet Config Parser: YAML Parsing', () => {
   it('parses valid 2-server fleet YAML config', async () => {
-    let parseFleetConfig: ((yaml: string) => { servers: Array<{ id: string; host: string }> }) | undefined
+    let parseFleetConfig: ((yaml: string) => { servers: { id: string; host: string }[] }) | undefined
     try {
       const mod = await import('../../src/shared/fleet-config-parser')
       parseFleetConfig = (mod as Record<string, unknown>).parseFleetConfig as typeof parseFleetConfig

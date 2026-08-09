@@ -146,7 +146,7 @@ export function createWorkflowMethods(
       params: GetExecutionParam,
       handler: async (params) => {
         const execution = await orchestrator.getExecution(params.executionId)
-        if (!execution) throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)
+        if (!execution) {throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)}
         return execution
       },
     }),
@@ -170,7 +170,7 @@ export function createWorkflowMethods(
         const userId = ctx.userId ?? ''
         // Access control: only triggeredBy user can cancel
         const execution = await orchestrator.getExecution(params.executionId)
-        if (!execution) throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)
+        if (!execution) {throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)}
         if (execution.triggeredBy !== userId) {
           throw new Error('WORKFLOW_CANCEL_DENIED: only the triggering user can cancel this execution')
         }
@@ -188,7 +188,7 @@ export function createWorkflowMethods(
         const userId = ctx.userId ?? ''
         // Access control: same rule as workflow.cancel — only the triggering user may pause
         const execution = await orchestrator.getExecution(params.executionId)
-        if (!execution) throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)
+        if (!execution) {throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)}
         if (execution.triggeredBy !== userId) {
           throw new Error('WORKFLOW_PAUSE_DENIED: only the triggering user can pause this execution')
         }
@@ -205,7 +205,7 @@ export function createWorkflowMethods(
       handler: async (params, ctx) => {
         const userId = ctx.userId ?? ''
         const execution = await orchestrator.getExecution(params.executionId)
-        if (!execution) throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)
+        if (!execution) {throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)}
         if (execution.triggeredBy !== userId) {
           throw new Error('WORKFLOW_RESUME_DENIED: only the triggering user can resume this execution')
         }

@@ -302,7 +302,7 @@ describe('pty-agent-bridge — terminal:* tracing (CR-TRACE-003)', () => {
     const { handlePtyCreate, handlePtyWrite } = await import('./pty-agent-bridge')
     const created = (await handlePtyCreate(1, {}, log, vi.fn())) as { result: { id: string } }
     events = []
-    for (let i = 0; i < 20; i++) await handlePtyWrite(i, { id: created.result.id, data: 'a' }, log)
+    for (let i = 0; i < 20; i++) {await handlePtyWrite(i, { id: created.result.id, data: 'a' }, log)}
     expect(events.filter((e) => e.flow.startsWith('terminal:'))).toHaveLength(0)
   })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
+import type { AiVaultSession } from '../vendor-shared/shared/ai-vault-types'
 import {
   buildMobileAiVaultResumeLaunch,
   buildMobileAiVaultResumeCommand,

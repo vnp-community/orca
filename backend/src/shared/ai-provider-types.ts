@@ -36,7 +36,7 @@ export type AIProviderStatus =
   | 'unreachable'    // network / relay error
 
 /** A registered AI provider account (no credential stored here) */
-export interface AIProviderAccount {
+export type AIProviderAccount = {
   id: string
   /** Which dev server holds the encrypted credential */
   devServerId: string
@@ -64,7 +64,7 @@ export interface AIProviderAccount {
 }
 
 /** Payload sent to relay when writing an encrypted credential */
-export interface CredentialWriteRequest {
+export type CredentialWriteRequest = {
   accountId: string
   /** AES-256-GCM encrypted API key blob (base64) */
   encryptedBlob: string
@@ -73,7 +73,7 @@ export interface CredentialWriteRequest {
 }
 
 /** Today's aggregated usage for a provider account */
-export interface ProviderUsageToday {
+export type ProviderUsageToday = {
   tokens: number
   requests: number
   costUsd: number

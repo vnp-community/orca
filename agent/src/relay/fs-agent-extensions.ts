@@ -24,7 +24,7 @@ const preflightTracer = createTracer('agent:preflight')
 
 // ─── fs.readDir ───────────────────────────────────────────────────────────────
 
-interface FileTreeNode {
+type FileTreeNode = {
   path: string
   name: string
   type: 'file' | 'directory'
@@ -87,7 +87,7 @@ async function readDirRecursive(
   )
   // Sort: directories first, then files; alphabetically within each group
   return nodes.sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
+    if (a.type !== b.type) {return a.type === 'directory' ? -1 : 1}
     return a.name.localeCompare(b.name)
   })
 }
@@ -139,7 +139,7 @@ export async function handleFsReadFile(
 
 // ─── fs.grep ─────────────────────────────────────────────────────────────────
 
-interface GrepMatch {
+type GrepMatch = {
   file: string
   line: number
   text: string
@@ -200,7 +200,7 @@ function grepWithRg(
       if (code !== 0 && code !== 1) { reject(new Error(`rg exited with code ${code}`)); return }
       const matches: GrepMatch[] = []
       for (const line of output.split('\n')) {
-        if (!line.trim()) continue
+        if (!line.trim()) {continue}
         try {
           const obj = JSON.parse(line) as {
             type: string
@@ -212,7 +212,7 @@ function grepWithRg(
               line: obj.data.line_number,
               text: obj.data.lines.text.trimEnd(),
             })
-            if (matches.length >= maxResults) break
+            if (matches.length >= maxResults) {break}
           }
         } catch { /* skip non-JSON lines */ }
       }
@@ -246,8 +246,8 @@ function grepFallback(
       for (const raw of output.split('\n')) {
         const m = raw.match(/^(.+?):(\d+):(.*)$/)
         if (m) {
-          matches.push({ file: m[1], line: parseInt(m[2], 10), text: m[3] })
-          if (matches.length >= maxResults) break
+          matches.push({ file: m[1], line: Number.parseInt(m[2], 10), text: m[3] })
+          if (matches.length >= maxResults) {break}
         }
       }
       resolve(matches)
@@ -400,7 +400,7 @@ export async function handleFsGlob(
     child.stdout?.on('data', (chunk: Buffer) => {
       const newLines = chunk.toString().split('\n').filter((l: string) => l.trim())
       lines.push(...newLines)
-      if (lines.length > MAX_RESULTS) child.kill('SIGTERM')
+      if (lines.length > MAX_RESULTS) {child.kill('SIGTERM')}
     })
 
     child.on('close', () => resolve(lines.slice(0, MAX_RESULTS)))
@@ -408,7 +408,7 @@ export async function handleFsGlob(
   })
 
   const relativePaths = results.map((p: string) =>
-    p.startsWith(cwd + '/') ? p.slice(cwd.length + 1) : p
+    p.startsWith(`${cwd  }/`) ? p.slice(cwd.length + 1) : p
   )
 
   return {
@@ -443,7 +443,7 @@ export async function handleFsWriteFile(
   const span         = fsTracer.start({ method: 'fs.writeFile', path: rawPath })
 
   // SecureFs: must be within workDir
-  if (!resolvedPath.startsWith(resolvedWork + '/') && resolvedPath !== resolvedWork) {
+  if (!resolvedPath.startsWith(`${resolvedWork  }/`) && resolvedPath !== resolvedWork) {
     span.fail('path outside project root', { path: rawPath })
     return {
       jsonrpc: '2.0', id,
@@ -594,7 +594,7 @@ export async function handleFsRmdir(
 // Server) can watch the same path without one's unwatch tearing it down for
 // the others.
 
-interface AgentWatchEntry {
+type AgentWatchEntry = {
   close: () => void
   refCount: number
 }
@@ -709,7 +709,7 @@ export async function handleFsWatch(
       const watchers = new Map<string, FSWatcher>()
       await watchDirLinux(absPath, absPath, watchers, notify)
       AGENT_WATCH_MAP.set(absPath, {
-        close: () => { for (const w of watchers.values()) w.close() },
+        close: () => { for (const w of watchers.values()) {w.close()} },
         refCount: 1,
       })
       return { jsonrpc: '2.0', id, result: { ok: true, path: absPath } }

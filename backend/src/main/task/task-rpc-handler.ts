@@ -170,7 +170,7 @@ export function createTaskMethods(
         const userId = ctx.userId ?? ''
         await requirePermission(grantService, userId, params.taskId, 'view')
         const task = await taskService.get(params.taskId)
-        if (!task) throw new Error(`TASK_NOT_FOUND: ${params.taskId}`)
+        if (!task) {throw new Error(`TASK_NOT_FOUND: ${params.taskId}`)}
         return task
       },
     }),

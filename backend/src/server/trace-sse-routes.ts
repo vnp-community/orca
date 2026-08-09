@@ -30,11 +30,11 @@ const clients = new Set<ServerResponse>()
 // Registration happens lazily on first client connection.
 let sinkInstalled = false
 function ensureSinkInstalled(): void {
-  if (sinkInstalled) return
+  if (sinkInstalled) {return}
   sinkInstalled = true
 
   registerTraceSink((event: TraceEvent) => {
-    if (clients.size === 0) return
+    if (clients.size === 0) {return}
     const data = `data: ${JSON.stringify(event)}\n\n`
     for (const res of clients) {
       try {
@@ -53,18 +53,18 @@ function isAuthorized(req: IncomingMessage): boolean {
   const apiSecret = process.env['ORCA_AGENT_API_SECRET']
   if (apiSecret) {
     const auth = req.headers['authorization'] ?? ''
-    if (auth === `Bearer ${apiSecret}`) return true
+    if (auth === `Bearer ${apiSecret}`) {return true}
   }
 
   // Option 2: X-Orca-Admin header (dev-only)
-  if (req.headers['x-orca-admin'] === '1') return true
+  if (req.headers['x-orca-admin'] === '1') {return true}
 
   // Option 3: X-Orca-Trace-Client — any browser with the trace panel open
   // This is intentionally low-security: trace data is diagnostic, not sensitive.
-  if (req.headers['x-orca-trace-client'] === '1') return true
+  if (req.headers['x-orca-trace-client'] === '1') {return true}
 
   // If no secret is configured, allow any local connection for convenience
-  if (!apiSecret) return true
+  if (!apiSecret) {return true}
 
   return false
 }

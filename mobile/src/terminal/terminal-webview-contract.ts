@@ -1,4 +1,4 @@
-import type { RuntimeMobileTerminalTheme } from '../../../src/shared/runtime-types'
+import type { RuntimeMobileTerminalTheme } from '../vendor-shared/shared/runtime-types'
 import type { StyleProp, ViewStyle } from 'react-native'
 import type { TerminalOscLinkRange } from './terminal-osc-link-ranges'
 

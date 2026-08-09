@@ -13,7 +13,6 @@ import type { ProjectService } from '../ProjectService'
 import type { ProfileAwareAgentSpawner } from '../ProfileAwareAgentSpawner'
 import type { RpcContext } from '../../runtime/rpc/core'
 import type { OrcaProject, ProjectMember } from '../../../shared/project-types'
-import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -67,7 +66,7 @@ function makeSpawner(): ProfileAwareAgentSpawner {
 /** Find a method handler by name from the factory output */
 function findHandler(methods: ReturnType<typeof createProjectMethods>, name: string) {
   const method = methods.find(m => m.name === name)
-  if (!method) throw new Error(`Method not found: ${name}`)
+  if (!method) {throw new Error(`Method not found: ${name}`)}
   return method.handler
 }
 
@@ -175,7 +174,7 @@ describe('project RPC methods', () => {
     ).rejects.toThrow('AGENT_SPAWNER_NOT_AVAILABLE')
   })
 
-  // ── CR-TRACE-002/015: project.agentSpawn traceId propagation (TASK-BE-002.4/015.4) ──
+  // ── CR-TRACE-002: project.agentSpawn traceId propagation (TASK-BE-002.4) ──
 
   it('project.agentSpawn: forwards traceId from params into agentSpawner.spawn()', async () => {
     const service = makeService()
@@ -203,46 +202,5 @@ describe('project RPC methods', () => {
       expect.objectContaining({ projectId: 'proj-1', userId: 'u-1' })
     )
     expect(vi.mocked(spawner.spawn).mock.calls[0]?.[0].traceId).toEqual(expect.any(String))
-  })
-
-  // ── CR-TRACE-015: profile:agentSpawnRoute tracing (TASK-BE-015.5) ──────────
-
-  function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
-    const events: TraceEvent[] = []
-    const unregister = registerTraceSink((e) => events.push(e))
-    return { events, stop: unregister }
-  }
-
-  it('project.agentSpawn: profile:agentSpawnRoute span.fail() on assertAccess rejection, spawn() never called', async () => {
-    const service = makeService({
-      assertAccess: vi.fn().mockRejectedValue(new Error('PROJECT_ACCESS_DENIED')),
-    })
-    const spawner = makeSpawner()
-    const methods = createProjectMethods(service, spawner)
-    const handler = findHandler(methods, 'project.agentSpawn')
-    const { events, stop } = captureTraceEvents()
-
-    await expect(
-      handler({ projectId: 'proj-1', command: 'echo hi' }, makeCtx('u-1'))
-    ).rejects.toThrow('PROJECT_ACCESS_DENIED')
-    stop()
-
-    const failEvent = events.find((e) => e.flow === 'profile:agentSpawnRoute' && e.level === 'fail')
-    expect(failEvent?.fields.err).toContain('PROJECT_ACCESS_DENIED')
-    expect(spawner.spawn).not.toHaveBeenCalled()
-  })
-
-  it('project.agentSpawn: profile:agentSpawnRoute resumes span id from params.traceId', async () => {
-    const service = makeService()
-    const spawner = makeSpawner()
-    const methods = createProjectMethods(service, spawner)
-    const handler = findHandler(methods, 'project.agentSpawn')
-    const { events, stop } = captureTraceEvents()
-
-    await handler({ projectId: 'proj-1', command: 'echo hi', traceId: 'resume-route-2' }, makeCtx('u-1'))
-    stop()
-
-    const routeEvents = events.filter((e) => e.flow === 'profile:agentSpawnRoute')
-    expect(routeEvents.every((e) => e.id === 'resume-route-2')).toBe(true)
   })
 })

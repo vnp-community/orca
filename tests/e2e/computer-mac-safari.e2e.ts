@@ -3,7 +3,7 @@ import type {
   ComputerActionResult,
   ComputerListWindowsResult,
   ComputerSnapshotResult
-} from '../../src/shared/runtime-types'
+} from '../vendor-shared/shared/runtime-types'
 import {
   closeSafariDraftFixture,
   ensureOrcaRuntimeLaunched,

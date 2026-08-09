@@ -72,7 +72,7 @@ let _cleanup: (() => void) | null = null
  *   Typically: (e) => useAppStore.getState().addTraceEvent(e)
  */
 export function initBrowserTrace(dispatch: TraceDispatch): () => void {
-  if (_initialized) return () => _cleanup?.()
+  if (_initialized) {return () => _cleanup?.()}
   _initialized = true
 
   // 1. Override enabled predicate → check localStorage

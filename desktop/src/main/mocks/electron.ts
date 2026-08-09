@@ -6,9 +6,9 @@
 // src/main/mocks/electron.ts
 // Mock for Electron APIs used by Orca backend when running as a pure Node.js daemon.
 
-import { EventEmitter } from 'events'
-import path from 'path'
-import os from 'os'
+import { EventEmitter } from 'node:events'
+import path from 'node:path'
+import os from 'node:os'
 
 // ── App ────────────────────────────────────────────────────────
 class App extends EventEmitter {

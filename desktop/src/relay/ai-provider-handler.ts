@@ -16,7 +16,7 @@ import { homedir } from 'node:os'
 
 const PROVIDER_STORE_DIR = join(homedir(), '.orca', 'ai-providers')
 
-export interface CredentialRecord {
+export type CredentialRecord = {
   encryptedBlob: string
   iv: string
   updatedAt: number

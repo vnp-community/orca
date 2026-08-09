@@ -91,7 +91,7 @@ describe('TaskAgentExecutor', () => {
       const statuses: string[] = []
       const origUpdate = taskService.update.bind(taskService)
       vi.spyOn(taskService, 'update').mockImplementation(async (id, patch) => {
-        if (patch.status) statuses.push(patch.status)
+        if (patch.status) {statuses.push(patch.status)}
         return origUpdate(id, patch)
       })
 

@@ -153,12 +153,12 @@ export class ProfileResolver {
       _resolvedAt: Date.now(),
     }
 
-    if (agent) result.agent = agent
-    if (editor) result.editor = editor
-    if (shell) result.shell = shell
-    if (mcp) result.mcp = mcp
-    if (security) result.security = security
-    if (envVars && Object.keys(envVars).length > 0) result.envVars = envVars
+    if (agent) {result.agent = agent}
+    if (editor) {result.editor = editor}
+    if (shell) {result.shell = shell}
+    if (mcp) {result.mcp = mcp}
+    if (security) {result.security = security}
+    if (envVars && Object.keys(envVars).length > 0) {result.envVars = envVars}
 
     return result
   }
@@ -174,7 +174,7 @@ export class ProfileResolver {
     prefix: string,
     sources: Record<string, 'company' | 'dept' | 'user'>
   ): T | undefined {
-    if (!company && !dept && !user) return undefined
+    if (!company && !dept && !user) {return undefined}
 
     const merged: Record<string, unknown> = {}
 
@@ -213,7 +213,7 @@ export class ProfileResolver {
     user: ShellProfileSection | undefined,
     sources: Record<string, 'company' | 'dept' | 'user'>
   ): ShellProfileSection | undefined {
-    if (!company && !dept && !user) return undefined
+    if (!company && !dept && !user) {return undefined}
 
     const shell: ShellProfileSection = {}
 
@@ -265,17 +265,17 @@ export class ProfileResolver {
     prefix: string,
     sources: Record<string, 'company' | 'dept' | 'user'>
   ): Record<string, string> | undefined {
-    if (!company && !dept && !user) return undefined
+    if (!company && !dept && !user) {return undefined}
 
     const merged: Record<string, string> = {
-      ...(company ?? {}),
-      ...(dept ?? {}),
-      ...(user ?? {}),
+      ...company,
+      ...dept,
+      ...user,
     }
 
     // Track sources for each key
     for (const key of Object.keys(company ?? {})) {
-      if (!sources[`${prefix}.${key}`]) sources[`${prefix}.${key}`] = 'company'
+      if (!sources[`${prefix}.${key}`]) {sources[`${prefix}.${key}`] = 'company'}
     }
     for (const key of Object.keys(dept ?? {})) {
       sources[`${prefix}.${key}`] = 'dept'

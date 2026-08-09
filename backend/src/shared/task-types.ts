@@ -36,7 +36,7 @@ export type TaskPermission = 'view' | 'comment' | 'edit' | 'execute' | 'manage'
 export type TaskEdgeType = 'depends_on' | 'blocks' | 'relates_to' | 'duplicates'
 
 /** A task entity */
-export interface OrcaTask {
+export type OrcaTask = {
   id: string
   projectId?: string
   parentId?: string
@@ -62,7 +62,7 @@ export interface OrcaTask {
 }
 
 /** Parameters for creating a new task */
-export interface CreateTaskParams {
+export type CreateTaskParams = {
   projectId?: string
   parentId?: string
   title: string
@@ -80,7 +80,7 @@ export interface CreateTaskParams {
 }
 
 /** A permission grant on a task (optionally propagates to descendants) */
-export interface TaskGrant {
+export type TaskGrant = {
   id: string
   taskId: string
   /** Who the grant applies to */
@@ -96,7 +96,7 @@ export interface TaskGrant {
 }
 
 /** A comment or activity event on a task */
-export interface TaskComment {
+export type TaskComment = {
   id: number
   taskId: string
   userId: string
@@ -106,7 +106,7 @@ export interface TaskComment {
 }
 
 /** A directed dependency edge between two tasks */
-export interface TaskEdge {
+export type TaskEdge = {
   fromTaskId: string
   toTaskId: string
   edgeType: TaskEdgeType

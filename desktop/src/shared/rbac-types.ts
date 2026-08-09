@@ -79,9 +79,9 @@ export function resolveUserPermissions(
   agentTrust: 'minimal' | 'standard' | 'full'
 } {
   const matchingPolicies = policies.filter((policy) => {
-    if (policy.roles?.includes(user.role)) return true
-    if (policy.teams?.some((t) => user.teams.includes(t))) return true
-    if (policy.users?.includes(user.email)) return true
+    if (policy.roles?.includes(user.role)) {return true}
+    if (policy.teams?.some((t) => user.teams.includes(t))) {return true}
+    if (policy.users?.includes(user.email)) {return true}
     return false
   })
 

@@ -85,7 +85,7 @@ export class StepExecutors {
 
   private async executeAgent(step: WorkflowStep, signal: AbortSignal, traceId?: string): Promise<StepOutput> {
     const relay = await this.getRelay(step)
-    if (signal.aborted) throw new Error('EXECUTION_CANCELLED')
+    if (signal.aborted) {throw new Error('EXECUTION_CANCELLED')}
 
     const result = (await relay.call('agent.exec', {
       stepId: step.id,
@@ -106,7 +106,7 @@ export class StepExecutors {
 
   private async executeShell(step: WorkflowStep, signal: AbortSignal, traceId?: string): Promise<StepOutput> {
     const relay = await this.getRelay(step)
-    if (signal.aborted) throw new Error('EXECUTION_CANCELLED')
+    if (signal.aborted) {throw new Error('EXECUTION_CANCELLED')}
 
     const result = (await relay.call('shell.exec', {
       script: step.config['script'],
@@ -148,7 +148,7 @@ export class StepExecutors {
 
   private async executeNotification(step: WorkflowStep, signal: AbortSignal, traceId?: string): Promise<StepOutput> {
     const relay = await this.getRelay(step)
-    if (signal.aborted) throw new Error('EXECUTION_CANCELLED')
+    if (signal.aborted) {throw new Error('EXECUTION_CANCELLED')}
 
     await relay.call('notification.send', {
       channel: step.config['channel'],
@@ -235,14 +235,14 @@ function evaluateSafeCondition(
   // Step 2: Parse supported comparison patterns
   const normalize = (s: string): unknown => {
     const trimmed = s.trim().replace(/^['"](.*)['"]$/, '$1')
-    if (trimmed === 'true')  return true
-    if (trimmed === 'false') return false
+    if (trimmed === 'true')  {return true}
+    if (trimmed === 'false') {return false}
     const n = Number(trimmed)
     return isNaN(n) ? trimmed : n
   }
 
   // Match operators in order of specificity (>= before >)
-  const patterns: Array<[RegExp, (a: unknown, b: unknown) => boolean]> = [
+  const patterns: [RegExp, (a: unknown, b: unknown) => boolean][] = [
     [/^(.+?)\s*===\s*(.+)$/, (a, b) => a === b],
     [/^(.+?)\s*!==\s*(.+)$/, (a, b) => a !== b],
     [/^(.+?)\s*==\s*(.+)$/,  (a, b) => String(a) === String(b)],
@@ -255,13 +255,13 @@ function evaluateSafeCondition(
 
   for (const [pattern, compare] of patterns) {
     const m = interpolated.match(pattern)
-    if (m) return compare(normalize(m[1]!), normalize(m[2]!))
+    if (m) {return compare(normalize(m[1]!), normalize(m[2]!))}
   }
 
   // Literal boolean
   const trimmed = interpolated.trim()
-  if (trimmed === 'true')  return true
-  if (trimmed === 'false') return false
+  if (trimmed === 'true')  {return true}
+  if (trimmed === 'false') {return false}
 
   // Unknown expression — fail-safe: return false and warn
   console.warn(

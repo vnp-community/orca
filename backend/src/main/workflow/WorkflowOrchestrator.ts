@@ -37,7 +37,7 @@ import type {
 
 // ── DB row types ──────────────────────────────────────────────────────────────
 
-interface ExecutionRow {
+type ExecutionRow = {
   id: string
   definitionSnapshot: string  // JSON — column: definition_snapshot
   status: string
@@ -160,7 +160,7 @@ export class WorkflowOrchestrator {
         [executionId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return rowToExecution(rows[0])
   }
 
@@ -218,7 +218,7 @@ export class WorkflowOrchestrator {
    */
   async pause(executionId: string): Promise<void> {
     const execution = await this.getExecution(executionId)
-    if (!execution) throw new Error(`EXECUTION_NOT_FOUND: ${executionId}`)
+    if (!execution) {throw new Error(`EXECUTION_NOT_FOUND: ${executionId}`)}
     if (execution.status !== 'running') {
       throw new Error(
         `WORKFLOW_PAUSE_INVALID_STATE: cannot pause execution "${executionId}" in status "${execution.status}" (expected "running")`
@@ -238,7 +238,7 @@ export class WorkflowOrchestrator {
    */
   async resumeFromPause(executionId: string): Promise<void> {
     const execution = await this.getExecution(executionId)
-    if (!execution) throw new Error(`EXECUTION_NOT_FOUND: ${executionId}`)
+    if (!execution) {throw new Error(`EXECUTION_NOT_FOUND: ${executionId}`)}
     if (execution.status !== 'paused') {
       throw new Error(
         `WORKFLOW_RESUME_INVALID_STATE: cannot resume execution "${executionId}" from status "${execution.status}" (expected "paused")`

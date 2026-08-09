@@ -2,7 +2,7 @@ import { rmSync, writeFileSync } from 'node:fs'
 import type { Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { waitForSessionReady } from './helpers/store'
-import { getLargeDiffRenderLimit } from '../../src/shared/large-diff-render-limit'
+import { getLargeDiffRenderLimit } from '../vendor-shared/shared/large-diff-render-limit'
 import {
   buildLargeTypeScriptFile,
   createIsolatedLargeDiffRepo,

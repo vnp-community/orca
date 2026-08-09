@@ -182,7 +182,7 @@ export function registerOnboardingIpcHandlers(
       }
 
       const relay = devServerManager.getRelay(devServerId)
-      if (!relay) throw new Error(`Dev server '${devServerId}' not connected`)
+      if (!relay) {throw new Error(`Dev server '${devServerId}' not connected`)}
 
       const raw = await relay.call<{
         platform: NodeJS.Platform
@@ -211,7 +211,7 @@ export function registerOnboardingIpcHandlers(
       params: { devServerId: string; name: string; email: string }
     ): Promise<void> => {
       const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) throw new Error(`Dev server '${params.devServerId}' not connected`)
+      if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
       await relay.call('preflight.setGitIdentity', {
         name: params.name,
         email: params.email
@@ -230,7 +230,7 @@ export function registerOnboardingIpcHandlers(
       params: { devServerId: string }
     ): Promise<{ configPath: string | null; themeDir: string | null }> => {
       const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) throw new Error('Dev server not connected')
+      if (!relay) {throw new Error('Dev server not connected')}
       return relay.call<{ configPath: string | null; themeDir: string | null }>(
         'preflight.detectGhosttyConfig',
         {}
@@ -250,7 +250,7 @@ export function registerOnboardingIpcHandlers(
       params: { devServerId: string }
     ): Promise<{ ptyId: string; devServerId: string }> => {
       const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) throw new Error('Dev server not connected')
+      if (!relay) {throw new Error('Dev server not connected')}
       // Why: call the relay's pty.spawn to spawn 'gh auth login' in a remote PTY.
       // The ptyId is returned to the renderer to subscribe to pty output events.
       const ptyId = await relay.call<string>('pty.spawn', {
@@ -276,7 +276,7 @@ export function registerOnboardingIpcHandlers(
       params: { devServerId: string }
     ): Promise<WindowsTerminalCapabilities> => {
       const devServer = devServerManager.get(params.devServerId)
-      if (!devServer) throw new Error(`Dev server '${params.devServerId}' not found`)
+      if (!devServer) {throw new Error(`Dev server '${params.devServerId}' not found`)}
       if (devServer.platform !== 'win32') {
         throw new Error(
           `Dev server '${params.devServerId}' is not Windows (platform: ${devServer.platform ?? 'unknown'})`
@@ -284,7 +284,7 @@ export function registerOnboardingIpcHandlers(
       }
 
       const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) throw new Error(`Dev server '${params.devServerId}' not connected`)
+      if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
 
       // Cache hit: serve from cache if still fresh
       const cacheKey = params.devServerId

@@ -27,7 +27,7 @@ import type { DevServerRelayBridge } from '../dev-server/dev-server-relay-bridge
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface WorktreeCleanupPolicy {
+export type WorktreeCleanupPolicy = {
   /** Max age in ms before worktree is eligible for cleanup. Default: 7 days */
   maxAgeMs?:     number
   /** Check interval in ms. Default: 1 hour */
@@ -36,14 +36,14 @@ export interface WorktreeCleanupPolicy {
   dryRun?:       boolean
 }
 
-export interface CleanupResult {
+export type CleanupResult = {
   cleanedCount:  number
   skippedCount:  number
   errorCount:    number
   at:            Date
 }
 
-interface WorktreeRecord {
+type WorktreeRecord = {
   id:         string
   path:       string
   repoPath:   string
@@ -81,10 +81,10 @@ export class WorktreeCleanupService {
 
   /** Start periodic cleanup. Idempotent. */
   start(): void {
-    if (this.timer) return
+    if (this.timer) {return}
     console.log(`[WorktreeCleanupService] Starting (maxAge=${Math.round(this.maxAgeMs / 3600_000)}h, interval=${Math.round(this.intervalMs / 3600_000)}h, dryRun=${this.dryRun})`)
     this.timer = setInterval(() => void this.runCleanup(), this.intervalMs)
-    if ((this.timer as NodeJS.Timeout).unref) (this.timer as NodeJS.Timeout).unref()
+    if ((this.timer as NodeJS.Timeout).unref) {(this.timer as NodeJS.Timeout).unref()}
   }
 
   /** Stop periodic cleanup. */

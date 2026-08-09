@@ -43,8 +43,8 @@ console.log('[Orca Server] userData:', adapter.app.getPath('userData'))
 console.log('[Orca Server] Version:', adapter.app.getVersion())
 
 // ── STEP 2: Parse configuration ───────────────────────────────────────────────
-const rpcPort = parseInt(process.env.ORCA_PORT ?? '6768', 10)
-const httpPort = parseInt(process.env.ORCA_HTTP_PORT ?? String(rpcPort + 1), 10)
+const rpcPort = Number.parseInt(process.env.ORCA_PORT ?? '6768', 10)
+const httpPort = Number.parseInt(process.env.ORCA_HTTP_PORT ?? String(rpcPort + 1), 10)
 
 // Web bundle root: prefer env var, otherwise look for out/web/ next to out/server/
 const webRoot = process.env.ORCA_WEB_ROOT
@@ -159,13 +159,13 @@ async function main(): Promise<void> {
       httpServer.on('upgrade', (req, socket, head) => {
         const reqUrl = req.url ?? ''
         // Skip /agent path — already handled by agentWsServer.attach()
-        if (reqUrl === AGENT_WS_PATH || reqUrl.startsWith(AGENT_WS_PATH + '?')) return
+        if (reqUrl === AGENT_WS_PATH || reqUrl.startsWith(`${AGENT_WS_PATH  }?`)) {return}
 
         wss.handleUpgrade(req, socket, head, (ws) => {
           void wsRouter.handleConnection(ws, req).catch((err: Error) => {
             console.error('[MultiUser] WsSessionRouter error:', err.message)
             const wsAny = ws as unknown as { readyState: number; OPEN: number; close: (c: number, r: string) => void }
-            if (wsAny.readyState === wsAny.OPEN) wsAny.close(1011, 'Internal session error')
+            if (wsAny.readyState === wsAny.OPEN) {wsAny.close(1011, 'Internal session error')}
           })
         })
       })
@@ -186,7 +186,7 @@ async function main(): Promise<void> {
     console.log(`\n[Orca Server] ${signal} received — shutting down gracefully...`)
     try {
       httpServer?.close()
-      if (sessionManagerShutdown) await sessionManagerShutdown()
+      if (sessionManagerShutdown) {await sessionManagerShutdown()}
       await shutdown()
     } catch (err) {
       console.error('[Orca Server] Error during shutdown:', err)

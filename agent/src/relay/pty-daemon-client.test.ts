@@ -36,7 +36,7 @@ function startFakeDaemon(
     sockets.add(socket)
     acceptedSockets.push(socket)
     const decoder = new DaemonMessageDecoder((msg: DaemonMessage) => {
-      if (!isDaemonRequest(msg)) return
+      if (!isDaemonRequest(msg)) {return}
       const result = handler(msg.method, msg.params)
       socket.write(encodeDaemonMessage({ id: msg.id, result }))
     })
@@ -49,7 +49,7 @@ function startFakeDaemon(
     server,
     pushNotification: (method, params) => {
       const line = encodeDaemonMessage({ method, params })
-      for (const s of sockets) s.write(line)
+      for (const s of sockets) {s.write(line)}
     }
   }
 }
@@ -66,7 +66,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   process.env['HOME'] = originalHome
-  for (const socket of acceptedSockets) socket.destroy()
+  for (const socket of acceptedSockets) {socket.destroy()}
   acceptedSockets = []
   await Promise.all(servers.map((s) => new Promise<void>((resolve) => s.close(() => resolve()))))
   servers = []
@@ -142,7 +142,7 @@ describe('pty-daemon-client', () => {
 
     pushNotification('pty.data', { id: 'agent-pty-1', data: 'hello' })
     await vi.waitFor(() => {
-      if (secondNotify.mock.calls.length === 0) throw new Error('not yet notified')
+      if (secondNotify.mock.calls.length === 0) {throw new Error('not yet notified')}
     })
     expect(secondNotify).toHaveBeenCalledWith('pty.data', { id: 'agent-pty-1', data: 'hello' })
     expect(firstNotify).not.toHaveBeenCalled()

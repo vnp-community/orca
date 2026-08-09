@@ -7,7 +7,7 @@
 import type { IDatabase } from '../types'
 
 /** A single database migration */
-export interface Migration {
+export type Migration = {
   /** Unique sequential version number (e.g., 1, 2, 3) */
   version: number
   /** Human-readable description (e.g., 'initial_schema') */
@@ -19,7 +19,7 @@ export interface Migration {
 }
 
 /** Record of an applied migration stored in the DB */
-export interface AppliedMigration {
+export type AppliedMigration = {
   version: number
   name: string
   /** ISO 8601 timestamp when migration was applied */
@@ -27,7 +27,7 @@ export interface AppliedMigration {
 }
 
 /** Result of a single migration step */
-export interface MigrationResult {
+export type MigrationResult = {
   version: number
   name: string
   direction: 'up' | 'down'

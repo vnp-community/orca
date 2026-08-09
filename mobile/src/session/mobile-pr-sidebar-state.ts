@@ -1,4 +1,4 @@
-import type { GitHubWorkItemDetails, PRCheckDetail, PRInfo } from '../../../src/shared/types'
+import type { GitHubWorkItemDetails, PRCheckDetail, PRInfo } from '../vendor-shared/shared/types'
 import type { GitHubPrReadOutcome, GitHubPrRepoSlug } from './github-pr-rpc'
 import { resolveLinkedPrNumber } from './mobile-pr-sidebar-resolve'
 

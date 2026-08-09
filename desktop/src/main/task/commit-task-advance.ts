@@ -26,10 +26,10 @@ export async function onCommitComplete(
   const refs = [...commitMsg.matchAll(TASK_REF_REGEX)].map(m => m[1])
   for (const ref of refs) {
     const task = await taskService.findByRef(ref).catch(() => null)
-    if (!task || task.projectId !== projectId) continue
+    if (!task || task.projectId !== projectId) {continue}
 
     const perm = await grantService.resolvePermission(userId, task.id)
-    if (!perm || !EDIT_LEVEL_OR_HIGHER.has(perm)) continue
+    if (!perm || !EDIT_LEVEL_OR_HIGHER.has(perm)) {continue}
 
     await taskService.update(task.id, { status: 'review' })
 

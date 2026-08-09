@@ -42,7 +42,7 @@ function createRelayStub(
 }
 
 function createManagerStub(
-  servers: Array<{ id: string; status: string; platform: NodeJS.Platform | null }> = [],
+  servers: { id: string; status: string; platform: NodeJS.Platform | null }[] = [],
   relayByServerId: Record<string, ReturnType<typeof createRelayStub> | null> = {}
 ) {
   return {
@@ -59,7 +59,7 @@ function createManagerStub(
 
 /** Register handlers and return the freshly created ipcMain mock for this module instance. */
 async function setupTest(
-  servers: Array<{ id: string; status: string; platform: NodeJS.Platform | null }> = [],
+  servers: { id: string; status: string; platform: NodeJS.Platform | null }[] = [],
   relayByServerId: Record<string, ReturnType<typeof createRelayStub> | null> = {}
 ) {
   // Reset modules so each test gets a fresh cache and fresh ipcMain mock

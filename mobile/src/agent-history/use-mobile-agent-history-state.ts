@@ -6,7 +6,7 @@ import type {
   AiVaultScanIssue,
   AiVaultScope,
   AiVaultSession
-} from '../../../src/shared/ai-vault-types'
+} from '../vendor-shared/shared/ai-vault-types'
 import type { Worktree } from '../worktree/workspace-list-types'
 import { deriveMobileAiVaultScopePaths } from './agent-history-scope-paths'
 import { MOBILE_AI_VAULT_CAPABILITY } from './agent-history-capability'

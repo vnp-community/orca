@@ -9,17 +9,17 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 type AgentType = 'claude' | 'codex' | 'custom'
 type TrustPreset = 'standard' | 'permissive' | 'strict'
 
-interface StartOpts {
+type StartOpts = {
   worktreeId: string
   agentType: AgentType
   trustPreset?: TrustPreset
 }
 
-interface StopOpts {
+type StopOpts = {
   sessionId: string
 }
 
-interface ResumeOpts {
+type ResumeOpts = {
   sessionId: string
 }
 

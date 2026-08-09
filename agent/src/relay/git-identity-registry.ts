@@ -6,7 +6,7 @@
 // instead means one user's `preflight.setGitIdentity` call can never leak
 // into another concurrently-connected user's `git commit`.
 
-export interface GitIdentity {
+export type GitIdentity = {
   readonly name: string
   readonly email: string
 }
@@ -27,7 +27,7 @@ export function clearClientGitIdentity(clientId: number): void {
 
 /** Per-invocation env override — never touches global git config. */
 export function buildGitIdentityEnv(identity: GitIdentity | undefined): NodeJS.ProcessEnv {
-  if (!identity) return {}
+  if (!identity) {return {}}
   return {
     GIT_AUTHOR_NAME: identity.name,
     GIT_AUTHOR_EMAIL: identity.email,

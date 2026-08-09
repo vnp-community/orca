@@ -27,7 +27,7 @@ export async function clientLogin(
     body: JSON.stringify({ email, password }),
     credentials: 'include'
   })
-  if (!res.ok) throw new Error(`Login failed: ${res.status}`)
+  if (!res.ok) {throw new Error(`Login failed: ${res.status}`)}
   const user = (await res.json()) as { id: string; email: string; role: string }
   const setCookie = res.headers.get('set-cookie') ?? ''
   const match = setCookie.match(/orca_session=[^;]+/)
@@ -43,7 +43,7 @@ export async function clientGetMe(
   const res = await fetch(`${BASE_URL}/auth/me`, {
     headers: { Cookie: cookie }
   })
-  if (!res.ok) return null
+  if (!res.ok) {return null}
   return (await res.json()) as { id: string; email: string; role: string }
 }
 

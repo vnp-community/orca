@@ -20,12 +20,12 @@ function createMockWs(readyState = WS_READY_STATE.OPEN) {
     }),
     close: vi.fn(),
     on: vi.fn((event: string, cb: MockListener) => {
-      if (!listeners[event]) listeners[event] = []
+      if (!listeners[event]) {listeners[event] = []}
       listeners[event].push(cb)
     }),
     // Test helpers
     _emit(event: string, data?: unknown) {
-      for (const cb of listeners[event] ?? []) cb(data)
+      for (const cb of listeners[event] ?? []) {cb(data)}
     },
     _sent: sent,
   }

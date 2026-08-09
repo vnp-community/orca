@@ -34,7 +34,7 @@ import { Tracers } from '../../shared/trace/tracers'
 
 // ── DB row type ────────────────────────────────────────────────────────────────
 
-interface TaskRow {
+type TaskRow = {
   id: string
   projectId: string | null
   parentId: string | null
@@ -56,7 +56,7 @@ interface TaskRow {
   updatedAt: number
 }
 
-interface EdgeRow {
+type EdgeRow = {
   fromTaskId: string
   toTaskId: string
   edgeType: string
@@ -106,7 +106,7 @@ const TASK_SELECT = `
   FROM orca_tasks
 `
 
-export interface ListTasksFilter {
+export type ListTasksFilter = {
   projectId?: string
   parentId?: string
   assigneeId?: string
@@ -208,7 +208,7 @@ export class TaskService {
     let current = await this.get(taskId)
     while (current?.parentId) {
       const parent = await this.get(current.parentId)
-      if (!parent) break
+      if (!parent) {break}
       ancestors.unshift(parent) // prepend so root is first
       current = parent
     }
@@ -274,7 +274,7 @@ export class TaskService {
     const result: { task: OrcaTask; edgeType: TaskEdgeType }[] = []
     for (const row of rows) {
       const task = await this.get(row.toTaskId)
-      if (task) result.push({ task, edgeType: row.edgeType as TaskEdgeType })
+      if (task) {result.push({ task, edgeType: row.edgeType as TaskEdgeType })}
     }
     return result
   }
@@ -290,7 +290,7 @@ export class TaskService {
     const result: { task: OrcaTask; edgeType: TaskEdgeType }[] = []
     for (const row of rows) {
       const task = await this.get(row.fromTaskId)
-      if (task) result.push({ task, edgeType: row.edgeType as TaskEdgeType })
+      if (task) {result.push({ task, edgeType: row.edgeType as TaskEdgeType })}
     }
     return result
   }

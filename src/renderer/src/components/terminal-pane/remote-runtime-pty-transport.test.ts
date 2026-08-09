@@ -191,6 +191,54 @@ describe('createRemoteRuntimePtyTransport', () => {
     })
   })
 
+  it('routes the web session client (session-auth) through terminal.subscribe, not terminal.multiplex', async () => {
+    // Regression: terminal.multiplex requires sendBinary/registerBinaryStreamHandler,
+    // which don't exist anywhere on the web session client's WS-proxied-over-
+    // Unix-socket transport (binary_terminal_stream_required). 'session-auth' is
+    // the stable environment id that client always resolves to (see
+    // web-runtime-environment.ts) — it must use the plain-JSON terminal.subscribe
+    // RPC instead, and must never touch sendBinary at all.
+    let jsonCallbacks: {
+      onResponse: (response: unknown) => void
+      onError?: (error: { code: string; message: string }) => void
+      onClose?: () => void
+    } | null = null
+    const jsonUnsubscribe = vi.fn()
+    runtimeSubscribe.mockImplementation(async (_args: unknown, callbacks: typeof jsonCallbacks) => {
+      jsonCallbacks = callbacks
+      return { unsubscribe: jsonUnsubscribe, sendBinary: vi.fn() }
+    })
+
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const onError = vi.fn()
+    const transport = createRemoteRuntimePtyTransport('session-auth', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    transport.attach({
+      existingPtyId: 'remote:terminal-1',
+      cols: 120,
+      rows: 40,
+      callbacks: { onError }
+    })
+
+    await vi.waitFor(() => expect(runtimeSubscribe).toHaveBeenCalled())
+    expect(runtimeSubscribe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selector: 'session-auth',
+        method: 'terminal.subscribe',
+        params: expect.objectContaining({ terminal: 'terminal-1' })
+      }),
+      expect.any(Object)
+    )
+    // The binary multiplex path always sends a Subscribe control frame via
+    // sendBinary — confirm the JSON path never touches it at all.
+    expect(subscriptionSendBinary).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+  })
+
   it('scopes the same legacy handle independently for each runtime environment', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const first = createRemoteRuntimePtyTransport('env-1', { worktreeId: 'wt-1' })
@@ -2386,5 +2434,172 @@ describe('createRemoteRuntimePtyTransport', () => {
     expect(onError).not.toHaveBeenCalled()
     expect(onConnect).toHaveBeenCalled()
     expect(onData).toHaveBeenCalledWith('live-after-overflow', expect.objectContaining({ seq: 1 }))
+  })
+
+  // TASK-FE-003.2: resize()/claimViewport() claim-only span + disconnect() scrollback-save span.
+  describe('resize/claimViewport/disconnect tracing (CR-TRACE-003)', () => {
+    it('does not open a ui:terminal.resize span for an unclaimed resize (viewportBatcher path)', async () => {
+      const { registerTraceSink } = await import('../../../../shared/trace')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const events: { flow: string; level: string }[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+      const transport = createRemoteRuntimePtyTransport('env-1', { worktreeId: 'wt-1', tabId: 'tab-1' })
+
+      await transport.connect({ url: '', callbacks: {} })
+      await vi.waitFor(() => expect(subscriptionSendBinary).toHaveBeenCalled())
+
+      transport.resize(132, 43)
+
+      expect(events.filter((e) => e.flow === 'ui:terminal.resize')).toHaveLength(0)
+      unregister()
+    })
+
+    it('opens exactly one ui:terminal.resize span and ok()s it for a claimed resize', async () => {
+      const { registerTraceSink } = await import('../../../../shared/trace')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const events: { flow: string; level: string }[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+      const transport = createRemoteRuntimePtyTransport('env-1', { worktreeId: 'wt-1', tabId: 'tab-1' })
+
+      await transport.connect({ url: '', callbacks: {} })
+      await vi.waitFor(() => expect(subscriptionSendBinary).toHaveBeenCalled())
+
+      transport.resize(132, 43, { claim: true })
+
+      const resizeEvents = events.filter((e) => e.flow === 'ui:terminal.resize')
+      expect(resizeEvents.filter((e) => e.level === 'start')).toHaveLength(1)
+      expect(resizeEvents.filter((e) => e.level === 'ok')).toHaveLength(1)
+      unregister()
+    })
+
+    it('claimViewport() always opens and ok()s a ui:terminal.resize span', async () => {
+      const { registerTraceSink } = await import('../../../../shared/trace')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const events: { flow: string; level: string }[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+      const transport = createRemoteRuntimePtyTransport('env-1', { worktreeId: 'wt-1', tabId: 'tab-1' })
+
+      await transport.connect({ url: '', callbacks: {} })
+      await vi.waitFor(() => expect(subscriptionSendBinary).toHaveBeenCalled())
+
+      transport.claimViewport(80, 24)
+
+      const resizeEvents = events.filter((e) => e.flow === 'ui:terminal.resize')
+      expect(resizeEvents.filter((e) => e.level === 'start')).toHaveLength(1)
+      expect(resizeEvents.filter((e) => e.level === 'ok')).toHaveLength(1)
+      unregister()
+    })
+
+    it('does not open a scrollback-save span from disconnect() when tabId is missing', async () => {
+      const { registerTraceSink } = await import('../../../../shared/trace')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const events: { flow: string; level: string; fields: Record<string, unknown> }[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+      // Why: worktreeId is required for connect() to proceed, but tabId is not —
+      // omitting it exercises the `id && worktreeId && tabId` skip guard.
+      const transport = createRemoteRuntimePtyTransport('env-1', { worktreeId: 'wt-1' })
+
+      await transport.connect({ url: '', callbacks: {} })
+      await vi.waitFor(() => expect(subscriptionSendBinary).toHaveBeenCalled())
+
+      transport.disconnect()
+
+      expect(
+        events.some(
+          (e) => e.flow === 'ui:terminal.destroy' && e.fields.route === 'scrollback-save'
+        )
+      ).toBe(false)
+      unregister()
+    })
+
+    it('opens a scrollback-save span and ok()s it with bufferBytes when the snapshot save succeeds', async () => {
+      const stream = {
+        streamId: 2,
+        sendInput: vi.fn(() => true),
+        resize: vi.fn(() => true),
+        serializeBuffer: vi.fn(async () => ({ data: 'scrollback-data', cols: 80, rows: 24 })),
+        close: vi.fn()
+      }
+      const subscribeTerminal = vi.fn().mockResolvedValue(stream)
+      vi.doMock('../../runtime/remote-runtime-terminal-multiplexer', () => ({
+        getRemoteRuntimeTerminalMultiplexer: vi.fn(() => ({ subscribeTerminal }))
+      }))
+      const terminalSessionsSave = vi.fn().mockResolvedValue(undefined)
+      vi.stubGlobal('window', {
+        api: {
+          runtimeEnvironments: { call: runtimeCall, subscribe: runtimeSubscribe },
+          terminalSessions: { save: terminalSessionsSave }
+        }
+      })
+      const { registerTraceSink } = await import('../../../../shared/trace')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const events: { flow: string; level: string; fields: Record<string, unknown> }[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+      const transport = createRemoteRuntimePtyTransport('env-1', { worktreeId: 'wt-1', tabId: 'tab-1' })
+
+      transport.attach({ existingPtyId: 'remote:env-1@@terminal-1', cols: 80, rows: 24, callbacks: {} })
+      await vi.waitFor(() => expect(subscribeTerminal).toHaveBeenCalled())
+      // Why: subscribeTerminal() resolving is a microtask ahead of
+      // multiplexedStream actually being assigned inside subscribeToHandle().
+      await Promise.resolve()
+      await Promise.resolve()
+
+      transport.disconnect()
+      await vi.waitFor(() =>
+        expect(events.some((e) => e.flow === 'ui:terminal.destroy' && e.level === 'ok')).toBe(true)
+      )
+
+      // route is only carried on the 'start' event's fields — correlate by span id.
+      const startEvent = events.find(
+        (e) =>
+          e.flow === 'ui:terminal.destroy' && e.level === 'start' && e.fields.route === 'scrollback-save'
+      )
+      expect(startEvent).toBeDefined()
+      const saveOk = events.find(
+        (e) => e.flow === 'ui:terminal.destroy' && e.level === 'ok' && e.id === startEvent?.id
+      )
+      expect(saveOk?.fields.bufferBytes).toBe('scrollback-data'.length)
+      expect(terminalSessionsSave).toHaveBeenCalledWith(
+        expect.objectContaining({ worktreeId: 'wt-1', tabId: 'tab-1' })
+      )
+      unregister()
+    })
+
+    it('fail()s the scrollback-save span without throwing when the save IPC rejects', async () => {
+      const stream = {
+        streamId: 2,
+        sendInput: vi.fn(() => true),
+        resize: vi.fn(() => true),
+        serializeBuffer: vi.fn(async () => ({ data: 'x', cols: 80, rows: 24 })),
+        close: vi.fn()
+      }
+      const subscribeTerminal = vi.fn().mockResolvedValue(stream)
+      vi.doMock('../../runtime/remote-runtime-terminal-multiplexer', () => ({
+        getRemoteRuntimeTerminalMultiplexer: vi.fn(() => ({ subscribeTerminal }))
+      }))
+      const terminalSessionsSave = vi.fn().mockRejectedValue(new Error('disk full'))
+      vi.stubGlobal('window', {
+        api: {
+          runtimeEnvironments: { call: runtimeCall, subscribe: runtimeSubscribe },
+          terminalSessions: { save: terminalSessionsSave }
+        }
+      })
+      const { registerTraceSink } = await import('../../../../shared/trace')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const events: { flow: string; level: string; fields: Record<string, unknown> }[] = []
+      const unregister = registerTraceSink((e) => events.push(e))
+      const transport = createRemoteRuntimePtyTransport('env-1', { worktreeId: 'wt-1', tabId: 'tab-1' })
+
+      transport.attach({ existingPtyId: 'remote:env-1@@terminal-1', cols: 80, rows: 24, callbacks: {} })
+      await vi.waitFor(() => expect(subscribeTerminal).toHaveBeenCalled())
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(() => transport.disconnect()).not.toThrow()
+      await vi.waitFor(() =>
+        expect(events.some((e) => e.flow === 'ui:terminal.destroy' && e.level === 'fail')).toBe(true)
+      )
+      unregister()
+    })
   })
 })

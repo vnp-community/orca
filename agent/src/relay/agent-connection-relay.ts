@@ -55,7 +55,7 @@ export async function listenRelay(
       const remoteAddr = req.socket.remoteAddress ?? 'unknown'
       const span = relayConnTracer.start({ remoteAddr })
 
-      if (!authenticate(ws, req, token, log, span)) return
+      if (!authenticate(ws, req, token, log, span)) {return}
 
       log.info(`Orca Server connected from ${remoteAddr}`)
       span.step('accepted', { remoteAddr })

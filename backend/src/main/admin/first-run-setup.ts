@@ -25,7 +25,7 @@ export async function ensureFirstAdminUser(
   userStore: AuthUserStore
 ): Promise<void> {
   const adminCount = await userStore.countAdmins()  // async — must await
-  if (adminCount > 0) return  // Admin already exists — skip
+  if (adminCount > 0) {return}  // Admin already exists — skip
 
 
   const adminEmail    = process.env['ORCA_ADMIN_EMAIL']    ?? 'admin@localhost'

@@ -33,20 +33,20 @@ function extractResume(params: Record<string, unknown>): { id: string } | undefi
 
 // ─── JSON-RPC types ───────────────────────────────────────────────────────────
 
-export interface JsonRpcRequest {
+export type JsonRpcRequest = {
   readonly jsonrpc: '2.0'
   readonly id: string | number | null
   readonly method: string
   readonly params?: Record<string, unknown>
 }
 
-interface JsonRpcSuccess {
+type JsonRpcSuccess = {
   readonly jsonrpc: '2.0'
   readonly id: string | number | null
   readonly result: unknown
 }
 
-interface JsonRpcError {
+type JsonRpcError = {
   readonly jsonrpc: '2.0'
   readonly id: string | number | null
   readonly error: { code: number; message: string; data?: unknown }
@@ -56,7 +56,7 @@ type JsonRpcResponse = JsonRpcSuccess | JsonRpcError
 
 // ─── RpcDispatcher ────────────────────────────────────────────────────────────
 
-export interface RpcDispatcher {
+export type RpcDispatcher = {
   dispatch(ws: WebSocket, state: WireState, rpc: JsonRpcRequest): Promise<void>
 }
 
@@ -72,11 +72,11 @@ function extractTraceFields(method: string, params: Record<string, unknown>): Tr
   const num = (v: unknown) => (typeof v === 'number' ? v : undefined)
   const truncPath = (v: unknown) => {
     const s = str(v)
-    return s ? (s.length > 60 ? '...' + s.slice(-57) : s) : undefined
+    return s ? (s.length > 60 ? `...${  s.slice(-57)}` : s) : undefined
   }
   const truncCmd = (v: unknown) => {
     const s = str(v)
-    return s ? (s.length > 80 ? s.slice(0, 77) + '...' : s) : undefined
+    return s ? (s.length > 80 ? `${s.slice(0, 77)  }...` : s) : undefined
   }
 
   if (method.startsWith('fs.') || method === 'shell.eval' || method === 'preflight.check') {
@@ -239,7 +239,7 @@ export function createRpcDispatcher(
  */
 function makeNotifier(ws: WebSocket, state: WireState): (method: string, params: Record<string, unknown>) => void {
   return (method, params) => {
-    if (ws.readyState !== 1 /* WebSocket.OPEN */) return
+    if (ws.readyState !== 1 /* WebSocket.OPEN */) {return}
     ws.send(encodeDataFrame(state, JSON.stringify({ jsonrpc: '2.0', method, params })))
   }
 }
@@ -624,7 +624,7 @@ async function route(
           const child = spawn(binary, args, { cwd, env: spawnEnv, stdio: ['pipe', 'pipe', 'pipe'] })
 
           const finish = (r: typeof result): void => {
-            if (settled) return
+            if (settled) {return}
             settled = true
             clearTimeout(timer)
             resolve(r)
@@ -642,8 +642,8 @@ async function route(
           })
           child.on('close', (code) => { finish({ stdout, stderr, exitCode: code, timedOut }) })
 
-          if (stdin !== null) child.stdin?.end(stdin)
-          else child.stdin?.end()
+          if (stdin !== null) {child.stdin?.end(stdin)}
+          else {child.stdin?.end()}
         })
 
         log.info(`agent.exec: binary=${binary} exitCode=${result.exitCode} timedOut=${result.timedOut}`)

@@ -1,4 +1,4 @@
-import type { AiVaultScope } from '../../../src/shared/ai-vault-types'
+import type { AiVaultScope } from '../vendor-shared/shared/ai-vault-types'
 
 export function shouldShowMobileCurrentWorktreeBadge(scope: AiVaultScope): boolean {
   // Why: Workspace is already the current-worktree-only view; Project and All

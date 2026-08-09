@@ -1,4 +1,4 @@
-import type { DiffComment } from '../../../src/shared/types'
+import type { DiffComment } from '../vendor-shared/shared/types'
 
 export type UpdateMobileDiffCommentInput = {
   id: string

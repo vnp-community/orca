@@ -28,7 +28,7 @@ const aiCompleteTracer = createTracer('agent:aiComplete')
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface AICompleteParams {
+export type AICompleteParams = {
   prompt:  string
   format?: 'json' | 'text'
   taskId?: string
@@ -37,7 +37,7 @@ export interface AICompleteParams {
   resolvedApiKey?: string  // plaintext key forwarded by Orca Server, mirrors agent.spawn's resolvedApiKey
 }
 
-export interface AICompleteResult {
+export type AICompleteResult = {
   content: string
   model?:  string
 }
@@ -102,9 +102,9 @@ export async function handleAIComplete(
 
 /** Trích tên provider chỉ để gắn field trace — KHÔNG chứa apiKey. */
 function providerNameFromModel(model: string): string {
-  if (model.startsWith('claude')) return 'anthropic'
-  if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4')) return 'openai'
-  if (model.startsWith('gemini')) return 'google'
+  if (model.startsWith('claude')) {return 'anthropic'}
+  if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4')) {return 'openai'}
+  if (model.startsWith('gemini')) {return 'google'}
   return 'unknown'
 }
 
@@ -147,9 +147,9 @@ async function resolveApiKey(
   log:            AgentLogger,
 ): Promise<string | null> {
   const envKey = resolveApiKeyFromEnv(model)
-  if (envKey) return envKey
+  if (envKey) {return envKey}
 
-  if (resolvedApiKey) return resolvedApiKey
+  if (resolvedApiKey) {return resolvedApiKey}
 
   if (accountId) {
     const { readDecryptedKey } = await import('./agent-credential-store')
@@ -223,7 +223,7 @@ async function callAnthropic(
     throw new Error(`Anthropic API error ${res.status}: ${errBody}`)
   }
 
-  const data = await res.json() as { content: Array<{ type: string; text?: string }> }
+  const data = await res.json() as { content: { type: string; text?: string }[] }
   return data.content.find(c => c.type === 'text')?.text ?? ''
 }
 
@@ -255,7 +255,7 @@ async function callOpenAI(
     throw new Error(`OpenAI API error ${res.status}: ${errBody}`)
   }
 
-  const data = await res.json() as { choices: Array<{ message: { content: string } }> }
+  const data = await res.json() as { choices: { message: { content: string } }[] }
   return data.choices[0]?.message.content ?? ''
 }
 
@@ -284,7 +284,7 @@ async function callGoogle(
   }
 
   const data = await res.json() as {
-    candidates: Array<{ content: { parts: Array<{ text?: string }> } }>
+    candidates: { content: { parts: Array<{ text?: string }> } }[]
   }
   return data.candidates[0]?.content.parts[0]?.text ?? ''
 }

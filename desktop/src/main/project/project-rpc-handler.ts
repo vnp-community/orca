@@ -96,7 +96,7 @@ export function createProjectMethods(
       params: null,
       handler: async (_params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         return projectService.list(userId)
       }
     }),
@@ -108,7 +108,7 @@ export function createProjectMethods(
       params: ProjectIdParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         await projectService.assertAccess(params.projectId, userId)
         return projectService.get(params.projectId)
       }
@@ -121,7 +121,7 @@ export function createProjectMethods(
       params: CreateProjectParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         return projectService.create({ ...params, createdBy: userId })
       }
     }),
@@ -133,7 +133,7 @@ export function createProjectMethods(
       params: UpdateProjectParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         const member = await projectService.assertAccess(params.projectId, userId)
         await requireOwnerOrAdmin(member.role, userId, getUserRole)
         await projectService.update(params.projectId, params.patch, userId)
@@ -148,7 +148,7 @@ export function createProjectMethods(
       params: ProjectIdParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         const member = await projectService.assertAccess(params.projectId, userId)
         await requireOwnerOrAdmin(member.role, userId, getUserRole)
         await projectService.delete(params.projectId, userId)
@@ -163,7 +163,7 @@ export function createProjectMethods(
       params: AddMemberParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         const member = await projectService.assertAccess(params.projectId, userId)
         await requireOwnerOrAdmin(member.role, userId, getUserRole)
         await projectService.addMember(params.projectId, params.userId, params.role)
@@ -178,7 +178,7 @@ export function createProjectMethods(
       params: MemberParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         const member = await projectService.assertAccess(params.projectId, userId)
         await requireOwnerOrAdmin(member.role, userId, getUserRole)
         await projectService.removeMember(params.projectId, params.userId)
@@ -193,7 +193,7 @@ export function createProjectMethods(
       params: UpdateMemberRoleParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         const member = await projectService.assertAccess(params.projectId, userId)
         await requireOwnerOrAdmin(member.role, userId, getUserRole)
         await projectService.updateMemberRole(params.projectId, params.userId, params.role)
@@ -208,7 +208,7 @@ export function createProjectMethods(
       params: ProjectIdParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         await projectService.assertAccess(params.projectId, userId)
         return projectService.getMembers(params.projectId)
       }
@@ -227,8 +227,8 @@ export function createProjectMethods(
       params: AgentSpawnParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
-        if (!agentSpawner) throw new Error('AGENT_SPAWNER_NOT_AVAILABLE')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
+        if (!agentSpawner) {throw new Error('AGENT_SPAWNER_NOT_AVAILABLE')}
 
         const routeSpan = Tracers.profileAgentSpawnFlow.start(
           { projectId: params.projectId, userId },
@@ -259,8 +259,8 @@ async function requireOwnerOrAdmin(
   userId: string,
   getUserRole: UserRoleLookup
 ): Promise<void> {
-  if (role === 'owner') return
+  if (role === 'owner') {return}
   const globalRole = await getUserRole(userId)
-  if (globalRole === 'admin') return
+  if (globalRole === 'admin') {return}
   throw new Error('FORBIDDEN: only project owners or global admins can perform this action')
 }

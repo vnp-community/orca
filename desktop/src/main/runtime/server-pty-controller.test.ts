@@ -123,7 +123,7 @@ describe('createServerPtyController', () => {
     const killed = controller.kill('ssh:dev-01@@agent-pty-1')
     expect(killed).toBe(true)
     await vi.waitFor(() => {
-      if (runtime.onPtyExit.mock.calls.length === 0) throw new Error('not yet')
+      if (runtime.onPtyExit.mock.calls.length === 0) {throw new Error('not yet')}
     })
     expect(runtime.onPtyExit).toHaveBeenCalledTimes(1)
     expect(runtime.onPtyExit).toHaveBeenCalledWith('ssh:dev-01@@agent-pty-1', -1)

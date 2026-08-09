@@ -10,19 +10,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { SqliteSingleConnectionPool } from '../../db/sqlite/sqlite-pool'
 import { MigrationRunner } from '../../db/migrations/runner'
 import { ALL_MIGRATIONS } from '../../db/migrations'
 import { TaskService } from '../TaskService'
 import { TaskDAGValidator } from '../TaskDAGValidator'
 import { TaskAgentExecutor } from '../TaskAgentExecutor'
-import { registerTraceSink, type TraceEvent } from '../../../shared/trace'
-
-function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
-  const events: TraceEvent[] = []
-  const unregister = registerTraceSink((e) => events.push(e))
-  return { events, stop: unregister }
-}
 
 // ── Mock helpers ──────────────────────────────────────────────────────────────
 
@@ -91,7 +86,7 @@ describe('TaskAgentExecutor', () => {
       const statuses: string[] = []
       const origUpdate = taskService.update.bind(taskService)
       vi.spyOn(taskService, 'update').mockImplementation(async (id, patch) => {
-        if (patch.status) statuses.push(patch.status)
+        if (patch.status) {statuses.push(patch.status)}
         return origUpdate(id, patch)
       })
 
@@ -199,106 +194,38 @@ describe('TaskAgentExecutor', () => {
     })
   })
 
-  // ── executeTask tracing (TASK-BE-018.5) ──────────────────────────────────────
-  describe('executeTask tracing', () => {
-    it('permission denied → span.fail(TASK_PERMISSION_DENIED), NO step(agent-spawn)', async () => {
+  // ── CR-TRACE-002: traceId propagation, no own span (TASK-BE-002.4) ────────
+  describe('CR-TRACE-002 traceId propagation', () => {
+    it('forwards traceId to agentSpawner.spawn() when provided', async () => {
       const task = await taskService.create({
-        title: 'T', type: 'task', status: 'backlog', priority: 'low',
-        reporterId: 'reporter-001', visibility: 'team',
-      })
-      const noPermGrantService = makeMockGrantService(null)
-      const executor = new TaskAgentExecutor(taskService, makeMockSpawner() as any, noPermGrantService as any)
-
-      const { events, stop } = captureTraceEvents()
-      await expect(executor.executeTask({ ...EXEC_PARAMS, taskId: task.id })).rejects.toThrow('TASK_PERMISSION_DENIED')
-      stop()
-
-      const spanEvents = events.filter((e) => e.flow === 'taskGraph:execute')
-      expect(spanEvents.some((e) => e.level === 'step' && e.label === 'agent-spawn')).toBe(false)
-      const failEvent = spanEvents.find((e) => e.level === 'fail')
-      expect(failEvent?.fields.err).toContain('TASK_PERMISSION_DENIED')
-      // Only ever fails once for this call — the outer catch re-throws without double-failing.
-      expect(spanEvents.filter((e) => e.level === 'fail')).toHaveLength(1)
-    })
-
-    it('spawn succeeds → span.ok({status: "review"})', async () => {
-      const task = await taskService.create({
-        title: 'T', type: 'task', status: 'backlog', priority: 'low',
-        reporterId: 'reporter-001', visibility: 'team',
-      })
-      const executor = new TaskAgentExecutor(taskService, makeMockSpawner() as any, makeMockGrantService() as any)
-
-      const { events, stop } = captureTraceEvents()
-      await executor.executeTask({ ...EXEC_PARAMS, taskId: task.id })
-      stop()
-
-      const spanEvents = events.filter((e) => e.flow === 'taskGraph:execute')
-      const okEvent = spanEvents.find((e) => e.level === 'ok')
-      expect(okEvent?.fields.status).toBe('review')
-      expect(spanEvents.some((e) => e.level === 'step' && e.label === 'agent-spawn')).toBe(true)
-    })
-
-    it('spawn throws → span.fail(err, {status: "blocked"})', async () => {
-      const task = await taskService.create({
-        title: 'T', type: 'task', status: 'backlog', priority: 'low',
-        reporterId: 'reporter-001', visibility: 'team',
-      })
-      const badSpawner = { spawn: vi.fn().mockRejectedValue(new Error('Spawn failed')) }
-      const executor = new TaskAgentExecutor(taskService, badSpawner as any, makeMockGrantService() as any)
-
-      const { events, stop } = captureTraceEvents()
-      await expect(executor.executeTask({ ...EXEC_PARAMS, taskId: task.id })).rejects.toThrow('Spawn failed')
-      stop()
-
-      const spanEvents = events.filter((e) => e.flow === 'taskGraph:execute')
-      const failEvent = spanEvents.find((e) => e.level === 'fail')
-      expect(failEvent?.fields.status).toBe('blocked')
-      expect(failEvent?.fields.err).toContain('Spawn failed')
-    })
-
-    it('forwards traceId: span.id into agentSpawner.spawn() options', async () => {
-      const task = await taskService.create({
-        title: 'T', type: 'task', status: 'backlog', priority: 'low',
+        title: 'Traced task', type: 'task', status: 'backlog', priority: 'high',
         reporterId: 'reporter-001', visibility: 'team',
       })
       const spawner = makeMockSpawner()
       const executor = new TaskAgentExecutor(taskService, spawner as any, makeMockGrantService() as any)
-
-      const { events, stop } = captureTraceEvents()
-      await executor.executeTask({ ...EXEC_PARAMS, taskId: task.id })
-      stop()
-
-      const startEvent = events.find((e) => e.flow === 'taskGraph:execute' && e.level === 'start')
-      const spawnOptions = spawner.spawn.mock.calls[0][0]
-      expect(spawnOptions.traceId).toBe(startEvent?.id)
+      await executor.executeTask({ ...EXEC_PARAMS, taskId: task.id, traceId: 'resume-task-exec-1' })
+      expect(spawner.spawn).toHaveBeenCalledWith(
+        expect.objectContaining({ traceId: 'resume-task-exec-1' })
+      )
     })
 
-    it('step order: permission-check happens before agent-spawn', async () => {
+    it('spawn() is still called without a traceId field breaking when none is provided (backward compatible)', async () => {
       const task = await taskService.create({
-        title: 'T', type: 'task', status: 'backlog', priority: 'low',
+        title: 'Untraced task', type: 'task', status: 'backlog', priority: 'high',
         reporterId: 'reporter-001', visibility: 'team',
       })
-      const executor = new TaskAgentExecutor(taskService, makeMockSpawner() as any, makeMockGrantService() as any)
-
-      const { events, stop } = captureTraceEvents()
+      const spawner = makeMockSpawner()
+      const executor = new TaskAgentExecutor(taskService, spawner as any, makeMockGrantService() as any)
       await executor.executeTask({ ...EXEC_PARAMS, taskId: task.id })
-      stop()
-
-      const spanEvents = events.filter((e) => e.flow === 'taskGraph:execute' && e.level === 'step')
-      expect(spanEvents.map((e) => e.label)).toEqual(['permission-check', 'agent-spawn'])
+      expect(spawner.spawn).toHaveBeenCalledWith(
+        expect.objectContaining({ traceId: undefined })
+      )
     })
 
-    it('task not found → span.fail(TASK_NOT_FOUND), NO step(agent-spawn)', async () => {
-      const executor = new TaskAgentExecutor(taskService, makeMockSpawner() as any, makeMockGrantService() as any)
-
-      const { events, stop } = captureTraceEvents()
-      await expect(executor.executeTask({ ...EXEC_PARAMS, taskId: 'unknown-id' })).rejects.toThrow('TASK_NOT_FOUND')
-      stop()
-
-      const spanEvents = events.filter((e) => e.flow === 'taskGraph:execute')
-      expect(spanEvents.some((e) => e.level === 'step' && e.label === 'agent-spawn')).toBe(false)
-      const failEvent = spanEvents.find((e) => e.level === 'fail')
-      expect(failEvent?.fields.err).toContain('TASK_NOT_FOUND')
+    it('does not create its own tracer/span — no createTracer/Tracers.* reference in TaskAgentExecutor.ts source', () => {
+      const source = readFileSync(join(__dirname, '../TaskAgentExecutor.ts'), 'utf-8')
+      expect(source).not.toMatch(/createTracer\(/)
+      expect(source).not.toMatch(/Tracers\./)
     })
   })
 })

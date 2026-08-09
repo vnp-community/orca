@@ -30,7 +30,7 @@ function sanitizeConfig(
   service: CredentialService,
   config: Record<string, string> | null
 ): Record<string, string> | null {
-  if (!config) return null
+  if (!config) {return null}
   const allowed = SAFE_CONFIG_FIELDS[service] ?? []
   return Object.fromEntries(Object.entries(config).filter(([k]) => allowed.includes(k)))
 }

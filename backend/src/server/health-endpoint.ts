@@ -14,7 +14,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { HealthChecker, DatabaseHealthCheck } from '../main/db/health'
 
-export interface HealthEndpointOptions {
+export type HealthEndpointOptions = {
   /** Whether to include pool stats in responses */
   includePoolStats?: boolean
   /** Timeout in ms for /health/ready live check (default: 5000) */
@@ -40,8 +40,8 @@ function buildResponse(check: DatabaseHealthCheck, options: HealthEndpointOption
     latencyMs: check.latencyMs,
     checkedAt: check.checkedAt
   }
-  if (check.lastError) db['lastError'] = check.lastError
-  if (options.includePoolStats && check.poolStats) db['pool'] = check.poolStats
+  if (check.lastError) {db['lastError'] = check.lastError}
+  if (options.includePoolStats && check.poolStats) {db['pool'] = check.poolStats}
   return db
 }
 

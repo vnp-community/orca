@@ -87,7 +87,7 @@ describe('Tracers registry — CR-TRACE-002 agentOrch entries', () => {
     const events: TraceEvent[] = []
     const unregister = registerTraceSink((e) => events.push(e))
     try {
-      for (const tracer of agentOrchFlows) tracer.start({})
+      for (const tracer of agentOrchFlows) {tracer.start({})}
     } finally {
       unregister()
     }
@@ -132,7 +132,7 @@ describe('Tracers registry — CR-TRACE-003 terminal entries', () => {
     const events: TraceEvent[] = []
     const unregister = registerTraceSink((e) => events.push(e))
     try {
-      for (const tracer of terminalFlows) tracer.start({})
+      for (const tracer of terminalFlows) {tracer.start({})}
     } finally {
       unregister()
     }

@@ -131,7 +131,7 @@ describe('GenericConnectionPool', () => {
       },
       async () => {
         attempt++
-        if (attempt === 1) throw new Error('transient')
+        if (attempt === 1) {throw new Error('transient')}
         return makeMockDb()
       }
     )

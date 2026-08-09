@@ -17,7 +17,7 @@ import type { ISystemInfo } from './system-interface'
 export type PlatformMode = 'electron' | 'node'
 
 /** All platform services bundled into one injectable object */
-export interface IPlatformServices {
+export type IPlatformServices = {
   readonly mode: PlatformMode
   readonly app: IApp
   readonly ipc: IIpcBridge

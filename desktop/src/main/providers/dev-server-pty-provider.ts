@@ -53,20 +53,20 @@ export class DevServerPtyProvider implements IPtyProvider {
     this.unsubscribeNotifications =
       this.relay.onNotification?.((method, params) => {
         const relayId = typeof params.id === 'string' ? params.id : null
-        if (!relayId) return
+        if (!relayId) {return}
         const appId = this.toAppPtyId(relayId)
         if (method === 'pty.data') {
           const data = typeof params.data === 'string' ? params.data : null
-          if (data === null) return
-          for (const cb of this.dataListeners) cb({ id: appId, data })
+          if (data === null) {return}
+          for (const cb of this.dataListeners) {cb({ id: appId, data })}
         } else if (method === 'pty.exit') {
           const exitCode = typeof params.exitCode === 'number' ? params.exitCode : 0
           this.initialCwdByRelayId.delete(relayId)
-          for (const cb of this.exitListeners) cb({ id: appId, code: exitCode })
+          for (const cb of this.exitListeners) {cb({ id: appId, code: exitCode })}
         } else if (method === 'pty.replay') {
           const data = typeof params.data === 'string' ? params.data : null
-          if (data === null) return
-          for (const cb of this.replayListeners) cb({ id: appId, data })
+          if (data === null) {return}
+          for (const cb of this.replayListeners) {cb({ id: appId, data })}
         }
       }) ?? null
   }

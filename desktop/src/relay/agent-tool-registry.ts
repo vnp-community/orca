@@ -17,14 +17,14 @@ import type { AgentConfig } from './agent-config'
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
-export interface ToolResult {
+export type ToolResult = {
   stdout: string
   stderr: string
   exitCode: number
   meta?: Record<string, unknown>
 }
 
-export interface ToolInputSchema {
+export type ToolInputSchema = {
   type: 'object'
   properties: Record<string, {
     type: string
@@ -35,7 +35,7 @@ export interface ToolInputSchema {
   required?: readonly string[]
 }
 
-export interface ToolDefinition {
+export type ToolDefinition = {
   readonly name: string
   /** null means built-in — always available, no binary check */
   readonly binary: string | null
@@ -53,7 +53,7 @@ export interface ToolDefinition {
  */
 function resolveToolBinary(binary: string, toolPath: string): string {
   for (const dir of toolPath.split(':')) {
-    if (!dir) continue
+    if (!dir) {continue}
     const candidate = join(dir, binary)
     try {
       accessSync(candidate, constants.X_OK)
@@ -360,7 +360,7 @@ export async function discoverTools(config: AgentConfig): Promise<ToolDefinition
       }
     })
 
-    if (found) discovered.push(tool)
+    if (found) {discovered.push(tool)}
   }
 
   return discovered

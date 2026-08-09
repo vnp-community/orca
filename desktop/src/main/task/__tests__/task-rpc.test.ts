@@ -85,7 +85,7 @@ function makeExecutor() {
 // Find a method by name in the RpcMethod[] array
 function findMethod(methods: ReturnType<typeof createTaskMethods>, name: string) {
   const method = methods.find(m => m.name === name)
-  if (!method) throw new Error(`Method not found: ${name}`)
+  if (!method) {throw new Error(`Method not found: ${name}`)}
   return method
 }
 

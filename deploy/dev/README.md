@@ -1,22 +1,26 @@
 # Orca Dev Server — README Triển khai
 
+> Thư mục này chỉ deploy **backend/** + **frontend/**. Deploy Agent (Dev Server Agent)
+> đã chuyển sang [`deploy/agent/`](../agent/README.md); build/đóng gói Desktop xem
+> [`deploy/desktop/`](../desktop/README.md); build/release Mobile xem
+> [`deploy/mobile/`](../mobile/README.md).
+
 ## Tổng quan
 
-Mô hình **build local → sync → run minimal container**:
+Mô hình **rsync source → build server-side qua Docker → run minimal container**:
 
 ```
 [Máy Developer / CI]                  [Orca Server]
 ─────────────────────                 ─────────────────────────────────────
-1. build-local.sh                     4. docker compose up -d
-   ↓ pnpm build                          ┌──────────────────────┐
-   ↓ electron-builder --linux --dir      │  orca  (debian-slim) │ ← app mount
-   → dist/linux-unpacked/               │  nginx (alpine 5MB)  │ ← TLS proxy
-                                         └──────────────────────┘
-2. gen-certs.sh  (1 lần)
-   → docker/nginx/certs/server.crt
-
-3. sync-to-server.sh
-   → rsync dist/ + docker/ lên server
+1. build-local.sh (tuỳ chọn)          4. docker compose up -d --build
+   ↓ build thử backend/+frontend/        ┌──────────────────────────┐
+   ↓ chỉ để bắt lỗi sớm                  │ orca (backend+frontend)  │
+                                         │   Dockerfile tự build    │ ← từ
+2. gen-certs.sh  (1 lần)                │   backend/ + frontend/   │   source
+   → docker/nginx/certs/server.crt      │  nginx (alpine 5MB)      │ ← TLS proxy
+                                         └──────────────────────────┘
+3. sync-to-server.sh <version>
+   → rsync source lên server (KHÔNG rsync artifact — Docker tự build)
 ```
 
 ## Cấu trúc thư mục
@@ -24,21 +28,23 @@ Mô hình **build local → sync → run minimal container**:
 ```
 deploy/dev/
 ├── docker-compose.yml          # Chạy trên server
-├── .env.example                # Config template
+├── docker-compose.orca.yml     # Biến thể 2-server (b15.openledger.vn)
+├── .env.example                # Config template (backend/nginx only —
+│                                #   agent config đã chuyển deploy/agent/.env.example)
 ├── .env                        # Config thực (gitignored)
 ├── .gitignore
 │
 ├── scripts/
-│   ├── build-local.sh          # [LOCAL] Build Orca → dist/linux-unpacked/
-│   ├── sync-to-server.sh       # [LOCAL] Rsync lên server + restart
+│   ├── build-local.sh          # [LOCAL] Build thử backend/+frontend/ (pre-flight)
+│   ├── sync-to-server.sh       # [LOCAL] Rsync source lên server + docker build + restart
 │   ├── gen-certs.sh            # [LOCAL] Tạo self-signed TLS cert
 │   ├── setup-ssh-keys.sh       # [LOCAL] Setup SSH key: Orca Server → Dev Machine
 │   └── get-pairing-url.sh      # [LOCAL] Lấy Pairing URL/Code để vào web UI
 │
 ├── docker/
-│   ├── orca/
-│   │   ├── Dockerfile          # debian:bookworm-slim + runtime libs
-│   │   ├── entrypoint.sh       # Xvfb → orca serve
+│   ├── backend/
+│   │   ├── Dockerfile          # 2 build stage (backend/ + frontend/) + 1 runtime stage
+│   │   ├── entrypoint.sh       # Khởi động out/server/index.js
 │   │   └── ssh/                # SSH keys (gitignored)
 │   │       ├── id_ed25519      # Private key → dev servers
 │   │       └── config          # SSH config
@@ -49,9 +55,6 @@ deploy/dev/
 │       └── certs/              # TLS certs (gitignored)
 │           ├── server.crt
 │           └── server.key
-│
-├── dist/                       # Build output (gitignored)
-│   └── linux-unpacked/         # Electron app (synced từ local build)
 │
 └── specs/                      # Tài liệu kiến trúc
     ├── 00-overview.md
@@ -65,10 +68,11 @@ deploy/dev/
 ```bash
 cd /path/to/orca   # root của Orca repo
 
-# 1. Copy và điền config
+# 1. Copy và điền config (backend/nginx)
 cp deploy/dev/.env.example deploy/dev/.env
 nano deploy/dev/.env
-# → Set ORCA_DOMAIN, SERVER_HOST, DEV_SERVER_HOST, etc.
+# → Set ORCA_DOMAIN, SERVER_HOST, HTTP_PORT/HTTPS_PORT, DB, AI keys, etc.
+# Deploy Agent lên Dev Server? Xem deploy/agent/.env.example (DEV_SERVER_HOST, ...)
 
 # 2. Tạo TLS certificate
 ORCA_DOMAIN=orca.vnpblc.internal \
@@ -76,7 +80,7 @@ ORCA_DOMAIN=orca.vnpblc.internal \
 
 # 3. Chuẩn bị SSH key để Orca Server SSH vào Dev Machine
 bash deploy/dev/scripts/setup-ssh-keys.sh
-# → Sinh key tại deploy/dev/docker/orca/ssh/
+# → Sinh key tại deploy/dev/docker/backend/ssh/
 # → Authorize public key vào 172.20.2.31 tự động
 # → Sync SSH dir lên Orca Server (172.20.2.39)
 
@@ -192,18 +196,18 @@ bash deploy/dev/scripts/setup-ssh-keys.sh --test
 
 ```bash
 # 1. Sinh key trên máy local
-mkdir -p deploy/dev/docker/orca/ssh
+mkdir -p deploy/dev/docker/backend/ssh
 ssh-keygen -t ed25519 \
-  -f deploy/dev/docker/orca/ssh/id_ed25519 \
+  -f deploy/dev/docker/backend/ssh/id_ed25519 \
   -N "" \
   -C "orca-server@172.20.2.39"
 
 # 2. Authorize lên dev server
-ssh-copy-id -i deploy/dev/docker/orca/ssh/id_ed25519.pub \
+ssh-copy-id -i deploy/dev/docker/backend/ssh/id_ed25519.pub \
   ubuntu@172.20.2.31
 
 # 3. Tạo SSH config
-cat > deploy/dev/docker/orca/ssh/config << 'EOF'
+cat > deploy/dev/docker/backend/ssh/config << 'EOF'
 Host dev-local
     HostName 172.20.2.31
     User ubuntu
@@ -213,11 +217,11 @@ Host dev-local
 EOF
 
 # 4. Lấy fingerprint
-ssh-keyscan -H 172.20.2.31 > deploy/dev/docker/orca/ssh/known_hosts
+ssh-keyscan -H 172.20.2.31 > deploy/dev/docker/backend/ssh/known_hosts
 
 # 5. Sync SSH dir lên Orca Server
-rsync -az deploy/dev/docker/orca/ssh/ \
-  ubuntu@172.20.2.39:~/orca-deploy/docker/orca/ssh/
+rsync -az deploy/dev/docker/backend/ssh/ \
+  ubuntu@172.20.2.39:~/orca-deploy/docker/backend/ssh/
 
 # 6. Restart container để mount SSH dir mới
 ssh ubuntu@172.20.2.39 \
@@ -237,7 +241,7 @@ https://b15.openledger.vn
 
 Orca sẽ tự động SSH vào 172.20.2.31 và deploy relay process (`~/.orca-remote/`).
 
-### Files SSH (trong deploy/dev/docker/orca/ssh/)
+### Files SSH (trong deploy/dev/docker/backend/ssh/)
 
 | File | Gitignore | Mô tả |
 |------|-----------|-------|

@@ -52,8 +52,8 @@ describe('ServerBootstrap — DB lifecycle (unit)', () => {
     expect(config).toBeNull()
 
     // Restore
-    if (saved.ORCA_DB_URL) process.env['ORCA_DB_URL'] = saved.ORCA_DB_URL
-    if (saved.ORCA_DB_DIALECT) process.env['ORCA_DB_DIALECT'] = saved.ORCA_DB_DIALECT
+    if (saved.ORCA_DB_URL) {process.env['ORCA_DB_URL'] = saved.ORCA_DB_URL}
+    if (saved.ORCA_DB_DIALECT) {process.env['ORCA_DB_DIALECT'] = saved.ORCA_DB_DIALECT}
   })
 
   it('loadDatabaseConfig() parses ORCA_DB_URL when set', async () => {

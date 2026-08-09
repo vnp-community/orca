@@ -54,7 +54,7 @@ export class NodeWindow extends EventEmitter implements IWindow {
   }
 
   destroy(): void {
-    if (this._destroyed) return
+    if (this._destroyed) {return}
     this._destroyed = true
     this._sendSubscribers.clear()
     this.emit('closed')
@@ -68,10 +68,10 @@ export class NodeWindow extends EventEmitter implements IWindow {
    * In Node mode, this routes to WebSocket clients via WebIpcBridge.
    */
   send(channel: string, ...args: any[]): void {
-    if (this._destroyed) return
+    if (this._destroyed) {return}
     const subs = this._sendSubscribers.get(channel)
     if (subs) {
-      for (const cb of subs) cb(args)
+      for (const cb of subs) {cb(args)}
     }
   }
 

@@ -29,7 +29,7 @@ import type {
 export const DEFAULT_ROTATION_GRACE_PERIOD_MS = 30_000
 
 /** Result of a rotateKey() call — reported back over RPC. */
-export interface RotateKeyResult {
+export type RotateKeyResult = {
   accountId: string
   status: AIProviderStatus
   rotationGraceUntil: Date
@@ -41,7 +41,7 @@ function rotationShadowId(accountId: string): string {
 }
 
 /** Raw DB row from orca_ai_provider_accounts */
-interface AccountRow {
+type AccountRow = {
   id: string
   devServerId: string
   provider: string
@@ -61,7 +61,7 @@ interface AccountRow {
 }
 
 /** Parameters for creating a new provider account */
-export interface CreateAccountParams {
+export type CreateAccountParams = {
   devServerId: string
   provider: AIProviderType
   scope: AIProviderScope
@@ -74,7 +74,7 @@ export interface CreateAccountParams {
 }
 
 /** Partial update payload */
-export interface UpdateAccountParams {
+export type UpdateAccountParams = {
   label?: string
   model?: string
   baseUrl?: string
@@ -185,7 +185,7 @@ export class AIProviderService {
         [accountId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return rowToAccount(rows[0])
   }
 
@@ -300,14 +300,14 @@ export class AIProviderService {
     const gracePeriodMs = options?.gracePeriodMs ?? DEFAULT_ROTATION_GRACE_PERIOD_MS
 
     const account = await this.getAccount(accountId)
-    if (!account) throw new Error(`ACCOUNT_NOT_FOUND: ${accountId}`)
-    if (account.status === 'rotating') throw new Error(`ROTATION_IN_PROGRESS: ${accountId}`)
+    if (!account) {throw new Error(`ACCOUNT_NOT_FOUND: ${accountId}`)}
+    if (account.status === 'rotating') {throw new Error(`ROTATION_IN_PROGRESS: ${accountId}`)}
     if (account.status !== 'active') {
       throw new Error(`INVALID_STATUS_FOR_ROTATION: ${accountId} is '${account.status}', expected 'active'`)
     }
 
     const server = this.devServerManager.get(account.devServerId)
-    if (!server) throw new Error(`DEV_SERVER_NOT_FOUND: ${account.devServerId}`)
+    if (!server) {throw new Error(`DEV_SERVER_NOT_FOUND: ${account.devServerId}`)}
     const relay = await this.relayPool.getOrConnect(account.devServerId, server)
 
     // Stage the new credential at a shadow id — never touches the real file.
@@ -359,7 +359,7 @@ export class AIProviderService {
    */
   async completeRotation(accountId: string): Promise<void> {
     const account = await this.getAccount(accountId)
-    if (!account || account.status !== 'rotating') return
+    if (!account || account.status !== 'rotating') {return}
 
     const server = this.devServerManager.get(account.devServerId)
     if (!server) {
@@ -474,10 +474,10 @@ export class AIProviderService {
     const start = Date.now()
     try {
       const account = await this.getAccount(accountId)
-      if (!account) return { ok: false, latencyMs: 0, error: `ACCOUNT_NOT_FOUND: ${accountId}` }
+      if (!account) {return { ok: false, latencyMs: 0, error: `ACCOUNT_NOT_FOUND: ${accountId}` }}
 
       const server = this.devServerManager.get(account.devServerId)
-      if (!server) return { ok: false, latencyMs: 0, error: `DEV_SERVER_NOT_FOUND: ${account.devServerId}` }
+      if (!server) {return { ok: false, latencyMs: 0, error: `DEV_SERVER_NOT_FOUND: ${account.devServerId}` }}
 
       const relay = await this.relayPool.getOrConnect(account.devServerId, server)
       await relay.call('ai.provider.testConnection', { accountId })
@@ -528,7 +528,7 @@ export class AIProviderService {
         [accountId, date]
       )
     )
-    if (!rows[0]) return { tokens: 0, requests: 0, costUsd: 0 }
+    if (!rows[0]) {return { tokens: 0, requests: 0, costUsd: 0 }}
     return { tokens: rows[0].tokensUsed, requests: rows[0].requests, costUsd: rows[0].costUsd }
   }
 
@@ -550,7 +550,7 @@ export class AIProviderService {
     // credential until completeRotation() commits — treat them as usable.
     const active = all.filter(a => a.status === 'active' || a.status === 'rotating')
 
-    const scopePriority: Array<{ scope: AIProviderScope; scopeRefId?: string }> = [
+    const scopePriority: { scope: AIProviderScope; scopeRefId?: string }[] = [
       { scope: 'user', scopeRefId: userId },
       { scope: 'project', scopeRefId: projectId },
       { scope: 'server' },
@@ -560,12 +560,12 @@ export class AIProviderService {
     for (const useModelHint of [true, false]) {
       for (const { scope, scopeRefId } of scopePriority) {
         const candidates = active.filter(a => {
-          if (a.scope !== scope) return false
-          if (scopeRefId && a.scopeRefId !== scopeRefId) return false
-          if (useModelHint && modelHint && a.model !== modelHint) return false
+          if (a.scope !== scope) {return false}
+          if (scopeRefId && a.scopeRefId !== scopeRefId) {return false}
+          if (useModelHint && modelHint && a.model !== modelHint) {return false}
           return true
         })
-        if (candidates[0]) return candidates[0]
+        if (candidates[0]) {return candidates[0]}
       }
     }
 

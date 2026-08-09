@@ -50,14 +50,14 @@ export type AgentLifecycleState = 'idle' | 'spawning' | 'running' | 'stopping' |
  * AgentBinarySpec: mô tả binary và cách build args cho mỗi model type.
  * apiKeyEnvVar = null nghĩa là model không cần API key (local inference / opencode).
  */
-export interface AgentBinarySpec {
+export type AgentBinarySpec = {
   readonly binary:         string
   readonly buildArgs:      (req?: { resumeId?: string; trustPreset?: 'standard' | 'full' | 'none' }) => string[]
   readonly apiKeyEnvVar:   string | null
   readonly localInference?: boolean
 }
 
-export interface AgentSpawnRequest {
+export type AgentSpawnRequest = {
   taskId:        string
   userId:        string
   modelId:       string
@@ -71,7 +71,7 @@ export interface AgentSpawnRequest {
   trustPreset?:  'standard' | 'full' | 'none'  // BUG-AG-HLD-008: 'full' → thêm flag skip-permission của CLI
 }
 
-export interface AgentStatusEvent {
+export type AgentStatusEvent = {
   type:    'spawn.accepted' | 'spawn.started' | 'spawn.output' | 'spawn.exit' | 'spawn.error'
   ptyId?:  string
   taskId?: string
@@ -135,7 +135,7 @@ const AGENT_SPECS: AgentBinarySpec[] = [
         ? ['--resume', req.resumeId]
         : ['--output-format', 'stream-json', '--verbose']
       // BUG-AG-HLD-008: flag verified trong YOLO_TUI_AGENT_ARGS (dùng thật cho TUI launcher)
-      if (req?.trustPreset === 'full') args.push(YOLO_TUI_AGENT_ARGS.claude!)
+      if (req?.trustPreset === 'full') {args.push(YOLO_TUI_AGENT_ARGS.claude!)}
       return args
     },
     apiKeyEnvVar: 'ANTHROPIC_API_KEY',
@@ -147,7 +147,7 @@ const AGENT_SPECS: AgentBinarySpec[] = [
       const args = req?.resumeId
         ? ['--session-file', `~/.codex/${req.resumeId}.json`]
         : []
-      if (req?.trustPreset === 'full') args.push(YOLO_TUI_AGENT_ARGS.codex!)
+      if (req?.trustPreset === 'full') {args.push(YOLO_TUI_AGENT_ARGS.codex!)}
       return args
     },
     apiKeyEnvVar: 'OPENAI_API_KEY',
@@ -163,7 +163,7 @@ const AGENT_SPECS: AgentBinarySpec[] = [
       const args = req?.resumeId
         ? ['--resume', req.resumeId]
         : ['--stream']
-      if (req?.trustPreset === 'full') args.push(YOLO_TUI_AGENT_ARGS.gemini!)
+      if (req?.trustPreset === 'full') {args.push(YOLO_TUI_AGENT_ARGS.gemini!)}
       return args
     },
     apiKeyEnvVar: 'GEMINI_API_KEY',
@@ -184,7 +184,7 @@ const AGENT_SPECS: AgentBinarySpec[] = [
       const args = req?.resumeId
         ? ['--session', req.resumeId]
         : []
-      if (req?.trustPreset === 'full') args.push('--dangerously-skip-permissions')
+      if (req?.trustPreset === 'full') {args.push('--dangerously-skip-permissions')}
       return args
     },
     apiKeyEnvVar: null,
@@ -193,7 +193,7 @@ const AGENT_SPECS: AgentBinarySpec[] = [
   { binary: 'ollama',   buildArgs: () => [],            apiKeyEnvVar: null, localInference: true },
 ]
 
-const MODEL_PREFIX_MAP: Array<[prefix: string, specIndex: number]> = [
+const MODEL_PREFIX_MAP: [prefix: string, specIndex: number][] = [
   ['claude',   0],
   ['gpt-',     1],
   ['codex',    1],
@@ -203,9 +203,9 @@ const MODEL_PREFIX_MAP: Array<[prefix: string, specIndex: number]> = [
 ]
 
 export function resolveAgentSpec(modelId: string): AgentBinarySpec | undefined {
-  if (!modelId) return undefined
+  if (!modelId) {return undefined}
   for (const [prefix, idx] of MODEL_PREFIX_MAP) {
-    if (modelId === prefix || modelId.startsWith(prefix + '-') || modelId.startsWith(prefix)) {
+    if (modelId === prefix || modelId.startsWith(`${prefix  }-`) || modelId.startsWith(prefix)) {
       return AGENT_SPECS[idx]
     }
   }
@@ -241,7 +241,7 @@ function buildAgentArgs(spec: AgentBinarySpec, req: AgentSpawnRequest): string[]
 // credential at all" from "credential exists but Orca Server forgot to
 // resolve+forward resolvedApiKey" in the error message.
 
-export interface AgentEnvRequest {
+export type AgentEnvRequest = {
   accountId:   string
   userId:      string
   taskId:      string
@@ -384,10 +384,10 @@ export async function handleAgentSpawn(
 
   // ── Validation ────────────────────────────────────────────────────────────────
   const missing: string[] = []
-  if (!req.modelId)  missing.push('model')
-  if (!req.taskId)   missing.push('taskId')
-  if (!req.userId)   missing.push('userId')
-  if (!req.cwd)      missing.push('cwd')
+  if (!req.modelId)  {missing.push('model')}
+  if (!req.taskId)   {missing.push('taskId')}
+  if (!req.userId)   {missing.push('userId')}
+  if (!req.cwd)      {missing.push('cwd')}
 
   if (missing.length > 0) {
     span.fail(`missing ${missing.join(',')}`, { taskId: req.taskId, modelId: req.modelId })
@@ -636,7 +636,7 @@ export async function handleAgentSendInput(
 // Prevents orphaned agent processes consuming resources on the Dev Server.
 
 export function cleanupAllPtys(log: AgentLogger): void {
-  if (PTY_REGISTRY.size === 0) return
+  if (PTY_REGISTRY.size === 0) {return}
   log.info(`session.stop: cleaning up ${PTY_REGISTRY.size} orphaned PTY(s)`)
   for (const [ptyId, entry] of PTY_REGISTRY.entries()) {
     try {

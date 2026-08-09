@@ -13,13 +13,13 @@ import type { DatabaseConfig } from './config'
 export type BindValue = string | number | bigint | Buffer | null | undefined
 
 /** Result of a DML statement (INSERT/UPDATE/DELETE) */
-export interface StatementResult {
+export type StatementResult = {
   changes: number
   lastInsertRowid: number | bigint
 }
 
 /** A prepared SQL statement (sync or async depending on backend) */
-export interface IStatement {
+export type IStatement = {
   run(...params: BindValue[]): StatementResult | Promise<StatementResult>
   get(
     ...params: BindValue[]
@@ -29,7 +29,7 @@ export interface IStatement {
 }
 
 /** Capabilities advertised by a database adapter */
-export interface IDatabaseCapabilities {
+export type IDatabaseCapabilities = {
   /** Whether WAL journal mode is active (SQLite only) */
   walMode: boolean
   /** Whether RETURNING clause is supported */
@@ -43,7 +43,7 @@ export interface IDatabaseCapabilities {
 }
 
 /** Base database interface — works for both sync and async adapters */
-export interface IDatabase {
+export type IDatabase = {
   exec(sql: string): void | Promise<void>
   prepare(sql: string): IStatement | Promise<IStatement>
   close(): void | Promise<void>
@@ -56,29 +56,29 @@ export interface IDatabase {
  * Synchronous database interface — for SQLite (node:sqlite DatabaseSync).
  * exec/prepare/close are synchronous; transaction/query are async wrappers.
  */
-export interface ISyncDatabase extends IDatabase {
+export type ISyncDatabase = {
   exec(sql: string): void
   prepare(sql: string): IStatement
   close(): void
   /** SQLite-specific PRAGMA accessor */
   pragma?(sql: string, options?: { simple?: boolean }): unknown
-}
+} & IDatabase
 
 /**
  * Asynchronous database interface — for MySQL, PostgreSQL, TiDB.
  * All methods return Promises.
  */
-export interface IAsyncDatabase extends IDatabase {
+export type IAsyncDatabase = {
   exec(sql: string): Promise<void>
   prepare(sql: string): Promise<IStatement>
   close(): Promise<void>
-}
+} & IDatabase
 
 /**
  * Factory for creating database connections.
  * Each dialect registers a provider via registerDatabaseProvider().
  */
-export interface DatabaseProvider {
+export type DatabaseProvider = {
   readonly dialect: IDatabaseCapabilities['dialect']
   connect(config: DatabaseConfig): Promise<IDatabase>
 }

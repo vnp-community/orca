@@ -1,8 +1,8 @@
 import type {
   HostedReviewCreationBlockedReason,
   HostedReviewCreationEligibility
-} from '../../../src/shared/hosted-review'
-import { supportsHostedReviewCreation } from '../../../src/shared/hosted-review-creation-providers'
+} from '../vendor-shared/shared/hosted-review'
+import { supportsHostedReviewCreation } from '../vendor-shared/shared/hosted-review-creation-providers'
 import { hostedReviewCopy } from './hosted-review-copy'
 import { getMobilePrCreateBlockMessage } from './mobile-pr-create'
 

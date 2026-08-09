@@ -8,7 +8,7 @@ import type { IPlatformServices } from '../../../types'
 const testPath = join(tmpdir(), `orca-adapter-test-${Date.now()}`)
 
 afterEach(() => {
-  if (existsSync(testPath)) rmSync(testPath, { recursive: true })
+  if (existsSync(testPath)) {rmSync(testPath, { recursive: true })}
 })
 
 describe('createNodeAdapter()', () => {

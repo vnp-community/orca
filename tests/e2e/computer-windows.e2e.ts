@@ -4,7 +4,7 @@ import type {
   ComputerListAppsResult,
   ComputerListWindowsResult,
   ComputerSnapshotResult
-} from '../../src/shared/runtime-types'
+} from '../vendor-shared/shared/runtime-types'
 import {
   ensureOrcaRuntimeLaunched,
   ensureNotepadLaunched,

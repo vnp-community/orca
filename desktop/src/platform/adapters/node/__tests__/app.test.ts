@@ -9,7 +9,7 @@ const testDataPath = join(tmpdir(), `orca-node-app-test-${Date.now()}`)
 
 // Cleanup after each test group
 afterEach(() => {
-  if (existsSync(testDataPath)) rmSync(testDataPath, { recursive: true })
+  if (existsSync(testDataPath)) {rmSync(testDataPath, { recursive: true })}
 })
 
 // ── Conformance ──────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ describe('NodeApp — specific behavior', () => {
       const envApp = new NodeApp()
       expect(envApp.getPath('userData')).toBe(envPath)
       delete process.env.ORCA_USER_DATA_PATH
-      if (existsSync(envPath)) rmSync(envPath, { recursive: true })
+      if (existsSync(envPath)) {rmSync(envPath, { recursive: true })}
     })
 
     it('falls back to ~/.orca when no option and no env var', () => {

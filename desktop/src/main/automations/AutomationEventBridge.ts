@@ -17,7 +17,7 @@
  * @module main/automations/AutomationEventBridge
  */
 
-import { EventEmitter } from 'node:events'
+import type { EventEmitter } from 'node:events'
 import type { AutomationService } from './service'
 
 // ── EventBus type ─────────────────────────────────────────────────────────────
@@ -26,21 +26,21 @@ export type EventBus = EventEmitter
 
 // ── Event payloads ────────────────────────────────────────────────────────────
 
-export interface GitPushEvent {
+export type GitPushEvent = {
   projectId: string
   repoPath:  string
   branch:    string
   pushedBy?: string
 }
 
-export interface PullRequestCreatedEvent {
+export type PullRequestCreatedEvent = {
   projectId: string
   prId:      string
   branch:    string
   title?:    string
 }
 
-export interface WorktreeCreatedEvent {
+export type WorktreeCreatedEvent = {
   projectId:    string
   worktreePath: string
   branch:       string
@@ -49,7 +49,7 @@ export interface WorktreeCreatedEvent {
 // ── AutomationEventBridge ─────────────────────────────────────────────────────
 
 export class AutomationEventBridge {
-  private readonly handlers: Array<{ event: string; handler: (...args: unknown[]) => void }> = []
+  private readonly handlers: { event: string; handler: (...args: unknown[]) => void }[] = []
   private started = false
 
   constructor(
@@ -59,7 +59,7 @@ export class AutomationEventBridge {
 
   /** Subscribe to all trigger events. Idempotent. */
   start(): void {
-    if (this.started) return
+    if (this.started) {return}
     this.started = true
 
     this.register('git.push',         (e) => void this.onGitPush(e as GitPushEvent))
@@ -130,12 +130,12 @@ export class AutomationEventBridge {
       // Note: 'scheduled' + 'manual' are the existing trigger types;
       // event-based triggers are a new extension recognized by label prefix.
       const allAutomations = (this.automationService as unknown as {
-        store: { listAutomations(): Array<{ id: string; name: string; projectId?: string; triggerType?: string; enabled?: boolean }> }
+        store: { listAutomations(): { id: string; name: string; projectId?: string; triggerType?: string; enabled?: boolean }[] }
       }).store.listAutomations()
 
       const matching = allAutomations.filter((a) => {
-        if (a.enabled === false) return false
-        if (a.projectId && a.projectId !== projectId) return false
+        if (a.enabled === false) {return false}
+        if (a.projectId && a.projectId !== projectId) {return false}
         // Match triggerType via explicit field or name prefix convention
         return a.triggerType === triggerType || a.name?.startsWith(`[${triggerType}]`)
       })

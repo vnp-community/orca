@@ -78,13 +78,13 @@ describe('AuthLocalHandler', () => {
 
       const result = await handler.login({ email: 'alice@test.com', password: 'wrong' }, '127.0.0.1', 'ua')
       expect(result.success).toBe(false)
-      if (!result.success) expect(result.error).toBe('invalid_credentials')
+      if (!result.success) {expect(result.error).toBe('invalid_credentials')}
     })
 
     it('returns validation_error for invalid email format', async () => {
       const result = await handler.login({ email: 'not-an-email', password: 'pw' }, '127.0.0.1', 'ua')
       expect(result.success).toBe(false)
-      if (!result.success) expect(result.error).toBe('validation_error')
+      if (!result.success) {expect(result.error).toBe('validation_error')}
       // Must NOT query the database for invalid format
       expect(userStore.verifyPassword).not.toHaveBeenCalled()
     })
@@ -92,14 +92,14 @@ describe('AuthLocalHandler', () => {
     it('returns validation_error for empty email', async () => {
       const result = await handler.login({ email: '', password: 'pw' }, '127.0.0.1', 'ua')
       expect(result.success).toBe(false)
-      if (!result.success) expect(result.error).toBe('validation_error')
+      if (!result.success) {expect(result.error).toBe('validation_error')}
       expect(userStore.verifyPassword).not.toHaveBeenCalled()
     })
 
     it('returns validation_error for empty password', async () => {
       const result = await handler.login({ email: 'a@test.com', password: '' }, '127.0.0.1', 'ua')
       expect(result.success).toBe(false)
-      if (!result.success) expect(result.error).toBe('validation_error')
+      if (!result.success) {expect(result.error).toBe('validation_error')}
       expect(userStore.verifyPassword).not.toHaveBeenCalled()
     })
 

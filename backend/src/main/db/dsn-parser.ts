@@ -71,7 +71,7 @@ export function parseDsn(dsn: string): DatabaseConfig {
   const ssl =
     sslParam === 'true' ? true : sslParam === 'false' ? false : undefined
 
-  const port = portStr ? parseInt(portStr, 10) : undefined
+  const port = portStr ? Number.parseInt(portStr, 10) : undefined
 
   return DatabaseConfigSchema.parse({ dialect, host, port, database, username, password, ssl })
 }

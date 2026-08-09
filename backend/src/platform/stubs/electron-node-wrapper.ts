@@ -17,7 +17,7 @@ import { EventEmitter } from 'node:events'
 import { getPlatform, isPlatformInitialized } from '../context'
 
 function tryGetPlatform() {
-  if (!isPlatformInitialized()) return null
+  if (!isPlatformInitialized()) {return null}
   try {
     return getPlatform()
   } catch {
@@ -250,7 +250,7 @@ export class BrowserWindow extends EventEmitter {
 
   static getAllWindows(): BrowserWindow[] {
     const platform = tryGetPlatform()
-    if (!platform) return []
+    if (!platform) {return []}
     return platform.windowManager.getAllWindows().map((w) => {
       const bw = new BrowserWindow()
       bw._win = w
@@ -261,7 +261,7 @@ export class BrowserWindow extends EventEmitter {
 
   static getFocusedWindow(): BrowserWindow | null {
     const win = tryGetPlatform()?.windowManager.getFocusedWindow()
-    if (!win) return null
+    if (!win) {return null}
     const bw = new BrowserWindow()
     bw._win = win
     bw.id = win.id

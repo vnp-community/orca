@@ -1,5 +1,5 @@
 /** IWindow — abstraction over Electron's BrowserWindow */
-export interface IWindow {
+export type IWindow = {
   readonly id: number
 
   isDestroyed(): boolean
@@ -29,7 +29,7 @@ export type WindowEvent =
   | 'blur' | 'minimize' | 'maximize' | 'restore'
   | string
 
-export interface WindowCreationOptions {
+export type WindowCreationOptions = {
   width?: number
   height?: number
   minWidth?: number
@@ -42,7 +42,7 @@ export interface WindowCreationOptions {
 }
 
 /** IWindowManager — factory and registry for windows */
-export interface IWindowManager {
+export type IWindowManager = {
   createWindow(options: WindowCreationOptions): IWindow
   getAllWindows(): IWindow[]
   getFocusedWindow(): IWindow | null

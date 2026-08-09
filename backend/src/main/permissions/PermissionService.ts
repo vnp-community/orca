@@ -24,7 +24,7 @@ import type { AuthUserStore } from '../auth/auth-user-store'
 export type PermissionResource = 'company' | 'department' | 'project' | 'task'
 export type PermissionAction = 'read' | 'write' | 'create' | 'delete' | 'admin'
 
-export interface PermissionContext {
+export type PermissionContext = {
   /** Role trong phạm vi resource (vd ProjectMemberRole 'owner'|'member'|'viewer'). */
   resourceRole?: string
 }
@@ -45,8 +45,8 @@ export class PermissionService {
     context?: PermissionContext
   ): Promise<boolean> {
     const globalRole = await this.getGlobalRole(userId)
-    if (!globalRole) return false
-    if (globalRole === 'admin') return true // global admin override mọi resource (F32)
+    if (!globalRole) {return false}
+    if (globalRole === 'admin') {return true} // global admin override mọi resource (F32)
 
     switch (resource) {
       case 'company':
@@ -54,7 +54,7 @@ export class PermissionService {
         // Company/dept mutation là admin-only bất kể resourceRole (F32/F33 security lock).
         return action === 'read'
       case 'project':
-        if (action === 'read') return true // membership đã được assertAccess() check trước
+        if (action === 'read') {return true} // membership đã được assertAccess() check trước
         return context?.resourceRole === 'owner'
       default:
         return false

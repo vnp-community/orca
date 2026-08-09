@@ -25,8 +25,8 @@ export function getFleetStatus(filter?: FleetStatusFilter): FleetStatusReport {
   let targets = store?.listTargets() ?? []
 
   // Apply filters
-  if (filter?.project) targets = targets.filter((t) => t.project === filter.project)
-  if (filter?.team) targets = targets.filter((t) => t.team === filter.team)
+  if (filter?.project) {targets = targets.filter((t) => t.project === filter.project)}
+  if (filter?.team) {targets = targets.filter((t) => t.team === filter.team)}
 
   const servers: FleetServerStatus[] = targets.map((target) => {
     const connState = manager?.getState(target.id)

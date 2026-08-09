@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcFailure, RpcResponse, RpcSuccess } from '../transport/types'
-import type { HostedReviewCreationEligibility } from '../../../src/shared/hosted-review'
-import { shouldOpenChecksPanelCreateComposer } from '../../../src/renderer/src/components/right-sidebar/checks-panel-review-creation'
+import type { HostedReviewCreationEligibility } from '../vendor-shared/shared/hosted-review'
+import { shouldOpenChecksPanelCreateComposer } from '../vendor-shared/renderer/src/components/right-sidebar/checks-panel-review-creation'
 import {
   buildMobilePrCreateParams,
   getMobilePrCreateBlockMessage,

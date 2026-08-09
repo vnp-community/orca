@@ -24,8 +24,8 @@ vi.mock('../../src/main/providers/agent-foreground-process', () => ({
   }
 }))
 
-import { createPtySubprocess } from '../../src/main/daemon/pty-subprocess'
-import { createPaneForegroundAgentTracker } from '../../src/renderer/src/components/terminal-pane/pane-foreground-agent-tracker'
+import { createPtySubprocess } from '../vendor-shared/main/daemon/pty-subprocess'
+import { createPaneForegroundAgentTracker } from '../vendor-shared/renderer/src/components/terminal-pane/pane-foreground-agent-tracker'
 
 function mockWindowsPty() {
   const exitListeners: ((event: { exitCode: number }) => void)[] = []

@@ -34,7 +34,7 @@ fi
 # Validate required files
 if [ ! -f "out/server/index.js" ]; then
   echo "[entrypoint] ERROR: out/server/index.js not found!"
-  echo "[entrypoint] Run 'pnpm run build:backend' first."
+  echo "[entrypoint] Build server-side qua docker build (xem deploy/prod/Dockerfile)."
   exit 1
 fi
 

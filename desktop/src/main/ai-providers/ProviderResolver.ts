@@ -17,7 +17,7 @@ import type { AIProviderService } from './AIProviderService'
 import type { AIProviderAccount, AIProviderScope } from '../../shared/ai-provider-types'
 import { Tracers } from '../../shared/trace/tracers'
 
-export interface ResolveOptions {
+export type ResolveOptions = {
   devServerId: string
   projectId: string
   userId: string
@@ -76,7 +76,7 @@ export class ProviderResolver {
       }
 
       // Priority resolution matrix: user > project > server, modelHint first then without
-      const scopePriority: Array<{ scope: AIProviderScope; scopeRefId?: string }> = [
+      const scopePriority: { scope: AIProviderScope; scopeRefId?: string }[] = [
         { scope: 'user', scopeRefId: userId },
         { scope: 'project', scopeRefId: projectId },
         { scope: 'server' },
@@ -126,9 +126,9 @@ export class ProviderResolver {
     modelHint: string | undefined
   ): AIProviderAccount | undefined {
     return accounts.find(a => {
-      if (a.scope !== scope) return false
-      if (scopeRefId !== undefined && a.scopeRefId !== scopeRefId) return false
-      if (modelHint !== undefined && a.model !== modelHint) return false
+      if (a.scope !== scope) {return false}
+      if (scopeRefId !== undefined && a.scopeRefId !== scopeRefId) {return false}
+      if (modelHint !== undefined && a.model !== modelHint) {return false}
       return true
     })
   }

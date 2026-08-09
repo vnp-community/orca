@@ -31,7 +31,7 @@ import {
 const DEFAULT_WS_PORT = 6768
 // ORCA_PORT: allow headless/container deployments to override the WebSocket port
 // ORCA_DOMAIN: when running behind a reverse proxy, use this domain for pairing URLs
-const ORCA_PORT = process.env.ORCA_PORT ? parseInt(process.env.ORCA_PORT, 10) : undefined
+const ORCA_PORT = process.env.ORCA_PORT ? Number.parseInt(process.env.ORCA_PORT, 10) : undefined
 const ORCA_DOMAIN = process.env.ORCA_DOMAIN  // e.g. 'orca-backend.vnpblc.internal'
 
 type OrcaRuntimeRpcServerOptions = {
@@ -95,8 +95,8 @@ function resolvePairingEndpoint(rawEndpoint: string, address: string | null | un
     const scheme = ORCA_DOMAIN.startsWith('wss://') || ORCA_DOMAIN.startsWith('https://') ? 'wss' : 'ws'
     const cleanDomain = ORCA_DOMAIN.replace(/^https?:\/\/|^wss?:\/\//, '')
     endpoint.hostname = cleanDomain.split(':')[0]
-    if (cleanDomain.includes(':')) endpoint.port = cleanDomain.split(':')[1]
-    endpoint.protocol = scheme + ':'
+    if (cleanDomain.includes(':')) {endpoint.port = cleanDomain.split(':')[1]}
+    endpoint.protocol = `${scheme  }:`
     return formatWebSocketUrl(endpoint)
   }
 
@@ -772,7 +772,7 @@ export class OrcaRuntimeRpcServer {
           // Wire fleet Prometheus /metrics if enabled (SOL-005 — CR-005)
           ...(fleetMetricsEnabled ? {
             onHttpRequest: async (req, res) => {
-              if (req.url !== '/metrics' || req.method !== 'GET') return false
+              if (req.url !== '/metrics' || req.method !== 'GET') {return false}
               const { createFleetMetricsHandler } = await import('./rpc/fleet-metrics-handler')
               const { getFleetStatus } = await import('../ssh/fleet-status-service')
               const handler = createFleetMetricsHandler(() => getFleetStatus())

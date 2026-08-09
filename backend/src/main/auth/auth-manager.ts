@@ -44,13 +44,13 @@ export class AuthManager {
     // Periodic cleanup of expired sessions — don't block process exit
     this.cleanupTimer = setInterval(() => {
       void this.sessionStore.cleanupExpired().then((n) => {
-        if (n > 0) console.log(`[AuthManager] Cleaned ${n} expired session(s)`)
+        if (n > 0) {console.log(`[AuthManager] Cleaned ${n} expired session(s)`)}
       }).catch((err: unknown) => {
         console.warn('[AuthManager] Session cleanup error:', err)
       })
     }, CLEANUP_INTERVAL_MS)
 
-    if (this.cleanupTimer.unref) this.cleanupTimer.unref()
+    if (this.cleanupTimer.unref) {this.cleanupTimer.unref()}
   }
 
   /**
@@ -60,7 +60,7 @@ export class AuthManager {
    */
   async validateRequest(cookieHeader: string | undefined): Promise<OrcaSession | null> {
     const sessionId = extractSessionCookie(cookieHeader)
-    if (!sessionId) return null
+    if (!sessionId) {return null}
     return this.sessionStore.validateSession(sessionId)
   }
 
@@ -98,7 +98,7 @@ export class AuthManager {
 }
 
 export function extractSessionCookie(cookieHeader: string | undefined): string | null {
-  if (!cookieHeader) return null
+  if (!cookieHeader) {return null}
   const match = SESSION_COOKIE_REGEX.exec(cookieHeader)
   return match ? match[1]! : null
 }

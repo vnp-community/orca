@@ -131,7 +131,7 @@ export class DeviceRegistry {
 
   getScopedToken(token: string): ScopedPairingToken | null {
     const found = this.scopedTokens.get(token)
-    if (!found) return null
+    if (!found) {return null}
     if (found.expiresAt < Date.now()) {
       this.scopedTokens.delete(token)
       return null
@@ -145,14 +145,14 @@ export class DeviceRegistry {
 
   revokeAllUserTokens(userId: string): void {
     for (const [key, value] of this.scopedTokens) {
-      if (value.userId === userId) this.scopedTokens.delete(key)
+      if (value.userId === userId) {this.scopedTokens.delete(key)}
     }
   }
 
   pruneExpiredTokens(): void {
     const now = Date.now()
     for (const [key, value] of this.scopedTokens) {
-      if (value.expiresAt < now) this.scopedTokens.delete(key)
+      if (value.expiresAt < now) {this.scopedTokens.delete(key)}
     }
   }
 

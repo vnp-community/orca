@@ -51,7 +51,7 @@ const MIME_TYPES: Record<string, string> = {
   '.avif':  'image/avif'
 }
 
-export interface HttpServerOptions {
+export type HttpServerOptions = {
   /** If provided, /health/* routes are exposed before static file serving */
   dbMonitor?: HealthChecker
   /** If provided, /auth/* and /admin/api/* Express routes are mounted */
@@ -153,11 +153,11 @@ export async function startHttpServer(
     // 2. /api/* → optional API handler (agent-token, etc.)
     if (path.startsWith('/api/')) {
       // 2a. /api/trace-stream → SSE trace event stream (always registered)
-      if (handleTraceStreamRequest(req, res)) return
+      if (handleTraceStreamRequest(req, res)) {return}
       // 2b. other /api/* → caller-provided handler (agent-token, etc.)
       if (options.apiHandler) {
         const handled = options.apiHandler(req, res)
-        if (handled) return
+        if (handled) {return}
       }
     }
 
@@ -207,7 +207,7 @@ function handleStaticRequest(
   const normalizedPath = decodedPath === '/' ? '/web-index.html' : decodedPath
   const filePath = join(webRoot, normalizedPath)
 
-  if (!filePath.startsWith(webRoot + '/') && filePath !== webRoot) {
+  if (!filePath.startsWith(`${webRoot  }/`) && filePath !== webRoot) {
     res.writeHead(403, { 'Content-Type': 'text/plain' })
     res.end('Forbidden')
     return
@@ -231,7 +231,7 @@ function handleStaticRequest(
       serveFile(res, indexPath)
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' })
-      res.end('Not Found: web-index.html missing from ' + webRoot)
+      res.end(`Not Found: web-index.html missing from ${  webRoot}`)
     }
     return
   }

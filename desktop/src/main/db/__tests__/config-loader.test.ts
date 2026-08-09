@@ -22,14 +22,14 @@ describe('loadDatabaseConfig', () => {
       delete process.env[k]
     }
     for (const [k, v] of Object.entries(vars)) {
-      if (v !== undefined) process.env[k] = v
+      if (v !== undefined) {process.env[k] = v}
     }
   }
 
   afterEach(() => {
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) delete process.env[k]
-      else process.env[k] = v
+      if (v === undefined) {delete process.env[k]}
+      else {process.env[k] = v}
     }
   })
 

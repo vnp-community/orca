@@ -8,30 +8,18 @@
 
 ## 1. bootstrapWebApp()
 
+**Cập nhật 2026-08-09:** mục này trước đây mô tả `bootstrapWebApp()` tự quyết định "no-auth mode" bên trong nó (`checkNoAuthMode()` → `renderPairCodeFallback()`). **Không khớp code thật** — quyết định đó xảy ra ở tầng NGOÀI `bootstrapWebApp()`, trong `main.tsx`, TRƯỚC KHI hàm này được gọi (xem §6, §7 đã viết lại). Phát hiện qua audit `specs/frontend/crs/frontend-e2ee/solutions/SOL-FE2E-001-scope-and-discovery-audit.md` mục 4.
+
+`bootstrapWebApp()` thật (chỉ chạy trong nhánh `/auth/config` → 200) không có nhánh no-auth — nó luôn kết thúc bằng `<LoginPage>` (không có `PairCodeFallback` bên trong nữa, xem [CR-FE2E-002](../../../../docs/crs/v2/frontend-e2ee/CR-FE2E-002-remove-paircode-fallback-from-login.md)) hoặc `<App>`:
+
 ```typescript
 // src/renderer/src/web/main-web-bootstrap.tsx
-
-export async function bootstrapWebApp(): Promise<void> {
-  // Step 1: Service Worker registration (Web Push)
-  if ('serviceWorker' in navigator) {
-    await navigator.serviceWorker.register('/service-worker.js')
-  }
-
-  // Step 2: Auth check
-  const user = await checkAuthSession()
-
-  if (user) {
-    // Authenticated → render App.tsx
-    renderApp(user)
-  } else {
-    // Check if no-auth mode (pair code legacy)
-    const isNoAuth = await checkNoAuthMode()
-    if (isNoAuth) {
-      renderPairCodeFallback()
-    } else {
-      renderLoginPage()
-    }
-  }
+export async function bootstrapWebApp(options: BootstrapOptions = {}): Promise<void> {
+  // 1. Tạo WebSocketRpcClient nhẹ (chỉ cho ConnectionStatusProvider), retry connect
+  // 2. installAuthFailedRedirect() — lắng nghe 'orca:auth-failed' (WS đóng mã 4401)
+  // 3. Mount <WebRootBoundary client={client} /> — component này tự fetch
+  //    /auth/me + /auth/config để quyết định LoginPage hay App, KHÔNG có
+  //    nhánh no-auth/pair-code nào (đã bỏ ở CR-FE2E-002)
 }
 ```
 
@@ -113,28 +101,38 @@ function getRpcUrl(): string {
 
 ---
 
-## 6. main.tsx (Web)
+## 6. main.tsx (Web) — cập nhật 2026-08-09 ([CR-FE2E-003](../../../../docs/crs/v2/frontend-e2ee/CR-FE2E-003-lazy-split-pairing-bundle.md))
+
+`main.tsx` **KHÔNG** chỉ delegate sang `bootstrapWebApp()` — nó là nơi thật sự quyết định nhánh nào chạy, bằng cách probe `/auth/config` (không phải `/auth/me` như §7 cũ mô tả):
 
 ```typescript
-// src/renderer/src/web/main.tsx — CHỈ ĐỌC, KHÔNG SỬA
-// Delegates tất cả logic sang bootstrapWebApp()
-
+// src/renderer/src/web/main.tsx (thật)
+import '../assets/main.css'
 import { bootstrapWebApp } from './main-web-bootstrap'
-bootstrapWebApp().catch(console.error)
+
+fetch('/auth/config')
+  .then((res) => {
+    if (res.ok) void bootstrapWebApp()        // multi-user backend (backend/) — session-auth
+    else renderOriginalPairCodeApp()           // Desktop Pair Code sharing — không có backend
+  })
+  .catch(() => renderOriginalPairCodeApp())    // lỗi mạng → coi như Desktop mode
+
+// Chỉ /auth/config 404 mới tới đây — dynamic import giữ TweetNaCl/E2EE pairing UI
+// ngoài bundle mà mọi browser multi-user tải (CR-FE2E-003).
+function renderOriginalPairCodeApp(): void {
+  void import('./pair-code-app-entry').then(({ mountPairCodeApp }) => mountPairCodeApp())
+}
 ```
+
+`pair-code-app-entry.tsx` (file mới, CR-FE2E-003) chứa `WebRoot`/`WebRootBoundary` — logic pairing đầy đủ (`WebConnect`, `web-pairing.ts`, `web-runtime-environment.ts`) — di chuyển nguyên vẹn từ `main.tsx` cũ.
 
 ---
 
-## 7. No-Auth Mode Detection
+## 7. Phân biệt 2 nhánh (thay cho "No-Auth Mode Detection" cũ — hàm `checkNoAuthMode()` không tồn tại trong code)
 
-```typescript
-// checkNoAuthMode() — kiểm tra xem server có auth endpoint không
-async function checkNoAuthMode(): Promise<boolean> {
-  const res = await fetch('/auth/me', { credentials: 'include' })
-  if (res.status === 404) return true    // no-auth mode (old server)
-  return false
-}
-```
+Doc trước đây mô tả 1 hàm `checkNoAuthMode()` kiểm tra `/auth/me` trả 404 để suy ra "no-auth mode". **Không có hàm này trong code.** Cơ chế thật (xem §6): `main.tsx` probe **`/auth/config`** (không phải `/auth/me`), và route thẳng tới 1 trong 2 hàm mount hoàn toàn tách biệt (`bootstrapWebApp()` vs `renderOriginalPairCodeApp()`) — không có khái niệm "no-auth mode" như 1 cờ boolean truyền vào 1 hàm dùng chung.
+
+Backend (`backend/src/server/http-server.ts`) chỉ mount `/auth/*` (gồm cả `/auth/config` lẫn `/auth/local`) khi `options.authManager` tồn tại — 2 route này **luôn cùng có hoặc cùng không có**, không có deployment nào tách rời được (xác nhận: `specs/frontend/crs/frontend-e2ee/solutions/SOL-FE2E-001-scope-and-discovery-audit.md` mục 1).
 
 ---
 

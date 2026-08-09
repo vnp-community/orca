@@ -16,7 +16,7 @@
 
 import { test, expect } from './helpers/orca-app'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../src/shared/constants'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../vendor-shared/shared/constants'
 import {
   execInTerminal,
   sendToTerminal,

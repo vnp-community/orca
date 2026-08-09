@@ -80,7 +80,7 @@ export class FleetHealthStore {
     const cutoff = Date.now() - windowMs
     const windowRecords = records.filter((r) => r.timestamp > cutoff)
 
-    if (!windowRecords.length) return { windowMs, uptimeMs: 0, uptimePercent: 0 }
+    if (!windowRecords.length) {return { windowMs, uptimeMs: 0, uptimePercent: 0 }}
 
     let uptimeMs = 0
     let lastConnectedAt: number | null = null
@@ -94,7 +94,7 @@ export class FleetHealthStore {
       }
     }
     // Target still connected at end of window
-    if (lastConnectedAt) uptimeMs += Date.now() - lastConnectedAt
+    if (lastConnectedAt) {uptimeMs += Date.now() - lastConnectedAt}
 
     return {
       windowMs,
@@ -117,7 +117,7 @@ export class FleetHealthStore {
   /** Full history, optionally filtered to records within the past `limitMs` ms. */
   getHistory(targetId: string, limitMs?: number): HealthRecord[] {
     const records = this.history.get(targetId) ?? []
-    if (!limitMs) return records
+    if (!limitMs) {return records}
     const cutoff = Date.now() - limitMs
     return records.filter((r) => r.timestamp > cutoff)
   }

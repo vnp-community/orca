@@ -2,7 +2,7 @@ import type { WebSocket } from 'ws'
 import {
   DESKTOP_PROTOCOL_VERSION,
   MIN_COMPATIBLE_MOBILE_VERSION
-} from '../../src/shared/protocol-version'
+} from '../src/vendor-shared/shared/protocol-version'
 import { handleMockFilePreviewRequest } from './mock-server-file-preview-data'
 import { handleMockGitRequest } from './mock-server-git-state'
 import { FAKE_SCROLLBACK, STREAMING_CHUNKS } from './mock-server-terminal-fixtures'

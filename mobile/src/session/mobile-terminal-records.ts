@@ -1,5 +1,5 @@
 import type { MobileTerminalTheme } from '../terminal/terminal-webview-contract'
-import type { AgentStatusEntry } from '../../../src/shared/agent-status-types'
+import type { AgentStatusEntry } from '../vendor-shared/shared/agent-status-types'
 
 export type TerminalRecord = {
   handle: string

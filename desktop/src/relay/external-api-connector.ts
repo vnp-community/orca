@@ -25,7 +25,7 @@ const SHELL_METACHARACTERS = /[&|;$`<>\\!]/
 
 // ─── Shared executor ──────────────────────────────────────────────────────────
 
-interface ExecResult {
+type ExecResult = {
   stdout:   string
   stderr:   string
   exitCode: number
@@ -98,7 +98,7 @@ async function getCurrentBranch(cwd: string, env: NodeJS.ProcessEnv): Promise<st
   return result.exitCode === 0 ? result.stdout.trim() : null
 }
 
-interface GitHubPrResult {
+type GitHubPrResult = {
   url:    string
   number: number
   title:  string
@@ -116,7 +116,7 @@ async function checkExistingPr(
     '--limit', '1',
   ], { cwd, env, timeout: 15_000 })
 
-  if (result.exitCode !== 0 || !result.stdout.trim()) return null
+  if (result.exitCode !== 0 || !result.stdout.trim()) {return null}
   try {
     const prs = JSON.parse(result.stdout) as GitHubPrResult[]
     return prs[0] ?? null
@@ -170,7 +170,7 @@ export async function handleGitHubPrCreate(
     '--base',  base,
     '--json',  'url,number,title,state',
   ]
-  if (draft) ghArgs.push('--draft')
+  if (draft) {ghArgs.push('--draft')}
 
   try {
     const result = await execFileCaptured('gh', ghArgs, { cwd, env, timeout: 30_000 })

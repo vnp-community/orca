@@ -2,7 +2,7 @@
  * IApp — abstraction over Electron's `app` module.
  * NodeAdapter implements this without any Electron dependency.
  */
-export interface IApp {
+export type IApp = {
   /** App version from package.json or ORCA_VERSION env */
   getVersion(): string
 

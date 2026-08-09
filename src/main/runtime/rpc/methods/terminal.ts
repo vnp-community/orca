@@ -1287,17 +1287,22 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
     name: 'terminal.create',
     params: TerminalCreateParams,
     handler: async (params, ctx) => {
+      // Why no ctx.userId gate here: TASK-TRM-006's actual RBAC intent (a
+      // scoped pairing token may only create terminals on its allowedServerIds)
+      // is already enforced upstream in runtime-rpc.ts's parseAndAuth →
+      // isScopedMethodAllowed, before a request ever reaches this handler. A
+      // `ctx.userId` check was added here too, but nothing in the RPC dispatch
+      // chain (Unix-socket transport used by ORCA_MULTI_USER=1) ever populates
+      // it — see core.ts's RpcContext.userId, which stays undefined on every
+      // transport — so the check unconditionally threw UNAUTHORIZED for every
+      // caller, including already-authenticated per-user sessions (a per-user
+      // process is only ever reachable after WsSessionRouter validates the
+      // session cookie in the first place).
+      const { runtime } = ctx
       const span = Tracers.terminalCreate.start(
         { worktree: params.worktree ?? '' },
         params.traceId ? { id: params.traceId } : undefined
       )
-      // ctx.userId is never populated by any RPC transport in this codebase
-      // (WsSessionRouter resolves and validates userId at WS-accept time, but
-      // that value is never threaded into RpcContext for handlers to read) —
-      // a `!ctx.userId` check here always throws, for every caller. Real
-      // authorization for this method is already enforced upstream in
-      // parseAndAuth -> isScopedMethodAllowed.
-      const { runtime } = ctx
       try {
         const terminal = await runtime.createTerminal(params.worktree, {
           command: params.command,

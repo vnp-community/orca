@@ -1,7 +1,0 @@
-@@ -54,2 +54,6 @@
-    */
-   database?: DatabaseConfig | null
-+  /**
-+   * True if running inside a User Process (child of SessionManager).
-+   */
-+  isUserProcess?: boolean

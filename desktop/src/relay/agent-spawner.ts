@@ -49,14 +49,14 @@ export type AgentLifecycleState = 'idle' | 'spawning' | 'running' | 'stopping' |
  * AgentBinarySpec: mô tả binary và cách build args cho mỗi model type.
  * apiKeyEnvVar = null nghĩa là model không cần API key (local inference / opencode).
  */
-export interface AgentBinarySpec {
+export type AgentBinarySpec = {
   readonly binary:         string
   readonly buildArgs:      (req?: { resumeId?: string }) => string[]
   readonly apiKeyEnvVar:   string | null
   readonly localInference?: boolean
 }
 
-export interface AgentSpawnRequest {
+export type AgentSpawnRequest = {
   taskId:        string
   userId:        string
   modelId:       string
@@ -67,7 +67,7 @@ export interface AgentSpawnRequest {
   branchName?:   string  // WT-Issue-3: git branch this worktree corresponds to
 }
 
-export interface AgentStatusEvent {
+export type AgentStatusEvent = {
   type:    'spawn.accepted' | 'spawn.started' | 'spawn.output' | 'spawn.exit' | 'spawn.error'
   ptyId?:  string
   taskId?: string
@@ -141,7 +141,7 @@ const AGENT_SPECS: AgentBinarySpec[] = [
   { binary: 'ollama',   buildArgs: () => [],            apiKeyEnvVar: null, localInference: true },
 ]
 
-const MODEL_PREFIX_MAP: Array<[prefix: string, specIndex: number]> = [
+const MODEL_PREFIX_MAP: [prefix: string, specIndex: number][] = [
   ['claude',   0],
   ['gpt-',     1],
   ['codex',    1],
@@ -151,9 +151,9 @@ const MODEL_PREFIX_MAP: Array<[prefix: string, specIndex: number]> = [
 ]
 
 export function resolveAgentSpec(modelId: string): AgentBinarySpec | undefined {
-  if (!modelId) return undefined
+  if (!modelId) {return undefined}
   for (const [prefix, idx] of MODEL_PREFIX_MAP) {
-    if (modelId === prefix || modelId.startsWith(prefix + '-') || modelId.startsWith(prefix)) {
+    if (modelId === prefix || modelId.startsWith(`${prefix  }-`) || modelId.startsWith(prefix)) {
       return AGENT_SPECS[idx]
     }
   }
@@ -180,7 +180,7 @@ function buildAgentArgs(spec: AgentBinarySpec, req: AgentSpawnRequest): string[]
 //   via the spawn request params when it has the Layer 1 session key.
 //   If resolvedApiKey is provided, it takes priority over credStore lookup.
 
-export interface AgentEnvRequest {
+export type AgentEnvRequest = {
   accountId:   string
   userId:      string
   taskId:      string
@@ -297,10 +297,10 @@ export async function handleAgentSpawn(
 
   // ── Validation ────────────────────────────────────────────────────────────────
   const missing: string[] = []
-  if (!req.modelId)  missing.push('model')
-  if (!req.taskId)   missing.push('taskId')
-  if (!req.userId)   missing.push('userId')
-  if (!req.cwd)      missing.push('cwd')
+  if (!req.modelId)  {missing.push('model')}
+  if (!req.taskId)   {missing.push('taskId')}
+  if (!req.userId)   {missing.push('userId')}
+  if (!req.cwd)      {missing.push('cwd')}
 
   if (missing.length > 0) {
     span.fail(`missing ${missing.join(',')}`, { taskId: req.taskId, modelId: req.modelId })
@@ -548,7 +548,7 @@ export async function handleAgentSendInput(
 // Prevents orphaned agent processes consuming resources on the Dev Server.
 
 export function cleanupAllPtys(log: AgentLogger): void {
-  if (PTY_REGISTRY.size === 0) return
+  if (PTY_REGISTRY.size === 0) {return}
   log.info(`session.stop: cleaning up ${PTY_REGISTRY.size} orphaned PTY(s)`)
   for (const [ptyId, entry] of PTY_REGISTRY.entries()) {
     try {

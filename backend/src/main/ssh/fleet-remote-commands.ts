@@ -27,7 +27,7 @@ export async function detectRemotePlatform(
   conn: SshConnection
 ): Promise<FleetRemotePlatform> {
   const cached = platformCache.get(conn)
-  if (cached) return cached
+  if (cached) {return cached}
 
   let distroRaw = 'unknown'
   let archRaw = 'unknown'
@@ -207,7 +207,7 @@ export async function installPackages(
   conn: SshConnection,
   packages: string[]
 ): Promise<void> {
-  if (!packages.length) return
+  if (!packages.length) {return}
   const platform = await detectRemotePlatform(conn)
 
   let cmd: string
@@ -300,9 +300,9 @@ export function parseResourceMetricsOutput(output: string): RemoteResourceMetric
   const disk = /DISK=([\d.]+)/.exec(output)
   const cpu = /CPU=([\d.]+)/.exec(output)
   return {
-    ramPercent: ram ? parseFloat(ram[1]) : null,
-    diskPercent: disk ? parseFloat(disk[1]) : null,
-    cpuPercent: cpu ? parseFloat(cpu[1]) : null
+    ramPercent: ram ? Number.parseFloat(ram[1]) : null,
+    diskPercent: disk ? Number.parseFloat(disk[1]) : null,
+    cpuPercent: cpu ? Number.parseFloat(cpu[1]) : null
   }
 }
 
@@ -335,9 +335,9 @@ export async function checkRemoteDiskSpace(
 /** Parses a `df -h`-style size string ("47G", "512M", "1.2T", "900K") into GB. */
 export function parseDfSizeToGb(raw: string): number {
   const match = /^([\d.]+)\s*([KMGT]?)/i.exec(raw.trim())
-  if (!match) return 0
-  const value = parseFloat(match[1])
-  if (Number.isNaN(value)) return 0
+  if (!match) {return 0}
+  const value = Number.parseFloat(match[1])
+  if (Number.isNaN(value)) {return 0}
   switch (match[2].toUpperCase()) {
     case 'T':
       return value * 1024

@@ -52,11 +52,11 @@ export class AuthUserStore {
       WHERE email = ? AND provider = 'none'
     `)
     const row = await stmt.get(email) as Record<string, unknown> | undefined
-    if (!row) return null
-    if (!row['is_active']) return null
+    if (!row) {return null}
+    if (!row['is_active']) {return null}
 
     const isValid = await bcryptCompare(password, row['password_hash'] as string)
-    if (!isValid) return null
+    if (!isValid) {return null}
 
     return {
       id:       row['id']       as string,

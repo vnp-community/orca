@@ -24,7 +24,7 @@ import {
 const DEFAULT_TICK_MS = 60 * 1000
 
 /** FIX TASK-AT-001: Minimal interface replacing WebContents — Electron's WebContents satisfies this. */
-interface RendererBridge {
+type RendererBridge = {
   isDestroyed(): boolean
   send(channel: string, ...args: unknown[]): void
 }

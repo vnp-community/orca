@@ -1,5 +1,5 @@
-import type { ExecutionHostId } from '../../../src/shared/execution-host'
-import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
+import type { ExecutionHostId } from '../vendor-shared/shared/execution-host'
+import type { RuntimeWorktreeAgentRow } from '../vendor-shared/shared/runtime-types'
 
 export type Worktree = {
   sectionListKey?: string

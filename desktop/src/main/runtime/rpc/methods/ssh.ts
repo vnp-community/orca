@@ -98,7 +98,7 @@ export const SSH_METHODS: RpcMethod[] = [
     params: z.object({ filePath: z.string().min(1) }),
     handler: async (params) => {
       const store = getSshConnectionStore()
-      if (!store) throw new Error('SSH store not initialized')
+      if (!store) {throw new Error('SSH store not initialized')}
       const result = await store.importFromFleetConfig(params.filePath)
       return { result }
     }

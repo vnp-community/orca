@@ -67,7 +67,7 @@ describe('toLinuxUsername — with userId (collision avoidance)', () => {
     // Format: orca-{local}-{4char}
     const withoutPrefix = result.replace(/^orca-/, '')
     const parts         = withoutPrefix.split('-')
-    const suffix        = parts[parts.length - 1]!
+    const suffix        = parts.at(-1)!
     expect(suffix).toHaveLength(4)
   })
 
@@ -101,7 +101,7 @@ describe('isValidLinuxUsername', () => {
   })
 
   it('accepts exactly 32-char username', () => {
-    expect(isValidLinuxUsername('a' + 'b'.repeat(31))).toBe(true)
+    expect(isValidLinuxUsername(`a${  'b'.repeat(31)}`)).toBe(true)
   })
 })
 

@@ -61,7 +61,7 @@ export class SessionManager {
 
     // Periodic idle-process sweep — unref so it won't prevent process exit
     this.idleTimer = setInterval(() => this.sweepIdleProcesses(), IDLE_CHECK_INTERVAL_MS)
-    if (this.idleTimer.unref) this.idleTimer.unref()
+    if (this.idleTimer.unref) {this.idleTimer.unref()}
   }
 
   /**
@@ -175,7 +175,7 @@ export class SessionManager {
   /** Update lastSeenAt for a user process — call on any WS activity */
   touch(userId: string): void {
     const proc = this.processes.get(userId)
-    if (proc) proc.lastSeenAt = Date.now()
+    if (proc) {proc.lastSeenAt = Date.now()}
   }
 
   /** Get a process by userId (null if not running) */
@@ -250,7 +250,7 @@ export class SessionManager {
 
   private killUserProcess(userId: string): void {
     const proc = this.processes.get(userId)
-    if (!proc) return
+    if (!proc) {return}
     try { proc.process.kill('SIGTERM') } catch { /* already exited */ }
     this.processes.delete(userId)
     rm(proc.socketPath, { force: true }).catch(() => {/* ignore */})
@@ -287,22 +287,22 @@ export class SessionManager {
       // Bitbucket — App Password auth
       const bitbucketToken = await store.getToken('bitbucket')
       const bitbucketConfig = await store.getConfig('bitbucket')
-      if (bitbucketToken) env['ORCA_BITBUCKET_ACCESS_TOKEN'] = bitbucketToken
-      if (bitbucketConfig?.email) env['ORCA_BITBUCKET_EMAIL'] = bitbucketConfig.email
-      if (bitbucketConfig?.apiBaseUrl) env['ORCA_BITBUCKET_API_BASE_URL'] = bitbucketConfig.apiBaseUrl
+      if (bitbucketToken) {env['ORCA_BITBUCKET_ACCESS_TOKEN'] = bitbucketToken}
+      if (bitbucketConfig?.email) {env['ORCA_BITBUCKET_EMAIL'] = bitbucketConfig.email}
+      if (bitbucketConfig?.apiBaseUrl) {env['ORCA_BITBUCKET_API_BASE_URL'] = bitbucketConfig.apiBaseUrl}
 
       // Azure DevOps — Personal Access Token
       const azureToken = await store.getToken('azure-devops')
       const azureConfig = await store.getConfig('azure-devops')
-      if (azureToken) env['ORCA_AZURE_DEVOPS_TOKEN'] = azureToken
-      if (azureConfig?.apiBaseUrl) env['ORCA_AZURE_DEVOPS_API_BASE_URL'] = azureConfig.apiBaseUrl
-      if (azureConfig?.username) env['ORCA_AZURE_DEVOPS_USERNAME'] = azureConfig.username
+      if (azureToken) {env['ORCA_AZURE_DEVOPS_TOKEN'] = azureToken}
+      if (azureConfig?.apiBaseUrl) {env['ORCA_AZURE_DEVOPS_API_BASE_URL'] = azureConfig.apiBaseUrl}
+      if (azureConfig?.username) {env['ORCA_AZURE_DEVOPS_USERNAME'] = azureConfig.username}
 
       // Gitea — API token
       const giteaToken = await store.getToken('gitea')
       const giteaConfig = await store.getConfig('gitea')
-      if (giteaToken) env['ORCA_GITEA_TOKEN'] = giteaToken
-      if (giteaConfig?.apiBaseUrl) env['ORCA_GITEA_API_BASE_URL'] = giteaConfig.apiBaseUrl
+      if (giteaToken) {env['ORCA_GITEA_TOKEN'] = giteaToken}
+      if (giteaConfig?.apiBaseUrl) {env['ORCA_GITEA_API_BASE_URL'] = giteaConfig.apiBaseUrl}
     } catch (err) {
       // Non-fatal: integration tokens not yet configured or store not initialised
       console.warn(`[SessionManager] Could not load credentials for user ${userId} (non-fatal):`, (err as Error)?.message)

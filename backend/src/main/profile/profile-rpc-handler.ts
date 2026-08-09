@@ -98,7 +98,7 @@ export function createProfileMethods(
       params: null,
       handler: async (_params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         return profileResolver.resolve(userId)
       }
     }),
@@ -110,7 +110,7 @@ export function createProfileMethods(
       params: UserIdParam,
       handler: async (params, ctx) => {
         const userId = params.userId ?? ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
         return profileService.getUserProfile(userId)
       }
     }),
@@ -123,7 +123,7 @@ export function createProfileMethods(
       params: ProfileJsonParam,
       handler: async (params, ctx) => {
         const userId = ctx.userId
-        if (!userId) throw new Error('UNAUTHENTICATED')
+        if (!userId) {throw new Error('UNAUTHENTICATED')}
 
         const span = Tracers.profileUpdateLayerFlow.start(
           { scope: 'user', targetId: userId },
@@ -291,7 +291,7 @@ async function requireAdmin(
   ctx: { userId?: string },
   getUserRole: UserRoleLookup
 ): Promise<void> {
-  if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+  if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
   const role = await getUserRole(ctx.userId)
-  if (role !== 'admin') throw new Error('FORBIDDEN: admin role required')
+  if (role !== 'admin') {throw new Error('FORBIDDEN: admin role required')}
 }

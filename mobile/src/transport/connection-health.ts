@@ -1,4 +1,4 @@
-import { isTailscaleEndpoint } from '../../../src/shared/remote-runtime-tailscale-hint'
+import { isTailscaleEndpoint } from '../vendor-shared/shared/remote-runtime-tailscale-hint'
 import type { ConnectionState } from './types'
 
 // Why: thresholds for escalating connection UX from neutral

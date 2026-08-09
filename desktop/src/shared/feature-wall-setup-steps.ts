@@ -146,7 +146,7 @@ export function isAddDevServerRepoComplete(
   repos: Repo[],
   activeDevServerId: string | null
 ): boolean {
-  if (!activeDevServerId) return false
+  if (!activeDevServerId) {return false}
   return repos.some((r) => r.devServerId === activeDevServerId)
 }
 
@@ -189,10 +189,10 @@ export function getFirstIncompleteDevServerStepId(
       continue
     }
     if (id === 'add-dev-server-repo') {
-      if (!isAddDevServerRepoComplete(repos, activeDevServerId)) return id
+      if (!isAddDevServerRepoComplete(repos, activeDevServerId)) {return id}
       continue
     }
-    if (!stepDone[id]) return id
+    if (!stepDone[id]) {return id}
   }
   return null
 }

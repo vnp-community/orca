@@ -53,7 +53,7 @@ function resumeFrom(params: Record<string, unknown>): { id: string } | undefined
 
 type NotifyFn = (method: string, params: Record<string, unknown>) => void
 
-interface AgentPtyEntry {
+type AgentPtyEntry = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- node-pty IPty
   pty:    any
   cwd:    string
@@ -114,12 +114,12 @@ function attachIdentityMismatches(
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function safeCwd(raw: string): string {
-  if (!raw) return require('node:os').homedir() as string
-  if (raw.includes('\0')) return require('node:os').homedir() as string
+  if (!raw) {return require('node:os').homedir() as string}
+  if (raw.includes('\0')) {return require('node:os').homedir() as string}
   const resolved = require('node:path').resolve(raw) as string
   try {
     const stat = require('node:fs').statSync(resolved) as import('node:fs').Stats
-    if (!stat.isDirectory()) return require('node:os').homedir() as string
+    if (!stat.isDirectory()) {return require('node:os').homedir() as string}
     return resolved
   } catch {
     return require('node:os').homedir() as string
@@ -201,7 +201,7 @@ export async function handlePtyCreate(
       entry.notify('pty.data', { id: ptyId, data })
     })
     term.onExit(({ exitCode, signal }: { exitCode: number; signal?: number }) => {
-      if (entry.graceTimer) clearTimeout(entry.graceTimer)
+      if (entry.graceTimer) {clearTimeout(entry.graceTimer)}
       AGENT_PTY_MAP.delete(ptyId)
       entry.notify('pty.exit', { id: ptyId, exitCode, signal: signal ?? null })
     })
@@ -294,10 +294,10 @@ export async function handlePtyAttach(
  */
 export function scheduleGracePeriodCleanup(log: AgentLogger, graceTimeMs = PTY_GRACE_PERIOD_MS): void {
   for (const [ptyId, entry] of AGENT_PTY_MAP.entries()) {
-    if (entry.graceTimer) continue // already counting down from an earlier disconnect
+    if (entry.graceTimer) {continue} // already counting down from an earlier disconnect
     entry.graceTimer = setTimeout(() => {
       const current = AGENT_PTY_MAP.get(ptyId)
-      if (!current || current.graceTimer !== entry.graceTimer) return // reattached or already gone
+      if (!current || current.graceTimer !== entry.graceTimer) {return} // reattached or already gone
       try {
         current.pty.kill('SIGTERM')
         log.info(`scheduleGracePeriodCleanup: grace period expired, killed ${ptyId}`)
@@ -321,10 +321,10 @@ export async function handlePtyWrite(
 ): Promise<object> {
   const ptyId = typeof params.id   === 'string' ? params.id   : ''
   const data  = typeof params.data === 'string' ? params.data : ''
-  if (!ptyId) return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.write: missing id' } }
+  if (!ptyId) {return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.write: missing id' } }}
 
   const entry = AGENT_PTY_MAP.get(ptyId)
-  if (!entry) return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY not found: ${ptyId}` } }
+  if (!entry) {return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY not found: ${ptyId}` } }}
 
   try {
     entry.pty.write(data)
@@ -398,7 +398,7 @@ export async function handlePtyDestroy(
   }
 
   try {
-    if (entry.graceTimer) clearTimeout(entry.graceTimer)
+    if (entry.graceTimer) {clearTimeout(entry.graceTimer)}
     if (process.platform === 'win32') { entry.pty.kill() }
     else { entry.pty.kill(graceful ? 'SIGTERM' : 'SIGKILL') }
     AGENT_PTY_MAP.delete(ptyId)
@@ -423,10 +423,10 @@ export async function handlePtyScrollback(
 ): Promise<object> {
   const ptyId = typeof params.id    === 'string' ? params.id    : ''
   const lines = typeof params.lines === 'number' ? params.lines : 100
-  if (!ptyId) return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.scrollback: missing id' } }
+  if (!ptyId) {return { jsonrpc: '2.0', id, error: { code: -32602, message: 'pty.scrollback: missing id' } }}
 
   const entry = AGENT_PTY_MAP.get(ptyId)
-  if (!entry) return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY not found: ${ptyId}` } }
+  if (!entry) {return { jsonrpc: '2.0', id, error: { code: -32603, message: `PTY not found: ${ptyId}` } }}
 
   const allLines = entry.buf.split('\n')
   const data = allLines.slice(Math.max(0, allLines.length - lines)).join('\n')
@@ -493,7 +493,7 @@ export function activePtyCount(): number {
 export function cleanupAgentPtys(log: AgentLogger): void {
   for (const [ptyId, entry] of AGENT_PTY_MAP.entries()) {
     try {
-      if (entry.graceTimer) clearTimeout(entry.graceTimer)
+      if (entry.graceTimer) {clearTimeout(entry.graceTimer)}
       entry.pty.kill('SIGTERM')
       log.info(`cleanupAgentPtys: killed ${ptyId}`)
     } catch { /* best effort */ }

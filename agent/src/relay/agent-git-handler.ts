@@ -383,7 +383,7 @@ export async function handleGitWorktreeRemove(
   }
 
   const args = ['worktree', 'remove', path]
-  if (force) args.push('--force')
+  if (force) {args.push('--force')}
 
   span.step('git-worktree-remove-exec', { force })
   const result = await handleGitExec(

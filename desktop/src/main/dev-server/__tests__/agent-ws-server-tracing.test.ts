@@ -30,7 +30,7 @@ vi.mock('../ws-handshake', () => ({
         // — this is what makes handleConnection()'s span.step('tokenLookup')
         // observable in these tests.
         handshakeCtrl.resolve = (info: WsHandshakeInfo) => {
-          if (info.agentToken) validate(info.agentToken)
+          if (info.agentToken) {validate(info.agentToken)}
           res(info)
         }
         handshakeCtrl.reject = rej
@@ -72,14 +72,14 @@ function makeHandshakeInfo(overrides: Partial<WsHandshakeInfo> = {}): WsHandshak
 // agent-ws-server.test.ts — this suite exercises the success path, which
 // calls `ws.once('close', ...)`, so `.once`/`.emit` must actually work.
 function makeMockWs() {
-  const listeners: Record<string, Array<(...args: unknown[]) => void>> = {}
+  const listeners: Record<string, ((...args: unknown[]) => void)[]> = {}
   return {
     close: vi.fn(),
     once(event: string, cb: (...args: unknown[]) => void) {
       ;(listeners[event] ??= []).push(cb)
     },
     emit(event: string, ...args: unknown[]) {
-      for (const cb of listeners[event] ?? []) cb(...args)
+      for (const cb of listeners[event] ?? []) {cb(...args)}
     },
   }
 }

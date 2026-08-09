@@ -4,7 +4,7 @@
  * NodeAdapter provides an in-process implementation that
  * dispatches via WebSocket (via WebIpcBridge in SOL-BE-003).
  */
-export interface IIpcBridge {
+export type IIpcBridge = {
   /** Register an async handler for a channel (like ipcMain.handle) */
   handle(channel: string, listener: IpcHandler): void
 
@@ -28,7 +28,7 @@ export type IpcHandler = (event: IpcEvent, ...args: any[]) => Promise<any> | any
 
 export type IpcListener = (event: IpcEvent, ...args: any[]) => void
 
-export interface IpcEvent {
+export type IpcEvent = {
   readonly sender: {
     readonly id: number
     send(channel: string, ...args: any[]): void

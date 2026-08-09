@@ -67,7 +67,7 @@ export const DEV_SERVER_METHODS = [
     name: 'devServer.list',
     params: null,
     handler: async (_params, ctx): Promise<DevServer[]> => {
-      if (!ctx.devServerManager) return []
+      if (!ctx.devServerManager) {return []}
       return ctx.devServerManager.list()
     }
   }),
@@ -79,7 +79,7 @@ export const DEV_SERVER_METHODS = [
     name: 'devServer.add',
     params: DevServerInputSchema,
     handler: async (params, ctx): Promise<DevServer> => {
-      if (!ctx.devServerManager) throw new Error('DevServerManager unavailable')
+      if (!ctx.devServerManager) {throw new Error('DevServerManager unavailable')}
       const input: DevServerInput = {
         name: params.name,
         connectionType: params.connectionType,
@@ -96,7 +96,7 @@ export const DEV_SERVER_METHODS = [
     name: 'devServer.remove',
     params: DevServerIdParam,
     handler: async (params, ctx): Promise<void> => {
-      if (!ctx.devServerManager) throw new Error('DevServerManager unavailable')
+      if (!ctx.devServerManager) {throw new Error('DevServerManager unavailable')}
       await ctx.devServerManager.remove(params.id)
     }
   }),
@@ -109,10 +109,10 @@ export const DEV_SERVER_METHODS = [
     name: 'devServer.connect',
     params: DevServerIdParam,
     handler: async (params, ctx): Promise<DevServer> => {
-      if (!ctx.devServerManager) throw new Error('DevServerManager unavailable')
+      if (!ctx.devServerManager) {throw new Error('DevServerManager unavailable')}
       await ctx.devServerManager.connect(params.id)
       const server = ctx.devServerManager.get(params.id)
-      if (!server) throw new Error(`Dev server not found after connect: ${params.id}`)
+      if (!server) {throw new Error(`Dev server not found after connect: ${params.id}`)}
       return server
     }
   }),
@@ -123,7 +123,7 @@ export const DEV_SERVER_METHODS = [
     name: 'devServer.disconnect',
     params: DevServerIdParam,
     handler: async (params, ctx): Promise<void> => {
-      if (!ctx.devServerManager) throw new Error('DevServerManager unavailable')
+      if (!ctx.devServerManager) {throw new Error('DevServerManager unavailable')}
       await ctx.devServerManager.disconnect(params.id)
     }
   }),
@@ -135,7 +135,7 @@ export const DEV_SERVER_METHODS = [
     name: 'devServer.testConnection',
     params: DevServerInputSchema,
     handler: async (params, ctx) => {
-      if (!ctx.devServerManager) throw new Error('DevServerManager unavailable')
+      if (!ctx.devServerManager) {throw new Error('DevServerManager unavailable')}
       const input: DevServerInput = {
         name: params.name,
         connectionType: params.connectionType,
@@ -204,7 +204,7 @@ export const DEV_SERVER_METHODS = [
       id: z.string().min(1),
       path: z.string().default('~')
     }),
-    handler: async (params, ctx): Promise<{ resolvedPath: string; entries: Array<{ name: string; isDirectory: boolean; isSymlink: boolean }> }> => {
+    handler: async (params, ctx): Promise<{ resolvedPath: string; entries: { name: string; isDirectory: boolean; isSymlink: boolean }[] }> => {
       const span = Tracers.browseDirFlow.start({ devServerId: params.id, path: params.path })
 
       if (!ctx.devServerManager) {
@@ -256,7 +256,7 @@ export const DEV_SERVER_METHODS = [
       // Agent returns: { path: string, entries: Array<{ path, name, type, size? }> }
       type AgentReadDirResult = {
         path: string
-        entries: Array<{ path: string; name: string; type: 'file' | 'directory'; size?: number }>
+        entries: { path: string; name: string; type: 'file' | 'directory'; size?: number }[]
       }
 
       span.step('agent-call', { method: 'fs.readDir', remotePath })
@@ -287,7 +287,7 @@ export const DEV_SERVER_METHODS = [
             isSymlink: false // agent does not expose symlink info currently
           }))
           .sort((a, b) => {
-            if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
+            if (a.isDirectory !== b.isDirectory) {return a.isDirectory ? -1 : 1}
             return a.name.localeCompare(b.name)
           })
       }
@@ -303,9 +303,9 @@ export const DEV_SERVER_METHODS = [
       path: z.string().min(1)
     }),
     handler: async (params, ctx): Promise<{ path: string }> => {
-      if (!ctx.devServerManager) throw new Error('DevServerManager unavailable')
+      if (!ctx.devServerManager) {throw new Error('DevServerManager unavailable')}
       const relay = ctx.devServerManager.getRelay(params.id)
-      if (!relay) throw new Error(`Dev server '${params.id}' is not connected.`)
+      if (!relay) {throw new Error(`Dev server '${params.id}' is not connected.`)}
 
       const span = Tracers.mkdirFlow.start({ devServerId: params.id, path: params.path })
       let result: { path: string }
@@ -329,9 +329,9 @@ export const DEV_SERVER_METHODS = [
       path: z.string().min(1)
     }),
     handler: async (params, ctx): Promise<void> => {
-      if (!ctx.devServerManager) throw new Error('DevServerManager unavailable')
+      if (!ctx.devServerManager) {throw new Error('DevServerManager unavailable')}
       const relay = ctx.devServerManager.getRelay(params.id)
-      if (!relay) throw new Error(`Dev server '${params.id}' is not connected.`)
+      if (!relay) {throw new Error(`Dev server '${params.id}' is not connected.`)}
 
       const span = Tracers.rmdirFlow.start({ devServerId: params.id, path: params.path })
       try {

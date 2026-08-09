@@ -70,8 +70,8 @@ describe('GET /api/agent-token — tokenTracer (agentToken:register) tracing', (
   afterEach(
     () =>
       new Promise<void>((resolve, reject) => {
-        if (originalSecret === undefined) delete process.env['ORCA_AGENT_API_SECRET']
-        else process.env['ORCA_AGENT_API_SECRET'] = originalSecret
+        if (originalSecret === undefined) {delete process.env['ORCA_AGENT_API_SECRET']}
+        else {process.env['ORCA_AGENT_API_SECRET'] = originalSecret}
         server.close((err) => (err ? reject(err) : resolve()))
       })
   )

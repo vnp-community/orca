@@ -21,7 +21,7 @@ export type { GlobalSettings }
  * T = entity type, CreateInput = input for create,
  * UpdateInput = partial update (id excluded).
  */
-export interface IRepository<T, CreateInput = Omit<T, 'id'>, UpdateInput = Partial<T>> {
+export type IRepository<T, CreateInput = Omit<T, 'id'>, UpdateInput = Partial<T>> = {
   findById(id: string): Promise<T | null>
   findAll(): Promise<T[]>
   create(input: CreateInput): Promise<T>
@@ -29,23 +29,23 @@ export interface IRepository<T, CreateInput = Omit<T, 'id'>, UpdateInput = Parti
   delete(id: string): Promise<void>
 }
 
-export interface IProjectRepository extends IRepository<Project> {
+export type IProjectRepository = {
   findByGroup?(groupId: string): Promise<Project[]>
-}
+} & IRepository<Project>
 
-export interface IRepoRepository extends IRepository<Repo> {
+export type IRepoRepository = {
   findByProject?(projectId: string): Promise<Repo[]>
-}
+} & IRepository<Repo>
 
-export interface ISshTargetRepository extends IRepository<SshTarget> {}
+export type ISshTargetRepository = {} & IRepository<SshTarget>
 
-export interface IGlobalSettingsRepository {
+export type IGlobalSettingsRepository = {
   get(): Promise<GlobalSettings>
   update(patch: Partial<GlobalSettings>): Promise<GlobalSettings>
 }
 
 /** The unified state repository contract */
-export interface IStateRepository {
+export type IStateRepository = {
   readonly projects: IProjectRepository
   readonly repos: IRepoRepository
   readonly sshTargets: ISshTargetRepository

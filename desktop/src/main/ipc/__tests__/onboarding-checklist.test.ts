@@ -145,7 +145,7 @@ describe('onboarding.markChecklistItem', () => {
 
 function migrateOnboardingChecklistLocal(onboarding: OnboardingState): OnboardingState {
   const cl = onboarding.checklist
-  if (!cl || cl.perServer !== undefined) return onboarding
+  if (!cl || cl.perServer !== undefined) {return onboarding}
 
   const PER_SERVER_KEYS = [
     'addedRepo', 'ranFirstAgent', 'ranSecondAgentOnSameTask',

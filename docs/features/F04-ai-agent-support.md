@@ -47,7 +47,14 @@ Thị trường AI agent đang phát triển nhanh chóng với hàng chục age
 | **MiMo Code** | Xiaomi | CLI support |
 | **Hermes Agent** | Nous Research | Startup query |
 | **Kiro** | Kiro.dev | CLI integration |
-| + 15 agent khác | Various | Generic CLI |
+| **Kimi Code** | Moonshot AI | Hook install qua `config.toml` (không có JSON settings, Orca quản lý bằng marker-delimited TOML block) |
+| **MiniMax** | MiniMax | Session cookie riêng (mã hoá bằng `safeStorage`, lưu tại `~/.orca/minimax-session-cookie.enc`) |
+| **OpenClaude** | OpenClaude | Dùng lại `ClaudeHookService` (Claude-compatible hook settings) |
+| **Command Code** | Command Code | Hook install qua `~/.commandcode/settings.json`, tự khôi phục biến môi trường từ tiến trình cha khi CLI strip env |
+| **Droid** | Factory | Hook install qua `~/.factory/settings.json`, hỗ trợ `PermissionRequest` riêng cho approval prompt |
+| + 10 agent khác | Various | Generic CLI |
+
+> **Native chat transcript reader** (`src/main/native-chat/`) không phải một provider — đây là hạ tầng đọc/parse transcript dùng chung cho Claude Code, Codex, và Grok (session file resolver, transcript decoders theo từng format, tail-follow watcher).
 
 ---
 
@@ -81,6 +88,9 @@ Thị trường AI agent đang phát triển nhanh chóng với hàng chục age
 - Hook vào lifecycle events của agent
 - OSC parsing để detect agent status
 - Process recognition (phân biệt agent process với process thường)
+- Mỗi agent có `HookService` riêng (`getStatus` / `install` / `installRemote` / `remove`) ghi một managed script + block hook vào config của agent (JSON `settings.json` hoặc TOML tuỳ agent), đánh dấu bằng marker để không đụng vào hook do người dùng tự thêm
+- `installRemote()` ghi cùng hook qua SFTP lên SSH host — cần thiết vì agent CLI (vd. Droid, Kimi) chạy trên Dev Server, không phải trên máy Orca Desktop
+- Managed script POST kết quả hook về `http://127.0.0.1:<ORCA_AGENT_HOOK_PORT>/hook/<agent>` kèm token xác thực (`X-Orca-Agent-Hook-Token`)
 
 ### Agent Startup Configuration
 - Agent-specific environment variables
@@ -126,3 +136,10 @@ Thị trường AI agent đang phát triển nhanh chóng với hàng chục age
 | **Codex usage** | `src/main/codex-usage/` |
 | **Hooks** | `src/main/hooks.ts` |
 | **Agent awake** | `src/main/agent-awake-service.ts` |
+| **Hook installer (dùng chung)** | `src/main/agent-hooks/installer-utils.ts`, `installer-utils-remote.ts` |
+| **Kimi hooks** | `src/main/kimi/hook-service.ts`, `kimi-hook-config-toml.ts` |
+| **MiniMax cookie store** | `src/main/minimax/minimax-cookie-store.ts` |
+| **OpenClaude hooks** | `src/main/openclaude/hook-service.ts` (bọc `ClaudeHookService`) |
+| **Command Code hooks** | `src/main/command-code/hook-service.ts`, `command-code-managed-script.ts` |
+| **Droid hooks** | `src/main/droid/hook-service.ts` |
+| **Transcript reader dùng chung** | `src/main/native-chat/` |

@@ -19,7 +19,7 @@ import {
   type MobileAiVaultResumeSettings
 } from '../session/ai-vault-resume-launch'
 import { triggerError, triggerSuccess } from '../platform/haptics'
-import type { AiVaultScope, AiVaultSession } from '../../../src/shared/ai-vault-types'
+import type { AiVaultScope, AiVaultSession } from '../vendor-shared/shared/ai-vault-types'
 import type { Worktree } from '../worktree/workspace-list-types'
 import { useMobileAgentHistoryState } from './use-mobile-agent-history-state'
 import { buildMobileAgentHistorySections } from './agent-history-sections'

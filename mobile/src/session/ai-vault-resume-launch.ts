@@ -1,18 +1,18 @@
-import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
+import type { AiVaultSession } from '../vendor-shared/shared/ai-vault-types'
 import {
   buildAiVaultResumeCommand,
   buildAiVaultResumeShellCommand
-} from '../../../src/shared/ai-vault-types'
-import { isResumableTuiAgent } from '../../../src/shared/agent-session-resume'
-import type { SleepingAgentLaunchConfig } from '../../../src/shared/agent-session-resume'
-import { buildAgentResumeStartupPlan } from '../../../src/shared/tui-agent-startup'
+} from '../vendor-shared/shared/ai-vault-types'
+import { isResumableTuiAgent } from '../vendor-shared/shared/agent-session-resume'
+import type { SleepingAgentLaunchConfig } from '../vendor-shared/shared/agent-session-resume'
+import { buildAgentResumeStartupPlan } from '../vendor-shared/shared/tui-agent-startup'
 import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
-} from '../../../src/shared/tui-agent-launch-defaults'
-import type { TuiAgent } from '../../../src/shared/types'
-import { parseWslUncPath } from '../../../src/shared/wsl-paths'
-import { resolveWindowsShellStartupFamily } from '../../../src/shared/windows-terminal-shell'
+} from '../vendor-shared/shared/tui-agent-launch-defaults'
+import type { TuiAgent } from '../vendor-shared/shared/types'
+import { parseWslUncPath } from '../vendor-shared/shared/wsl-paths'
+import { resolveWindowsShellStartupFamily } from '../vendor-shared/shared/windows-terminal-shell'
 import type { RpcClient } from '../transport/rpc-client'
 import {
   readMobileReviewCreatedTerminal,

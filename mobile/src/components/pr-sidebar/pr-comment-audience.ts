@@ -1,8 +1,8 @@
-import type { PRComment } from '../../../../src/shared/types'
+import type { PRComment } from '../../vendor-shared/shared/types'
 import {
   createBotAuthorOverrideSet,
   normalizePRCommentAuthorLogin
-} from '../../../../src/shared/pr-bot-author-overrides'
+} from '../../vendor-shared/shared/pr-bot-author-overrides'
 
 export { createBotAuthorOverrideSet }
 

@@ -23,7 +23,7 @@ export class FleetHealthMonitor {
   private lastAlertedStatus: Map<string, string> = new Map()
 
   // Dependency injection via properties — set externally after construction
-  getSshTargets: (() => Array<{ id: string; label: string; project?: string }> | Promise<Array<{ id: string; label: string; project?: string }>>) | null = null
+  getSshTargets: (() => { id: string; label: string; project?: string }[] | Promise<{ id: string; label: string; project?: string }[]>) | null = null
   getConnectionState:
     | ((targetId: string) => { status: string; error?: string | null; remotePlatform?: unknown } | null)
     | null = null
@@ -39,7 +39,7 @@ export class FleetHealthMonitor {
 
   /** Start the periodic health check loop. No-op if already running. */
   start(intervalMs = DEFAULT_PING_INTERVAL_MS): void {
-    if (this.intervalId) return
+    if (this.intervalId) {return}
     this.intervalId = setInterval(() => {
       this.runHealthCheck().catch((err) => {
         console.error('[fleet-monitor] Health check error:', err)
@@ -57,7 +57,7 @@ export class FleetHealthMonitor {
 
   /** Run a single health check cycle — poll all targets and record states. */
   async runHealthCheck(): Promise<void> {
-    if (!this.getSshTargets || !this.getConnectionState) return
+    if (!this.getSshTargets || !this.getConnectionState) {return}
 
     const targets = await this.getSshTargets()
 

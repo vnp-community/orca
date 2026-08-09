@@ -136,7 +136,7 @@ const ExecuteParam = z.object({
   projectId: z.string().min(1),
   worktreePath: z.string().min(1),
   accountId: z.string().optional(),
-  traceId: z.string().optional(), // [NEW CR-TRACE-018]
+  traceId: z.string().optional(), // [NEW CR-TRACE-002]
 })
 
 // ── Factory ───────────────────────────────────────────────────────────────────
@@ -170,7 +170,7 @@ export function createTaskMethods(
         const userId = ctx.userId ?? ''
         await requirePermission(grantService, userId, params.taskId, 'view')
         const task = await taskService.get(params.taskId)
-        if (!task) throw new Error(`TASK_NOT_FOUND: ${params.taskId}`)
+        if (!task) {throw new Error(`TASK_NOT_FOUND: ${params.taskId}`)}
         return task
       },
     }),
@@ -387,6 +387,7 @@ export function createTaskMethods(
           userId,
           worktreePath: params.worktreePath,
           accountId: params.accountId,
+          traceId: params.traceId, // [NEW CR-TRACE-002]
         })
         return { started: true }
       },

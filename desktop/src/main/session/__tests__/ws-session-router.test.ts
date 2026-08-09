@@ -143,7 +143,7 @@ describe('WsSessionRouter', () => {
         close: vi.fn(),
         send: vi.fn(),
         on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
-          if (event === 'close') wsCloseHandler = cb
+          if (event === 'close') {wsCloseHandler = cb}
         })
       }
 

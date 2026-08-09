@@ -4247,14 +4247,14 @@ const api = {
     // ── Fleet Health Monitoring (CR-005) ──────────────────────────────────────
 
     getFleetHealth: (): Promise<{
-      servers: Array<{
+      servers: {
         serverId: string
         isReachable: boolean
         uptimeSeconds?: number
         relayVersion?: string
         nodeVersion?: string
         diskUsagePercent?: number
-      }>
+      }[]
     }> => ipcRenderer.invoke('ssh:getFleetHealth'),
 
     refreshFleetHealth: (): Promise<void> => ipcRenderer.invoke('ssh:refreshFleetHealth'),

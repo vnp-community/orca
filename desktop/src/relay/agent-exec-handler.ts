@@ -320,7 +320,7 @@ export class AgentExecHandler {
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 
-export interface AgentExecRequest {
+export type AgentExecRequest = {
   prompt:       string
   worktreePath: string
   trustPreset?: 'standard' | 'full' | 'none'
@@ -332,8 +332,8 @@ export interface AgentExecRequest {
 }
 
 function parseAgentExecRequest(params: Record<string, unknown>): AgentExecRequest | null {
-  if (typeof params.prompt       !== 'string' || !params.prompt)       return null
-  if (typeof params.worktreePath !== 'string' || !params.worktreePath) return null
+  if (typeof params.prompt       !== 'string' || !params.prompt)       {return null}
+  if (typeof params.worktreePath !== 'string' || !params.worktreePath) {return null}
   return {
     prompt:       params.prompt,
     worktreePath: params.worktreePath,
@@ -390,7 +390,7 @@ export async function handleAgentExec(
   // Build CLI args for non-interactive (print) mode
   // Claude uses: --print <prompt> --output-format text
   const args: string[] = []
-  if (req.model)        args.push('--model', req.model)
+  if (req.model)        {args.push('--model', req.model)}
   args.push('--print', req.prompt, '--output-format', 'text')
   if (req.trustPreset && req.trustPreset !== 'standard') {
     args.push('--allowedTools', req.trustPreset === 'full' ? 'all' : 'none')
@@ -408,7 +408,7 @@ export async function handleAgentExec(
     let stdout = '', stderr = '', timedOut = false, settled = false
 
     const finish = (r: typeof result): void => {
-      if (settled) return
+      if (settled) {return}
       settled = true
       clearTimeout(timer)
       resolve(r)

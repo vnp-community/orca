@@ -121,7 +121,7 @@ export class WebPushManager {
    */
   private loadOrCreateVapidKeys(): { publicKey: string; privateKey: string } {
     const stored = this.store.getVapidKeys()
-    if (stored) return stored
+    if (stored) {return stored}
     const keys = webPush.generateVAPIDKeys()
     this.store.setVapidKeys(keys)
     return keys

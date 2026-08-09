@@ -17,7 +17,7 @@
 
 export type TraceLevel = 'start' | 'step' | 'ok' | 'fail'
 
-export interface TraceEvent {
+export type TraceEvent = {
   /** Span identifier (short random string) */
   id: string
   /** Tracer flow name e.g. 'devServer:browseDir' */
@@ -36,14 +36,14 @@ export interface TraceEvent {
 
 export type TraceFields = Record<string, string | number | boolean | undefined>
 
-export interface TraceSpan {
+export type TraceSpan = {
   readonly id: string
   step(label: string, fields?: TraceFields): void
   ok(fields?: TraceFields): void
   fail(err: unknown, fields?: TraceFields): void
 }
 
-export interface Tracer {
+export type Tracer = {
   start(fields?: TraceFields, resume?: { id: string }): TraceSpan
 }
 
@@ -62,7 +62,7 @@ export function registerTraceSink(sink: TraceSink): () => void {
   sinks.push(sink)
   return () => {
     const i = sinks.indexOf(sink)
-    if (i >= 0) sinks.splice(i, 1)
+    if (i >= 0) {sinks.splice(i, 1)}
   }
 }
 
@@ -106,14 +106,14 @@ function serializeFields(fields: TraceFields): string {
 }
 
 function formatError(err: unknown): string {
-  if (err instanceof Error) return err.message
+  if (err instanceof Error) {return err.message}
   return String(err)
 }
 
 function emit(event: TraceEvent): void {
   // Console output
   const extra = serializeFields(event.fields)
-  const extraStr = extra ? ' ' + extra : ''
+  const extraStr = extra ? ` ${  extra}` : ''
 
   if (event.level === 'start') {
     if (isTraceEnabled()) {

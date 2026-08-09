@@ -25,7 +25,7 @@ import type { Project, Repo } from '../../shared/types'
 import type { SshTarget } from '../../shared/ssh-types'
 
 /** Minimal state structure stored in the JSON file */
-interface JsonState {
+type JsonState = {
   projects: Project[]
   repos: Repo[]
   sshTargets: SshTarget[]
@@ -69,14 +69,14 @@ export class JsonFileStateRepository implements IStateRepository {
   }
 
   private scheduleSave(): void {
-    if (this.flushTimer) clearTimeout(this.flushTimer)
+    if (this.flushTimer) {clearTimeout(this.flushTimer)}
     this.flushTimer = setTimeout(() => this.flush(), this.DEBOUNCE_MS)
   }
 
   private flush(): void {
     try {
       const dir = dirname(this.dataFile)
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      if (!existsSync(dir)) {mkdirSync(dir, { recursive: true })}
       writeFileSync(this.dataFile, JSON.stringify(this.state, null, 2), 'utf-8')
     } catch (err) {
       console.error('[JsonFileStateRepository] Failed to flush state:', err)
@@ -99,7 +99,7 @@ export class JsonFileStateRepository implements IStateRepository {
       },
       update: async (id, patch) => {
         const idx = state.projects.findIndex((p) => p.id === id)
-        if (idx === -1) throw new Error(`Project not found: ${id}`)
+        if (idx === -1) {throw new Error(`Project not found: ${id}`)}
         state.projects[idx] = { ...state.projects[idx]!, ...(patch as Partial<Project>) }
         save()
         return { ...state.projects[idx]! }
@@ -129,7 +129,7 @@ export class JsonFileStateRepository implements IStateRepository {
       },
       update: async (id, patch) => {
         const idx = state.repos.findIndex((r) => r.id === id)
-        if (idx === -1) throw new Error(`Repo not found: ${id}`)
+        if (idx === -1) {throw new Error(`Repo not found: ${id}`)}
         state.repos[idx] = { ...state.repos[idx]!, ...(patch as Partial<Repo>) }
         save()
         return { ...state.repos[idx]! }
@@ -159,7 +159,7 @@ export class JsonFileStateRepository implements IStateRepository {
       },
       update: async (id, patch) => {
         const idx = state.sshTargets.findIndex((t) => t.id === id)
-        if (idx === -1) throw new Error(`SshTarget not found: ${id}`)
+        if (idx === -1) {throw new Error(`SshTarget not found: ${id}`)}
         state.sshTargets[idx] = { ...state.sshTargets[idx]!, ...(patch as Partial<SshTarget>) }
         save()
         return { ...state.sshTargets[idx]! }

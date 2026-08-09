@@ -370,9 +370,9 @@ describe('PreflightHandler', () => {
     it('reports glab installed and authenticated when glab auth status succeeds', async () => {
       execFileAsyncMock.mockImplementation(async (_file: string, args: string[]) => {
         // glab --version
-        if (args[0] === '--version') return { stdout: 'glab version 1.45.0 (2025-01-10)\n' }
+        if (args[0] === '--version') {return { stdout: 'glab version 1.45.0 (2025-01-10)\n' }}
         // glab auth status
-        if (args[0] === 'auth' && args[1] === 'status') return { stdout: '✓ Logged in to gitlab.com\n' }
+        if (args[0] === 'auth' && args[1] === 'status') {return { stdout: '✓ Logged in to gitlab.com\n' }}
         throw new Error('not found')
       })
 
@@ -387,8 +387,8 @@ describe('PreflightHandler', () => {
 
     it('reports glab installed but not authenticated when auth status fails', async () => {
       execFileAsyncMock.mockImplementation(async (_file: string, args: string[]) => {
-        if (args[0] === '--version') return { stdout: 'glab version 1.45.0\n' }
-        if (args[0] === 'auth' && args[1] === 'status') throw new Error('not authenticated')
+        if (args[0] === '--version') {return { stdout: 'glab version 1.45.0\n' }}
+        if (args[0] === 'auth' && args[1] === 'status') {throw new Error('not authenticated')}
         throw new Error('not found')
       })
 
@@ -403,7 +403,7 @@ describe('PreflightHandler', () => {
 
     it('reports glab not installed when glab binary not found', async () => {
       execFileAsyncMock.mockImplementation(async (_file: string, args: string[]) => {
-        if (args[0] === '--version') throw new Error('ENOENT: glab not found')
+        if (args[0] === '--version') {throw new Error('ENOENT: glab not found')}
         throw new Error('not found')
       })
 

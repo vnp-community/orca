@@ -10,7 +10,7 @@
 import type { IDatabase } from './types'
 
 /** Real-time statistics for a connection pool */
-export interface PoolStats {
+export type PoolStats = {
   /** Total connections managed (idle + acquired) */
   total: number
   /** Connections currently idle (available) */
@@ -22,7 +22,7 @@ export interface PoolStats {
 }
 
 /** Configuration for connection pools (used by GenericConnectionPool) */
-export interface PoolConfig {
+export type PoolConfig = {
   /** Minimum connections to keep alive */
   min: number
   /** Maximum connections allowed */
@@ -51,7 +51,7 @@ export const DEFAULT_POOL_CONFIG: PoolConfig = {
  * Connection pool contract.
  * Both single-connection (SQLite) and multi-connection pools implement this.
  */
-export interface IConnectionPool {
+export type IConnectionPool = {
   /**
    * Acquire a connection from the pool.
    * @throws Error if pool is draining or acquire times out.

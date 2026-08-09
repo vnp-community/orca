@@ -63,7 +63,7 @@ function makeProfileResolver(resolved = FAKE_RESOLVED) {
 
 function findHandler(methods: ReturnType<typeof createProfileMethods>, name: string) {
   const method = methods.find(m => m.name === name)
-  if (!method) throw new Error(`Method not found: ${name}`)
+  if (!method) {throw new Error(`Method not found: ${name}`)}
   return method.handler
 }
 

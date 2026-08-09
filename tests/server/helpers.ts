@@ -11,27 +11,27 @@ export const ADMIN_PASSWORD = process.env['ORCA_ADMIN_PASSWORD'] ?? 'Orca@Adm1n#
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface ApiResponse<T = unknown> {
+export type ApiResponse<T = unknown> = {
   status: number
   body: T
   headers: Headers
 }
 
-export interface UserRecord {
+export type UserRecord = {
   id: string
   email: string
   role: 'admin' | 'developer'
   isActive: boolean
 }
 
-export interface SessionRecord {
+export type SessionRecord = {
   sessionId: string
   userId: string
   expiresAt: number
   lastSeenAt: number
 }
 
-export interface AuditEntry {
+export type AuditEntry = {
   id: string
   action: string
   userId?: string
@@ -39,7 +39,7 @@ export interface AuditEntry {
   createdAt: number
 }
 
-export interface AdminStats {
+export type AdminStats = {
   totalUsers: number
   activeSessions: number
   pairedDevices?: number
@@ -89,7 +89,7 @@ export async function loginAs(email: string, password: string): Promise<string> 
   }
   const setCookie = res.headers.get('set-cookie') ?? ''
   const match = setCookie.match(/orca_session=[^;]+/)
-  if (!match) throw new Error(`No session cookie in login response for ${email}`)
+  if (!match) {throw new Error(`No session cookie in login response for ${email}`)}
   return match[0]
 }
 

@@ -1,4 +1,4 @@
-import { isTerminalQueryReply } from '../../../src/shared/terminal-query-reply'
+import { isTerminalQueryReply } from '../vendor-shared/shared/terminal-query-reply'
 import type { RpcClient } from '../transport/rpc-client'
 import { isTerminalSendRpcAccepted } from './terminal-send-rpc-response'
 

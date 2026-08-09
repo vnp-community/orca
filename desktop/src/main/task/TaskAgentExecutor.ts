@@ -22,7 +22,7 @@ import { Tracers } from '../../shared/trace/tracers'
 /** Minimum permission required to execute an agent on a task */
 const MIN_EXECUTE_LEVEL = TASK_PERMISSION_ORDER['execute'] // 4
 
-export interface ExecuteTaskParams {
+export type ExecuteTaskParams = {
   taskId: string
   projectId: string
   userId: string
@@ -150,8 +150,8 @@ export class TaskAgentExecutor {
 
     // Auto-generated prompt
     const lines: string[] = [`# Task: ${task.title}`]
-    if (task.description) lines.push(`\n## Description\n${task.description}`)
-    if (task.aiContext) lines.push(`\n## AI Context\n${task.aiContext}`)
+    if (task.description) {lines.push(`\n## Description\n${task.description}`)}
+    if (task.aiContext) {lines.push(`\n## AI Context\n${task.aiContext}`)}
     lines.push(`\n## Instructions`)
     lines.push(
       `Complete the task described above. When finished, the task status will be moved to "review".`

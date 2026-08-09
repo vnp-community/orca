@@ -99,7 +99,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.list',
       params: ListParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         return service.listAccounts(params.devServerId, params.scope)
       }
     }),
@@ -109,7 +109,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.create',
       params: CreateParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         return service.createAccount({ ...params, createdBy: ctx.userId })
       }
     }),
@@ -119,7 +119,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.get',
       params: AccountIdParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         return service.getAccount(params.accountId)
       }
     }),
@@ -130,7 +130,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.update',
       params: UpdateParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         await assertAccountAccess(service, params.accountId, ctx.userId)
         await service.updateAccount(params.accountId, params.patch, ctx.userId) // BUG-BE-HLD-014: pass actor for audit
         return { success: true }
@@ -143,7 +143,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.delete',
       params: AccountIdParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         await assertAccountAccess(service, params.accountId, ctx.userId)
         await service.deleteAccount(params.accountId, ctx.userId) // BUG-BE-HLD-014: pass actor for audit
         return { success: true }
@@ -156,7 +156,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.writeCredential',
       params: WriteCredentialParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         await assertAccountAccess(service, params.accountId, ctx.userId)
         // traceId resume happens INSIDE writeCredentialToDevServer() via the traceId? overload above.
         await service.writeCredentialToDevServer(
@@ -175,7 +175,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.rotateKey',
       params: RotateKeyParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         await assertAccountAccess(service, params.accountId, ctx.userId)
         return service.rotateKey(
           params.accountId,
@@ -190,7 +190,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.testConnection',
       params: AccountIdParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         return service.testConnection(params.accountId)
       }
     }),
@@ -200,7 +200,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.getUsageToday',
       params: AccountIdParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         return service.getUsageToday(params.accountId)
       }
     }),
@@ -211,7 +211,7 @@ export function createAIProviderMethods(
       name: 'aiProvider.resolve',
       params: ResolveParam,
       handler: async (params, ctx) => {
-        if (!ctx.userId) throw new Error('UNAUTHENTICATED')
+        if (!ctx.userId) {throw new Error('UNAUTHENTICATED')}
         const userId = params.userId ?? ctx.userId
         return resolver.resolve({
           devServerId: params.devServerId,
@@ -236,7 +236,7 @@ async function assertAccountAccess(
   userId: string
 ): Promise<void> {
   const account = await service.getAccount(accountId)
-  if (!account) throw new Error(`ACCOUNT_NOT_FOUND: ${accountId}`)
+  if (!account) {throw new Error(`ACCOUNT_NOT_FOUND: ${accountId}`)}
   if (account.createdBy !== userId) {
     throw new Error('FORBIDDEN: only the account owner can perform this action')
   }

@@ -1,12 +1,12 @@
 import {
   isRuntimePathAbsolute,
   normalizeRuntimePathForComparison
-} from '../../../src/shared/cross-platform-path'
+} from '../vendor-shared/shared/cross-platform-path'
 import type { Worktree } from '../worktree/workspace-list-types'
 import {
   AI_VAULT_SCOPE_PATHS_MAX_COUNT,
   type AiVaultScope
-} from '../../../src/shared/ai-vault-types'
+} from '../vendor-shared/shared/ai-vault-types'
 
 // Why: the renderer's deriveAiVault* helpers are renderer-located and
 // Metro-unresolvable, so mobile does its own minimal derivation seeded by the

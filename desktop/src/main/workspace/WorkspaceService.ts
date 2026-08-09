@@ -23,7 +23,7 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
-export interface GitStatus {
+export type GitStatus = {
   branch: string
   upstream?: string
   ahead: number
@@ -34,13 +34,13 @@ export interface GitStatus {
   files: GitStatusFile[]
 }
 
-export interface GitStatusFile {
+export type GitStatusFile = {
   path: string
   x: string  // staged status char
   y: string  // unstaged status char
 }
 
-export interface GitWorktree {
+export type GitWorktree = {
   path: string
   branch: string
   head: string
@@ -48,14 +48,14 @@ export interface GitWorktree {
   isLocked: boolean
 }
 
-export interface FileTreeNode {
+export type FileTreeNode = {
   name: string
   path: string
   isDir: boolean
   children?: FileTreeNode[]
 }
 
-export interface WorkspaceInitResult {
+export type WorkspaceInitResult = {
   gitStatus: GitStatus | null
   worktrees: GitWorktree[]
   fileTree: FileTreeNode[]
@@ -155,7 +155,7 @@ export class WorkspaceService {
     path?: string
   ): Promise<FileTreeNode[]> {
     const relay = await this.router.getRelayForProject(projectId, userId).catch(() => null)
-    if (!relay) return []
+    if (!relay) {return []}
 
     const result = await relay
       .call('fs.readDir', { path: path ?? '.', depth: 2 })
@@ -173,7 +173,7 @@ export class WorkspaceService {
     worktreePath: string
   ): Promise<GitStatus | null> {
     const relay = await this.router.getRelayForProject(projectId, userId).catch(() => null)
-    if (!relay) return null
+    if (!relay) {return null}
 
     const raw = await relay
       .call('git.exec', {
@@ -205,15 +205,15 @@ export class WorkspaceService {
     const files: GitStatusFile[] = []
 
     for (const line of lines) {
-      if (line.startsWith('# branch.oid')) continue
+      if (line.startsWith('# branch.oid')) {continue}
       if (line.startsWith('# branch.head')) {
         branch = line.split(' ').slice(2).join(' ')
       } else if (line.startsWith('# branch.upstream')) {
         upstream = line.split(' ').slice(2).join(' ')
       } else if (line.startsWith('# branch.ab')) {
         const parts = line.split(' ')
-        ahead = Math.abs(parseInt(parts[2] ?? '0', 10))
-        behind = Math.abs(parseInt(parts[3] ?? '0', 10))
+        ahead = Math.abs(Number.parseInt(parts[2] ?? '0', 10))
+        behind = Math.abs(Number.parseInt(parts[3] ?? '0', 10))
       } else if (line.startsWith('1 ') || line.startsWith('2 ')) {
         const parts = line.split(' ')
         const xy = parts[1] ?? '..'
@@ -253,11 +253,11 @@ export class WorkspaceService {
       let isLocked = false
 
       for (const line of lines) {
-        if (line.startsWith('worktree ')) path = line.slice(9)
-        else if (line.startsWith('HEAD ')) head = line.slice(5)
-        else if (line.startsWith('branch ')) branch = line.slice(7).replace('refs/heads/', '')
-        else if (line.startsWith('locked')) isLocked = true
-        else if (line === 'detached') branch = 'HEAD (detached)'
+        if (line.startsWith('worktree ')) {path = line.slice(9)}
+        else if (line.startsWith('HEAD ')) {head = line.slice(5)}
+        else if (line.startsWith('branch ')) {branch = line.slice(7).replace('refs/heads/', '')}
+        else if (line.startsWith('locked')) {isLocked = true}
+        else if (line === 'detached') {branch = 'HEAD (detached)'}
       }
 
       if (path) {

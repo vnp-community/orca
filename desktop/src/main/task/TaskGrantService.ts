@@ -28,7 +28,7 @@ import { Tracers } from '../../shared/trace/tracers'
 
 // ── DB row types ──────────────────────────────────────────────────────────────
 
-interface GrantRow {
+type GrantRow = {
   id: string
   taskId: string
   scope: string
@@ -115,7 +115,7 @@ export class TaskGrantService {
 
     // Collect candidate task IDs: the task itself + ancestors
     const ancestorIds = await this.getAncestorIds(taskId)
-    const candidates: Array<{ taskId: string; requireApplyTree: boolean }> = [
+    const candidates: { taskId: string; requireApplyTree: boolean }[] = [
       { taskId, requireApplyTree: false },     // direct grants on the task
       ...ancestorIds.map(id => ({ taskId: id, requireApplyTree: true })), // inherited grants
     ]
@@ -128,10 +128,10 @@ export class TaskGrantService {
       const grants = await this.getGrantsForTask(tid, requireApplyTree)
       for (const grant of grants) {
         // Skip expired grants
-        if (grant.expiresAt && grant.expiresAt.getTime() < now) continue
+        if (grant.expiresAt && grant.expiresAt.getTime() < now) {continue}
         // Check scope match
         const matches = await this.matchesScope(userId, grant)
-        if (!matches) continue
+        if (!matches) {continue}
 
         // Compare with current highest
         const level = TASK_PERMISSION_ORDER[grant.permission] ?? 0
@@ -222,7 +222,7 @@ export class TaskGrantService {
         return grant.scopeId === userId
 
       case 'team': {
-        if (!grant.scopeId) return false
+        if (!grant.scopeId) {return false}
         const rows = await this.pool.withConnection((db) =>
           db.query<{ userId: string }>(
             `SELECT user_id as userId FROM orca_team_members
@@ -234,7 +234,7 @@ export class TaskGrantService {
       }
 
       case 'role': {
-        if (!grant.scopeId) return false
+        if (!grant.scopeId) {return false}
         const rows = await this.pool.withConnection((db) =>
           db.query<{ role: string }>(
             `SELECT role FROM orca_users WHERE id = ?`,

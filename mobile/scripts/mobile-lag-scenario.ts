@@ -1,7 +1,7 @@
 import type {
   RuntimeWorktreeAgentRow,
   RuntimeWorktreePsSummary
-} from '../../src/shared/runtime-types'
+} from '../src/vendor-shared/shared/runtime-types'
 
 export type MockRepo = {
   id: string

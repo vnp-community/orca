@@ -74,7 +74,7 @@ describe('MigrationRunner', () => {
     })
 
     it('applies migrations in ascending version order', async () => {
-      const reversed = [...migrations].reverse()
+      const reversed = [...migrations].toReversed()
       const runner = new MigrationRunner(db, reversed)
       const results = await runner.migrate()
       expect(results.map((r) => r.version)).toEqual([1, 2, 3])

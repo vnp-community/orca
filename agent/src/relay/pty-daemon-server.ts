@@ -135,9 +135,9 @@ export async function runPtyDaemon(socketPath: string, log: AgentLogger): Promis
   }
 
   const armIdleShutdownIfEmpty = (): void => {
-    if (idleTimer) clearTimeout(idleTimer)
+    if (idleTimer) {clearTimeout(idleTimer)}
     idleTimer = null
-    if (clients.size > 0 || activePtyCount() > 0) return
+    if (clients.size > 0 || activePtyCount() > 0) {return}
     idleTimer = setTimeout(() => {
       if (clients.size === 0 && activePtyCount() === 0) {
         log.info('pty-daemon: idle with no PTYs and no clients — shutting down')
@@ -153,7 +153,7 @@ export async function runPtyDaemon(socketPath: string, log: AgentLogger): Promis
       idleTimer = null
     }
     const decoder = new DaemonMessageDecoder((msg: DaemonMessage) => {
-      if (!isDaemonRequest(msg)) return
+      if (!isDaemonRequest(msg)) {return}
       void dispatchDaemonRequest(msg.method, msg.params ?? {}, log, broadcast)
         .then((outcome) => {
           const response: DaemonResponse = { id: msg.id, ...outcome }

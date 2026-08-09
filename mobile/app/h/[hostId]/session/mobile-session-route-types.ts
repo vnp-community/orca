@@ -6,8 +6,8 @@ import type {
   MobileSyntaxSegment
 } from '../../../../src/session/mobile-file-syntax'
 import type { TerminalRecord } from '../../../../src/session/mobile-terminal-records'
-import type { DiffComment, TuiAgent } from '../../../../../src/shared/types'
-import type { AgentStatusEntry } from '../../../../../src/shared/agent-status-types'
+import type { DiffComment, TuiAgent } from '../../../../src/vendor-shared/shared/types'
+import type { AgentStatusEntry } from '../../../../src/vendor-shared/shared/agent-status-types'
 
 export type Terminal = TerminalRecord
 

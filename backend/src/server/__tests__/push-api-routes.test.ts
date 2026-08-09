@@ -26,7 +26,7 @@ function makePushManager(overrides?: { publicKey?: string }) {
     }),
     removeSubscription: vi.fn((endpoint: string) => {
       const idx = subscriptions.findIndex((s) => s.endpoint === endpoint)
-      if (idx >= 0) subscriptions.splice(idx, 1)
+      if (idx >= 0) {subscriptions.splice(idx, 1)}
     }),
     subscriptions
   }
@@ -63,7 +63,7 @@ function doRequest(
       }
     )
     req.on('error', reject)
-    if (bodyStr) req.write(bodyStr)
+    if (bodyStr) {req.write(bodyStr)}
     req.end()
   })
 }

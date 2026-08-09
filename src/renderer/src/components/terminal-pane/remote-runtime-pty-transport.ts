@@ -38,6 +38,8 @@ import { createBrowserUuid } from '@/lib/browser-uuid'
 import { setFitOverride } from '@/lib/pane-manager/mobile-fit-overrides'
 import { setDriverForPty } from '@/lib/pane-manager/mobile-driver-state'
 import { isWebTerminalSurfaceTabId, toHostSessionTabId } from '@/runtime/web-terminal-surface-id'
+import { Tracers } from '../../../../shared/trace/tracers'
+import type { TraceSpan } from '../../../../shared/trace'
 
 const REMOTE_TERMINAL_INPUT_FLUSH_MS = 8
 const REMOTE_TERMINAL_VIEWPORT_FLUSH_MS = 33
@@ -282,13 +284,17 @@ export function createRemoteRuntimePtyTransport(
    */
   async function callRuntimeWithColdStartRetry<TResult>(
     method: string,
-    params?: unknown
+    params?: unknown,
+    span?: TraceSpan
   ): Promise<TResult> {
     let lastError: unknown
     for (let attempt = 0; attempt <= COLD_START_MAX_RETRIES; attempt++) {
       if (attempt === 0) {
         onColdStartBegin?.()
       } else {
+        // Why: cold-start retry step()s the caller's already-open span instead
+        // of starting a new one — Dev Server cold-start can take up to 60s.
+        span?.step('cold-start-retry', { attempt, method })
         onColdStartRetry?.(attempt)
       }
       try {
@@ -298,27 +304,14 @@ export function createRemoteRuntimePtyTransport(
       } catch (err: unknown) {
         lastError = err
         const msg = err instanceof Error ? err.message : String(err)
-        // Why 'agent not connected' is retryable: this specific message means
-        // the Dev Server's agent WS to Orca is mid-reconnect — a normal,
-        // self-healing ~1-2s network blip (see agent-connection-direct.ts's
-        // proactive-renew-on-drop fix), not a real outage. A request that
-        // happens to land in that narrow gap shouldn't surface a scary error
-        // for something that resolves itself a moment later.
-        const isAgentReconnectRace = msg.includes('agent not connected')
+        // Only retry on timeout or cold-start related errors
         const isRetryable =
           msg.includes('timed out') ||
           msg.includes('timeout') ||
           msg.includes('relay_starting') ||
-          msg.includes('worker_cold') ||
-          isAgentReconnectRace
+          msg.includes('worker_cold')
         if (!isRetryable || attempt >= COLD_START_MAX_RETRIES) {
           break
-        }
-        if (isAgentReconnectRace) {
-          // Why a fixed delay instead of retrying immediately: an instant
-          // retry would almost certainly land in the same still-reconnecting
-          // gap. Tonight's observed reconnect times were ~1.1-2.3s.
-          await new Promise((resolve) => setTimeout(resolve, 2000))
         }
       }
     }
@@ -572,89 +565,93 @@ export function createRemoteRuntimePtyTransport(
       generation === subscriptionGeneration &&
       isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)
     const subscribeCallbacks: RemoteRuntimeMultiplexedTerminalCallbacks = {
-        onData: (data, meta) => {
-          if (isCurrentSubscription()) {
-            outputProcessor.processData(data, storedCallbacks, undefined, meta)
-          }
-        },
-        onSnapshot: (data, meta) => {
-          // Why: a snapshot with no body can still carry a pending mid-escape
-          // tail that must be replayed so the next live chunk completes it.
-          if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
-            outputProcessor.processData(data, storedCallbacks, {
-              replayingBufferedData: true,
-              suppressAttentionEvents: true,
-              ...(meta?.pendingEscapeTailAnsi
-                ? { pendingEscapeTailAnsi: meta.pendingEscapeTailAnsi }
-                : {})
-            })
-          }
-        },
-        onSubscribed: () => {
-          if (!isCurrentSubscription()) {
-            return
-          }
-          storedCallbacks.onConnect?.()
-          storedCallbacks.onStatus?.('shell')
-        },
-        onEnd: () => {
-          if (!isCurrentSubscription()) {
-            return
-          }
-          outputProcessor.clearAccumulatedState()
-          connected = false
-          handle = null
-          remotePtyId = null
-          multiplexedStream = null
-          multiplexedStreamHandle = null
-          clearPendingViewportClaim()
-          storedCallbacks.onExit?.(0)
-          storedCallbacks.onDisconnect?.()
-          if (subscribedPtyId) {
-            onPtyExit?.(subscribedPtyId)
-          }
-        },
-        onError: (message) => {
-          if (isCurrentSubscription()) {
-            handleRemoteTerminalError(message)
-          }
-        },
-        onFitOverrideChanged: (event) => {
-          if (isCurrentSubscription() && subscribedPtyId) {
-            setFitOverride(subscribedPtyId, event.mode, event.cols, event.rows)
-          }
-        },
-        onDriverChanged: (driver) => {
-          if (isCurrentSubscription() && subscribedPtyId) {
-            setDriverForPty(subscribedPtyId, driver)
-          }
-        },
-        onTransportClose: () => {
-          transportClosed = true
-          if (generation !== subscriptionGeneration) {
-            return
-          }
-          if (!isCurrentSubscription()) {
-            // isCurrentSubscription excludes the just-closed stream by design.
-            if (!isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)) {
-              return
-            }
-          }
-          multiplexedStream = null
-          multiplexedStreamHandle = null
-          scheduleResubscribeAfterTransportClose()
+      onData: (data, meta) => {
+        if (isCurrentSubscription()) {
+          outputProcessor.processData(data, storedCallbacks, undefined, meta)
         }
+      },
+      onSnapshot: (data, meta) => {
+        // Why: a snapshot with no body can still carry a pending mid-escape
+        // tail that must be replayed so the next live chunk completes it.
+        if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
+          outputProcessor.processData(data, storedCallbacks, {
+            replayingBufferedData: true,
+            suppressAttentionEvents: true,
+            ...(meta?.pendingEscapeTailAnsi
+              ? { pendingEscapeTailAnsi: meta.pendingEscapeTailAnsi }
+              : {})
+          })
+        }
+      },
+      onSubscribed: () => {
+        if (!isCurrentSubscription()) {
+          return
+        }
+        storedCallbacks.onConnect?.()
+        storedCallbacks.onStatus?.('shell')
+      },
+      onEnd: () => {
+        if (!isCurrentSubscription()) {
+          return
+        }
+        outputProcessor.clearAccumulatedState()
+        connected = false
+        handle = null
+        remotePtyId = null
+        multiplexedStream = null
+        multiplexedStreamHandle = null
+        clearPendingViewportClaim()
+        storedCallbacks.onExit?.(0)
+        storedCallbacks.onDisconnect?.()
+        if (subscribedPtyId) {
+          onPtyExit?.(subscribedPtyId)
+        }
+      },
+      onError: (message) => {
+        if (isCurrentSubscription()) {
+          handleRemoteTerminalError(message)
+        }
+      },
+      onFitOverrideChanged: (event) => {
+        if (isCurrentSubscription() && subscribedPtyId) {
+          setFitOverride(subscribedPtyId, event.mode, event.cols, event.rows)
+        }
+      },
+      onDriverChanged: (driver) => {
+        if (isCurrentSubscription() && subscribedPtyId) {
+          setDriverForPty(subscribedPtyId, driver)
+        }
+      },
+      onTransportClose: () => {
+        transportClosed = true
+        if (generation !== subscriptionGeneration) {
+          return
+        }
+        if (!isCurrentSubscription()) {
+          // isCurrentSubscription excludes the just-closed stream by design.
+          if (!isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)) {
+            return
+          }
+        }
+        multiplexedStream = null
+        multiplexedStreamHandle = null
+        scheduleResubscribeAfterTransportClose()
+      }
     }
+    // Why 'session-auth' gates the transport choice: it's the stable id the
+    // web session client (cookie-auth, no E2EE) always resolves to — see
+    // web-runtime-environment.ts. That client's WS is proxied through
+    // WsSessionRouter into a per-user process's Unix socket, which is
+    // JSON-lines only end to end (no sendBinary/registerBinaryStreamHandler
+    // at any layer) — terminal.multiplex always throws
+    // 'binary_terminal_stream_required' there. terminal.subscribe is the
+    // plain-JSON streaming method that already works over that path.
     const subscribeArgs = {
       terminal: subscribedHandle,
       client: { id: clientId, type: 'desktop' as const },
       viewport: subscribedViewport ?? undefined,
       callbacks: subscribeCallbacks
     }
-    // Why: the web session client's Unix-socket-proxied transport has no
-    // binary-frame capability at any layer, so terminal.multiplex (which
-    // requires sendBinary/registerBinaryStreamHandler) can never work there —
-    // fall back to the plain-JSON terminal.subscribe RPC instead.
     const nextStream =
       currentRuntimeEnvironmentId === 'session-auth'
         ? await subscribeTerminalViaJson({
@@ -710,9 +707,23 @@ export function createRemoteRuntimePtyTransport(
         return
       }
 
+      // Why: one span for the whole connect() — cold-start retry is a step(),
+      // not a separate attempt (CR-TRACE-000 §5).
+      const span = Tracers.uiTerminalCreateFlow.start({
+        worktreeId,
+        providerType: 'remote',
+        environmentId: runtimeEnvironmentId
+      })
+
       try {
         if (isWebTerminalSurfaceTabId(tabId ?? '')) {
-          return await attachHostSessionMirror(options)
+          const result = await attachHostSessionMirror(options)
+          if (result) {
+            span.ok({ ptyId: result.id, providerType: 'remote', mirrored: true })
+          } else {
+            span.fail(new Error('attachHostSessionMirror returned undefined'), { worktreeId })
+          }
+          return result
         }
 
         const commandToSend = options.command ?? command
@@ -723,29 +734,36 @@ export function createRemoteRuntimePtyTransport(
         const launchTokenToSend = options.launchToken ?? launchToken
         const launchAgentToSend = options.launchAgent ?? launchAgent
         // TM-001-B: Use retry-aware helper for terminal.create (cold-start resilience)
-        const created = await callRuntimeWithColdStartRetry<{ terminal: RuntimeTerminalCreate }>('terminal.create', {
-          worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
-          ...(commandToSend !== undefined ? { command: commandToSend } : {}),
-          ...(startupCommandDeliveryToSend !== undefined
-            ? { startupCommandDelivery: startupCommandDeliveryToSend }
-            : {}),
-          ...(envToSend !== undefined ? { env: envToSend } : {}),
-          ...(launchConfigToSend !== undefined ? { launchConfig: launchConfigToSend } : {}),
-          ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
-          ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
-          tabId,
-          leafId,
-          focus: false,
-          // Why: this transport is backing an already-mounted renderer pane;
-          // activation here is local state, not permission for remote UI reveal.
-          presentation: 'background',
-          ...(activate === true ? { activate: true } : {})
-        })
+        span.step('relay-terminal-create', { worktreeId, tabId: tabId ?? '' })
+        const created = await callRuntimeWithColdStartRetry<{ terminal: RuntimeTerminalCreate }>(
+          'terminal.create',
+          {
+            worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
+            ...(commandToSend !== undefined ? { command: commandToSend } : {}),
+            ...(startupCommandDeliveryToSend !== undefined
+              ? { startupCommandDelivery: startupCommandDeliveryToSend }
+              : {}),
+            ...(envToSend !== undefined ? { env: envToSend } : {}),
+            ...(launchConfigToSend !== undefined ? { launchConfig: launchConfigToSend } : {}),
+            ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
+            ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
+            tabId,
+            leafId,
+            focus: false,
+            // Why: this transport is backing an already-mounted renderer pane;
+            // activation here is local state, not permission for remote UI reveal.
+            presentation: 'background',
+            ...(activate === true ? { activate: true } : {}),
+            traceId: span.id
+          },
+          span
+        )
         handle = created.terminal.handle
         if (destroyed) {
           // Why: this is a cancelled launch, not a connected shared session.
           // Close the server PTY so rapid tab-open/tab-close does not leak.
           await closeRemoteTerminal(created.terminal.handle)
+          span.fail(new Error('connect cancelled after create'), { worktreeId })
           return
         }
 
@@ -759,14 +777,17 @@ export function createRemoteRuntimePtyTransport(
 
         await subscribeToHandle()
         if (destroyed || !connected || !remotePtyId) {
+          span.fail(new Error('connect cancelled after subscribe'), { worktreeId })
           return
         }
 
+        span.ok({ ptyId: remotePtyId, providerType: 'remote' })
         return {
           id: remotePtyId,
           replay: ''
         } satisfies PtyConnectResult
       } catch (error) {
+        span.fail(error, { worktreeId, providerType: 'remote' })
         storedCallbacks.onError?.(runtimeTerminalErrorMessage(error))
         return undefined
       }
@@ -829,6 +850,16 @@ export function createRemoteRuntimePtyTransport(
       if (id && worktreeId && tabId) {
         const stream = multiplexedStream
         if (stream) {
+          // Why: no dedicated span per keystroke here — but this fire-and-forget
+          // save is still worth a light span since it's sync-adjacent I/O that
+          // can be slow on a large scrollback buffer. Reuses uiTerminalDestroyFlow
+          // (route: 'scrollback-save') to let TracePanel filter just save events
+          // separately from the route/tab teardown spans in TASK-FE-003.3.
+          const span = Tracers.uiTerminalDestroyFlow.start({
+            ptyId: id,
+            route: 'scrollback-save',
+            tabId
+          })
           stream.serializeBuffer?.({ scrollbackRows: 1000 })
             .then(snap => {
               if (snap && worktreeId && tabId) {
@@ -839,10 +870,16 @@ export function createRemoteRuntimePtyTransport(
                   snapshotData: snap.data,
                   snapshotCols: snap.cols,
                   snapshotRows: snap.rows,
-                })
+                }).then(() => span.ok({ ptyId: id, bufferBytes: snap.data.length }))
+                  .catch((err) => span.fail(err, { ptyId: id }))
+              } else {
+                span.ok({ ptyId: id, skipped: true })
               }
             })
-            .catch(() => { /* Non-fatal snapshot save */ })
+            .catch((err) => {
+              span.fail(err, { ptyId: id })
+              /* Non-fatal snapshot save */
+            })
         }
       }
       closeMultiplexedStream()
@@ -933,7 +970,17 @@ export function createRemoteRuntimePtyTransport(
       }
       rememberViewport(cols, rows)
       viewportBatcher.clear()
+      // Why: claiming the viewport is a meaningful branch point — worth a span.
+      // Regular (non-claim) resize goes through viewportBatcher at high frequency
+      // during a pane drag — not instrumented, per anti-over-instrumentation rule.
+      const span = Tracers.uiTerminalResizeFlow.start({
+        worktreeId: worktreeId ?? '',
+        cols,
+        rows,
+        claim: true
+      })
       sendViewportUpdate(cols, rows, true)
+      span.ok({ cols, rows })
       return true
     },
 
@@ -943,8 +990,15 @@ export function createRemoteRuntimePtyTransport(
       }
       rememberViewport(cols, rows)
       if (meta?.claim) {
+        const span = Tracers.uiTerminalResizeFlow.start({
+          worktreeId: worktreeId ?? '',
+          cols,
+          rows,
+          claim: true
+        })
         viewportBatcher.clear()
         sendViewportUpdate(cols, rows, true)
+        span.ok({ cols, rows })
         return true
       }
       // Why: xterm fit can emit resize bursts while the user drags panes or

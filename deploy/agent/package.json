@@ -1,0 +1,16 @@
+{
+  "name": "orca-dev-agent",
+  "version": "2.1.0",
+  "description": "Orca Dev Server Agent — built from agent/src/relay/agent-entry.ts via node agent/build.mjs",
+  "main": "agent.js",
+  "scripts": {
+    "start":        "node agent.js",
+    "start:direct": "MODE=direct-websocket node agent.js",
+    "start:relay":  "MODE=relay-websocket node agent.js",
+    "start:debug":  "LOG_LEVEL=debug node agent.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "note": "agent.js is a self-contained bundle. No npm install needed. Built by: node agent/build.mjs (repo root)"
+}

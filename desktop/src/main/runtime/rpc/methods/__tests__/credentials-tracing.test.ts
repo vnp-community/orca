@@ -41,7 +41,7 @@ import { registerTraceSink, type TraceEvent } from '../../../../../shared/trace'
 
 function findMethod(name: string): RpcMethod {
   const m = CREDENTIAL_METHODS.find((m) => m.name === name)
-  if (!m) throw new Error(`Method ${name} not found`)
+  if (!m) {throw new Error(`Method ${name} not found`)}
   return m
 }
 

@@ -3,7 +3,7 @@ import type {
   ComputerActionResult,
   ComputerListAppsResult,
   ComputerSnapshotResult
-} from '../../src/shared/runtime-types'
+} from '../vendor-shared/shared/runtime-types'
 import {
   activateFinder,
   ensureOrcaRuntimeLaunched,

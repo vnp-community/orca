@@ -13,8 +13,8 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
-import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
-import { PTY_SESSION_ID_SEPARATOR } from '../../src/shared/pty-session-id-format'
+import { PROTOCOL_VERSION } from '../vendor-shared/main/daemon/types'
+import { PTY_SESSION_ID_SEPARATOR } from '../vendor-shared/shared/pty-session-id-format'
 
 // Why: must land after the relaunched app's 3s daemon health check has timed
 // out (so the unhealthy guard runs) but before the guard's 5s client hello

@@ -23,7 +23,7 @@ function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
 
 function makeAccount(overrides: Partial<AIProviderAccount> = {}): AIProviderAccount {
   return {
-    id: 'acc-' + Math.random().toString(36).slice(2, 8),
+    id: `acc-${  Math.random().toString(36).slice(2, 8)}`,
     devServerId: 'srv-1',
     provider: 'anthropic',
     scope: 'server',

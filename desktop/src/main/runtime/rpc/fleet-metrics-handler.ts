@@ -25,7 +25,7 @@ export function createFleetMetricsHandler(
     req: http.IncomingMessage,
     res: http.ServerResponse
   ): Promise<void> {
-    if (req.url !== '/metrics' || req.method !== 'GET') return
+    if (req.url !== '/metrics' || req.method !== 'GET') {return}
 
     try {
       const report = await getReport()
@@ -83,7 +83,7 @@ export function createFleetMetricsHandler(
       lines.push(`orca_fleet_servers_error ${report.summary.error}`)
 
       res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' })
-      res.end(lines.join('\n') + '\n')
+      res.end(`${lines.join('\n')  }\n`)
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'text/plain' })
       res.end(`# Error generating metrics: ${err instanceof Error ? err.message : String(err)}\n`)

@@ -14,7 +14,7 @@
 /**
  * Kết quả đọc credential từ bất kỳ tier nào.
  */
-export interface CredentialReadResult {
+export type CredentialReadResult = {
   encryptedBlob: string
   iv:            string
   updatedAt:     string
@@ -24,7 +24,7 @@ export interface CredentialReadResult {
  * Kết quả kiểm tra sức khỏe AI provider connection.
  * Cả agent-credential-store.ts và ai-provider-handler.ts phải trả về shape này.
  */
-export interface HealthCheckResult {
+export type HealthCheckResult = {
   ok:        boolean
   latencyMs: number
   error?:    string
@@ -33,7 +33,7 @@ export interface HealthCheckResult {
 /**
  * Params để write/update credential.
  */
-export interface CredentialWriteParams {
+export type CredentialWriteParams = {
   accountId:     string
   encryptedBlob: string
   iv:            string
@@ -42,7 +42,7 @@ export interface CredentialWriteParams {
 /**
  * Params để thực hiện health check.
  */
-export interface HealthCheckParams {
+export type HealthCheckParams = {
   accountId: string
   /** Timeout tính bằng ms. Default: 5000 */
   timeoutMs?: number

@@ -2,7 +2,7 @@
 // Lightweight structured logger for the Orca Dev Agent process.
 // Uses console.log/warn/error — output captured by systemd journald on dev server.
 
-export interface AgentLogger {
+export type AgentLogger = {
   info(...args: unknown[]): void
   warn(...args: unknown[]): void
   error(...args: unknown[]): void
@@ -20,7 +20,7 @@ export function createAgentLogger(level: string): AgentLogger {
     warn:  (...a: unknown[]) => console.warn(`[agent] ${ts()} WARN  ${a.join(' ')}`),
     error: (...a: unknown[]) => console.error(`[agent] ${ts()} ERROR ${a.join(' ')}`),
     debug: (...a: unknown[]) => {
-      if (level === 'debug') console.log(`[agent] ${ts()} DEBUG ${a.join(' ')}`)
+      if (level === 'debug') {console.log(`[agent] ${ts()} DEBUG ${a.join(' ')}`)}
     },
   }
 }

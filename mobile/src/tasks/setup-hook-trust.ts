@@ -1,4 +1,4 @@
-import type { PersistedTrustedOrcaHooks } from '../../../src/shared/types'
+import type { PersistedTrustedOrcaHooks } from '../vendor-shared/shared/types'
 
 export type SetupHookTrust = {
   contentHash: string

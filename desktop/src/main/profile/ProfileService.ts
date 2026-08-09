@@ -44,7 +44,7 @@ export class ProfileService {
         [companyId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return JSON.parse(rows[0].profileJson) as OrcaProfile
   }
 
@@ -93,7 +93,7 @@ export class ProfileService {
         [deptId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return JSON.parse(rows[0].profileJson) as OrcaProfile
   }
 
@@ -123,7 +123,7 @@ export class ProfileService {
         [userId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return JSON.parse(rows[0].profileJson) as OrcaProfile
   }
 
@@ -162,7 +162,7 @@ export class ProfileService {
         [userId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return JSON.parse(rows[0].profileJson) as OrcaProfile
   }
 
@@ -181,7 +181,7 @@ export class ProfileService {
         [userId]
       )
     )
-    if (!rows[0]) return null
+    if (!rows[0]) {return null}
     return JSON.parse(rows[0].profileJson) as OrcaProfile
   }
 

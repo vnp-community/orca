@@ -128,7 +128,7 @@ export function createWorkflowMethods(
       params: GetExecutionParam,
       handler: async (params) => {
         const execution = await orchestrator.getExecution(params.executionId)
-        if (!execution) throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)
+        if (!execution) {throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)}
         return execution
       },
     }),
@@ -152,7 +152,7 @@ export function createWorkflowMethods(
         const userId = ctx.userId ?? ''
         // Access control: only triggeredBy user can cancel
         const execution = await orchestrator.getExecution(params.executionId)
-        if (!execution) throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)
+        if (!execution) {throw new Error(`EXECUTION_NOT_FOUND: ${params.executionId}`)}
         if (execution.triggeredBy !== userId) {
           throw new Error('WORKFLOW_CANCEL_DENIED: only the triggering user can cancel this execution')
         }

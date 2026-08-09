@@ -26,7 +26,7 @@ const QUOTA_ALERT_THRESHOLD_RATIO = 0.8 // BUG-BE-HLD-015: warn at 80% of quotaL
 
 // ── Status change event ───────────────────────────────────────────────────────
 
-export interface ProviderStatusChange {
+export type ProviderStatusChange = {
   accountId:  string
   oldStatus:  string
   newStatus:  string
@@ -34,7 +34,7 @@ export interface ProviderStatusChange {
 }
 
 // BUG-BE-HLD-015: emitted the first time an account crosses 80% of its daily quota.
-export interface ProviderQuotaWarning {
+export type ProviderQuotaWarning = {
   accountId:    string
   tokensUsed:   number
   quotaLimitDay: number
@@ -152,9 +152,9 @@ export class ProviderHealthChecker {
           lastHealthCheck: checkedAt,
         })
 
-        if (newStatus === 'active') activeCount++
-        else if (newStatus === 'quota_exceeded') quotaExceededCount++
-        else invalidCount++
+        if (newStatus === 'active') {activeCount++}
+        else if (newStatus === 'quota_exceeded') {quotaExceededCount++}
+        else {invalidCount++}
 
         // FIX BUG-AIP-003: Emit status change event when status transitions
         if (oldStatus !== newStatus && this.onStatusChanged) {

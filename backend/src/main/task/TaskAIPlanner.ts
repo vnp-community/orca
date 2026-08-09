@@ -19,7 +19,7 @@ import { Tracers } from '../../shared/trace/tracers'
 
 // ── Decomposed subtask shape from AI response ─────────────────────────────────
 
-interface SubtaskProposal {
+type SubtaskProposal = {
   title: string
   type?: 'subtask' | 'task'
   estimatedHours?: number
@@ -105,10 +105,10 @@ export class TaskAIPlanner {
    */
   async applyDecomposition(
     taskId: string,
-    subtasks: Array<Partial<OrcaTask>>
+    subtasks: Partial<OrcaTask>[]
   ): Promise<OrcaTask[]> {
     const parent = await this.taskService.get(taskId)
-    if (!parent) throw new Error(`TASK_NOT_FOUND: ${taskId}`)
+    if (!parent) {throw new Error(`TASK_NOT_FOUND: ${taskId}`)}
 
     const created: OrcaTask[] = []
     for (const s of subtasks) {
@@ -135,7 +135,7 @@ export class TaskAIPlanner {
    */
   async generatePromptTemplate(taskId: string, userId: string): Promise<string> {
     const task = await this.taskService.get(taskId)
-    if (!task) throw new Error(`TASK_NOT_FOUND: ${taskId}`)
+    if (!task) {throw new Error(`TASK_NOT_FOUND: ${taskId}`)}
 
     // If task already has a prompt template, resolve it
     if (task.promptTemplate) {
@@ -146,8 +146,8 @@ export class TaskAIPlanner {
     const lines: string[] = [
       `# Task: ${task.title}`,
     ]
-    if (task.description) lines.push(`\n## Description\n${task.description}`)
-    if (task.aiContext) lines.push(`\n## Context\n${task.aiContext}`)
+    if (task.description) {lines.push(`\n## Description\n${task.description}`)}
+    if (task.aiContext) {lines.push(`\n## Context\n${task.aiContext}`)}
     lines.push(`\n## Type: ${task.type} | Priority: ${task.priority} | Status: ${task.status}`)
     lines.push(`\nPlease complete this task. When done, update the status to 'review'.`)
 
@@ -179,7 +179,7 @@ export class TaskAIPlanner {
 
       // Extract JSON array from response
       const match = text.match(/\[[\s\S]*\]/)
-      if (!match) return []
+      if (!match) {return []}
       return JSON.parse(match[0]) as SubtaskProposal[]
     } catch {
       console.warn('[TaskAIPlanner] Failed to parse AI response')
@@ -204,7 +204,7 @@ export class TaskAIPlanner {
         text = (r['content'] ?? r['text'] ?? '') as string
       }
       const match = text.match(/\[[\s\S]*\]/)
-      if (!match) return { proposals: [], parseOk: false }
+      if (!match) {return { proposals: [], parseOk: false }}
       return { proposals: JSON.parse(match[0]) as SubtaskProposal[], parseOk: true }
     } catch {
       console.warn('[TaskAIPlanner] Failed to parse AI response')

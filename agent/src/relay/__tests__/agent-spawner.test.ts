@@ -483,7 +483,7 @@ describe('handleAgentSpawn — agentOrch tracing', () => {
       model: 'claude', taskId: 'task-1', userId: 'user-1', cwd: tmpdir(),
     }, SPAWNABLE_CONFIG, MOCK_LOG, MOCK_WS, MOCK_WIRE)
 
-    for (let i = 0; i < 50; i++) lastSpawnedAgentPty!.emitData(`chunk-${i}\n`)
+    for (let i = 0; i < 50; i++) {lastSpawnedAgentPty!.emitData(`chunk-${i}\n`)}
 
     const firstOutputSteps = events.filter(
       e => e.flow === 'agentOrch:spawn' && e.level === 'step' && e.label === 'first-output'

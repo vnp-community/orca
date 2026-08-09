@@ -20,7 +20,7 @@ import type { WorkflowDefinition, WorkflowStep } from './WorkflowTypes'
 
 const MAX_INHERIT_DEPTH = 5
 
-interface TemplateRow {
+type TemplateRow = {
   id: string
   name: string
   definitionJson: string   // JSON — column: definition_json
@@ -30,7 +30,7 @@ interface TemplateRow {
   createdAt: number
 }
 
-export interface CreateTemplateParams {
+export type CreateTemplateParams = {
   name: string
   definition: WorkflowDefinition
   ownerId: string
@@ -38,7 +38,7 @@ export interface CreateTemplateParams {
   parentTemplateId?: string
 }
 
-export interface TemplateRecord {
+export type TemplateRecord = {
   id: string
   name: string
   definition: WorkflowDefinition

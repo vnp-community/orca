@@ -78,7 +78,7 @@ export class DatabaseHealthMonitor implements HealthChecker {
   }
 
   startPeriodicCheck(intervalMs: number = DEFAULT_INTERVAL_MS): void {
-    if (this.intervalHandle) return // already running
+    if (this.intervalHandle) {return} // already running
     this.intervalHandle = setInterval(() => {
       void this.check()
     }, intervalMs)

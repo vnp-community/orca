@@ -20,12 +20,12 @@ import type { OrcaSession } from '../auth/auth-types'
 export type FleetImportResult = {
   configPath: string
   serverCount: number
-  servers: Array<{
+  servers: {
     fleetId: string
     action: 'created' | 'updated' | 'skipped'
     targetId: string
     error?: string
-  }>
+  }[]
 }
 
 // ── Fleet Filter Types ─────────────────────────────────────────────
@@ -370,18 +370,18 @@ export class SshConnectionStore {
    */
   filterTargets(criteria: SshTargetFilterCriteria): SshTarget[] {
     return this.listTargets().filter((target) => {
-      if (criteria.project !== undefined && target.project !== criteria.project) return false
-      if (criteria.team !== undefined && target.team !== criteria.team) return false
+      if (criteria.project !== undefined && target.project !== criteria.project) {return false}
+      if (criteria.team !== undefined && target.team !== criteria.team) {return false}
       if (criteria.environment !== undefined && target.environment !== criteria.environment)
-        return false
+        {return false}
       if (criteria.tags && criteria.tags.length > 0) {
         const targetTags = target.tags ?? []
-        if (!criteria.tags.some((tag) => targetTags.includes(tag))) return false
+        if (!criteria.tags.some((tag) => targetTags.includes(tag))) {return false}
       }
       if (criteria.search) {
         const q = criteria.search.toLowerCase()
         const haystack = `${target.label} ${target.host}`.toLowerCase()
-        if (!haystack.includes(q)) return false
+        if (!haystack.includes(q)) {return false}
       }
       return true
     })
@@ -399,7 +399,7 @@ export class SshConnectionStore {
    */
   resolveSshTargetForUser(targetId: string, session: OrcaSession): SshTarget | undefined {
     const base = this.getTarget(targetId)
-    if (!base) return undefined
+    if (!base) {return undefined}
     return resolveUserSshTarget(base, session.userId, session.userEmail)
   }
 }

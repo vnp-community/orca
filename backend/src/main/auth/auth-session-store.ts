@@ -61,7 +61,7 @@ export class AuthSessionStore {
    */
   async validateSession(sessionId: string): Promise<OrcaSession | null> {
     const session = await this.getSession(sessionId)
-    if (!session) return null
+    if (!session) {return null}
 
     if (session.expiresAt < Date.now()) {
       await this.revokeSession(sessionId)

@@ -17,13 +17,13 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-interface PooledConnection {
+type PooledConnection = {
   db: IDatabase
   idleTimer: ReturnType<typeof setTimeout> | null
   createdAt: number
 }
 
-interface Waiter {
+type Waiter = {
   resolve: (conn: IDatabase) => void
   reject: (err: Error) => void
   timer: ReturnType<typeof setTimeout>
@@ -51,7 +51,7 @@ export class GenericConnectionPool implements IConnectionPool {
 
   /** Warm up min connections. Call after construction in server mode. */
   async initialize(): Promise<void> {
-    if (this.initialized) return
+    if (this.initialized) {return}
     this.initialized = true
     const promises: Promise<void>[] = []
     for (let i = 0; i < this.config.min; i++) {
@@ -90,12 +90,12 @@ export class GenericConnectionPool implements IConnectionPool {
   }
 
   async acquire(): Promise<IDatabase> {
-    if (this.draining) throw new Error('Connection pool is draining')
+    if (this.draining) {throw new Error('Connection pool is draining')}
 
     // Return idle connection if available
     const pooled = this.idle.pop()
     if (pooled) {
-      if (pooled.idleTimer) clearTimeout(pooled.idleTimer)
+      if (pooled.idleTimer) {clearTimeout(pooled.idleTimer)}
       this.acquired.add(pooled.db)
       return pooled.db
     }
@@ -112,7 +112,7 @@ export class GenericConnectionPool implements IConnectionPool {
     return new Promise<IDatabase>((resolve, reject) => {
       const timer = setTimeout(() => {
         const idx = this.waiters.findIndex((w) => w.timer === timer)
-        if (idx !== -1) this.waiters.splice(idx, 1)
+        if (idx !== -1) {this.waiters.splice(idx, 1)}
         reject(
           new Error(
             `Connection acquire timeout after ${this.config.acquireTimeoutMs}ms`
@@ -125,7 +125,7 @@ export class GenericConnectionPool implements IConnectionPool {
   }
 
   release(conn: IDatabase): void {
-    if (!this.acquired.has(conn)) return
+    if (!this.acquired.has(conn)) {return}
     this.acquired.delete(conn)
 
     // Give to next waiter if any
@@ -189,7 +189,7 @@ export class GenericConnectionPool implements IConnectionPool {
 
     // Close all idle connections
     for (const pooled of this.idle) {
-      if (pooled.idleTimer) clearTimeout(pooled.idleTimer)
+      if (pooled.idleTimer) {clearTimeout(pooled.idleTimer)}
       await pooled.db.close().catch(() => {})
     }
     this.idle = []
@@ -205,7 +205,7 @@ export class GenericConnectionPool implements IConnectionPool {
     this.waiters = []
 
     for (const pooled of this.idle) {
-      if (pooled.idleTimer) clearTimeout(pooled.idleTimer)
+      if (pooled.idleTimer) {clearTimeout(pooled.idleTimer)}
       await pooled.db.close().catch(() => {})
     }
     this.idle = []

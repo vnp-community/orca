@@ -25,7 +25,7 @@ vi.mock('ws', () => {
     binaryType = ''
     terminate = vi.fn()
     close = vi.fn()
-    private listeners: Record<string, Array<(...args: unknown[]) => void>> = {}
+    private listeners: Record<string, ((...args: unknown[]) => void)[]> = {}
 
     constructor(public url: string, public opts?: unknown) {
       MockWebSocket.instances.push(this)
@@ -37,7 +37,7 @@ vi.mock('ws', () => {
     }
 
     emit(event: string, ...args: unknown[]): void {
-      for (const cb of this.listeners[event] ?? []) cb(...args)
+      for (const cb of this.listeners[event] ?? []) {cb(...args)}
     }
   }
   return { default: MockWebSocket }
@@ -46,7 +46,7 @@ vi.mock('ws', () => {
 // vi.hoisted() runs before vi.mock() factories, making handshakeCtrl available
 // inside the factory below.
 const handshakeCtrl = vi.hoisted(() => ({
-  pending: [] as Array<{ resolve: (info: WsHandshakeInfo) => void; reject: (err: Error) => void }>,
+  pending: [] as { resolve: (info: WsHandshakeInfo) => void; reject: (err: Error) => void }[],
 }))
 
 vi.mock('../ws-handshake', () => ({
@@ -122,7 +122,7 @@ function connectRelayWebSocket(
 
 function lastWs(): InstanceType<typeof WebSocket> & { emit: (event: string, ...args: unknown[]) => void } {
   const instances = (WebSocket as unknown as { instances: unknown[] }).instances
-  return instances[instances.length - 1] as InstanceType<typeof WebSocket> & {
+  return instances.at(-1) as InstanceType<typeof WebSocket> & {
     emit: (event: string, ...args: unknown[]) => void
   }
 }

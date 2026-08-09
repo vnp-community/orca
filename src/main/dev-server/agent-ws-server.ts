@@ -10,11 +10,11 @@
 //
 // Does NOT import from 'electron' — works in Node.js server mode.
 
+import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws'
-import type { WebSocket } from 'ws'
 import type { IncomingMessage } from 'node:http'
 import type { Server as HttpServer } from 'node:http'
-import { createHash } from 'node:crypto' // FIX TASK-AWS-002: for SHA-256 token hashing
+import { createHash } from 'node:crypto'  // FIX TASK-AWS-002: for SHA-256 token hashing
 import { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
 import { createWebSocketTransport } from './ws-transport'
 import { runOrcaReceiverHandshake } from './ws-handshake'
@@ -26,7 +26,10 @@ import { Tracers } from '../../shared/trace/tracers'
 
 export type AgentConnectedInfo = WsHandshakeInfo
 
-export type AgentConnectionCallback = (mux: SshChannelMultiplexer, info: AgentConnectedInfo) => void
+export type AgentConnectionCallback = (
+  mux: SshChannelMultiplexer,
+  info: AgentConnectedInfo
+) => void
 
 type PendingSlot = {
   callback: AgentConnectionCallback
@@ -61,9 +64,7 @@ export class AgentWebSocketServer {
 
     httpServer.on('upgrade', (req: IncomingMessage, socket, head) => {
       const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
-      if (url.pathname !== AGENT_WS_PATH) {
-        return
-      } // not for us — pass through
+      if (url.pathname !== AGENT_WS_PATH) {return}  // not for us — pass through
 
       this.wss!.handleUpgrade(req, socket, head, (ws: WebSocket) => {
         this.handleConnection(ws)
@@ -99,9 +100,9 @@ export class AgentWebSocketServer {
       this.pendingSlots.delete(tokenHash)
       onExpired(
         `direct-websocket: Agent did not connect within ${AGENT_CONNECT_TIMEOUT_MS / 1000}s. ` +
-          `Configure your agent with:\n` +
-          `  ORCA_URL=ws://<orca-host>:6768${AGENT_WS_PATH}\n` +
-          `  AGENT_TOKEN=${agentToken}`
+        `Configure your agent with:\n` +
+        `  ORCA_URL=ws://<orca-host>:6768${AGENT_WS_PATH}\n` +
+        `  AGENT_TOKEN=${agentToken}`
       )
     }, AGENT_CONNECT_TIMEOUT_MS)
 
@@ -119,14 +120,6 @@ export class AgentWebSocketServer {
   }
 
   private handleConnection(ws: WebSocket): void {
-    // Keep connection alive through reverse proxies (ALB/Cloudflare)
-    const wsAnyPing = ws as unknown as { isAlive: boolean; ping: () => void; terminate: () => void }
-    const keepAliveInterval = setInterval(() => {
-      wsAnyPing.ping()
-    }, 30_000)
-
-    ws.on('close', () => clearInterval(keepAliveInterval))
-
     // [FIX CR-TRACE-013] span mở NGAY khi socket upgrade thành công, TRƯỚC
     // khi biết kết quả handshake — thay vì tạo span mồ côi ngẫu nhiên trong
     // .catch() như trước (id không liên kết được với attempt connect nào).
@@ -140,14 +133,14 @@ export class AgentWebSocketServer {
       ws,
       (token) => {
         // KHÔNG log token đầy đủ — chỉ 12 ký tự đầu, theo tiền lệ dòng log hiện có.
-        span.step('tokenLookup', { tokenPrefix: `${token.slice(0, 12)}...` })
+        span.step('tokenLookup', { tokenPrefix: `${token.slice(0, 12)  }...` })
         return this.pendingSlots.has(hashToken(token))
       },
       this.orcaVersion
     )
       .then((info) => {
         const agentToken = info.agentToken ?? ''
-        const tokenHash = hashToken(agentToken)
+        const tokenHash  = hashToken(agentToken)
         const slot = this.pendingSlots.get(tokenHash)
 
         if (!slot) {
@@ -183,7 +176,7 @@ export class AgentWebSocketServer {
           lifecycleSpan.step('disconnect', { code, reason: reasonStr })
         })
 
-        lifecycleSpan.step('connected', { token: `${agentToken.slice(0, 12)}...` })
+        lifecycleSpan.step('connected', { token: `${agentToken.slice(0, 12)  }...` })
         slot.callback(mux, info)
       })
       .catch((err: Error) => {

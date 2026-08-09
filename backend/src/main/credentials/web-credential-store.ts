@@ -182,7 +182,7 @@ export class WebCredentialStore {
       try {
         const raw = readFileSync(this.tokenPath(service))
         // Skip blobs already in V2 format
-        if (raw.length >= 4 && raw.subarray(0, 4).equals(V2_MAGIC)) continue
+        if (raw.length >= 4 && raw.subarray(0, 4).equals(V2_MAGIC)) {continue}
         // Decrypt V1, re-encrypt as V2
         const plaintext = this.decryptBlob(raw)
         const newBlob   = this.encryptV2(plaintext)

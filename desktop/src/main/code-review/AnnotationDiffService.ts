@@ -16,7 +16,7 @@ import type { DevServerRelayBridge } from '../dev-server/dev-server-relay-bridge
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface DiffAnnotation {
+export type DiffAnnotation = {
   /** Relative file path from repo root */
   file:    string
   /** 1-indexed line number in the new version (additions) or old (deletions) */
@@ -27,7 +27,7 @@ export interface DiffAnnotation {
   content: string
 }
 
-export interface GetDiffAnnotationsParams {
+export type GetDiffAnnotationsParams = {
   repoPath:   string
   filePath:   string  // relative to repo root
   fromCommit: string
@@ -55,7 +55,7 @@ export class AnnotationDiffService {
       }) as { stdout?: string } | null
 
       const stdout = result?.stdout ?? ''
-      if (!stdout.trim()) return []
+      if (!stdout.trim()) {return []}
 
       return this.parseDiff(stdout, params.filePath)
     } catch (err) {
@@ -77,7 +77,7 @@ export class AnnotationDiffService {
       if (line.startsWith('@@')) {
         // Parse hunk header: @@ -old_start[,old_count] +new_start[,new_count] @@
         const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)/)
-        if (match) lineNum = Number(match[1]) - 1
+        if (match) {lineNum = Number(match[1]) - 1}
       } else if (line.startsWith('+') && !line.startsWith('+++')) {
         lineNum++
         annotations.push({

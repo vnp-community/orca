@@ -30,7 +30,7 @@ export class DAGBuilder {
    * @throws WorkflowCycleError if a dependency cycle is detected
    */
   buildWaves(steps: WorkflowStep[]): WorkflowStep[][] {
-    if (steps.length === 0) return []
+    if (steps.length === 0) {return []}
 
     // 1. Build lookup map and validate all dependsOn references
     const stepMap = new Map<string, WorkflowStep>()
@@ -53,8 +53,8 @@ export class DAGBuilder {
     const dependents = new Map<string, Set<string>>()
 
     for (const step of steps) {
-      if (!inDegree.has(step.id)) inDegree.set(step.id, 0)
-      if (!dependents.has(step.id)) dependents.set(step.id, new Set())
+      if (!inDegree.has(step.id)) {inDegree.set(step.id, 0)}
+      if (!dependents.has(step.id)) {dependents.set(step.id, new Set())}
     }
 
     for (const step of steps) {
@@ -70,7 +70,7 @@ export class DAGBuilder {
 
     // Seed with zero in-degree
     for (const [id, deg] of inDegree) {
-      if (deg === 0) queue.push(id)
+      if (deg === 0) {queue.push(id)}
     }
 
     let processed = 0

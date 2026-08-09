@@ -1,4 +1,4 @@
-import type { PRInfo } from '../../../../src/shared/types'
+import type { PRInfo } from '../../vendor-shared/shared/types'
 
 type MobilePRAutoMergeAvailabilityInput = Pick<
   PRInfo,

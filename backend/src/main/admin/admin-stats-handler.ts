@@ -29,7 +29,7 @@ export class AdminStatsHandler {
 
   private countQuery(sql: string): number {
     const row = this.db.prepare(sql).get() as Record<string, number> | undefined
-    if (!row) return 0
+    if (!row) {return 0}
     return Object.values(row)[0] ?? 0
   }
 }

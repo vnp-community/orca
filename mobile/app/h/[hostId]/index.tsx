@@ -49,7 +49,7 @@ import { MobileRepoIcon } from '../../../src/components/MobileRepoIcon'
 import { WorktreeListRow } from '../../../src/components/WorktreeListRow'
 import { useNow } from '../../../src/hooks/use-now'
 import { useActiveWorktreeScroll } from '../../../src/hooks/use-active-worktree-scroll'
-import type { RepoIcon } from '../../../../src/shared/repo-icon'
+import type { RepoIcon } from '../../../src/vendor-shared/shared/repo-icon'
 import { PickerModal } from '../../../src/components/PickerModal'
 import { ActionSheetContent } from '../../../src/components/ActionSheetModal'
 import { buildWorktreeNavigationActions } from '../../../src/agent-history/worktree-navigation-actions'
@@ -94,7 +94,7 @@ import {
   WORKSPACE_SORT_OPTIONS as SORT_OPTIONS
 } from '../../../src/worktree/workspace-list-picker-options'
 import type { DesktopStatus, RepoSummary } from '../../../src/worktree/host-worktree-rpc-types'
-import type { WorkspaceStatusDefinition } from '../../../../src/shared/types'
+import type { WorkspaceStatusDefinition } from '../../../src/vendor-shared/shared/types'
 import { DEFAULT_MOBILE_WORKSPACE_STATUSES } from '../../../src/worktree/mobile-workspace-statuses'
 
 function isErrorVerdict(v: ConnectionVerdict): boolean {

@@ -1,4 +1,4 @@
-import type { PRComment } from '../../../src/shared/types'
+import type { PRComment } from '../vendor-shared/shared/types'
 import type { PrSidebarState } from '../session/mobile-pr-sidebar-state'
 import {
   prStateBadge,

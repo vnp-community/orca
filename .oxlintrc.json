@@ -75,6 +75,15 @@
   },
   "overrides": [
     {
+      "files": [
+        "frontend/src/main/profile/**/*.ts",
+        "frontend/src/main/project/**/*.ts",
+        "frontend/src/main/workflow/**/*.ts",
+        "frontend/src/main/task/**/*.ts"
+      ],
+      "rules": { "no-restricted-imports": ["error", { "paths": ["electron"] }] }
+    },
+    {
       "files": ["**/*.ts"],
       "rules": {
         "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }]

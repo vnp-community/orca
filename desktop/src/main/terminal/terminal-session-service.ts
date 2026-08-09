@@ -13,14 +13,14 @@ import type { IDatabase } from '../db/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface TerminalSessionKey {
+export type TerminalSessionKey = {
   worktreeId:     string
   tabId:          string
   leafId?:        string
   runtimeEnvId?:  string
 }
 
-export interface TerminalSessionSnapshot {
+export type TerminalSessionSnapshot = {
   id:            string
   worktreeId:    string
   tabId:         string

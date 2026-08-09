@@ -28,17 +28,17 @@ import type { IConnectionPool } from '../db/pool'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface PushSubscriptionKeys {
+export type PushSubscriptionKeys = {
   auth:   string
   p256dh: string
 }
 
-export interface PushSubscription {
+export type PushSubscription = {
   endpoint: string
   keys:     PushSubscriptionKeys
 }
 
-export interface NotificationPayload {
+export type NotificationPayload = {
   title: string
   body:  string
   url?:  string
@@ -140,7 +140,7 @@ export class MobileCompanionService {
     }
 
     const subscriptions = await this.listDevices(userId)
-    if (subscriptions.length === 0) return
+    if (subscriptions.length === 0) {return}
 
     const body = JSON.stringify(payload)
 
@@ -170,7 +170,7 @@ export class MobileCompanionService {
    * Fetches all unique users with active subscriptions.
    */
   async broadcast(payload: NotificationPayload): Promise<void> {
-    if (!this.vapidConfigured) return
+    if (!this.vapidConfigured) {return}
 
     const rows = await this.pool.withConnection((db) =>
       db.query<{ user_id: string }>(

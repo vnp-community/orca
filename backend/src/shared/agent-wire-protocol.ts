@@ -104,7 +104,7 @@ export function isAgentVersionBelowMinimum(version: string, minVersion: string):
   }
   const [aMaj, aMin, aPat] = parse(version)
   const [bMaj, bMin, bPat] = parse(minVersion)
-  if (aMaj !== bMaj) return aMaj < bMaj
-  if (aMin !== bMin) return aMin < bMin
+  if (aMaj !== bMaj) {return aMaj < bMaj}
+  if (aMin !== bMin) {return aMin < bMin}
   return aPat < bPat
 }

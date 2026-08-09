@@ -224,9 +224,13 @@ TYPE:  0x01 = Regular | 0x09 = KeepAlive (every 30s)
 PAYLOAD: UTF-8 JSON-RPC 2.0
 ```
 
-### 5.2 WebRuntimeClient (E2EE — legacy pairing mode)
+### 5.2 WebRuntimeClient (E2EE pairing — Desktop Pair Code sharing only)
 
 **File:** `src/renderer/src/web/web-runtime-client.ts` (~27KB)
+
+**Cập nhật 2026-08-09 ([CR-FE2E series](../../../docs/crs/v2/frontend-e2ee/)):** `main.tsx` probe `GET /auth/config` lúc khởi động để chọn 1 trong 2 nhánh hoàn toàn tách biệt:
+- **`/auth/config` → 200** (đang chạy sau Orca Web Server multi-user, `backend/`) → `bootstrapWebApp()` — SSO/local login, session cookie luôn có. `WebRuntimeClient`/E2EE pairing **không còn reachable** từ nhánh này (CR-FE2E-002 đã bỏ `PairCodeFallback` khỏi `LoginPage`; CR-FE2E-003 code-split để bundle nhánh này không tải `WebConnect.tsx` nữa — dù `web-e2ee.ts`/TweetNaCl vẫn còn trong entry chunk qua `web-preload-api.ts`, xem ghi chú giới hạn ở `specs/frontend/crs/frontend-e2ee/tasks/TASK-FE2E-008-tests-and-bundle-measurement.md`).
+- **`/auth/config` → 404** ("Desktop Pair Code sharing mode" — browser trỏ thẳng vào 1 Desktop app/bare relay, không qua `backend`) → `pair-code-app-entry.tsx` (dynamic import) — **đây là nơi duy nhất** `WebRuntimeClient` còn được dùng từ browser. Mobile Companion (F03) pair vào `backend` qua cùng cơ chế E2EE ở tầng backend, không đi qua code này.
 
 ```typescript
 class WebRuntimeClient {

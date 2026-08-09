@@ -23,13 +23,13 @@ import { existsSync, unlinkSync, chmodSync } from 'node:fs'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface DaemonCommand {
+export type DaemonCommand = {
   id:      string
   method:  string
   params?: unknown
 }
 
-export interface DaemonResponse {
+export type DaemonResponse = {
   id:      string
   ok:      boolean
   result?: unknown
@@ -74,7 +74,7 @@ export class PtyDaemon {
       })
 
       this.server.on('error', (err) => {
-        if (!this.server) return  // already stopped
+        if (!this.server) {return}  // already stopped
         console.error('[PtyDaemon] Server error:', err)
         reject(err)
       })
@@ -86,7 +86,7 @@ export class PtyDaemon {
     this.server?.close()
     this.server = null
     try {
-      if (existsSync(this.socketPath)) unlinkSync(this.socketPath)
+      if (existsSync(this.socketPath)) {unlinkSync(this.socketPath)}
     } catch {
       // Ignore cleanup errors
     }
@@ -106,20 +106,20 @@ export class PtyDaemon {
         const line = buffer.slice(0, newline).trim()
         buffer = buffer.slice(newline + 1)
 
-        if (!line) continue
+        if (!line) {continue}
 
         let cmd: DaemonCommand
         try {
           cmd = JSON.parse(line) as DaemonCommand
         } catch {
-          client.write(JSON.stringify({ id: 'unknown', ok: false, error: 'Invalid JSON' }) + '\n')
+          client.write(`${JSON.stringify({ id: 'unknown', ok: false, error: 'Invalid JSON' })  }\n`)
           continue
         }
 
         this.handler(cmd)
           .then((result) => {
             const resp: DaemonResponse = { id: cmd.id, ok: true, result }
-            client.write(JSON.stringify(resp) + '\n')
+            client.write(`${JSON.stringify(resp)  }\n`)
           })
           .catch((err: unknown) => {
             const resp: DaemonResponse = {
@@ -127,7 +127,7 @@ export class PtyDaemon {
               ok:    false,
               error: err instanceof Error ? err.message : String(err),
             }
-            client.write(JSON.stringify(resp) + '\n')
+            client.write(`${JSON.stringify(resp)  }\n`)
           })
       }
     })

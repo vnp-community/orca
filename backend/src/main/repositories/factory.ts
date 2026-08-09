@@ -13,7 +13,7 @@ import type { IConnectionPool } from '../db/pool'
 import { SqlStateRepository } from './sql-repository'
 import { JsonFileStateRepository } from './json-file-repository'
 
-export interface RepositoryFactoryOptions {
+export type RepositoryFactoryOptions = {
   /** SQL pool — if provided, SqlStateRepository is used */
   pool?: IConnectionPool
   /** JSON file path — if provided (and no pool), JsonFileStateRepository is used */

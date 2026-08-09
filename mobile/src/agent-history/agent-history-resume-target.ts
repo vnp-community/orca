@@ -4,9 +4,9 @@ import {
   parseExecutionHostId,
   toSshExecutionHostId,
   type ExecutionHostId
-} from '../../../src/shared/execution-host'
-import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
-import { isPathInsideOrEqual } from '../../../src/shared/cross-platform-path'
+} from '../vendor-shared/shared/execution-host'
+import type { AiVaultSession } from '../vendor-shared/shared/ai-vault-types'
+import { isPathInsideOrEqual } from '../vendor-shared/shared/cross-platform-path'
 import type { Worktree } from '../worktree/workspace-list-types'
 import {
   canResumeInMobileSessionWorktree,

@@ -16,7 +16,7 @@ export type ProjectVisibility = 'private' | 'team' | 'company'
 export type ProjectRole = 'owner' | 'member' | 'viewer'
 
 /** A persisted project linked to a dev server */
-export interface OrcaProject {
+export type OrcaProject = {
   id: string
   name: string
   description?: string
@@ -32,7 +32,7 @@ export interface OrcaProject {
 }
 
 /** Project membership record */
-export interface ProjectMember {
+export type ProjectMember = {
   projectId: string
   userId: string
   role: ProjectRole
@@ -40,7 +40,7 @@ export interface ProjectMember {
 }
 
 /** Full project context passed to agent spawners and relay operations */
-export interface ProjectContext {
+export type ProjectContext = {
   project: OrcaProject
   /** The requesting user's membership record */
   member: ProjectMember
@@ -51,7 +51,7 @@ export interface ProjectContext {
 }
 
 /** Parameters required to create a new project */
-export interface CreateProjectParams {
+export type CreateProjectParams = {
   name: string
   description?: string
   devServerId: string
@@ -62,7 +62,7 @@ export interface CreateProjectParams {
 }
 
 /** Partial update payload for an existing project */
-export interface UpdateProjectParams {
+export type UpdateProjectParams = {
   name?: string
   description?: string
   defaultBranch?: string

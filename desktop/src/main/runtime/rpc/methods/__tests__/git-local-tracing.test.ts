@@ -17,7 +17,7 @@ import { Tracers } from '../../../../../shared/trace/tracers'
 
 function findMethod(name: string): RpcMethod {
   const m = GIT_METHODS.find((m) => m.name === name)
-  if (!m) throw new Error(`Method ${name} not found`)
+  if (!m) {throw new Error(`Method ${name} not found`)}
   return m
 }
 

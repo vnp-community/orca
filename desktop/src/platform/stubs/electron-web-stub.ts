@@ -185,7 +185,7 @@ const electronWebStub = {
 
 export default new Proxy(electronWebStub, {
   get(target, prop) {
-    if (prop in target) return target[prop as keyof typeof target]
+    if (prop in target) {return target[prop as keyof typeof target]}
     // Silent in web mode — no warning needed
     return {}
   }

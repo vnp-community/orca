@@ -21,6 +21,13 @@ export type UnixSocketTransportOptions = {
   // the client honours them, the client-side idle timer. Tests override this
   // to avoid waiting 10 s for a frame.
   keepaliveIntervalMs?: number
+  // Why: the 30s default suits short-lived local CLI connections (cleans up
+  // abandoned AbortControllers promptly — see handleConnection). It's wrong
+  // for a long-lived proxy tunnel with no per-request cadence of its own
+  // (WsSessionRouter's browser session socket) — those legitimately sit idle
+  // between user actions for far longer than 30s. Pass 0 to disable the idle
+  // destroy entirely for that connection kind; omit to keep the 30s default.
+  idleTimeoutMs?: number
 }
 
 type MessageHandler = (
@@ -33,14 +40,16 @@ export class UnixSocketTransport implements RpcTransport {
   private readonly endpoint: string
   private readonly kind: 'unix' | 'named-pipe'
   private readonly keepaliveIntervalMs: number
+  private readonly idleTimeoutMs: number
   private server: Server | null = null
   private messageHandler: MessageHandler | null = null
   private readonly activeSockets = new Set<Socket>()
 
-  constructor({ endpoint, kind, keepaliveIntervalMs }: UnixSocketTransportOptions) {
+  constructor({ endpoint, kind, keepaliveIntervalMs, idleTimeoutMs }: UnixSocketTransportOptions) {
     this.endpoint = endpoint
     this.kind = kind
     this.keepaliveIntervalMs = keepaliveIntervalMs ?? DEFAULT_KEEPALIVE_INTERVAL_MS
+    this.idleTimeoutMs = idleTimeoutMs ?? RUNTIME_RPC_SOCKET_IDLE_TIMEOUT_MS
   }
 
   onMessage(handler: MessageHandler): void {
@@ -116,9 +125,13 @@ export class UnixSocketTransport implements RpcTransport {
 
     socket.setEncoding('utf8')
     socket.setNoDelay(true)
-    socket.setTimeout(RUNTIME_RPC_SOCKET_IDLE_TIMEOUT_MS, () => {
-      socket.destroy()
-    })
+    // Why: idleTimeoutMs === 0 means the caller opted this connection out of
+    // the idle-destroy cleanup entirely (see UnixSocketTransportOptions).
+    if (this.idleTimeoutMs > 0) {
+      socket.setTimeout(this.idleTimeoutMs, () => {
+        socket.destroy()
+      })
+    }
     socket.on('error', () => {
       socket.destroy()
     })

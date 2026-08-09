@@ -119,7 +119,7 @@ export class DevServerManager extends EventEmitter {
 
   get(id: string): DevServer | null {
     const persisted = this.store.list().find((ds) => ds.id === id)
-    if (!persisted) return null
+    if (!persisted) {return null}
     return this.mergeWithRuntime(persisted)
   }
 
@@ -209,7 +209,7 @@ export class DevServerManager extends EventEmitter {
 
   async connect(id: string): Promise<void> {
     const persisted = this.store.list().find((ds) => ds.id === id)
-    if (!persisted) throw new Error(`DevServer not found: ${id}`)
+    if (!persisted) {throw new Error(`DevServer not found: ${id}`)}
 
     const span = mgr.start({ op: 'connect', devServerId: id, type: persisted.connectionType })
     this.setRuntimeState(id, { status: 'connecting', lastError: null })

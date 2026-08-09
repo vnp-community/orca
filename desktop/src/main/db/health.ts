@@ -15,7 +15,7 @@ export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy'
  * 'degraded'  — slow (>=500ms) or pool has waiting requests
  * 'unhealthy' — connection fails or timeout (>=2000ms)
  */
-export interface DatabaseHealthCheck {
+export type DatabaseHealthCheck = {
   status: HealthStatus
   /** Query latency in milliseconds */
   latencyMs: number
@@ -30,7 +30,7 @@ export interface DatabaseHealthCheck {
 }
 
 /** Interface for database health monitoring */
-export interface HealthChecker {
+export type HealthChecker = {
   /** Run a live health check now */
   check(): Promise<DatabaseHealthCheck>
   /** Return cached result from last check (never queries DB) */

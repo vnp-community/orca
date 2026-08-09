@@ -22,13 +22,13 @@ export type WorkflowStatus = 'pending' | 'running' | 'paused' | 'completed' | 'f
  * dev server the step's serverSpec resolves to — StepExecutors validates this at
  * dispatch time (WORKFLOW_STEP_PROVIDER_NOT_FOUND if the account doesn't exist).
  */
-export interface WorkflowStepProviderConfig {
+export type WorkflowStepProviderConfig = {
   accountId: string
   /** Overrides the account's configured model for this step only. */
   model?: string
 }
 
-export interface WorkflowStepConfig {
+export type WorkflowStepConfig = {
   type: WorkflowStepType
   // agent:        { prompt: string; worktreePath: string; trustPreset?: string; provider?: WorkflowStepProviderConfig }
   // shell:        { script: string; env?: Record<string, string> }
@@ -41,7 +41,7 @@ export interface WorkflowStepConfig {
 }
 
 /** A single node in the workflow DAG */
-export interface WorkflowStep {
+export type WorkflowStep = {
   id: string
   name: string
   /** 'project:<projectId>' or 'server:<devServerId>' */
@@ -56,13 +56,13 @@ export interface WorkflowStep {
 }
 
 /** Static workflow blueprint */
-export interface WorkflowDefinition {
+export type WorkflowDefinition = {
   steps: WorkflowStep[]
   inputs?: Record<string, unknown>
 }
 
 /** A running or completed workflow execution instance */
-export interface WorkflowExecution {
+export type WorkflowExecution = {
   id: string
   definition: WorkflowDefinition
   status: WorkflowStatus
@@ -80,7 +80,7 @@ export interface WorkflowExecution {
 }
 
 /** Result produced by a step executor */
-export interface StepOutput {
+export type StepOutput = {
   exitCode: number
   stdout?: string
   stderr?: string
@@ -88,7 +88,7 @@ export interface StepOutput {
 }
 
 /** Filters for listing workflow executions */
-export interface ListExecutionsFilter {
+export type ListExecutionsFilter = {
   projectId?: string
   triggeredBy?: string
   status?: WorkflowStatus

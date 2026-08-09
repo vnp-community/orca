@@ -126,20 +126,6 @@ export const Tracers = {
   /** BL-INT-03: preflight check (local host hoặc relay-delegated) */
   remoteIntegrationPreflightFlow:         createTracer('remoteIntegration:preflight'),
 
-  // ─── CR-TRACE-014: Remote Integration (renderer-initiated, ui: prefix) ─────
-  // Why: TASK-FE-014.1/014.2 originally proposed bare `remoteIntegrationPreflightFlow`/
-  // `remoteIntegrationCredentialStoreFlow` keys, but a concurrent backend task already
-  // claimed those exact key names above (`remoteIntegration:preflight`/
-  // `remoteIntegration:credentialStore`). Per the no-rename collision rule, the
-  // renderer-initiated `ui:*` variants use the `ui` prefix — same pattern as
-  // `uiWorktreeCreateFlow`/`uiAgentOrchSpawnFlow`/`uiTerminalCreateFlow` above.
-  /** BL-INT-01 + BL-INT-03: click "Re-check" → refreshPreflightStatus({ force: true }) —
-   *  single shared renderer entry point (usePreflightCardStatuses + auto triggers). */
-  uiRemoteIntegrationPreflightFlow:       createTracer('ui:remoteIntegration.preflight'),
-  /** BL-INT-02: CredentialInputForm.tsx handleSave/handleRevoke — orphan component,
-   *  not mounted yet (TASK-FE-014.2). */
-  uiRemoteIntegrationCredentialStoreFlow: createTracer('ui:remoteIntegration.credentialStore'),
-
   // ─── CR-TRACE-005: Code Review (Backend-side, `codeReview:` prefix per
   // CR-TRACE-000 §4) — NOTE naming drift: the `codeReview*Flow` keys above
   // (`codeReviewDiffFlow`/`codeReviewAnnotateFlow`/`codeReviewFeedbackFlow`/

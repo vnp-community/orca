@@ -12,7 +12,7 @@ import type { OrcaRuntimeService } from './orca-runtime'
 import type { DevServerManager } from '../dev-server/dev-server-manager'
 import { writeRuntimeMetadata } from './runtime-metadata'
 import { RpcDispatcher } from './rpc/dispatcher'
-import type { RpcRequest, RpcResponse } from './rpc/core'
+import type { RpcAnyMethod, RpcRequest, RpcResponse } from './rpc/core'
 import { errorResponse } from './rpc/errors'
 import type { RpcMessageContext, RpcTransport } from './rpc/transport'
 import { UnixSocketTransport } from './rpc/unix-socket-transport'
@@ -23,6 +23,7 @@ import { DeviceRegistry, type DeviceScope } from './device-registry'
 import { loadOrCreateE2EEKeypair, type E2EEKeypair } from './e2ee-keypair'
 import { E2EEChannel } from './rpc/e2ee-channel'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
+import type { ScopedPairingToken } from '../../shared/rbac-types'
 import {
   decodeTerminalStreamFrame,
   type TerminalStreamFrame
@@ -31,8 +32,8 @@ import {
 const DEFAULT_WS_PORT = 6768
 // ORCA_PORT: allow headless/container deployments to override the WebSocket port
 // ORCA_DOMAIN: when running behind a reverse proxy, use this domain for pairing URLs
-const ORCA_PORT = process.env.ORCA_PORT ? parseInt(process.env.ORCA_PORT, 10) : undefined
-const ORCA_DOMAIN = process.env.ORCA_DOMAIN  // e.g. 'orca-backend.vnpblc.internal'
+const ORCA_PORT = process.env.ORCA_PORT ? Number.parseInt(process.env.ORCA_PORT, 10) : undefined
+const ORCA_DOMAIN = process.env.ORCA_DOMAIN // e.g. 'orca-backend.vnpblc.internal'
 
 type OrcaRuntimeRpcServerOptions = {
   runtime: OrcaRuntimeService
@@ -58,7 +59,7 @@ type OrcaRuntimeRpcServerOptions = {
   // cannot be statically registered in ALL_RPC_METHODS because they require
   // runtime service injection. Pass them here at bootstrap time so they are
   // merged into the dispatcher's registry. (v5.0 TDD-16)
-  extraMethods?: import('./rpc/core').RpcAnyMethod[]
+  extraMethods?: RpcAnyMethod[]
   // Why: test-only overrides for the two time-bound constants below.
   // Production callers must not pass these — defaults are set by the design
   // doc (§3.1) and changing them in production would weaken the admission
@@ -92,11 +93,14 @@ function resolvePairingEndpoint(rawEndpoint: string, address: string | null | un
   // ORCA_DOMAIN env var: use as public hostname for generated pairing URLs.
   // Useful when running behind a reverse proxy (nginx, Caddy, etc.).
   if (ORCA_DOMAIN && !override) {
-    const scheme = ORCA_DOMAIN.startsWith('wss://') || ORCA_DOMAIN.startsWith('https://') ? 'wss' : 'ws'
+    const scheme =
+      ORCA_DOMAIN.startsWith('wss://') || ORCA_DOMAIN.startsWith('https://') ? 'wss' : 'ws'
     const cleanDomain = ORCA_DOMAIN.replace(/^https?:\/\/|^wss?:\/\//, '')
     endpoint.hostname = cleanDomain.split(':')[0]
-    if (cleanDomain.includes(':')) endpoint.port = cleanDomain.split(':')[1]
-    endpoint.protocol = scheme + ':'
+    if (cleanDomain.includes(':')) {
+      endpoint.port = cleanDomain.split(':')[1]
+    }
+    endpoint.protocol = `${scheme}:`
     return formatWebSocketUrl(endpoint)
   }
 
@@ -536,7 +540,7 @@ export class OrcaRuntimeRpcServer {
    * Called by server-bootstrap to inject service-dependent methods (e.g. AI provider)
    * that are initialized after the RPC server is created. (v5.0 TDD-16)
    */
-  addMethods(methods: import('./rpc/core').RpcAnyMethod[]): void {
+  addMethods(methods: RpcAnyMethod[]): void {
     this.dispatcher.addMethods(methods)
   }
 
@@ -714,7 +718,14 @@ export class OrcaRuntimeRpcServer {
     const socketTransport = new UnixSocketTransport({
       endpoint: transportMeta.endpoint,
       kind: transportMeta.kind as 'unix' | 'named-pipe',
-      keepaliveIntervalMs: this.keepaliveIntervalMs
+      keepaliveIntervalMs: this.keepaliveIntervalMs,
+      // Why: socketPathOverride means this socket is WsSessionRouter's private
+      // proxy tunnel to one browser session (SessionManager-spawned user
+      // process), not the shared CLI-facing socket — no other client ever
+      // connects here. It legitimately sits idle between user actions for
+      // well over 30s, so the CLI-oriented idle-destroy cleanup must not
+      // apply to it (see BUG: 30s WS reconnect / SSH_SESSION_EXPIRED).
+      ...(this.socketPathOverride ? { idleTimeoutMs: 0 } : {})
     })
 
     // Why: Unix socket transport uses the shared runtime auth token. This is
@@ -770,16 +781,20 @@ export class OrcaRuntimeRpcServer {
           // pin it.
           ...(this.wsPort !== 0 ? { fallbackPort: readWsFallbackPort(this.userDataPath) } : {}),
           // Wire fleet Prometheus /metrics if enabled (SOL-005 — CR-005)
-          ...(fleetMetricsEnabled ? {
-            onHttpRequest: async (req, res) => {
-              if (req.url !== '/metrics' || req.method !== 'GET') return false
-              const { createFleetMetricsHandler } = await import('./rpc/fleet-metrics-handler')
-              const { getFleetStatus } = await import('../ssh/fleet-status-service')
-              const handler = createFleetMetricsHandler(() => getFleetStatus())
-              await handler(req, res)
-              return true
-            }
-          } : {})
+          ...(fleetMetricsEnabled
+            ? {
+                onHttpRequest: async (req, res) => {
+                  if (req.url !== '/metrics' || req.method !== 'GET') {
+                    return false
+                  }
+                  const { createFleetMetricsHandler } = await import('./rpc/fleet-metrics-handler')
+                  const { getFleetStatus } = await import('../ssh/fleet-status-service')
+                  const handler = createFleetMetricsHandler(() => getFleetStatus())
+                  await handler(req, res)
+                  return true
+                }
+              }
+            : {})
         })
         this.wsTransport = wsTransport
 
@@ -928,7 +943,11 @@ export class OrcaRuntimeRpcServer {
     // client exceeds the max message size. The transport closes the connection
     // after this response.
     if (!rawMessage) {
-      reply(JSON.stringify(this.buildError('unknown', 'request_too_large', 'RPC request exceeds the maximum size')))
+      reply(
+        JSON.stringify(
+          this.buildError('unknown', 'request_too_large', 'RPC request exceeds the maximum size')
+        )
+      )
       return
     }
 
@@ -943,11 +962,15 @@ export class OrcaRuntimeRpcServer {
     // — it only guards handlers that can block for minutes. See §7 risk #2.
     const longPoll = isLongPollRequest(request)
     if (longPoll && this.activeLongPolls >= this.longPollCap) {
-      reply(JSON.stringify(this.buildError(
-        request.id,
-        'runtime_busy',
-        'long-poll capacity reached; retry with backoff'
-      )))
+      reply(
+        JSON.stringify(
+          this.buildError(
+            request.id,
+            'runtime_busy',
+            'long-poll capacity reached; retry with backoff'
+          )
+        )
+      )
       return
     }
     if (longPoll) {
@@ -1002,7 +1025,7 @@ export class OrcaRuntimeRpcServer {
             request.id,
             'forbidden',
             `Access to ${request.method} denied by scoped token policy`
-          ),
+          )
         }
       }
       return { request }
@@ -1015,14 +1038,17 @@ export class OrcaRuntimeRpcServer {
   private isScopedMethodAllowed(
     method: string,
     params: unknown,
-    scope: import('../../shared/rbac-types').ScopedPairingToken
+    scope: ScopedPairingToken
   ): boolean {
     // SSH/worktree/terminal methods require allowedServerIds check
-    if (method.startsWith('ssh.') || method.startsWith('worktree.') || method.startsWith('terminal.')) {
+    if (
+      method.startsWith('ssh.') ||
+      method.startsWith('worktree.') ||
+      method.startsWith('terminal.')
+    ) {
       const p = params as Record<string, unknown> | null
       const targetId =
-        (p?.['targetId'] as string | undefined) ??
-        (p?.['sshTargetId'] as string | undefined)
+        (p?.['targetId'] as string | undefined) ?? (p?.['sshTargetId'] as string | undefined)
 
       if (targetId) {
         const allowed = scope.allowedServerIds
@@ -1034,7 +1060,6 @@ export class OrcaRuntimeRpcServer {
 
     return true
   }
-
 
   // Why: WebSocket messages go through streaming dispatch which can emit
   // multiple responses. Auth uses per-device tokens from the device registry.

@@ -252,17 +252,17 @@ function validatePtyCwd(rawCwd: string): string {
   const { homedir } = require('node:os') as typeof import('node:os')
 
   const home = homedir()
-  if (!rawCwd) return home
+  if (!rawCwd) {return home}
 
   // Reject null bytes
-  if (rawCwd.includes('\0')) return home
+  if (rawCwd.includes('\0')) {return home}
 
   const resolved = resolve(rawCwd)
 
   // Must exist and be a directory
   try {
     const stat = statSync(resolved)
-    if (!stat.isDirectory()) return home
+    if (!stat.isDirectory()) {return home}
   } catch {
     return home
   }

@@ -141,7 +141,7 @@ export class PreflightHandler {
   /** TASK-028: Get pwsh availability and version. */
   private async checkPwsh(): Promise<{ pwshAvailable: boolean; pwshVersion?: string }> {
     const available = isPwshAvailable()
-    if (!available) return { pwshAvailable: false }
+    if (!available) {return { pwshAvailable: false }}
     try {
       const { stdout } = await execFileAsync('pwsh', ['--version'])
       return { pwshAvailable: true, pwshVersion: stdout.trim() }

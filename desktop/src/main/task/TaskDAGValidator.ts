@@ -31,15 +31,15 @@ export class TaskDAGValidator {
     edgeType: TaskEdgeType
   ): Promise<boolean> {
     // A self-loop always creates a cycle
-    if (fromTaskId === toTaskId) return true
+    if (fromTaskId === toTaskId) {return true}
 
     const visited = new Set<string>()
     const stack = [toTaskId]
 
     while (stack.length > 0) {
       const current = stack.pop()!
-      if (current === fromTaskId) return true
-      if (visited.has(current)) continue
+      if (current === fromTaskId) {return true}
+      if (visited.has(current)) {continue}
       visited.add(current)
 
       const rows = await this.pool.withConnection((db) =>
@@ -67,15 +67,15 @@ export class TaskDAGValidator {
    * Spec-required entry-point that ignores edge type filtering.
    */
   async detectCycle(fromTaskId: string, toTaskId: string): Promise<boolean> {
-    if (fromTaskId === toTaskId) return true
+    if (fromTaskId === toTaskId) {return true}
 
     const visited = new Set<string>()
     const queue = [toTaskId]
 
     while (queue.length > 0) {
       const current = queue.shift()!
-      if (current === fromTaskId) return true
-      if (visited.has(current)) continue
+      if (current === fromTaskId) {return true}
+      if (visited.has(current)) {continue}
       visited.add(current)
 
       const rows = await this.pool.withConnection((db) =>
@@ -107,9 +107,9 @@ export class TaskDAGValidator {
 
     while (queue.length > 0) {
       const current = queue.shift()!
-      if (visited.has(current)) continue
+      if (visited.has(current)) {continue}
       visited.add(current)
-      if (current !== fromTaskId) result.push(current)
+      if (current !== fromTaskId) {result.push(current)}
 
       const rows = await this.pool.withConnection((db) =>
         db.query<{ toTaskId: string }>(

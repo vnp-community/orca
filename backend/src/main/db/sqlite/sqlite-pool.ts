@@ -16,7 +16,7 @@ export class SqliteSingleConnectionPool implements IConnectionPool {
   private readonly db: SqliteAdapter
   private inUse = false
   private draining = false
-  private waiters: Array<() => void> = []
+  private waiters: (() => void)[] = []
 
   constructor(path: string, options?: { readonly?: boolean }) {
     this.db = new SqliteAdapter(path, options)
@@ -33,7 +33,7 @@ export class SqliteSingleConnectionPool implements IConnectionPool {
   release(_conn: IDatabase): void {
     this.inUse = false
     const waiter = this.waiters.shift()
-    if (waiter) waiter()
+    if (waiter) {waiter()}
   }
 
   async withConnection<T>(fn: (db: IDatabase) => Promise<T>): Promise<T> {

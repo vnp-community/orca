@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { ComputerListAppsResult, ComputerSnapshotResult } from '../../src/shared/runtime-types'
+import type { ComputerListAppsResult, ComputerSnapshotResult } from '../vendor-shared/shared/runtime-types'
 import {
   ensureOrcaRuntimeLaunched,
   findRoleIndex,

@@ -203,7 +203,7 @@ export class WebSocketTransport implements RpcTransport {
     const requestListener = this.onHttpRequest
       ? (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
           void this.onHttpRequest!(req, res).then((handled) => {
-            if (!handled && staticHandler) staticHandler(req, res)
+            if (!handled && staticHandler) {staticHandler(req, res)}
             else if (!handled) { res.writeHead(404); res.end() }
           }).catch(() => { res.writeHead(500); res.end() })
         }

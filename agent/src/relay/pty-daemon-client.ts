@@ -105,10 +105,10 @@ function wireSocket(sock: net.Socket): void {
   const decoder = new DaemonMessageDecoder((msg: DaemonMessage) => {
     if (isDaemonResponse(msg)) {
       const pending = pendingRequests.get(msg.id)
-      if (!pending) return
+      if (!pending) {return}
       pendingRequests.delete(msg.id)
-      if (msg.error) pending.reject(new Error(msg.error.message))
-      else pending.resolve({ result: msg.result })
+      if (msg.error) {pending.reject(new Error(msg.error.message))}
+      else {pending.resolve({ result: msg.result })}
       return
     }
     // Notification: { method, params }, no id.
@@ -118,7 +118,7 @@ function wireSocket(sock: net.Socket): void {
   })
   sock.on('data', (chunk) => decoder.feed(chunk.toString('utf8')))
   const onDrop = (): void => {
-    if (socket === sock) socket = null
+    if (socket === sock) {socket = null}
     for (const [id, pending] of pendingRequests) {
       pending.reject(new Error('pty-daemon connection lost'))
       pendingRequests.delete(id)
@@ -129,8 +129,8 @@ function wireSocket(sock: net.Socket): void {
 }
 
 async function ensureConnection(log: AgentLogger): Promise<net.Socket> {
-  if (socket && !socket.destroyed) return socket
-  if (connectingPromise) return connectingPromise
+  if (socket && !socket.destroyed) {return socket}
+  if (connectingPromise) {return connectingPromise}
   connectingPromise = (async () => {
     const socketPath = getDaemonSocketPath()
     let sock: net.Socket
@@ -178,7 +178,7 @@ async function forward(
   log: AgentLogger,
   notify?: NotifyFn
 ): Promise<object> {
-  if (notify) currentNotify = notify
+  if (notify) {currentNotify = notify}
   try {
     const outcome = await sendRequest(method, params, log)
     if (outcome.error) {

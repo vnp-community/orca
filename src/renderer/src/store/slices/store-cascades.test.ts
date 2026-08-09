@@ -5038,11 +5038,11 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
 // TASK-FE-003.3: shutdownWorktreeTerminals() worktree-teardown route tracing.
 describe('shutdownWorktreeTerminals tracing (CR-TRACE-003 route b)', () => {
   async function loadTraceSink(): Promise<{
-    events: { id: string; flow: string; level: string; fields: Record<string, unknown> }[]
+    events: { flow: string; level: string; fields: Record<string, unknown> }[]
     unregister: () => void
   }> {
     const { registerTraceSink } = await import('../../../../shared/trace')
-    const events: { id: string; flow: string; level: string; fields: Record<string, unknown> }[] = []
+    const events: { flow: string; level: string; fields: Record<string, unknown> }[] = []
     const unregister = registerTraceSink((e) => events.push(e))
     return { events, unregister }
   }

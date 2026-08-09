@@ -4,7 +4,7 @@
  * NodeAdapter uses AES-256-GCM with a file-based key.
  * ElectronAdapter delegates to Electron's OS keychain integration.
  */
-export interface ISecureStorage {
+export type ISecureStorage = {
   /** True if encryption is available (false = will store as plain bytes) */
   isEncryptionAvailable(): boolean
 

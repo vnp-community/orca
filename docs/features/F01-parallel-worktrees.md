@@ -43,6 +43,11 @@ Khi phát triển với AI agent, developers thường chỉ chạy một agent 
 - Chọn worktree thắng và merge vào nhánh chính
 - Cleanup tự động hoặc thủ công các worktree không cần nữa
 
+### Sparse Checkout Presets
+- Giới hạn checkout của worktree mới xuống một tập thư mục con (Git sparse-checkout), hữu ích với monorepo lớn
+- Lưu preset (tên + danh sách thư mục repo-relative) theo từng repo, chọn lại khi tạo worktree tiếp theo
+- Validate path: chặn đường dẫn tuyệt đối và `..` để tránh checkout ngoài repo
+
 ### Remote Worktrees
 - Hỗ trợ worktree trên SSH host (remote machine)
 - Cùng trải nghiệm như worktree local
@@ -88,6 +93,8 @@ Khi phát triển với AI agent, developers thường chỉ chạy một agent 
 | **File** | `src/main/repo-worktrees.ts`, `src/shared/worktree-id.ts` |
 | **Safety logic** | `src/main/worktree-removal-safety.ts` |
 | **Recovery** | `src/main/local-worktree-removal-recovery.ts` |
+| **Sparse checkout presets UI** | `src/renderer/src/components/sparse/SparseCheckoutPresetSelect.tsx`, `SparseCheckoutPresetDraftForm.tsx` |
+| **Sparse checkout validation** | `src/main/ipc/sparse-checkout-directories.ts` |
 
 ---
 

@@ -8,7 +8,7 @@ import { NodeSecureStorage } from '../storage'
 const testDataPath = join(tmpdir(), `orca-storage-test-${Date.now()}`)
 
 afterEach(() => {
-  if (existsSync(testDataPath)) rmSync(testDataPath, { recursive: true })
+  if (existsSync(testDataPath)) {rmSync(testDataPath, { recursive: true })}
 })
 
 describe('NodeSecureStorage', () => {

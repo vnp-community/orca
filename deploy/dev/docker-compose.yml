@@ -2,14 +2,15 @@
 # Orca Dev Server — Docker Compose (Gateway server-side)
 # ============================================================
 #
-# Kiến trúc:  Nginx (HTTPS reverse proxy) + Orca (Node.js backend)
+# Kiến trúc:  Nginx (HTTPS reverse proxy) + Orca (backend/ + frontend/, 1 container)
 #
 # Workflow:
 #   [Local Machine]
-#     1. pnpm build:server                 # build backend + web SPA
-#     2. ./scripts/sync-to-server.sh       # rsync source lên server
+#     1. (tuỳ chọn) ./scripts/build-local.sh   # build thử backend/+frontend/ để bắt lỗi sớm
+#     2. ./scripts/sync-to-server.sh <version>  # rsync source lên server
 #
-#   [Server] (file này)
+#   [Server] (file này) — docker/backend/Dockerfile tự build backend/ và
+#   frontend/ (2 stage riêng, xem comment đầu Dockerfile) rồi gộp vào 1 image:
 #     3. docker compose up -d --build     # build image + chạy containers
 #     4. docker compose logs orca         # check logs
 #
@@ -31,7 +32,7 @@ services:
   orca:
     build:
       context: ../../
-      dockerfile: deploy/dev/docker/orca/Dockerfile
+      dockerfile: deploy/dev/docker/backend/Dockerfile
     image: vnpblc/orca-server:${ORCA_VERSION:-latest}
     container_name: orca-server
     restart: unless-stopped
@@ -58,7 +59,7 @@ services:
       - orca-data:/data/orca
 
       # SSH key để Orca Server SSH vào các Dev Servers (internal)
-      - ./docker/orca/ssh:/home/orca/.ssh:ro
+      - ./docker/backend/ssh:/home/orca/.ssh:ro
 
       # Project repos (mount từ host, NFS, hoặc volume)
       - orca-projects:/srv/projects

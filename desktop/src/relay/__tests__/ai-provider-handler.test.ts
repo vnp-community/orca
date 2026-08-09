@@ -25,7 +25,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     }),
     readFile: vi.fn().mockImplementation(async (path: string) => {
       const content = mockFiles.get(String(path))
-      if (!content) throw Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' })
+      if (!content) {throw Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' })}
       return content
     }),
   }
@@ -77,7 +77,7 @@ describe('aiProviderHandlers — relay credential store', () => {
 
       // The last written value should be 'new'
       const allFiles = [...mockFiles.values()]
-      const lastFile = allFiles[allFiles.length - 1]
+      const lastFile = allFiles.at(-1)
       const parsed = JSON.parse(lastFile)
       expect(parsed.encryptedBlob).toBe('new')
     })

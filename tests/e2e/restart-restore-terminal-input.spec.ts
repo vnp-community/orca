@@ -42,8 +42,8 @@ import {
   probeKeyboardType,
   probeOwnershipRebuildRevival
 } from './helpers/terminal-input-probes'
-import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
-import { PTY_SESSION_ID_SEPARATOR } from '../../src/shared/pty-session-id-format'
+import { PROTOCOL_VERSION } from '../vendor-shared/main/daemon/types'
+import { PTY_SESSION_ID_SEPARATOR } from '../vendor-shared/shared/pty-session-id-format'
 
 function readDaemonPid(userDataDir: string): number {
   const raw = readFileSync(

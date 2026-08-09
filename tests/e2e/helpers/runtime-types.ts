@@ -1,13 +1,13 @@
-import type { AppState } from '../../../src/renderer/src/store/types'
-import type { OpenFile, RightSidebarTab } from '../../../src/renderer/src/store/slices/editor'
-import type { ManagedPane } from '../../../src/renderer/src/lib/pane-manager/pane-manager-types'
+import type { AppState } from '../../vendor-shared/renderer/src/store/types'
+import type { OpenFile, RightSidebarTab } from '../../vendor-shared/renderer/src/store/slices/editor'
+import type { ManagedPane } from '../../vendor-shared/renderer/src/lib/pane-manager/pane-manager-types'
 import type {
   BrowserWorkspace,
   Repo,
   TerminalTab,
   Worktree,
   WorkspaceVisibleTabType
-} from '../../../src/shared/types'
+} from '../../vendor-shared/shared/types'
 
 export type AppStore = {
   getState(): AppState

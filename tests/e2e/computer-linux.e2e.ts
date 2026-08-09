@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { ComputerActionResult, ComputerSnapshotResult } from '../../src/shared/runtime-types'
+import type { ComputerActionResult, ComputerSnapshotResult } from '../vendor-shared/shared/runtime-types'
 import {
   ensureOrcaRuntimeLaunched,
   ensureGeditLaunched,

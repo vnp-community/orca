@@ -171,7 +171,7 @@ function execFileWithStdin(
  */
 export function validateWorktreePath(args: string[], workDir: string): void {
   // Only validate 'git worktree add <path> [branch]'
-  if (args[0] !== 'worktree' || args[1] !== 'add' || !args[2]) return
+  if (args[0] !== 'worktree' || args[1] !== 'add' || !args[2]) {return}
 
   const rawPath = args[2]
   const resolved = rawPath.startsWith('/')
@@ -190,7 +190,7 @@ export function validateWorktreePath(args: string[], workDir: string): void {
   const parentDir = path.dirname(workDir)
   const allowedRoots = [workDir, parentDir, '/tmp', '/var/tmp']
   const isAllowed = allowedRoots.some(
-    (root) => resolved === root || resolved.startsWith(root + '/')
+    (root) => resolved === root || resolved.startsWith(`${root  }/`)
   )
 
   if (!isAllowed) {
@@ -201,7 +201,7 @@ export function validateWorktreePath(args: string[], workDir: string): void {
   }
 }
 
-export interface WorktreeInfo {
+export type WorktreeInfo = {
   path:         string
   head:         string      // commit SHA
   branch:       string      // branch name (without refs/heads/)

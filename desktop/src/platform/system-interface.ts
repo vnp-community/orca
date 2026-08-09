@@ -1,5 +1,5 @@
 /** ISystemInfo — platform/OS information queries */
-export interface ISystemInfo {
+export type ISystemInfo = {
   /** Host OS platform */
   getPlatform(): NodeJS.Platform
 

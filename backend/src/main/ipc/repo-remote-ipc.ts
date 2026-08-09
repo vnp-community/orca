@@ -41,7 +41,7 @@ export function registerRepoRemoteIpcHandlers(
       params: { devServerId: string; path: string; includeGitStatus?: boolean }
     ): Promise<{ entries: DirectoryEntry[]; platform: NodeJS.Platform }> => {
       const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) throw new Error(`Dev server '${params.devServerId}' not connected`)
+      if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
       return relay.call<{ entries: DirectoryEntry[]; platform: NodeJS.Platform }>(
         'fs.listDirectory',
         { path: params.path, includeGitStatus: params.includeGitStatus ?? false }
@@ -61,7 +61,7 @@ export function registerRepoRemoteIpcHandlers(
       params: { devServerId: string; path: string; name?: string }
     ): Promise<Repo> => {
       const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) throw new Error(`Dev server '${params.devServerId}' not connected`)
+      if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
 
       // Validate the path exists on the remote before persisting.
       const statResult = await relay.call<{ exists: boolean; isDirectory?: boolean }>(
@@ -101,7 +101,7 @@ export function registerRepoRemoteIpcHandlers(
       params: { devServerId: string; url: string; targetDir?: string }
     ): Promise<{ repoId: string; path: string }> => {
       const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) throw new Error(`Dev server '${params.devServerId}' not connected`)
+      if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
 
       const devServer = devServerManager.get(params.devServerId)!
       const workspaceDir = devServer.workspaceDir ?? '~/orca/workspaces'
@@ -143,7 +143,7 @@ export function registerRepoRemoteIpcHandlers(
       params: { devServerId: string; rootPath: string }
     ): Promise<{ path: string; name: string }[]> => {
       const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) throw new Error(`Dev server '${params.devServerId}' not connected`)
+      if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
 
       const { entries } = await relay.call<{ entries: DirectoryEntry[]; platform: NodeJS.Platform }>(
         'fs.listDirectory',

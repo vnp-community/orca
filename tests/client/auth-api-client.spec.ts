@@ -143,7 +143,7 @@ describe('Auth API Client: Admin API Access', () => {
       headers: { Cookie: adminCookie }
     })
     expect(res.status).toBe(200)
-    const users = await res.json() as Array<{ email: string }>
+    const users = await res.json() as { email: string }[]
     expect(Array.isArray(users)).toBe(true)
   })
 

@@ -4,8 +4,8 @@ import type {
   PRCheckDetail,
   PRCheckRunDetails,
   PRInfo
-} from '../../../src/shared/types'
-import type { HostedReviewInfo } from '../../../src/shared/hosted-review'
+} from '../vendor-shared/shared/types'
+import type { HostedReviewInfo } from '../vendor-shared/shared/hosted-review'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcSuccess } from '../transport/types'
 import { mobileRepoSelectorFromWorktreeId } from '../source-control/mobile-pr-create'

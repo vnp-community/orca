@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { PRCheckDetail, PRComment, PRInfo } from '../../../src/shared/types'
+import type { PRCheckDetail, PRComment, PRInfo } from '../vendor-shared/shared/types'
 import type { PrSidebarState } from '../session/mobile-pr-sidebar-state'
 import { buildMobilePrChipSummary, countUnresolvedReviewThreads } from './mobile-pr-chip-summary'
 

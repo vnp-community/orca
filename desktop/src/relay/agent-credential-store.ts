@@ -29,7 +29,7 @@ const FILE_VERSION = 1
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface StoredCredential {
+type StoredCredential = {
   version: number
   salt:    string  // base64 16 bytes (scrypt salt)
   iv2:     string  // base64 12 bytes (AES-GCM IV for server-side encryption)
@@ -266,7 +266,7 @@ async function checkProviderReachabilityDetailed(provider: string): Promise<{
   const url = PROVIDER_HEALTH_URLS[provider]
 
   // Local providers (Ollama, vLLM, LM Studio) — no external check needed
-  if (!url) return { ok: true, note: 'local_provider' }
+  if (!url) {return { ok: true, note: 'local_provider' }}
 
   try {
     const ctrl  = new AbortController()
@@ -276,7 +276,7 @@ async function checkProviderReachabilityDetailed(provider: string): Promise<{
     const statusCode = resp.status
     // 401/403/429 = server reachable (auth required / rate-limited — expected without auth)
     // 5xx = server error = not ok
-    if (statusCode < 500) return { ok: true, note: 'reachable', statusCode }
+    if (statusCode < 500) {return { ok: true, note: 'reachable', statusCode }}
     return { ok: false, note: 'server_error', statusCode }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -343,6 +343,6 @@ export async function readDecryptedKey(
   const result = await handleReadCredential(null, { accountId, parentSpanId }, config, log) as {
     result?: { encryptedBlob: string }; error?: unknown
   }
-  if (result.error || !result.result) return null
+  if (result.error || !result.result) {return null}
   return result.result.encryptedBlob
 }

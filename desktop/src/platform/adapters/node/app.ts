@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { homedir, tmpdir } from 'node:os'
 import type { IApp, AppPathName, AppEvent } from '../../app-interface'
 
-export interface NodeAppOptions {
+export type NodeAppOptions = {
   userDataPath?: string
 }
 
@@ -69,7 +69,7 @@ export class NodeApp extends EventEmitter implements IApp {
 
   getAppPath(): string {
     // Why: ORCA_APP_PATH allows explicit override (e.g. in Docker / tests).
-    if (process.env.ORCA_APP_PATH) return resolve(process.env.ORCA_APP_PATH)
+    if (process.env.ORCA_APP_PATH) {return resolve(process.env.ORCA_APP_PATH)}
     // Why: In server mode, compiled output is at <appRoot>/out/server/index.js.
     // __dirname here is <appRoot>/out/server (or deeper in sub-modules).
     // We find the app root by walking up to the directory that contains `out/`.
@@ -82,7 +82,7 @@ export class NodeApp extends EventEmitter implements IApp {
 
   async whenReady(): Promise<void> {
     // In Node mode, always "ready"
-    return Promise.resolve()
+    return
   }
 
   quit(): void {

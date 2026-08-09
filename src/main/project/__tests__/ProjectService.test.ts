@@ -293,7 +293,7 @@ describe('ProjectService.create tracing (CR-TRACE-015)', () => {
     expect(okEvent?.fields).toMatchObject({ op: 'create', projectId: project.id })
   })
 
-  it('create() with a non-existent devServerId → span.fail("DEV_SERVER_NOT_FOUND", { devServerId }), no project created', async () => {
+  it('create() with a non-existent devServerId → span.fail("DEV_SERVER_NOT_FOUND", { op: "create" }), no project created', async () => {
     const dsm = makeMockDSM(false)
     const noServerService = new ProjectService(pool, dsm)
     await insertUser(pool, 'u-trace-2')
@@ -305,7 +305,7 @@ describe('ProjectService.create tracing (CR-TRACE-015)', () => {
     stop()
 
     const failEvent = events.find((e) => e.flow === 'profile:projectRoute' && e.level === 'fail')
-    expect(failEvent?.fields).toMatchObject({ devServerId: 'missing-dev-server' })
+    expect(failEvent?.fields).toMatchObject({ op: 'create' })
     expect(failEvent?.fields.err).toContain('DEV_SERVER_NOT_FOUND')
   })
 

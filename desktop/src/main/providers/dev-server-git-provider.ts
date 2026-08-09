@@ -133,7 +133,7 @@ export class DevServerGitProvider implements IGitProvider {
       const xy = parts[1] ?? ''
       const filePath = parts.slice(10).join(' ')
       const conflictKind = parseConflictKind(xy)
-      if (!filePath || !conflictKind) continue
+      if (!filePath || !conflictKind) {continue}
       parser.entries.push({
         path: filePath,
         area: 'unstaged',
@@ -202,9 +202,9 @@ export class DevServerGitProvider implements IGitProvider {
         return false
       }
     }
-    if (await exists('MERGE_HEAD')) return 'merge'
-    if ((await exists('rebase-merge')) || (await exists('rebase-apply'))) return 'rebase'
-    if (await exists('CHERRY_PICK_HEAD')) return 'cherry-pick'
+    if (await exists('MERGE_HEAD')) {return 'merge'}
+    if ((await exists('rebase-merge')) || (await exists('rebase-apply'))) {return 'rebase'}
+    if (await exists('CHERRY_PICK_HEAD')) {return 'cherry-pick'}
     return 'unknown'
   }
 
@@ -212,7 +212,7 @@ export class DevServerGitProvider implements IGitProvider {
     try {
       const { stdout } = await this.exec(['rev-parse', '--git-dir'], worktreePath)
       const dir = stdout.trim()
-      if (!dir) return `${worktreePath}/.git`
+      if (!dir) {return `${worktreePath}/.git`}
       return dir.startsWith('/') ? dir : `${worktreePath}/${dir}`
     } catch {
       return `${worktreePath}/.git`
@@ -320,12 +320,12 @@ export class DevServerGitProvider implements IGitProvider {
   }
 
   async bulkStageFiles(worktreePath: string, filePaths: string[]): Promise<void> {
-    if (filePaths.length === 0) return
+    if (filePaths.length === 0) {return}
     await this.exec(['add', '--', ...filePaths], worktreePath)
   }
 
   async bulkUnstageFiles(worktreePath: string, filePaths: string[]): Promise<void> {
-    if (filePaths.length === 0) return
+    if (filePaths.length === 0) {return}
     await this.exec(['restore', '--staged', '--', ...filePaths], worktreePath)
   }
 
@@ -379,17 +379,17 @@ export class DevServerGitProvider implements IGitProvider {
     let current: string | null = null
     for (const rawLine of stdout.split('\n')) {
       const line = rawLine.trim()
-      if (!line) continue
+      if (!line) {continue}
       const isCurrent = line.startsWith('* ')
       const name = isCurrent ? line.slice(2).trim() : line
       branches.push(name)
-      if (isCurrent) current = name
+      if (isCurrent) {current = name}
     }
     return { current, branches }
   }
 
   private targetArgs(pushTarget?: GitPushTarget): string[] {
-    if (!pushTarget) return []
+    if (!pushTarget) {return []}
     return [pushTarget.remoteName ?? 'origin', pushTarget.branchName].filter((v): v is string =>
       Boolean(v)
     )
@@ -402,7 +402,7 @@ export class DevServerGitProvider implements IGitProvider {
     options?: { forceWithLease?: boolean }
   ): Promise<void> {
     const args = ['push', ...this.targetArgs(pushTarget)]
-    if (options?.forceWithLease) args.push('--force-with-lease')
+    if (options?.forceWithLease) {args.push('--force-with-lease')}
     await this.exec(args, worktreePath)
   }
 
@@ -513,13 +513,13 @@ export class DevServerGitProvider implements IGitProvider {
     line: number
   ): Promise<string | null> {
     const remoteUrl = await this.readOriginRemoteUrl(worktreePath)
-    if (!remoteUrl) return null
+    if (!remoteUrl) {return null}
 
     let defaultBranch = 'main'
     try {
       const { stdout } = await this.exec(['rev-parse', '--abbrev-ref', 'origin/HEAD'], worktreePath)
       const ref = stdout.trim()
-      if (ref) defaultBranch = ref.replace(/^origin\//, '')
+      if (ref) {defaultBranch = ref.replace(/^origin\//, '')}
     } catch {
       // Fall back to 'main'
     }
@@ -528,7 +528,7 @@ export class DevServerGitProvider implements IGitProvider {
 
   async getRemoteCommitUrl(worktreePath: string, sha: string): Promise<string | null> {
     const remoteUrl = await this.readOriginRemoteUrl(worktreePath)
-    if (!remoteUrl) return null
+    if (!remoteUrl) {return null}
     return buildHostedRemoteCommitUrl(remoteUrl, sha)
   }
 }

@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   server?.close()
-  if (existsSync(webRoot)) rmSync(webRoot, { recursive: true })
+  if (existsSync(webRoot)) {rmSync(webRoot, { recursive: true })}
 })
 
 describe('startHttpServer()', () => {

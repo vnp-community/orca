@@ -15,8 +15,8 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/orca-restart'
-import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
-import { DEFAULT_LOCAL_ORCA_PROFILE_ID } from '../../src/shared/orca-profiles'
+import { PROTOCOL_VERSION } from '../vendor-shared/main/daemon/types'
+import { DEFAULT_LOCAL_ORCA_PROFILE_ID } from '../vendor-shared/shared/orca-profiles'
 
 const PROVIDER_SESSION_ID = 'e2e-live-force-exit-session'
 

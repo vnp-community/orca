@@ -19,7 +19,7 @@ import type { ProfileResolver } from '../profile/ProfileResolver'
 import { Tracers } from '../../shared/trace/tracers'
 
 /** Minimal interface for AI provider resolution (fulfilled by Phase 4 AIProviderService) */
-export interface AIProviderResolver {
+export type AIProviderResolver = {
   resolveForProject(
     projectId: string,
     preferredModel: string | undefined
@@ -27,7 +27,7 @@ export interface AIProviderResolver {
 }
 
 /** Options for spawning an agent in a project */
-export interface AgentSpawnOptions {
+export type AgentSpawnOptions = {
   /** Target project */
   projectId: string
   /** Authenticated user requesting the spawn */
@@ -43,7 +43,7 @@ export interface AgentSpawnOptions {
 }
 
 /** Result returned by spawn() */
-export interface AgentSpawnResult {
+export type AgentSpawnResult = {
   /** Opaque agent session ID assigned by the relay */
   sessionId: string
   /** Resolved AI provider used for this session */
@@ -85,9 +85,9 @@ export class ProfileAwareAgentSpawner {
 
       // 2. Compose env: profile envVars + shell.envVars + extraEnv (last wins)
       const profileEnv: Record<string, string> = {
-        ...(resolvedProfile.envVars ?? {}),
-        ...(resolvedProfile.shell?.envVars ?? {}),
-        ...(extraEnv ?? {}),
+        ...resolvedProfile.envVars,
+        ...resolvedProfile.shell?.envVars,
+        ...extraEnv,
       }
 
       // 3. Prepend pathAdditions to PATH

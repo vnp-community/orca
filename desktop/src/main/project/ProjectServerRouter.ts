@@ -68,9 +68,9 @@ export class ProjectServerRouter {
   ): Promise<ProjectContext> {
     const member = await this.projectService.assertAccess(projectId, userId)
     const project = await this.projectService.get(projectId)
-    if (!project) throw new Error('PROJECT_NOT_FOUND')
+    if (!project) {throw new Error('PROJECT_NOT_FOUND')}
     const devServer = this.devServerManager.get(project.devServerId)
-    if (!devServer) throw new Error('DEV_SERVER_NOT_FOUND')
+    if (!devServer) {throw new Error('DEV_SERVER_NOT_FOUND')}
     const resolvedProfile = await profileResolver.resolve(userId)
     return { project, member, devServer, resolvedProfile }
   }

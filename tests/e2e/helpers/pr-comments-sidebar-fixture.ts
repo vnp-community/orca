@@ -1,5 +1,5 @@
 import type { Page } from '@stablyai/playwright-test'
-import type { PRComment, PRInfo } from '../../../src/shared/types'
+import type { PRComment, PRInfo } from '../../vendor-shared/shared/types'
 
 export type PRCommentsSidebarSeed = {
   worktreeId: string

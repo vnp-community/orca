@@ -24,14 +24,14 @@ const aiCompleteTracer = createTracer('agent:aiComplete')
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface AICompleteParams {
+export type AICompleteParams = {
   prompt:  string
   format?: 'json' | 'text'
   taskId?: string
   model?:  string
 }
 
-export interface AICompleteResult {
+export type AICompleteResult = {
   content: string
   model?:  string
 }
@@ -90,9 +90,9 @@ export async function handleAIComplete(
 
 /** Trích tên provider chỉ để gắn field trace — KHÔNG chứa apiKey. */
 function providerNameFromModel(model: string): string {
-  if (model.startsWith('claude')) return 'anthropic'
-  if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4')) return 'openai'
-  if (model.startsWith('gemini')) return 'google'
+  if (model.startsWith('claude')) {return 'anthropic'}
+  if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4')) {return 'openai'}
+  if (model.startsWith('gemini')) {return 'google'}
   return 'unknown'
 }
 
@@ -171,7 +171,7 @@ async function callAnthropic(
     throw new Error(`Anthropic API error ${res.status}: ${errBody}`)
   }
 
-  const data = await res.json() as { content: Array<{ type: string; text?: string }> }
+  const data = await res.json() as { content: { type: string; text?: string }[] }
   return data.content.find(c => c.type === 'text')?.text ?? ''
 }
 
@@ -203,7 +203,7 @@ async function callOpenAI(
     throw new Error(`OpenAI API error ${res.status}: ${errBody}`)
   }
 
-  const data = await res.json() as { choices: Array<{ message: { content: string } }> }
+  const data = await res.json() as { choices: { message: { content: string } }[] }
   return data.choices[0]?.message.content ?? ''
 }
 
@@ -232,7 +232,7 @@ async function callGoogle(
   }
 
   const data = await res.json() as {
-    candidates: Array<{ content: { parts: Array<{ text?: string }> } }>
+    candidates: { content: { parts: { text?: string }[] } }[]
   }
   return data.candidates[0]?.content.parts[0]?.text ?? ''
 }

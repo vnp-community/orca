@@ -39,14 +39,14 @@ const MAX_RENEWAL_ATTEMPTS = 5
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface FetchedToken {
+export type FetchedToken = {
   token: string
   /** TTL in seconds as returned by the server */
   ttlSec: number
   fetchedAt: number
 }
 
-export interface TokenManagerOptions {
+export type TokenManagerOptions = {
   /** Base HTTP URL of the Orca server, e.g. http://172.20.2.39:6769 */
   orcaHttpUrl: string
   devServerId: string
@@ -134,7 +134,7 @@ export class AgentTokenManager {
       clearTimeout(this.renewTimer)
       this.renewTimer = null
     }
-    if (this.disposed) return
+    if (this.disposed) {return}
 
     const delayMs = Math.floor(ttlSec * TOKEN_RENEW_RATIO * 1000)
     const renewAt = new Date(Date.now() + delayMs).toISOString()
@@ -154,7 +154,7 @@ export class AgentTokenManager {
   }
 
   private async doRenewal(): Promise<void> {
-    if (this.disposed) return
+    if (this.disposed) {return}
     this.opts.log.info('[TokenManager] Proactive token renewal starting...')
     const span = tokenTracer.start({ op: 'renew', devServerId: this.opts.devServerId })
 
@@ -217,8 +217,8 @@ export class AgentTokenManager {
       'Authorization': `Bearer ${this.opts.apiSecret}`,
     }, 10_000)
 
-    if (res.status === 401) throw new Error('Unauthorized — check ORCA_AGENT_API_SECRET')
-    if (res.status !== 200) throw new Error(`HTTP ${res.status}: ${res.body.slice(0, 200)}`)
+    if (res.status === 401) {throw new Error('Unauthorized — check ORCA_AGENT_API_SECRET')}
+    if (res.status !== 200) {throw new Error(`HTTP ${res.status}: ${res.body.slice(0, 200)}`)}
 
     let parsed: Record<string, unknown>
     try {
@@ -246,7 +246,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-interface HttpResult { status: number; body: string }
+type HttpResult = { status: number; body: string }
 
 async function httpPost(
   url: string,

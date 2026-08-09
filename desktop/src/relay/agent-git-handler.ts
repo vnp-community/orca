@@ -299,7 +299,7 @@ export async function handleGitPrCreate(
   }
 
   const ghArgs: string[] = ['pr', 'create', '--title', title, '--body', body, '--base', base]
-  if (draft) ghArgs.push('--draft')
+  if (draft) {ghArgs.push('--draft')}
 
   const { homedir } = await import('node:os')
   const env: NodeJS.ProcessEnv = {
@@ -429,7 +429,7 @@ export async function handleGitWorktreeRemove(
   }
 
   const args = ['worktree', 'remove', path]
-  if (force) args.push('--force')
+  if (force) {args.push('--force')}
 
   span.step('git-worktree-remove-exec', { force })
   const result = await handleGitExec(

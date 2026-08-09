@@ -1,7 +1,7 @@
 # Orca — Feature Specifications
 
-**Cập nhật:** 2026-08-01 | **Phiên bản:** v5.0  
-**Tổng số features:** 40 (F01–F40)
+**Cập nhật:** 2026-08-08 | **Phiên bản:** v5.0  
+**Tổng số features:** 42 (F01–F42)
 
 ---
 
@@ -9,9 +9,11 @@
 
 | Trạng thái | Số lượng | Features |
 |-----------|---------|---------|
-| ✅ Phát hành | 28 | F01–F13, F16, F19, F21–F31, F40 |
+| ✅ Phát hành | 30 | F01–F13, F16, F19, F21–F31, F40–F42 |
 | 🚧 Phát triển | 10 | F14, F15, F17, F18, F32–F39 |
 | 📋 Kế hoạch | 2 | F20, F32 |
+
+> F41–F42 được bổ sung 2026-08-08 từ rà soát code `frontend/` thực tế (không có trong PRD gốc) — xem ghi chú "Notes" trong từng file.
 
 ---
 
@@ -82,6 +84,15 @@
 |----|-----|----------|--------|-----|-----|
 | [F40](./F40-full-flow-tracing.md) | Full-Flow Tracing | P1 | ✅ | C3.1, C3.8 | — |
 
+### Group 6: In-App Engagement & Onboarding UX (F41–F42)
+
+> Bổ sung 2026-08-08 từ code thực tế, chưa có trong PRD gốc.
+
+| ID | Tên | Priority | Status | HLD | ADR |
+|----|-----|----------|--------|-----|-----|
+| [F41](./F41-desktop-pet-companion.md) | Desktop Pet Companion | P3 | ✅ | C3.1 | — |
+| [F42](./F42-contextual-onboarding-tours.md) | Contextual Onboarding Tours | P2 | ✅ | C3.4 | — |
+
 ---
 
 ## DB Migration → Feature Dependency
@@ -127,7 +138,11 @@ Phase 4 — Task & Workflow (v5.0d):
 Tất cả v5.0 features phải tuân thủ:
 1. **Zero Mock**: không dùng mock data trong implementation
 2. **Zero Hardcode**: config qua env vars hoặc DB settings
-3. **IPlatformServices**: không import electron trực tiếp
+3. **IPlatformServices**: code v5.0 mới (Profile/Project/AI Provider/Workflow/Task —
+   `src/main/profile`, `project`, `ai-providers`, `workflow`, `task`) không import
+   electron trực tiếp. Áp dụng cho code **mới** thuộc các domain này; không áp dụng
+   hồi tố cho code Electron/desktop main-process đã tồn tại trước restructure_v1
+   (xem `specs/frontend/crs/v1/restructure_v1/README.md` — nguyên tắc "Additive only").
 4. **IConnectionPool**: không access DB dialect trực tiếp
 5. **relay.call()**: tất cả remote operations qua relay RPC
 6. **Test coverage**: unit test cho service layer, integration test cho relay

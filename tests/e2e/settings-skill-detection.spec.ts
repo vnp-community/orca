@@ -5,8 +5,8 @@ import type {
   DiscoveredSkill,
   SkillDiscoveryResult,
   SkillSourceKind
-} from '../../src/shared/skills'
-import { ORCHESTRATION_ENABLED_STORAGE_KEY } from '../../src/renderer/src/lib/orchestration-setup-state'
+} from '../vendor-shared/shared/skills'
+import { ORCHESTRATION_ENABLED_STORAGE_KEY } from '../vendor-shared/renderer/src/lib/orchestration-setup-state'
 
 type MockSkillDiscoveryGlobal = typeof globalThis & {
   __orcaSettingsSkillDiscoveryResult?: SkillDiscoveryResult

@@ -169,7 +169,7 @@ describe('ProviderHealthChecker', () => {
     const service = {
       getAllAccounts: vi.fn().mockResolvedValue([acc1, acc2, acc3]),
       testConnection: vi.fn().mockImplementation((id: string) => {
-        if (id === 'acc-2') return Promise.reject(new Error('unexpected error'))
+        if (id === 'acc-2') {return Promise.reject(new Error('unexpected error'))}
         return Promise.resolve({ ok: true, latencyMs: 5 })
       }),
       updateAccount: updateMock,
@@ -257,7 +257,7 @@ describe('ProviderHealthChecker', () => {
       const service = {
         getAllAccounts: vi.fn().mockResolvedValue([acc1, acc2]),
         testConnection: vi.fn().mockImplementation((id: string) => {
-          if (id === 'acc-2') return Promise.reject(new Error('unexpected error'))
+          if (id === 'acc-2') {return Promise.reject(new Error('unexpected error'))}
           return Promise.resolve({ ok: true, latencyMs: 5 })
         }),
         updateAccount: vi.fn().mockResolvedValue(undefined),

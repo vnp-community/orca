@@ -157,7 +157,7 @@ describe('F25 — Admin API Client: Dashboard Stats', () => {
       headers: { Cookie: adminCookie }
     })
     expect(res.status).toBe(200)
-    const users = await res.json() as Array<{ email: string; role: string }>
+    const users = await res.json() as { email: string; role: string }[]
     expect(users.some((u) => u.role === 'admin')).toBe(true)
   })
 
