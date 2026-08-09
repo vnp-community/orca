@@ -1809,6 +1809,17 @@ export function useTerminalPaneLifecycle({
           // instead of reviving a stale binding after unmount.
           transport.detach?.()
         } else {
+          // DIAG BUG-FE-PTY-001: temporary — remove once the trigger for this
+          // unmount is confirmed. Logs unconditionally (not gated on dev/e2e)
+          // so the next repro captures it in the browser console.
+          console.error('[DIAG BUG-FE-PTY-001] destroying pty on unmount', {
+            tabId,
+            worktreeId,
+            ptyId,
+            tabStillExists,
+            currentWorktreeTabIds: currentWorktreeTabs?.map((t) => t.id) ?? null,
+            stack: new Error('diag').stack
+          })
           transport.destroy?.()
         }
       }
