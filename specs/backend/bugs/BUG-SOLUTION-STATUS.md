@@ -101,7 +101,36 @@
 | Bug ID | Mức độ | Status | Solution File |
 |--------|--------|--------|--------------|
 | BE-FLEET-001 | 🔴 HIGH | ✅ | [SOLUTION-fleet.md](fleet/solutions/SOLUTION-fleet.md) |
-| BE-FLEET-002 | 🟡 MEDIUM | ✅ | [SOLUTION-fleet.md](fleet/solutions/SOLUTION-fleet.md) |
+| BE-FLEET-002 | 🟡 MEDIUM | ⚠️ **RE-OPENED** | [SOLUTION-fleet.md](fleet/solutions/SOLUTION-fleet.md) — audit 2026-08-09 xác nhận code hiện tại KHÔNG khớp solution (vẫn không CPU/RAM/disk/latency, vẫn 60s không phải 30s). Xem [BUG-BE-HLD-010](hld-v1/BUG-BE-HLD-010-fleet-health-monitor-no-real-metrics-still-broken.md). |
+
+## Domain: hld-v1 (20 bugs) — Audit 2026-08-08/09 (backend vs `docs/hld/*` + `docs/features/F22-F40`)
+
+**Cập nhật 2026-08-09:** toàn bộ 20 bug đã có solution code-level (12 file, xem [`hld-v1/solutions/00-index.md`](hld-v1/solutions/00-index.md)) — căn cứ theo `specs/backend/tdd/v4`+`v5`. Status đổi thành 🟡 **Solution Ready** (chưa merge vào code thật — vẫn cần review + áp dụng patch + test).
+
+| Bug ID | Mức độ | Status | Solution File | Ghi chú |
+|--------|--------|--------|---------------|---------|
+| BE-HLD-001 | 🔴 CRITICAL | 🟡 Solution Ready | [SOLUTION-rbac-exact.md](hld-v1/solutions/SOLUTION-rbac-exact.md) | `requireAdmin(ctx)` RPC stub không check role — permission bypass; patch cũng cần áp lại cho `desktop/` (bản sao byte-for-byte) |
+| BE-HLD-002 | 🟠 HIGH | 🟡 Solution Ready | [SOLUTION-rbac-exact.md](hld-v1/solutions/SOLUTION-rbac-exact.md) | `requireOwnerOrAdmin` dead code, `project.create` không giới hạn quyền |
+| BE-HLD-003 | 🟠 HIGH | 🟡 Solution Ready | [SOLUTION-rbac-exact.md](hld-v1/solutions/SOLUTION-rbac-exact.md) | RBAC phân mảnh — solution đề xuất `PermissionService.hasPermission()` làm phase 2 |
+| BE-HLD-004 | 🟠 HIGH | 🟡 Solution Ready | [SOLUTION-github-gitlab-relay-exact.md](hld-v1/solutions/SOLUTION-github-gitlab-relay-exact.md) | Backend tự thực thi gh/glab — fix tối thiểu (guard `ORCA_MULTI_USER`) trước, roadmap relay đầy đủ sau |
+| BE-HLD-005 | 🟠 HIGH | 🟡 Solution Ready | [SOLUTION-github-gitlab-relay-exact.md](hld-v1/solutions/SOLUTION-github-gitlab-relay-exact.md) | GH_CONFIG_DIR không truyền — cần sửa cả Backend VÀ `agent/src/relay/pty-handler.ts` (hiện không đọc userId) |
+| BE-HLD-006 | 🟠 HIGH | 🟡 Solution Ready | [SOLUTION-admin-panel-exact.md](hld-v1/solutions/SOLUTION-admin-panel-exact.md) | Admin sessions list là stub rỗng |
+| BE-HLD-007 | 🟠 HIGH | 🟡 Solution Ready | [SOLUTION-admin-panel-exact.md](hld-v1/solutions/SOLUTION-admin-panel-exact.md) | Admin Access Policies API — file mới `admin-policy-handlers.ts` |
+| BE-HLD-008 | 🟠 HIGH | 🟡 Solution Ready ⚠️ | [SOLUTION-workflow-exact.md](hld-v1/solutions/SOLUTION-workflow-exact.md) | Provider-selection theo step — **verify trước**: `WorkflowOrchestrator.executeStep()` type-mismatch có thể khiến mọi step đã throw `UNSUPPORTED_STEP_TYPE` |
+| BE-HLD-009 | 🟠 HIGH | 🟡 Solution Ready | [SOLUTION-workflow-exact.md](hld-v1/solutions/SOLUTION-workflow-exact.md) | Pause/resume — cần migration mới 0014 |
+| BE-HLD-010 | 🟡 MEDIUM | 🟡 Solution Ready (re-open BE-FLEET-002) | [SOLUTION-fleet-exact.md](hld-v1/solutions/SOLUTION-fleet-exact.md) | FleetHealthMonitor CPU/RAM/disk/latency — solution cũ SOLUTION-fleet.md bịa kiến trúc không khớp code thật, đã viết lại |
+| BE-HLD-011 | 🟡 MEDIUM | 🟡 Solution Ready | [SOLUTION-session-manager-exact.md](hld-v1/solutions/SOLUTION-session-manager-exact.md) | Auto-respawn + idle-timeout config |
+| BE-HLD-012 | 🟡 MEDIUM | 🟡 Solution Ready | [SOLUTION-fleet-exact.md](hld-v1/solutions/SOLUTION-fleet-exact.md) | CLI `orca fleet provision` — file mới `fleet-provision-cli.ts`, chưa rõ điểm wire vào `bin.orca` |
+| BE-HLD-013 | 🟡 MEDIUM | 🟡 Solution Ready | [SOLUTION-fleet-exact.md](hld-v1/solutions/SOLUTION-fleet-exact.md) | Fleet bootstrap disk-check + SHA256 verify |
+| BE-HLD-014 | 🟡 MEDIUM | 🟡 Solution Ready ⚠️ | [SOLUTION-ai-provider-exact.md](hld-v1/solutions/SOLUTION-ai-provider-exact.md) | Key rotation — **verify trước**: `AuditLogger.log()` insert sai cột so với schema thật `orca_audit_log` |
+| BE-HLD-015 | 🟡 MEDIUM | 🟡 Solution Ready | [SOLUTION-ai-provider-exact.md](hld-v1/solutions/SOLUTION-ai-provider-exact.md) | Quota 80% alert qua `onQuotaWarning`, debounce 1 lần/ngày |
+| BE-HLD-016 | 🟡 MEDIUM | 🟡 Solution Ready | [SOLUTION-db-migration-naming-exact.md](hld-v1/solutions/SOLUTION-db-migration-naming-exact.md) | Chỉ sửa tài liệu — không đề xuất sửa migration đã chạy |
+| BE-HLD-017 | 🟡 MEDIUM | 🟡 Solution Ready (cần PO xác nhận scope) | [SOLUTION-platform-electron-adapter-exact.md](hld-v1/solutions/SOLUTION-platform-electron-adapter-exact.md) | ElectronAdapter — skeleton code có sẵn, chờ quyết định phạm vi |
+| BE-HLD-018 | 🟡 MEDIUM | 🟡 Solution Ready | [SOLUTION-remote-git-ui-exact.md](hld-v1/solutions/SOLUTION-remote-git-ui-exact.md) | DevServerGitProvider thiếu git log/AI commit-msg/diff — 1/9 method fix ngay, 8/9 cần bổ sung Agent trước |
+| BE-HLD-019 | 🟡 MEDIUM | 🟡 Solution Ready | [SOLUTION-agent-ws-protocol-exact.md](hld-v1/solutions/SOLUTION-agent-ws-protocol-exact.md) | Chủ yếu sửa tài liệu F29; version-check thật dùng mã 1008, không bịa 4003 |
+| BE-HLD-020 | 🟡 MEDIUM | 🟡 Solution Ready | [SOLUTION-project-devserver-rebind-exact.md](hld-v1/solutions/SOLUTION-project-devserver-rebind-exact.md) | Rebind devServerId — phụ thuộc BE-HLD-002 cho phần RBAC |
+
+> Chi tiết đầy đủ: [`hld-v1/00-index.md`](hld-v1/00-index.md). Nguồn: `audit/backend/backend-vs-design-review.md`.
 
 ---
 
@@ -242,9 +271,10 @@
 
 | Metric | Số lượng |
 |--------|---------|
-| **Backend bugs tổng** | 57 |
-| **Backend bugs có solution** | 57 ✅ |
-| **Backend bugs source-verified** | ~25 (BE-TM-001~006, AWS-001~004, TG-001~002, WT-001~002, AUTH-002) |
+| **Backend bugs tổng** | 77 (57 cũ + 20 `hld-v1`, 2026-08-09) |
+| **Backend bugs có solution** | 57 ✅ / 20 `hld-v1` 🟡 Solution Ready (2026-08-09, chưa merge vào code) |
+| **Backend bugs source-verified** | ~25 (BE-TM-001~006, AWS-001~004, TG-001~002, WT-001~002, AUTH-002) + toàn bộ 20 `hld-v1` (source-verified bằng CodeGraph/GitNexus khi audit) |
+| **Status cần sửa lại (stale "FIXED")** | BE-FLEET-002 (re-open thành BE-HLD-010), khả năng cả AUTH-003 và PI-001 — xem ghi chú trong `hld-v1/00-index.md` |
 | **Frontend bugs tổng** | 11 |
 | **Frontend bugs có solution** | 10 ✅ |
 | **Dev-server-v1 bugs đã DONE** | 8 ✅ |

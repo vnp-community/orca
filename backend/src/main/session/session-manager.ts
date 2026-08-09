@@ -1,0 +1,408 @@
+/**
+ * SessionManager — Fork and track per-user child processes (sandbox)
+ *
+ * Each authenticated user gets their own OrcaRuntime child process,
+ * communicating via a Unix domain socket at `baseDataPath/users/<userId>/orca.sock`.
+ *
+ * @module main/session/session-manager
+ */
+
+import { fork } from 'node:child_process'
+import { mkdir, rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import type { UserProcess, SessionManagerConfig } from './session-types'
+import { WebCredentialStore } from '../credentials/web-credential-store'
+import { createTracer } from '../../shared/trace'
+
+const sessionTracer = createTracer('session:spawn')
+
+const DEFAULT_IDLE_TIMEOUT_MS = 4 * 60 * 60 * 1000   // 4 hours
+const DEFAULT_MAX_RESPAWN     = 3
+const IDLE_CHECK_INTERVAL_MS  = 5 * 60 * 1000          // check every 5 minutes
+const SPAWN_TIMEOUT_MS        = 30_000                  // 30s for fork to be ready
+
+// FIX BUG-BE-HLD-011: bounded auto-respawn backoff for crashed user processes.
+// Pattern mirrors calcBackoffDelay() in dev-server-relay-bridge.ts (base/cap/jitter),
+// scaled down: only 3 attempts total and the user is actively waiting to reconnect.
+const RESPAWN_BACKOFF_BASE_MS   = 1_000   // 1s
+const RESPAWN_BACKOFF_MAX_MS    = 10_000  // 10s cap
+const RESPAWN_BACKOFF_JITTER_MS = 500     // avoid thundering herd on host-wide crashes
+// A process that stayed up this long before crashing is treated as a fresh
+// failure, not a continuation of an earlier crash loop — this is well above
+// the ≤ few-second span of the full backoff sequence above.
+const RESPAWN_STABLE_MS         = 60_000  // 60s
+
+// FIX BUG-BE-HLD-011: exponential backoff — 1s, 2s, 4s, 8s... capped at 10s, +jitter.
+function calcRespawnBackoffDelay(attempt: number): number {
+  const exponential = RESPAWN_BACKOFF_BASE_MS * Math.pow(2, attempt)
+  const capped = Math.min(exponential, RESPAWN_BACKOFF_MAX_MS)
+  return capped + Math.random() * RESPAWN_BACKOFF_JITTER_MS
+}
+
+/**
+ * Parse SESSION_IDLE_TIMEOUT_MS from the environment. Returns undefined (so the
+ * SessionManager constructor's DEFAULT_IDLE_TIMEOUT_MS fallback applies) when the
+ * var is unset, blank, non-numeric, or <= 0 — an invalid value must never silently
+ * disable idle cleanup.
+ */
+export function resolveIdleTimeoutMsFromEnv(env: NodeJS.ProcessEnv = process.env): number | undefined {
+  const raw = env['SESSION_IDLE_TIMEOUT_MS']
+  if (raw === undefined || raw.trim() === '') return undefined
+
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    console.warn(
+      `[SessionManager] Ignoring invalid SESSION_IDLE_TIMEOUT_MS="${raw}" — must be a positive number (ms). Using default.`
+    )
+    return undefined
+  }
+  return parsed
+}
+
+export class SessionManager {
+  private readonly processes = new Map<string, UserProcess>()
+  private idleTimer: ReturnType<typeof setInterval> | null = null
+  private readonly config: Required<Omit<SessionManagerConfig, 'serverSecret'>> & { serverSecret?: string }
+  // FIX BUG-BE-HLD-011: pending auto-respawn timers per userId, cancelled on shutdown().
+  private readonly respawnTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  // FIX BUG-BE-HLD-011: userIds whose current exit was triggered intentionally
+  // (idle sweep or shutdown) — the exit handler consumes this to skip respawn.
+  private readonly intentionalExitUserIds = new Set<string>()
+
+  constructor(config: SessionManagerConfig) {
+    this.config = {
+      idleTimeoutMs:      config.idleTimeoutMs      ?? DEFAULT_IDLE_TIMEOUT_MS,
+      maxRespawnAttempts: config.maxRespawnAttempts  ?? DEFAULT_MAX_RESPAWN,
+      baseDataPath:       config.baseDataPath,
+      userProcessEntry:   config.userProcessEntry,
+      serverSecret:       config.serverSecret,
+      devServerManager:   config.devServerManager
+    }
+
+    // Broadcast DevServer events to all active user processes
+    const broadcastEvent = (event: string, ...args: any[]) => {
+      for (const proc of this.processes.values()) {
+        proc.process.send({ type: 'devServer:event', event, args })
+      }
+    }
+
+    this.config.devServerManager.on('devServer:added', (id: string) => broadcastEvent('devServer:added', id))
+    this.config.devServerManager.on('devServer:removed', (id: string) => broadcastEvent('devServer:removed', id))
+    this.config.devServerManager.on('devServer:statusChanged', (id: string, status: string, err?: Error) => broadcastEvent('devServer:statusChanged', id, status, err))
+
+    // Push agent notifications (pty.data, pty.exit, fs.changed) to every user
+    // process — mirrors devServer:event above. Each process's DevServerPtyProvider
+    // / watch subscriber filters to the devServerId/ids it actually cares about.
+    this.config.devServerManager.on(
+      'devServer:notification',
+      (devServerId: string, method: string, params: Record<string, unknown>) => {
+        for (const proc of this.processes.values()) {
+          proc.process.send({ type: 'devServer:proxyNotification', devServerId, method, params })
+        }
+      }
+    )
+
+    // Periodic idle-process sweep — unref so it won't prevent process exit
+    this.idleTimer = setInterval(() => this.sweepIdleProcesses(), IDLE_CHECK_INTERVAL_MS)
+    if (this.idleTimer.unref) this.idleTimer.unref()
+  }
+
+  /**
+   * Return existing process for userId, or fork a new one.
+   * Concurrent calls for the same userId are safe: second call waits
+   * on the same spawn promise (map is populated before promise resolves).
+   */
+  async getOrSpawnUserProcess(userId: string): Promise<UserProcess> {
+    const existing = this.processes.get(userId)
+    if (existing) {
+      existing.lastSeenAt = Date.now()
+      return existing
+    }
+    return this.spawnUserProcess(userId)
+  }
+
+  private async spawnUserProcess(userId: string): Promise<UserProcess> {
+    const userDataPath = join(this.config.baseDataPath, 'users', userId)
+    const socketPath   = join(userDataPath, 'orca.sock')
+    const span = sessionTracer.start({ userId })
+
+    // Create per-user directory with restricted permissions (700)
+    await mkdir(userDataPath, { recursive: true, mode: 0o700 })
+
+    // Load integration credentials from WebCredentialStore and inject into
+    // the child process environment. This is the mechanism by which Bitbucket,
+    // Azure DevOps and Gitea tokens reach the integration clients without calling
+    // Electron's safeStorage (which is unavailable in headless Node.js).
+    //
+    // Why env vars: the child process can read them synchronously at start-up
+    // without needing async I/O or RPC round-trips. Each user gets their own
+    // isolated env because spawnUserProcess is always called per-userId.
+    const credentialEnv = await this.buildCredentialEnv(userId)
+
+    const child = fork(this.config.userProcessEntry, [], {
+      env: {
+        ...process.env,
+        ...credentialEnv,               // ORCA_BITBUCKET_*, ORCA_AZURE_*, etc.
+        ORCA_USER_DATA_PATH: userDataPath,
+        ORCA_USER_ID:        userId,
+        ORCA_SOCKET_PATH:    socketPath,
+        NODE_OPTIONS:        '--max-old-space-size=512'
+      },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      detached: false
+    })
+
+    span.step('forked', { pid: child.pid ?? 0 })
+
+    // Prefix stdout/stderr logs with userId for easy filtering
+    child.stdout?.on('data', (d: Buffer) => process.stdout.write(`[user:${userId}] ${d}`))
+    child.stderr?.on('data', (d: Buffer) => process.stderr.write(`[user:${userId}] ${d}`))
+
+    // Wait for 'ready' IPC message — timeout 30s
+    let rpcAuthToken = ''
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL')
+        span.fail(`spawn timeout ${SPAWN_TIMEOUT_MS}ms`, { userId })
+        reject(new Error(`UserProcess spawn timeout (30s): userId=${userId}`))
+      }, SPAWN_TIMEOUT_MS)
+
+      child.on('message', (msg: unknown) => {
+        if (msg && typeof msg === 'object') {
+          const m = msg as Record<string, unknown>
+          if (m['type'] === 'ready') {
+            // Why: rpcAuthToken is generated by OrcaRuntimeRpcServer and sent
+            // back via IPC so WsSessionRouter can inject it into proxied
+            // WebSocket messages. Without it, the Unix socket rejects all
+            // requests with "Invalid auth token".
+            if (typeof m['rpcAuthToken'] === 'string') {
+              rpcAuthToken = m['rpcAuthToken']
+            }
+            clearTimeout(timer)
+            resolve()
+          } else if (m['type'] === 'devServer:proxyRequest') {
+            const req = m as { requestId: string, method: string, args: any[] }
+            this.handleDevServerProxyRequest(child, req)
+          }
+        }
+      })
+      child.on('error', (err) => { clearTimeout(timer); span.fail(err, { userId, phase: 'fork' }); reject(err) })
+    })
+
+    const proc: UserProcess = {
+      userId,
+      pid:          child.pid!,
+      socketPath,
+      authToken:    rpcAuthToken,
+      startedAt:    Date.now(),
+      lastSeenAt:   Date.now(),
+      process:      child,
+      respawnCount: 0
+    }
+
+    // Auto-cleanup on exit: remove from map + delete socket file
+    child.on('exit', (code) => {
+      span.step('exit', { userId, code: code ?? -1 })
+      console.warn(`[SessionManager] UserProcess exited: userId=${userId}, code=${code}`)
+      this.processes.delete(userId)
+      rm(socketPath, { force: true }).catch(() => {/* ignore cleanup errors */})
+
+      // FIX BUG-BE-HLD-011: idle-sweep / shutdown kills are intentional — do not
+      // auto-respawn those. Only unexpected crashes get a bounded auto-respawn.
+      if (this.intentionalExitUserIds.delete(userId)) return
+      this.scheduleRespawn(userId, proc)
+    })
+
+    this.processes.set(userId, proc)
+    console.log(`[SessionManager] Spawned process: userId=${userId}, pid=${child.pid}, socket=${socketPath}`)
+    span.ok({ userId, pid: child.pid ?? 0 })
+    return proc
+  }
+
+  /**
+   * FIX BUG-BE-HLD-011: bounded auto-respawn for a user process that exited
+   * unexpectedly (crash, OOM, uncaught exception) — up to config.maxRespawnAttempts
+   * times, with short exponential backoff. Stops permanently past the limit to
+   * avoid a crash loop; the user then needs a manual reconnect to re-spawn.
+   */
+  private scheduleRespawn(userId: string, proc: UserProcess): void {
+    if (proc.respawnCount >= this.config.maxRespawnAttempts) {
+      console.warn(
+        `[SessionManager] UserProcess crash-loop detected: userId=${userId} ` +
+        `respawnCount=${proc.respawnCount} >= maxRespawnAttempts=${this.config.maxRespawnAttempts}. ` +
+        `Giving up auto-respawn — user must reconnect manually.`
+      )
+      return
+    }
+
+    // A crash after RESPAWN_STABLE_MS of healthy uptime is a fresh failure,
+    // not a continuation of an earlier crash loop — restart the counter at 1.
+    const uptimeMs = Date.now() - proc.startedAt
+    const nextRespawnCount = uptimeMs >= RESPAWN_STABLE_MS ? 1 : proc.respawnCount + 1
+
+    const delayMs = calcRespawnBackoffDelay(nextRespawnCount - 1)
+    console.warn(
+      `[SessionManager] Auto-respawning userId=${userId} in ${Math.round(delayMs)}ms ` +
+      `(attempt ${nextRespawnCount}/${this.config.maxRespawnAttempts})`
+    )
+
+    const timer = setTimeout(() => {
+      this.respawnTimers.delete(userId)
+      // A new WS connection may have already respawned this user via
+      // getOrSpawnUserProcess() while we were waiting — don't double-spawn.
+      if (this.processes.has(userId)) return
+      this.spawnUserProcess(userId)
+        .then((respawned) => { respawned.respawnCount = nextRespawnCount })
+        .catch((err) => {
+          console.warn(`[SessionManager] Auto-respawn failed: userId=${userId}`, (err as Error)?.message)
+        })
+    }, delayMs)
+    if (timer.unref) timer.unref()
+    this.respawnTimers.set(userId, timer)
+  }
+
+  /** Update lastSeenAt for a user process — call on any WS activity */
+  touch(userId: string): void {
+    const proc = this.processes.get(userId)
+    if (proc) proc.lastSeenAt = Date.now()
+  }
+
+  /** Get a process by userId (null if not running) */
+  getProcess(userId: string): UserProcess | null {
+    return this.processes.get(userId) ?? null
+  }
+
+  /** Snapshot of all running user processes */
+  listProcesses(): readonly UserProcess[] {
+    return [...this.processes.values()]
+  }
+
+  private async handleDevServerProxyRequest(
+    child: import('node:child_process').ChildProcess,
+    req: { requestId: string; method: string; args: any[] }
+  ): Promise<void> {
+    try {
+      const dm = this.config.devServerManager
+      let result: any
+      if (req.method === 'list') {
+        result = await dm.list()
+      } else if (req.method === 'add') {
+        result = await dm.add(req.args[0])
+      } else if (req.method === 'remove') {
+        result = await dm.remove(req.args[0])
+      } else if (req.method === 'connect') {
+        result = await dm.connect(req.args[0])
+      } else if (req.method === 'disconnect') {
+        result = await dm.disconnect(req.args[0])
+      } else if (req.method === 'testConnection') {
+        result = await dm.testConnection(req.args[0])
+      } else if (req.method === 'generateAgentToken') {
+        result = await dm.generateAgentToken(req.args[0])
+      } else if (req.method === 'relayCall') {
+        // relayCall(id, method, params, timeoutMs)
+        const [id, rpcMethod, params, timeoutMs] = req.args
+        const relay = dm.getRelay(id)
+        if (!relay) {
+          throw new Error(`Dev server '${id}' relay is not connected.`)
+        }
+        const { Tracers } = await import('../../shared/trace/tracers')
+        const span = Tracers.ipcProxyFlow.start({ devServerId: id, method: rpcMethod })
+        try {
+          result = await relay.call(rpcMethod, params, timeoutMs)
+          span.ok()
+        } catch (err) {
+          span.fail(err, { devServerId: id, method: rpcMethod })
+          throw err
+        }
+      } else {
+        throw new Error(`Unsupported devServer proxy method: ${req.method}`)
+      }
+      child.send({ type: 'devServer:proxyResponse', requestId: req.requestId, result })
+    } catch (err) {
+      child.send({
+        type: 'devServer:proxyResponse',
+        requestId: req.requestId,
+        error: err instanceof Error ? err.message : String(err)
+      })
+    }
+  }
+
+  private sweepIdleProcesses(): void {
+    const now = Date.now()
+    for (const [userId, proc] of this.processes) {
+      if (now - proc.lastSeenAt > this.config.idleTimeoutMs) {
+        console.log(`[SessionManager] Idle shutdown: userId=${userId}, idle=${Math.round((now - proc.lastSeenAt) / 60000)}m`)
+        this.killUserProcess(userId)
+      }
+    }
+  }
+
+  private killUserProcess(userId: string): void {
+    const proc = this.processes.get(userId)
+    if (!proc) return
+    // FIX BUG-BE-HLD-011: mark intentional so the exit handler skips auto-respawn.
+    this.intentionalExitUserIds.add(userId)
+    try { proc.process.kill('SIGTERM') } catch { /* already exited */ }
+    this.processes.delete(userId)
+    rm(proc.socketPath, { force: true }).catch(() => {/* ignore */})
+  }
+
+  /** Graceful shutdown: stop idle timer + SIGTERM all user processes */
+  async shutdown(): Promise<void> {
+    if (this.idleTimer) {
+      clearInterval(this.idleTimer)
+      this.idleTimer = null
+    }
+    // FIX BUG-BE-HLD-011: cancel pending auto-respawn timers so shutdown doesn't
+    // fork new user processes after the server has started tearing down.
+    for (const timer of this.respawnTimers.values()) clearTimeout(timer)
+    this.respawnTimers.clear()
+
+    const userIds = [...this.processes.keys()]
+    console.log(`[SessionManager] Shutdown: killing ${userIds.length} user process(es)`)
+    for (const userId of userIds) {
+      this.killUserProcess(userId)
+    }
+  }
+
+  /**
+   * Read credentials from WebCredentialStore for userId and build the set of
+   * environment variables to inject into the child process.
+   *
+   * Failures are non-fatal: a warning is logged but spawn continues without creds.
+   * The user can set tokens later via the credentials.set RPC method and reconnect.
+   */
+  private async buildCredentialEnv(userId: string): Promise<Record<string, string>> {
+    if (!this.config.serverSecret) {
+      return {}
+    }
+    const env: Record<string, string> = {}
+    try {
+      const store = new WebCredentialStore(this.config.baseDataPath, userId, this.config.serverSecret)
+
+      // Bitbucket — App Password auth
+      const bitbucketToken = await store.getToken('bitbucket')
+      const bitbucketConfig = await store.getConfig('bitbucket')
+      if (bitbucketToken) env['ORCA_BITBUCKET_ACCESS_TOKEN'] = bitbucketToken
+      if (bitbucketConfig?.email) env['ORCA_BITBUCKET_EMAIL'] = bitbucketConfig.email
+      if (bitbucketConfig?.apiBaseUrl) env['ORCA_BITBUCKET_API_BASE_URL'] = bitbucketConfig.apiBaseUrl
+
+      // Azure DevOps — Personal Access Token
+      const azureToken = await store.getToken('azure-devops')
+      const azureConfig = await store.getConfig('azure-devops')
+      if (azureToken) env['ORCA_AZURE_DEVOPS_TOKEN'] = azureToken
+      if (azureConfig?.apiBaseUrl) env['ORCA_AZURE_DEVOPS_API_BASE_URL'] = azureConfig.apiBaseUrl
+      if (azureConfig?.username) env['ORCA_AZURE_DEVOPS_USERNAME'] = azureConfig.username
+
+      // Gitea — API token
+      const giteaToken = await store.getToken('gitea')
+      const giteaConfig = await store.getConfig('gitea')
+      if (giteaToken) env['ORCA_GITEA_TOKEN'] = giteaToken
+      if (giteaConfig?.apiBaseUrl) env['ORCA_GITEA_API_BASE_URL'] = giteaConfig.apiBaseUrl
+    } catch (err) {
+      // Non-fatal: integration tokens not yet configured or store not initialised
+      console.warn(`[SessionManager] Could not load credentials for user ${userId} (non-fatal):`, (err as Error)?.message)
+    }
+    return env
+  }
+}

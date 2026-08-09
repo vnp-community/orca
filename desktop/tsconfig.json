@@ -1,0 +1,24 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": [
+    "./src/main/**/*",
+    "./src/platform/**/*",
+    "./src/preload/**/*",
+    "./src/shared/**/*",
+    "./src/relay/**/*",
+    "./src/types/**/*"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "types": [
+      "electron-vite/node"
+    ],
+    "rootDir": "./src",
+    "outDir": "./out",
+    "paths": {
+      "@/*": [
+        "./src/renderer/src/*"
+      ]
+    }
+  }
+}

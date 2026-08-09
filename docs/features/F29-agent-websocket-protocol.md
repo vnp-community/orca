@@ -88,11 +88,36 @@ JSON-RPC methods Orca gọi agent: `preflight.check`, `pty.spawn`, `fs.readDir`,
 rawToken → stored as SHA-256(rawToken)  // không lưu plain text
 
 // Validate khi kết nối
-SHA-256(received) === storedHash ? OK : close(4001)
+SHA-256(received) === storedHash ? OK : close(1008, 'Authentication failed...')
 ```
 
 - UI: `AgentTokenPanel` — hiển thị token 1 lần, copy-to-clipboard, regenerate
-- Close codes: 4001=Unauthorized, 4002=HandshakeTimeout, 4003=VersionMismatch
+- Close codes: `1008` (Policy Violation) = token sai/slot hết hạn, `1005` (No Status
+  Received, mặc định của `ws.close()` không tham số) = handshake timeout. Không có
+  mã tùy biến 4000-4999 — xem mục "Version Compatibility Check" nếu cần version-mismatch
+  dùng mã riêng.
+
+---
+
+### Version Compatibility Check
+
+`AGENT_MIN_VERSION` (`src/shared/agent-wire-protocol.ts`) là version Agent tối
+thiểu Orca chấp nhận. Được kiểm tra trong `runOrcaReceiverHandshake()`
+(`src/main/dev-server/ws-handshake.ts`) ngay sau khi validate token, trước khi
+trả `handshake-ok`:
+
+```typescript
+if (semverLt(agentVersion, AGENT_MIN_VERSION)) {
+  ws.close(1008, `Agent version ${agentVersion} is below minimum ${AGENT_MIN_VERSION}`)
+}
+```
+
+- Áp dụng cho cả `direct-websocket` (Agent gửi `agentVersion` trong
+  `agent.handshake` params) và `relay-websocket` (Orca đọc `agentVersion` từ
+  handshake result của Agent).
+- Không dùng close code tùy biến (4000-4999) cho version mismatch — dùng `1008`
+  (Policy Violation), cùng mã đã dùng cho auth failure, kèm message phân biệt rõ
+  lý do trong `reason` string (client phân loại theo message, không theo code).
 
 ---
 
@@ -119,7 +144,8 @@ ws.send(Buffer.concat([header, body]))
 - [x] `direct-websocket` mode hoạt động (Agent → ws://orca:6768/agent)
 - [x] Wire protocol 13-byte header đúng spec
 - [x] `agent.handshake` + `handshake-ok` cả 2 mode
-- [x] KeepAlive 0x09 gửi mỗi 30s, timeout 90s
+- [x] KeepAlive 0x09 gửi mỗi 5s nếu không có frame Regular nào được gửi; ngắt kết
+  nối nếu không nhận được frame nào (Regular hoặc KeepAlive) trong 20s liên tục
 - [x] Token validate via SHA-256 (không lưu plain text)
 - [x] AgentWebSocketServer tại `/agent` (tách biệt `/` dành cho browser)
 - [x] UI: AddDevServerDialog 3 modes, AgentTokenPanel
@@ -153,7 +179,25 @@ ws.send(Buffer.concat([header, body]))
 | KPI | Mục tiêu |
 |-----|----------|
 | Handshake round-trip | < 500ms |
-| KeepAlive interval | 30s |
-| KeepAlive timeout | 90s (3 missed) |
+| KeepAlive interval | 5s |
+| KeepAlive timeout | 20s (không nhận bất kỳ frame nào — không phải "3 lần miss") |
 | Token entropy | 32 bytes (64 hex chars) |
 | Max frame payload | 16 MB |
+
+---
+
+## Ghi chú: hai cơ chế keepalive độc lập
+
+Có **hai** lớp keepalive riêng biệt, không nên gộp chung:
+
+1. **Application-level KeepAlive (0x09)** — khung 13-byte header với `TYPE=0x09`,
+   gửi mỗi 5s nếu không có frame Regular nào vừa gửi; bên nhận coi mất kết nối nếu
+   không nhận **bất kỳ** frame nào (Regular hoặc KeepAlive) trong 20s. Định nghĩa ở
+   `src/main/ssh/relay-protocol.ts` (`KEEPALIVE_SEND_MS`, `TIMEOUT_MS`) và lặp lại
+   giá trị ở `src/shared/agent-wire-protocol.ts` (`AGENT_KEEPALIVE_INTERVAL_MS`,
+   `AGENT_TIMEOUT_MS`). Đây là cơ chế chính bảo vệ giao thức JSON-RPC framed.
+2. **Transport-level WS ping** — `ws.ping()` gọi mỗi 30s trong
+   `src/main/dev-server/agent-ws-server.ts:124-126`, chỉ nhằm giữ kết nối sống qua
+   reverse proxy/load balancer (ALB, Cloudflare) hay đóng idle socket sau một
+   khoảng lặng nhất định — không phải cơ chế phát hiện mất kết nối ở tầng ứng
+   dụng và không có logic timeout tương ứng ở phía Orca.

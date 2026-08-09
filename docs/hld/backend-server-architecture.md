@@ -289,13 +289,15 @@ Provider registry (`IFilesystemProvider`/`IGitProvider`/`IPtyProvider`, dùng ch
 | 0001 `init` | `projects`, `worktrees`, `agent_sessions`, `settings` |
 | 0002 `sessions` | `terminal_scrollback_snapshots` |
 | 0003 `ssh_targets` | `ssh_hosts`, `saved_port_forwards` |
-| 0004 `automations` | `automations`, `automation_runs`, `notifications`, `rate_limits` |
+| 0004 `orca_app_tables` | `orca_projects` (legacy, tab/state cho desktop/single-user mode — KHÔNG liên quan Project↔DevServer binding), `orca_repos`, `orca_ssh_targets`, `orca_global_settings` |
 | 0005 `auth_schema` | `orca_users`, `orca_sessions`, `orca_audit_log`, `orca_access_policies` |
 | 0006 `profile` | `orca_company`, `orca_departments` + ALTER `orca_users` |
-| 0007 `project` | `orca_projects`, `orca_project_members` |
+| 0007 `project` | `orca_v5_projects`, `orca_v5_project_members` — dùng tiền tố `v5` để tránh đụng độ với bảng `orca_projects` legacy của migration 0004 (xem comment `0007_projects.ts:5-9`). Đây là bảng project thật cho tính năng Project-DevServer binding (F34/TDD-15). |
 | 0008 `ai_providers` | `orca_ai_provider_accounts`, `orca_provider_usage` |
 | 0009 `workflow` | `orca_workflow_templates`, `orca_workflow_executions`, `orca_step_executions` |
 | 0010 `task_graph` | `orca_tasks`, `orca_task_edges`, `orca_task_grants`, `orca_task_comments` |
+
+> ⚠️ **Lưu ý naming:** `orca_projects` (0004) và `orca_v5_projects` (0007) là **hai bảng khác nhau, cùng tồn tại song song trong DB**, không phải hai phiên bản của cùng một bảng. `orca_projects` lưu state/tab đơn giản (desktop/single-user mode, không có `dev_server_id`); `orca_v5_projects` là entity project đầy đủ gắn với dev server (server mode, F34). Khi viết SQL hoặc query trực tiếp, LUÔN xác nhận đang thao tác đúng bảng theo mục đích. Xem `BUG-BE-HLD-016` để biết bối cảnh đầy đủ và kế hoạch dọn dẹp dài hạn.
 
 ---
 
