@@ -391,6 +391,14 @@ export class SshChannelMultiplexer {
         const msg = parseJsonRpcMessage(frame.payload)
         this.handleMessage(msg)
       } catch (err) {
+        // TEMP DIAG BUG-FE-PTY-001: parseJsonRpcMessage throws uncaught on
+        // bad JSON/version — handleProtocolError disposes the whole
+        // connection for it. Log the exact bytes that failed to parse so we
+        // can see WHY (truncated frame, concatenated frames, garbage) instead
+        // of just that it happened.
+        console.error(
+          `[DIAG BUG-FE-PTY-001] parseJsonRpcMessage failed frameId=${frame.id} frameAck=${frame.ack} payloadLen=${frame.payload.length} payloadUtf8=${JSON.stringify(frame.payload.toString('utf-8'))} payloadHex=${frame.payload.toString('hex')}`
+        )
         this.handleProtocolError(err)
       }
     }
