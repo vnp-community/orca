@@ -65,6 +65,44 @@ function isRemoteTerminalGoneMessage(message: string): boolean {
   )
 }
 
+// FIX BUG-FE-PTY-001: a fresh local tab's connect() and its own host-session
+// mirror tab can both mount for one leaf during the same reconcile churn (the
+// mirror publishes before the local tab's terminal.create round-trip
+// resolves). When connect() then finds itself destroyed(), it used to close
+// the PTY it just spawned immediately — but that is the EXACT same PTY
+// waitForHostSessionHandle's poll loop (150ms interval, up to 15s) is about
+// to discover for the mirror, so this raced the mirror's every attach/resize
+// into "PTY not found" (diagnosed live via ipc:devServerProxy trace logs and
+// browser console transport create/destroy stacks). Give the mirror a short
+// window to claim the handle via attachHostSessionMirror() below before
+// actually closing it — a real cancelled launch just closes slightly later.
+const GRACE_CLOSE_DELAY_MS = 2_000
+const pendingGraceCloses = new Map<string, { timer: ReturnType<typeof setTimeout> }>()
+
+function scheduleGraceClose(handle: string, close: () => void): void {
+  const existing = pendingGraceCloses.get(handle)
+  if (existing) {
+    clearTimeout(existing.timer)
+  }
+  const timer = setTimeout(() => {
+    pendingGraceCloses.delete(handle)
+    close()
+  }, GRACE_CLOSE_DELAY_MS)
+  pendingGraceCloses.set(handle, { timer })
+}
+
+/** Cancels a scheduled grace-close when a mirror successfully claims the same
+ *  handle. Returns true if a pending close was actually cancelled. */
+function claimGraceClose(handle: string): boolean {
+  const pending = pendingGraceCloses.get(handle)
+  if (!pending) {
+    return false
+  }
+  clearTimeout(pending.timer)
+  pendingGraceCloses.delete(handle)
+  return true
+}
+
 /**
  * PTY transport backing a renderer terminal pane with a terminal on a remote Orca
  * runtime, over runtime RPC plus the multiplexed stream (create, subscribe, input,
@@ -248,6 +286,11 @@ export function createRemoteRuntimePtyTransport(
       return undefined
     }
 
+    // FIX BUG-FE-PTY-001: this handle may be the exact PTY a sibling local
+    // tab's now-superseded connect() just spawned and is about to grace-close
+    // — claim it before that timer fires so we don't attach to (or race) a
+    // PTY that's being torn down underneath us.
+    claimGraceClose(hostHandle)
     handle = hostHandle
     remotePtyId = toRemoteRuntimePtyId(hostHandle, currentRuntimeEnvironmentId)
     connected = true
@@ -753,11 +796,18 @@ export function createRemoteRuntimePtyTransport(
           // immediately destroyed" race — logs which tab/leaf raced and how
           // long the create() round-trip took before destroy() beat it.
           console.error(
-            `[DIAG BUG-FE-PTY-001] connect() found destroyed=true right after terminal.create resolved — closing orphaned PTY tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId} handle=${created.terminal.handle}`
+            `[DIAG BUG-FE-PTY-001] connect() found destroyed=true right after terminal.create resolved — grace-closing PTY tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId} handle=${created.terminal.handle}`
           )
-          // Why: this is a cancelled launch, not a connected shared session.
-          // Close the server PTY so rapid tab-open/tab-close does not leak.
-          await closeRemoteTerminal(created.terminal.handle)
+          // FIX BUG-FE-PTY-001: this is USUALLY a cancelled launch (rapid
+          // tab-open/tab-close) — close the server PTY so it doesn't leak.
+          // But it's also exactly what happens when this same leaf's own
+          // host-session mirror tab mounted and superseded this one before
+          // terminal.create finished: that mirror's attachHostSessionMirror
+          // is polling for THIS exact PTY (waitForHostSessionHandle). Give it
+          // GRACE_CLOSE_DELAY_MS to claim the handle before actually closing.
+          scheduleGraceClose(created.terminal.handle, () => {
+            void closeRemoteTerminal(created.terminal.handle)
+          })
           return
         }
 
