@@ -47,29 +47,49 @@ xác minh từng bước. Kỳ vọng sau giai đoạn này: ~24,785 → ~23,450
 
 ## Giai đoạn 3 (rủi ro cao — làm SAU CÙNG) — Class `OrcaRuntimeService`
 
-Class bắt đầu dòng 2,109, sau 2 giai đoạn trên còn lại ~23,450 dòng, trong đó
-class chiếm gần như toàn bộ. **Không tách trong 1 bước** — đề xuất áp dụng
-pattern composition theo domain trách nhiệm, theo đúng tiền lệ đã có trong
-chính thư mục này:
+Sau TASK-008/009, class chiếm dòng 2,030–24,617 (~22,587 dòng) trong file
+24,733 dòng. **Không tách trong 1 bước.**
+
+**Cập nhật (TASK-BIGFILE-035, phân tích dữ liệu thật thay cho đoán theo
+tên type):** 4 domain liệt kê ban đầu ở bản kế hoạch này (đoán từ tên type
+Giai đoạn 2) **không khớp với ranh giới thật** — xác nhận bằng phân tích
+field-span (đếm dòng nhỏ nhất/lớn nhất mỗi private field được tham chiếu).
+Kết quả thật, xem đầy đủ tại
+`../tasks/TASK-BIGFILE-035-orca-runtime-service-domains-investigate.md`:
+
+- **State lõi dùng chéo toàn class** (`ptyController`, `notifier`,
+  `ptysById`, `leaves`/`handles`/`handleByPtyId`, `_orchestrationDb`,
+  `graphStatus`, `tabs` — span 15,000–21,000+ dòng): KHÔNG tách được bằng
+  Move cơ học, cần thiết kế "RuntimeGraphStore" riêng (kiến trúc mới, không
+  phải giai đoạn này) + test coverage tốt hơn hiện tại (hiện KHÔNG có test
+  bao phủ `OrcaRuntimeService` bản frontend).
+- **5 domain tách được ngay** (field co cụm, ranh giới liền mạch — pattern
+  composition, KHÔNG phải barrel vì là instance method):
+
+  | Task | Domain | Dòng gốc (ước tính) |
+  |---|---|---|
+  | TASK-BIGFILE-036 | Automation | ~191 dòng |
+  | TASK-BIGFILE-037 | Mobile floor / remote-desktop / layout queue | ~1,830 dòng |
+  | TASK-BIGFILE-038 | Remote fetch dedup/cache | ~238 dòng |
+  | TASK-BIGFILE-039 | Branch cleanup / managed-worktree removal | ~608 dòng |
+  | TASK-BIGFILE-040 | Resolved-worktree cache/lineage | ~247 dòng |
+
+  Tổng ~3,114 dòng (~14% class) — đáng kể nhưng không giải quyết hết; phần
+  PTY lifecycle/live-graph lõi (~5,600+ dòng) vẫn ở lại cho tới khi có
+  RuntimeGraphStore.
+- **Phát hiện quan trọng**: "mobile session tabs" (CRUD/listing,
+  headless hydration — 106 method theo cụm từ khoá) và "mobile
+  floor/layout" (60 method, co cụm 1 khối liền) tưởng là 1 domain nhưng
+  field-span cho thấy chúng KHÁC NHAU — chỉ "mobile floor/layout" tách
+  được ngay, "mobile session tabs" còn rải rác, cần phân tích field-span
+  riêng trước khi sinh task Move.
+
+Tiền lệ đã tách trước đó (không phải instance method, dùng barrel thuần):
 
 | Domain đã tách trước (tiền lệ) | File |
 |---|---|
 | Browser command adapters | `orca-runtime-browser.ts` (1,841 dòng) |
 | File command adapters | `orca-runtime-files.ts` (1,885 dòng) |
-
-**Domain còn lại trong class, ứng viên tách tiếp** (dựa trên tên type ở Giai
-đoạn 2 — đọc lại comment dòng 1 gốc: "mutable live graph, PTY handles,
-waiters, mobile floor/layout state, and managed-worktree reconciliation"):
-
-1. Mobile session mirror / floor-layout state (liên quan
-   `MobileNotificationDispatchEvent`, `PtyLayoutState`, `ApplyLayoutResult`)
-   → `orca-runtime-mobile-session.ts`
-2. Automation (`RuntimeAutomationCreateInput`/`UpdateInput`) →
-   `orca-runtime-automation.ts`
-3. PTY liveness/waiters (nếu tách được khỏi phần graph chính) →
-   `orca-runtime-pty-liveness.ts`
-4. Worktree reconciliation — làm SAU CÙNG, sau khi 3 domain trên đã tách,
-   để nhìn rõ ranh giới còn lại của "live graph" cốt lõi.
 
 **Cách tách 1 domain khỏi class lớn (composition, không đổi public API):**
 

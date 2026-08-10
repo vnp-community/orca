@@ -62,7 +62,12 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 32 | [TASK-BIGFILE-032](./TASK-BIGFILE-032-taskpage-state-investigate.md) | Investigate | `TaskPage.tsx` component chính (83 state) | L | 27–31 | ⬜ |
 | 33 | [TASK-BIGFILE-033](./TASK-BIGFILE-033-pty-connection-test-coverage.md) | Test | `pty-connection.ts` | M | — | ⬜ |
 | 34 | [TASK-BIGFILE-034](./TASK-BIGFILE-034-pty-connection-branches-investigate.md) | Investigate | `pty-connection.ts` `connectPanePty` | L | 33 | ⬜ |
-| 35 | [TASK-BIGFILE-035](./TASK-BIGFILE-035-orca-runtime-service-domains-investigate.md) | Investigate | `orca-runtime.ts` `OrcaRuntimeService` | L | 8, 9 | ⬜ |
+| 35 | [TASK-BIGFILE-035](./TASK-BIGFILE-035-orca-runtime-service-domains-investigate.md) | Investigate | `orca-runtime.ts` `OrcaRuntimeService` | L | 8, 9 | ✅ (sinh task 36–40) |
+| 36 | [TASK-BIGFILE-036](./TASK-BIGFILE-036-orca-runtime-automation-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-automation.ts` | S | 8, 9 | ⬜ |
+| 37 | [TASK-BIGFILE-037](./TASK-BIGFILE-037-orca-runtime-mobile-floor-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-mobile-floor.ts` | L | 8, 9, khuyến nghị sau 36 | ⬜ |
+| 38 | [TASK-BIGFILE-038](./TASK-BIGFILE-038-orca-runtime-remote-fetch-dedup-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-remote-fetch-cache.ts` | S | 8, 9 | ⬜ |
+| 39 | [TASK-BIGFILE-039](./TASK-BIGFILE-039-orca-runtime-branch-cleanup-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-branch-cleanup.ts` | M | 8, 9 | ⬜ |
+| 40 | [TASK-BIGFILE-040](./TASK-BIGFILE-040-orca-runtime-resolved-worktree-cache-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-resolved-worktree-cache.ts` | S | 8, 9 | ⬜ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
@@ -93,6 +98,19 @@ pane-key-registry + provider-resolution state trong `ipc/pty.ts`, output là
 ghi chú thiết kế xác định ranh giới thật (có thể là "trích cả object/class
 đóng gói state" thay vì trích từng hàm rời) — theo đúng khuôn của TASK-007
 (vốn đã đúng là Investigate) — trước khi sinh lại các task Move con.
+
+## Kết quả TASK-BIGFILE-035 (2026-08-10) — thiết kế tách domain `OrcaRuntimeService`
+
+Phân tích field-span (không đọc tuyến tính 22,587 dòng — dùng `grep`/`awk`
+đếm dòng nhỏ nhất/lớn nhất mỗi private field được tham chiếu) xác định:
+**state lõi** (`ptyController`, `notifier`, `ptysById`, `handles`, `tabs`,
+`_orchestrationDb`...) dùng chéo toàn class (span 15,000–21,000+ dòng) —
+KHÔNG tách được bằng Move, cần thiết kế "RuntimeGraphStore" riêng (kiến
+trúc mới) + test coverage tốt hơn (hiện KHÔNG có test bao phủ). **5 domain
+field co cụm, ranh giới liền mạch** — sinh task TASK-BIGFILE-036–040 (Move
+theo pattern **composition**, không phải barrel, vì đây là instance method
+dùng `this`). Chi tiết đầy đủ:
+`./TASK-BIGFILE-035-orca-runtime-service-domains-investigate.md`.
 
 **Task Investigate không tự thực thi split** — output là 1 ghi chú thiết kế
 (+ có thể là các task Move mới, đặt tên tiếp `TASK-BIGFILE-036`, `037`, ...
