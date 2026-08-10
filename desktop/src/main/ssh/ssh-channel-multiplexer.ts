@@ -38,7 +38,17 @@ const REQUEST_TIMEOUT_MS = 30_000
 // (system sleep, App Nap timer throttling) — not that the link is dead (#7773).
 const WAKE_GAP_MS = KEEPALIVE_SEND_MS * 3
 
+// TEMP DIAG BUG-FE-PTY-001: multiple SshChannelMultiplexer instances run
+// concurrently (one per connected devServerId — dev-01, dev-ai, test-01 are
+// all connected simultaneously in this deployment), all logging through the
+// same [DIAG BUG-FE-PTY-001] prefix. Without a per-instance tag, a close
+// event for one devServer's mux is indistinguishable from another's in the
+// merged log, making frame-sequence correlation unreliable.
+let diagNextMuxInstanceId = 1
+
 export class SshChannelMultiplexer {
+  // TEMP DIAG BUG-FE-PTY-001
+  private readonly diagMuxId = diagNextMuxInstanceId++
   private decoder: FrameDecoder
   private transport: MultiplexerTransport
   private nextRequestId = 1
@@ -275,7 +285,7 @@ export class SshChannelMultiplexer {
     }
     if (process.env.ORCA_SSH_MUX_DEBUG === '1') {
       console.warn(
-        `[ssh-mux] Disposing multiplexer (reason: ${reason})`,
+        `[ssh-mux] Disposing multiplexer muxId=${this.diagMuxId} (reason: ${reason})`,
         new Error('dispose trace').stack
       )
     }
@@ -370,7 +380,7 @@ export class SshChannelMultiplexer {
     // batch triggered it, or whether it's a throw at all (no
     // parseJsonRpcMessage-fail log fired despite the same call site).
     console.error(
-      `[DIAG BUG-FE-PTY-001] handleFrame ENTER type=${frame.type} id=${frame.id} ack=${frame.ack} payloadLen=${frame.payload.length}`
+      `[DIAG BUG-FE-PTY-001] handleFrame ENTER muxId=${this.diagMuxId} type=${frame.type} id=${frame.id} ack=${frame.ack} payloadLen=${frame.payload.length}`
     )
     // Why: any decoded frame proves the relay round-trip is alive; resolve
     // pending resume probes before ordinary dispatch (#7773).
@@ -406,7 +416,7 @@ export class SshChannelMultiplexer {
         // can see WHY (truncated frame, concatenated frames, garbage) instead
         // of just that it happened.
         console.error(
-          `[DIAG BUG-FE-PTY-001] parseJsonRpcMessage failed frameId=${frame.id} frameAck=${frame.ack} payloadLen=${frame.payload.length} payloadUtf8=${JSON.stringify(frame.payload.toString('utf-8'))} payloadHex=${frame.payload.toString('hex')}`
+          `[DIAG BUG-FE-PTY-001] parseJsonRpcMessage failed muxId=${this.diagMuxId} frameId=${frame.id} frameAck=${frame.ack} payloadLen=${frame.payload.length} payloadUtf8=${JSON.stringify(frame.payload.toString('utf-8'))} payloadHex=${frame.payload.toString('hex')}`
         )
         this.handleProtocolError(err)
       }
