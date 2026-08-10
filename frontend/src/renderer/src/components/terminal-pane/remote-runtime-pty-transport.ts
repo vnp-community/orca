@@ -977,20 +977,6 @@ export function createRemoteRuntimePtyTransport(
     },
 
     destroy() {
-      // TEMP DIAG BUG-FE-PTY-001: logs unconditionally (not gated on dev/e2e)
-      // so the next repro captures the caller in the browser console — a
-      // devServer terminal.create that resolves after destroyed=true here
-      // triggers connect()'s closeRemoteTerminal() cleanup (-> pty.destroy
-      // server-side), confirmed live right after a successful
-      // terminal:create for a brand-new tab (no prior session to race).
-      console.error('[DIAG BUG-FE-PTY-001] remote-runtime-pty-transport destroy() called', {
-        worktreeId,
-        tabId,
-        leafId,
-        handle,
-        connected,
-        stack: new Error('diag').stack
-      })
       destroyed = true
       this.disconnect()
       inputBatcher.clear()
