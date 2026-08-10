@@ -68,6 +68,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 38 | [TASK-BIGFILE-038](./TASK-BIGFILE-038-orca-runtime-remote-fetch-dedup-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-remote-fetch-cache.ts` | S | 8, 9 | ⬜ |
 | 39 | [TASK-BIGFILE-039](./TASK-BIGFILE-039-orca-runtime-branch-cleanup-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-branch-cleanup.ts` | M | 8, 9 | ⬜ |
 | 40 | [TASK-BIGFILE-040](./TASK-BIGFILE-040-orca-runtime-resolved-worktree-cache-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-resolved-worktree-cache.ts` | S | 8, 9 | ⬜ |
+| 41 | [TASK-BIGFILE-041](./TASK-BIGFILE-041-orca-runtime-graph-store.md) | Extract (state container, không phải domain) | `orca-runtime.ts` → `orca-runtime-graph-store.ts` | L | 8, 9, 35 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
@@ -111,6 +112,21 @@ field co cụm, ranh giới liền mạch** — sinh task TASK-BIGFILE-036–040
 theo pattern **composition**, không phải barrel, vì đây là instance method
 dùng `this`). Chi tiết đầy đủ:
 `./TASK-BIGFILE-035-orca-runtime-service-domains-investigate.md`.
+
+**Cập nhật (TASK-BIGFILE-041):** đã tách 13 field "graph lõi"
+(`ptysById`, `handles`, `leaves`, `tabs`...) vào `RuntimeGraphStore`
+(`orca-runtime-graph-store.ts`) — KHÔNG phải Move theo domain (không giảm
+nhiều dòng), mà là bước dọn state khỏi hành vi để TASK-036–040 sau này có
+thể inject `RuntimeGraphStore` thay vì đọc field private trực tiếp. Xác
+minh bằng `tsc --noEmit` (225 chỗ `this.X` → `this.graph.X`, compiler bắt
+mọi chỗ sót — 0 lỗi mới) vì **GitNexus KHÔNG index được `orca-runtime.ts`**
+(cả 3 bản backend/desktop/frontend) — file vượt giới hạn mặc định 512KB
+(bản frontend ~905KB), bị loại khỏi index hoàn toàn. Đây là phát hiện
+quan trọng: các cảnh báo "index cũ, chạy `gitnexus analyze`" xuất hiện
+suốt phiên làm việc này **không giải quyết được vấn đề** cho riêng file
+này — cần `GITNEXUS_MAX_FILE_SIZE` lớn hơn + `--force` mới đưa file này
+vào index (chưa làm, ngoài phạm vi). Chi tiết:
+`./TASK-BIGFILE-041-orca-runtime-graph-store.md`.
 
 **Task Investigate không tự thực thi split** — output là 1 ghi chú thiết kế
 (+ có thể là các task Move mới, đặt tên tiếp `TASK-BIGFILE-036`, `037`, ...

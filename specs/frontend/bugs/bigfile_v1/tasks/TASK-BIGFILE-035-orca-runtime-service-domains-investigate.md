@@ -41,10 +41,19 @@ bằng `grep`/`awk` (không đọc tuyến tính 22,587 dòng):
 Đây chính xác là điều comment dòng 1 gốc mô tả ("mutable live graph, PTY
 handles, waiters"). Các field này được hầu hết mọi domain (PTY, mobile,
 worktree, agent-status...) đọc/ghi trực tiếp — tách domain nào cũng phải
-inject lại các field này qua constructor. **Không đề xuất tách trong đợt
-này** — cần thiết kế 1 "RuntimeGraphStore" tách riêng trước (thay đổi kiến
-trúc, không phải Move cơ học), và cần test coverage tốt hơn hiện tại
-(gitnexus báo class này ở bản frontend **không có test bao phủ**).
+inject lại các field này qua constructor. **Không đề xuất tách theo domain
+trong đợt này** — cần test coverage tốt hơn hiện tại (gitnexus báo class
+này ở bản frontend **không có test bao phủ**) trước khi tách hành vi.
+
+**Cập nhật (TASK-BIGFILE-041, đã làm):** 13 trong số field lõi trên
+(nhóm "graph" — `ptysById`, `handles`, `leaves`, `tabs`... KHÔNG gồm
+`ptyController`/`notifier`/`_orchestrationDb` — đây là collaborator
+reference, không phải graph data) đã được gom vào 1 class chứa dữ liệu
+thuần `RuntimeGraphStore`, xác minh an toàn bằng compiler (`tsc`) thay vì
+gitnexus (file này bị GitNexus loại khỏi index do vượt giới hạn 512KB —
+không phải vấn đề "index cũ"). Đây KHÔNG phải tách domain (không giảm
+nhiều dòng) mà là bước chuẩn bị kiến trúc — xem chi tiết
+`./TASK-BIGFILE-041-orca-runtime-graph-store.md`.
 
 ### 2. 5 domain tách được — ranh giới liền mạch, field co cụm (an toàn)
 

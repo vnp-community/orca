@@ -2,6 +2,7 @@
 /* eslint-disable unicorn/no-useless-spread -- Why: waiter sets and handle keys are cloned intentionally before mutation so resolution and rejection can safely remove entries while iterating. */
 /* eslint-disable no-control-regex -- Why: terminal normalization must strip ANSI and OSC control sequences from PTY output before returning bounded text to agents. */
 import type { WebPushManager } from '../notifications/web-push-manager'
+import { RuntimeGraphStore } from './orca-runtime-graph-store'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -276,7 +277,6 @@ import {
 } from '../ports/workspace-port-ownership'
 import { advertisedUrlWatcher } from '../ports/advertised-url-watcher'
 import type {
-  RuntimeGraphStatus,
   RuntimeRepoSearchRefs,
   RuntimeTerminalRead,
   RuntimeTerminalRename,
@@ -305,7 +305,6 @@ import type {
   RuntimeTerminalVisualPaneNode,
   RuntimeTerminalVisualTab,
   RuntimeSyncedLeaf,
-  RuntimeSyncedTab,
   RuntimeMarkdownReadTabResult,
   RuntimeMarkdownSaveTabResult,
   RuntimeMobileSessionCreateTerminalResult,
@@ -1359,7 +1358,7 @@ type RuntimeNotifier = {
   browserDriverChanged?(browserPageId: string, driver: RuntimeBrowserDriverState): void
 }
 
-type TerminalHandleRecord = {
+export type TerminalHandleRecord = {
   handle: string
   runtimeId: string
   rendererGraphEpoch: number
@@ -1370,7 +1369,7 @@ type TerminalHandleRecord = {
   ptyGeneration: number
 }
 
-type TerminalWaiter = {
+export type TerminalWaiter = {
   handle: string
   condition: RuntimeTerminalWaitCondition
   resolve: (result: RuntimeTerminalWait) => void
@@ -2031,10 +2030,12 @@ export class OrcaRuntimeService {
   private readonly runtimeId = randomUUID()
   private readonly startedAt = Date.now()
   private readonly store: RuntimeStore | null
-  private rendererGraphEpoch = 0
-  private graphStatus: RuntimeGraphStatus = 'unavailable'
-  private authoritativeWindowId: number | null = null
-  private tabs = new Map<string, RuntimeSyncedTab>()
+  // Why: the mutable live graph (leaves/tabs/PTY handles/waiters) is read
+  // from nearly every method in this class (TASK-BIGFILE-035 field-span
+  // analysis: 15,000-21,000+ line reference spread) — too pervasive to move
+  // alongside any single domain, so it gets its own logic-free holder
+  // (TASK-BIGFILE-041) instead of living as scattered fields here.
+  private readonly graph = new RuntimeGraphStore()
   private mobileSessionTabsByWorktree = new Map<string, RuntimeMobileSessionTabsSnapshot>()
   // Why: idempotency map for mobile terminal creation — a retried create with the
   // same clientMutationId returns the in-flight operation instead of duplicating.
@@ -2059,16 +2060,6 @@ export class OrcaRuntimeService {
     createMobileSessionTabsNotifyCoalescer((worktreeId) =>
       this.notifyMobileSessionTabsChangedNow(worktreeId)
     )
-  private leaves = new Map<string, RuntimeLeafRecord>()
-  // Why: PTY output is a per-keystroke hot path. Looking up affected leaves by
-  // ptyId keeps active TUI redraws independent of the total open terminal count.
-  private leavesByPtyId = new Map<string, RuntimeLeafRecord[]>()
-  private handles = new Map<string, TerminalHandleRecord>()
-  private handleByLeafKey = new Map<string, string>()
-  private handleByPtyId = new Map<string, string>()
-  private detachedPreAllocatedLeaves = new Map<string, RuntimeLeafRecord>()
-  private graphSyncCallbacks: (() => void)[] = []
-  private waitersByHandle = new Map<string, Set<TerminalWaiter>>()
   private ptyController: RuntimePtyController | null = null
   private notifier: RuntimeNotifier | null = null
   private clientEventListeners = new Set<(event: RuntimeClientEvent) => void>()
@@ -2131,7 +2122,6 @@ export class OrcaRuntimeService {
   // mobile client gets its own listener, and dispatchMobileNotification
   // iterates them all. Listeners are cleaned up via subscriptionCleanups.
   private notificationListeners = new Set<(event: MobileNotificationEvent) => void>()
-  private ptysById = new Map<string, RuntimePtyWorktreeRecord>()
   private titleObservationSequence = 0
   private headlessTerminals = new Map<string, RuntimeHeadlessTerminal>()
   private ptyOutputSequenceById = new Map<string, number>()
@@ -2873,11 +2863,11 @@ export class OrcaRuntimeService {
     }
     return {
       runtimeId: this.runtimeId,
-      rendererGraphEpoch: this.rendererGraphEpoch,
-      graphStatus: this.graphStatus,
-      authoritativeWindowId: this.authoritativeWindowId,
-      liveTabCount: this.tabs.size,
-      liveLeafCount: this.leaves.size,
+      rendererGraphEpoch: this.graph.rendererGraphEpoch,
+      graphStatus: this.graph.graphStatus,
+      authoritativeWindowId: this.graph.authoritativeWindowId,
+      liveTabCount: this.graph.tabs.size,
+      liveLeafCount: this.graph.leaves.size,
       runtimeProtocolVersion: RUNTIME_PROTOCOL_VERSION,
       minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
       // Why: headless orca serve cannot create/stream BrowserViews, so clients
@@ -2990,30 +2980,30 @@ export class OrcaRuntimeService {
   }
 
   attachWindow(windowId: number): void {
-    if (this.authoritativeWindowId === null) {
-      this.authoritativeWindowId = windowId
+    if (this.graph.authoritativeWindowId === null) {
+      this.graph.authoritativeWindowId = windowId
     }
   }
 
   syncWindowGraph(windowId: number, graph: RuntimeSyncWindowGraph): RuntimeSyncWindowGraphResult {
-    if (this.authoritativeWindowId === null) {
-      this.authoritativeWindowId = windowId
+    if (this.graph.authoritativeWindowId === null) {
+      this.graph.authoritativeWindowId = windowId
     }
-    if (windowId !== this.authoritativeWindowId) {
+    if (windowId !== this.graph.authoritativeWindowId) {
       throw new Error('Runtime graph publisher does not match the authoritative window')
     }
 
-    this.tabs = new Map(graph.tabs.map((tab) => [tab.tabId, tab]))
+    this.graph.tabs = new Map(graph.tabs.map((tab) => [tab.tabId, tab]))
     this.syncMobileSessionTabs(graph.mobileSessionTabs)
     const nextLeaves = new Map<string, RuntimeLeafRecord>()
     const graphSyncedAt = this.nextTitleObservationSequence()
 
     // Why: renderer reloads can briefly republish the same leaf with no ptyId;
     // keep live CLI handles usable while the UI graph rebuilds.
-    const preserveLivePtysDuringReload = this.graphStatus === 'reloading'
+    const preserveLivePtysDuringReload = this.graph.graphStatus === 'reloading'
     for (const leaf of graph.leaves) {
       const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
-      const existing = this.leaves.get(leafKey)
+      const existing = this.graph.leaves.get(leafKey)
       const ptyId =
         preserveLivePtysDuringReload && leaf.ptyId === null && existing?.ptyId
           ? existing.ptyId
@@ -3022,7 +3012,7 @@ export class OrcaRuntimeService {
         existing && existing.ptyId !== ptyId
           ? existing.ptyGeneration + 1
           : (existing?.ptyGeneration ?? 0)
-      const existingPty = ptyId ? this.ptysById.get(ptyId) : undefined
+      const existingPty = ptyId ? this.graph.ptysById.get(ptyId) : undefined
       const tailSource = existing?.ptyId === ptyId ? existing : existingPty
 
       nextLeaves.set(leafKey, {
@@ -3030,7 +3020,7 @@ export class OrcaRuntimeService {
         ptyId,
         ptyGeneration,
         connected: ptyId !== null,
-        writable: this.graphStatus === 'ready' && ptyId !== null,
+        writable: this.graph.graphStatus === 'ready' && ptyId !== null,
         lastOutputAt: tailSource?.lastOutputAt ?? null,
         lastExitCode: tailSource?.lastExitCode ?? null,
         tailBuffer: tailSource?.tailBuffer ?? [],
@@ -3072,13 +3062,13 @@ export class OrcaRuntimeService {
     const nextPtyIds = new Set(
       [...nextLeaves.values()].map((leaf) => leaf.ptyId).filter((ptyId): ptyId is string => !!ptyId)
     )
-    for (const oldLeafKey of this.leaves.keys()) {
+    for (const oldLeafKey of this.graph.leaves.keys()) {
       if (!nextLeaves.has(oldLeafKey)) {
-        const oldLeaf = this.leaves.get(oldLeafKey)
+        const oldLeaf = this.graph.leaves.get(oldLeafKey)
         if (
           preserveLivePtysDuringReload &&
           oldLeaf?.ptyId &&
-          this.handleByPtyId.has(oldLeaf.ptyId) &&
+          this.graph.handleByPtyId.has(oldLeaf.ptyId) &&
           !nextPtyIds.has(oldLeaf.ptyId)
         ) {
           // Why: a CLI-created agent keeps using its exported handle even if
@@ -3094,9 +3084,12 @@ export class OrcaRuntimeService {
           // so release only this dead leaf key's alias. A leaf-unique handle has
           // no next owner — invalidate it so in-flight CLI waiters fail fast
           // instead of hanging on a dead leaf.
-          const oldHandle = this.handleByLeafKey.get(oldLeafKey)
-          if (oldHandle !== undefined && oldHandle === this.handleByPtyId.get(oldLeaf.ptyId)) {
-            this.handleByLeafKey.delete(oldLeafKey)
+          const oldHandle = this.graph.handleByLeafKey.get(oldLeafKey)
+          if (
+            oldHandle !== undefined &&
+            oldHandle === this.graph.handleByPtyId.get(oldLeaf.ptyId)
+          ) {
+            this.graph.handleByLeafKey.delete(oldLeafKey)
           } else {
             this.invalidateLeafHandle(oldLeafKey)
           }
@@ -3106,27 +3099,27 @@ export class OrcaRuntimeService {
       }
     }
 
-    for (const [ptyId, leaf] of this.detachedPreAllocatedLeaves) {
-      if (nextPtyIds.has(ptyId) || !this.handleByPtyId.has(ptyId)) {
-        this.detachedPreAllocatedLeaves.delete(ptyId)
+    for (const [ptyId, leaf] of this.graph.detachedPreAllocatedLeaves) {
+      if (nextPtyIds.has(ptyId) || !this.graph.handleByPtyId.has(ptyId)) {
+        this.graph.detachedPreAllocatedLeaves.delete(ptyId)
         continue
       }
       nextLeaves.set(this.getLeafKey(leaf.tabId, leaf.leafId), leaf)
       nextPtyIds.add(ptyId)
     }
 
-    this.leaves = nextLeaves
+    this.graph.leaves = nextLeaves
     this.rebuildLeafPtyIndex()
     this.notifyMobileSessionTabSnapshots()
-    this.graphStatus = 'ready'
+    this.graph.graphStatus = 'ready'
     this.refreshWritableFlags()
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       this.adoptPreAllocatedHandle(leaf)
     }
 
     // Why: createTerminal waits for the renderer's graph sync to populate the
     // new leaf so it can return a handle. Drain callbacks after leaves update.
-    for (const cb of [...this.graphSyncCallbacks]) {
+    for (const cb of [...this.graph.graphSyncCallbacks]) {
       cb()
     }
 
@@ -3459,7 +3452,7 @@ export class OrcaRuntimeService {
     if (pty && this.isServeOrSshOwnedPtyId(pty.ptyId)) {
       return true
     }
-    return !this.tabs.has(tab.parentTabId)
+    return !this.graph.tabs.has(tab.parentTabId)
   }
 
   private mergeMobileSessionSnapshotTabs(
@@ -4304,7 +4297,7 @@ export class OrcaRuntimeService {
     if (snapshot.publicationEpoch.includes(':headless-merge:')) {
       return false
     }
-    if (this.authoritativeWindowId !== null && this.graphStatus === 'ready') {
+    if (this.graph.authoritativeWindowId !== null && this.graph.graphStatus === 'ready') {
       return false
     }
     return this.shouldMaterializeHeadlessMobileSessionTab(snapshot, tab)
@@ -5380,12 +5373,12 @@ export class OrcaRuntimeService {
   // env var) so they can self-identify in orchestration messages without an
   // extra RPC round-trip. Pre-allocating by ptyId lets issueHandle reuse it.
   preAllocateHandleForPty(ptyId: string): string {
-    const existing = this.handleByPtyId.get(ptyId)
+    const existing = this.graph.handleByPtyId.get(ptyId)
     if (existing) {
       return existing
     }
     const handle = this.createPreAllocatedTerminalHandle()
-    this.handleByPtyId.set(ptyId, handle)
+    this.graph.handleByPtyId.set(ptyId, handle)
     return handle
   }
 
@@ -5394,7 +5387,7 @@ export class OrcaRuntimeService {
   }
 
   registerPreAllocatedHandleForPty(ptyId: string, handle: string): void {
-    this.handleByPtyId.set(ptyId, handle)
+    this.graph.handleByPtyId.set(ptyId, handle)
     for (const leaf of this.getLeavesForPty(ptyId)) {
       this.adoptPreAllocatedHandle(leaf)
     }
@@ -5419,20 +5412,20 @@ export class OrcaRuntimeService {
   // are not trusted to be collision-free — a handle bound to a different
   // pty must never be stolen by a later report.
   private isTerminalHandleAdoptionBlocked(ptyId: string, handle: string): boolean {
-    if (this.handleByPtyId.get(ptyId) ?? this.findHandleForPtyRecord(ptyId)) {
+    if (this.graph.handleByPtyId.get(ptyId) ?? this.findHandleForPtyRecord(ptyId)) {
       return true
     }
     for (const leaf of this.getLeavesForPty(ptyId)) {
-      const issued = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
+      const issued = this.graph.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
       if (issued && issued !== handle) {
         return true
       }
     }
-    const existingRecord = this.handles.get(handle)
+    const existingRecord = this.graph.handles.get(handle)
     if (existingRecord && existingRecord.ptyId !== ptyId) {
       return true
     }
-    for (const [otherPtyId, otherHandle] of this.handleByPtyId) {
+    for (const [otherPtyId, otherHandle] of this.graph.handleByPtyId) {
       if (otherHandle === handle && otherPtyId !== ptyId) {
         return true
       }
@@ -5448,7 +5441,7 @@ export class OrcaRuntimeService {
     }
     for (const leaf of this.getLeavesForPty(ptyId)) {
       leaf.connected = true
-      leaf.writable = this.graphStatus === 'ready'
+      leaf.writable = this.graph.graphStatus === 'ready'
       this.adoptPreAllocatedHandle(leaf)
     }
   }
@@ -5571,7 +5564,7 @@ export class OrcaRuntimeService {
         paneKey: this.makeRuntimePaneKey(leaf)
       })
       leaf.connected = true
-      leaf.writable = this.graphStatus === 'ready'
+      leaf.writable = this.graph.graphStatus === 'ready'
       leaf.lastOutputAt = at
       if (
         pty &&
@@ -5739,7 +5732,7 @@ export class OrcaRuntimeService {
     },
     at: number
   ): void {
-    const pty = this.ptysById.get(ptyId)
+    const pty = this.graph.ptysById.get(ptyId)
     if (!pty) {
       state.appended = ''
       return
@@ -5928,7 +5921,7 @@ export class OrcaRuntimeService {
     paneKey?: string
     connectionId?: string | null
   } {
-    const pty = this.ptysById.get(ptyId)
+    const pty = this.graph.ptysById.get(ptyId)
     const connectionId = pty?.connectionId ?? null
     for (const leaf of this.getLeavesForPty(ptyId)) {
       return {
@@ -5953,7 +5946,7 @@ export class OrcaRuntimeService {
    *  rule: snapshots restore title state, never historical bells/completions. */
   getTerminalSideEffectSnapshot(ptyId: string): TerminalSideEffectBatch | null {
     const tracker = this.ptyTitleTrackersByPtyId.get(ptyId)?.tracker
-    const recordTitle = this.ptysById.get(ptyId)?.lastOscTitle
+    const recordTitle = this.graph.ptysById.get(ptyId)?.lastOscTitle
     // Why: the cursor-agent literal drop applies to every title surface; a
     // record-fallback snapshot must not replay the bare native title the
     // tracker would have refused to emit live.
@@ -5980,7 +5973,7 @@ export class OrcaRuntimeService {
   /** Raw last title from main's tracked PTY/leaf records — the title surface
    *  the tracker (live bytes + synthetic frames) keeps current. */
   private getTrackedRawTitleForPty(ptyId: string): string | null {
-    const recordTitle = this.ptysById.get(ptyId)?.lastOscTitle
+    const recordTitle = this.graph.ptysById.get(ptyId)?.lastOscTitle
     if (recordTitle) {
       return recordTitle
     }
@@ -6022,7 +6015,7 @@ export class OrcaRuntimeService {
     // app relaunch the PTY/leaf records can already hold a persisted title; a
     // cold tracker would miss the parked working→idle completion and never
     // arm the stale-title timer for a persisted 'working' title.
-    let initialTitle = this.ptysById.get(ptyId)?.lastOscTitle ?? null
+    let initialTitle = this.graph.ptysById.get(ptyId)?.lastOscTitle ?? null
     if (initialTitle === null) {
       for (const leaf of this.getLeavesForPty(ptyId)) {
         if (leaf.lastOscTitle) {
@@ -6140,7 +6133,7 @@ export class OrcaRuntimeService {
     // one stable stored label (#7880) instead of churning `ps`/mobile tabs.
     const agentStatus = detectAgentStatusFromTitle(rawTitle)
     let ptyRecordChanged = false
-    const pty = this.ptysById.get(ptyId)
+    const pty = this.graph.ptysById.get(ptyId)
     if (pty) {
       const prevStatus = pty.lastAgentStatus
       const prevTitle = pty.lastOscTitle
@@ -6230,7 +6223,7 @@ export class OrcaRuntimeService {
       this.osc7ScanTailByPtyId.delete(ptyId)
     }
     const uri = extractLastOsc7Uri(input)
-    const pty = this.ptysById.get(ptyId)
+    const pty = this.graph.ptysById.get(ptyId)
     const pathFlavor = this.pathFlavorForPty(pty)
     return uri
       ? parseFileUriPathParts(uri, {
@@ -6288,7 +6281,7 @@ export class OrcaRuntimeService {
         connectionId?: string | null
       }
     >()
-    const pty = this.ptysById.get(ptyId)
+    const pty = this.graph.ptysById.get(ptyId)
     const connectionId = pty?.connectionId ?? null
     for (const leaf of this.getLeavesForPty(ptyId)) {
       const paneKey = this.makeRuntimePaneKey(leaf)
@@ -6744,7 +6737,7 @@ export class OrcaRuntimeService {
     // otherwise the first live frame after hydration compares unequal and
     // touches session tabs once for no visible change.
     const seededTitle = normalizeTerminalTitle(title)
-    const pty = this.ptysById.get(ptyId)
+    const pty = this.graph.ptysById.get(ptyId)
     if (pty) {
       const observedAt = this.nextTitleObservationSequence()
       pty.lastOscTitle = seededTitle
@@ -6801,13 +6794,13 @@ export class OrcaRuntimeService {
     dims: { cols: number; rows: number }
   ): RuntimeHeadlessTerminal {
     let state: RuntimeHeadlessTerminal | null = null
-    const pathFlavor = this.pathFlavorForPty(this.ptysById.get(ptyId))
+    const pathFlavor = this.pathFlavorForPty(this.graph.ptysById.get(ptyId))
     const emulator = new HeadlessEmulator({
       cols: dims.cols,
       rows: dims.rows,
       pathFlavor,
       remotePosixFileUriAuthority:
-        !!this.ptysById.get(ptyId)?.connectionId && pathFlavor !== 'win32',
+        !!this.graph.ptysById.get(ptyId)?.connectionId && pathFlavor !== 'win32',
       // Why: replies take the provider input path (same entry as pty:write —
       // daemon shell-ready gating and the SSH relay write apply unchanged),
       // NOT writePtyInput, so renderer interactive-output metering never
@@ -7081,14 +7074,14 @@ export class OrcaRuntimeService {
   }
 
   resolveLeafForHandle(handle: string): { ptyId: string | null } | null {
-    const record = this.handles.get(handle)
+    const record = this.graph.handles.get(handle)
     if (!record) {
       return null
     }
     if (record.tabId.startsWith('pty:')) {
       return { ptyId: record.ptyId }
     }
-    const leaf = this.leaves.get(this.getLeafKey(record.tabId, record.leafId))
+    const leaf = this.graph.leaves.get(this.getLeafKey(record.tabId, record.leafId))
     if (!leaf) {
       return null
     }
@@ -7101,14 +7094,14 @@ export class OrcaRuntimeService {
   // still awaiting their first PTY (ptyId null) may adopt it, which preserves
   // the mobile pre-spawn subscribe flow.
   resolveLiveLeafForHandle(handle: string): { ptyId: string | null } | null {
-    const record = this.handles.get(handle)
+    const record = this.graph.handles.get(handle)
     if (!record) {
       return null
     }
     if (record.tabId.startsWith('pty:')) {
       return { ptyId: record.ptyId }
     }
-    const leaf = this.leaves.get(this.getLeafKey(record.tabId, record.leafId))
+    const leaf = this.graph.leaves.get(this.getLeafKey(record.tabId, record.leafId))
     if (!leaf) {
       return null
     }
@@ -7158,7 +7151,7 @@ export class OrcaRuntimeService {
     handle: string
   ): { worktreeId: string; connectionId: string | null } | null {
     const ptyId = this.resolveLeafForHandle(handle)?.ptyId
-    const pty = ptyId ? this.ptysById.get(ptyId) : null
+    const pty = ptyId ? this.graph.ptysById.get(ptyId) : null
     return pty ? { worktreeId: pty.worktreeId, connectionId: pty.connectionId } : null
   }
 
@@ -8033,7 +8026,7 @@ export class OrcaRuntimeService {
     // process died, renderer reload) must release its team + nested panes map.
     // Previously only explicit closeTerminal evicted it, so natural exits leaked
     // one team per never-reused teamId for the runtime's lifetime.
-    const exitedTeamLeaderHandle = this.handleByPtyId.get(ptyId)
+    const exitedTeamLeaderHandle = this.graph.handleByPtyId.get(ptyId)
     if (exitedTeamLeaderHandle) {
       this.claudeAgentTeams.removeTeamForLeaderHandle(exitedTeamLeaderHandle)
     }
@@ -8074,7 +8067,7 @@ export class OrcaRuntimeService {
     this.remoteDesktopViewerRevisions.delete(ptyId)
     this.disposeHeadlessTerminal(ptyId)
     this.agentDetector?.onExit(ptyId)
-    const pty = this.ptysById.get(ptyId)
+    const pty = this.graph.ptysById.get(ptyId)
     if (pty) {
       pty.connected = false
       pty.disconnectedAt = Date.now()
@@ -8085,7 +8078,7 @@ export class OrcaRuntimeService {
     }
 
     for (const leaf of this.getLeavesForPty(ptyId)) {
-      this.detachedPreAllocatedLeaves.delete(ptyId)
+      this.graph.detachedPreAllocatedLeaves.delete(ptyId)
       leaf.connected = false
       leaf.writable = false
       leaf.lastExitCode = exitCode
@@ -9615,7 +9608,7 @@ export class OrcaRuntimeService {
       return
     }
 
-    const handle = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
+    const handle = this.graph.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
     if (!handle) {
       return
     }
@@ -9656,7 +9649,7 @@ export class OrcaRuntimeService {
     if (!Number.isInteger(limit) || limit <= 0) {
       throw new Error('invalid_limit')
     }
-    const graphEpoch = this.graphStatus === 'ready' ? this.rendererGraphEpoch : null
+    const graphEpoch = this.graph.graphStatus === 'ready' ? this.graph.rendererGraphEpoch : null
     const explicitTargetWorktreeId = worktreeSelector
       ? this.getValidatedExplicitWorktreeIdSelector(worktreeSelector)
       : null
@@ -9718,7 +9711,7 @@ export class OrcaRuntimeService {
     }
 
     const livePtyWorktreeIds = new Set<string>()
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (pty.connected) {
         livePtyWorktreeIds.add(pty.worktreeId)
       }
@@ -9727,7 +9720,7 @@ export class OrcaRuntimeService {
     const terminals: RuntimeTerminalSummary[] = []
     const ptyIdsFromLeaves = new Set<string>()
     if (graphEpoch !== null) {
-      for (const leaf of this.leaves.values()) {
+      for (const leaf of this.graph.leaves.values()) {
         if (targetWorktreeId && leaf.worktreeId !== targetWorktreeId) {
           continue
         }
@@ -9747,7 +9740,7 @@ export class OrcaRuntimeService {
     // Why: worktree.ps can classify active worktrees from PTY records even when
     // the renderer graph is missing a leaf. terminal.list needs the same fallback
     // so mobile does not show a false "No terminals" create flow.
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (!pty.connected || ptyIdsFromLeaves.has(pty.ptyId)) {
         continue
       }
@@ -9914,7 +9907,7 @@ export class OrcaRuntimeService {
     }
     return {
       tabId: parentTabId || tabId,
-      title: this.tabs.get(parentTabId)?.title ?? firstSurface.title ?? null,
+      title: this.graph.tabs.get(parentTabId)?.title ?? firstSurface.title ?? null,
       activeLeafId,
       panes
     }
@@ -9989,7 +9982,7 @@ export class OrcaRuntimeService {
   // Why: when --terminal is omitted, the CLI auto-resolves to the active
   // terminal in the current worktree — matching browser's implicit active tab.
   async resolveActiveTerminal(worktreeSelector?: string): Promise<string> {
-    if (this.graphStatus !== 'ready') {
+    if (this.graph.graphStatus !== 'ready') {
       const targetWorktreeId = worktreeSelector
         ? (await this.resolveWorktreeSelector(worktreeSelector)).id
         : null
@@ -10022,7 +10015,7 @@ export class OrcaRuntimeService {
       : null
 
     // Prefer the tab's activeLeafId — this is the pane the user last focused
-    for (const tab of this.tabs.values()) {
+    for (const tab of this.graph.tabs.values()) {
       if (targetWorktreeId && tab.worktreeId !== targetWorktreeId) {
         continue
       }
@@ -10030,14 +10023,14 @@ export class OrcaRuntimeService {
         continue
       }
       const leafKey = this.getLeafKey(tab.tabId, tab.activeLeafId)
-      const leaf = this.leaves.get(leafKey)
+      const leaf = this.graph.leaves.get(leafKey)
       if (leaf) {
         return this.issueHandle(leaf)
       }
     }
 
     // Fallback: any leaf in the target worktree
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (targetWorktreeId && leaf.worktreeId !== targetWorktreeId) {
         continue
       }
@@ -10061,7 +10054,7 @@ export class OrcaRuntimeService {
     if (!handle) {
       throw new Error('terminal_not_found')
     }
-    const record = this.handles.get(handle)
+    const record = this.graph.handles.get(handle)
     const parsed = parsePaneKey(paneKey)
     return {
       handle,
@@ -10081,7 +10074,7 @@ export class OrcaRuntimeService {
         leafId: parsePaneKey(pty.pty.paneKey ?? '')?.leafId ?? pty.record.leafId,
         paneRuntimeId: -1,
         ptyId: pty.pty.ptyId,
-        rendererGraphEpoch: this.rendererGraphEpoch
+        rendererGraphEpoch: this.graph.rendererGraphEpoch
       }
     }
     const graphEpoch = this.captureReadyGraphEpoch()
@@ -10093,7 +10086,7 @@ export class OrcaRuntimeService {
       ...summary,
       paneRuntimeId: leaf.paneRuntimeId,
       ptyId: leaf.ptyId,
-      rendererGraphEpoch: this.rendererGraphEpoch
+      rendererGraphEpoch: this.graph.rendererGraphEpoch
     }
   }
 
@@ -10326,7 +10319,7 @@ export class OrcaRuntimeService {
     const title = getLatestAgentCandidateTitleInfo(
       { title: leaf.paneTitle, updatedAt: leaf.paneTitleUpdatedAt },
       { title: leaf.lastOscTitle, updatedAt: leaf.lastOscTitleAt },
-      { title: this.tabs.get(leaf.tabId)?.title, updatedAt: 0 }
+      { title: this.graph.tabs.get(leaf.tabId)?.title, updatedAt: 0 }
     )
     return {
       waitText: buildTerminalWaitText(leaf.tailBuffer, leaf.tailPartialLine, leaf.preview),
@@ -10466,7 +10459,7 @@ export class OrcaRuntimeService {
     if (!this.ptyController) {
       return false
     }
-    const pty = this.ptysById.get(ptyId)
+    const pty = this.graph.ptysById.get(ptyId)
     if (!pty?.connected) {
       return false
     }
@@ -10711,10 +10704,10 @@ export class OrcaRuntimeService {
             reject(new Error('timeout'))
           }, effectiveTimeoutMs)
         }
-        let waiters = this.waitersByHandle.get(handle)
+        let waiters = this.graph.waitersByHandle.get(handle)
         if (!waiters) {
           waiters = new Set()
-          this.waitersByHandle.set(handle, waiters)
+          this.graph.waitersByHandle.set(handle, waiters)
         }
         waiters.add(waiter)
         const live = this.getLivePtyForHandle(handle)
@@ -10769,7 +10762,7 @@ export class OrcaRuntimeService {
       return buildTerminalWaitResult(handle, condition, leaf)
     }
     if (condition === 'tui-idle') {
-      const fastPathTitle = leaf.paneTitle ?? this.tabs.get(leaf.tabId)?.title
+      const fastPathTitle = leaf.paneTitle ?? this.graph.tabs.get(leaf.tabId)?.title
       if (
         (fastPathTitle && detectExplicitIdleStatusFromTitle(fastPathTitle) === 'idle') ||
         isKnownReadyPromptPreview(leafWaitText)
@@ -10811,10 +10804,10 @@ export class OrcaRuntimeService {
         }, effectiveTimeoutMs)
       }
 
-      let waiters = this.waitersByHandle.get(handle)
+      let waiters = this.graph.waitersByHandle.get(handle)
       if (!waiters) {
         waiters = new Set()
-        this.waitersByHandle.set(handle, waiters)
+        this.graph.waitersByHandle.set(handle, waiters)
       }
       waiters.add(waiter)
 
@@ -10847,7 +10840,7 @@ export class OrcaRuntimeService {
             // Why: renderer-synced previews can show a known ready prompt even
             // while the last OSC title is still "working"; keep polling the
             // preview/title until the waiter resolves or hits its timeout.
-            const fastPathTitle = live.leaf.paneTitle ?? this.tabs.get(live.leaf.tabId)?.title
+            const fastPathTitle = live.leaf.paneTitle ?? this.graph.tabs.get(live.leaf.tabId)?.title
             if (
               (fastPathTitle && detectExplicitIdleStatusFromTitle(fastPathTitle) === 'idle') ||
               isKnownReadyPromptPreview(liveLeafWaitText)
@@ -11009,7 +11002,7 @@ export class OrcaRuntimeService {
     }
 
     const countedPtyIds = new Set<string>()
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       const summary = this.getSummaryForRuntimeWorktreeId(
         summaries,
         resolvedWorktrees,
@@ -11030,7 +11023,7 @@ export class OrcaRuntimeService {
       summary.lastOutputAt = maxTimestamp(summary.lastOutputAt, leaf.lastOutputAt)
       summary.status = mergeWorktreeStatus(
         summary.status,
-        getLeafWorktreeStatus(leaf, this.tabs.get(leaf.tabId)?.title ?? null)
+        getLeafWorktreeStatus(leaf, this.graph.tabs.get(leaf.tabId)?.title ?? null)
       )
       if (
         leaf.preview &&
@@ -11040,7 +11033,7 @@ export class OrcaRuntimeService {
       }
     }
 
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (!pty.connected || countedPtyIds.has(pty.ptyId)) {
         continue
       }
@@ -11079,7 +11072,7 @@ export class OrcaRuntimeService {
       // still needs those worktrees to show as terminal-bearing entries.
       summary.liveTerminalCount = Math.max(summary.liveTerminalCount, tabs.length)
       summary.hasAttachedPty = summary.hasAttachedPty || tabs.some((tab) => tab.ptyId !== null)
-      if (tabs.some((tab) => tab.ptyId !== null && this.ptysById.get(tab.ptyId)?.connected)) {
+      if (tabs.some((tab) => tab.ptyId !== null && this.graph.ptysById.get(tab.ptyId)?.connected)) {
         summary.hasHostSidebarActivity = true
       }
       for (const tab of tabs) {
@@ -15207,7 +15200,8 @@ export class OrcaRuntimeService {
     }
     const shouldRunSetup = hooks?.scripts.setup && shouldRunSetupForCreate(repo, effectiveDecision)
     if (shouldRunSetup && hooks?.scripts.setup) {
-      const shouldUseSetupRunner = this.authoritativeWindowId !== null || Boolean(effectiveStartup)
+      const shouldUseSetupRunner =
+        this.graph.authoritativeWindowId !== null || Boolean(effectiveStartup)
       if (shouldUseSetupRunner) {
         try {
           // Why: setup+startup must share the terminal runner path even without
@@ -17329,7 +17323,7 @@ export class OrcaRuntimeService {
       if (!this.notifier?.renameTerminal && pty.pty.tabId) {
         this.persistHeadlessTerminalTitle(pty.pty.worktreeId, pty.pty.tabId, title)
       }
-      for (const leaf of this.leaves.values()) {
+      for (const leaf of this.graph.leaves.values()) {
         if (leaf.ptyId === pty.pty.ptyId) {
           this.notifier?.renameTerminal(leaf.tabId, title)
           return { handle, tabId: leaf.tabId, title }
@@ -17677,7 +17671,7 @@ export class OrcaRuntimeService {
     })
 
     // Why: the renderer created the tab immediately, but the graph sync that
-    // populates this.leaves may not have arrived yet. Wait for the leaf to
+    // populates this.graph.leaves may not have arrived yet. Wait for the leaf to
     // appear so we can return a valid handle the caller can use right away.
     const handle = await this.waitForTerminalHandle(reply.tabId)
     return {
@@ -18174,9 +18168,9 @@ export class OrcaRuntimeService {
       const cleanup = (): void => {
         clearTimeout(timer)
         options.signal?.removeEventListener('abort', onAbort)
-        const idx = this.graphSyncCallbacks.indexOf(check)
+        const idx = this.graph.graphSyncCallbacks.indexOf(check)
         if (idx !== -1) {
-          this.graphSyncCallbacks.splice(idx, 1)
+          this.graph.graphSyncCallbacks.splice(idx, 1)
         }
       }
       const timer = setTimeout(() => {
@@ -18199,7 +18193,7 @@ export class OrcaRuntimeService {
         cleanup()
         resolve(next)
       }
-      this.graphSyncCallbacks.push(check)
+      this.graph.graphSyncCallbacks.push(check)
       check()
     })
   }
@@ -18263,7 +18257,7 @@ export class OrcaRuntimeService {
     // Why: waitForMobileTerminalSurface's check closures are drained only inside
     // syncWindowGraph; a main-side publish must drain them too or the pending
     // wait won't observe the insertion (mirrors syncWindowGraph's drain).
-    for (const cb of [...this.graphSyncCallbacks]) {
+    for (const cb of [...this.graph.graphSyncCallbacks]) {
       cb()
     }
     return this.findMobileTerminalSurface(worktreeId, tabId)
@@ -18273,7 +18267,7 @@ export class OrcaRuntimeService {
     worktreeId: string,
     tabId: string
   ): RuntimePtyWorktreeRecord | null {
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (
         pty.worktreeId === worktreeId &&
         pty.tabId === tabId &&
@@ -18290,7 +18284,7 @@ export class OrcaRuntimeService {
   // shell whose pane key hasn't registered yet can't be surface-rescued, but
   // it is still a real terminal the create timeout must not kill (#7718).
   private hasLiveShellForRendererTab(worktreeId: string, tabId: string): boolean {
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (pty.worktreeId === worktreeId && pty.tabId === tabId && pty.connected) {
         return true
       }
@@ -18316,9 +18310,9 @@ export class OrcaRuntimeService {
 
     return new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
-        const idx = this.graphSyncCallbacks.indexOf(check)
+        const idx = this.graph.graphSyncCallbacks.indexOf(check)
         if (idx !== -1) {
-          this.graphSyncCallbacks.splice(idx, 1)
+          this.graph.graphSyncCallbacks.splice(idx, 1)
         }
         reject(new Error('Timed out waiting for terminal handle after creation'))
       }, timeoutMs)
@@ -18327,14 +18321,14 @@ export class OrcaRuntimeService {
         const handle = this.resolveHandleForTab(tabId)
         if (handle) {
           clearTimeout(timer)
-          const idx = this.graphSyncCallbacks.indexOf(check)
+          const idx = this.graph.graphSyncCallbacks.indexOf(check)
           if (idx !== -1) {
-            this.graphSyncCallbacks.splice(idx, 1)
+            this.graph.graphSyncCallbacks.splice(idx, 1)
           }
           resolve(handle)
         }
       }
-      this.graphSyncCallbacks.push(check)
+      this.graph.graphSyncCallbacks.push(check)
       // Why: the graph sync may have fired between the initial check and
       // callback registration. Re-check immediately to avoid a missed wake-up.
       check()
@@ -18351,9 +18345,9 @@ export class OrcaRuntimeService {
     }
 
     // Why: when the ptyId changes from null to a real value, the old handle
-    // is invalidated (deleted from this.handles). Capture the tabId+leafId
+    // is invalidated (deleted from this.graph.handles). Capture the tabId+leafId
     // now so we can look up the leaf directly even after handle invalidation.
-    const record = this.handles.get(handle)
+    const record = this.graph.handles.get(handle)
     const savedTabId = record?.tabId ?? null
     const savedLeafId = record?.leafId ?? null
 
@@ -18365,9 +18359,9 @@ export class OrcaRuntimeService {
           clearTimeout(timer)
           timer = null
         }
-        const idx = this.graphSyncCallbacks.indexOf(check)
+        const idx = this.graph.graphSyncCallbacks.indexOf(check)
         if (idx !== -1) {
-          this.graphSyncCallbacks.splice(idx, 1)
+          this.graph.graphSyncCallbacks.splice(idx, 1)
         }
         signal?.removeEventListener('abort', onAbort)
       }
@@ -18397,14 +18391,14 @@ export class OrcaRuntimeService {
         // Why: when ptyId transitions null→real, issueHandle invalidates the
         // old handle. Fall back to direct leaf lookup by the saved coordinates.
         if (!ptyId && savedTabId && savedLeafId) {
-          const directLeaf = this.leaves.get(this.getLeafKey(savedTabId, savedLeafId))
+          const directLeaf = this.graph.leaves.get(this.getLeafKey(savedTabId, savedLeafId))
           ptyId = directLeaf?.ptyId ?? null
         }
         if (ptyId) {
           finish(ptyId)
         }
       }
-      this.graphSyncCallbacks.push(check)
+      this.graph.graphSyncCallbacks.push(check)
       check()
     })
   }
@@ -18415,7 +18409,7 @@ export class OrcaRuntimeService {
   // the handle is stable and immediately usable for send/read/wait.
   private countLeavesInTab(tabId: string): number {
     let count = 0
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (leaf.tabId === tabId) {
         count++
       }
@@ -18424,7 +18418,7 @@ export class OrcaRuntimeService {
   }
 
   private resolveHandleForTab(tabId: string): string | null {
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (leaf.tabId === tabId && leaf.ptyId !== null) {
         return this.issueHandle(leaf)
       }
@@ -18511,7 +18505,7 @@ export class OrcaRuntimeService {
     // Why: snapshot current leaf keys for this tab so we can detect the new
     // pane that appears after the split via graph sync delta.
     const leafKeysBefore = new Set<string>()
-    for (const [key, l] of this.leaves) {
+    for (const [key, l] of this.graph.leaves) {
       if (l.tabId === leaf.tabId) {
         leafKeysBefore.add(key)
       }
@@ -18662,7 +18656,7 @@ export class OrcaRuntimeService {
     timeoutMs = 10_000
   ): Promise<string> {
     const tryResolve = (): string | null => {
-      for (const [key, leaf] of this.leaves) {
+      for (const [key, leaf] of this.graph.leaves) {
         if (leaf.tabId === tabId && !existingLeafKeys.has(key) && leaf.ptyId !== null) {
           return this.issueHandle(leaf)
         }
@@ -18677,9 +18671,9 @@ export class OrcaRuntimeService {
 
     return new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
-        const idx = this.graphSyncCallbacks.indexOf(check)
+        const idx = this.graph.graphSyncCallbacks.indexOf(check)
         if (idx !== -1) {
-          this.graphSyncCallbacks.splice(idx, 1)
+          this.graph.graphSyncCallbacks.splice(idx, 1)
         }
         reject(new Error('Timed out waiting for split pane handle'))
       }, timeoutMs)
@@ -18688,14 +18682,14 @@ export class OrcaRuntimeService {
         const handle = tryResolve()
         if (handle) {
           clearTimeout(timer)
-          const idx = this.graphSyncCallbacks.indexOf(check)
+          const idx = this.graph.graphSyncCallbacks.indexOf(check)
           if (idx !== -1) {
-            this.graphSyncCallbacks.splice(idx, 1)
+            this.graph.graphSyncCallbacks.splice(idx, 1)
           }
           resolve(handle)
         }
       }
-      this.graphSyncCallbacks.push(check)
+      this.graph.graphSyncCallbacks.push(check)
       check()
     })
   }
@@ -18707,12 +18701,12 @@ export class OrcaRuntimeService {
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     this.assertStableReadyGraph(graphEpoch)
     const ptyIds = new Set<string>()
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (leaf.worktreeId === worktree.id && leaf.ptyId) {
         ptyIds.add(leaf.ptyId)
       }
     }
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (pty.worktreeId === worktree.id && pty.connected) {
         ptyIds.add(pty.ptyId)
       }
@@ -18814,7 +18808,7 @@ export class OrcaRuntimeService {
     freshPtyIds?: ReadonlySet<string>
   ): Set<string> {
     const ptyIds = new Set<string>()
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (
         leaf.worktreeId === worktreeId &&
         leaf.connected &&
@@ -18824,7 +18818,7 @@ export class OrcaRuntimeService {
         ptyIds.add(leaf.ptyId)
       }
     }
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (
         pty.worktreeId === worktreeId &&
         pty.connected &&
@@ -18840,12 +18834,12 @@ export class OrcaRuntimeService {
     const graphEpoch = this.captureReadyGraphEpoch()
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     this.assertStableReadyGraph(graphEpoch)
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (leaf.worktreeId === worktree.id && leaf.ptyId) {
         return true
       }
     }
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (pty.worktreeId === worktree.id && pty.connected) {
         return true
       }
@@ -18854,20 +18848,20 @@ export class OrcaRuntimeService {
   }
 
   markRendererReloading(windowId: number): void {
-    if (windowId !== this.authoritativeWindowId) {
+    if (windowId !== this.graph.authoritativeWindowId) {
       return
     }
-    if (this.graphStatus !== 'ready') {
+    if (this.graph.graphStatus !== 'ready') {
       return
     }
     // Why: any renderer reload tears down the published live graph, so live
     // terminal handles must become stale immediately instead of being reused
     // against whatever the renderer rebuilds next.
-    this.rendererGraphEpoch += 1
-    this.graphStatus = 'reloading'
+    this.graph.rendererGraphEpoch += 1
+    this.graph.graphStatus = 'reloading'
     this.rememberDetachedPreAllocatedLeaves()
-    this.handles.clear()
-    this.handleByLeafKey.clear()
+    this.graph.handles.clear()
+    this.graph.handleByLeafKey.clear()
     // Why: handleByPtyId maps ptyId → pre-allocated CLI handle (ORCA_TERMINAL_HANDLE).
     // These must survive renderer reloads so CLI agents can keep controlling the
     // same terminal across graph rebuilds — adoptPreAllocatedHandle re-links
@@ -18877,48 +18871,51 @@ export class OrcaRuntimeService {
   }
 
   markGraphReady(windowId: number): void {
-    if (windowId !== this.authoritativeWindowId) {
+    if (windowId !== this.graph.authoritativeWindowId) {
       return
     }
-    this.graphStatus = 'ready'
+    this.graph.graphStatus = 'ready'
     this.refreshWritableFlags()
   }
 
   markGraphUnavailable(windowId: number): void {
-    if (windowId !== this.authoritativeWindowId) {
+    if (windowId !== this.graph.authoritativeWindowId) {
       return
     }
     // Why: once the authoritative renderer graph disappears, Orca must fail
     // closed for live-terminal operations instead of guessing from old state.
-    if (this.graphStatus !== 'unavailable') {
-      this.rendererGraphEpoch += 1
+    if (this.graph.graphStatus !== 'unavailable') {
+      this.graph.rendererGraphEpoch += 1
     }
-    this.graphStatus = 'unavailable'
-    this.authoritativeWindowId = null
+    this.graph.graphStatus = 'unavailable'
+    this.graph.authoritativeWindowId = null
     this.rememberDetachedPreAllocatedLeaves()
-    this.tabs.clear()
-    this.leaves.clear()
-    this.leavesByPtyId.clear()
-    this.handles.clear()
-    this.handleByLeafKey.clear()
+    this.graph.tabs.clear()
+    this.graph.leaves.clear()
+    this.graph.leavesByPtyId.clear()
+    this.graph.handles.clear()
+    this.graph.handleByLeafKey.clear()
     // Why: same as markRendererReloading — pre-allocated CLI handles must
     // survive graph unavailability so they can be re-adopted on reconnect.
     this.rejectAllWaiters('terminal_handle_stale')
   }
 
   private assertGraphReady(): void {
-    if (this.graphStatus !== 'ready') {
+    if (this.graph.graphStatus !== 'ready') {
       throw new Error('runtime_unavailable')
     }
   }
 
   private captureReadyGraphEpoch(): number {
     this.assertGraphReady()
-    return this.rendererGraphEpoch
+    return this.graph.rendererGraphEpoch
   }
 
   private assertStableReadyGraph(expectedGraphEpoch: number): void {
-    if (this.graphStatus !== 'ready' || this.rendererGraphEpoch !== expectedGraphEpoch) {
+    if (
+      this.graph.graphStatus !== 'ready' ||
+      this.graph.rendererGraphEpoch !== expectedGraphEpoch
+    ) {
       throw new Error('runtime_unavailable')
     }
   }
@@ -19934,7 +19931,7 @@ export class OrcaRuntimeService {
       >
     > = {}
   ): RuntimePtyWorktreeRecord {
-    let pty = this.ptysById.get(ptyId)
+    let pty = this.graph.ptysById.get(ptyId)
     if (!pty) {
       const titleObservedAt = state.title ? this.nextTitleObservationSequence() : null
       pty = {
@@ -19970,7 +19967,7 @@ export class OrcaRuntimeService {
       if (state.title) {
         this.setPtyManagementTitleFromObservedTitle(pty, state.title, titleObservedAt ?? 0)
       }
-      this.ptysById.set(ptyId, pty)
+      this.graph.ptysById.set(ptyId, pty)
       // Why: restored/controller-discovered PTYs learn their worktree here
       // without registerPty(), so URL enrichment must bind at this source.
       advertisedUrlWatcher.bindPty(ptyId, worktreeId)
@@ -20020,7 +20017,7 @@ export class OrcaRuntimeService {
   }
 
   private getOrCreatePtyWorktreeRecord(ptyId: string): RuntimePtyWorktreeRecord | null {
-    const existing = this.ptysById.get(ptyId)
+    const existing = this.graph.ptysById.get(ptyId)
     if (existing) {
       return existing
     }
@@ -20072,7 +20069,7 @@ export class OrcaRuntimeService {
       // listener cannot abort the liveness sweep below.
       this.refreshPtyForegroundAgent(session.id)
     }
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (!livePtyIds.has(pty.ptyId) && !this.leafExistsForPty(pty.ptyId)) {
         pty.connected = false
         pty.disconnectedAt ??= Date.now()
@@ -20102,7 +20099,7 @@ export class OrcaRuntimeService {
   }
 
   private pruneDisconnectedPtyRecords(): void {
-    const retained = [...this.ptysById.values()]
+    const retained = [...this.graph.ptysById.values()]
       .filter((pty) => !pty.connected && !this.leafExistsForPty(pty.ptyId))
       .sort((a, b) => (a.disconnectedAt ?? 0) - (b.disconnectedAt ?? 0))
     const staleCount = Math.max(0, retained.length - DISCONNECTED_PTY_RECORD_MAX)
@@ -20116,7 +20113,7 @@ export class OrcaRuntimeService {
   private dropDisconnectedPtyRecord(ptyId: string): void {
     // Why: pruning can remove a PTY without the normal exit callback.
     serveSimStateWatcher.unbindPty(ptyId)
-    this.ptysById.delete(ptyId)
+    this.graph.ptysById.delete(ptyId)
     this.recentPtyOutputById.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
     this.recentPtyPathCandidatesById.delete(ptyId)
@@ -20129,26 +20126,26 @@ export class OrcaRuntimeService {
     this.terminalCwdByPtyId.delete(ptyId)
     this.terminalFileUriHostnameByPtyId.delete(ptyId)
     this.clearAgentRowSnapshotsForPty(ptyId)
-    const handle = this.handleByPtyId.get(ptyId)
+    const handle = this.graph.handleByPtyId.get(ptyId)
     if (handle) {
       // Why: pruning can remove a PTY without onPtyExit firing; release any agent
       // team owned by this leader handle so it does not leak.
       this.claudeAgentTeams.removeTeamForLeaderHandle(handle)
-      this.handleByPtyId.delete(ptyId)
-      const record = this.handles.get(handle)
+      this.graph.handleByPtyId.delete(ptyId)
+      const record = this.graph.handles.get(handle)
       if (record?.tabId.startsWith('pty:')) {
-        this.handles.delete(handle)
+        this.graph.handles.delete(handle)
       }
     }
   }
 
   private leafExistsForPty(ptyId: string): boolean {
-    return (this.leavesByPtyId.get(ptyId)?.length ?? 0) > 0
+    return (this.graph.leavesByPtyId.get(ptyId)?.length ?? 0) > 0
   }
 
   private rebuildLeafPtyIndex(): void {
     const next = new Map<string, RuntimeLeafRecord[]>()
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (!leaf.ptyId) {
         continue
       }
@@ -20159,11 +20156,11 @@ export class OrcaRuntimeService {
         next.set(leaf.ptyId, [leaf])
       }
     }
-    this.leavesByPtyId = next
+    this.graph.leavesByPtyId = next
   }
 
   private getLeavesForPty(ptyId: string): RuntimeLeafRecord[] {
-    return this.leavesByPtyId.get(ptyId) ?? []
+    return this.graph.leavesByPtyId.get(ptyId) ?? []
   }
 
   private getSummaryForRuntimeWorktreeId(
@@ -20192,7 +20189,7 @@ export class OrcaRuntimeService {
     worktreesById: Map<string, ResolvedWorktree>
   ): RuntimeTerminalSummary {
     const worktree = worktreesById.get(leaf.worktreeId)
-    const tab = this.tabs.get(leaf.tabId) ?? null
+    const tab = this.graph.tabs.get(leaf.tabId) ?? null
 
     return {
       handle: this.issueHandle(leaf),
@@ -20601,11 +20598,11 @@ export class OrcaRuntimeService {
         tabs.push(tab)
         continue
       }
-      const syncedTab = this.tabs.get(tab.parentTabId)
-      const leaf = this.leaves.get(this.getLeafKey(tab.parentTabId, tab.leafId)) ?? null
+      const syncedTab = this.graph.tabs.get(tab.parentTabId)
+      const leaf = this.graph.leaves.get(this.getLeafKey(tab.parentTabId, tab.leafId)) ?? null
       const liveLeaf = leaf?.ptyId && leaf.connected ? leaf : null
       const liveLeafPtyId = liveLeaf?.ptyId ?? null
-      const liveLeafPty = liveLeafPtyId ? (this.ptysById.get(liveLeafPtyId) ?? null) : null
+      const liveLeafPty = liveLeafPtyId ? (this.graph.ptysById.get(liveLeafPtyId) ?? null) : null
       const pty = liveLeaf
         ? null
         : this.findPtyForMobileTerminalTab(snapshot.worktree, tab, {
@@ -20776,7 +20773,7 @@ export class OrcaRuntimeService {
     if (!pty?.lastAgentStatus && !retained) {
       return {}
     }
-    const leaf = this.leaves.get(this.getLeafKey(tab.parentTabId, tab.leafId)) ?? null
+    const leaf = this.graph.leaves.get(this.getLeafKey(tab.parentTabId, tab.leafId)) ?? null
     const ptyTitle = pty
       ? getLatestAgentCandidateTitle(
           { title: pty.title, updatedAt: pty.titleUpdatedAt },
@@ -20890,7 +20887,7 @@ export class OrcaRuntimeService {
     const snapshotPtyId = tab.ptyId ?? tab.parentLayout?.ptyIdsByLeafId?.[tab.leafId] ?? null
     const paneKey = this.getMobileTerminalPaneKey(tab)
     if (snapshotPtyId) {
-      const pty = this.ptysById.get(snapshotPtyId)
+      const pty = this.graph.ptysById.get(snapshotPtyId)
       if (!pty) {
         return null
       }
@@ -20913,7 +20910,7 @@ export class OrcaRuntimeService {
     if (tab.leafId === `pane:${FIRST_PANE_ID}`) {
       paneKeys.add(`${tab.parentTabId}:${FIRST_PANE_ID}`)
     }
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (pty.tabId === tab.parentTabId && pty.paneKey && paneKeys.has(pty.paneKey)) {
         return pty
       }
@@ -20992,7 +20989,7 @@ export class OrcaRuntimeService {
       return undefined
     }
     const contexts: Record<string, AgentStatusOrchestrationContext> = {}
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (!leaf.ptyId) {
         continue
       }
@@ -21002,7 +20999,7 @@ export class OrcaRuntimeService {
         contexts[this.makeRuntimePaneKey(leaf)] = context
       }
     }
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (!pty.paneKey || contexts[pty.paneKey]) {
         continue
       }
@@ -21081,12 +21078,12 @@ export class OrcaRuntimeService {
   private getTerminalHandleForPaneKey(paneKey: string): string | null {
     const parsed = parsePaneKey(paneKey)
     if (parsed) {
-      const leaf = this.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId))
+      const leaf = this.graph.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId))
       if (leaf?.ptyId) {
         return this.issueHandle(leaf)
       }
     }
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (pty.paneKey === paneKey) {
         return this.issuePtyHandle(pty)
       }
@@ -21097,13 +21094,13 @@ export class OrcaRuntimeService {
   private getPtyRecordForPaneKey(paneKey: string): RuntimePtyWorktreeRecord | null {
     const parsed = parsePaneKey(paneKey)
     if (parsed) {
-      const leaf = this.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId))
-      const pty = leaf?.ptyId ? this.ptysById.get(leaf.ptyId) : undefined
+      const leaf = this.graph.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId))
+      const pty = leaf?.ptyId ? this.graph.ptysById.get(leaf.ptyId) : undefined
       if (pty) {
         return pty
       }
     }
-    for (const pty of this.ptysById.values()) {
+    for (const pty of this.graph.ptysById.values()) {
       if (pty.paneKey === paneKey) {
         return pty
       }
@@ -21116,7 +21113,7 @@ export class OrcaRuntimeService {
     if (livePty?.pty.paneKey) {
       return livePty.pty.paneKey
     }
-    const record = this.handles.get(handle)
+    const record = this.graph.handles.get(handle)
     if (!record || record.runtimeId !== this.runtimeId) {
       return null
     }
@@ -21175,7 +21172,7 @@ export class OrcaRuntimeService {
       if (paneTitleClassification === 'agent') {
         return true
       }
-      const tabTitle = this.tabs.get(leaf.tabId)?.title?.trim() || null
+      const tabTitle = this.graph.tabs.get(leaf.tabId)?.title?.trim() || null
       const tabTitleClassification = paneTitle === null ? classifyAgentTitle(tabTitle) : 'neutral'
       if (tabTitleClassification === 'agent') {
         return true
@@ -21447,15 +21444,15 @@ export class OrcaRuntimeService {
     leaf: RuntimeLeafRecord
   } {
     this.assertGraphReady()
-    const record = this.handles.get(handle)
+    const record = this.graph.handles.get(handle)
     if (!record || record.runtimeId !== this.runtimeId) {
       throw new Error('terminal_handle_stale')
     }
-    if (record.rendererGraphEpoch !== this.rendererGraphEpoch) {
+    if (record.rendererGraphEpoch !== this.graph.rendererGraphEpoch) {
       throw new Error('terminal_handle_stale')
     }
 
-    const leaf = this.leaves.get(this.getLeafKey(record.tabId, record.leafId))
+    const leaf = this.graph.leaves.get(this.getLeafKey(record.tabId, record.leafId))
     if (!leaf || leaf.ptyId !== record.ptyId || leaf.ptyGeneration !== record.ptyGeneration) {
       throw new Error('terminal_handle_stale')
     }
@@ -21466,17 +21463,17 @@ export class OrcaRuntimeService {
     record: TerminalHandleRecord
     pty: RuntimePtyWorktreeRecord
   } | null {
-    let record = this.handles.get(handle)
+    let record = this.graph.handles.get(handle)
     if (!record) {
-      const ptyId = [...this.handleByPtyId.entries()].find(
+      const ptyId = [...this.graph.handleByPtyId.entries()].find(
         ([, mappedHandle]) => mappedHandle === handle
       )?.[0]
-      const pty = ptyId ? this.ptysById.get(ptyId) : null
+      const pty = ptyId ? this.graph.ptysById.get(ptyId) : null
       if (pty) {
         // Why: graph reload/unavailability clears renderer handle records, but
         // runtime-owned PTY handles remain the caller's control identity.
         this.issuePtyHandle(pty)
-        record = this.handles.get(handle)
+        record = this.graph.handles.get(handle)
       }
     }
     if (!record || record.runtimeId !== this.runtimeId || !record.tabId.startsWith('pty:')) {
@@ -21485,14 +21482,14 @@ export class OrcaRuntimeService {
     if (!record.ptyId) {
       return null
     }
-    const pty = this.ptysById.get(record.ptyId)
+    const pty = this.graph.ptysById.get(record.ptyId)
     if (!pty || pty.ptyId !== record.ptyId) {
       return null
     }
     // Why: renderer adoption can race with CLI reads. If this synthetic PTY
     // handle is valid, keep ptyId -> handle populated so summaries do not mint
     // a second handle for the same terminal.
-    this.handleByPtyId.set(record.ptyId, handle)
+    this.graph.handleByPtyId.set(record.ptyId, handle)
     return { record, pty }
   }
 
@@ -21515,12 +21512,12 @@ export class OrcaRuntimeService {
 
   private issueHandle(leaf: RuntimeLeafRecord): string {
     const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
-    const existingHandle = this.handleByLeafKey.get(leafKey)
+    const existingHandle = this.graph.handleByLeafKey.get(leafKey)
     if (existingHandle) {
-      const existingRecord = this.handles.get(existingHandle)
+      const existingRecord = this.graph.handles.get(existingHandle)
       if (
         existingRecord &&
-        existingRecord.rendererGraphEpoch === this.rendererGraphEpoch &&
+        existingRecord.rendererGraphEpoch === this.graph.rendererGraphEpoch &&
         existingRecord.ptyId === leaf.ptyId &&
         existingRecord.ptyGeneration === leaf.ptyGeneration
       ) {
@@ -21529,20 +21526,20 @@ export class OrcaRuntimeService {
     }
 
     const handle = this.adoptPreAllocatedHandle(leaf) ?? `term_${randomUUID()}`
-    if (this.handles.has(handle)) {
+    if (this.graph.handles.has(handle)) {
       return handle
     }
-    this.handles.set(handle, {
+    this.graph.handles.set(handle, {
       handle,
       runtimeId: this.runtimeId,
-      rendererGraphEpoch: this.rendererGraphEpoch,
+      rendererGraphEpoch: this.graph.rendererGraphEpoch,
       worktreeId: leaf.worktreeId,
       tabId: leaf.tabId,
       leafId: leaf.leafId,
       ptyId: leaf.ptyId,
       ptyGeneration: leaf.ptyGeneration
     })
-    this.handleByLeafKey.set(leafKey, handle)
+    this.graph.handleByLeafKey.set(leafKey, handle)
     return handle
   }
 
@@ -21550,58 +21547,58 @@ export class OrcaRuntimeService {
     if (!leaf.ptyId) {
       return null
     }
-    const preAllocated = this.handleByPtyId.get(leaf.ptyId)
+    const preAllocated = this.graph.handleByPtyId.get(leaf.ptyId)
     if (!preAllocated) {
       return null
     }
     const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
-    this.handles.set(preAllocated, {
+    this.graph.handles.set(preAllocated, {
       handle: preAllocated,
       runtimeId: this.runtimeId,
-      rendererGraphEpoch: this.rendererGraphEpoch,
+      rendererGraphEpoch: this.graph.rendererGraphEpoch,
       worktreeId: leaf.worktreeId,
       tabId: leaf.tabId,
       leafId: leaf.leafId,
       ptyId: leaf.ptyId,
       ptyGeneration: leaf.ptyGeneration
     })
-    this.handleByLeafKey.set(leafKey, preAllocated)
+    this.graph.handleByLeafKey.set(leafKey, preAllocated)
     return preAllocated
   }
 
   private issuePtyHandle(pty: RuntimePtyWorktreeRecord): string {
     const existingHandle =
-      this.handleByPtyId.get(pty.ptyId) ?? this.findHandleForPtyRecord(pty.ptyId)
+      this.graph.handleByPtyId.get(pty.ptyId) ?? this.findHandleForPtyRecord(pty.ptyId)
     if (existingHandle) {
-      const existingRecord = this.handles.get(existingHandle)
+      const existingRecord = this.graph.handles.get(existingHandle)
       if (
         existingRecord &&
         existingRecord.runtimeId === this.runtimeId &&
         existingRecord.ptyId === pty.ptyId
       ) {
-        this.handleByPtyId.set(pty.ptyId, existingHandle)
+        this.graph.handleByPtyId.set(pty.ptyId, existingHandle)
         return existingHandle
       }
     }
 
     const handle = existingHandle ?? `term_${randomUUID()}`
     const syntheticId = `pty:${pty.ptyId}`
-    this.handles.set(handle, {
+    this.graph.handles.set(handle, {
       handle,
       runtimeId: this.runtimeId,
-      rendererGraphEpoch: this.rendererGraphEpoch,
+      rendererGraphEpoch: this.graph.rendererGraphEpoch,
       worktreeId: pty.worktreeId,
       tabId: syntheticId,
       leafId: syntheticId,
       ptyId: pty.ptyId,
       ptyGeneration: 0
     })
-    this.handleByPtyId.set(pty.ptyId, handle)
+    this.graph.handleByPtyId.set(pty.ptyId, handle)
     return handle
   }
 
   private findHandleForPtyRecord(ptyId: string): string | null {
-    for (const [handle, record] of this.handles) {
+    for (const [handle, record] of this.graph.handles) {
       if (
         record.runtimeId === this.runtimeId &&
         record.ptyId === ptyId &&
@@ -21614,27 +21611,27 @@ export class OrcaRuntimeService {
   }
 
   private refreshWritableFlags(): void {
-    for (const leaf of this.leaves.values()) {
-      leaf.writable = this.graphStatus === 'ready' && leaf.connected && leaf.ptyId !== null
+    for (const leaf of this.graph.leaves.values()) {
+      leaf.writable = this.graph.graphStatus === 'ready' && leaf.connected && leaf.ptyId !== null
     }
   }
 
   private invalidateLeafHandle(leafKey: string): void {
-    const handle = this.handleByLeafKey.get(leafKey)
+    const handle = this.graph.handleByLeafKey.get(leafKey)
     if (!handle) {
       return
     }
-    this.handleByLeafKey.delete(leafKey)
-    this.handles.delete(handle)
+    this.graph.handleByLeafKey.delete(leafKey)
+    this.graph.handles.delete(handle)
     this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
   }
 
   private rememberDetachedPreAllocatedLeaves(): void {
-    for (const leaf of this.leaves.values()) {
-      if (leaf.ptyId && this.handleByPtyId.has(leaf.ptyId)) {
+    for (const leaf of this.graph.leaves.values()) {
+      if (leaf.ptyId && this.graph.handleByPtyId.has(leaf.ptyId)) {
         // Why: ORCA_TERMINAL_HANDLE is an agent identity, so CLI control should
         // survive renderer graph loss as long as the underlying PTY is alive.
-        this.detachedPreAllocatedLeaves.set(leaf.ptyId, leaf)
+        this.graph.detachedPreAllocatedLeaves.set(leaf.ptyId, leaf)
       }
     }
   }
@@ -21644,7 +21641,7 @@ export class OrcaRuntimeService {
     if (!handle) {
       return
     }
-    const waiters = this.waitersByHandle.get(handle)
+    const waiters = this.graph.waitersByHandle.get(handle)
     if (!waiters || waiters.size === 0) {
       return
     }
@@ -21662,11 +21659,11 @@ export class OrcaRuntimeService {
   }
 
   private resolveTuiIdleWaiters(leaf: RuntimeLeafRecord): void {
-    const handle = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
+    const handle = this.graph.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
     if (!handle) {
       return
     }
-    const waiters = this.waitersByHandle.get(handle)
+    const waiters = this.graph.waitersByHandle.get(handle)
     if (!waiters || waiters.size === 0) {
       return
     }
@@ -21678,11 +21675,11 @@ export class OrcaRuntimeService {
   }
 
   private resolvePtyExitWaiters(pty: RuntimePtyWorktreeRecord, ptyId: string): void {
-    const handle = this.handleByPtyId.get(ptyId)
+    const handle = this.graph.handleByPtyId.get(ptyId)
     if (!handle) {
       return
     }
-    const waiters = this.waitersByHandle.get(handle)
+    const waiters = this.graph.waitersByHandle.get(handle)
     if (!waiters || waiters.size === 0) {
       return
     }
@@ -21697,11 +21694,11 @@ export class OrcaRuntimeService {
   }
 
   private resolvePtyTuiIdleWaiters(pty: RuntimePtyWorktreeRecord, ptyId: string): void {
-    const handle = this.handleByPtyId.get(ptyId)
+    const handle = this.graph.handleByPtyId.get(ptyId)
     if (!handle) {
       return
     }
-    const waiters = this.waitersByHandle.get(handle)
+    const waiters = this.graph.waitersByHandle.get(handle)
     if (!waiters || waiters.size === 0) {
       return
     }
@@ -21736,7 +21733,7 @@ export class OrcaRuntimeService {
         }
         // Why: check the renderer-synced title. For daemon-hosted terminals,
         // this is the only path where OSC titles are visible to the runtime.
-        const pollTitle = leaf.paneTitle ?? this.tabs.get(leaf.tabId)?.title
+        const pollTitle = leaf.paneTitle ?? this.graph.tabs.get(leaf.tabId)?.title
         if (pollTitle) {
           const titleStatus = detectExplicitIdleStatusFromTitle(pollTitle)
           if (titleStatus === 'idle') {
@@ -21873,11 +21870,11 @@ export class OrcaRuntimeService {
   }
 
   private getAdoptedPtyExplicitIdleStatus(pty: RuntimePtyWorktreeRecord): AgentStatus | null {
-    for (const leaf of this.leaves.values()) {
+    for (const leaf of this.graph.leaves.values()) {
       if (leaf.ptyId !== pty.ptyId) {
         continue
       }
-      const title = leaf.paneTitle ?? this.tabs.get(leaf.tabId)?.title
+      const title = leaf.paneTitle ?? this.graph.tabs.get(leaf.tabId)?.title
       if (!title) {
         continue
       }
@@ -21898,7 +21895,7 @@ export class OrcaRuntimeService {
       return
     }
 
-    const handle = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
+    const handle = this.graph.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
     if (!handle) {
       return
     }
@@ -21924,7 +21921,7 @@ export class OrcaRuntimeService {
       return
     }
 
-    const tabTitle = this.tabs.get(leaf.tabId)?.title
+    const tabTitle = this.graph.tabs.get(leaf.tabId)?.title
     if (isCursorAgentOrchestrationTarget(leaf, tabTitle)) {
       // Why: Cursor Agent treats injected PTY text as editable prompt input.
       // Push-on-idle may surface the message, but submitting it must stay
@@ -21987,7 +21984,7 @@ export class OrcaRuntimeService {
   }
 
   private rejectWaitersForHandle(handle: string, code: string): void {
-    const waiters = this.waitersByHandle.get(handle)
+    const waiters = this.graph.waitersByHandle.get(handle)
     if (!waiters || waiters.size === 0) {
       return
     }
@@ -21998,7 +21995,7 @@ export class OrcaRuntimeService {
   }
 
   private rejectAllWaiters(code: string): void {
-    for (const handle of [...this.waitersByHandle.keys()]) {
+    for (const handle of [...this.graph.waitersByHandle.keys()]) {
       this.rejectWaitersForHandle(handle, code)
     }
   }
@@ -22014,13 +22011,13 @@ export class OrcaRuntimeService {
       waiter.abortCleanup()
       waiter.abortCleanup = null
     }
-    const waiters = this.waitersByHandle.get(waiter.handle)
+    const waiters = this.graph.waitersByHandle.get(waiter.handle)
     if (!waiters) {
       return
     }
     waiters.delete(waiter)
     if (waiters.size === 0) {
-      this.waitersByHandle.delete(waiter.handle)
+      this.graph.waitersByHandle.delete(waiter.handle)
     }
   }
 
@@ -24605,13 +24602,13 @@ export class OrcaRuntimeService {
   }
 
   private getAvailableAuthoritativeWindow(): BrowserWindow | null {
-    if (this.authoritativeWindowId === null) {
+    if (this.graph.authoritativeWindowId === null) {
       return null
     }
     if (!BrowserWindow?.fromId) {
       return null
     }
-    const win = BrowserWindow.fromId(this.authoritativeWindowId)
+    const win = BrowserWindow.fromId(this.graph.authoritativeWindowId)
     return win && !win.isDestroyed() ? win : null
   }
 }
