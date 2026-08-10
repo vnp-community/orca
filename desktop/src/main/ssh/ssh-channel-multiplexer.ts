@@ -410,15 +410,22 @@ export class SshChannelMultiplexer {
         const msg = parseJsonRpcMessage(frame.payload)
         this.handleMessage(msg)
       } catch (err) {
-        // TEMP DIAG BUG-FE-PTY-001: parseJsonRpcMessage throws uncaught on
-        // bad JSON/version — handleProtocolError disposes the whole
-        // connection for it. Log the exact bytes that failed to parse so we
-        // can see WHY (truncated frame, concatenated frames, garbage) instead
-        // of just that it happened.
+        // FIX BUG-FE-PTY-001: a single frame that fails to parse as JSON-RPC
+        // (bad JSON, wrong jsonrpc version — or, per live diagnosis, a race
+        // where handleMessage's own dispatch throws) used to call
+        // handleProtocolError() -> dispose('connection_lost'), tearing down
+        // the ENTIRE agent connection — killing every other in-flight PTY
+        // and pending request on it — for what is recoverable at the single
+        // frame level. Unlike the oversized-frame case above, this is safe to
+        // just skip: FrameDecoder.feed() already advanced its buffer past
+        // this frame via takeBytes(totalLength) BEFORE calling onFrame(), so
+        // the decoder's byte stream stays correctly synchronized regardless
+        // of what we do with a frame we can't parse. Only the one pending
+        // request this frame would have resolved is affected (it times out
+        // normally instead), not the whole session.
         console.error(
-          `[DIAG BUG-FE-PTY-001] parseJsonRpcMessage failed muxId=${this.diagMuxId} frameId=${frame.id} frameAck=${frame.ack} payloadLen=${frame.payload.length} payloadUtf8=${JSON.stringify(frame.payload.toString('utf-8'))} payloadHex=${frame.payload.toString('hex')}`
+          `[DIAG BUG-FE-PTY-001] frame failed to process (skipping this frame, keeping connection alive) muxId=${this.diagMuxId} frameId=${frame.id} frameAck=${frame.ack} payloadLen=${frame.payload.length} payloadUtf8=${JSON.stringify(frame.payload.toString('utf-8'))} payloadHex=${frame.payload.toString('hex')} err=${err instanceof Error ? err.stack : String(err)}`
         )
-        this.handleProtocolError(err)
       }
     }
   }
