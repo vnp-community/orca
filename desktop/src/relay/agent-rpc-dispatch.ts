@@ -222,7 +222,18 @@ export function createRpcDispatcher(
       }
 
       if (ws.readyState === 1 /* WebSocket.OPEN */) {
-        ws.send(encodeDataFrame(state, JSON.stringify(response)))
+        // TEMP DIAG BUG-FE-PTY-001
+        const frame = encodeDataFrame(state, JSON.stringify(response))
+        log.info(
+          `[DIAG BUG-FE-PTY-001] send response id=${rpc.id} method=${rpc.method} bytes=${frame.length} bufferedAmount=${ws.bufferedAmount} t=${Date.now()}`
+        )
+        ws.send(frame, (err) => {
+          if (err) {
+            log.error(`[DIAG BUG-FE-PTY-001] ws.send callback ERROR id=${rpc.id}: ${err.stack ?? err.message}`)
+          }
+        })
+      } else {
+        log.error(`[DIAG BUG-FE-PTY-001] skipped send — readyState=${ws.readyState} id=${rpc.id} method=${rpc.method}`)
       }
     },
   }
@@ -319,6 +330,94 @@ async function route(
       }
     }
 
+    // ── v5.0: git.history ────────────────────────────────────────────────────
+    case 'git.history': {
+      try {
+        const { handleGitHistory } = await import('./agent-git-handler-extended')
+        return (await handleGitHistory(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.history unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: git.branchCompare ─────────────────────────────────────────────
+    case 'git.branchCompare': {
+      try {
+        const { handleGitBranchCompare } = await import('./agent-git-handler-extended')
+        return (await handleGitBranchCompare(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.branchCompare unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: git.commitCompare ─────────────────────────────────────────────
+    case 'git.commitCompare': {
+      try {
+        const { handleGitCommitCompare } = await import('./agent-git-handler-extended')
+        return (await handleGitCommitCompare(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.commitCompare unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: git.branchDiff ────────────────────────────────────────────────
+    case 'git.branchDiff': {
+      try {
+        const { handleGitBranchDiff } = await import('./agent-git-handler-extended')
+        return (await handleGitBranchDiff(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.branchDiff unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: git.commitDiff ────────────────────────────────────────────────
+    case 'git.commitDiff': {
+      try {
+        const { handleGitCommitDiff } = await import('./agent-git-handler-extended')
+        return (await handleGitCommitDiff(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.commitDiff unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: git.checkIgnored ──────────────────────────────────────────────
+    case 'git.checkIgnored': {
+      try {
+        const { handleGitCheckIgnored } = await import('./agent-git-handler-extended')
+        return (await handleGitCheckIgnored(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.checkIgnored unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: git.forkSync ──────────────────────────────────────────────────
+    case 'git.forkSync': {
+      try {
+        const { handleGitForkSync } = await import('./agent-git-handler-extended')
+        return (await handleGitForkSync(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.forkSync unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: git.submoduleStatus ───────────────────────────────────────────
+    case 'git.submoduleStatus': {
+      try {
+        const { handleGitSubmoduleStatus } = await import('./agent-git-handler-extended')
+        return (await handleGitSubmoduleStatus(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.submoduleStatus unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: fs.readDir ─────────────────────────────────────────────────────
     case 'fs.readDir': {
       try {
@@ -410,8 +509,12 @@ async function route(
     // ── v5.0: git.pr.create ──────────────────────────────────────────────────
     case 'git.pr.create': {
       try {
-        const { handleGitPrCreate } = await import('./agent-git-handler')
-        return (await handleGitPrCreate(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+        // BUG-AG-HLD-004: 'git.pr.create' and 'github.pr.create' are the same
+        // action — route both to the one implementation with the idempotency
+        // check (handleGitHubPrCreate) so a retry/double-click never creates
+        // a duplicate PR regardless of which method name the caller used.
+        const { handleGitHubPrCreate } = await import('./external-api-connector')
+        return (await handleGitHubPrCreate(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `git.pr.create unavailable: ${msg}`)
@@ -550,6 +653,39 @@ async function route(
       }
     }
 
+    // ── v5.0: gitlab.mr.list ─────────────────────────────────────────────────
+    case 'gitlab.mr.list': {
+      try {
+        const { handleGitLabMrList } = await import('./external-api-connector')
+        return (await handleGitLabMrList(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `gitlab.mr.list unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: github.auth.status ─────────────────────────────────────────────
+    case 'github.auth.status': {
+      try {
+        const { handleGitHubAuthStatus } = await import('./external-api-connector')
+        return (await handleGitHubAuthStatus(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `github.auth.status unavailable: ${msg}`)
+      }
+    }
+
+    // ── v5.0: gitlab.auth.status ─────────────────────────────────────────────
+    case 'gitlab.auth.status': {
+      try {
+        const { handleGitLabAuthStatus } = await import('./external-api-connector')
+        return (await handleGitLabAuthStatus(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `gitlab.auth.status unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: agent.spawn ────────────────────────────────────────────────────
     case 'agent.spawn': {
       try {
@@ -591,6 +727,9 @@ async function route(
     // TG-001: Non-interactive subprocess execution (for task graph steps).
     // Returns captured stdout/stderr/exitCode instead of streaming.
     // Distinct from agent.spawn (interactive PTY) — no terminal allocation.
+    // Called by:
+    //   - StepExecutors.executeAgent() via relay.call('agent.exec', {...})
+    //   - ProfileAwareAgentSpawner via relay.call('agent.exec', {...})
     case 'agent.exec': {
       const p       = rpc.params ?? {}
       const binary  = typeof p.binary === 'string' ? p.binary : ''
@@ -680,6 +819,8 @@ async function route(
             format: typeof p['format'] === 'string' ? p['format'] as 'json' | 'text' : 'text',
             taskId: typeof p['taskId'] === 'string' ? p['taskId']  : undefined,
             model:  typeof p['model']  === 'string' ? p['model']   : undefined,
+            accountId:      typeof p['accountId']      === 'string' ? p['accountId']      : undefined,
+            resolvedApiKey: typeof p['resolvedApiKey'] === 'string' ? p['resolvedApiKey'] : undefined,
           },
           config,
           log

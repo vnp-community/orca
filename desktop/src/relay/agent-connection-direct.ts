@@ -103,6 +103,40 @@ export async function connectDirect(
         rejectUnauthorized: config.tlsRejectUnauthorized,
       })
 
+      // TEMP DIAG BUG-FE-PTY-001: no application code was found calling
+      // ws.close()/terminate() around the observed disconnect — wrap both so
+      // ANY call (ours, or from a library path we haven't traced) logs a
+      // stack trace instead of silently firing.
+      const diagOrigClose = ws.close.bind(ws)
+      const diagOrigTerminate = ws.terminate.bind(ws)
+      ws.close = ((...args: Parameters<typeof diagOrigClose>) => {
+        log.error(
+          `[DIAG BUG-FE-PTY-001] ws.close() called args=${JSON.stringify(args)} readyState=${ws.readyState}\n${new Error('close call site').stack}`
+        )
+        return diagOrigClose(...args)
+      }) as typeof ws.close
+      ws.terminate = (() => {
+        log.error(
+          `[DIAG BUG-FE-PTY-001] ws.terminate() called readyState=${ws.readyState}\n${new Error('terminate call site').stack}`
+        )
+        return diagOrigTerminate()
+      }) as typeof ws.terminate
+
+      // TEMP DIAG BUG-FE-PTY-001: raw socket-level visibility — logged once,
+      // right when the underlying TCP socket itself signals it's ending, to
+      // see which side/reason the 'ws' library attributes it to before any
+      // of our own 'close' handling runs.
+      ws.once('open', () => {
+        const sock = (ws as unknown as { _socket?: import('node:net').Socket })._socket
+        sock?.once('end', () => log.error('[DIAG BUG-FE-PTY-001] raw socket "end" (peer sent FIN)'))
+        sock?.once('close', (hadError: boolean) =>
+          log.error(`[DIAG BUG-FE-PTY-001] raw socket "close" hadError=${hadError}`)
+        )
+        sock?.once('error', (err: Error) =>
+          log.error(`[DIAG BUG-FE-PTY-001] raw socket "error": ${err.stack ?? err.message}`)
+        )
+      })
+
       let handshakeOkAt: number | null = null
       // Why this side pings too (not just relying on the server's own 30s
       // ping in agent-ws-server.ts): defends against ANY intermediate hop
@@ -124,6 +158,8 @@ export async function connectDirect(
       session.start(ws)
 
       ws.once('close', (code: number) => {
+        // TEMP DIAG BUG-FE-PTY-001
+        log.error(`[DIAG BUG-FE-PTY-001] ws 'close' event fired code=${code} t=${Date.now()}`)
         if (keepAliveTimer) {
           clearInterval(keepAliveTimer)
           keepAliveTimer = null

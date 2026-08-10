@@ -222,7 +222,18 @@ export function createRpcDispatcher(
       }
 
       if (ws.readyState === 1 /* WebSocket.OPEN */) {
-        ws.send(encodeDataFrame(state, JSON.stringify(response)))
+        // TEMP DIAG BUG-FE-PTY-001
+        const frame = encodeDataFrame(state, JSON.stringify(response))
+        log.info(
+          `[DIAG BUG-FE-PTY-001] send response id=${rpc.id} method=${rpc.method} bytes=${frame.length} bufferedAmount=${ws.bufferedAmount} t=${Date.now()}`
+        )
+        ws.send(frame, (err) => {
+          if (err) {
+            log.error(`[DIAG BUG-FE-PTY-001] ws.send callback ERROR id=${rpc.id}: ${err.stack ?? err.message}`)
+          }
+        })
+      } else {
+        log.error(`[DIAG BUG-FE-PTY-001] skipped send — readyState=${ws.readyState} id=${rpc.id} method=${rpc.method}`)
       }
     },
   }
