@@ -363,6 +363,15 @@ export class SshChannelMultiplexer {
   }
 
   private handleFrame(frame: DecodedFrame): void {
+    // TEMP DIAG BUG-FE-PTY-001: unconditional entry log for every decoded
+    // frame — feed()'s while-loop can synchronously process MULTIPLE frames
+    // from one 'message' event, so the earlier close-site stack trace
+    // (FrameDecoder.onFrame -> ws.close) alone doesn't say WHICH frame in a
+    // batch triggered it, or whether it's a throw at all (no
+    // parseJsonRpcMessage-fail log fired despite the same call site).
+    console.error(
+      `[DIAG BUG-FE-PTY-001] handleFrame ENTER type=${frame.type} id=${frame.id} ack=${frame.ack} payloadLen=${frame.payload.length}`
+    )
     // Why: any decoded frame proves the relay round-trip is alive; resolve
     // pending resume probes before ordinary dispatch (#7773).
     for (const waiter of this.livenessProbeWaiters.splice(0)) {
