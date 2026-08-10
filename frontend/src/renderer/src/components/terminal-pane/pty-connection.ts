@@ -442,6 +442,10 @@ type PendingStartupCommand = {
 
 type FreshSpawnOptions = {
   forceBlankRestoredViewport?: boolean
+  // Why BUG-FE-PTY-001: bounds the mirrored-host-attach retry in startFreshSpawn's
+  // onError to a single attempt so a persistently-dead host handle still
+  // surfaces its error instead of retrying forever.
+  mirroredHostAttachRetried?: boolean
 }
 
 type ColdRestoreAgentResumeStartup = PendingStartupCommand & {
@@ -4336,7 +4340,31 @@ export function connectPanePty(
         callbacks: {
           onData: dataCallback,
           onReplayData: replayDataCallback,
-          onError: reportError
+          onError: (message) => {
+            // FIX BUG-FE-PTY-001: mirror every sibling reattach handler in this
+            // file (the deferred-reattach .catch(), the detachedRemoteLeafPtyId
+            // try/catch, and the pending-spawn .catch()) — this was the one
+            // unguarded onError left. For a mirrored web-terminal-surface tab,
+            // transport.connect() routes into attachHostSessionMirror(), which
+            // attaches to an already-published host PTY handle rather than
+            // spawning a new one; a session-expired failure here means that
+            // handle died between the mirror publishing it and this attach
+            // landing (grace period elapsed, or an agent WS reconnect race —
+            // see worktree-runtime-owner.ts's isRepoOwnerDataLoadedForWorktree
+            // doc comment for the race this narrows but doesn't fully
+            // eliminate). Retry once instead of leaving the pane on a dead-end
+            // toast; mirroredHostAttachRetried bounds it to a single attempt so
+            // a genuinely-gone handle still surfaces its error.
+            if (isSshSessionExpiredError(message) && !options.mirroredHostAttachRetried) {
+              const staleMirroredPtyId = transport.getPtyId()
+              if (staleMirroredPtyId) {
+                deps.clearTabPtyId(deps.tabId, staleMirroredPtyId)
+              }
+              startFreshSpawn(startupOverride, { ...options, mirroredHostAttachRetried: true })
+              return
+            }
+            reportError(message)
+          }
         }
       })
 
