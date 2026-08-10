@@ -150,6 +150,12 @@ export class DevServerPtyProvider implements IPtyProvider {
   }
 
   async shutdown(id: string, opts: { immediate?: boolean; keepHistory?: boolean }): Promise<void> {
+    // TEMP DIAG BUG-FE-PTY-001: capture the caller for the "created then
+    // immediately destroyed" repro — stack trace pinpoints which orca-runtime
+    // path decided to tear this PTY down seconds after spawn.
+    console.error(
+      `[DIAG BUG-FE-PTY-001] DevServerPtyProvider.shutdown() called id=${id} immediate=${opts.immediate} keepHistory=${opts.keepHistory}\n${new Error('shutdown call site').stack}`
+    )
     const relayId = this.toRelayPtyId(id)
     await this.relay.call('pty.destroy', { id: relayId, graceful: !opts.immediate })
     this.initialCwdByRelayId.delete(relayId)
