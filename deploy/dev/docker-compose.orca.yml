@@ -57,6 +57,10 @@ services:
       NODE_ENV: production
       # Set ORCA_TRACE=1 in .env to enable structured trace logs (wsSession, agentWs, relay flows)
       ORCA_TRACE: ${ORCA_TRACE:-}
+      # TEMP DIAG BUG-FE-PTY-001: set ORCA_SSH_MUX_DEBUG=1 in .env to log a full
+      # stack trace on every SshChannelMultiplexer.dispose() call — pinpoints
+      # what's actually closing the dev-01 agent WS connection.
+      ORCA_SSH_MUX_DEBUG: ${ORCA_SSH_MUX_DEBUG:-}
 
       # ── Multi-User & Auth ─────────────────────────────────────
       # Set ORCA_MULTI_USER=1 để enable login + per-user process isolation
