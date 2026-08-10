@@ -121,6 +121,12 @@ export function createRemoteRuntimePtyTransport(
     }
     viewportClaimReadyWaiters.clear()
   }
+  // TEMP DIAG BUG-FE-PTY-001: log every transport instantiation with its
+  // tabId/leafId + call stack, to catch a second transport being created for
+  // the same tab while the first one's terminal.create is still in flight.
+  console.error(
+    `[DIAG BUG-FE-PTY-001] transport CREATED tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId}\n${new Error('create call site').stack}`
+  )
   // Why: tab/leaf ids identify the mirrored host pane, so every paired viewer
   // shares them. The instance suffix keeps one viewer's refresh off peer records.
   const clientId = `desktop:${tabId ?? 'tab'}:${leafId ?? 'leaf'}:${createBrowserUuid()}`
@@ -743,6 +749,12 @@ export function createRemoteRuntimePtyTransport(
         })
         handle = created.terminal.handle
         if (destroyed) {
+          // TEMP DIAG BUG-FE-PTY-001: this is the exact "created then
+          // immediately destroyed" race — logs which tab/leaf raced and how
+          // long the create() round-trip took before destroy() beat it.
+          console.error(
+            `[DIAG BUG-FE-PTY-001] connect() found destroyed=true right after terminal.create resolved — closing orphaned PTY tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId} handle=${created.terminal.handle}`
+          )
           // Why: this is a cancelled launch, not a connected shared session.
           // Close the server PTY so rapid tab-open/tab-close does not leak.
           await closeRemoteTerminal(created.terminal.handle)
@@ -977,6 +989,12 @@ export function createRemoteRuntimePtyTransport(
     },
 
     destroy() {
+      // TEMP DIAG BUG-FE-PTY-001: pairs with the "transport CREATED" log —
+      // correlate by tabId/leafId to see whether a second transport for the
+      // same tab triggered this teardown before connect() finished.
+      console.error(
+        `[DIAG BUG-FE-PTY-001] transport DESTROY called tabId=${tabId} leafId=${leafId} handle=${handle} connected=${connected}\n${new Error('destroy call site').stack}`
+      )
       destroyed = true
       this.disconnect()
       inputBatcher.clear()
