@@ -850,6 +850,21 @@ async function route(
       }
     }
 
+    // ── pty.listProcesses ────────────────────────────────────────────────────
+    // Enumerate every PTY this daemon currently tracks. Backend's
+    // DevServerPtyProvider.listProcesses() uses this so its liveness sweep can
+    // detect a Dev-Server-hosted PTY that died without any client noticing
+    // (BUG-FE-PTY-001) — previously there was no agent-wide enumeration RPC.
+    case 'pty.listProcesses': {
+      try {
+        const { handlePtyListProcesses } = await import('./pty-daemon-client')
+        return (await handlePtyListProcesses(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.listProcesses unavailable: ${msg}`)
+      }
+    }
+
     // ── Unknown method ───────────────────────────────────────────────────────
     default:
       return makeError(rpc.id, AgentErrorCode.MethodNotFound, `Method not found: ${rpc.method}`)
