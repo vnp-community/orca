@@ -87,9 +87,9 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 57 | ~~TASK-BIGFILE-057~~ | Move (composition) | `orca-runtime.ts` → `orca-runtime-pty-title-tracker.ts` | S | 54 | ❌ Huỷ (xem TASK-BIGFILE-054 "Bài học phương pháp" — method-body entangled sâu, không an toàn như ước tính) |
 | 58 | [TASK-BIGFILE-058](./TASK-BIGFILE-058-orca-runtime-connection-subscription-notify-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-connection-subscription-notify.ts` | S | 54 | ✅ |
 | 59 | [TASK-BIGFILE-059](./TASK-BIGFILE-059-orca-runtime-pty-wait-blocked-check-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-pty-wait-blocked-check.ts` | S | 54 | ✅ |
-| 60 | TASK-BIGFILE-060 | Move (composition) | `orca-runtime.ts` → `orca-runtime-pty-foreground-agent-refresh.ts` | S | 54 | ⬜ |
+| 60 | [TASK-BIGFILE-060](./TASK-BIGFILE-060-orca-runtime-pty-foreground-agent-refresh-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-pty-foreground-agent-refresh.ts` | S | 54 | ✅ |
 | 61 | [TASK-BIGFILE-061](./TASK-BIGFILE-061-orca-runtime-terminal-message-waiter-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-terminal-message-waiter.ts` | S | 54 | ✅ |
-| 62 | TASK-BIGFILE-062 | Move (composition) | `orca-runtime.ts` → `orca-runtime-remote-terminal-view-subscriber.ts` | S | 54 | ⬜ |
+| 62 | [TASK-BIGFILE-062](./TASK-BIGFILE-062-orca-runtime-remote-terminal-view-subscriber-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-remote-terminal-view-subscriber.ts` | S | 54 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn

@@ -24,6 +24,8 @@ import { RuntimeAccountServicesCommands } from './orca-runtime-account-services'
 import { RuntimePtyWaitBlockedCheckCommands } from './orca-runtime-pty-wait-blocked-check'
 import { RuntimeTerminalMessageWaiterCommands } from './orca-runtime-terminal-message-waiter'
 import { RuntimeConnectionSubscriptionNotifyCommands } from './orca-runtime-connection-subscription-notify'
+import { RuntimePtyForegroundAgentRefreshCommands } from './orca-runtime-pty-foreground-agent-refresh'
+import { RuntimeRemoteTerminalViewSubscriberCommands } from './orca-runtime-remote-terminal-view-subscriber'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -541,7 +543,7 @@ export type TerminalCreateOptions = {
   deferMobileSessionPublish?: boolean
 }
 
-type PtyForegroundAgentRefresh = {
+export type PtyForegroundAgentRefresh = {
   promise: Promise<boolean>
   startedAfterTitleObservation: number
   requestedAfterTitleObservation: number
@@ -1099,8 +1101,6 @@ export class OrcaRuntimeService {
   /** Web Push manager — optional; null until setPushManager() is called. TASK-036. */
   private pushManager: WebPushManager | null = null
   private agentDetector: AgentDetector | null = null
-  private ptyForegroundAgentRefreshes = new Map<string, PtyForegroundAgentRefresh>()
-  private ptyDelayedForegroundSnapshotTitleObservations = new Map<string, number>()
   private _orchestrationDb: OrchestrationDb | null = null
   // Why: mobile clients subscribe to terminal output via terminal.subscribe.
   // These listeners fire on every onPtyData call, enabling real-time streaming
@@ -1159,14 +1159,6 @@ export class OrcaRuntimeService {
   // Absent  → hydration has not been considered yet for this PTY.
   // See docs/mobile-prefer-renderer-scrollback.md.
   private headlessHydrationState = new Map<string, 'pending' | 'done'>()
-
-  // Why: Phase-5 query-responder suppression — a terminal-RPC subscribe
-  // stream feeds a remote xterm view (mobile/web/remote desktop) that answers
-  // queries with view authority, so main must yield while one is attached
-  // (terminal-query-authority.md). Ref-counted per PTY because multiple
-  // streams can attach concurrently; mobileSubscribers is consulted too so
-  // grace-window mobile records keep suppressing.
-  private remoteTerminalViewSubscriberCounts = new Map<string, number>()
 
   private stats: StatsCollector | null = null
   private readonly getLocalProviderFn: (() => IPtyProvider) | null
@@ -2986,46 +2978,24 @@ export class OrcaRuntimeService {
    *  while the desktop pane is hidden. */
   onRemoteTerminalViewPresenceChanged: ((ptyId: string) => void) | null = null
 
-  private notifyRemoteTerminalViewPresenceChanged(ptyId: string): void {
-    try {
-      this.onRemoteTerminalViewPresenceChanged?.(ptyId)
-    } catch (err) {
-      console.error('[runtime] remote view presence listener threw', { ptyId, err })
-    }
-  }
+  private readonly remoteTerminalViewSubscriberCommands =
+    new RuntimeRemoteTerminalViewSubscriberCommands({
+      hasMobileSubscriber: (ptyId) => this.mobileFloorCommands.hasMobileSubscriber(ptyId),
+      getOnRemoteTerminalViewPresenceChanged: () => this.onRemoteTerminalViewPresenceChanged
+    })
 
-  /** Registered by terminal-RPC subscribe/multiplex streams: while a remote
-   *  view subscriber is attached its xterm answers queries with view
-   *  authority and the model responder must stay silent. Returns an
-   *  idempotent release. */
-  registerRemoteTerminalViewSubscriber(ptyId: string): () => void {
-    this.remoteTerminalViewSubscriberCounts.set(
-      ptyId,
-      (this.remoteTerminalViewSubscriberCounts.get(ptyId) ?? 0) + 1
+  notifyRemoteTerminalViewPresenceChanged: RuntimeRemoteTerminalViewSubscriberCommands['notifyRemoteTerminalViewPresenceChanged'] =
+    this.remoteTerminalViewSubscriberCommands.notifyRemoteTerminalViewPresenceChanged.bind(
+      this.remoteTerminalViewSubscriberCommands
     )
-    this.notifyRemoteTerminalViewPresenceChanged(ptyId)
-    let released = false
-    return () => {
-      if (released) {
-        return
-      }
-      released = true
-      const next = (this.remoteTerminalViewSubscriberCounts.get(ptyId) ?? 1) - 1
-      if (next <= 0) {
-        this.remoteTerminalViewSubscriberCounts.delete(ptyId)
-      } else {
-        this.remoteTerminalViewSubscriberCounts.set(ptyId, next)
-      }
-      this.notifyRemoteTerminalViewPresenceChanged(ptyId)
-    }
-  }
-
-  hasRemoteTerminalViewSubscriber(ptyId: string): boolean {
-    if ((this.remoteTerminalViewSubscriberCounts.get(ptyId) ?? 0) > 0) {
-      return true
-    }
-    return this.mobileFloorCommands.hasMobileSubscriber(ptyId)
-  }
+  registerRemoteTerminalViewSubscriber: RuntimeRemoteTerminalViewSubscriberCommands['registerRemoteTerminalViewSubscriber'] =
+    this.remoteTerminalViewSubscriberCommands.registerRemoteTerminalViewSubscriber.bind(
+      this.remoteTerminalViewSubscriberCommands
+    )
+  hasRemoteTerminalViewSubscriber: RuntimeRemoteTerminalViewSubscriberCommands['hasRemoteTerminalViewSubscriber'] =
+    this.remoteTerminalViewSubscriberCommands.hasRemoteTerminalViewSubscriber.bind(
+      this.remoteTerminalViewSubscriberCommands
+    )
 
   serializeTerminalBuffer(
     ptyId: string,
@@ -3926,7 +3896,7 @@ export class OrcaRuntimeService {
     advertisedUrlWatcher.unbindPty(ptyId)
     serveSimStateWatcher.unbindPty(ptyId)
     // Clean up new mobile state for this PTY
-    this.remoteTerminalViewSubscriberCounts.delete(ptyId)
+    this.remoteTerminalViewSubscriberCommands.clearRemoteTerminalViewSubscriberCountForPty(ptyId)
     this.recentPtyOutputById.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
     this.recentPtyPathCandidatesById.delete(ptyId)
@@ -4749,116 +4719,31 @@ export class OrcaRuntimeService {
    * Schedules an asynchronous query to check which agent process is currently
    * running in the foreground of a PTY.
    */
-  private refreshPtyForegroundAgent(ptyId: string): void {
-    void this.refreshPtyForegroundAgentFromController(ptyId)
-  }
+  private readonly ptyForegroundAgentRefreshCommands = new RuntimePtyForegroundAgentRefreshCommands(
+    {
+      getGraph: () => this.graph,
+      getPtyController: () => this.ptyController,
+      touchMobileSessionSnapshotsForPty: (ptyId, options) =>
+        this.touchMobileSessionSnapshotsForPty(ptyId, options)
+    }
+  )
 
-  private getPendingForegroundAgentRefreshForTitle(
-    ptyId: string,
-    titleObservedAt: number
-  ): Promise<boolean> | undefined {
-    if (!this.ptyForegroundAgentRefreshes.has(ptyId)) {
-      return undefined
-    }
-    return this.refreshPtyForegroundAgentFromController(ptyId, {
-      afterTitleObservation: titleObservedAt
-    })
-  }
-
-  private delayPtyBackedMobileSnapshotForForegroundAgent(
-    ptyId: string,
-    titleObservedAt: number,
-    foregroundRefresh: Promise<boolean>
-  ): void {
-    this.ptyDelayedForegroundSnapshotTitleObservations.set(ptyId, titleObservedAt)
-    void foregroundRefresh.then((foregroundAgentChanged) => {
-      if (this.ptyDelayedForegroundSnapshotTitleObservations.get(ptyId) !== titleObservedAt) {
-        return
-      }
-      this.ptyDelayedForegroundSnapshotTitleObservations.delete(ptyId)
-      if (!foregroundAgentChanged) {
-        this.touchMobileSessionSnapshotsForPty(ptyId)
-      }
-    })
-  }
-
-  /**
-   * Deduplicates and manages in-flight foreground agent refresh queries
-   * for a specific PTY.
-   */
-  private refreshPtyForegroundAgentFromController(
-    ptyId: string,
-    options: { afterTitleObservation?: number } = {}
-  ): Promise<boolean> {
-    const startedAfterTitleObservation = options.afterTitleObservation ?? 0
-    const pendingRefresh = this.ptyForegroundAgentRefreshes.get(ptyId)
-    if (pendingRefresh) {
-      pendingRefresh.requestedAfterTitleObservation = Math.max(
-        pendingRefresh.requestedAfterTitleObservation,
-        startedAfterTitleObservation
-      )
-      return pendingRefresh.promise
-    }
-    const entry: PtyForegroundAgentRefresh = {
-      promise: Promise.resolve(false),
-      startedAfterTitleObservation,
-      requestedAfterTitleObservation: startedAfterTitleObservation
-    }
-    const refresh = (async (): Promise<boolean> => {
-      while (true) {
-        entry.startedAfterTitleObservation = entry.requestedAfterTitleObservation
-        const foregroundAgentChanged = await this.loadPtyForegroundAgentFromController(ptyId)
-        if (
-          foregroundAgentChanged ||
-          entry.requestedAfterTitleObservation <= entry.startedAfterTitleObservation
-        ) {
-          return foregroundAgentChanged
-        }
-      }
-    })().finally(() => {
-      if (this.ptyForegroundAgentRefreshes.get(ptyId) === entry) {
-        this.ptyForegroundAgentRefreshes.delete(ptyId)
-      }
-    })
-    entry.promise = refresh
-    this.ptyForegroundAgentRefreshes.set(ptyId, entry)
-    return refresh
-  }
-
-  /**
-   * Queries the PTY controller for the active foreground process, identifies if it
-   * is a recognized agent, and updates the PTY's foreground agent state if changed.
-   */
-  private async loadPtyForegroundAgentFromController(ptyId: string): Promise<boolean> {
-    if (!this.ptyController) {
-      return false
-    }
-    const pty = this.graph.ptysById.get(ptyId)
-    if (!pty?.connected) {
-      return false
-    }
-    // Why: foregroundAgent is only consulted as the owner fallback when
-    // launchAgent is unknown, so a known launchAgent makes the relay
-    // getForegroundProcess round-trip pure waste (covers all launched agents).
-    if (pty.launchAgent) {
-      return false
-    }
-    let foregroundProcess: string | null
-    try {
-      foregroundProcess = await this.ptyController.getForegroundProcess(ptyId)
-    } catch {
-      return false
-    }
-    const foregroundAgent = foregroundProcess
-      ? (recognizeAgentProcess(foregroundProcess)?.agent ?? null)
-      : null
-    if (pty.foregroundAgent === foregroundAgent) {
-      return false
-    }
-    pty.foregroundAgent = foregroundAgent
-    this.touchMobileSessionSnapshotsForPty(ptyId)
-    return true
-  }
+  refreshPtyForegroundAgent: RuntimePtyForegroundAgentRefreshCommands['refreshPtyForegroundAgent'] =
+    this.ptyForegroundAgentRefreshCommands.refreshPtyForegroundAgent.bind(
+      this.ptyForegroundAgentRefreshCommands
+    )
+  getPendingForegroundAgentRefreshForTitle: RuntimePtyForegroundAgentRefreshCommands['getPendingForegroundAgentRefreshForTitle'] =
+    this.ptyForegroundAgentRefreshCommands.getPendingForegroundAgentRefreshForTitle.bind(
+      this.ptyForegroundAgentRefreshCommands
+    )
+  delayPtyBackedMobileSnapshotForForegroundAgent: RuntimePtyForegroundAgentRefreshCommands['delayPtyBackedMobileSnapshotForForegroundAgent'] =
+    this.ptyForegroundAgentRefreshCommands.delayPtyBackedMobileSnapshotForForegroundAgent.bind(
+      this.ptyForegroundAgentRefreshCommands
+    )
+  refreshPtyForegroundAgentFromController: RuntimePtyForegroundAgentRefreshCommands['refreshPtyForegroundAgentFromController'] =
+    this.ptyForegroundAgentRefreshCommands.refreshPtyForegroundAgentFromController.bind(
+      this.ptyForegroundAgentRefreshCommands
+    )
 
   private getFreshExplicitAgentStatusForHandle(handle: string): {
     status: NonNullable<RuntimeTerminalAgentStatus['status']>
