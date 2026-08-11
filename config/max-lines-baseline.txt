@@ -62,6 +62,15 @@ inline frontend/src/main/runtime/orca-runtime-linear.ts
 # immediately after this block in the source but are a separate, larger
 # domain not yet extracted — kept as host dependencies here.
 inline frontend/src/main/runtime/orca-runtime-project-groups.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-047, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's worktree base-status/drift-reconciliation
+# and managed PR/MR base-resolution command block, already covered by
+# orca-runtime.ts's own grandfathered max-lines disable. Deliberately
+# excludes the PTY-adjacent worktree cluster (stopTerminalsForWorktree and
+# friends) and the scattered managed-worktree list/create/activate cluster —
+# per the user's explicit choice to avoid PTY-lifecycle-entangled code.
+inline frontend/src/main/runtime/orca-runtime-worktree-base-status.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts

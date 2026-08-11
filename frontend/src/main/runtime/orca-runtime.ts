@@ -13,6 +13,7 @@ import { RuntimeRepoHooksCommands } from './orca-runtime-repo-hooks'
 import { RuntimeLinearCommands } from './orca-runtime-linear'
 import { RuntimeJiraCommands } from './orca-runtime-jira'
 import { RuntimeProjectGroupsCommands } from './orca-runtime-project-groups'
+import { RuntimeWorktreeBaseStatusCommands } from './orca-runtime-worktree-base-status'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -84,7 +85,6 @@ import type {
   CreateWorktreeResult,
   DetectedWorktree,
   DetectedWorktreeListResult,
-  GitHubPrStartPoint,
   GitPushTarget,
   GitWorktreeInfo,
   GlobalSettings,
@@ -291,13 +291,6 @@ import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
 import { BrowserError } from '../browser/cdp-bridge'
 import { getPRForBranch, getRepoSlug, getRepoUpstream, listWorkItems } from '../github/client'
-import {
-  getProjectRefForRemote as getGitLabProjectRefForRemote,
-  getWorkItemByProjectRef as getGitLabWorkItemByProjectRef
-} from '../gitlab/client'
-import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
-import { fetchPrHeadTrackingRef } from '../github/pr-head-tracking-ref'
-import { getGlabKnownHosts } from '../gitlab/gl-utils'
 import { getHostedReviewForBranch as getHostedReviewForBranchFromRepo } from '../source-control/hosted-review'
 import type { ForgeProviderId } from '../source-control/forge-provider'
 import {
@@ -308,7 +301,6 @@ import {
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
 import {
   getBaseRefDefault,
-  getDefaultRemote,
   getBranchConflictKind,
   isGitRepo,
   getRepoName,
@@ -321,9 +313,7 @@ import {
   resolveDefaultBaseRefWithLocalGit,
   buildSearchBaseRefsArgv,
   isForEachRefExcludeUnsupportedError,
-  mergeBaseRefSearchResultGroups,
-  getRemoteDrift,
-  getRecentDriftSubjects
+  mergeBaseRefSearchResultGroups
 } from '../git/repo'
 import { hasCommitObjectViaGitExec } from '../git/commit-object-ref'
 import { hasWorktreeBaseCommitRef } from '../git/worktree-base-ref-probe'
@@ -372,7 +362,6 @@ import {
   shouldSetDisplayName,
   areWorktreePathsEqual
 } from '../ipc/worktree-logic'
-import { stripOrcaProvenanceMetaUpdates } from '../worktree-removal-safety'
 import { prefetchWorktreeCreateBase } from '../worktree-create-base-prefetch'
 import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
@@ -398,7 +387,7 @@ import {
   getFolderWorkspacePathStatus,
   inferFolderWorkspacePathConnection
 } from '../project-groups/folder-workspace-path-status'
-import { getRemoteGitProvider, requireRemoteGitProvider } from '../providers/ssh-git-dispatch'
+import { getRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import { detectRepoIconAndUpstream } from '../repo-icon-autodetect'
 import { githubAvatarIcon } from '../../shared/repo-icon'
 import type { ClaudeAccountService } from '../claude-accounts/service'
@@ -480,8 +469,6 @@ import type {
   AccountsSnapshot,
   DriverState,
   MobileNotificationEvent,
-  RemoteFetchResult,
-  RemoteTrackingBase,
   RuntimePtyController,
   RuntimeTerminalAgentStatusEvent
 } from './orca-runtime-types'
@@ -1013,7 +1000,7 @@ type MessageWaiter = {
   abortCleanup: (() => void) | null
 }
 
-function omitUndefinedProperties<T extends Record<string, unknown>>(value: T): Partial<T> {
+export function omitUndefinedProperties<T extends Record<string, unknown>>(value: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(value).filter(([, entry]) => entry !== undefined)
   ) as Partial<T>
@@ -1447,7 +1434,7 @@ function extractOrchestrationTaskId(text?: string): string | undefined {
   return text?.match(/\btask_[A-Za-z0-9]+\b/)?.[0]
 }
 
-class RuntimeLineageError extends Error {
+export class RuntimeLineageError extends Error {
   code: string
   data?: unknown
 
@@ -1646,7 +1633,6 @@ export class OrcaRuntimeService {
   private remoteTerminalViewSubscriberCounts = new Map<string, number>()
 
   private stats: StatsCollector | null = null
-  private optimisticReconcileTokens = new Map<string, string>()
   private readonly getLocalProviderFn: (() => IPtyProvider) | null
   private readonly onPtyStopped: ((ptyId: string) => void) | null
   private readonly onTerminalAgentStatus: ((event: RuntimeTerminalAgentStatusEvent) => void) | null
@@ -11452,663 +11438,51 @@ export class OrcaRuntimeService {
   hasRemoteTrackingRef: RuntimeRemoteFetchCache['hasRemoteTrackingRef'] =
     this.remoteFetchCache.hasRemoteTrackingRef.bind(this.remoteFetchCache)
 
-  recordOptimisticReconcileToken(worktreeId: string): string {
-    const token = randomUUID()
-    this.optimisticReconcileTokens.set(worktreeId, token)
-    return token
-  }
+  private readonly worktreeBaseStatusCommands = new RuntimeWorktreeBaseStatusCommands({
+    getStore: () => this.store,
+    requireStore: () => this.requireStore(),
+    resolveWorktreeSelector: (selector) => this.resolveWorktreeSelector(selector),
+    resolveRepoSelector: (selector) => this.resolveRepoSelector(selector),
+    showManagedWorktree: (worktreeSelector) => this.showManagedWorktree(worktreeSelector),
+    notifyWorktreesChanged: (repoId) => this.notifyWorktreesChanged(repoId),
+    notifyReposChanged: () => this.notifyReposChanged(),
+    invalidateResolvedWorktreeCache: () => this.invalidateResolvedWorktreeCache(),
+    validateLineageParent: (child, parent) => this.validateLineageParent(child, parent),
+    getOrStartRemoteFetch: (repoPath, remote, gitOptions) =>
+      this.getOrStartRemoteFetch(repoPath, remote, gitOptions),
+    fetchRemoteWithCache: (repoPath, remote, gitOptions) =>
+      this.fetchRemoteWithCache(repoPath, remote, gitOptions),
+    resolveRemoteTrackingBase: (repoPath, baseBranch, gitOptions) =>
+      this.resolveRemoteTrackingBase(repoPath, baseBranch, gitOptions),
+    getNotifier: () => this.notifier
+  })
 
-  clearOptimisticReconcileToken(worktreeId: string): void {
-    this.optimisticReconcileTokens.delete(worktreeId)
-  }
-
-  emitWorktreeBaseStatus(event: WorktreeBaseStatusEvent): void {
-    this.notifier?.worktreeBaseStatus?.(event)
-  }
-
-  async reconcileWorktreeBaseStatus(args: {
-    repoId: string
-    repoPath: string
-    worktreeId: string
-    base: RemoteTrackingBase
-    branchName: string
-    createdBaseSha: string
-    token: string
-    fetchPromise: Promise<RemoteFetchResult>
-  }): Promise<void> {
-    const stillCurrent = (): boolean =>
-      this.optimisticReconcileTokens.get(args.worktreeId) === args.token
-    const emit = (event: Omit<WorktreeBaseStatusEvent, 'repoId' | 'worktreeId' | 'base'>): void => {
-      if (!stillCurrent()) {
-        return
-      }
-      this.notifier?.worktreeBaseStatus?.({
-        repoId: args.repoId,
-        worktreeId: args.worktreeId,
-        base: args.base.base,
-        remote: args.base.remote,
-        ...event
-      })
-    }
-    const resolvePublishRemote = async (): Promise<string> => {
-      // Why: repos whose canonical publish remote is named differently (e.g.
-      // `upstream`, a forked `myfork`, or any non-`origin` configuration —
-      // including multi-segment names like `foo/bar` that this PR's resolver
-      // explicitly supports) would otherwise silently skip the conflict
-      // signal. Resolve from git config in priority order:
-      //   1) branch.<name>.pushRemote (explicit per-branch override)
-      //   2) remote.pushDefault (workspace-wide override)
-      //   3) branch.<name>.remote (tracked remote)
-      //   4) the base ref's own remote (matches resolveRemoteTrackingBase)
-      //   5) `origin` as a final fallback.
-      const tryConfig = async (key: string): Promise<string | null> => {
-        try {
-          const { stdout } = await gitExecFileAsync(['config', '--get', key], {
-            cwd: args.repoPath
-          })
-          const value = stdout.trim()
-          return value || null
-        } catch {
-          return null
-        }
-      }
-      return (
-        (await tryConfig(`branch.${args.branchName}.pushRemote`)) ??
-        (await tryConfig('remote.pushDefault')) ??
-        (await tryConfig(`branch.${args.branchName}.remote`)) ??
-        args.base.remote ??
-        'origin'
-      )
-    }
-    const checkPublishRemoteConflict = async (): Promise<void> => {
-      const publishRemote = await resolvePublishRemote()
-      try {
-        if (publishRemote !== args.base.remote) {
-          const result = await this.getOrStartRemoteFetch(args.repoPath, publishRemote)
-          if (!result.ok) {
-            return
-          }
-        }
-        await gitExecFileAsync(
-          ['rev-parse', '--verify', `refs/remotes/${publishRemote}/${args.branchName}^{commit}`],
-          { cwd: args.repoPath }
-        )
-        if (stillCurrent()) {
-          this.notifier?.worktreeRemoteBranchConflict?.({
-            repoId: args.repoId,
-            worktreeId: args.worktreeId,
-            remote: publishRemote,
-            branchName: args.branchName
-          })
-        }
-      } catch {
-        // No publish-remote conflict is the common case; stay quiet.
-      }
-    }
-
-    try {
-      const fetchResult = await args.fetchPromise
-      if (!stillCurrent()) {
-        return
-      }
-      if (!fetchResult.ok) {
-        emit({ status: 'unknown' })
-        return
-      }
-
-      const { stdout } = await gitExecFileAsync(
-        ['rev-parse', '--verify', `${args.base.ref}^{commit}`],
-        { cwd: args.repoPath }
-      )
-      const postFetchSha = stdout.trim()
-      if (postFetchSha === args.createdBaseSha) {
-        emit({ status: 'current' })
-        await checkPublishRemoteConflict()
-        return
-      }
-
-      try {
-        await gitExecFileAsync(['merge-base', '--is-ancestor', args.createdBaseSha, postFetchSha], {
-          cwd: args.repoPath
-        })
-      } catch {
-        emit({ status: 'base_changed' })
-        await checkPublishRemoteConflict()
-        return
-      }
-
-      const { stdout: countStdout } = await gitExecFileAsync(
-        ['rev-list', '--count', `${args.createdBaseSha}..${postFetchSha}`],
-        { cwd: args.repoPath }
-      )
-      const behind = Number(countStdout.trim())
-      if (!Number.isFinite(behind) || behind <= 0) {
-        emit({ status: 'current' })
-        await checkPublishRemoteConflict()
-        return
-      }
-      const { stdout: logStdout } = await gitExecFileAsync(
-        ['log', '--format=%s', '-n', '5', `${args.createdBaseSha}..${postFetchSha}`],
-        { cwd: args.repoPath }
-      )
-      emit({
-        status: 'drift',
-        behind,
-        recentSubjects: logStdout.split('\n').filter((line) => line.trim().length > 0)
-      })
-      await checkPublishRemoteConflict()
-    } catch (err) {
-      console.warn(`[worktree-base-status] reconcile failed for ${args.worktreeId}:`, err)
-      emit({ status: 'unknown' })
-    } finally {
-      // Why: reconcile is one-shot; clear the token so long-lived sessions
-      // that create many worktrees without removing them don't grow the
-      // optimisticReconcileTokens map monotonically. Removal still no-ops
-      // because the entry is already gone.
-      if (this.optimisticReconcileTokens.get(args.worktreeId) === args.token) {
-        this.optimisticReconcileTokens.delete(args.worktreeId)
-      }
-    }
-  }
-
-  /**
-   * Probe how far the worktree's HEAD is behind its tracking remote. Returns
-   * null when the probe cannot establish a signal (no default base ref, or
-   * git failure). Dispatch treats null as "unknown — proceed" (§3.1); only
-   * knowing-and-stale refuses.
-   */
-  async probeWorktreeDrift(worktreeSelector: string): Promise<{
-    base: string
-    behind: number
-    recentSubjects: string[]
-  } | null> {
-    const wt = await this.resolveWorktreeSelector(worktreeSelector)
-    if (!this.store) {
-      return null
-    }
-    const repo = this.store.getRepos().find((r) => r.id === wt.repoId)
-    if (!repo) {
-      return null
-    }
-    if (repo.connectionId) {
-      // Why: the drift probe uses local git helpers. Until the SSH provider
-      // exposes equivalent remote refs/log plumbing, fail closed to "unknown"
-      // instead of probing a server path on the desktop filesystem.
-      return null
-    }
-    const localGitExecOptions = getLocalProjectGitExecOptions(this.requireStore(), repo)
-    const localWorktreeGitOptions = getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
-    const meta = this.store.getWorktreeMeta(wt.id)
-    const base =
-      meta?.baseRef ||
-      meta?.sparseBaseRef ||
-      repo.worktreeBaseRef ||
-      (await getBaseRefDefault(repo.path, localWorktreeGitOptions))
-    if (!base) {
-      // Why: brand-new repo with no remote primary — nothing to compare
-      // against, so there's no meaningful drift to report. Dispatch should
-      // not block on a probe that cannot form an opinion.
-      return null
-    }
-    const remoteTrackingBase = await this.resolveRemoteTrackingBase(
-      repo.path,
-      base,
-      localWorktreeGitOptions
+  recordOptimisticReconcileToken: RuntimeWorktreeBaseStatusCommands['recordOptimisticReconcileToken'] =
+    this.worktreeBaseStatusCommands.recordOptimisticReconcileToken.bind(
+      this.worktreeBaseStatusCommands
     )
-    if (!remoteTrackingBase) {
-      return null
-    }
-    const remote = remoteTrackingBase.remote
-    // Why: fetch failures are non-fatal; we proceed with whatever the
-    // last-known remote ref points at. `fetchRemoteWithCache` never throws.
-    await this.fetchRemoteWithCache(repo.path, remote, localWorktreeGitOptions)
-    const drift = getRemoteDrift(wt.path, 'HEAD', base, localGitExecOptions)
-    if (!drift) {
-      return null
-    }
-    const recentSubjects = getRecentDriftSubjects(
-      wt.path,
-      'HEAD',
-      base,
-      DRIFT_PROBE_SUBJECT_LIMIT,
-      localGitExecOptions
+  clearOptimisticReconcileToken: RuntimeWorktreeBaseStatusCommands['clearOptimisticReconcileToken'] =
+    this.worktreeBaseStatusCommands.clearOptimisticReconcileToken.bind(
+      this.worktreeBaseStatusCommands
     )
-    return { base, behind: drift.behind, recentSubjects }
-  }
-
-  async updateManagedWorktreeMeta(
-    worktreeSelector: string,
-    updates: Omit<Partial<WorktreeMeta>, 'pushTarget'> & {
-      pushTarget?: GitPushTarget | null
-      lineage?: {
-        parentWorktree?: string
-        noParent?: boolean
-      }
-    }
-  ) {
-    if (!this.store) {
-      throw new Error('runtime_unavailable')
-    }
-    const worktree = await this.resolveWorktreeSelector(worktreeSelector)
-    const { lineage, ...metaUpdates } = updates
-    const shouldClearPushTarget =
-      Object.prototype.hasOwnProperty.call(metaUpdates, 'pushTarget') &&
-      metaUpdates.pushTarget === null
-    const normalizedMetaUpdates: Partial<WorktreeMeta> = shouldClearPushTarget
-      ? { ...metaUpdates, pushTarget: undefined }
-      : (metaUpdates as Partial<WorktreeMeta>)
-    const persistedMetaUpdates: Partial<WorktreeMeta> = omitUndefinedProperties(
-      normalizedMetaUpdates.displayName !== undefined
-        ? {
-            ...normalizedMetaUpdates,
-            pendingFirstAgentMessageRename: false,
-            firstAgentMessageRenameError: null
-          }
-        : normalizedMetaUpdates
+  emitWorktreeBaseStatus: RuntimeWorktreeBaseStatusCommands['emitWorktreeBaseStatus'] =
+    this.worktreeBaseStatusCommands.emitWorktreeBaseStatus.bind(this.worktreeBaseStatusCommands)
+  reconcileWorktreeBaseStatus: RuntimeWorktreeBaseStatusCommands['reconcileWorktreeBaseStatus'] =
+    this.worktreeBaseStatusCommands.reconcileWorktreeBaseStatus.bind(
+      this.worktreeBaseStatusCommands
     )
-    if (shouldClearPushTarget) {
-      // Why: omitUndefinedProperties protects ordinary optional RPC fields, but
-      // pushTarget:null is an explicit request to remove persisted target metadata.
-      persistedMetaUpdates.pushTarget = undefined
-    }
-    if (lineage?.noParent === true) {
-      this.store.removeWorktreeLineage?.(worktree.id)
-      this.store.removeWorkspaceLineage?.(worktreeWorkspaceKey(worktree.id))
-    } else if (lineage?.parentWorktree) {
-      const parent = await this.resolveWorktreeSelector(lineage.parentWorktree)
-
-      this.validateLineageParent(worktree, parent)
-      if (!worktree.instanceId || !parent.instanceId) {
-        throw new RuntimeLineageError(
-          'LINEAGE_PARENT_CONTEXT_MISSING',
-          'Worktree instance identity was unavailable.'
-        )
-      }
-      if (!this.store.setWorktreeLineage) {
-        throw new RuntimeLineageError(
-          'LINEAGE_PARENT_CONTEXT_MISSING',
-          'Worktree lineage storage was unavailable.'
-        )
-      }
-      const createdAt = Date.now()
-      this.store.setWorktreeLineage(worktree.id, {
-        worktreeId: worktree.id,
-        worktreeInstanceId: worktree.instanceId,
-        parentWorktreeId: parent.id,
-        parentWorktreeInstanceId: parent.instanceId,
-        origin: 'manual',
-        capture: { source: 'manual-action', confidence: 'explicit' },
-        createdAt
-      })
-      this.store.setWorkspaceLineage?.({
-        childWorkspaceKey: worktreeWorkspaceKey(worktree.id),
-        childInstanceId: worktree.instanceId,
-        parentWorkspaceKey: worktreeWorkspaceKey(parent.id),
-        parentInstanceId: parent.instanceId,
-        origin: 'manual',
-        capture: { source: 'manual-action', confidence: 'explicit' },
-        createdAt
-      })
-    }
-    this.store.setWorktreeMeta(worktree.id, stripOrcaProvenanceMetaUpdates(persistedMetaUpdates))
-    // Why: unlike renderer-initiated optimistic updates, CLI callers need an
-    // explicit push so the editor refreshes metadata changed outside the UI.
-    this.invalidateResolvedWorktreeCache()
-    this.notifyWorktreesChanged(worktree.repoId)
-    return await this.showManagedWorktree(`id:${worktree.id}`)
-  }
-
-  persistManagedWorktreeSortOrder(orderedIds: string[]): { updated: number } {
-    if (!this.store) {
-      throw new Error('runtime_unavailable')
-    }
-    const now = Date.now()
-    let updated = 0
-    for (let i = 0; i < orderedIds.length; i++) {
-      this.store.setWorktreeMeta(orderedIds[i], { sortOrder: now - i * 1000 })
-      updated++
-    }
-    this.invalidateResolvedWorktreeCache()
-    this.notifyReposChanged()
-    return { updated }
-  }
-
-  async resolveManagedPrBase(args: {
-    repoSelector: string
-    prNumber: number
-    headRefName?: string
-    baseRefName?: string
-    isCrossRepository?: boolean
-  }): Promise<GitHubPrStartPoint | { error: string }> {
-    if (!this.store) {
-      throw new Error('runtime_unavailable')
-    }
-    let repo: Repo
-    try {
-      repo = await this.resolveRepoSelector(args.repoSelector)
-    } catch {
-      return { error: 'Repo not found' }
-    }
-    if (isFolderRepo(repo)) {
-      return { error: 'Folder mode does not support creating worktrees.' }
-    }
-    const providerConnectionId = getRepoProviderConnectionKey(repo)
-    const sshGitProvider = providerConnectionId
-      ? requireRemoteGitProvider(providerConnectionId)
-      : null
-    const localGitExecOptions = sshGitProvider
-      ? undefined
-      : getLocalProjectGitExecOptions(this.requireStore(), repo)
-    const localWorktreeGitOptions = sshGitProvider
-      ? {}
-      : getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
-    const gitExec = sshGitProvider
-      ? (gitArgs: string[]) => sshGitProvider.exec(gitArgs, repo.path)
-      : (gitArgs: string[]) => gitExecFileAsync(gitArgs, localGitExecOptions ?? { cwd: repo.path })
-    const resolveRemote = sshGitProvider
-      ? async () => {
-          const { stdout } = await sshGitProvider.exec(['remote'], repo.path)
-          const remotes = stdout
-            .split('\n')
-            .map((line) => line.trim())
-            .filter(Boolean)
-          if (remotes.includes('origin')) {
-            return 'origin'
-          }
-          if (remotes.length === 1) {
-            return remotes[0]!
-          }
-          if (remotes.length === 0) {
-            throw new Error('Repo has no configured git remotes.')
-          }
-          throw new Error(
-            `Repo has multiple remotes (${remotes.join(', ')}) and no default is configured.`
-          )
-        }
-      : () => getDefaultRemote(repo.path, localWorktreeGitOptions)
-
-    // Why: SSH repos can't fetch over the relay's read-only git.exec channel, so
-    // route the PR head fetch through the write-capable helper instead of gitExec.
-    const fetchRemoteTrackingRef = (remote: string, branch: string): Promise<void> =>
-      fetchPrHeadTrackingRef(
-        repo,
-        sshGitProvider,
-        remote,
-        branch,
-        localGitExecOptions ? { localGitExecOptions } : {}
-      )
-
-    return resolveGitHubPrStartPoint({
-      repoPath: repo.path,
-      prNumber: args.prNumber,
-      headRefName: args.headRefName,
-      baseRefName: args.baseRefName,
-      isCrossRepository: args.isCrossRepository,
-      connectionId: repo.connectionId ?? null,
-      localGitOptions: localWorktreeGitOptions,
-      gitExec,
-      fetchRemoteTrackingRef,
-      resolveRemote
-    })
-  }
-
-  async resolveManagedMrBase(args: {
-    repoSelector: string
-    mrIid: number
-    sourceBranch?: string
-    targetBranch?: string
-    isCrossRepository?: boolean
-  }): Promise<
-    { baseBranch: string; compareBaseRef?: string; pushTarget?: GitPushTarget } | { error: string }
-  > {
-    if (!this.store) {
-      throw new Error('runtime_unavailable')
-    }
-    let repo: Repo
-    try {
-      repo = await this.resolveRepoSelector(args.repoSelector)
-    } catch {
-      return { error: 'Repo not found' }
-    }
-    if (isFolderRepo(repo)) {
-      return { error: 'Folder mode does not support creating worktrees.' }
-    }
-    const providerConnectionId = getRepoProviderConnectionKey(repo)
-    const sshGitProvider = providerConnectionId
-      ? requireRemoteGitProvider(providerConnectionId)
-      : null
-    const localGitExecOptions = sshGitProvider
-      ? undefined
-      : getLocalProjectGitExecOptions(this.requireStore(), repo)
-    const localWorktreeGitOptions = sshGitProvider
-      ? {}
-      : getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
-    const gitExec = sshGitProvider
-      ? (gitArgs: string[]) => sshGitProvider.exec(gitArgs, repo.path)
-      : (gitArgs: string[]) => gitExecFileAsync(gitArgs, localGitExecOptions ?? { cwd: repo.path })
-
-    let sourceBranch = args.sourceBranch?.trim() ?? ''
-    let targetBranch = args.targetBranch?.trim() ?? ''
-    let isCrossRepository = args.isCrossRepository === true
-
-    if (!sourceBranch) {
-      let remote: string
-      try {
-        remote = await this.resolveGitLabIssueSourceRemote(
-          repo.path,
-          repo.issueSourcePreference,
-          repo.connectionId ?? null,
-          localWorktreeGitOptions
-        )
-      } catch (error) {
-        return { error: error instanceof Error ? error.message : 'Could not resolve git remote.' }
-      }
-      const knownHosts = await getGlabKnownHosts(repo.connectionId ?? null)
-      const projectRef = await getGitLabProjectRefForRemote(
-        repo.path,
-        remote,
-        knownHosts,
-        repo.connectionId ?? null,
-        localWorktreeGitOptions
-      )
-      if (!projectRef) {
-        return { error: 'No GitLab project found for this repository.' }
-      }
-      const item = await getGitLabWorkItemByProjectRef(
-        repo.path,
-        projectRef,
-        args.mrIid,
-        'mr',
-        repo.connectionId ?? null,
-        localWorktreeGitOptions
-      )
-      if (!item || item.type !== 'mr') {
-        return { error: `MR !${args.mrIid} not found.` }
-      }
-      sourceBranch = (item.branchName ?? '').trim()
-      targetBranch = (item.baseRefName ?? '').trim()
-      if (!sourceBranch) {
-        return { error: `MR !${args.mrIid} has no source branch.` }
-      }
-      if (item.isCrossRepository === true) {
-        isCrossRepository = true
-      }
-    }
-
-    let remote: string
-    try {
-      remote = await this.resolveGitLabIssueSourceRemote(
-        repo.path,
-        repo.issueSourcePreference,
-        repo.connectionId ?? null,
-        localWorktreeGitOptions
-      )
-    } catch (error) {
-      return { error: error instanceof Error ? error.message : 'Could not resolve git remote.' }
-    }
-    const compareBaseRef = targetBranch ? `refs/remotes/${remote}/${targetBranch}` : undefined
-    const fetchRemoteTrackingRef = async (branch: string, ref: string): Promise<void> => {
-      await (sshGitProvider
-        ? sshGitProvider.fetchRemoteTrackingRef!(repo.path, remote, branch, ref)
-        : gitExec(['fetch', remote, `+refs/heads/${branch}:${ref}`]))
-    }
-    // Why: the target/compare branch is optional (it only powers the diff
-    // base). A merged MR may have had its target ref deleted, so a fetch
-    // failure must NOT abort the whole resolution — that would discard the
-    // already-verified source-branch base and silently fall back to the repo
-    // default branch. Degrade gracefully by dropping compareBaseRef instead.
-    const fetchCompareBaseRef = async (): Promise<boolean> => {
-      if (!targetBranch || !compareBaseRef) {
-        return false
-      }
-      try {
-        await fetchRemoteTrackingRef(targetBranch, compareBaseRef)
-        return true
-      } catch (error) {
-        console.warn('[runtime:resolveManagedMrBase] optional compare-base fetch failed', {
-          remote,
-          targetBranch,
-          mrIid: args.mrIid,
-          error: error instanceof Error ? error.message.split('\n')[0] : String(error)
-        })
-        return false
-      }
-    }
-
-    if (isCrossRepository) {
-      const mrRef = `refs/merge-requests/${args.mrIid}/head`
-      // Why: GitLab exposes fork MR heads on the target project, so mobile/SSH
-      // can match desktop without adding the contributor fork as a remote.
-      try {
-        await (sshGitProvider
-          ? sshGitProvider.fetchGitLabMergeRequestHead!(repo.path, remote, args.mrIid)
-          : gitExec(['fetch', remote, mrRef]))
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        return { error: `Failed to fetch ${mrRef}: ${message.split('\n')[0]}` }
-      }
-      let sha: string
-      try {
-        const { stdout } = await gitExec(['rev-parse', '--verify', 'FETCH_HEAD'])
-        sha = stdout.trim()
-      } catch {
-        return { error: `Could not resolve fork MR !${args.mrIid} head after fetch.` }
-      }
-      if (!sha) {
-        return { error: `Empty SHA resolving fork MR !${args.mrIid} head.` }
-      }
-      const compareBaseFetched = await fetchCompareBaseRef()
-      return { baseBranch: sha, ...(compareBaseFetched ? { compareBaseRef } : {}) }
-    }
-
-    try {
-      await fetchRemoteTrackingRef(sourceBranch, `refs/remotes/${remote}/${sourceBranch}`)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      return { error: `Failed to fetch ${remote}/${sourceBranch}: ${message.split('\n')[0]}` }
-    }
-
-    const remoteRef = `${remote}/${sourceBranch}`
-    try {
-      await gitExec(['rev-parse', '--verify', remoteRef])
-    } catch {
-      return { error: `Remote ref ${remoteRef} does not exist after fetch.` }
-    }
-    const compareBaseFetched = await fetchCompareBaseRef()
-    return {
-      baseBranch: remoteRef,
-      ...(compareBaseFetched ? { compareBaseRef } : {}),
-      pushTarget: { remoteName: remote, branchName: sourceBranch }
-    }
-  }
-
-  private async resolveGitLabIssueSourceRemote(
-    repoPath: string,
-    preference?: Repo['issueSourcePreference'],
-    connectionId?: string | null,
-    localGitOptions: { wslDistro?: string } = {}
-  ): Promise<string> {
-    const knownHosts = await getGlabKnownHosts(connectionId)
-    const localGitOptionArgs =
-      Object.keys(localGitOptions).length > 0 ? ([localGitOptions] as const) : []
-    if (preference === 'origin') {
-      const origin = await getGitLabProjectRefForRemote(
-        repoPath,
-        'origin',
-        knownHosts,
-        connectionId,
-        ...localGitOptionArgs
-      )
-      if (origin) {
-        return 'origin'
-      }
-      throw new Error('No GitLab project found for origin.')
-    }
-    if (preference === 'upstream') {
-      const upstream = await getGitLabProjectRefForRemote(
-        repoPath,
-        'upstream',
-        knownHosts,
-        connectionId,
-        ...localGitOptionArgs
-      )
-      if (upstream) {
-        return 'upstream'
-      }
-      const origin = await getGitLabProjectRefForRemote(
-        repoPath,
-        'origin',
-        knownHosts,
-        connectionId,
-        ...localGitOptionArgs
-      )
-      if (origin) {
-        return 'origin'
-      }
-      throw new Error('No GitLab project found for upstream or origin.')
-    }
-    const upstream = await getGitLabProjectRefForRemote(
-      repoPath,
-      'upstream',
-      knownHosts,
-      connectionId,
-      ...localGitOptionArgs
+  probeWorktreeDrift: RuntimeWorktreeBaseStatusCommands['probeWorktreeDrift'] =
+    this.worktreeBaseStatusCommands.probeWorktreeDrift.bind(this.worktreeBaseStatusCommands)
+  updateManagedWorktreeMeta: RuntimeWorktreeBaseStatusCommands['updateManagedWorktreeMeta'] =
+    this.worktreeBaseStatusCommands.updateManagedWorktreeMeta.bind(this.worktreeBaseStatusCommands)
+  persistManagedWorktreeSortOrder: RuntimeWorktreeBaseStatusCommands['persistManagedWorktreeSortOrder'] =
+    this.worktreeBaseStatusCommands.persistManagedWorktreeSortOrder.bind(
+      this.worktreeBaseStatusCommands
     )
-    if (upstream) {
-      return 'upstream'
-    }
-    const origin = await getGitLabProjectRefForRemote(
-      repoPath,
-      'origin',
-      knownHosts,
-      connectionId,
-      ...localGitOptionArgs
-    )
-    if (origin) {
-      return 'origin'
-    }
-    if (connectionId) {
-      const provider = requireRemoteGitProvider(connectionId)
-      const { stdout } = await provider.exec(['remote'], repoPath)
-      const remotes = stdout
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-      if (remotes.includes('origin')) {
-        return 'origin'
-      }
-      if (remotes.length === 1) {
-        return remotes[0]!
-      }
-      if (remotes.length === 0) {
-        throw new Error('Repo has no configured git remotes.')
-      }
-      throw new Error(
-        `Repo has multiple remotes (${remotes.join(', ')}) and no default is configured.`
-      )
-    }
-    return getDefaultRemote(repoPath, localGitOptions)
-  }
+  resolveManagedPrBase: RuntimeWorktreeBaseStatusCommands['resolveManagedPrBase'] =
+    this.worktreeBaseStatusCommands.resolveManagedPrBase.bind(this.worktreeBaseStatusCommands)
+  resolveManagedMrBase: RuntimeWorktreeBaseStatusCommands['resolveManagedMrBase'] =
+    this.worktreeBaseStatusCommands.resolveManagedMrBase.bind(this.worktreeBaseStatusCommands)
 
   private readonly branchCleanupCommands = new RuntimeBranchCleanupCommands({
     getStore: () => this.store,
@@ -17257,7 +16631,6 @@ const DEFAULT_WORKTREE_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_PS_LIMIT = 200
 const DISCONNECTED_PTY_RECORD_MAX = 128
 const PTY_CONTROLLER_LIST_TIMEOUT_MS = 3000
-const DRIFT_PROBE_SUBJECT_LIMIT = 5
 
 function getExplicitWorktreeIdSelector(selector: string | undefined): string | null {
   if (!selector?.startsWith('id:')) {
