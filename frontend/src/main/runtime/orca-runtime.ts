@@ -31,17 +31,14 @@ import { RuntimeHeadlessTerminalCommands } from './orca-runtime-headless-termina
 import { RuntimeWorktreeLineageCommands } from './orca-runtime-worktree-lineage'
 import { RuntimeBrowserScreencastCommands } from './orca-runtime-browser-screencast'
 import { RuntimePtyTitleTrackerCommands } from './orca-runtime-pty-title-tracker'
+import { RuntimeTerminalSideEffectsCommands } from './orca-runtime-terminal-side-effects'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
   isCursorAgentTitle,
-  isCursorNativeAgentTitle,
-  isShellProcess,
-  normalizeTerminalTitle
+  isShellProcess
 } from '../../shared/agent-detection'
 import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
-import { extractLastOsc7Uri, extractOscScanTail } from '../daemon/osc7-uri-extraction'
-import { parseFileUriPathParts } from '../daemon/osc7-file-uri'
 import type { AgentStatus } from '../../shared/agent-detection'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { TerminalTitleTracker } from '../../shared/terminal-output-side-effects'
@@ -57,10 +54,7 @@ import {
   type AgentStatusEntry
 } from '../../shared/agent-status-types'
 import { hasCompatibleAgentTitleIdentity } from '../../shared/agent-title-owner'
-import {
-  createAgentStatusOscProcessor,
-  type ProcessedAgentStatusChunk
-} from '../../shared/agent-status-osc'
+import type { ProcessedAgentStatusChunk } from '../../shared/agent-status-osc'
 import { buildOrchestrationTaskDisplayMetadata } from '../../shared/orchestration-task-display'
 import { iterateTerminalInputChunks } from '../../shared/terminal-input'
 import {
@@ -244,7 +238,7 @@ import {
   createMobileSessionTabsNotifyCoalescer,
   type MobileSessionTabsNotifyCoalescer
 } from './mobile-session-tabs-notify-coalescer'
-import type { IPtyProvider, PtyTransientFact } from '../providers/types'
+import type { IPtyProvider } from '../providers/types'
 import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
   assertFolderWorkspacePathUsable,
@@ -2281,214 +2275,6 @@ export class OrcaRuntimeService {
       this.ptyWaitBlockedCheckCommands
     )
 
-  private processAgentStatusOscForPty(ptyId: string, data: string): ProcessedAgentStatusChunk {
-    let processor = this.ptyTranscripts.agentStatusOscProcessorsByPtyId.get(ptyId)
-    if (!processor) {
-      processor = createAgentStatusOscProcessor()
-      this.ptyTranscripts.agentStatusOscProcessorsByPtyId.set(ptyId, processor)
-    }
-    return processor(data)
-  }
-
-  /** Emit the facts batched while applying one chunk/frame as a single
-   *  pty:sideEffect batch, preserving byte order. */
-  private flushPendingTerminalSideEffectFacts(
-    ptyId: string,
-    entry: RuntimePtyTitleTrackerEntry
-  ): void {
-    if (entry.pendingFacts.length === 0) {
-      return
-    }
-    const facts = entry.pendingFacts
-    entry.pendingFacts = []
-    this.emitTerminalSideEffectBatch(ptyId, facts)
-  }
-
-  /** Feed a main-fabricated OSC title/BEL frame (agent hook spinners) through
-   *  the per-PTY tracker — NOT onPtyData, so emulator state, tails,
-   *  transcripts, and stats never see synthetic bytes. Parsed via the
-   *  tracker's stateless synthetic path: the shared chunk bell detector must
-   *  never observe fabricated bytes, or a tick interleaved with a split real
-   *  OSC corrupts its escape state (phantom/swallowed bells). While the
-   *  side-effect kill switch is off the legacy pty:data copy still drives
-   *  renderer parsers; this ingest keeps main's facts and records
-   *  authoritative. */
-  ingestSyntheticTitleFrame(ptyId: string, data: string): void {
-    const entry = this.getOrCreatePtyTitleTrackerEntry(ptyId)
-    entry.applyingChunk = true
-    entry.applyingSyntheticFrame = true
-    entry.chunkTouchedSessionTabs = false
-    try {
-      entry.tracker.applySyntheticTitleFrame(data)
-    } finally {
-      entry.applyingChunk = false
-      entry.applyingSyntheticFrame = false
-      this.flushPendingTerminalSideEffectFacts(ptyId, entry)
-    }
-    if (entry.chunkTouchedSessionTabs) {
-      this.touchMobileSessionSnapshotsForPty(ptyId)
-    }
-  }
-
-  /** Scan-authority handoff for a backgrounded PTY (daemon keep-tail
-   *  thinning): while delegated, the daemon relays bell/133/pr-link/2031
-   *  facts itself and the delivered bytes may be gapped — feeding them to
-   *  main's transient scanners would mint phantom or duplicate facts. Title
-   *  processing stays main-side either way. */
-  setPtyTransientFactDelegation(ptyId: string, delegated: boolean, scanSeedAnsi?: string): void {
-    const entry = this.getOrCreatePtyTitleTrackerEntry(ptyId)
-    entry.tracker.setTransientFactScanningSuppressed(delegated)
-    if (!delegated && scanSeedAnsi) {
-      // Prime the freshly reset scanner carry with the emulator's dangling
-      // incomplete escape at the handoff position — a sequence split across
-      // the un-background toggle must not mint a phantom bell or lose its
-      // fact. titleScanData:'' keeps titles out (they were never suppressed).
-      entry.tracker.handleChunk(scanSeedAnsi, { titleScanData: '' })
-    }
-  }
-
-  /** A transient fact the daemon detected while it held scan authority —
-   *  emitted through the same fact channel as byte-scanned facts. Arrives
-   *  between chunks, so recordTerminalSideEffectFact emits it immediately. */
-  emitDaemonPtyTransientFact(ptyId: string, fact: PtyTransientFact): void {
-    switch (fact.kind) {
-      case 'bell':
-        this.recordTerminalSideEffectFact(ptyId, { kind: 'bell' })
-        return
-      case 'command-finished':
-        this.recordTerminalSideEffectFact(ptyId, {
-          kind: 'command-finished',
-          exitCode: fact.exitCode
-        })
-        return
-      case 'pr-link':
-        this.recordTerminalSideEffectFact(ptyId, { kind: 'pr-link', link: fact.link })
-        return
-      case '2031-subscribe':
-        this.recordTerminalSideEffectFact(ptyId, { kind: '2031-subscribe' })
-    }
-  }
-
-  /** The daemon keep-tail dropped this PTY's oldest undelivered output; the
-   *  next delivered chunk is discontinuous. Reset every cross-chunk parse
-   *  carry so a half-open escape from before the gap cannot corrupt what
-   *  follows, and drop the mobile headless mirror — it rebuilds from the
-   *  delivered tail / snapshot seeds instead of parsing a gapped stream. */
-  notePtyDataGap(ptyId: string, droppedChars = 0): void {
-    if (droppedChars > 0) {
-      // Why: the daemon snapshot's seq counts bytes its monitoring stream
-      // dropped. Advancing without parsing preserves that absolute domain so
-      // post-snapshot live chunks can be reconciled instead of duplicated.
-      const outputSequence =
-        (this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0) + droppedChars
-      this.ptyTranscripts.ptyOutputSequenceById.set(ptyId, outputSequence)
-    }
-    const pty = this.getOrCreatePtyWorktreeRecord(ptyId)
-    if (pty) {
-      pty.tailPendingAnsi = ''
-    }
-    for (const leaf of this.getLeavesForPty(ptyId)) {
-      leaf.tailPendingAnsi = ''
-    }
-    this.ptyTranscripts.oscTitleScanTailByPtyId.delete(ptyId)
-    this.ptyTranscripts.osc7ScanTailByPtyId.delete(ptyId)
-    this.ptyTranscripts.agentStatusOscProcessorsByPtyId.delete(ptyId)
-    this.disposeHeadlessTerminal(ptyId)
-  }
-
-  /** Record one derived side-effect fact: batched per chunk while applying
-   *  bytes, emitted immediately for between-chunk facts (stale-title timer). */
-  private recordTerminalSideEffectFact(ptyId: string, fact: TerminalSideEffectFact): void {
-    if (!this.onTerminalSideEffects) {
-      return
-    }
-    const entry = this.ptyTranscripts.ptyTitleTrackersByPtyId.get(ptyId)
-    if (entry?.applyingChunk) {
-      entry.pendingFacts.push(fact)
-      return
-    }
-    this.emitTerminalSideEffectBatch(ptyId, [fact])
-  }
-
-  private emitTerminalSideEffectBatch(
-    ptyId: string,
-    facts: TerminalSideEffectFact[],
-    options: { replay?: boolean } = {}
-  ): void {
-    if (!this.onTerminalSideEffects || facts.length === 0) {
-      return
-    }
-    const batch: TerminalSideEffectBatch = {
-      ptyId,
-      seq: this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0,
-      facts,
-      ...(options.replay ? { replay: true } : {}),
-      ...this.resolveTerminalSideEffectAttribution(ptyId)
-    }
-    try {
-      this.onTerminalSideEffects(batch)
-    } catch (err) {
-      console.error('[runtime] terminal side-effect listener threw', { ptyId, err })
-    }
-  }
-
-  /** Same attribution resolution as emitTerminalAgentStatusEvents: prefer the
-   *  first mounted leaf, fall back to the spawn-time PTY record binding. */
-  private resolveTerminalSideEffectAttribution(ptyId: string): {
-    worktreeId?: string
-    tabId?: string
-    paneKey?: string
-    connectionId?: string | null
-  } {
-    const pty = this.graph.ptysById.get(ptyId)
-    const connectionId = pty?.connectionId ?? null
-    for (const leaf of this.getLeavesForPty(ptyId)) {
-      return {
-        worktreeId: leaf.worktreeId,
-        tabId: leaf.tabId,
-        paneKey: this.makeRuntimePaneKey(leaf),
-        connectionId
-      }
-    }
-    if (pty?.paneKey) {
-      return {
-        worktreeId: pty.worktreeId,
-        ...(pty.tabId ? { tabId: pty.tabId } : {}),
-        paneKey: pty.paneKey,
-        connectionId
-      }
-    }
-    return {}
-  }
-
-  /** Title-only replay batch for renderer (re)attach — the no-attention-replay
-   *  rule: snapshots restore title state, never historical bells/completions. */
-  getTerminalSideEffectSnapshot(ptyId: string): TerminalSideEffectBatch | null {
-    const tracker = this.ptyTranscripts.ptyTitleTrackersByPtyId.get(ptyId)?.tracker
-    const recordTitle = this.graph.ptysById.get(ptyId)?.lastOscTitle
-    // Why: the cursor-agent literal drop applies to every title surface; a
-    // record-fallback snapshot must not replay the bare native title the
-    // tracker would have refused to emit live.
-    const rawTitle = recordTitle && !isCursorNativeAgentTitle(recordTitle) ? recordTitle : null
-    const normalizedTitle = tracker?.getLastNormalizedTitle() ?? null
-    if (normalizedTitle === null && !rawTitle) {
-      return null
-    }
-    return {
-      ptyId,
-      seq: this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0,
-      replay: true,
-      facts: [
-        {
-          kind: 'title',
-          normalizedTitle: normalizedTitle ?? normalizeTerminalTitle(rawTitle!),
-          rawTitle: rawTitle ?? normalizedTitle!
-        }
-      ],
-      ...this.resolveTerminalSideEffectAttribution(ptyId)
-    }
-  }
-
   private readonly ptyTitleTrackerCommands = new RuntimePtyTitleTrackerCommands({
     getGraph: () => this.graph,
     getPtyTranscripts: () => this.ptyTranscripts,
@@ -2526,62 +2312,53 @@ export class OrcaRuntimeService {
   disposePtyTitleTracker: RuntimePtyTitleTrackerCommands['disposePtyTitleTracker'] =
     this.ptyTitleTrackerCommands.disposePtyTitleTracker.bind(this.ptyTitleTrackerCommands)
 
-  private extractLastOsc7CwdForPty(
-    ptyId: string,
-    data: string
-  ): { path: string; hostname: string } | null {
-    const previousTail = this.ptyTranscripts.osc7ScanTailByPtyId.get(ptyId)
-    if (!previousTail && !data.includes('\x1b]7;')) {
-      return null
-    }
-    const input = `${previousTail ?? ''}${data}`
-    const scanTail = extractOscScanTail(input, 4096)
-    if (scanTail.length > 0) {
-      this.ptyTranscripts.osc7ScanTailByPtyId.set(ptyId, scanTail)
-    } else {
-      this.ptyTranscripts.osc7ScanTailByPtyId.delete(ptyId)
-    }
-    const uri = extractLastOsc7Uri(input)
-    const pty = this.graph.ptysById.get(ptyId)
-    const pathFlavor = this.pathFlavorForPty(pty)
-    return uri
-      ? parseFileUriPathParts(uri, {
-          pathFlavor,
-          remotePosixAuthority: !!pty?.connectionId && pathFlavor !== 'win32'
-        })
-      : null
-  }
+  private readonly terminalSideEffectsCommands = new RuntimeTerminalSideEffectsCommands({
+    getGraph: () => this.graph,
+    getPtyTranscripts: () => this.ptyTranscripts,
+    getOnTerminalSideEffects: () => this.onTerminalSideEffects,
+    getLeavesForPty: (ptyId) => this.getLeavesForPty(ptyId),
+    getOrCreatePtyTitleTrackerEntry: (ptyId) => this.getOrCreatePtyTitleTrackerEntry(ptyId),
+    getOrCreatePtyWorktreeRecord: (ptyId) => this.getOrCreatePtyWorktreeRecord(ptyId),
+    makeRuntimePaneKey: (leaf) => this.makeRuntimePaneKey(leaf),
+    touchMobileSessionSnapshotsForPty: (ptyId, options) =>
+      this.touchMobileSessionSnapshotsForPty(ptyId, options),
+    disposeHeadlessTerminal: (ptyId) => this.disposeHeadlessTerminal(ptyId)
+  })
 
-  private recordOsc7MetadataForPty(
-    ptyId: string,
-    data: string
-  ): { cwd: string | null; cwdChanged: boolean } {
-    const osc7 = this.extractLastOsc7CwdForPty(ptyId, data)
-    const cwd = osc7?.path ?? null
-    const cwdChanged =
-      cwd !== null &&
-      cwd.trim().length > 0 &&
-      this.ptyTranscripts.terminalCwdByPtyId.get(ptyId) !== cwd
-    if (cwdChanged) {
-      this.ptyTranscripts.terminalCwdByPtyId.set(ptyId, cwd)
-    }
-    if (osc7) {
-      if (osc7.hostname) {
-        this.ptyTranscripts.terminalFileUriHostnameByPtyId.set(ptyId, osc7.hostname)
-      } else {
-        this.ptyTranscripts.terminalFileUriHostnameByPtyId.delete(ptyId)
-      }
-    }
-    return { cwd, cwdChanged }
-  }
-
-  private pathFlavorForPty(pty?: RuntimePtyWorktreeRecord | null): 'posix' | 'win32' {
-    if (!pty?.connectionId) {
-      return process.platform === 'win32' ? 'win32' : 'posix'
-    }
-    const worktreePath = splitWorktreeIdForFilesystem(pty.worktreeId)?.worktreePath
-    return worktreePath && isWindowsAbsolutePathLike(worktreePath) ? 'win32' : 'posix'
-  }
+  processAgentStatusOscForPty: RuntimeTerminalSideEffectsCommands['processAgentStatusOscForPty'] =
+    this.terminalSideEffectsCommands.processAgentStatusOscForPty.bind(
+      this.terminalSideEffectsCommands
+    )
+  flushPendingTerminalSideEffectFacts: RuntimeTerminalSideEffectsCommands['flushPendingTerminalSideEffectFacts'] =
+    this.terminalSideEffectsCommands.flushPendingTerminalSideEffectFacts.bind(
+      this.terminalSideEffectsCommands
+    )
+  ingestSyntheticTitleFrame: RuntimeTerminalSideEffectsCommands['ingestSyntheticTitleFrame'] =
+    this.terminalSideEffectsCommands.ingestSyntheticTitleFrame.bind(
+      this.terminalSideEffectsCommands
+    )
+  setPtyTransientFactDelegation: RuntimeTerminalSideEffectsCommands['setPtyTransientFactDelegation'] =
+    this.terminalSideEffectsCommands.setPtyTransientFactDelegation.bind(
+      this.terminalSideEffectsCommands
+    )
+  emitDaemonPtyTransientFact: RuntimeTerminalSideEffectsCommands['emitDaemonPtyTransientFact'] =
+    this.terminalSideEffectsCommands.emitDaemonPtyTransientFact.bind(
+      this.terminalSideEffectsCommands
+    )
+  notePtyDataGap: RuntimeTerminalSideEffectsCommands['notePtyDataGap'] =
+    this.terminalSideEffectsCommands.notePtyDataGap.bind(this.terminalSideEffectsCommands)
+  recordTerminalSideEffectFact: RuntimeTerminalSideEffectsCommands['recordTerminalSideEffectFact'] =
+    this.terminalSideEffectsCommands.recordTerminalSideEffectFact.bind(
+      this.terminalSideEffectsCommands
+    )
+  getTerminalSideEffectSnapshot: RuntimeTerminalSideEffectsCommands['getTerminalSideEffectSnapshot'] =
+    this.terminalSideEffectsCommands.getTerminalSideEffectSnapshot.bind(
+      this.terminalSideEffectsCommands
+    )
+  recordOsc7MetadataForPty: RuntimeTerminalSideEffectsCommands['recordOsc7MetadataForPty'] =
+    this.terminalSideEffectsCommands.recordOsc7MetadataForPty.bind(this.terminalSideEffectsCommands)
+  pathFlavorForPty: RuntimeTerminalSideEffectsCommands['pathFlavorForPty'] =
+    this.terminalSideEffectsCommands.pathFlavorForPty.bind(this.terminalSideEffectsCommands)
 
   /** Returns true when any retained agent-row snapshot changed in a
    *  client-visible way, so the caller can republish session snapshots. */
