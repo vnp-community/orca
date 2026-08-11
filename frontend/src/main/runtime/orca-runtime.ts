@@ -11,6 +11,7 @@ import { RuntimeMobileFloorCommands } from './orca-runtime-mobile-floor'
 import { RuntimeIssueTrackingCommands } from './orca-runtime-issue-tracking'
 import { RuntimeRepoHooksCommands } from './orca-runtime-repo-hooks'
 import { RuntimeLinearCommands } from './orca-runtime-linear'
+import { RuntimeJiraCommands } from './orca-runtime-jira'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -110,11 +111,6 @@ import type {
   WorktreeBaseStatusEvent,
   WorktreeRemoteBranchConflictEvent,
   WorktreeStartupLaunch,
-  JiraConnectArgs,
-  JiraCreateIssueArgs,
-  JiraIssueFilter,
-  JiraIssueUpdate,
-  JiraSiteSelection,
   NestedRepoScanResult,
   ProjectGroup,
   FolderWorkspace,
@@ -337,29 +333,6 @@ import {
   resolveLocalProjectRuntimeForRepo
 } from '../project-runtime-git-options'
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
-import {
-  connect as connectJira,
-  disconnect as disconnectJira,
-  getStatus as getJiraStatus,
-  selectSite as selectJiraSite,
-  testConnection as testJiraConnection
-} from '../jira/client'
-import {
-  addIssueComment as addJiraIssueComment,
-  createIssue as createJiraIssue,
-  getIssue as getJiraIssue,
-  getIssueComments as getJiraIssueComments,
-  getProjectStatusOrder as getJiraProjectStatusOrder,
-  listAssignableUsers as listJiraAssignableUsers,
-  listCreateFields as listJiraCreateFields,
-  listIssueTypes as listJiraIssueTypes,
-  listIssues as listJiraIssues,
-  listPriorities as listJiraPriorities,
-  listProjects as listJiraProjects,
-  listTransitions as listJiraTransitions,
-  searchIssues as searchJiraIssues,
-  updateIssue as updateJiraIssue
-} from '../jira/issues'
 import {
   getBaseRefDefault,
   getDefaultRemote,
@@ -17237,114 +17210,54 @@ export class OrcaRuntimeService {
   linearUpdateIssue: RuntimeLinearCommands['linearUpdateIssue'] =
     this.linearCommands.linearUpdateIssue.bind(this.linearCommands)
 
-  // ── Jira integration ──
+  private readonly jiraCommands = new RuntimeJiraCommands()
 
-  jiraConnect(args: JiraConnectArgs): ReturnType<typeof connectJira> {
-    return connectJira(args)
-  }
-
-  jiraDisconnect(siteId?: string): { ok: true } {
-    disconnectJira(siteId)
-    return { ok: true }
-  }
-
-  jiraSelectSite(siteId: JiraSiteSelection): ReturnType<typeof getJiraStatus> {
-    return selectJiraSite(siteId)
-  }
-
-  jiraStatus(): ReturnType<typeof getJiraStatus> {
-    return getJiraStatus()
-  }
-
-  jiraTestConnection(siteId?: string): ReturnType<typeof testJiraConnection> {
-    return testJiraConnection(siteId)
-  }
-
-  jiraSearchIssues(
-    jql: string,
-    limit = 30,
-    siteId?: JiraSiteSelection
-  ): ReturnType<typeof searchJiraIssues> {
-    return searchJiraIssues(jql, Math.min(Math.max(1, limit), 100), siteId)
-  }
-
-  jiraListIssues(
-    filter?: JiraIssueFilter,
-    limit = 30,
-    siteId?: JiraSiteSelection
-  ): ReturnType<typeof listJiraIssues> {
-    return listJiraIssues(filter, Math.min(Math.max(1, limit), 100), siteId)
-  }
-
-  jiraCreateIssue(args: JiraCreateIssueArgs): ReturnType<typeof createJiraIssue> {
-    return createJiraIssue(args)
-  }
-
-  jiraGetIssue(key: string, siteId?: string): ReturnType<typeof getJiraIssue> {
-    return getJiraIssue(key, siteId)
-  }
-
-  jiraUpdateIssue(
-    key: string,
-    updates: JiraIssueUpdate,
-    siteId?: string
-  ): ReturnType<typeof updateJiraIssue> {
-    return updateJiraIssue(key, updates, siteId)
-  }
-
-  jiraAddIssueComment(
-    key: string,
-    body: string,
-    siteId?: string
-  ): ReturnType<typeof addJiraIssueComment> {
-    return addJiraIssueComment(key, body, siteId)
-  }
-
-  jiraIssueComments(key: string, siteId?: string): ReturnType<typeof getJiraIssueComments> {
-    return getJiraIssueComments(key, siteId)
-  }
-
-  jiraListProjects(siteId?: JiraSiteSelection): ReturnType<typeof listJiraProjects> {
-    return listJiraProjects(siteId)
-  }
-
-  jiraListIssueTypes(
-    projectIdOrKey: string,
-    siteId?: string
-  ): ReturnType<typeof listJiraIssueTypes> {
-    return listJiraIssueTypes(projectIdOrKey, siteId)
-  }
-
-  jiraListCreateFields(
-    projectIdOrKey: string,
-    issueTypeId: string,
-    siteId?: string
-  ): ReturnType<typeof listJiraCreateFields> {
-    return listJiraCreateFields(projectIdOrKey, issueTypeId, siteId)
-  }
-
-  jiraListPriorities(siteId?: string): ReturnType<typeof listJiraPriorities> {
-    return listJiraPriorities(siteId)
-  }
-
-  jiraListAssignableUsers(
-    key: string,
-    query?: string,
-    siteId?: string
-  ): ReturnType<typeof listJiraAssignableUsers> {
-    return listJiraAssignableUsers(key, query, siteId)
-  }
-
-  jiraListTransitions(key: string, siteId?: string): ReturnType<typeof listJiraTransitions> {
-    return listJiraTransitions(key, siteId)
-  }
-
-  jiraGetProjectStatusOrder(
-    projectKey: string,
-    siteId?: string
-  ): ReturnType<typeof getJiraProjectStatusOrder> {
-    return getJiraProjectStatusOrder(projectKey, siteId)
-  }
+  jiraConnect: RuntimeJiraCommands['jiraConnect'] = this.jiraCommands.jiraConnect.bind(
+    this.jiraCommands
+  )
+  jiraDisconnect: RuntimeJiraCommands['jiraDisconnect'] = this.jiraCommands.jiraDisconnect.bind(
+    this.jiraCommands
+  )
+  jiraSelectSite: RuntimeJiraCommands['jiraSelectSite'] = this.jiraCommands.jiraSelectSite.bind(
+    this.jiraCommands
+  )
+  jiraStatus: RuntimeJiraCommands['jiraStatus'] = this.jiraCommands.jiraStatus.bind(
+    this.jiraCommands
+  )
+  jiraTestConnection: RuntimeJiraCommands['jiraTestConnection'] =
+    this.jiraCommands.jiraTestConnection.bind(this.jiraCommands)
+  jiraSearchIssues: RuntimeJiraCommands['jiraSearchIssues'] =
+    this.jiraCommands.jiraSearchIssues.bind(this.jiraCommands)
+  jiraListIssues: RuntimeJiraCommands['jiraListIssues'] = this.jiraCommands.jiraListIssues.bind(
+    this.jiraCommands
+  )
+  jiraCreateIssue: RuntimeJiraCommands['jiraCreateIssue'] = this.jiraCommands.jiraCreateIssue.bind(
+    this.jiraCommands
+  )
+  jiraGetIssue: RuntimeJiraCommands['jiraGetIssue'] = this.jiraCommands.jiraGetIssue.bind(
+    this.jiraCommands
+  )
+  jiraUpdateIssue: RuntimeJiraCommands['jiraUpdateIssue'] = this.jiraCommands.jiraUpdateIssue.bind(
+    this.jiraCommands
+  )
+  jiraAddIssueComment: RuntimeJiraCommands['jiraAddIssueComment'] =
+    this.jiraCommands.jiraAddIssueComment.bind(this.jiraCommands)
+  jiraIssueComments: RuntimeJiraCommands['jiraIssueComments'] =
+    this.jiraCommands.jiraIssueComments.bind(this.jiraCommands)
+  jiraListProjects: RuntimeJiraCommands['jiraListProjects'] =
+    this.jiraCommands.jiraListProjects.bind(this.jiraCommands)
+  jiraListIssueTypes: RuntimeJiraCommands['jiraListIssueTypes'] =
+    this.jiraCommands.jiraListIssueTypes.bind(this.jiraCommands)
+  jiraListCreateFields: RuntimeJiraCommands['jiraListCreateFields'] =
+    this.jiraCommands.jiraListCreateFields.bind(this.jiraCommands)
+  jiraListPriorities: RuntimeJiraCommands['jiraListPriorities'] =
+    this.jiraCommands.jiraListPriorities.bind(this.jiraCommands)
+  jiraListAssignableUsers: RuntimeJiraCommands['jiraListAssignableUsers'] =
+    this.jiraCommands.jiraListAssignableUsers.bind(this.jiraCommands)
+  jiraListTransitions: RuntimeJiraCommands['jiraListTransitions'] =
+    this.jiraCommands.jiraListTransitions.bind(this.jiraCommands)
+  jiraGetProjectStatusOrder: RuntimeJiraCommands['jiraGetProjectStatusOrder'] =
+    this.jiraCommands.jiraGetProjectStatusOrder.bind(this.jiraCommands)
 
   // ── Browser automation ──
 
