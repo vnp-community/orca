@@ -30,6 +30,14 @@ inline frontend/src/main/runtime/orca-runtime-branch-cleanup.ts
 # mobile-subscriber-tracking) is a separate, un-tracked refactor candidate —
 # not addressed here to keep this a pure Move; see TASK-BIGFILE-037's task doc.
 inline frontend/src/main/runtime/orca-runtime-mobile-floor.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-042, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's GitHub/GitLab issue-tracking + hosted-review
+# command-wrapper method block, already covered by orca-runtime.ts's own
+# grandfathered max-lines disable before this move. Jira wrapper methods and
+# repo hooks/setup-script inspection (both textually adjacent) are explicitly
+# out of scope — left for follow-on tasks; see TASK-BIGFILE-042's task doc.
+inline frontend/src/main/runtime/orca-runtime-issue-tracking.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
