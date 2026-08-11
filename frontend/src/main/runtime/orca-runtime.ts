@@ -33,6 +33,7 @@ import { RuntimeBrowserScreencastCommands } from './orca-runtime-browser-screenc
 import { RuntimePtyTitleTrackerCommands } from './orca-runtime-pty-title-tracker'
 import { RuntimeTerminalSideEffectsCommands } from './orca-runtime-terminal-side-effects'
 import { RuntimeAgentRowSnapshotCommands } from './orca-runtime-agent-row-snapshot'
+import { RuntimeTerminalListingCommands } from './orca-runtime-terminal-listing'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -87,8 +88,6 @@ import type {
   WorktreeStartupLaunch,
   FolderWorkspace,
   MemorySnapshot,
-  TabGroupLayoutNode,
-  TerminalPaneLayoutNode,
   TuiAgent
 } from '../../shared/types'
 import type { SleepingAgentLaunchConfig } from '../../shared/agent-session-resume'
@@ -169,7 +168,6 @@ import type {
   RuntimeTerminalSplit,
   RuntimeTerminalFocus,
   RuntimeTerminalClose,
-  RuntimeTerminalListResult,
   RuntimeTerminalResolvePane,
   RuntimeStatus,
   RuntimeSyncWindowGraphResult,
@@ -179,16 +177,10 @@ import type {
   RuntimeWorktreeAgentRow,
   RuntimeTerminalShow,
   RuntimeTerminalSummary,
-  RuntimeTerminalVisualGroupNode,
-  RuntimeTerminalVisualLayout,
-  RuntimeTerminalVisualLayoutNode,
-  RuntimeTerminalVisualPaneNode,
-  RuntimeTerminalVisualTab,
   RuntimeSyncedLeaf,
   RuntimeMarkdownReadTabResult,
   RuntimeMarkdownSaveTabResult,
   RuntimeMobileSessionTabMove,
-  RuntimeMobileSessionTerminalTab,
   RuntimeMobileSessionTabsResult,
   RuntimeMobileSessionTabsSnapshot,
   RuntimeBrowserDriverState,
@@ -283,7 +275,6 @@ import {
   getLeafWorktreeStatus,
   getSavedTabWorktreeStatus,
   getTerminalState,
-  includeTargetResolvedWorktree,
   inferWorktreeIdFromPtyId,
   isKnownReadyPromptPreview,
   mapExplicitAgentStateToRuntimeTerminalStatus,
@@ -2951,343 +2942,28 @@ export class OrcaRuntimeService {
     }
   }
 
-  async listTerminals(
-    worktreeSelector?: string,
-    limit = DEFAULT_TERMINAL_LIST_LIMIT,
-    opts: { requireFreshPtyLiveness?: boolean } = {}
-  ): Promise<RuntimeTerminalListResult> {
-    if (!Number.isInteger(limit) || limit <= 0) {
-      throw new Error('invalid_limit')
-    }
-    const graphEpoch = this.graph.graphStatus === 'ready' ? this.graph.rendererGraphEpoch : null
-    const explicitTargetWorktreeId = worktreeSelector
-      ? this.getValidatedExplicitWorktreeIdSelector(worktreeSelector)
-      : null
-    const initialResolvedWorktreeCache = this.resolvedWorktreeCommands.peekCache()
-    const cachedResolvedWorktrees =
-      initialResolvedWorktreeCache && initialResolvedWorktreeCache.expiresAt > Date.now()
-        ? initialResolvedWorktreeCache.worktrees
-        : null
-    const cachedExplicitTargetWorktree =
-      explicitTargetWorktreeId && cachedResolvedWorktrees
-        ? (cachedResolvedWorktrees.find((worktree) => worktree.id === explicitTargetWorktreeId) ??
-          null)
-        : null
-    const parsedExplicitTargetWorktree =
-      explicitTargetWorktreeId && !cachedExplicitTargetWorktree
-        ? this.buildResolvedWorktreeFromId(explicitTargetWorktreeId)
-        : null
-    const targetWorktree =
-      worktreeSelector && !explicitTargetWorktreeId
-        ? await this.resolveWorktreeSelector(worktreeSelector)
-        : (cachedExplicitTargetWorktree ?? parsedExplicitTargetWorktree)
-    const targetWorktreeId = explicitTargetWorktreeId ?? targetWorktree?.id ?? null
-    const classificationResolvedWorktreeCache = this.resolvedWorktreeCommands.peekCache()
-    const classificationResolvedWorktrees =
-      targetWorktreeId &&
-      classificationResolvedWorktreeCache &&
-      classificationResolvedWorktreeCache.expiresAt > Date.now()
-        ? includeTargetResolvedWorktree(
-            classificationResolvedWorktreeCache.worktrees,
-            targetWorktree
-          )
-        : targetWorktreeId && explicitTargetWorktreeId
-          ? this.listKnownResolvedWorktreesForExplicitTarget(targetWorktreeId, targetWorktree)
-          : null
-    const worktreesById =
-      targetWorktreeId && targetWorktree
-        ? new Map([[targetWorktree.id, targetWorktree]])
-        : targetWorktreeId
-          ? new Map()
-          : await this.getResolvedWorktreeMap()
-    if (graphEpoch !== null) {
-      this.assertStableReadyGraph(graphEpoch)
-    }
+  private readonly terminalListingCommands = new RuntimeTerminalListingCommands({
+    getGraph: () => this.graph,
+    getLeafKey: (tabId, leafId) => this.getLeafKey(tabId, leafId),
+    peekResolvedWorktreeCache: () => this.resolvedWorktreeCommands.peekCache(),
+    getMobileSessionTabsByWorktree: () => this.mobileSessionTabsByWorktree,
+    resolveWorktreeSelector: (selector) => this.resolveWorktreeSelector(selector),
+    refreshPtyWorktreeRecordsFromController: (resolvedWorktrees, targetWorktreeId) =>
+      this.refreshPtyWorktreeRecordsFromController(resolvedWorktrees, targetWorktreeId),
+    listKnownResolvedWorktreesForExplicitTarget: (targetWorktreeId, targetWorktree) =>
+      this.listKnownResolvedWorktreesForExplicitTarget(targetWorktreeId, targetWorktree),
+    getValidatedExplicitWorktreeIdSelector: (selector) =>
+      this.getValidatedExplicitWorktreeIdSelector(selector),
+    getResolvedWorktreeMap: () => this.getResolvedWorktreeMap(),
+    buildTerminalSummary: (leaf, worktreesById) => this.buildTerminalSummary(leaf, worktreesById),
+    buildResolvedWorktreeFromId: (worktreeId) => this.buildResolvedWorktreeFromId(worktreeId),
+    buildPtyTerminalSummary: (pty, worktreesById) =>
+      this.buildPtyTerminalSummary(pty, worktreesById),
+    assertStableReadyGraph: (expectedGraphEpoch) => this.assertStableReadyGraph(expectedGraphEpoch)
+  })
 
-    const resolvedWorktrees =
-      targetWorktreeId && classificationResolvedWorktrees
-        ? classificationResolvedWorktrees
-        : targetWorktreeId && targetWorktree
-          ? [targetWorktree]
-          : targetWorktreeId
-            ? []
-            : [...worktreesById.values()]
-    const refreshedPtyLiveness = await this.refreshPtyWorktreeRecordsFromController(
-      resolvedWorktrees,
-      targetWorktreeId
-    )
-    if (opts.requireFreshPtyLiveness && !refreshedPtyLiveness) {
-      throw new Error('terminal_liveness_unavailable')
-    }
-
-    const livePtyWorktreeIds = new Set<string>()
-    for (const pty of this.graph.ptysById.values()) {
-      if (pty.connected) {
-        livePtyWorktreeIds.add(pty.worktreeId)
-      }
-    }
-
-    const terminals: RuntimeTerminalSummary[] = []
-    const ptyIdsFromLeaves = new Set<string>()
-    if (graphEpoch !== null) {
-      for (const leaf of this.graph.leaves.values()) {
-        if (targetWorktreeId && leaf.worktreeId !== targetWorktreeId) {
-          continue
-        }
-        if (opts.requireFreshPtyLiveness && leaf.ptyId && !refreshedPtyLiveness?.has(leaf.ptyId)) {
-          continue
-        }
-        if (!leaf.ptyId && livePtyWorktreeIds.has(leaf.worktreeId)) {
-          continue
-        }
-        if (leaf.ptyId) {
-          ptyIdsFromLeaves.add(leaf.ptyId)
-        }
-        terminals.push(this.buildTerminalSummary(leaf, worktreesById))
-      }
-    }
-
-    // Why: worktree.ps can classify active worktrees from PTY records even when
-    // the renderer graph is missing a leaf. terminal.list needs the same fallback
-    // so mobile does not show a false "No terminals" create flow.
-    for (const pty of this.graph.ptysById.values()) {
-      if (!pty.connected || ptyIdsFromLeaves.has(pty.ptyId)) {
-        continue
-      }
-      if (opts.requireFreshPtyLiveness && !refreshedPtyLiveness?.has(pty.ptyId)) {
-        continue
-      }
-      if (targetWorktreeId && pty.worktreeId !== targetWorktreeId) {
-        continue
-      }
-      terminals.push(this.buildPtyTerminalSummary(pty, worktreesById))
-    }
-
-    const listedTerminals = terminals.slice(0, limit)
-    const visualLayouts = this.buildTerminalVisualLayouts(
-      listedTerminals,
-      worktreesById,
-      targetWorktreeId
-    )
-
-    return {
-      terminals: listedTerminals,
-      ...(visualLayouts.length > 0 ? { visualLayouts } : {}),
-      totalCount: terminals.length,
-      truncated: terminals.length > limit
-    }
-  }
-
-  private buildTerminalVisualLayouts(
-    terminals: RuntimeTerminalSummary[],
-    worktreesById: Map<string, ResolvedWorktree>,
-    targetWorktreeId: string | null
-  ): RuntimeTerminalVisualLayout[] {
-    if (terminals.length === 0) {
-      return []
-    }
-    // Why: the mobile/session snapshot supplies topology, but terminal.list
-    // must print the same handles in both the flat list and visual tree.
-    const summariesByLeafKey = new Map(
-      terminals.map((terminal) => [this.getLeafKey(terminal.tabId, terminal.leafId), terminal])
-    )
-    const summariesByWorktree = new Map<string, RuntimeTerminalSummary[]>()
-    for (const terminal of terminals) {
-      const existing = summariesByWorktree.get(terminal.worktreeId)
-      if (existing) {
-        existing.push(terminal)
-      } else {
-        summariesByWorktree.set(terminal.worktreeId, [terminal])
-      }
-    }
-    const snapshots = targetWorktreeId
-      ? [this.mobileSessionTabsByWorktree.get(targetWorktreeId)].filter(
-          (snapshot): snapshot is RuntimeMobileSessionTabsSnapshot => snapshot !== undefined
-        )
-      : [...this.mobileSessionTabsByWorktree.values()]
-    const layouts: RuntimeTerminalVisualLayout[] = []
-    for (const snapshot of snapshots) {
-      const worktreeTerminals = summariesByWorktree.get(snapshot.worktree)
-      if (!worktreeTerminals || worktreeTerminals.length === 0) {
-        continue
-      }
-      const groups = this.buildTerminalVisualGroups(snapshot, summariesByLeafKey)
-      if (groups.length === 0) {
-        continue
-      }
-      const groupsById = new Map(
-        groups
-          .filter((group): group is RuntimeTerminalVisualGroupNode & { groupId: string } =>
-            Boolean(group.groupId)
-          )
-          .map((group) => [group.groupId, group])
-      )
-      const root =
-        this.buildTerminalVisualGroupLayout(snapshot.tabGroupLayout, groupsById) ?? groups[0]
-      if (!root) {
-        continue
-      }
-      const worktree = worktreesById.get(snapshot.worktree)
-      layouts.push({
-        worktreeId: snapshot.worktree,
-        worktreePath: worktree?.path ?? worktreeTerminals[0]?.worktreePath ?? '',
-        root
-      })
-    }
-    return layouts
-  }
-
-  private buildTerminalVisualGroups(
-    snapshot: RuntimeMobileSessionTabsSnapshot,
-    summariesByLeafKey: ReadonlyMap<string, RuntimeTerminalSummary>
-  ): RuntimeTerminalVisualGroupNode[] {
-    const terminalTabs = snapshot.tabs.filter(
-      (tab): tab is RuntimeMobileSessionTerminalTab => tab.type === 'terminal'
-    )
-    if (terminalTabs.length === 0) {
-      return []
-    }
-    const tabsByParentId = new Map<string, RuntimeMobileSessionTerminalTab[]>()
-    const parentOrder: string[] = []
-    for (const tab of terminalTabs) {
-      const existing = tabsByParentId.get(tab.parentTabId)
-      if (existing) {
-        existing.push(tab)
-      } else {
-        parentOrder.push(tab.parentTabId)
-        tabsByParentId.set(tab.parentTabId, [tab])
-      }
-    }
-    const groupSources =
-      snapshot.tabGroups && snapshot.tabGroups.length > 0
-        ? snapshot.tabGroups
-        : [{ id: null, activeTabId: snapshot.activeTabId, tabOrder: parentOrder }]
-    return groupSources
-      .map((group): RuntimeTerminalVisualGroupNode | null => {
-        const tabs = group.tabOrder
-          .map((tabId) => {
-            const surfaces =
-              tabsByParentId.get(tabId) ?? terminalTabs.filter((tab) => tab.id === tabId)
-            return this.buildTerminalVisualTab(tabId, surfaces, summariesByLeafKey)
-          })
-          .filter((tab): tab is RuntimeTerminalVisualTab => tab !== null)
-        if (tabs.length === 0) {
-          return null
-        }
-        return {
-          type: 'group',
-          groupId: group.id,
-          activeTabId: group.activeTabId,
-          tabs
-        }
-      })
-      .filter((group): group is RuntimeTerminalVisualGroupNode => group !== null)
-  }
-
-  private buildTerminalVisualTab(
-    tabId: string,
-    surfaces: RuntimeMobileSessionTerminalTab[],
-    summariesByLeafKey: ReadonlyMap<string, RuntimeTerminalSummary>
-  ): RuntimeTerminalVisualTab | null {
-    const firstSurface = surfaces[0]
-    if (!firstSurface) {
-      return null
-    }
-    const parentTabId = firstSurface.parentTabId
-    const requestedActiveLeafId =
-      firstSurface.parentLayout?.activeLeafId ??
-      surfaces.find((surface) => surface.isActive)?.leafId ??
-      firstSurface.leafId
-    const root = firstSurface.parentLayout?.root ?? {
-      type: 'leaf' as const,
-      leafId: firstSurface.leafId
-    }
-    const visibleLeafIds = this.collectVisibleTerminalLeafIds(root, parentTabId, summariesByLeafKey)
-    if (visibleLeafIds.length === 0) {
-      return null
-    }
-    const activeLeafId =
-      (requestedActiveLeafId && visibleLeafIds.includes(requestedActiveLeafId)
-        ? requestedActiveLeafId
-        : surfaces.find((surface) => surface.isActive && visibleLeafIds.includes(surface.leafId))
-            ?.leafId) ?? visibleLeafIds[0]!
-    const panes = this.buildTerminalVisualPane(root, parentTabId, activeLeafId, summariesByLeafKey)
-    if (!panes) {
-      return null
-    }
-    return {
-      tabId: parentTabId || tabId,
-      title: this.graph.tabs.get(parentTabId)?.title ?? firstSurface.title ?? null,
-      activeLeafId,
-      panes
-    }
-  }
-
-  private collectVisibleTerminalLeafIds(
-    node: TerminalPaneLayoutNode,
-    tabId: string,
-    summariesByLeafKey: ReadonlyMap<string, RuntimeTerminalSummary>
-  ): string[] {
-    if (node.type === 'leaf') {
-      return summariesByLeafKey.has(this.getLeafKey(tabId, node.leafId)) ? [node.leafId] : []
-    }
-    return [
-      ...this.collectVisibleTerminalLeafIds(node.first, tabId, summariesByLeafKey),
-      ...this.collectVisibleTerminalLeafIds(node.second, tabId, summariesByLeafKey)
-    ]
-  }
-
-  private buildTerminalVisualPane(
-    node: TerminalPaneLayoutNode,
-    tabId: string,
-    activeLeafId: string | null,
-    summariesByLeafKey: ReadonlyMap<string, RuntimeTerminalSummary>
-  ): RuntimeTerminalVisualPaneNode | null {
-    if (node.type === 'leaf') {
-      const summary = summariesByLeafKey.get(this.getLeafKey(tabId, node.leafId))
-      if (!summary) {
-        return null
-      }
-      return {
-        type: 'terminal',
-        handle: summary.handle,
-        tabId: summary.tabId,
-        leafId: summary.leafId,
-        title: summary.title,
-        connected: summary.connected,
-        active: summary.leafId === activeLeafId
-      }
-    }
-    const first = this.buildTerminalVisualPane(node.first, tabId, activeLeafId, summariesByLeafKey)
-    const second = this.buildTerminalVisualPane(
-      node.second,
-      tabId,
-      activeLeafId,
-      summariesByLeafKey
-    )
-    if (first && second) {
-      return { type: 'pane-split', direction: node.direction, first, second }
-    }
-    return first ?? second
-  }
-
-  private buildTerminalVisualGroupLayout(
-    node: TabGroupLayoutNode | null | undefined,
-    groupsById: ReadonlyMap<string, RuntimeTerminalVisualGroupNode>
-  ): RuntimeTerminalVisualLayoutNode | null {
-    if (!node) {
-      return null
-    }
-    if (node.type === 'leaf') {
-      return groupsById.get(node.groupId) ?? null
-    }
-    const first = this.buildTerminalVisualGroupLayout(node.first, groupsById)
-    const second = this.buildTerminalVisualGroupLayout(node.second, groupsById)
-    if (first && second) {
-      return { type: 'split', direction: node.direction, first, second }
-    }
-    return first ?? second
-  }
+  listTerminals: RuntimeTerminalListingCommands['listTerminals'] =
+    this.terminalListingCommands.listTerminals.bind(this.terminalListingCommands)
 
   // Why: when --terminal is omitted, the CLI auto-resolves to the active
   // terminal in the current worktree — matching browser's implicit active tab.
@@ -8388,7 +8064,6 @@ export class OrcaRuntimeService {
   }
 }
 
-const DEFAULT_TERMINAL_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_PS_LIMIT = 200
 const DISCONNECTED_PTY_RECORD_MAX = 128

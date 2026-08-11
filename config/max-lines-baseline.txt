@@ -174,6 +174,15 @@ inline frontend/src/main/runtime/orca-runtime-worktree-lineage.ts
 # and completed after TASK-BIGFILE-060/064 narrowed the host surface,
 # with the user explicitly accepting the risk.
 inline frontend/src/main/runtime/orca-runtime-pty-title-tracker.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-070, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's terminal.list command block
+# (listTerminals + 6 buildTerminalVisual* visual-layout-tree helpers),
+# already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. Found via gap-analysis outside the onPtyData-adjacent PTY-core
+# danger zone (TASK-BIGFILE-067/068/069) — lower risk, but still zero
+# test coverage.
+inline frontend/src/main/runtime/orca-runtime-terminal-listing.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
