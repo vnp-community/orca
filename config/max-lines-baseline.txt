@@ -161,6 +161,19 @@ inline frontend/src/main/runtime/orca-runtime-headless-terminal.ts
 # and worktree-creation (TASK-BIGFILE-049) domains — forwarding fields,
 # not moved together.
 inline frontend/src/main/runtime/orca-runtime-worktree-lineage.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-067, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's per-PTY title-tracking/seeded-agent-status
+# command block (getTrackedRawTitleForPty, preferTrackedLastTitle,
+# applySeededAgentStatus, getOrCreatePtyTitleTrackerEntry,
+# applyTrackedPtyTitle, disposePtyTitleTracker, and a private helper),
+# already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. One of the highest-risk domains moved off orca-runtime.ts (15
+# host deps, onPtyData-adjacent hot path, zero test coverage) —
+# TASK-BIGFILE-057 cancelled this same extraction earlier; re-attempted
+# and completed after TASK-BIGFILE-060/064 narrowed the host surface,
+# with the user explicitly accepting the risk.
+inline frontend/src/main/runtime/orca-runtime-pty-title-tracker.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
