@@ -79,6 +79,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 49 | [TASK-BIGFILE-049](./TASK-BIGFILE-049-orca-runtime-worktree-creation-domain.md) | Move (composition) — PTY-lifecycle core | `orca-runtime.ts` → `orca-runtime-worktree-creation.ts` | L | 47, 48 | ✅ |
 | 50 | [TASK-BIGFILE-050](./TASK-BIGFILE-050-orca-runtime-repo-lifecycle-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-repo-lifecycle.ts` | M | 46 | ✅ |
 | 51 | [TASK-BIGFILE-051](./TASK-BIGFILE-051-orca-runtime-mobile-session-tabs-cluster1.md) | Move (composition) — mobile-session-tabs cụm 1/3 | `orca-runtime.ts` → `orca-runtime-mobile-session-tabs.ts` | L | — | ✅ |
+| 52 | [TASK-BIGFILE-052](./TASK-BIGFILE-052-orca-runtime-mobile-session-terminal-cluster2.md) | Move (composition) — mobile-session-tabs cụm 2/3 | `orca-runtime.ts` → `orca-runtime-mobile-session-terminal.ts` | M | 51 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn

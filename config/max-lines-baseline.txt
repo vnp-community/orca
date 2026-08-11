@@ -105,6 +105,17 @@ inline frontend/src/main/runtime/orca-runtime-repo-lifecycle.ts
 # PTY-lifecycle-core-adjacent domain the user explicitly chose to tackle
 # after accepting the higher risk (zero test coverage).
 inline frontend/src/main/runtime/orca-runtime-mobile-session-tabs.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-052, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's mobile-session-terminal creation command
+# block, already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. Cluster 2 of 3 mobile-session-tabs clusters — cluster 1
+# (orca-runtime-mobile-session-tabs.ts, TASK-BIGFILE-051) is a sibling;
+# cluster 3 (notifyMobileSessionTabsChanged) not yet extracted.
+# waitForTerminalHandle/resolveHandleForTab/waitForLeafPtyId/
+# countLeavesInTab sit textually adjacent but are core createTerminal
+# plumbing shared with the desktop create path — deliberately excluded.
+inline frontend/src/main/runtime/orca-runtime-mobile-session-terminal.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
