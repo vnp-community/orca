@@ -20,6 +20,7 @@ import { RuntimeMobileSessionTabsCommands } from './orca-runtime-mobile-session-
 import { RuntimeMobileSessionTerminalCommands } from './orca-runtime-mobile-session-terminal'
 import { RuntimeMobileSessionNotifyCommands } from './orca-runtime-mobile-session-notify'
 import { RuntimeMobileDictationCommands } from './orca-runtime-mobile-dictation'
+import { RuntimeAccountServicesCommands } from './orca-runtime-account-services'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -266,7 +267,6 @@ import { githubAvatarIcon } from '../../shared/repo-icon'
 import type { ClaudeAccountService } from '../claude-accounts/service'
 import type { CodexAccountService } from '../codex-accounts/service'
 import type { RateLimitService } from '../rate-limits/service'
-import type { ClaudeRateLimitAccountsState, CodexRateLimitAccountsState } from '../../shared/types'
 import { applyPRBotAuthorOverride } from '../../shared/pr-bot-author-overrides'
 import type { VoiceSettings } from '../../shared/speech-types'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
@@ -332,7 +332,6 @@ import {
 // via tsc after the plain barrel-move first attempt surfaced 50 missing
 // names (BUG-FE-BIGFILE-002 / TASK-BIGFILE-008).
 import type {
-  AccountsSnapshot,
   DriverState,
   MobileNotificationEvent,
   RuntimePtyController,
@@ -346,7 +345,7 @@ import type {
 // orca-runtime-automation.ts (TASK-BIGFILE-036) and are no longer imported
 // back here, only re-exported below for external API compatibility.
 
-type RuntimeAccountServices = {
+export type RuntimeAccountServices = {
   claudeAccounts: ClaudeAccountService
   codexAccounts: CodexAccountService
   rateLimits: RateLimitService
@@ -1227,7 +1226,6 @@ export class OrcaRuntimeService {
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private readonly getAgentStatusSnapshotFn: (() => AgentStatusIpcPayload[]) | null
   private readonly buildAgentHookPtyEnv: (() => Record<string, string>) | null
-  private accountServices: RuntimeAccountServices | null = null
   private commitMessageAgentEnv: CommitMessageAgentEnvironmentResolvers | null = null
   private automationService: AutomationService | null = null
   private readonly claudeAgentTeams = new ClaudeAgentTeamsService()
@@ -3953,12 +3951,6 @@ export class OrcaRuntimeService {
     this.dispatchMobileNotification({ type: 'dismiss', notificationId })
   }
 
-  // ─── Account Services (mobile RPC bridge) ─────────────────────
-
-  setAccountServices(services: RuntimeAccountServices): void {
-    this.accountServices = services
-  }
-
   setCommitMessageAgentEnvironmentResolvers(
     resolvers: CommitMessageAgentEnvironmentResolvers
   ): void {
@@ -3996,66 +3988,26 @@ export class OrcaRuntimeService {
   cancelMobileDictationForClient: RuntimeMobileDictationCommands['cancelMobileDictationForClient'] =
     this.mobileDictationCommands.cancelMobileDictationForClient.bind(this.mobileDictationCommands)
 
-  private requireAccountServices(): RuntimeAccountServices {
-    if (!this.accountServices) {
-      throw new Error('Account services are not configured on this runtime')
-    }
-    return this.accountServices
-  }
+  // ─── Account Services (mobile RPC bridge) ─────────────────────
 
-  getAccountsSnapshot(): AccountsSnapshot {
-    const { claudeAccounts, codexAccounts, rateLimits } = this.requireAccountServices()
-    return {
-      claude: claudeAccounts.listAccounts(),
-      codex: codexAccounts.listAccounts(),
-      rateLimits: rateLimits.getState()
-    }
-  }
+  private readonly accountServicesCommands = new RuntimeAccountServicesCommands()
 
-  // Why: RateLimitService polls only when the Electron window is visible AND
-  // focused, and the inactive-account caches fill lazily when the user opens
-  // the desktop AccountsPane. Mobile has neither trigger, so without this the
-  // phone shows 0% / "—" against a backgrounded desktop. Errors swallowed
-  // because partial usage is still useful for the rest of the snapshot.
-  async refreshAccountsForMobile(): Promise<void> {
-    const { rateLimits } = this.requireAccountServices()
-    await Promise.allSettled([
-      rateLimits.refresh(),
-      rateLimits.fetchInactiveClaudeAccountsOnOpen(),
-      rateLimits.fetchInactiveCodexAccountsOnOpen()
-    ])
-  }
-
-  selectClaudeAccount(accountId: string | null): Promise<ClaudeRateLimitAccountsState> {
-    return this.requireAccountServices().claudeAccounts.selectAccount(accountId)
-  }
-
-  selectCodexAccount(accountId: string | null): Promise<CodexRateLimitAccountsState> {
-    return this.requireAccountServices().codexAccounts.selectAccount(accountId)
-  }
-
-  removeClaudeAccount(accountId: string): Promise<ClaudeRateLimitAccountsState> {
-    return this.requireAccountServices().claudeAccounts.removeAccount(accountId)
-  }
-
-  removeCodexAccount(accountId: string): Promise<CodexRateLimitAccountsState> {
-    return this.requireAccountServices().codexAccounts.removeAccount(accountId)
-  }
-
-  // Why: rate-limit polling fires every 5 minutes and on account switch.
-  // Mobile clients subscribe to receive a fresh AccountsSnapshot whenever
-  // RateLimitService pushes new usage data, mirroring the existing
-  // `rateLimits:update` IPC channel desktop already uses.
-  onAccountsChanged(listener: (snapshot: AccountsSnapshot) => void): () => void {
-    const services = this.requireAccountServices()
-    return services.rateLimits.onStateChange((rateLimits) => {
-      listener({
-        claude: services.claudeAccounts.listAccounts(),
-        codex: services.codexAccounts.listAccounts(),
-        rateLimits
-      })
-    })
-  }
+  setAccountServices: RuntimeAccountServicesCommands['setAccountServices'] =
+    this.accountServicesCommands.setAccountServices.bind(this.accountServicesCommands)
+  getAccountsSnapshot: RuntimeAccountServicesCommands['getAccountsSnapshot'] =
+    this.accountServicesCommands.getAccountsSnapshot.bind(this.accountServicesCommands)
+  refreshAccountsForMobile: RuntimeAccountServicesCommands['refreshAccountsForMobile'] =
+    this.accountServicesCommands.refreshAccountsForMobile.bind(this.accountServicesCommands)
+  selectClaudeAccount: RuntimeAccountServicesCommands['selectClaudeAccount'] =
+    this.accountServicesCommands.selectClaudeAccount.bind(this.accountServicesCommands)
+  selectCodexAccount: RuntimeAccountServicesCommands['selectCodexAccount'] =
+    this.accountServicesCommands.selectCodexAccount.bind(this.accountServicesCommands)
+  removeClaudeAccount: RuntimeAccountServicesCommands['removeClaudeAccount'] =
+    this.accountServicesCommands.removeClaudeAccount.bind(this.accountServicesCommands)
+  removeCodexAccount: RuntimeAccountServicesCommands['removeCodexAccount'] =
+    this.accountServicesCommands.removeCodexAccount.bind(this.accountServicesCommands)
+  onAccountsChanged: RuntimeAccountServicesCommands['onAccountsChanged'] =
+    this.accountServicesCommands.onAccountsChanged.bind(this.accountServicesCommands)
 
   // ─── Mobile Fit Override Management ─────────────────────────
 
