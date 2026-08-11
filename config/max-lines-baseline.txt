@@ -116,6 +116,19 @@ inline frontend/src/main/runtime/orca-runtime-mobile-session-tabs.ts
 # countLeavesInTab sit textually adjacent but are core createTerminal
 # plumbing shared with the desktop create path — deliberately excluded.
 inline frontend/src/main/runtime/orca-runtime-mobile-session-terminal.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-053, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's mobile-session-tabs notify/snapshot-merge/
+# client-payload-shaping command block (notifyMobileSessionTabsChanged and its
+# ~23 dedicated private helpers), already covered by orca-runtime.ts's own
+# grandfathered max-lines disable. Cluster 3 (last) of 3 mobile-session-tabs
+# clusters — cluster 1 (orca-runtime-mobile-session-tabs.ts, TASK-BIGFILE-051)
+# and cluster 2 (orca-runtime-mobile-session-terminal.ts, TASK-BIGFILE-052)
+# are siblings. getSummaryForRuntimeWorktreeId/buildTerminalSummary and
+# getAgentStatusForHandle-onward sit textually adjacent but are unrelated
+# listTerminals/getWorktreePs and general agent-status-for-pane-key infra —
+# deliberately excluded.
+inline frontend/src/main/runtime/orca-runtime-mobile-session-notify.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
