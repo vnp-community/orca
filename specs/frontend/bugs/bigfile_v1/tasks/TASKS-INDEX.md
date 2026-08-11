@@ -81,6 +81,15 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 51 | [TASK-BIGFILE-051](./TASK-BIGFILE-051-orca-runtime-mobile-session-tabs-cluster1.md) | Move (composition) — mobile-session-tabs cụm 1/3 | `orca-runtime.ts` → `orca-runtime-mobile-session-tabs.ts` | L | — | ✅ |
 | 52 | [TASK-BIGFILE-052](./TASK-BIGFILE-052-orca-runtime-mobile-session-terminal-cluster2.md) | Move (composition) — mobile-session-tabs cụm 2/3 | `orca-runtime.ts` → `orca-runtime-mobile-session-terminal.ts` | M | 51 | ✅ |
 | 53 | [TASK-BIGFILE-053](./TASK-BIGFILE-053-orca-runtime-mobile-session-notify-cluster3.md) | Move (composition) — mobile-session-tabs cụm 3/3 (cuối) | `orca-runtime.ts` → `orca-runtime-mobile-session-notify.ts` | M | 51, 52 | ✅ |
+| 54 | [TASK-BIGFILE-054](./TASK-BIGFILE-054-orca-runtime-terminal-pty-core-investigate.md) | Investigate | `orca-runtime.ts` phần Terminal/PTY/Agent-status core còn lại | L | 8, 9, 35, 41 | ✅ (sinh task 055–062) |
+| 55 | [TASK-BIGFILE-055](./TASK-BIGFILE-055-orca-runtime-mobile-dictation-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-mobile-dictation.ts` | S | 54 | ✅ |
+| 56 | TASK-BIGFILE-056 | Move (composition) | `orca-runtime.ts` → `orca-runtime-account-services.ts` | S | 54 | ⬜ |
+| 57 | TASK-BIGFILE-057 | Move (composition) | `orca-runtime.ts` → `orca-runtime-pty-title-tracker.ts` | S | 54 | ⬜ |
+| 58 | TASK-BIGFILE-058 | Move (composition) | `orca-runtime.ts` → `orca-runtime-connection-subscription-notify.ts` | S | 54 | ⬜ |
+| 59 | TASK-BIGFILE-059 | Move (composition) | `orca-runtime.ts` → `orca-runtime-pty-wait-blocked-check.ts` | S | 54 | ⬜ |
+| 60 | TASK-BIGFILE-060 | Move (composition) | `orca-runtime.ts` → `orca-runtime-pty-foreground-agent-refresh.ts` | S | 54 | ⬜ |
+| 61 | TASK-BIGFILE-061 | Move (composition) | `orca-runtime.ts` → `orca-runtime-terminal-message-waiter.ts` | S | 54 | ⬜ |
+| 62 | TASK-BIGFILE-062 | Move (composition) | `orca-runtime.ts` → `orca-runtime-remote-terminal-view-subscriber.ts` | S | 54 | ⬜ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
