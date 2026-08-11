@@ -2,7 +2,28 @@
 
 **Loại:** Move — composition pattern (KHÔNG phải barrel, class có `this`)
 · **Effort:** S · **Phụ thuộc:** TASK-BIGFILE-008, 009
-**Status:** ⬜ Todo
+**Status:** ✅ Done
+
+## Kết quả thực thi (2026-08-10)
+
+- Domain này hoàn toàn tự chứa (own state, không phụ thuộc field/method
+  nào khác của `OrcaRuntimeService`) — xác nhận qua grep trước khi tách,
+  nên KHÔNG cần host interface như TASK-036; class mới
+  `RuntimeRemoteFetchCache` không có tham số constructor, an toàn để
+  khởi tạo eager làm field-level (`new RuntimeRemoteFetchCache()`), không
+  gặp lỗi "used before initialization" như TASK-036.
+- Cả 6 public method ĐỀU được gọi từ nơi khác trong class (dòng
+  14554–16036, ngoài vùng 15588–15825 đã tách) — vẫn cần forward field ở
+  `OrcaRuntimeService` (không xoá hẳn API cũ).
+- Di chuyển kèm 3 const + 1 hàm helper (`FETCH_FRESHNESS_MS`,
+  `REMOTE_FETCH_TIMEOUT_MS`, `REMOTE_FETCH_CACHE_MAX`,
+  `setBoundedMapEntry`) — chỉ dùng riêng trong domain này, xác nhận qua
+  grep trước khi xoá khỏi `orca-runtime.ts`. Giữ lại
+  `DRIFT_PROBE_SUBJECT_LIMIT` (đứng cạnh nhưng dùng ở method khác).
+- `orca-runtime.ts`: 24,553 → **24,274 dòng** (giảm ~279 dòng). File mới:
+  305 dòng.
+- Xác minh: `tsc --noEmit --composite false` 251 lỗi pre-existing không
+  đổi (0 lỗi mới), `oxlint` sạch (exit 0) cả 2 config.
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-002-orca-runtime.md` (Giai
 đoạn 3) · Sinh ra từ `TASK-BIGFILE-035`
 
