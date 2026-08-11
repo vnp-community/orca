@@ -76,6 +76,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 46 | [TASK-BIGFILE-046](./TASK-BIGFILE-046-orca-runtime-project-groups-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-project-groups.ts` | M | — | ✅ |
 | 47 | [TASK-BIGFILE-047](./TASK-BIGFILE-047-orca-runtime-worktree-base-status-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-worktree-base-status.ts` | M | — | ✅ |
 | 48 | [TASK-BIGFILE-048](./TASK-BIGFILE-048-orca-runtime-issue-tracking-followup.md) | Move (bổ sung vào file đã có) | `orca-runtime.ts` → `orca-runtime-issue-tracking.ts` | S | 42 | ✅ |
+| 49 | [TASK-BIGFILE-049](./TASK-BIGFILE-049-orca-runtime-worktree-creation-domain.md) | Move (composition) — PTY-lifecycle core | `orca-runtime.ts` → `orca-runtime-worktree-creation.ts` | L | 47, 48 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
