@@ -26,6 +26,7 @@ import { RuntimeTerminalMessageWaiterCommands } from './orca-runtime-terminal-me
 import { RuntimeConnectionSubscriptionNotifyCommands } from './orca-runtime-connection-subscription-notify'
 import { RuntimePtyForegroundAgentRefreshCommands } from './orca-runtime-pty-foreground-agent-refresh'
 import { RuntimeRemoteTerminalViewSubscriberCommands } from './orca-runtime-remote-terminal-view-subscriber'
+import { RuntimePtyTranscriptStore } from './orca-runtime-pty-transcript-store'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -617,7 +618,7 @@ function inferCapturedClaudeAgentTeamsMode(
   return currentMode
 }
 
-type RuntimePtyTitleTrackerEntry = {
+export type RuntimePtyTitleTrackerEntry = {
   tracker: TerminalTitleTracker
   // Why: onPtyData batches the mobile session-tab touch to once per chunk;
   // the stale-working-title timer fires between chunks and must touch
@@ -1109,9 +1110,7 @@ export class OrcaRuntimeService {
     string,
     Set<(data: string, meta?: { seq?: number; rawLength?: number; cwd?: string }) => void>
   >()
-  // Why: startup draft paste can subscribe after the agent already emitted its
-  // ready marker. Keep a bounded raw buffer so fast startup output is replayed.
-  private recentPtyOutputById = new Map<string, string>()
+  private readonly ptyTranscripts = new RuntimePtyTranscriptStore()
   private activeBrowserScreencastsByConnection = new Map<
     string,
     { cancel: (emitEnd?: boolean) => void; done: Promise<void>; connectionKey: string }
@@ -1122,33 +1121,6 @@ export class OrcaRuntimeService {
   >()
   private titleObservationSequence = 0
   private headlessTerminals = new Map<string, RuntimeHeadlessTerminal>()
-  private ptyOutputSequenceById = new Map<string, number>()
-  private recentPtyPathCandidatesById = new Map<string, string[]>()
-  // Why: OSC 9999 status can span PTY chunks. Keeping parser state in the
-  // runtime lets hidden/model-owned terminals observe agent state without a
-  // mounted xterm view.
-  private agentStatusOscProcessorsByPtyId = new Map<
-    string,
-    ReturnType<typeof createAgentStatusOscProcessor>
-  >()
-  // Why: per-PTY shared title trackers (all-titles ordering + stale-working
-  // timer) replace last-title-per-chunk scanning so main observes the same
-  // intra-chunk working→idle transitions the renderer does (issue #1083).
-  // Lazily created like agentStatusOscProcessorsByPtyId; disposed on PTY exit.
-  private ptyTitleTrackersByPtyId = new Map<string, RuntimePtyTitleTrackerEntry>()
-  // Why: the Command Code output detector arms early from the launch command
-  // when known (banner detection covers user-typed launches), mirroring the
-  // renderer detector's startupCommand seed.
-  private terminalSpawnCommandsByPtyId = new Map<string, string>()
-  // Why: ordinary OSC 0/1/2 titles can split across PTY chunks, especially over
-  // SSH/relay buffering. Keep a small raw scan tail and feed reconstructed
-  // chunks into the title tracker instead of falling back to last-title scans.
-  private oscTitleScanTailByPtyId = new Map<string, string>()
-  // Why: mobile file taps resolve relative paths on the host. OSC 7 is the
-  // terminal-owned cwd signal, and it can arrive in live output between snapshots.
-  private osc7ScanTailByPtyId = new Map<string, string>()
-  private terminalCwdByPtyId = new Map<string, string>()
-  private terminalFileUriHostnameByPtyId = new Map<string, string>()
   // Why: latest agent-status payload per pane, retained so worktree.ps can serve
   // mobile the same inline agent rows the desktop sidebar renders. Cleared on pty
   // teardown so dead agents don't linger. See RuntimeAgentRowSnapshot.
@@ -2120,7 +2092,7 @@ export class OrcaRuntimeService {
   noteTerminalSpawnCommand(ptyId: string, command: string | null | undefined): void {
     const trimmed = typeof command === 'string' ? command.trim() : ''
     if (trimmed.length > 0) {
-      this.terminalSpawnCommandsByPtyId.set(ptyId, trimmed)
+      this.ptyTranscripts.terminalSpawnCommandsByPtyId.set(ptyId, trimmed)
     }
   }
 
@@ -2129,8 +2101,9 @@ export class OrcaRuntimeService {
    * updating terminal tail buffers, and triggering foreground agent refreshes.
    */
   onPtyData(ptyId: string, data: string, at: number, sequenceChars = data.length): number {
-    const outputSequence = (this.ptyOutputSequenceById.get(ptyId) ?? 0) + sequenceChars
-    this.ptyOutputSequenceById.set(ptyId, outputSequence)
+    const outputSequence =
+      (this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0) + sequenceChars
+    this.ptyTranscripts.ptyOutputSequenceById.set(ptyId, outputSequence)
     const osc7Metadata = this.recordOsc7MetadataForPty(ptyId, data)
     const cwd = osc7Metadata.cwd
     const cwdChanged = osc7Metadata.cwdChanged
@@ -2277,15 +2250,15 @@ export class OrcaRuntimeService {
     // title (issue #1083). Uses the OSC 9999-stripped cleanData like the
     // renderer, so pure status chunks don't perturb the stale-title probe.
     const titleTrackerEntry = this.getOrCreatePtyTitleTrackerEntry(ptyId)
-    const previousTitleScanTail = this.oscTitleScanTailByPtyId.get(ptyId)
+    const previousTitleScanTail = this.ptyTranscripts.oscTitleScanTailByPtyId.get(ptyId)
     const titleInput = previousTitleScanTail
       ? `${previousTitleScanTail}${agentStatusChunk.cleanData}`
       : agentStatusChunk.cleanData
     const nextTitleScanTail = extractOscTitleScanTail(titleInput)
     if (nextTitleScanTail.length > 0) {
-      this.oscTitleScanTailByPtyId.set(ptyId, nextTitleScanTail)
+      this.ptyTranscripts.oscTitleScanTailByPtyId.set(ptyId, nextTitleScanTail)
     } else {
-      this.oscTitleScanTailByPtyId.delete(ptyId)
+      this.ptyTranscripts.oscTitleScanTailByPtyId.delete(ptyId)
     }
     titleTrackerEntry.applyingChunk = true
     titleTrackerEntry.chunkTouchedSessionTabs = false
@@ -2345,10 +2318,10 @@ export class OrcaRuntimeService {
     )
 
   private processAgentStatusOscForPty(ptyId: string, data: string): ProcessedAgentStatusChunk {
-    let processor = this.agentStatusOscProcessorsByPtyId.get(ptyId)
+    let processor = this.ptyTranscripts.agentStatusOscProcessorsByPtyId.get(ptyId)
     if (!processor) {
       processor = createAgentStatusOscProcessor()
-      this.agentStatusOscProcessorsByPtyId.set(ptyId, processor)
+      this.ptyTranscripts.agentStatusOscProcessorsByPtyId.set(ptyId, processor)
     }
     return processor(data)
   }
@@ -2442,8 +2415,9 @@ export class OrcaRuntimeService {
       // Why: the daemon snapshot's seq counts bytes its monitoring stream
       // dropped. Advancing without parsing preserves that absolute domain so
       // post-snapshot live chunks can be reconciled instead of duplicated.
-      const outputSequence = (this.ptyOutputSequenceById.get(ptyId) ?? 0) + droppedChars
-      this.ptyOutputSequenceById.set(ptyId, outputSequence)
+      const outputSequence =
+        (this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0) + droppedChars
+      this.ptyTranscripts.ptyOutputSequenceById.set(ptyId, outputSequence)
     }
     const pty = this.getOrCreatePtyWorktreeRecord(ptyId)
     if (pty) {
@@ -2452,9 +2426,9 @@ export class OrcaRuntimeService {
     for (const leaf of this.getLeavesForPty(ptyId)) {
       leaf.tailPendingAnsi = ''
     }
-    this.oscTitleScanTailByPtyId.delete(ptyId)
-    this.osc7ScanTailByPtyId.delete(ptyId)
-    this.agentStatusOscProcessorsByPtyId.delete(ptyId)
+    this.ptyTranscripts.oscTitleScanTailByPtyId.delete(ptyId)
+    this.ptyTranscripts.osc7ScanTailByPtyId.delete(ptyId)
+    this.ptyTranscripts.agentStatusOscProcessorsByPtyId.delete(ptyId)
     this.disposeHeadlessTerminal(ptyId)
   }
 
@@ -2464,7 +2438,7 @@ export class OrcaRuntimeService {
     if (!this.onTerminalSideEffects) {
       return
     }
-    const entry = this.ptyTitleTrackersByPtyId.get(ptyId)
+    const entry = this.ptyTranscripts.ptyTitleTrackersByPtyId.get(ptyId)
     if (entry?.applyingChunk) {
       entry.pendingFacts.push(fact)
       return
@@ -2482,7 +2456,7 @@ export class OrcaRuntimeService {
     }
     const batch: TerminalSideEffectBatch = {
       ptyId,
-      seq: this.ptyOutputSequenceById.get(ptyId) ?? 0,
+      seq: this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0,
       facts,
       ...(options.replay ? { replay: true } : {}),
       ...this.resolveTerminalSideEffectAttribution(ptyId)
@@ -2526,7 +2500,7 @@ export class OrcaRuntimeService {
   /** Title-only replay batch for renderer (re)attach — the no-attention-replay
    *  rule: snapshots restore title state, never historical bells/completions. */
   getTerminalSideEffectSnapshot(ptyId: string): TerminalSideEffectBatch | null {
-    const tracker = this.ptyTitleTrackersByPtyId.get(ptyId)?.tracker
+    const tracker = this.ptyTranscripts.ptyTitleTrackersByPtyId.get(ptyId)?.tracker
     const recordTitle = this.graph.ptysById.get(ptyId)?.lastOscTitle
     // Why: the cursor-agent literal drop applies to every title surface; a
     // record-fallback snapshot must not replay the bare native title the
@@ -2538,7 +2512,7 @@ export class OrcaRuntimeService {
     }
     return {
       ptyId,
-      seq: this.ptyOutputSequenceById.get(ptyId) ?? 0,
+      seq: this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0,
       replay: true,
       facts: [
         {
@@ -2588,7 +2562,7 @@ export class OrcaRuntimeService {
   }
 
   private getOrCreatePtyTitleTrackerEntry(ptyId: string): RuntimePtyTitleTrackerEntry {
-    const existing = this.ptyTitleTrackersByPtyId.get(ptyId)
+    const existing = this.ptyTranscripts.ptyTitleTrackersByPtyId.get(ptyId)
     if (existing) {
       return existing
     }
@@ -2618,7 +2592,7 @@ export class OrcaRuntimeService {
           if (!changed) {
             return
           }
-          const live = this.ptyTitleTrackersByPtyId.get(ptyId)
+          const live = this.ptyTranscripts.ptyTitleTrackersByPtyId.get(ptyId)
           const gateKey = this.makeMobileTitleGateKey(rawTitle, normalizedTitle)
           const decorativeOnly = live?.lastMobileTitleGateKey === gateKey
           if (live) {
@@ -2691,7 +2665,7 @@ export class OrcaRuntimeService {
       // saw one) mirrors the renderer detector's startupCommand fast-arm.
       commandCodeDetector: this.onTerminalSideEffects
         ? createCommandCodeOutputStatusDetector({
-            startupCommand: this.terminalSpawnCommandsByPtyId.get(ptyId) ?? null,
+            startupCommand: this.ptyTranscripts.terminalSpawnCommandsByPtyId.get(ptyId) ?? null,
             onWorking: (prompt) => {
               this.recordTerminalSideEffectFact(ptyId, { kind: 'command-code-working', prompt })
             },
@@ -2701,7 +2675,7 @@ export class OrcaRuntimeService {
           })
         : null
     }
-    this.ptyTitleTrackersByPtyId.set(ptyId, entry)
+    this.ptyTranscripts.ptyTitleTrackersByPtyId.set(ptyId, entry)
     return entry
   }
 
@@ -2784,24 +2758,24 @@ export class OrcaRuntimeService {
   /** Cancel the per-PTY title tracker (stale-title timer included) on PTY
    *  teardown so it cannot fire into pruned records. */
   private disposePtyTitleTracker(ptyId: string): void {
-    this.ptyTitleTrackersByPtyId.get(ptyId)?.tracker.dispose()
-    this.ptyTitleTrackersByPtyId.delete(ptyId)
+    this.ptyTranscripts.ptyTitleTrackersByPtyId.get(ptyId)?.tracker.dispose()
+    this.ptyTranscripts.ptyTitleTrackersByPtyId.delete(ptyId)
   }
 
   private extractLastOsc7CwdForPty(
     ptyId: string,
     data: string
   ): { path: string; hostname: string } | null {
-    const previousTail = this.osc7ScanTailByPtyId.get(ptyId)
+    const previousTail = this.ptyTranscripts.osc7ScanTailByPtyId.get(ptyId)
     if (!previousTail && !data.includes('\x1b]7;')) {
       return null
     }
     const input = `${previousTail ?? ''}${data}`
     const scanTail = extractOscScanTail(input, 4096)
     if (scanTail.length > 0) {
-      this.osc7ScanTailByPtyId.set(ptyId, scanTail)
+      this.ptyTranscripts.osc7ScanTailByPtyId.set(ptyId, scanTail)
     } else {
-      this.osc7ScanTailByPtyId.delete(ptyId)
+      this.ptyTranscripts.osc7ScanTailByPtyId.delete(ptyId)
     }
     const uri = extractLastOsc7Uri(input)
     const pty = this.graph.ptysById.get(ptyId)
@@ -2821,15 +2795,17 @@ export class OrcaRuntimeService {
     const osc7 = this.extractLastOsc7CwdForPty(ptyId, data)
     const cwd = osc7?.path ?? null
     const cwdChanged =
-      cwd !== null && cwd.trim().length > 0 && this.terminalCwdByPtyId.get(ptyId) !== cwd
+      cwd !== null &&
+      cwd.trim().length > 0 &&
+      this.ptyTranscripts.terminalCwdByPtyId.get(ptyId) !== cwd
     if (cwdChanged) {
-      this.terminalCwdByPtyId.set(ptyId, cwd)
+      this.ptyTranscripts.terminalCwdByPtyId.set(ptyId, cwd)
     }
     if (osc7) {
       if (osc7.hostname) {
-        this.terminalFileUriHostnameByPtyId.set(ptyId, osc7.hostname)
+        this.ptyTranscripts.terminalFileUriHostnameByPtyId.set(ptyId, osc7.hostname)
       } else {
-        this.terminalFileUriHostnameByPtyId.delete(ptyId)
+        this.ptyTranscripts.terminalFileUriHostnameByPtyId.delete(ptyId)
       }
     }
     return { cwd, cwdChanged }
@@ -2962,7 +2938,7 @@ export class OrcaRuntimeService {
   }
 
   getPtyOutputSequence(ptyId: string): number {
-    return this.ptyOutputSequenceById.get(ptyId) ?? 0
+    return this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0
   }
 
   subscribeToTerminalData(
@@ -3448,7 +3424,7 @@ export class OrcaRuntimeService {
     return rendererSnapshot
       ? this.preferTrackedLastTitle(ptyId, {
           ...rendererSnapshot,
-          cwd: rendererSnapshot.cwd ?? this.terminalCwdByPtyId.get(ptyId),
+          cwd: rendererSnapshot.cwd ?? this.ptyTranscripts.terminalCwdByPtyId.get(ptyId),
           source: 'renderer' as const
         })
       : null
@@ -3542,7 +3518,7 @@ export class OrcaRuntimeService {
           data,
           cols: snapshot.cols,
           rows: snapshot.rows,
-          cwd: snapshot.cwd ?? this.terminalCwdByPtyId.get(ptyId),
+          cwd: snapshot.cwd ?? this.ptyTranscripts.terminalCwdByPtyId.get(ptyId),
           lastTitle: snapshot.lastTitle,
           seq: state.outputSequence,
           source: 'headless' as const,
@@ -3623,7 +3599,7 @@ export class OrcaRuntimeService {
     if (!ptyId) {
       return null
     }
-    const tracked = this.terminalCwdByPtyId.get(ptyId)
+    const tracked = this.ptyTranscripts.terminalCwdByPtyId.get(ptyId)
     if (tracked) {
       return tracked
     }
@@ -3637,17 +3613,20 @@ export class OrcaRuntimeService {
 
   resolveTerminalFileUriHostname(handle: string): string | null {
     const ptyId = this.resolveLeafForHandle(handle)?.ptyId
-    return ptyId ? (this.terminalFileUriHostnameByPtyId.get(ptyId) ?? null) : null
+    return ptyId ? (this.ptyTranscripts.terminalFileUriHostnameByPtyId.get(ptyId) ?? null) : null
   }
 
   private recordRecentPtyOutputForPathProvenance(ptyId: string, data: string): void {
-    this.recentPtyOutputById.set(
+    this.ptyTranscripts.recentPtyOutputById.set(
       ptyId,
-      appendRecentPtyOutput(this.recentPtyOutputById.get(ptyId), data)
+      appendRecentPtyOutput(this.ptyTranscripts.recentPtyOutputById.get(ptyId), data)
     )
-    this.recentPtyPathCandidatesById.set(
+    this.ptyTranscripts.recentPtyPathCandidatesById.set(
       ptyId,
-      appendRecentPtyPathCandidates(this.recentPtyPathCandidatesById.get(ptyId), data)
+      appendRecentPtyPathCandidates(
+        this.ptyTranscripts.recentPtyPathCandidatesById.get(ptyId),
+        data
+      )
     )
   }
 
@@ -3661,11 +3640,11 @@ export class OrcaRuntimeService {
 
   hasRecentTerminalOutputPath(handle: string, pathText: string, absolutePath: string): boolean {
     const ptyId = this.resolveLeafForHandle(handle)?.ptyId
-    const recentOutput = ptyId ? this.recentPtyOutputById.get(ptyId) : null
+    const recentOutput = ptyId ? this.ptyTranscripts.recentPtyOutputById.get(ptyId) : null
     if (recentOutput && recentTerminalOutputIncludesPath(recentOutput, pathText, absolutePath)) {
       return true
     }
-    const candidates = ptyId ? this.recentPtyPathCandidatesById.get(ptyId) : null
+    const candidates = ptyId ? this.ptyTranscripts.recentPtyPathCandidatesById.get(ptyId) : null
     return candidates
       ? recentTerminalPathCandidatesIncludePath(candidates, pathText, absolutePath)
       : false
@@ -3897,17 +3876,17 @@ export class OrcaRuntimeService {
     serveSimStateWatcher.unbindPty(ptyId)
     // Clean up new mobile state for this PTY
     this.remoteTerminalViewSubscriberCommands.clearRemoteTerminalViewSubscriberCountForPty(ptyId)
-    this.recentPtyOutputById.delete(ptyId)
+    this.ptyTranscripts.recentPtyOutputById.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
-    this.recentPtyPathCandidatesById.delete(ptyId)
-    this.ptyOutputSequenceById.delete(ptyId)
-    this.agentStatusOscProcessorsByPtyId.delete(ptyId)
-    this.terminalSpawnCommandsByPtyId.delete(ptyId)
+    this.ptyTranscripts.recentPtyPathCandidatesById.delete(ptyId)
+    this.ptyTranscripts.ptyOutputSequenceById.delete(ptyId)
+    this.ptyTranscripts.agentStatusOscProcessorsByPtyId.delete(ptyId)
+    this.ptyTranscripts.terminalSpawnCommandsByPtyId.delete(ptyId)
     this.disposePtyTitleTracker(ptyId)
-    this.oscTitleScanTailByPtyId.delete(ptyId)
-    this.osc7ScanTailByPtyId.delete(ptyId)
-    this.terminalCwdByPtyId.delete(ptyId)
-    this.terminalFileUriHostnameByPtyId.delete(ptyId)
+    this.ptyTranscripts.oscTitleScanTailByPtyId.delete(ptyId)
+    this.ptyTranscripts.osc7ScanTailByPtyId.delete(ptyId)
+    this.ptyTranscripts.terminalCwdByPtyId.delete(ptyId)
+    this.ptyTranscripts.terminalFileUriHostnameByPtyId.delete(ptyId)
     this.clearAgentRowSnapshotsForPty(ptyId)
     // Why: a Claude agent-team leader whose PTY exits naturally (agent finished,
     // process died, renderer reload) must release its team + nested panes map.
@@ -5981,7 +5960,7 @@ export class OrcaRuntimeService {
     fetchRemoteWithCache: (repoPath, remote, gitOptions) =>
       this.fetchRemoteWithCache(repoPath, remote, gitOptions),
     assertGraphReady: () => this.assertGraphReady(),
-    getRecentPtyOutput: (ptyId) => this.recentPtyOutputById.get(ptyId)
+    getRecentPtyOutput: (ptyId) => this.ptyTranscripts.recentPtyOutputById.get(ptyId)
   })
 
   activateManagedWorktree: RuntimeWorktreeCreationCommands['activateManagedWorktree'] =
@@ -8126,17 +8105,17 @@ export class OrcaRuntimeService {
     // Why: pruning can remove a PTY without the normal exit callback.
     serveSimStateWatcher.unbindPty(ptyId)
     this.graph.ptysById.delete(ptyId)
-    this.recentPtyOutputById.delete(ptyId)
+    this.ptyTranscripts.recentPtyOutputById.delete(ptyId)
     this.clearWaitBlockedCheckState(ptyId)
-    this.recentPtyPathCandidatesById.delete(ptyId)
-    this.ptyOutputSequenceById.delete(ptyId)
-    this.agentStatusOscProcessorsByPtyId.delete(ptyId)
-    this.terminalSpawnCommandsByPtyId.delete(ptyId)
+    this.ptyTranscripts.recentPtyPathCandidatesById.delete(ptyId)
+    this.ptyTranscripts.ptyOutputSequenceById.delete(ptyId)
+    this.ptyTranscripts.agentStatusOscProcessorsByPtyId.delete(ptyId)
+    this.ptyTranscripts.terminalSpawnCommandsByPtyId.delete(ptyId)
     this.disposePtyTitleTracker(ptyId)
-    this.oscTitleScanTailByPtyId.delete(ptyId)
-    this.osc7ScanTailByPtyId.delete(ptyId)
-    this.terminalCwdByPtyId.delete(ptyId)
-    this.terminalFileUriHostnameByPtyId.delete(ptyId)
+    this.ptyTranscripts.oscTitleScanTailByPtyId.delete(ptyId)
+    this.ptyTranscripts.osc7ScanTailByPtyId.delete(ptyId)
+    this.ptyTranscripts.terminalCwdByPtyId.delete(ptyId)
+    this.ptyTranscripts.terminalFileUriHostnameByPtyId.delete(ptyId)
     this.clearAgentRowSnapshotsForPty(ptyId)
     const handle = this.graph.handleByPtyId.get(ptyId)
     if (handle) {
