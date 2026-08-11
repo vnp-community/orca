@@ -27,6 +27,7 @@ import { RuntimeConnectionSubscriptionNotifyCommands } from './orca-runtime-conn
 import { RuntimePtyForegroundAgentRefreshCommands } from './orca-runtime-pty-foreground-agent-refresh'
 import { RuntimeRemoteTerminalViewSubscriberCommands } from './orca-runtime-remote-terminal-view-subscriber'
 import { RuntimePtyTranscriptStore } from './orca-runtime-pty-transcript-store'
+import { RuntimeHeadlessTerminalCommands } from './orca-runtime-headless-terminal'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -247,17 +248,8 @@ import type { Store } from '../persistence'
 import type { StatsCollector } from '../stats/collector'
 import { AgentDetector } from '../stats/agent-detector'
 import { mergeWorktree, areWorktreePathsEqual } from '../ipc/worktree-logic'
-import { HeadlessEmulator } from '../daemon/headless-emulator'
-import {
-  isNativeWindowsConptyPty,
-  registerConptyDa1OverrideInstaller,
-  shouldModelAnswerHiddenPtyQueries
-} from './terminal-model-query-authority'
-import {
-  getTerminalViewAttributes,
-  registerTerminalViewAttributesApplier
-} from './terminal-view-attribute-store'
-import { MOBILE_SUBSCRIBE_SCROLLBACK_ROWS } from './scrollback-limits'
+import { registerConptyDa1OverrideInstaller } from './terminal-model-query-authority'
+import { registerTerminalViewAttributesApplier } from './terminal-view-attribute-store'
 import {
   createMobileSessionTabsNotifyCoalescer,
   type MobileSessionTabsNotifyCoalescer
@@ -294,7 +286,6 @@ import {
   buildTerminalWaitBlockedResult,
   buildTerminalWaitResult,
   buildTerminalWaitText,
-  buildVisibleSnapshotReadFallback,
   classifyAgentTitle,
   classifyLatestAgentTitle,
   compareWorktreePs,
@@ -320,7 +311,6 @@ import {
   type RetainedTailRedrawCursor,
   runtimePathsEqual,
   setsEqual,
-  shouldFallbackToVisibleTerminalSnapshot,
   tailStateMatches,
   terminalTitleBlocksExplicitAgentStatus,
   TUI_IDLE_DEFAULT_TIMEOUT_MS,
@@ -653,23 +643,6 @@ export type RuntimeAgentRowSnapshot = {
   // When the current payload.state was first observed for this pane (ms).
   stateStartedAt: number
   updatedAt: number
-}
-
-type RuntimeHeadlessTerminal = {
-  emulator: HeadlessEmulator
-  // Why: serialize can race with newer writes appended to writeChain; return
-  // the seq actually painted into this emulator, not the latest PTY seq.
-  outputSequence: number
-  writeChain: Promise<void>
-}
-
-type HeadlessSeedMetadata = {
-  cwd?: string | null
-  oscLinks?: TerminalOscLinkRange[]
-  /** Persisted kitty flags from the daemon snapshot, re-applied to the fresh
-   *  emulator so hidden `CSI ? u` answers the real flags instead of ?0u
-   *  (terminal-query-authority.md §kitty). */
-  kittyKeyboardFlags?: number
 }
 
 function getAgentLaunchPlatformForRepo(
@@ -1120,7 +1093,22 @@ export class OrcaRuntimeService {
     { cancel: (emitEnd?: boolean) => void; done: Promise<void>; connectionKey: string }
   >()
   private titleObservationSequence = 0
-  private headlessTerminals = new Map<string, RuntimeHeadlessTerminal>()
+  private readonly headlessTerminalCommands = new RuntimeHeadlessTerminalCommands({
+    getGraph: () => this.graph,
+    getStore: () => this.store,
+    getPtyController: () => this.ptyController,
+    getPtyTranscripts: () => this.ptyTranscripts,
+    getHeadlessHydrationState: () => this.headlessHydrationState,
+    getTerminalSize: (ptyId) => this.getTerminalSize(ptyId),
+    hasRemoteTerminalViewSubscriber: (ptyId) => this.hasRemoteTerminalViewSubscriber(ptyId),
+    recordOsc7MetadataForPty: (ptyId, data) => this.recordOsc7MetadataForPty(ptyId, data),
+    recordRecentPtyOutputForPathProvenance: (ptyId, data) =>
+      this.recordRecentPtyOutputForPathProvenance(ptyId, data),
+    getTrackedRawTitleForPty: (ptyId) => this.getTrackedRawTitleForPty(ptyId),
+    applySeededAgentStatus: (ptyId, title) => this.applySeededAgentStatus(ptyId, title),
+    pathFlavorForPty: (pty) => this.pathFlavorForPty(pty),
+    preferTrackedLastTitle: (ptyId, snapshot) => this.preferTrackedLastTitle(ptyId, snapshot)
+  })
   // Why: latest agent-status payload per pane, retained so worktree.ps can serve
   // mobile the same inline agent rows the desktop sidebar renders. Cleared on pty
   // teardown so dead agents don't linger. See RuntimeAgentRowSnapshot.
@@ -1197,9 +1185,7 @@ export class OrcaRuntimeService {
     // override reset a theme apply implies (terminal-query-authority.md
     // §View-attribute bridge).
     registerTerminalViewAttributesApplier((attributes) => {
-      for (const state of this.headlessTerminals.values()) {
-        state.emulator.applyPushedViewAttributes(attributes)
-      }
+      this.headlessTerminalCommands.applyPushedViewAttributesToAll(attributes)
     })
   }
 
@@ -2561,6 +2547,45 @@ export class OrcaRuntimeService {
     )}`
   }
 
+  // Why: seed-derived agent status reflects historical state. Orchestration
+  // waiters (resolveTuiIdleWaiters, deliverPendingMessages) must only react
+  // to LIVE transitions, so this helper writes leaf.lastAgentStatus only and
+  // never resolves waiters. detectAgentStatusFromTitle wrap mirrors the live
+  // path so seeded and live values are the same union member, keeping
+  // downstream `=== 'idle'` checks correct.
+  private applySeededAgentStatus(ptyId: string, title: string): void {
+    if (!title) {
+      return
+    }
+    // Why: a relaunched main starts its per-PTY title tracker cold — without
+    // this seed it misses the parked working→idle completion and never arms
+    // the stale-title timer for a persisted 'working' title. Seeding no-ops
+    // once a live title was observed, so live state always wins.
+    this.getOrCreatePtyTitleTrackerEntry(ptyId).tracker.seedInitialTitle(title)
+    const status = detectAgentStatusFromTitle(title)
+    // Why: live observations store normalized titles, so seeds must match —
+    // otherwise the first live frame after hydration compares unequal and
+    // touches session tabs once for no visible change.
+    const seededTitle = normalizeTerminalTitle(title)
+    const pty = this.graph.ptysById.get(ptyId)
+    if (pty) {
+      const observedAt = this.nextTitleObservationSequence()
+      pty.lastOscTitle = seededTitle
+      pty.lastOscTitleAt = observedAt
+      this.setPtyManagementTitleFromObservedTitle(pty, seededTitle, observedAt)
+    }
+    for (const leaf of this.getLeavesForPty(ptyId)) {
+      // Why: seed lastOscTitle even when the seeded title doesn't classify
+      // as an agent state, so worktree.ps recomputes status from the live
+      // title rather than treating the leaf as agentless.
+      leaf.lastOscTitle = seededTitle
+      leaf.lastOscTitleAt = this.nextTitleObservationSequence()
+      if (status !== null) {
+        leaf.lastAgentStatus = status
+      }
+    }
+  }
+
   private getOrCreatePtyTitleTrackerEntry(ptyId: string): RuntimePtyTitleTrackerEntry {
     const existing = this.ptyTranscripts.ptyTitleTrackersByPtyId.get(ptyId)
     if (existing) {
@@ -3064,494 +3089,45 @@ export class OrcaRuntimeService {
   // TUI's own redraw, so the resize re-stream must be skipped. Returns false
   // when there is no headless emulator (resize falls back to geometry-only).
   isTerminalAlternateScreen(ptyId: string): boolean {
-    return this.headlessTerminals.get(ptyId)?.emulator.isAlternateScreen ?? false
+    return this.headlessTerminalCommands.isAlternateScreen(ptyId)
   }
 
-  // Why: daemon-backed PTYs that the runtime adopted after an Orca relaunch
-  // start with a fresh headless emulator that has zero scrollback, even though
-  // the daemon's on-disk checkpoint and the desktop xterm both contain the
-  // full prior history. Without this hydration, mobile subscribers see only
-  // the bare current prompt because serializeHeadlessTerminalBuffer always
-  // wins over the renderer-path fallback. Seeding the emulator with the
-  // adapter's snapshot/cold-restore data makes mobile and desktop agree on
-  // what scrollback is available.
-  seedHeadlessTerminal(
-    ptyId: string,
-    data: string,
-    size?: { cols: number; rows: number },
-    metadata: HeadlessSeedMetadata = {}
-  ): void {
-    if (!data) {
-      return
-    }
-    const existing = this.headlessTerminals.get(ptyId)
-    if (existing) {
-      // Why: emulator already has live data — re-seeding would duplicate
-      // every byte. The seed is only valid when the emulator is fresh.
-      return
-    }
-    const dims = size ?? this.getTerminalSize(ptyId) ?? { cols: 80, rows: 24 }
-    const state = this.createPtyHeadlessTerminalState(ptyId, dims)
-    this.headlessTerminals.set(ptyId, state)
-    this.recordOsc7MetadataForPty(ptyId, data)
-    this.recordRecentPtyOutputForPathProvenance(ptyId, data)
-    state.writeChain = state.writeChain
-      .then(async () => {
-        // Why: seed writes never set forwardQueryReplies — the main-side
-        // replay guard. A snapshot containing old queries must answer no one.
-        await state.emulator.write(data)
-        // Why AFTER the seed write: the snapshot payload cannot carry kitty
-        // pushes (rehydrateSequences deliberately omits them), but ordering
-        // behind it keeps the parse deterministic. Unflagged like the seed —
-        // re-applying flags must answer no one.
-        if (typeof metadata.kittyKeyboardFlags === 'number') {
-          await state.emulator.applyKittyKeyboardFlags(metadata.kittyKeyboardFlags)
-        }
-        if (metadata.cwd !== undefined) {
-          state.emulator.setCwd(metadata.cwd)
-        }
-        if (metadata.oscLinks !== undefined) {
-          state.emulator.setRestoredOscLinks(metadata.oscLinks)
-        }
-      })
-      .catch(() => {
-        // Seeding is best-effort; live data will continue to populate the
-        // emulator even if the snapshot replay fails.
-      })
-  }
-
-  // Why: hydrate the runtime headless emulator from the desktop renderer's
-  // xterm buffer on the first onPtyData byte after a PTY is taken over by a
-  // pane. Eager-state pattern matches seedHeadlessTerminal: headlessTerminals
-  // is populated synchronously so concurrent live writes from
-  // trackHeadlessTerminalData chain after the seed via the same writeChain.
-  // See docs/mobile-prefer-renderer-scrollback.md.
-  private maybeHydrateHeadlessFromRenderer(ptyId: string): void {
-    if (this.headlessHydrationState.has(ptyId)) {
-      return
-    }
-    if (this.headlessTerminals.has(ptyId)) {
-      // Daemon-snapshot seed already populated the emulator — skip hydration.
-      this.headlessHydrationState.set(ptyId, 'done')
-      return
-    }
-    const controller = this.ptyController
-    if (!controller?.serializeBuffer || !controller.hasRendererSerializer) {
-      return
-    }
-    if (!controller.hasRendererSerializer(ptyId)) {
-      // Renderer hasn't registered yet (or never will). Live writes lazy-
-      // create the state via trackHeadlessTerminalData on this same tick.
-      return
-    }
-
-    this.headlessHydrationState.set(ptyId, 'pending')
-    const dims = this.getTerminalSize(ptyId) ?? { cols: 80, rows: 24 }
-    // Why: hydration writes below never set forwardQueryReplies (main-side
-    // replay guard) — renderer-buffer snapshots can embed stale queries.
-    const state = this.createPtyHeadlessTerminalState(ptyId, dims)
-    this.headlessTerminals.set(ptyId, state)
-
-    // Why: append the seed work to writeChain so live writes queued by
-    // trackHeadlessTerminalData (after this method returns synchronously)
-    // execute AFTER the seed-write resolves. If we awaited inline before
-    // setting headlessTerminals, the live byte would lazy-create a separate
-    // state and the seed-resolve would overwrite it, dropping live bytes.
-    state.writeChain = state.writeChain.then(async () => {
-      try {
-        const rendered = await controller.serializeBuffer!(ptyId, {
-          scrollbackRows: MOBILE_SUBSCRIBE_SCROLLBACK_ROWS,
-          altScreenForcesZeroRows: true
-        })
-        if (!rendered || rendered.data.length === 0) {
-          return
-        }
-        this.recordOsc7MetadataForPty(ptyId, rendered.data)
-        this.recordRecentPtyOutputForPathProvenance(ptyId, rendered.data)
-        // Resize to renderer's dims so the seed reflows correctly into the
-        // emulator's grid, then resize back to PTY dims (if known) so live
-        // writes use the correct cell layout.
-        if (rendered.cols !== dims.cols || rendered.rows !== dims.rows) {
-          state.emulator.resize(rendered.cols, rendered.rows)
-        }
-        await state.emulator.write(rendered.data)
-        const ptyDims = this.getTerminalSize(ptyId)
-        if (ptyDims && (ptyDims.cols !== rendered.cols || ptyDims.rows !== rendered.rows)) {
-          state.emulator.resize(ptyDims.cols, ptyDims.rows)
-        }
-        // Why: the renderer xterm no longer sees synthetic hook title frames
-        // (they feed main's tracker only), so its serializer lastTitle can be
-        // stale here. Prefer main's tracked title; the renderer's is only the
-        // seed when main has observed none (fresh relaunch, cold tracker).
-        const seedTitle = this.getTrackedRawTitleForPty(ptyId) ?? rendered.lastTitle
-        if (seedTitle) {
-          state.emulator.setLastTitle(seedTitle)
-          this.applySeededAgentStatus(ptyId, seedTitle)
-        }
-      } catch {
-        // Hydration is best-effort. Live writes continue via the same
-        // writeChain that this catch-arm leaves intact.
-      } finally {
-        this.headlessHydrationState.set(ptyId, 'done')
-      }
-    })
-  }
-
-  // Why: seed-derived agent status reflects historical state. Orchestration
-  // waiters (resolveTuiIdleWaiters, deliverPendingMessages) must only react
-  // to LIVE transitions, so this helper writes leaf.lastAgentStatus only and
-  // never resolves waiters. detectAgentStatusFromTitle wrap mirrors the live
-  // path so seeded and live values are the same union member, keeping
-  // downstream `=== 'idle'` checks correct.
-  private applySeededAgentStatus(ptyId: string, title: string): void {
-    if (!title) {
-      return
-    }
-    // Why: a relaunched main starts its per-PTY title tracker cold — without
-    // this seed it misses the parked working→idle completion and never arms
-    // the stale-title timer for a persisted 'working' title. Seeding no-ops
-    // once a live title was observed, so live state always wins.
-    this.getOrCreatePtyTitleTrackerEntry(ptyId).tracker.seedInitialTitle(title)
-    const status = detectAgentStatusFromTitle(title)
-    // Why: live observations store normalized titles, so seeds must match —
-    // otherwise the first live frame after hydration compares unequal and
-    // touches session tabs once for no visible change.
-    const seededTitle = normalizeTerminalTitle(title)
-    const pty = this.graph.ptysById.get(ptyId)
-    if (pty) {
-      const observedAt = this.nextTitleObservationSequence()
-      pty.lastOscTitle = seededTitle
-      pty.lastOscTitleAt = observedAt
-      this.setPtyManagementTitleFromObservedTitle(pty, seededTitle, observedAt)
-    }
-    for (const leaf of this.getLeavesForPty(ptyId)) {
-      // Why: seed lastOscTitle even when the seeded title doesn't classify
-      // as an agent state, so worktree.ps recomputes status from the live
-      // title rather than treating the leaf as agentless.
-      leaf.lastOscTitle = seededTitle
-      leaf.lastOscTitleAt = this.nextTitleObservationSequence()
-      if (status !== null) {
-        leaf.lastAgentStatus = status
-      }
-    }
-  }
-
-  /** Per-chunk reply-ownership capture (Phase 5). Evaluated synchronously at
-   *  ingestion only — never re-read at reply time. */
-  private shouldAnswerQueriesForLiveChunk(ptyId: string): boolean {
-    return shouldModelAnswerHiddenPtyQueries({
-      ptyId,
-      settings: this.store?.getSettings(),
-      hasRemoteViewSubscriber: this.hasRemoteTerminalViewSubscriber(ptyId)
-    })
-  }
-
-  private trackHeadlessTerminalData(
-    ptyId: string,
-    data: string,
-    outputSequence: number,
-    forwardQueryReplies = false
-  ): void {
-    const state = this.getOrCreateHeadlessTerminal(ptyId)
-    state.writeChain = state.writeChain
-      .then(async () => {
-        // Why: the ingestion-time ownership decision is closed over this
-        // chain link; async scheduling cannot retroactively change it.
-        await state.emulator.write(data, { forwardQueryReplies })
-        state.outputSequence = outputSequence
-      })
-      .catch(() => {
-        // Best-effort state tracking; live streaming must continue even if
-        // xterm rejects a malformed or raced write during shutdown.
-      })
-  }
-
-  /** Shared factory for the per-PTY runtime emulators (seed, hydration, and
-   *  lazy live-byte creation): wires the Phase-5 query-reply sink and the
-   *  ConPTY DA1 override. The daemon emulator never goes through here. */
-  private createPtyHeadlessTerminalState(
-    ptyId: string,
-    dims: { cols: number; rows: number }
-  ): RuntimeHeadlessTerminal {
-    let state: RuntimeHeadlessTerminal | null = null
-    const pathFlavor = this.pathFlavorForPty(this.graph.ptysById.get(ptyId))
-    const emulator = new HeadlessEmulator({
-      cols: dims.cols,
-      rows: dims.rows,
-      pathFlavor,
-      remotePosixFileUriAuthority:
-        !!this.graph.ptysById.get(ptyId)?.connectionId && pathFlavor !== 'win32',
-      // Why: replies take the provider input path (same entry as pty:write —
-      // daemon shell-ready gating and the SSH relay write apply unchanged),
-      // NOT writePtyInput, so renderer interactive-output metering never
-      // counts responder traffic as user-input echo.
-      onQueryReply: (reply) => {
-        // Why the identity check: queued writeChain links can parse after
-        // disposeHeadlessTerminal, and daemon respawns reuse session ids — a
-        // stale link's reply must never reach a successor PTY under this id.
-        if (state !== null && this.headlessTerminals.get(ptyId) === state) {
-          // Why this write is safe pre-shell-ready: daemon Session.write
-          // QUEUES (never drops) input while the POSIX shell-ready gate is
-          // pending and flushes at the ready marker or the 15s
-          // SHELL_READY_TIMEOUT_MS bound (session.ts) — a spawn-time query
-          // reply is delayed at most that bound, not lost.
-          this.ptyController?.write(ptyId, reply)
-        }
-      }
-    })
-    if (isNativeWindowsConptyPty(ptyId)) {
-      emulator.installConptyPrimaryDeviceAttributesOverride()
-    }
-    // Why the lazy getter: replies must use the freshest renderer push at
-    // parse time, and stay silent (never default) before the first push.
-    emulator.installViewAttributeResponder(() => getTerminalViewAttributes())
-    const viewAttributes = getTerminalViewAttributes()
-    if (viewAttributes) {
-      emulator.applyPushedViewAttributes(viewAttributes)
-    }
-    state = { emulator, outputSequence: 0, writeChain: Promise.resolve() }
-    return state
-  }
-
-  /** Phase-5 ConPTY DA1 retrofit (terminal-query-authority.md): invoked via
-   *  markNativeWindowsConptyPty when the spawn mark lands after daemon stream
-   *  data already created this PTY's emulator. Idempotent emulator-side. */
-  private ensureNativeWindowsConptyDa1Override(ptyId: string): void {
-    if (isNativeWindowsConptyPty(ptyId)) {
-      this.headlessTerminals.get(ptyId)?.emulator.installConptyPrimaryDeviceAttributesOverride()
-    }
-  }
-
-  private getOrCreateHeadlessTerminal(ptyId: string): RuntimeHeadlessTerminal {
-    const existing = this.headlessTerminals.get(ptyId)
-    if (existing) {
-      return existing
-    }
-    const size = this.getTerminalSize(ptyId) ?? { cols: 80, rows: 24 }
-    const state = this.createPtyHeadlessTerminalState(ptyId, size)
-    this.headlessTerminals.set(ptyId, state)
-    return state
-  }
-
-  private resizeHeadlessTerminal(ptyId: string, cols: number, rows: number): void {
-    const state = this.headlessTerminals.get(ptyId)
-    if (!state) {
-      return
-    }
-    // Why: terminal reflow is a parser operation. It must sit in the same
-    // per-PTY stream as output bytes or restore snapshots can bake in wraps
-    // from the wrong terminal width.
-    state.writeChain = state.writeChain
-      .then(() => {
-        state.emulator.resize(cols, rows)
-      })
-      .catch(() => {
-        // Best-effort mirror tracking; live PTY streaming must continue even
-        // if xterm rejects a raced resize during teardown.
-      })
-  }
-
-  // Public: desktop-initiated clears (ipc/pty.ts) must also drop this mobile
-  // mirror or a resubscribing mobile client resurrects the cleared scrollback.
-  async clearHeadlessTerminalBuffer(ptyId: string): Promise<void> {
-    const state = this.headlessTerminals.get(ptyId)
-    if (!state) {
-      return
-    }
-    // Why: headless writes are queued to preserve xterm parser order. Clear
-    // must join that same chain or an earlier PTY chunk can finish after the
-    // clear request and repopulate mobile scrollback.
-    state.writeChain = state.writeChain.then(() => state.emulator.clearScrollback())
-    await state.writeChain
-  }
-
-  private async serializeTerminalBufferFromAvailableState(
-    ptyId: string,
-    opts: { scrollbackRows?: number } = {}
-  ): Promise<{
-    data: string
-    cols: number
-    rows: number
-    cwd?: string | null
-    lastTitle?: string
-    seq?: number
-    source?: 'headless' | 'renderer'
-    oscLinks?: TerminalOscLinkRange[]
-    alternateScreen?: boolean
-    pendingEscapeTailAnsi?: string
-  } | null> {
-    const headlessSnapshot = await this.serializeHeadlessTerminalBuffer(ptyId, opts)
-    if (headlessSnapshot) {
-      return headlessSnapshot
-    }
-
-    return this.serializeRendererTerminalBuffer(ptyId, opts)
-  }
-
-  private async serializeRendererTerminalBuffer(
-    ptyId: string,
-    opts: { scrollbackRows?: number } = {}
-  ): Promise<{
-    data: string
-    cols: number
-    rows: number
-    cwd?: string | null
-    lastTitle?: string
-    source?: 'renderer'
-    oscLinks?: TerminalOscLinkRange[]
-  } | null> {
-    let rendererSnapshot: {
-      data: string
-      cols: number
-      rows: number
-      cwd?: string | null
-      lastTitle?: string
-      oscLinks?: TerminalOscLinkRange[]
-    } | null = null
-    try {
-      // Why: recovery/read fallback wants visible alt-screen content (e.g. an
-      // active TUI), so altScreenForcesZeroRows is FALSE here. Hydration is
-      // the only path that suppresses alt-screen scrollback.
-      rendererSnapshot = await (this.ptyController?.serializeBuffer?.(ptyId, {
-        scrollbackRows: opts.scrollbackRows,
-        altScreenForcesZeroRows: false
-      }) ?? Promise.resolve(null))
-    } catch {
-      // Why: terminal snapshots should not depend on a mounted renderer pane.
-      // If renderer serialization races reload/unmount, callers can still use
-      // their existing null fallback paths.
-    }
-    return rendererSnapshot
-      ? this.preferTrackedLastTitle(ptyId, {
-          ...rendererSnapshot,
-          cwd: rendererSnapshot.cwd ?? this.ptyTranscripts.terminalCwdByPtyId.get(ptyId),
-          source: 'renderer' as const
-        })
-      : null
-  }
-
-  private async withVisibleSnapshotFallback(
-    ptyId: string,
-    read: RuntimeTerminalRead,
-    opts: { cursor?: number; limit?: number } = {}
-  ): Promise<RuntimeTerminalRead> {
-    if (!shouldFallbackToVisibleTerminalSnapshot(read, opts)) {
-      return read
-    }
-    const lines = await this.readRendererVisibleSnapshotLines(ptyId)
-    if (lines.length === 0) {
-      return read
-    }
-    return buildVisibleSnapshotReadFallback(read, lines, opts.limit)
-  }
-
-  private async readRendererVisibleSnapshotLines(ptyId: string): Promise<string[]> {
-    const controller = this.ptyController
-    if (!controller?.serializeBuffer) {
-      return []
-    }
-    if (controller.hasRendererSerializer && !controller.hasRendererSerializer(ptyId)) {
-      return []
-    }
-    try {
-      // Why: raw PTY tails can be whitespace-only while a full-screen TUI is
-      // visibly nonblank in renderer xterm. Ask the renderer for the active
-      // screen instead of reusing the headless transcript path.
-      const snapshot = await controller.serializeBuffer(ptyId, {
-        scrollbackRows: 0,
-        altScreenForcesZeroRows: false
-      })
-      if (!snapshot || snapshot.data.length === 0) {
-        return []
-      }
-      const emulator = new HeadlessEmulator({
-        cols: snapshot.cols,
-        rows: snapshot.rows,
-        scrollback: 0
-      })
-      try {
-        await emulator.write(snapshot.data)
-        return emulator
-          .getVisibleLines()
-          .map((line) => line.trimEnd())
-          .filter((line) => line.trim().length > 0)
-      } finally {
-        emulator.dispose()
-      }
-    } catch {
-      return []
-    }
-  }
-
-  private async serializeHeadlessTerminalBuffer(
-    ptyId: string,
-    opts: { scrollbackRows?: number; includeEmpty?: boolean } = {}
-  ): Promise<{
-    data: string
-    cols: number
-    rows: number
-    cwd?: string | null
-    lastTitle?: string
-    seq?: number
-    source?: 'headless'
-    oscLinks?: TerminalOscLinkRange[]
-    alternateScreen?: boolean
-    scrollbackAnsi?: string
-    // Why: dangling mid-escape tail the restorer must write LAST, after any
-    // reset, so the next live chunk completes it instead of rendering it
-    // literally (Bug E / #7329).
-    pendingEscapeTailAnsi?: string
-  } | null> {
-    const state = this.headlessTerminals.get(ptyId)
-    if (!state) {
-      return null
-    }
-    await state.writeChain
-    // Why: normal history is separated from an active alternate frame, so the
-    // caller's scrollback policy can be honored without painting it into alt.
-    const isAlternateScreen = state.emulator.isAlternateScreen
-    const scrollbackRows = opts.scrollbackRows ?? 0
-    const snapshot = state.emulator.getSnapshot({ scrollbackRows })
-    const data = snapshot.rehydrateSequences + snapshot.snapshotAnsi
-    return data.length > 0 || opts.includeEmpty === true
-      ? this.preferTrackedLastTitle(ptyId, {
-          data,
-          cols: snapshot.cols,
-          rows: snapshot.rows,
-          cwd: snapshot.cwd ?? this.ptyTranscripts.terminalCwdByPtyId.get(ptyId),
-          lastTitle: snapshot.lastTitle,
-          seq: state.outputSequence,
-          source: 'headless' as const,
-          oscLinks: snapshot.oscLinks,
-          scrollbackAnsi: snapshot.scrollbackAnsi,
-          ...(snapshot.pendingEscapeTailAnsi
-            ? { pendingEscapeTailAnsi: snapshot.pendingEscapeTailAnsi }
-            : {}),
-          // Why: lets the renderer skip the destructive scrollback clear when
-          // restoring an alt-screen snapshot — clearing wipes xterm's own
-          // history that the TUI relies on for scroll-up after a tab return.
-          alternateScreen: isAlternateScreen,
-          // Why NOT folded into data: the renderer writes its post-replay
-          // reset after data, and any ESC after a dangling partial aborts it.
-          // The restorer writes this last (Bug E fix).
-          pendingEscapeTailAnsi: snapshot.pendingEscapeTailAnsi
-        })
-      : null
-  }
-
-  private disposeHeadlessTerminal(ptyId: string): void {
-    this.headlessHydrationState.delete(ptyId)
-    const state = this.headlessTerminals.get(ptyId)
-    if (!state) {
-      return
-    }
-    this.headlessTerminals.delete(ptyId)
-    // Why: queued chain links still parse below before the emulator disposes;
-    // sever the reply sink now so they cannot write to a respawned PTY that
-    // reused this id (belt to the sink's state-identity check).
-    state.emulator.disableQueryReplyForwarding()
-    state.writeChain.finally(() => state.emulator.dispose()).catch(() => state.emulator.dispose())
-  }
+  seedHeadlessTerminal: RuntimeHeadlessTerminalCommands['seedHeadlessTerminal'] =
+    this.headlessTerminalCommands.seedHeadlessTerminal.bind(this.headlessTerminalCommands)
+  maybeHydrateHeadlessFromRenderer: RuntimeHeadlessTerminalCommands['maybeHydrateHeadlessFromRenderer'] =
+    this.headlessTerminalCommands.maybeHydrateHeadlessFromRenderer.bind(
+      this.headlessTerminalCommands
+    )
+  shouldAnswerQueriesForLiveChunk: RuntimeHeadlessTerminalCommands['shouldAnswerQueriesForLiveChunk'] =
+    this.headlessTerminalCommands.shouldAnswerQueriesForLiveChunk.bind(
+      this.headlessTerminalCommands
+    )
+  trackHeadlessTerminalData: RuntimeHeadlessTerminalCommands['trackHeadlessTerminalData'] =
+    this.headlessTerminalCommands.trackHeadlessTerminalData.bind(this.headlessTerminalCommands)
+  ensureNativeWindowsConptyDa1Override: RuntimeHeadlessTerminalCommands['ensureNativeWindowsConptyDa1Override'] =
+    this.headlessTerminalCommands.ensureNativeWindowsConptyDa1Override.bind(
+      this.headlessTerminalCommands
+    )
+  resizeHeadlessTerminal: RuntimeHeadlessTerminalCommands['resizeHeadlessTerminal'] =
+    this.headlessTerminalCommands.resizeHeadlessTerminal.bind(this.headlessTerminalCommands)
+  clearHeadlessTerminalBuffer: RuntimeHeadlessTerminalCommands['clearHeadlessTerminalBuffer'] =
+    this.headlessTerminalCommands.clearHeadlessTerminalBuffer.bind(this.headlessTerminalCommands)
+  serializeTerminalBufferFromAvailableState: RuntimeHeadlessTerminalCommands['serializeTerminalBufferFromAvailableState'] =
+    this.headlessTerminalCommands.serializeTerminalBufferFromAvailableState.bind(
+      this.headlessTerminalCommands
+    )
+  serializeRendererTerminalBuffer: RuntimeHeadlessTerminalCommands['serializeRendererTerminalBuffer'] =
+    this.headlessTerminalCommands.serializeRendererTerminalBuffer.bind(
+      this.headlessTerminalCommands
+    )
+  withVisibleSnapshotFallback: RuntimeHeadlessTerminalCommands['withVisibleSnapshotFallback'] =
+    this.headlessTerminalCommands.withVisibleSnapshotFallback.bind(this.headlessTerminalCommands)
+  serializeHeadlessTerminalBuffer: RuntimeHeadlessTerminalCommands['serializeHeadlessTerminalBuffer'] =
+    this.headlessTerminalCommands.serializeHeadlessTerminalBuffer.bind(
+      this.headlessTerminalCommands
+    )
+  disposeHeadlessTerminal: RuntimeHeadlessTerminalCommands['disposeHeadlessTerminal'] =
+    this.headlessTerminalCommands.disposeHeadlessTerminal.bind(this.headlessTerminalCommands)
 
   resolveLeafForHandle(handle: string): { ptyId: string | null } | null {
     const record = this.graph.handles.get(handle)

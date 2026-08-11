@@ -138,6 +138,17 @@ inline frontend/src/main/runtime/orca-runtime-mobile-session-notify.ts
 # Terminal/PTY/Agent-status core. Only marginally over budget (304 vs 300
 # lines).
 inline frontend/src/main/runtime/orca-runtime-mobile-dictation.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-064, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's headless (server-owned) PTY emulator
+# command block (seedHeadlessTerminal, maybeHydrateHeadlessFromRenderer,
+# trackHeadlessTerminalData, serialize*/dispose* helpers — 16 methods),
+# already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. One of the largest/riskiest domains moved off orca-runtime.ts
+# in this effort (14 host deps, zero test coverage) — extracted only
+# after the user explicitly accepted that risk, matching the scale of
+# TASK-BIGFILE-051's mobile-session-tabs cluster 1.
+inline frontend/src/main/runtime/orca-runtime-headless-terminal.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts

@@ -91,6 +91,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 61 | [TASK-BIGFILE-061](./TASK-BIGFILE-061-orca-runtime-terminal-message-waiter-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-terminal-message-waiter.ts` | S | 54 | ✅ |
 | 62 | [TASK-BIGFILE-062](./TASK-BIGFILE-062-orca-runtime-remote-terminal-view-subscriber-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-remote-terminal-view-subscriber.ts` | S | 54 | ✅ |
 | 63 | [TASK-BIGFILE-063](./TASK-BIGFILE-063-orca-runtime-pty-transcript-store.md) | Extract (state container, không phải domain) | `orca-runtime.ts` → `orca-runtime-pty-transcript-store.ts` | M | 41, 54 | ✅ |
+| 64 | [TASK-BIGFILE-064](./TASK-BIGFILE-064-orca-runtime-headless-terminal-domain.md) | Move (composition) — rủi ro cao | `orca-runtime.ts` → `orca-runtime-headless-terminal.ts` | L | 63 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
