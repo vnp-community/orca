@@ -3,7 +3,46 @@
 **Loại:** Move — composition pattern (KHÔNG phải barrel, class có `this`)
 · **Effort:** M (chứa 1 method khổng lồ — xem cảnh báo) · **Phụ thuộc:**
 TASK-BIGFILE-008, 009
-**Status:** ⬜ Todo
+**Status:** ✅ Done
+
+## Kết quả thực thi (2026-08-10)
+
+- Phạm vi thực tế rộng hơn 5 method gốc: thêm `resolveWorktreeRemovalTarget`
+  và `removeWorktreeMetadataAndHistory` (2 private helper CHỈ dùng bởi
+  domain này, task doc gốc bỏ sót — cùng pattern lặp lại ở mọi task trước).
+- Phát hiện quan trọng: `killAllProcessesForWorktree` (hàm ngoài, ở
+  `worktree-teardown.ts`) nhận tham số `runtime?: OrcaRuntimeService` và
+  gọi `.stopTerminalsForWorktree()` trên đó — code gốc truyền `runtime:
+  this`. Nếu giữ nguyên sau khi tách, `this` sẽ trỏ vào class MỚI
+  (`RuntimeBranchCleanupCommands`), SAI KIỂU. Thêm `getRuntimeForTeardown():
+  OrcaRuntimeService` vào host interface, implement ở `orca-runtime.ts`
+  bằng `() => this` (nơi `this` thực sự là `OrcaRuntimeService`).
+- Dùng đúng pattern `const store = this.host.getStore(); if (!store) throw`
+  rồi dùng biến local `store` (không gọi lại `getStore()` nhiều lần) —
+  khớp với cách code gốc đã làm sẵn (`const store = this.store` sau guard),
+  giữ nguyên TS narrowing.
+- Domain phụ thuộc ~10 dependency ngoài (nhiều nhất trong 5 task): store,
+  requireStore, resolveWorktreeSelector, agentBrowserBridge,
+  offscreenBrowserBackend, getLocalProvider, onPtyStopped,
+  clearOptimisticReconcileToken, invalidateResolvedWorktreeCache,
+  notifyWorktreesChanged, getRuntimeForTeardown — tất cả qua host
+  interface với closure lazy.
+- File mới vượt ngưỡng oxlint `max-lines` (844 dòng, chủ yếu do
+  `removeManagedWorktree` tự nó ~490 dòng) — đăng ký
+  `config/max-lines-baseline.txt` kèm disable comment "NEEDS PR REVIEW"
+  theo đúng chính sách `AGENTS.md`, KHÔNG tự ý bỏ qua.
+- Tiện thể sửa 1 lỗi `unicorn/no-useless-spread` phát sinh khi tách file
+  (`{...(warning ? {warning} : {}) }` → `warning ? {warning} : {}`) — an
+  toàn, không đổi hành vi.
+- `orca-runtime.ts`: 24,016 → **23,264 dòng** (giảm ~752 dòng — nhiều nhất
+  trong 5 task, vì `removeManagedWorktree` là method lớn nhất class). File
+  mới: 844 dòng.
+- Xác minh: `tsc --noEmit --composite false` 251 lỗi pre-existing không
+  đổi (0 lỗi mới), `oxlint` sạch (exit 0) cả 2 config sau khi đăng ký
+  baseline.
+- **CHƯA làm**: chưa chạy test PTY/worktree-removal thủ công (thao tác
+  phá huỷ, rủi ro cao nếu có lỗi copy) — khuyến nghị kiểm tra kỹ trước khi
+  coi là an toàn deploy.
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-002-orca-runtime.md` (Giai
 đoạn 3) · Sinh ra từ `TASK-BIGFILE-035`
 

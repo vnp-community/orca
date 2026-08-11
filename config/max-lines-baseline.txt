@@ -11,6 +11,15 @@
 # described in SOLUTION-FE-BIGFILE-002 to actually shrink below budget;
 # tracked there, not deferred silently.
 inline frontend/src/main/runtime/orca-runtime-tail-buffer.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-039, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's pre-existing removeManagedWorktree method
+# (~490 lines verbatim, itself already covered by orca-runtime.ts's own
+# grandfathered max-lines disable) plus its direct helper methods. The
+# 490-line method itself is a separate, un-tracked internal-refactor
+# candidate (split into smaller functions) — not addressed here to keep
+# this a pure Move; see TASK-BIGFILE-039's task doc.
+inline frontend/src/main/runtime/orca-runtime-branch-cleanup.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
