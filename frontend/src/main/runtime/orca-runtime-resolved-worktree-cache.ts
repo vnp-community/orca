@@ -28,7 +28,7 @@ import { listRuntimeFolderWorkspaces, withTimeout } from './orca-runtime'
 const RESOLVED_WORKTREE_CACHE_TTL_MS = 1000
 const RESOLVED_WORKTREE_REPO_TIMEOUT_MS = 5000
 
-type ResolvedWorktreeCacheEntry = {
+export type ResolvedWorktreeCacheEntry = {
   expiresAt: number
   worktrees: ResolvedWorktree[]
 }
