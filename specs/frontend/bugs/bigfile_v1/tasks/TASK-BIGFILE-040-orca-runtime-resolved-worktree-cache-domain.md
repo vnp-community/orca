@@ -2,7 +2,35 @@
 
 **Loại:** Move — composition pattern (KHÔNG phải barrel, class có `this`)
 · **Effort:** S · **Phụ thuộc:** TASK-BIGFILE-008, 009
-**Status:** ⬜ Todo
+**Status:** ✅ Done
+
+## Kết quả thực thi (2026-08-10)
+
+- Domain thực tế RỘNG hơn nhiều so với task doc gốc: `invalidateResolvedWorktreeCache`
+  có **~29 call site** rải khắp class (không chỉ trong vùng 9 method dự
+  kiến) — vẫn tách được, chỉ cần forward field bình thường.
+- Phát hiện quan trọng: field `resolvedWorktreeCache` được ĐỌC TRỰC TIẾP
+  (không qua method) tại **3 nơi khác** ngoài vùng dự kiến (dòng
+  ~9449/9468/18752, fast-path cache peek trong `listTerminals` và
+  `validateLineageParent`) — thêm accessor `peekCache()` trên class mới
+  để 3 nơi này vẫn hoạt động đúng.
+- Phát hiện thêm: `listRepoWorktreesForResolution`/
+  `pruneLineageForMissingRepoWorktrees` (khai báo `private` trong code
+  gốc) thực ra được gọi từ 1 method KHÁC ngoài vùng di chuyển (dòng
+  ~13579, luồng "detect worktrees") — phải đổi từ `private` sang public
+  trên class mới thay vì xoá hẳn khỏi `OrcaRuntimeService`.
+- Dùng đúng pattern composition + host interface tối thiểu (giống
+  TASK-036): `getStore()`, `requireStore()`, `notifyWorktreesChanged()`,
+  `notifierWorktreesChanged()`, `emitWorktreesChangedClientEvent()`.
+- Một số helper dùng chéo với method KHÁC còn lại trong `orca-runtime.ts`
+  (`withTimeout` — dùng bởi `withTimeoutResult` ở method khác;
+  `listRuntimeFolderWorkspaces`, `RuntimeStore`, `RuntimeWorktreeScanResult`
+  — dùng ở method khác) → thêm `export`, import type/value ngược lại vào
+  file mới thay vì di chuyển hẳn.
+- `orca-runtime.ts`: 24,274 → **24,016 dòng** (giảm ~258 dòng). File mới:
+  331 dòng.
+- Xác minh: `tsc --noEmit --composite false` 251 lỗi pre-existing không
+  đổi (0 lỗi mới), `oxlint` sạch (exit 0) cả 2 config.
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-002-orca-runtime.md` (Giai
 đoạn 3) · Sinh ra từ `TASK-BIGFILE-035`
 
