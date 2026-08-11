@@ -4,9 +4,53 @@
 · **Effort:** L (khối lớn nhất trong 5 task sinh từ TASK-035, ~1,830 dòng)
 · **Phụ thuộc:** TASK-BIGFILE-008, 009, khuyến nghị làm SAU TASK-036 (để
 xác nhận pattern composition hoạt động đúng trên khối nhỏ trước)
-**Status:** ⬜ Todo
+**Status:** ✅ Done
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-002-orca-runtime.md` (Giai
 đoạn 3) · Sinh ra từ `TASK-BIGFILE-035`
+
+## Kết quả thực thi (2026-08-10)
+
+- **Cảnh báo trong task doc gốc đã đúng**: `onPtyExit` (nằm giữa vùng dòng
+  dự kiến) là 1 method xử lý PTY-exit CHÉO NHIỀU domain (PTY output
+  buffer, agent-team teardown, leaf/pty graph state) — chỉ ~30% thân hàm
+  là dọn state mobile-floor. **KHÔNG di chuyển `onPtyExit`** — giữ nguyên
+  trong `OrcaRuntimeService`, thêm 1 method `clearStateForExitedPty(ptyId)`
+  trên class mới để `onPtyExit` gọi vào (thay 12 dòng xoá field trực tiếp
+  bằng 1 dòng delegate), phần dọn dẹp PTY-lifecycle khác giữ nguyên tại chỗ.
+- **Phát hiện thêm — quan trọng nhất phiên này**: rà soát TOÀN BỘ file cho
+  cả 19 field sẽ di chuyển (không chỉ trong dải dòng dự kiến) phát hiện
+  **5+ method/field nằm RẢI RÁC ngoài vùng dòng gốc**: `resizeForClient`
+  (~100 dòng, cách xa ~100 dòng), `isMobileTerminalQueryReplyAuthority` +
+  field liên quan trong `hasRemoteTerminalViewSubscriber` (cách xa ~1,300
+  dòng), `subscribeToDriverChanges` + field `driverListeners` (cách xa
+  ~1,300 dòng), `getTerminalFitOverride`/`getAllTerminalFitOverrides`/
+  `getAllTerminalDrivers`/`getAllBrowserDrivers`/`onClientDisconnected` (bị
+  bỏ sót khi build forward list, phát hiện qua `tsc` báo lỗi từ
+  `rpc/methods/terminal.ts` — 1 external caller thực tế ngoài
+  `orca-runtime.ts`). Đây là domain đầu tiên trong 5 domain mà việc dò
+  "toàn bộ field, không chỉ dải dòng" thực sự bắt được lỗi — các domain
+  trước (036/038/040) không có case này.
+- Host interface có **~10 dependency** (giống độ phức tạp TASK-039):
+  getStore, getNotifier (minimal 3-method shape), getPtyController,
+  getTerminalSize, resizeHeadlessTerminal,
+  notifyRemoteTerminalViewPresenceChanged, notifyFitOverrideListeners,
+  revokeTerminalFileGrantsForClient, cancelMobileDictationForClient,
+  cancelBrowserScreencastForPage, getAgentBrowserBridge.
+- 3 method private gốc (`enqueueLayout`, `resolveDesktopRestoreTarget`,
+  `getBrowserDriver`/`setBrowserDriver`) phải đổi thành public vì được gọi
+  từ method khác NGOÀI class mới (cùng pattern lặp lại từ TASK-039/040).
+- File mới vượt `max-lines` (2,200 dòng) — đăng ký
+  `config/max-lines-baseline.txt` "NEEDS PR REVIEW" theo đúng chính sách.
+- `orca-runtime.ts`: 23,264 → **21,263 dòng** (giảm ~2,001 dòng — LỚN NHẤT
+  trong toàn bộ 5 task composition). File mới: 2,200 dòng.
+- Xác minh: `tsc --noEmit --composite false` 251 lỗi pre-existing không
+  đổi (0 lỗi mới, xác nhận qua diff error-set trước/sau), `oxlint` sạch
+  (exit 0) cả 2 config.
+- **CHƯA làm**: chưa chạy test mobile-floor/remote-desktop/layout thủ
+  công (domain có docs riêng `docs/mobile-presence-lock.md`,
+  `docs/mobile-terminal-layout-state-machine.md`, độ phức tạp logic cao —
+  khuyến nghị kiểm tra kỹ: mobile subscribe/unsubscribe, remote-desktop
+  claim/release, resize đa viewer trước khi coi là an toàn deploy).
 
 ## Input
 

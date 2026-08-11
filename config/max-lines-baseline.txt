@@ -20,6 +20,16 @@ inline frontend/src/main/runtime/orca-runtime-tail-buffer.ts
 # candidate (split into smaller functions) — not addressed here to keep
 # this a pure Move; see TASK-BIGFILE-039's task doc.
 inline frontend/src/main/runtime/orca-runtime-branch-cleanup.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-037, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's mobile floor / remote-desktop / layout-queue
+# method block (~2,000 lines verbatim, itself already covered by
+# orca-runtime.ts's own grandfathered max-lines disable). The largest of the
+# 5 composition-pattern domains split off orca-runtime.ts to date; further
+# internal splitting (e.g. remote-desktop-viewer vs layout-state-machine vs
+# mobile-subscriber-tracking) is a separate, un-tracked refactor candidate —
+# not addressed here to keep this a pure Move; see TASK-BIGFILE-037's task doc.
+inline frontend/src/main/runtime/orca-runtime-mobile-floor.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
