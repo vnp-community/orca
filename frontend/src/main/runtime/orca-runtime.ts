@@ -290,7 +290,7 @@ import { BrowserWindow, ipcMain } from 'electron'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
 import { BrowserError } from '../browser/cdp-bridge'
-import { getPRForBranch, getRepoSlug, getRepoUpstream, listWorkItems } from '../github/client'
+import { getPRForBranch, getRepoUpstream } from '../github/client'
 import { getHostedReviewForBranch as getHostedReviewForBranchFromRepo } from '../source-control/hosted-review'
 import type { ForgeProviderId } from '../source-control/forge-provider'
 import {
@@ -9183,22 +9183,6 @@ export class OrcaRuntimeService {
     return isWslUncPath(scope.path) ? 'linux' : process.platform
   }
 
-  async getRepoSlug(repoSelector: string): Promise<{ owner: string; repo: string } | null> {
-    const repo = await this.resolveRepoSelector(repoSelector)
-    const options = this.getHostedReviewExecutionOptions(repo)
-    return options
-      ? getRepoSlug(repo.path, repo.connectionId ?? null, options)
-      : getRepoSlug(repo.path, repo.connectionId ?? null)
-  }
-
-  async getRepoUpstream(repoSelector: string): Promise<{ owner: string; repo: string } | null> {
-    const repo = await this.resolveRepoSelector(repoSelector)
-    const options = this.getHostedReviewExecutionOptions(repo)
-    return options
-      ? getRepoUpstream(repo.path, repo.connectionId ?? null, options)
-      : getRepoUpstream(repo.path, repo.connectionId ?? null)
-  }
-
   // Why: repos added before fork detection existed have no stored `upstream`, so
   // their avatar/badge would never self-correct. Resolve it once at startup for
   // local git repos; SSH repos resolve lazily when their settings open (their
@@ -9232,26 +9216,6 @@ export class OrcaRuntimeService {
     } catch {
       // Best-effort startup backfill; never disrupt launch.
     }
-  }
-
-  async listRepoWorkItems(
-    repoSelector: string,
-    limit?: number,
-    query?: string,
-    before?: string,
-    noCache?: boolean
-  ): Promise<Awaited<ReturnType<typeof listWorkItems>>> {
-    const repo = await this.resolveRepoSelector(repoSelector)
-    return listWorkItems(
-      repo.path,
-      limit,
-      query,
-      before,
-      repo.issueSourcePreference,
-      repo.connectionId ?? null,
-      noCache,
-      ...this.getLocalGitExecutionOptionArgs(repo)
-    )
   }
 
   private readonly issueTrackingCommands = new RuntimeIssueTrackingCommands({
@@ -9403,6 +9367,12 @@ export class OrcaRuntimeService {
     this.issueTrackingCommands.updateRepoPRState.bind(this.issueTrackingCommands)
   updateRepoPRTitle: RuntimeIssueTrackingCommands['updateRepoPRTitle'] =
     this.issueTrackingCommands.updateRepoPRTitle.bind(this.issueTrackingCommands)
+  getRepoSlug: RuntimeIssueTrackingCommands['getRepoSlug'] =
+    this.issueTrackingCommands.getRepoSlug.bind(this.issueTrackingCommands)
+  getRepoUpstream: RuntimeIssueTrackingCommands['getRepoUpstream'] =
+    this.issueTrackingCommands.getRepoUpstream.bind(this.issueTrackingCommands)
+  listRepoWorkItems: RuntimeIssueTrackingCommands['listRepoWorkItems'] =
+    this.issueTrackingCommands.listRepoWorkItems.bind(this.issueTrackingCommands)
 
   private readonly repoHooksCommands = new RuntimeRepoHooksCommands({
     resolveRepoSelector: (selector) => this.resolveRepoSelector(selector)

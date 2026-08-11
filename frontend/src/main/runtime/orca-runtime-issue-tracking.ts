@@ -17,8 +17,11 @@ import type { StatsCollector } from '../stats/collector'
 import type { RuntimeStore } from './orca-runtime'
 import {
   getPRForBranch,
+  getRepoSlug as getGitHubRepoSlug,
+  getRepoUpstream as getGitHubRepoUpstream,
   getWorkItem,
   listIssues as listGitHubIssues,
+  listWorkItems as listGitHubWorkItems,
   countWorkItems,
   getPRChecks,
   getPRCheckDetails,
@@ -164,6 +167,46 @@ export class RuntimeIssueTrackingCommands {
       throw new Error('Access denied: worktree does not belong to repository')
     }
     return { repo, repoPath: worktree.path }
+  }
+
+  // Why (TASK-BIGFILE-048): sat right next to this domain's composition
+  // wiring in orca-runtime.ts, same "task doc under-scoped from a shallow
+  // grep" pattern as every prior BIGFILE task — TASK-BIGFILE-042 missed
+  // these 3 when it extracted the rest of this domain.
+  async getRepoSlug(repoSelector: string): Promise<{ owner: string; repo: string } | null> {
+    const repo = await this.host.resolveRepoSelector(repoSelector)
+    const options = this.host.getHostedReviewExecutionOptions(repo)
+    return options
+      ? getGitHubRepoSlug(repo.path, repo.connectionId ?? null, options)
+      : getGitHubRepoSlug(repo.path, repo.connectionId ?? null)
+  }
+
+  async getRepoUpstream(repoSelector: string): Promise<{ owner: string; repo: string } | null> {
+    const repo = await this.host.resolveRepoSelector(repoSelector)
+    const options = this.host.getHostedReviewExecutionOptions(repo)
+    return options
+      ? getGitHubRepoUpstream(repo.path, repo.connectionId ?? null, options)
+      : getGitHubRepoUpstream(repo.path, repo.connectionId ?? null)
+  }
+
+  async listRepoWorkItems(
+    repoSelector: string,
+    limit?: number,
+    query?: string,
+    before?: string,
+    noCache?: boolean
+  ): Promise<Awaited<ReturnType<typeof listGitHubWorkItems>>> {
+    const repo = await this.host.resolveRepoSelector(repoSelector)
+    return listGitHubWorkItems(
+      repo.path,
+      limit,
+      query,
+      before,
+      repo.issueSourcePreference,
+      repo.connectionId ?? null,
+      noCache,
+      ...this.host.getLocalGitExecutionOptionArgs(repo)
+    )
   }
 
   async listRepoIssues(
