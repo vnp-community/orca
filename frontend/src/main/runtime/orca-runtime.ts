@@ -21,6 +21,8 @@ import { RuntimeMobileSessionTerminalCommands } from './orca-runtime-mobile-sess
 import { RuntimeMobileSessionNotifyCommands } from './orca-runtime-mobile-session-notify'
 import { RuntimeMobileDictationCommands } from './orca-runtime-mobile-dictation'
 import { RuntimeAccountServicesCommands } from './orca-runtime-account-services'
+import { RuntimePtyWaitBlockedCheckCommands } from './orca-runtime-pty-wait-blocked-check'
+import { RuntimeTerminalMessageWaiterCommands } from './orca-runtime-terminal-message-waiter'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -271,7 +273,6 @@ import { applyPRBotAuthorOverride } from '../../shared/pr-bot-author-overrides'
 import type { VoiceSettings } from '../../shared/speech-types'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
 import {
-  MAX_TAIL_CHARS,
   appendRecentPtyOutput,
   appendRecentPtyPathCandidates,
   recentTerminalPathCandidatesIncludePath,
@@ -309,7 +310,6 @@ import {
   mapExplicitAgentStateToRuntimeTerminalStatus,
   maxTimestamp,
   mergeWorktreeStatus,
-  MESSAGE_WAIT_DEFAULT_TIMEOUT_MS,
   normalizeTerminalChunk,
   parseRuntimeWorktreeId,
   readTerminalTail,
@@ -834,14 +834,6 @@ export type TerminalWaiter = {
   abortCleanup: (() => void) | null
 }
 
-type MessageWaiter = {
-  handle: string
-  typeFilter: string[] | undefined
-  resolve: (result: void) => void
-  timeout: NodeJS.Timeout | null
-  abortCleanup: (() => void) | null
-}
-
 export function omitUndefinedProperties<T extends Record<string, unknown>>(value: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(value).filter(([, entry]) => entry !== undefined)
@@ -1110,7 +1102,6 @@ export class OrcaRuntimeService {
   private ptyForegroundAgentRefreshes = new Map<string, PtyForegroundAgentRefresh>()
   private ptyDelayedForegroundSnapshotTitleObservations = new Map<string, number>()
   private _orchestrationDb: OrchestrationDb | null = null
-  private messageWaitersByHandle = new Map<string, Set<MessageWaiter>>()
   // Why: mobile clients subscribe to terminal output via terminal.subscribe.
   // These listeners fire on every onPtyData call, enabling real-time streaming
   // without polling. Keyed by ptyId for O(1) lookup per data event.
@@ -1161,23 +1152,6 @@ export class OrcaRuntimeService {
   // Why: OSC 9999 status can span PTY chunks. Keeping parser state in the
   // runtime lets hidden/model-owned terminals observe agent state without a
   // mounted xterm view.
-  // Why a throttle: the blocked-reason check builds and scans two full wait
-  // texts (<=256KB each, lowercased) — measured at ~85% of onPtyData's cost
-  // under a TUI flood (findings log 2026-07-03). PTY chunk boundaries are
-  // arbitrary, so running the identical computation over coalesced chunks at
-  // a bounded cadence (plus a trailing-edge timer so burst-final state is
-  // always evaluated) preserves semantics while removing it from the hot path.
-  private waitBlockedCheckStateByPtyId = new Map<
-    string,
-    {
-      lastAt: number
-      lastWaitState: TerminalTailWaitState | null
-      appended: string
-      keywordCarry: string
-      timer: ReturnType<typeof setTimeout> | null
-    }
-  >()
-
   private agentStatusOscProcessorsByPtyId = new Map<
     string,
     ReturnType<typeof createAgentStatusOscProcessor>
@@ -2392,79 +2366,16 @@ export class OrcaRuntimeService {
     return outputSequence
   }
 
-  private scheduleWaitBlockedCheck(ptyId: string, appendedText: string, at: number): void {
-    let state = this.waitBlockedCheckStateByPtyId.get(ptyId)
-    if (!state) {
-      state = { lastAt: 0, lastWaitState: null, appended: '', keywordCarry: '', timer: null }
-      this.waitBlockedCheckStateByPtyId.set(ptyId, state)
-    }
-    const appendedLower = appendedText.toLowerCase()
-    const keywordHit = WAIT_BLOCKED_KEYWORD_PATTERN.test(`${state.keywordCarry}${appendedLower}`)
-    state.keywordCarry = appendedLower.slice(-WAIT_BLOCKED_KEYWORD_CARRY_CHARS)
-    // Why the cap keeps the tail: the accumulated text only anchors boundary-
-    // spanning prompt detection; anything past the tail cap has scrolled out
-    // of the retained tail the check reads anyway.
-    state.appended =
-      state.appended.length + appendedText.length > MAX_TAIL_CHARS
-        ? `${state.appended}${appendedText}`.slice(-MAX_TAIL_CHARS)
-        : `${state.appended}${appendedText}`
-    const elapsed = at - state.lastAt
-    if (keywordHit || elapsed >= WAIT_BLOCKED_CHECK_MIN_INTERVAL_MS || elapsed < 0) {
-      this.runWaitBlockedCheck(ptyId, state, at)
-      return
-    }
-    if (!state.timer) {
-      // Why trailing edge: the final chunks of a burst must still be
-      // evaluated or a prompt arriving right after a flood would go
-      // unstamped until the next output.
-      state.timer = setTimeout(() => {
-        state.timer = null
-        this.runWaitBlockedCheck(ptyId, state, Date.now())
-      }, WAIT_BLOCKED_CHECK_MIN_INTERVAL_MS - elapsed)
-    }
-  }
+  private readonly ptyWaitBlockedCheckCommands = new RuntimePtyWaitBlockedCheckCommands({
+    getGraph: () => this.graph
+  })
 
-  private runWaitBlockedCheck(
-    ptyId: string,
-    state: {
-      lastAt: number
-      lastWaitState: TerminalTailWaitState | null
-      appended: string
-      keywordCarry: string
-      timer: ReturnType<typeof setTimeout> | null
-    },
-    at: number
-  ): void {
-    const pty = this.graph.ptysById.get(ptyId)
-    if (!pty) {
-      state.appended = ''
-      return
-    }
-    const nextWaitState = computeTerminalTailWaitState(
-      pty.tailBuffer,
-      pty.tailPartialLine,
-      pty.preview
+  scheduleWaitBlockedCheck: RuntimePtyWaitBlockedCheckCommands['scheduleWaitBlockedCheck'] =
+    this.ptyWaitBlockedCheckCommands.scheduleWaitBlockedCheck.bind(this.ptyWaitBlockedCheckCommands)
+  clearWaitBlockedCheckState: RuntimePtyWaitBlockedCheckCommands['clearWaitBlockedCheckState'] =
+    this.ptyWaitBlockedCheckCommands.clearWaitBlockedCheckState.bind(
+      this.ptyWaitBlockedCheckCommands
     )
-    const previousWaitState = state.lastWaitState ?? {
-      waitText: '',
-      signal: null,
-      fromTail: false
-    }
-    if (tailGainedNewerBlockedReason(previousWaitState, nextWaitState, state.appended)) {
-      pty.waitBlockedAt = at
-    }
-    state.lastAt = at
-    state.lastWaitState = nextWaitState
-    state.appended = ''
-  }
-
-  private clearWaitBlockedCheckState(ptyId: string): void {
-    const state = this.waitBlockedCheckStateByPtyId.get(ptyId)
-    if (state?.timer) {
-      clearTimeout(state.timer)
-    }
-    this.waitBlockedCheckStateByPtyId.delete(ptyId)
-  }
 
   private processAgentStatusOscForPty(ptyId: string, data: string): ProcessedAgentStatusChunk {
     let processor = this.agentStatusOscProcessorsByPtyId.get(ptyId)
@@ -8985,105 +8896,19 @@ export class OrcaRuntimeService {
     return this.getLeavesForPty(ptyId)[0] ?? null
   }
 
-  deliverPendingMessagesForHandle(handle: string): void {
-    try {
-      const { leaf } = this.getLiveLeafForHandle(handle)
-      if (leaf.lastAgentStatus === 'idle') {
-        this.deliverPendingMessages(leaf)
-      }
-    } catch {
-      // Unknown or stale handles cannot be pushed immediately; the persisted
-      // message remains available via explicit check or future idle delivery.
-    }
-  }
+  private readonly terminalMessageWaiterCommands = new RuntimeTerminalMessageWaiterCommands({
+    getLiveLeafForHandle: (handle) => this.getLiveLeafForHandle(handle),
+    deliverPendingMessages: (leaf) => this.deliverPendingMessages(leaf)
+  })
 
-  // Why: after a message is inserted for a recipient, any blocking
-  // orchestration.check --wait calls watching that handle must be woken
-  // so they can return the new message immediately instead of polling.
-  notifyMessageArrived(handle: string, messageType?: string): void {
-    const waiters = this.messageWaitersByHandle.get(handle)
-    if (!waiters || waiters.size === 0) {
-      return
-    }
-    for (const waiter of [...waiters]) {
-      // Why: a coordinator waiting for worker_done/escalation should not be
-      // woken by worker heartbeat noise and mistake that empty read for idleness.
-      if (messageType && waiter.typeFilter && !waiter.typeFilter.includes(messageType)) {
-        continue
-      }
-      this.resolveMessageWaiter(waiter)
-    }
-  }
-
-  waitForMessage(
-    handle: string,
-    options?: { typeFilter?: string[]; timeoutMs?: number; signal?: AbortSignal }
-  ): Promise<void> {
-    return new Promise((resolve) => {
-      const timeoutMs = options?.timeoutMs ?? MESSAGE_WAIT_DEFAULT_TIMEOUT_MS
-
-      const waiter: MessageWaiter = {
-        handle,
-        typeFilter: options?.typeFilter,
-        resolve,
-        timeout: null,
-        abortCleanup: null
-      }
-
-      // Why: if the caller aborts (socket closed on the RPC side — see design
-      // doc §3.1 counter-lifecycle), resolve immediately so the long-poll slot
-      // is released instead of counting down the full timeoutMs with a dead
-      // client on the other end.
-      const signal = options?.signal
-      const onAbort = (): void => {
-        this.removeMessageWaiter(waiter)
-        resolve()
-      }
-      if (signal) {
-        if (signal.aborted) {
-          resolve()
-          return
-        }
-        waiter.abortCleanup = () => signal.removeEventListener('abort', onAbort)
-        signal.addEventListener('abort', onAbort, { once: true })
-      }
-
-      waiter.timeout = setTimeout(() => {
-        this.removeMessageWaiter(waiter)
-        resolve()
-      }, timeoutMs)
-
-      let waiters = this.messageWaitersByHandle.get(handle)
-      if (!waiters) {
-        waiters = new Set()
-        this.messageWaitersByHandle.set(handle, waiters)
-      }
-      waiters.add(waiter)
-    })
-  }
-
-  private resolveMessageWaiter(waiter: MessageWaiter): void {
-    this.removeMessageWaiter(waiter)
-    waiter.resolve()
-  }
-
-  private removeMessageWaiter(waiter: MessageWaiter): void {
-    if (waiter.timeout) {
-      clearTimeout(waiter.timeout)
-      waiter.timeout = null
-    }
-    if (waiter.abortCleanup) {
-      waiter.abortCleanup()
-      waiter.abortCleanup = null
-    }
-    const waiters = this.messageWaitersByHandle.get(waiter.handle)
-    if (waiters) {
-      waiters.delete(waiter)
-      if (waiters.size === 0) {
-        this.messageWaitersByHandle.delete(waiter.handle)
-      }
-    }
-  }
+  deliverPendingMessagesForHandle: RuntimeTerminalMessageWaiterCommands['deliverPendingMessagesForHandle'] =
+    this.terminalMessageWaiterCommands.deliverPendingMessagesForHandle.bind(
+      this.terminalMessageWaiterCommands
+    )
+  notifyMessageArrived: RuntimeTerminalMessageWaiterCommands['notifyMessageArrived'] =
+    this.terminalMessageWaiterCommands.notifyMessageArrived.bind(this.terminalMessageWaiterCommands)
+  waitForMessage: RuntimeTerminalMessageWaiterCommands['waitForMessage'] =
+    this.terminalMessageWaiterCommands.waitForMessage.bind(this.terminalMessageWaiterCommands)
 
   private buildPtyTerminalSummary(
     pty: RuntimePtyWorktreeRecord,
@@ -10333,14 +10158,6 @@ export class OrcaRuntimeService {
   }
 }
 
-const WAIT_BLOCKED_CHECK_MIN_INTERVAL_MS = 50
-// Why: chunks that can complete an actionable prompt bypass the throttle so
-// blocked stamps stay per-chunk-immediate; the pattern heads mirror
-// findTerminalWaitBlockedSignal. Scanned over the new chunk plus a short
-// carry only — never the accumulated window.
-const WAIT_BLOCKED_KEYWORD_PATTERN =
-  /press enter|press t to trust|do you trust|trust this|trusted workspace|update available|choose working directory|codex just got an upgrade|hooks need review/
-const WAIT_BLOCKED_KEYWORD_CARRY_CHARS = 31
 const DEFAULT_TERMINAL_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_LIST_LIMIT = 200
 const DEFAULT_WORKTREE_PS_LIMIT = 200
