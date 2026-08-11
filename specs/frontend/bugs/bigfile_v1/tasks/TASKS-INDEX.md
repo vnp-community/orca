@@ -71,6 +71,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 41 | [TASK-BIGFILE-041](./TASK-BIGFILE-041-orca-runtime-graph-store.md) | Extract (state container, không phải domain) | `orca-runtime.ts` → `orca-runtime-graph-store.ts` | L | 8, 9, 35 | ✅ |
 | 42 | [TASK-BIGFILE-042](./TASK-BIGFILE-042-orca-runtime-issue-tracking-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-issue-tracking.ts` | L | 8, 9, 41 | ✅ |
 | 43 | [TASK-BIGFILE-043](./TASK-BIGFILE-043-orca-runtime-repo-hooks-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-repo-hooks.ts` | S | 42 | ✅ |
+| 44 | [TASK-BIGFILE-044](./TASK-BIGFILE-044-orca-runtime-linear-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-linear.ts` | L | 42 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
