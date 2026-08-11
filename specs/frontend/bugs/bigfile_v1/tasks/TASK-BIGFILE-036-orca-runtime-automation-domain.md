@@ -2,7 +2,29 @@
 
 **Loại:** Move — composition pattern (KHÔNG phải barrel, class có `this`)
 · **Effort:** S · **Phụ thuộc:** TASK-BIGFILE-008, 009
-**Status:** ⬜ Todo
+**Status:** ✅ Done
+
+## Kết quả thực thi (2026-08-10)
+
+- Pattern thực tế khác 1 chút so với kế hoạch: `automationService` chỉ
+  dùng cho `runAutomationNow`; 5 method CRUD còn lại dùng `this.store`
+  (khác field, chưa từng ghi trong task doc gốc) — xác nhận qua đọc code
+  trực tiếp trước khi tách, không tin theo tên field đoán trước.
+- Dùng ĐÚNG pattern composition tiền lệ đã có trong repo
+  (`RuntimeBrowserCommands`/`RuntimeEmulatorCommands` ở
+  `orca-runtime-browser.ts`): host interface với method có kiểu tối
+  thiểu, field composed dùng closure lazy (`getStore: () => this.store`),
+  KHÔNG bind trực tiếp tại thời điểm khai báo field — bind trực tiếp gây
+  lỗi `TS2729: Property 'store' is used before its initialization` vì
+  field initializer chạy trước constructor body (nơi `store` thực sự được
+  gán).
+- `resolveAutomationTarget` phụ thuộc `this.showManagedWorktree`/
+  `this.showRepo` (domain worktree/project khác) — inject qua host
+  interface bằng closure, không copy giá trị.
+- `orca-runtime.ts`: 24,723 → **24,553 dòng** (giảm ~170 dòng). File mới
+  `orca-runtime-automation.ts`: 243 dòng.
+- Xác minh: `tsc --noEmit --composite false` 251 lỗi pre-existing không
+  đổi (0 lỗi mới), `oxlint` sạch (exit 0) cả 2 config.
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-002-orca-runtime.md` (Giai
 đoạn 3) · Sinh ra từ `TASK-BIGFILE-035`
 

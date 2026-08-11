@@ -3,6 +3,7 @@
 /* eslint-disable no-control-regex -- Why: terminal normalization must strip ANSI and OSC control sequences from PTY output before returning bounded text to agents. */
 import type { WebPushManager } from '../notifications/web-push-manager'
 import { RuntimeGraphStore } from './orca-runtime-graph-store'
+import { RuntimeAutomationCommands } from './orca-runtime-automation'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -69,12 +70,6 @@ import { resolveWorktreeCreateBase } from '../worktree-create-base'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree-base-ref'
 import { OrchestrationDb } from './orchestration/db'
 import { formatMessagesForInjection } from './orchestration/formatter'
-import type {
-  Automation,
-  AutomationRun,
-  AutomationUpdateInput,
-  AutomationWorkspaceMode
-} from '../../shared/automations-types'
 import type {
   AutomationWorkspaceProvenance,
   BaseRefSearchResult,
@@ -815,15 +810,16 @@ import type {
   PtyLayoutTarget,
   RemoteFetchResult,
   RemoteTrackingBase,
-  RuntimeAutomationCreateInput,
-  RuntimeAutomationUpdateInput,
   RuntimePtyController,
   RuntimeTerminalAgentStatusEvent
 } from './orca-runtime-types'
-// Why: all 14 types are used as parameter/return types throughout
-// OrcaRuntimeService's body (BUG-FE-BIGFILE-002 / TASK-BIGFILE-009) —
+// Why: 12 of the original 14 types (BUG-FE-BIGFILE-002 / TASK-BIGFILE-009)
+// are used as parameter/return types throughout OrcaRuntimeService's body —
 // imported back here for internal use; re-exported below for external
 // importers (e.g. main/runtime/rpc/methods/terminal.ts's `DriverState`).
+// RuntimeAutomationCreateInput/UpdateInput moved on to
+// orca-runtime-automation.ts (TASK-BIGFILE-036) and are no longer imported
+// back here, only re-exported below for external API compatibility.
 
 function sanitizeNestedRepoRuntimeImportError(context: string, error: unknown): string {
   console.warn(`[project-groups] ${context}`, error)
@@ -957,13 +953,6 @@ function normalizeSparsePresetDirectoriesForSave(directories: string[]): string[
     throw new Error('Preset must have at least one directory.')
   }
   return normalized
-}
-
-function hasRuntimeAutomationUpdateValue<K extends keyof RuntimeAutomationUpdateInput>(
-  updates: RuntimeAutomationUpdateInput,
-  key: K
-): boolean {
-  return Object.hasOwn(updates, key) && updates[key] !== undefined
 }
 
 export type RuntimeLeafRecord = RuntimeSyncedLeaf & {
@@ -2623,194 +2612,27 @@ export class OrcaRuntimeService {
     return this.getClientSettings()
   }
 
-  listAutomations(): Automation[] {
-    if (!this.store?.listAutomations) {
-      throw new Error('runtime_unavailable')
-    }
-    return this.store.listAutomations()
-  }
+  private readonly automationCommands = new RuntimeAutomationCommands({
+    getStore: () => this.store,
+    getAutomationService: () => this.automationService,
+    showManagedWorktree: (selector) => this.showManagedWorktree(selector),
+    showRepo: (selector) => this.showRepo(selector)
+  })
 
-  listAutomationRuns(automationId?: string): AutomationRun[] {
-    if (!this.store?.listAutomationRuns) {
-      throw new Error('runtime_unavailable')
-    }
-    return this.store.listAutomationRuns(automationId)
-  }
-
-  showAutomation(id: string): Automation {
-    const automation = this.listAutomations().find((entry) => entry.id === id)
-    if (!automation) {
-      throw new Error('Automation not found.')
-    }
-    return automation
-  }
-
-  async createAutomation(input: RuntimeAutomationCreateInput): Promise<Automation> {
-    if (!this.store?.createAutomation) {
-      throw new Error('runtime_unavailable')
-    }
-    const target = await this.resolveAutomationTarget(input)
-    if (input.reuseSession && target.workspaceMode !== 'existing') {
-      throw new Error('Session reuse requires an existing workspace target.')
-    }
-    return this.store.createAutomation({
-      name: input.name,
-      prompt: input.prompt,
-      precheck: input.precheck,
-      agentId: input.agentId,
-      runContext: input.runContext,
-      sourceContext: input.sourceContext,
-      projectId: target.projectId,
-      workspaceMode: target.workspaceMode,
-      workspaceId: target.workspaceId,
-      baseBranch: input.baseBranch,
-      setupDecision: input.setupDecision,
-      reuseSession: input.reuseSession,
-      timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-      rrule: input.rrule,
-      dtstart: input.dtstart,
-      enabled: input.enabled,
-      missedRunGraceMinutes: input.missedRunGraceMinutes
-    })
-  }
-
-  async updateAutomation(id: string, updates: RuntimeAutomationUpdateInput): Promise<Automation> {
-    if (!this.store?.updateAutomation) {
-      throw new Error('runtime_unavailable')
-    }
-    const current = this.showAutomation(id)
-    const patch: AutomationUpdateInput = {}
-    if (hasRuntimeAutomationUpdateValue(updates, 'name')) {
-      patch.name = updates.name
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'prompt')) {
-      patch.prompt = updates.prompt
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'precheck')) {
-      patch.precheck = updates.precheck
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'agentId')) {
-      patch.agentId = updates.agentId
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'runContext')) {
-      patch.runContext = updates.runContext
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'sourceContext')) {
-      patch.sourceContext = updates.sourceContext
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'baseBranch')) {
-      patch.baseBranch = updates.baseBranch
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'setupDecision')) {
-      patch.setupDecision = updates.setupDecision
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'reuseSession')) {
-      patch.reuseSession = updates.reuseSession
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'timezone')) {
-      patch.timezone = updates.timezone
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'rrule')) {
-      patch.rrule = updates.rrule
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'dtstart')) {
-      patch.dtstart = updates.dtstart
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'enabled')) {
-      patch.enabled = updates.enabled
-    }
-    if (hasRuntimeAutomationUpdateValue(updates, 'missedRunGraceMinutes')) {
-      patch.missedRunGraceMinutes = updates.missedRunGraceMinutes
-    }
-    const targetChanged =
-      hasRuntimeAutomationUpdateValue(updates, 'repo') ||
-      hasRuntimeAutomationUpdateValue(updates, 'workspace') ||
-      hasRuntimeAutomationUpdateValue(updates, 'workspaceMode')
-    if (targetChanged) {
-      const target = await this.resolveAutomationTarget(updates, current)
-      if (patch.reuseSession === true && target.workspaceMode !== 'existing') {
-        throw new Error('Session reuse requires an existing workspace target.')
-      }
-      patch.projectId = target.projectId
-      patch.workspaceMode = target.workspaceMode
-      patch.workspaceId = target.workspaceId
-      if (target.workspaceMode !== 'existing') {
-        patch.reuseSession = false
-      }
-    }
-    if (!targetChanged && patch.reuseSession && current.workspaceMode !== 'existing') {
-      throw new Error('Session reuse requires an existing workspace target.')
-    }
-    return this.store.updateAutomation(id, patch)
-  }
-
-  deleteAutomation(id: string): { removed: boolean; id: string } {
-    if (!this.store?.deleteAutomation) {
-      throw new Error('runtime_unavailable')
-    }
-    this.showAutomation(id)
-    this.store.deleteAutomation(id)
-    return { removed: true, id }
-  }
-
-  async runAutomationNow(id: string): Promise<AutomationRun> {
-    if (!this.automationService) {
-      throw new Error('runtime_unavailable')
-    }
-    return await this.automationService.runNow(id)
-  }
-
-  private async resolveAutomationTarget(
-    input: {
-      repo?: string
-      workspace?: string
-      workspaceMode?: AutomationWorkspaceMode
-      baseBranch?: string | null
-    },
-    current?: Automation
-  ): Promise<{
-    projectId: string
-    workspaceMode: AutomationWorkspaceMode
-    workspaceId?: string | null
-  }> {
-    const hasRepo = input.repo !== undefined
-    const hasWorkspace = input.workspace !== undefined
-    if (
-      current?.workspaceMode === 'existing' &&
-      hasRepo &&
-      !hasWorkspace &&
-      input.workspaceMode !== 'new_per_run'
-    ) {
-      throw new Error(
-        'Repo updates for existing-workspace automation require workspaceMode new_per_run.'
-      )
-    }
-    const workspace = input.workspace ? await this.showManagedWorktree(input.workspace) : null
-    const repo = input.repo ? await this.showRepo(input.repo) : null
-    const workspaceMode =
-      input.workspaceMode ??
-      (workspace
-        ? 'existing'
-        : input.repo && !current
-          ? 'new_per_run'
-          : (current?.workspaceMode ?? 'new_per_run'))
-    if (workspaceMode === 'existing') {
-      const workspaceId = workspace?.id ?? current?.workspaceId
-      const projectId = workspace?.repoId ?? current?.projectId
-      if (repo && repo.id !== projectId) {
-        throw new Error('Selected workspace belongs to a different repo.')
-      }
-      if (!workspaceId || !projectId) {
-        throw new Error('Existing-workspace automation requires --workspace.')
-      }
-      return { projectId, workspaceMode, workspaceId }
-    }
-    const projectId = repo?.id ?? workspace?.repoId ?? current?.projectId
-    if (!projectId) {
-      throw new Error('Automation requires --repo or --workspace.')
-    }
-    return { projectId, workspaceMode: 'new_per_run', workspaceId: null }
-  }
+  listAutomations: RuntimeAutomationCommands['listAutomations'] =
+    this.automationCommands.listAutomations.bind(this.automationCommands)
+  listAutomationRuns: RuntimeAutomationCommands['listAutomationRuns'] =
+    this.automationCommands.listAutomationRuns.bind(this.automationCommands)
+  showAutomation: RuntimeAutomationCommands['showAutomation'] =
+    this.automationCommands.showAutomation.bind(this.automationCommands)
+  createAutomation: RuntimeAutomationCommands['createAutomation'] =
+    this.automationCommands.createAutomation.bind(this.automationCommands)
+  updateAutomation: RuntimeAutomationCommands['updateAutomation'] =
+    this.automationCommands.updateAutomation.bind(this.automationCommands)
+  deleteAutomation: RuntimeAutomationCommands['deleteAutomation'] =
+    this.automationCommands.deleteAutomation.bind(this.automationCommands)
+  runAutomationNow: RuntimeAutomationCommands['runAutomationNow'] =
+    this.automationCommands.runAutomationNow.bind(this.automationCommands)
 
   // Why: lazy initialization — the DB path depends on Electron's userData
   // which may not be finalized until after app.ready. Also allows unit tests
