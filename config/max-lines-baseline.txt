@@ -54,6 +54,14 @@ inline frontend/src/main/runtime/orca-runtime-repo-hooks.ts
 # cleanest (nearly every dependency was a self-reference to another Linear
 # method; only 5 genuine external dependencies).
 inline frontend/src/main/runtime/orca-runtime-linear.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-046, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's project/project-group/folder-workspace/
+# nested-repo-import command block, already covered by orca-runtime.ts's own
+# grandfathered max-lines disable. addRepo/cloneRepo (repo lifecycle) sit
+# immediately after this block in the source but are a separate, larger
+# domain not yet extracted — kept as host dependencies here.
+inline frontend/src/main/runtime/orca-runtime-project-groups.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts

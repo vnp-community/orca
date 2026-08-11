@@ -12,6 +12,7 @@ import { RuntimeIssueTrackingCommands } from './orca-runtime-issue-tracking'
 import { RuntimeRepoHooksCommands } from './orca-runtime-repo-hooks'
 import { RuntimeLinearCommands } from './orca-runtime-linear'
 import { RuntimeJiraCommands } from './orca-runtime-jira'
+import { RuntimeProjectGroupsCommands } from './orca-runtime-project-groups'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -71,7 +72,7 @@ import {
 import { getGitCloneFailureMessage } from '../../shared/git-clone-failure-message'
 import { createHash, randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
-import { isAbsolute, join, resolve } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree-base-ref'
@@ -88,18 +89,6 @@ import type {
   GitWorktreeInfo,
   GlobalSettings,
   PersistedUIState,
-  Project,
-  ProjectUpdateArgs,
-  ProjectHostSetup,
-  ProjectHostSetupCloneArgs,
-  ProjectHostSetupCreateArgs,
-  ProjectHostSetupCreateResult,
-  ProjectHostSetupDeleteArgs,
-  ProjectHostSetupDeleteResult,
-  ProjectHostSetupExistingFolderArgs,
-  ProjectHostSetupResult,
-  ProjectHostSetupUpdateArgs,
-  ProjectHostSetupUpdateResult,
   Repo,
   StatsSummary,
   Worktree,
@@ -111,11 +100,7 @@ import type {
   WorktreeBaseStatusEvent,
   WorktreeRemoteBranchConflictEvent,
   WorktreeStartupLaunch,
-  NestedRepoScanResult,
-  ProjectGroup,
   FolderWorkspace,
-  ProjectGroupImportMode,
-  ProjectGroupImportResult,
   MemorySnapshot,
   Tab,
   TabGroupLayoutNode,
@@ -124,8 +109,7 @@ import type {
   TerminalTab,
   TuiAgent,
   WorkspaceCreateTelemetrySource,
-  WorkspaceSessionState,
-  DirEntry
+  WorkspaceSessionState
 } from '../../shared/types'
 import {
   getRepoExecutionHostId,
@@ -143,10 +127,7 @@ import {
   WORKTREE_ID_SEPARATOR,
   splitWorktreeIdForFilesystem
 } from '../../shared/worktree-id'
-import {
-  getProjectHostSetupForRepo,
-  getProjectHostSetupWorktreeMeta
-} from '../../shared/project-host-setup-projection'
+import { getProjectHostSetupWorktreeMeta } from '../../shared/project-host-setup-projection'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { getRepoProviderConnectionKey } from '../../shared/execution-host'
 import { DEFAULT_WORKSPACE_STATUS_ID } from '../../shared/workspace-statuses'
@@ -190,11 +171,7 @@ import {
 } from '../agent-trust-presets'
 import { markRemoteAgentWorkspaceTrusted } from '../remote-agent-trust-presets'
 import { applyAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
-import {
-  isWindowsAbsolutePathLike,
-  isPathInsideOrEqual,
-  normalizeRuntimePathForComparison
-} from '../../shared/cross-platform-path'
+import { isWindowsAbsolutePathLike, isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import { resolveTerminalStartupCwd } from '../../shared/terminal-startup-cwd'
 import { isWslUncPath } from '../../shared/wsl-paths'
 import {
@@ -203,10 +180,6 @@ import {
   worktreeWorkspaceKey
 } from '../../shared/workspace-scope'
 import { folderWorkspaceToWorktree } from '../../shared/folder-workspace-worktree'
-import type {
-  FolderWorkspacePathStatus,
-  FolderWorkspacePathStatusRequest
-} from '../../shared/folder-workspace-path-status'
 import {
   buildKnownOrcaWorkspaceLayouts,
   isLegacyRepoForExternalWorktreeVisibility,
@@ -423,12 +396,10 @@ import { getRemoteFilesystemProvider } from '../providers/ssh-filesystem-dispatc
 import {
   assertFolderWorkspacePathUsable,
   getFolderWorkspacePathStatus,
-  getFolderWorkspacePathStatusForPath,
   inferFolderWorkspacePathConnection
 } from '../project-groups/folder-workspace-path-status'
 import { getRemoteGitProvider, requireRemoteGitProvider } from '../providers/ssh-git-dispatch'
 import { detectRepoIconAndUpstream } from '../repo-icon-autodetect'
-import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
 import { githubAvatarIcon } from '../../shared/repo-icon'
 import type { ClaudeAccountService } from '../claude-accounts/service'
 import type { CodexAccountService } from '../codex-accounts/service'
@@ -443,12 +414,6 @@ import {
   getSpeechModelDeletionErrorCode
 } from '../speech/speech-model-deletion'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
-import { scanNestedRepos } from '../project-groups/nested-repo-discovery'
-import {
-  createNestedProjectGroupResolver,
-  resolveNestedRepoSelection
-} from '../project-groups/nested-repo-import'
-import { createNestedRepoImportTargetResolver } from '../project-groups/nested-repo-import-target'
 import {
   normalizeLocalBranchName,
   MAX_TAIL_CHARS,
@@ -527,11 +492,6 @@ import type {
 // RuntimeAutomationCreateInput/UpdateInput moved on to
 // orca-runtime-automation.ts (TASK-BIGFILE-036) and are no longer imported
 // back here, only re-exported below for external API compatibility.
-
-function sanitizeNestedRepoRuntimeImportError(context: string, error: unknown): string {
-  console.warn(`[project-groups] ${context}`, error)
-  return 'Repository could not be imported'
-}
 
 type RuntimeAccountServices = {
   claudeAccounts: ClaudeAccountService
@@ -630,36 +590,6 @@ export type RuntimeStore = {
     updates: Partial<GlobalSettings>,
     options?: { notifyListeners?: boolean; originWebContentsId?: number }
   ) => unknown
-}
-
-function normalizeSparsePresetName(name: string): string {
-  const trimmed = name.trim()
-  if (!trimmed) {
-    throw new Error('Preset name is required.')
-  }
-  if (trimmed.length > 80) {
-    throw new Error('Preset name is too long.')
-  }
-  return trimmed
-}
-
-function normalizeSparsePresetDirectoriesForSave(directories: string[]): string[] {
-  let normalized: string[]
-  try {
-    normalized = normalizeSparseDirectories(directories)
-  } catch (err) {
-    if (
-      err instanceof Error &&
-      err.message === 'Sparse checkout directories must be repo-relative paths.'
-    ) {
-      throw new Error('Preset directories must be repo-relative paths.')
-    }
-    throw err
-  }
-  if (normalized.length === 0) {
-    throw new Error('Preset must have at least one directory.')
-  }
-  return normalized
 }
 
 export type RuntimeLeafRecord = RuntimeSyncedLeaf & {
@@ -1430,25 +1360,6 @@ async function pathExists(pathValue: string): Promise<boolean> {
     }
     throw error
   }
-}
-
-function resolveServerBrowsePath(pathValue: string): string {
-  const trimmed = pathValue.trim() || '~'
-  if (trimmed.includes('\0')) {
-    throw new Error('Path cannot contain null bytes')
-  }
-  if (trimmed === '~') {
-    return homedir()
-  }
-  if (/^~[\\/]/.test(trimmed)) {
-    return resolve(homedir(), trimmed.slice(2))
-  }
-  if (isAbsolute(trimmed)) {
-    return resolve(trimmed)
-  }
-  // Why: remote clients do not share the server process cwd; relative browse
-  // inputs are anchored to the server user's home to match the `~` picker root.
-  return resolve(homedir(), trimmed)
 }
 
 export type ResolvedWorktree = Worktree & {
@@ -8582,499 +8493,69 @@ export class OrcaRuntimeService {
     }
   }
 
-  listRepos(): Repo[] {
-    return this.store?.getRepos() ?? []
-  }
+  private readonly projectGroupsCommands = new RuntimeProjectGroupsCommands({
+    getStore: () => this.store,
+    resolveRepoSelector: (selector) => this.resolveRepoSelector(selector),
+    notifyReposChanged: () => this.notifyReposChanged(),
+    invalidateResolvedWorktreeCache: () => this.invalidateResolvedWorktreeCache(),
+    addRepo: (path, kind, executionHostId) => this.addRepo(path, kind, executionHostId),
+    cloneRepo: (url, destination, executionHostId) =>
+      this.cloneRepo(url, destination, executionHostId)
+  })
 
-  enrichMissingRepoGitRemoteIdentities(): void {
-    if (!this.store) {
-      return
-    }
-    enrichMissingRepoGitRemoteIdentities(this.store, {
-      onChanged: () => {
-        this.invalidateResolvedWorktreeCache()
-        this.notifyReposChanged()
-      }
-    })
-  }
-
-  listProjects(): Project[] {
-    return this.store?.getProjects?.() ?? []
-  }
-
-  updateProject(projectId: string, updates: ProjectUpdateArgs['updates']): Project {
-    if (!this.store?.updateProject) {
-      throw new Error('runtime_unavailable')
-    }
-    const project = this.store.updateProject(projectId, updates)
-    if (!project) {
-      throw new Error(`Project not found: ${projectId}`)
-    }
-    this.invalidateResolvedWorktreeCache()
-    this.notifyReposChanged()
-    return project
-  }
-
-  listProjectHostSetups(): ProjectHostSetup[] {
-    return this.store?.getProjectHostSetups?.() ?? []
-  }
-
-  createProjectHostSetup(args: ProjectHostSetupCreateArgs): ProjectHostSetupCreateResult {
-    if (!this.store?.createProjectHostSetup) {
-      throw new Error('runtime_unavailable')
-    }
-    const result = this.store.createProjectHostSetup(args)
-    if (!result) {
-      throw new Error(`Project not found: ${args.projectId}`)
-    }
-    return result
-  }
-
-  async setupProjectExistingFolder(
-    args: ProjectHostSetupExistingFolderArgs
-  ): Promise<ProjectHostSetupResult> {
-    if (!this.store) {
-      throw new Error('runtime_unavailable')
-    }
-    let repo = await this.addRepo(args.path, args.kind === 'folder' ? 'folder' : 'git', args.hostId)
-    let setup = getProjectHostSetupForRepo(this.listProjectHostSetups(), repo)
-    if (setup.projectId !== args.projectId) {
-      const existingProject = this.listProjects().find((project) => project.id === args.projectId)
-      if (
-        !existingProject?.providerIdentity ||
-        existingProject.providerIdentity.provider !== 'github'
-      ) {
-        throw new Error('Imported folder does not match the selected project identity.')
-      }
-      const updated = this.store.updateRepo(repo.id, {
-        upstream: {
-          owner: existingProject.providerIdentity.owner,
-          repo: existingProject.providerIdentity.repo
-        }
-      })
-      if (!updated) {
-        throw new Error(`Project setup repo disappeared before it could be linked: ${repo.id}`)
-      }
-      repo = updated
-      setup = getProjectHostSetupForRepo(this.listProjectHostSetups(), repo)
-    }
-    const setupMethod = args.setupMethod ?? 'imported-existing-folder'
-    const updated = this.store.updateRepo(repo.id, { projectHostSetupMethod: setupMethod })
-    if (!updated) {
-      throw new Error(
-        `Project setup repo disappeared before setup metadata could be linked: ${repo.id}`
-      )
-    }
-    repo = updated
-    setup = getProjectHostSetupForRepo(this.listProjectHostSetups(), repo)
-    const project = this.listProjects().find((entry) => entry.id === setup.projectId)
-    if (!project) {
-      throw new Error(`Project setup was created without a project record: ${setup.projectId}`)
-    }
-    return { project, setup, repo }
-  }
-
-  async setupProjectClone(args: ProjectHostSetupCloneArgs): Promise<ProjectHostSetupResult> {
-    const repo = await this.cloneRepo(args.url, args.destination, args.hostId)
-    return await this.setupProjectExistingFolder({
-      projectId: args.projectId,
-      hostId: args.hostId,
-      path: repo.path,
-      kind: 'git',
-      displayName: args.displayName,
-      setupMethod: 'cloned'
-    })
-  }
-
-  updateProjectHostSetup(args: ProjectHostSetupUpdateArgs): ProjectHostSetupUpdateResult {
-    if (!this.store?.updateProjectHostSetup) {
-      throw new Error('runtime_unavailable')
-    }
-    const result = this.store.updateProjectHostSetup(args)
-    if (!result) {
-      throw new Error(`Project host setup not found: ${args.setupId}`)
-    }
-    if ('worktreeBasePath' in args.updates && result.repo) {
-      void prepareLocalWorktreeRootForRepo(this.store, result.repo)
-      invalidateAuthorizedRootsCache()
-    }
-    return result
-  }
-
-  deleteProjectHostSetup(args: ProjectHostSetupDeleteArgs): ProjectHostSetupDeleteResult {
-    if (!this.store?.deleteProjectHostSetup) {
-      throw new Error('runtime_unavailable')
-    }
-    const result = this.store.deleteProjectHostSetup(args)
-    if (!result) {
-      throw new Error(`Project host setup not found: ${args.setupId}`)
-    }
-    return result
-  }
-
-  listProjectGroups(): ProjectGroup[] {
-    return this.store?.getProjectGroups?.() ?? []
-  }
-
-  listFolderWorkspaces(): FolderWorkspace[] {
-    return this.store?.getFolderWorkspaces?.() ?? []
-  }
-
-  async createProjectGroup(input: {
-    name: string
-    parentPath?: string | null
-    connectionId?: string | null
-    parentGroupId?: string | null
-    createdFrom?: ProjectGroup['createdFrom']
-  }): Promise<ProjectGroup> {
-    if (!this.store?.createProjectGroup) {
-      throw new Error('runtime_unavailable')
-    }
-    const group = this.store.createProjectGroup({
-      name: input.name,
-      parentPath: input.parentPath ?? null,
-      connectionId: input.connectionId ?? null,
-      parentGroupId: input.parentGroupId ?? null,
-      createdFrom: input.createdFrom ?? 'manual'
-    })
-    this.notifyReposChanged()
-    return group
-  }
-
-  async updateProjectGroup(
-    groupId: string,
-    updates: Partial<Pick<ProjectGroup, 'name' | 'isCollapsed' | 'tabOrder' | 'color'>>
-  ): Promise<ProjectGroup | null> {
-    if (!this.store?.updateProjectGroup) {
-      throw new Error('runtime_unavailable')
-    }
-    const updated = this.store.updateProjectGroup(groupId, updates)
-    if (updated) {
-      this.notifyReposChanged()
-    }
-    return updated
-  }
-
-  async deleteProjectGroup(groupId: string): Promise<{ deleted: boolean }> {
-    if (!this.store?.deleteProjectGroup) {
-      throw new Error('runtime_unavailable')
-    }
-    const deleted = this.store.deleteProjectGroup(groupId)
-    if (deleted) {
-      this.notifyReposChanged()
-    }
-    return { deleted }
-  }
-
-  async moveProjectToGroup(
-    repoSelector: string,
-    groupId: string | null,
-    order?: number
-  ): Promise<Repo> {
-    if (!this.store?.moveProjectToGroup) {
-      throw new Error('runtime_unavailable')
-    }
-    const repo = await this.resolveRepoSelector(repoSelector)
-    const moved = this.store.moveProjectToGroup(repo.id, groupId, order)
-    if (!moved) {
-      throw new Error('repo_not_found')
-    }
-    this.notifyReposChanged()
-    return moved
-  }
-
-  async createFolderWorkspace(input: {
-    projectGroupId: string
-    name?: string
-    folderPath?: string | null
-    connectionId?: string | null
-    linkedTask?: FolderWorkspace['linkedTask']
-    createdWithAgent?: FolderWorkspace['createdWithAgent']
-    pendingFirstAgentMessageRename?: boolean
-  }): Promise<FolderWorkspace> {
-    if (!this.store?.createFolderWorkspace) {
-      throw new Error('runtime_unavailable')
-    }
-    const projectGroups = this.store.getProjectGroups?.() ?? []
-    const group = projectGroups.find((entry) => entry.id === input.projectGroupId)
-    const folderPath =
-      typeof input.folderPath === 'string' && input.folderPath.trim().length > 0
-        ? input.folderPath
-        : group?.parentPath
-    if (!group || !folderPath) {
-      throw new Error('folder_workspace_project_group_not_found')
-    }
-    const status = await getFolderWorkspacePathStatusForPath(
-      {
-        folderPath,
-        projectGroupId: group.id,
-        connectionId: input.connectionId ?? group.connectionId ?? null,
-        projectGroups,
-        repos: this.store.getRepos()
-      },
-      { getRemoteFilesystemProvider }
-    )
-    assertFolderWorkspacePathUsable(status)
-    const workspace = this.store.createFolderWorkspace(input)
-    this.notifyReposChanged()
-    return workspace
-  }
-
-  async getFolderWorkspacePathStatus(
-    request: FolderWorkspacePathStatusRequest
-  ): Promise<FolderWorkspacePathStatus> {
-    if (!this.store) {
-      throw new Error('runtime_unavailable')
-    }
-    return getFolderWorkspacePathStatus(this.store, request, { getRemoteFilesystemProvider })
-  }
-
-  async updateFolderWorkspace(
-    folderWorkspaceId: string,
-    updates: Partial<
-      Pick<
-        FolderWorkspace,
-        | 'name'
-        | 'folderPath'
-        | 'linkedTask'
-        | 'comment'
-        | 'isArchived'
-        | 'isUnread'
-        | 'isPinned'
-        | 'sortOrder'
-        | 'manualOrder'
-        | 'workspaceStatus'
-        | 'createdWithAgent'
-        | 'pendingFirstAgentMessageRename'
-        | 'firstAgentMessageRenameError'
-        | 'lastActivityAt'
-      >
-    >
-  ): Promise<FolderWorkspace | null> {
-    if (!this.store?.updateFolderWorkspace) {
-      throw new Error('runtime_unavailable')
-    }
-    if (typeof updates.folderPath === 'string' && updates.folderPath.trim().length > 0) {
-      const workspace = this.store
-        .getFolderWorkspaces?.()
-        .find((entry) => entry.id === folderWorkspaceId)
-      if (!workspace) {
-        return null
-      }
-      const projectGroups = this.store.getProjectGroups?.() ?? []
-      const status = await getFolderWorkspacePathStatusForPath(
-        {
-          folderPath: updates.folderPath,
-          projectGroupId: workspace.projectGroupId,
-          connectionId:
-            workspace.connectionId ??
-            projectGroups.find((entry) => entry.id === workspace.projectGroupId)?.connectionId ??
-            null,
-          projectGroups,
-          repos: this.store.getRepos()
-        },
-        { getRemoteFilesystemProvider }
-      )
-      assertFolderWorkspacePathUsable(status)
-    }
-    const updated = this.store.updateFolderWorkspace(folderWorkspaceId, updates)
-    if (updated) {
-      this.notifyReposChanged()
-    }
-    return updated
-  }
-
-  async deleteFolderWorkspace(folderWorkspaceId: string): Promise<{ deleted: boolean }> {
-    if (!this.store?.removeFolderWorkspace) {
-      throw new Error('runtime_unavailable')
-    }
-    const deleted = this.store.removeFolderWorkspace(folderWorkspaceId)
-    if (deleted) {
-      this.notifyReposChanged()
-    }
-    return { deleted }
-  }
-
-  async scanNestedRepos(path: string): Promise<NestedRepoScanResult> {
-    if (!isAbsolute(path)) {
-      throw new Error('Project path must be an absolute path')
-    }
-    return scanNestedRepos({ path, options: { timeoutMs: 15_000 } })
-  }
-
-  async browseServerDir(pathValue: string): Promise<{ resolvedPath: string; entries: DirEntry[] }> {
-    const dirPath = resolveServerBrowsePath(pathValue)
-    const dirStat = await stat(dirPath)
-    if (!dirStat.isDirectory()) {
-      throw new Error(`${dirPath} is not a directory`)
-    }
-    const entries = await readdir(dirPath, { withFileTypes: true })
-    const mapped = entries
-      .filter((entry) => entry.name !== '.' && entry.name !== '..')
-      .map((entry) => ({
-        name: entry.name,
-        isDirectory: entry.isDirectory(),
-        isSymlink: entry.isSymbolicLink()
-      }))
-    mapped.sort((a, b) => {
-      if (a.isDirectory !== b.isDirectory) {
-        return a.isDirectory ? -1 : 1
-      }
-      return a.name.localeCompare(b.name)
-    })
-    return { resolvedPath: dirPath, entries: mapped }
-  }
-
-  async isGitAvailable(): Promise<boolean> {
-    try {
-      await gitExecFileAsync(['--version'], { cwd: process.cwd(), timeout: 3000 })
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  async importNestedRepos(args: {
-    parentPath: string
-    groupName: string
-    projectPaths: string[]
-    mode: ProjectGroupImportMode
-  }): Promise<ProjectGroupImportResult> {
-    if (!this.store?.createProjectGroup || !this.store?.moveProjectToGroup) {
-      throw new Error('runtime_unavailable')
-    }
-    if (!isAbsolute(args.parentPath)) {
-      throw new Error('Project path must be an absolute path')
-    }
-    const scan = await scanNestedRepos({ path: args.parentPath, options: { timeoutMs: 15_000 } })
-    const selection = resolveNestedRepoSelection({ scan, projectPaths: args.projectPaths })
-    const groupResolver = createNestedProjectGroupResolver({
-      parentPath: args.parentPath,
-      groupName: args.groupName,
-      mode: args.mode,
-      connectionId: null,
-      repoPaths: selection.selectedPaths,
-      createGroup: (input) => this.store!.createProjectGroup!(input)
-    })
-    const results: ProjectGroupImportResult['projects'] = selection.rejectedPaths.map(
-      (repoPath) => ({
-        path: repoPath,
-        status: 'failed',
-        error: 'Repository was not found in the nested repo scan result'
-      })
-    )
-    const importedProjectIdsByRepoPath = new Map<string, string>()
-    const importTargetResolver = createNestedRepoImportTargetResolver()
-    for (const [projectGroupOrder, repoPath] of selection.selectedPaths.entries()) {
-      try {
-        if (!isGitRepo(repoPath)) {
-          results.push({ path: repoPath, status: 'failed', error: 'Not a valid git repository' })
-          continue
-        }
-        const importRepoPath = await importTargetResolver.resolveLocal(repoPath)
-        const normalizedImportRepoPath = normalizeRuntimePathForComparison(importRepoPath)
-        const alreadyImportedProjectId = importedProjectIdsByRepoPath.get(normalizedImportRepoPath)
-        if (alreadyImportedProjectId) {
-          results.push({
-            path: repoPath,
-            projectId: alreadyImportedProjectId,
-            status: 'already-known'
-          })
-          continue
-        }
-        const existing = this.store
-          .getRepos()
-          .find((repo) => normalizeRuntimePathForComparison(repo.path) === normalizedImportRepoPath)
-        const group = groupResolver.getGroupForRepo(repoPath)
-        if (existing) {
-          if (group) {
-            this.store.moveProjectToGroup(existing.id, group.id, projectGroupOrder)
-          }
-          importedProjectIdsByRepoPath.set(normalizedImportRepoPath, existing.id)
-          results.push({ path: repoPath, projectId: existing.id, status: 'already-known' })
-          continue
-        }
-        const repo: Repo = {
-          id: randomUUID(),
-          path: importRepoPath,
-          displayName: getRepoName(importRepoPath),
-          badgeColor: DEFAULT_REPO_BADGE_COLOR,
-          addedAt: Date.now(),
-          kind: 'git',
-          externalWorktreeVisibility: 'hide',
-          externalWorktreeVisibilityLegacy: false,
-          ...(group
-            ? {
-                projectGroupId: group.id,
-                projectGroupOrder
-              }
-            : {})
-        }
-        this.store.addRepo(repo)
-        importedProjectIdsByRepoPath.set(normalizedImportRepoPath, repo.id)
-        results.push({ path: repoPath, projectId: repo.id, status: 'imported' })
-      } catch (error) {
-        results.push({
-          path: repoPath,
-          status: 'failed',
-          error: sanitizeNestedRepoRuntimeImportError(
-            'Failed to import nested repository in runtime',
-            error
-          )
-        })
-      }
-    }
-    const importedCount = results.filter((entry) => entry.status === 'imported').length
-    const alreadyKnownCount = results.filter((entry) => entry.status === 'already-known').length
-    const failedCount = results.filter((entry) => entry.status === 'failed').length
-    if (importedCount + alreadyKnownCount === 0) {
-      for (const group of groupResolver.getCreatedGroups().toReversed()) {
-        this.store.deleteProjectGroup?.(group.id)
-      }
-    }
-    this.invalidateResolvedWorktreeCache()
-    this.notifyReposChanged()
-    const rootGroup = groupResolver.getRootGroup()
-    return {
-      ...(rootGroup && importedCount + alreadyKnownCount > 0 ? { group: rootGroup } : {}),
-      projects: results,
-      importedCount,
-      alreadyKnownCount,
-      failedCount
-    }
-  }
-
-  async listSparsePresets(repoSelector: string) {
-    if (!this.store?.getSparsePresets) {
-      throw new Error('runtime_unavailable')
-    }
-    const repo = await this.resolveRepoSelector(repoSelector)
-    return this.store.getSparsePresets(repo.id)
-  }
-
-  async saveSparsePreset(
-    repoSelector: string,
-    args: { id?: string; name: string; directories: string[] }
-  ) {
-    if (!this.store?.getSparsePresets || !this.store.saveSparsePreset) {
-      throw new Error('runtime_unavailable')
-    }
-    const repo = await this.resolveRepoSelector(repoSelector)
-    const name = normalizeSparsePresetName(args.name)
-    const directories = normalizeSparsePresetDirectoriesForSave(args.directories)
-    const now = Date.now()
-    const existing = args.id
-      ? this.store.getSparsePresets(repo.id).find((preset) => preset.id === args.id)
-      : undefined
-    return this.store.saveSparsePreset({
-      id: existing?.id ?? randomUUID(),
-      repoId: repo.id,
-      name,
-      directories,
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now
-    })
-  }
+  listRepos: RuntimeProjectGroupsCommands['listRepos'] = this.projectGroupsCommands.listRepos.bind(
+    this.projectGroupsCommands
+  )
+  enrichMissingRepoGitRemoteIdentities: RuntimeProjectGroupsCommands['enrichMissingRepoGitRemoteIdentities'] =
+    this.projectGroupsCommands.enrichMissingRepoGitRemoteIdentities.bind(this.projectGroupsCommands)
+  listProjects: RuntimeProjectGroupsCommands['listProjects'] =
+    this.projectGroupsCommands.listProjects.bind(this.projectGroupsCommands)
+  updateProject: RuntimeProjectGroupsCommands['updateProject'] =
+    this.projectGroupsCommands.updateProject.bind(this.projectGroupsCommands)
+  listProjectHostSetups: RuntimeProjectGroupsCommands['listProjectHostSetups'] =
+    this.projectGroupsCommands.listProjectHostSetups.bind(this.projectGroupsCommands)
+  createProjectHostSetup: RuntimeProjectGroupsCommands['createProjectHostSetup'] =
+    this.projectGroupsCommands.createProjectHostSetup.bind(this.projectGroupsCommands)
+  setupProjectExistingFolder: RuntimeProjectGroupsCommands['setupProjectExistingFolder'] =
+    this.projectGroupsCommands.setupProjectExistingFolder.bind(this.projectGroupsCommands)
+  setupProjectClone: RuntimeProjectGroupsCommands['setupProjectClone'] =
+    this.projectGroupsCommands.setupProjectClone.bind(this.projectGroupsCommands)
+  updateProjectHostSetup: RuntimeProjectGroupsCommands['updateProjectHostSetup'] =
+    this.projectGroupsCommands.updateProjectHostSetup.bind(this.projectGroupsCommands)
+  deleteProjectHostSetup: RuntimeProjectGroupsCommands['deleteProjectHostSetup'] =
+    this.projectGroupsCommands.deleteProjectHostSetup.bind(this.projectGroupsCommands)
+  listProjectGroups: RuntimeProjectGroupsCommands['listProjectGroups'] =
+    this.projectGroupsCommands.listProjectGroups.bind(this.projectGroupsCommands)
+  listFolderWorkspaces: RuntimeProjectGroupsCommands['listFolderWorkspaces'] =
+    this.projectGroupsCommands.listFolderWorkspaces.bind(this.projectGroupsCommands)
+  createProjectGroup: RuntimeProjectGroupsCommands['createProjectGroup'] =
+    this.projectGroupsCommands.createProjectGroup.bind(this.projectGroupsCommands)
+  updateProjectGroup: RuntimeProjectGroupsCommands['updateProjectGroup'] =
+    this.projectGroupsCommands.updateProjectGroup.bind(this.projectGroupsCommands)
+  deleteProjectGroup: RuntimeProjectGroupsCommands['deleteProjectGroup'] =
+    this.projectGroupsCommands.deleteProjectGroup.bind(this.projectGroupsCommands)
+  moveProjectToGroup: RuntimeProjectGroupsCommands['moveProjectToGroup'] =
+    this.projectGroupsCommands.moveProjectToGroup.bind(this.projectGroupsCommands)
+  createFolderWorkspace: RuntimeProjectGroupsCommands['createFolderWorkspace'] =
+    this.projectGroupsCommands.createFolderWorkspace.bind(this.projectGroupsCommands)
+  getFolderWorkspacePathStatus: RuntimeProjectGroupsCommands['getFolderWorkspacePathStatus'] =
+    this.projectGroupsCommands.getFolderWorkspacePathStatus.bind(this.projectGroupsCommands)
+  updateFolderWorkspace: RuntimeProjectGroupsCommands['updateFolderWorkspace'] =
+    this.projectGroupsCommands.updateFolderWorkspace.bind(this.projectGroupsCommands)
+  deleteFolderWorkspace: RuntimeProjectGroupsCommands['deleteFolderWorkspace'] =
+    this.projectGroupsCommands.deleteFolderWorkspace.bind(this.projectGroupsCommands)
+  scanNestedRepos: RuntimeProjectGroupsCommands['scanNestedRepos'] =
+    this.projectGroupsCommands.scanNestedRepos.bind(this.projectGroupsCommands)
+  browseServerDir: RuntimeProjectGroupsCommands['browseServerDir'] =
+    this.projectGroupsCommands.browseServerDir.bind(this.projectGroupsCommands)
+  isGitAvailable: RuntimeProjectGroupsCommands['isGitAvailable'] =
+    this.projectGroupsCommands.isGitAvailable.bind(this.projectGroupsCommands)
+  importNestedRepos: RuntimeProjectGroupsCommands['importNestedRepos'] =
+    this.projectGroupsCommands.importNestedRepos.bind(this.projectGroupsCommands)
+  listSparsePresets: RuntimeProjectGroupsCommands['listSparsePresets'] =
+    this.projectGroupsCommands.listSparsePresets.bind(this.projectGroupsCommands)
+  saveSparsePreset: RuntimeProjectGroupsCommands['saveSparsePreset'] =
+    this.projectGroupsCommands.saveSparsePreset.bind(this.projectGroupsCommands)
 
   async addRepo(
     path: string,
