@@ -83,6 +83,14 @@ inline frontend/src/main/runtime/orca-runtime-worktree-base-status.ts
 # ~990 lines, a separate, un-tracked refactor candidate not addressed here
 # to keep this a pure Move.
 inline frontend/src/main/runtime/orca-runtime-worktree-creation.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-050, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's repo lifecycle command block (add/create/
+# clone/show/update/remove/reorder + base-ref search/default), already
+# covered by orca-runtime.ts's own grandfathered max-lines disable.
+# inspectTerminalProcess sits textually in the middle of this range but is
+# PTY-controller-adjacent, not repo lifecycle — deliberately excluded.
+inline frontend/src/main/runtime/orca-runtime-repo-lifecycle.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
