@@ -29,6 +29,7 @@ import { RuntimeRemoteTerminalViewSubscriberCommands } from './orca-runtime-remo
 import { RuntimePtyTranscriptStore } from './orca-runtime-pty-transcript-store'
 import { RuntimeHeadlessTerminalCommands } from './orca-runtime-headless-terminal'
 import { RuntimeWorktreeLineageCommands } from './orca-runtime-worktree-lineage'
+import { RuntimeBrowserScreencastCommands } from './orca-runtime-browser-screencast'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -203,8 +204,7 @@ import type {
   RuntimeMobileSessionTabsSnapshot,
   RuntimeBrowserDriverState,
   RuntimeSyncWindowGraph,
-  RuntimeWorktreeListResult,
-  BrowserScreencastResult
+  RuntimeWorktreeListResult
 } from '../../shared/runtime-types'
 import type { AutomationService } from '../automations/service'
 import { RuntimeBrowserCommands } from './orca-runtime-browser'
@@ -232,7 +232,6 @@ import { collectMemorySnapshot } from '../memory/collector'
 import { BrowserWindow, ipcMain } from 'electron'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import type { BrowserBackend } from '../browser/browser-backend'
-import { BrowserError } from '../browser/cdp-bridge'
 import { getRepoUpstream } from '../github/client'
 import {
   getLocalProjectWorktreeGitOptions,
@@ -1076,14 +1075,6 @@ export class OrcaRuntimeService {
     Set<(data: string, meta?: { seq?: number; rawLength?: number; cwd?: string }) => void>
   >()
   private readonly ptyTranscripts = new RuntimePtyTranscriptStore()
-  private activeBrowserScreencastsByConnection = new Map<
-    string,
-    { cancel: (emitEnd?: boolean) => void; done: Promise<void>; connectionKey: string }
-  >()
-  private activeBrowserScreencastsByPage = new Map<
-    string,
-    { cancel: (emitEnd?: boolean) => void; done: Promise<void>; connectionKey: string }
-  >()
   private titleObservationSequence = 0
   private readonly headlessTerminalCommands = new RuntimeHeadlessTerminalCommands({
     getGraph: () => this.graph,
@@ -3338,7 +3329,7 @@ export class OrcaRuntimeService {
       this.revokeTerminalFileGrantsForClient(clientId),
     cancelMobileDictationForClient: (clientId) => this.cancelMobileDictationForClient(clientId),
     cancelBrowserScreencastForPage: (browserPageId) =>
-      this.activeBrowserScreencastsByPage.get(browserPageId)?.cancel(true),
+      this.cancelBrowserScreencastForPage(browserPageId),
     getAgentBrowserBridge: () => this.agentBrowserBridge
   })
 
@@ -8655,151 +8646,21 @@ export class OrcaRuntimeService {
   browserScreenshot: RuntimeBrowserCommands['browserScreenshot'] =
     this.browserCommands.browserScreenshot.bind(this.browserCommands)
 
-  async browserScreencast(
-    params: Parameters<RuntimeBrowserCommands['browserScreencast']>[0],
-    options: {
-      connectionId?: string
-      sendBinary?: (bytes: Uint8Array<ArrayBufferLike>) => boolean | void
-      signal?: AbortSignal
-      emit: (result: BrowserScreencastResult) => void
-    }
-  ): Promise<void> {
-    if (!options.sendBinary) {
-      throw new BrowserError(
-        'browser_error',
-        'Browser screencast requires a binary streaming transport.'
-      )
-    }
+  private readonly browserScreencastCommands = new RuntimeBrowserScreencastCommands({
+    browserScreencast: (params, opts) => this.browserCommands.browserScreencast(params, opts),
+    getBrowserDriver: (browserPageId) => this.getBrowserDriver(browserPageId),
+    setBrowserDriver: (browserPageId, driver) => this.setBrowserDriver(browserPageId, driver),
+    registerSubscriptionCleanup: (subscriptionId, cleanup, connectionId) =>
+      this.registerSubscriptionCleanup(subscriptionId, cleanup, connectionId),
+    cleanupSubscription: (subscriptionId) => this.cleanupSubscription(subscriptionId)
+  })
 
-    const connectionKey = options.connectionId ?? 'local'
-    const requestedPageId = typeof params.page === 'string' ? params.page : null
-    let existingPageStream = requestedPageId
-      ? this.activeBrowserScreencastsByPage.get(requestedPageId)
-      : undefined
-    while (existingPageStream) {
-      // Why: CDP only supports one screencast per browser page. A stale paired
-      // web/mobile stream should not leave the next tab activation stuck on an
-      // already-active error or old viewport dimensions.
-      existingPageStream.cancel(existingPageStream.connectionKey !== connectionKey)
-      await existingPageStream.done
-      existingPageStream = requestedPageId
-        ? this.activeBrowserScreencastsByPage.get(requestedPageId)
-        : undefined
-    }
-    let existingStream = this.activeBrowserScreencastsByConnection.get(connectionKey)
-    while (existingStream) {
-      existingStream.cancel()
-      await existingStream.done
-      existingStream = this.activeBrowserScreencastsByConnection.get(connectionKey)
-    }
-    if (options.signal?.aborted) {
-      throw new BrowserError('browser_error', 'Browser screencast was cancelled.')
-    }
-
-    let screencast: Awaited<ReturnType<RuntimeBrowserCommands['browserScreencast']>> | null = null
-    let registeredSubscriptionId: string | null = null
-    let activeBrowserPageId: string | null = null
-    let ended = false
-    let cancelledBeforeStart = false
-    let readyEmitted = false
-    let resolveActiveDone!: () => void
-    const activeDone = new Promise<void>((resolve) => {
-      resolveActiveDone = resolve
-    })
-    const end = (emitEnd: boolean): void => {
-      if (ended) {
-        return
-      }
-      ended = true
-      screencast?.session.stop()
-      if (emitEnd && screencast) {
-        options.emit({ type: 'end', subscriptionId: screencast.subscriptionId })
-      }
-    }
-    const cancel = (emitEnd = false): void => {
-      if (!screencast) {
-        cancelledBeforeStart = true
-        return
-      }
-      end(emitEnd)
-    }
-    const abortScreencast = (): void => cancel()
-    const sendBinaryAfterReady = (bytes: Uint8Array<ArrayBufferLike>): boolean | void => {
-      if (!readyEmitted) {
-        // Why: binary screencast frames are connection-scoped; clients learn the
-        // owning subscription from `ready`, so CDP frames must remain unacked
-        // until the stream's JSON ready event has been delivered.
-        return false
-      }
-      return options.sendBinary?.(bytes)
-    }
-
-    // Why: a phone can rotate before the first stream reaches `ready`, so it
-    // has no subscriptionId to unsubscribe. A same-socket replacement cancels
-    // and waits here instead of racing the active connection/page gates.
-    this.activeBrowserScreencastsByConnection.set(connectionKey, {
-      cancel,
-      done: activeDone,
-      connectionKey
-    })
-    options.signal?.addEventListener('abort', abortScreencast, { once: true })
-    try {
-      screencast = await this.browserCommands.browserScreencast(params, {
-        sendBinary: sendBinaryAfterReady,
-        emit: options.emit
-      })
-      if (cancelledBeforeStart || options.signal?.aborted) {
-        end(false)
-        await screencast.session.done
-        return
-      }
-      activeBrowserPageId = screencast.ready.browserPageId
-      this.activeBrowserScreencastsByPage.set(activeBrowserPageId, {
-        cancel,
-        done: activeDone,
-        connectionKey
-      })
-      this.setBrowserDriver(activeBrowserPageId, { kind: 'mobile', clientId: connectionKey })
-
-      // Why: browser screencast frames are connection-scoped media. Registering
-      // cleanup ties Page.stopScreencast to the exact remote socket so hidden
-      // client panes and dropped connections do not leave Chromium streaming.
-      this.registerSubscriptionCleanup(
-        screencast.subscriptionId,
-        () => end(true),
-        options.connectionId
-      )
-      registeredSubscriptionId = screencast.subscriptionId
-      options.emit(screencast.ready)
-      readyEmitted = true
-      await screencast.session.done
-      end(true)
-      this.cleanupSubscription(screencast.subscriptionId)
-    } finally {
-      options.signal?.removeEventListener('abort', abortScreencast)
-      if (!ended) {
-        end(false)
-      }
-      if (registeredSubscriptionId) {
-        this.cleanupSubscription(registeredSubscriptionId)
-      }
-      const active = this.activeBrowserScreencastsByConnection.get(connectionKey)
-      if (active?.done === activeDone) {
-        this.activeBrowserScreencastsByConnection.delete(connectionKey)
-      }
-      if (activeBrowserPageId) {
-        const activePageStream = this.activeBrowserScreencastsByPage.get(activeBrowserPageId)
-        if (activePageStream?.done === activeDone) {
-          this.activeBrowserScreencastsByPage.delete(activeBrowserPageId)
-        }
-        const driver = this.getBrowserDriver(activeBrowserPageId)
-        if (driver.kind === 'mobile' && driver.clientId === connectionKey) {
-          this.setBrowserDriver(activeBrowserPageId, { kind: 'idle' })
-        }
-      }
-      resolveActiveDone()
-    }
-  }
+  browserScreencast: RuntimeBrowserScreencastCommands['browserScreencast'] =
+    this.browserScreencastCommands.browserScreencast.bind(this.browserScreencastCommands)
+  cancelBrowserScreencastForPage: RuntimeBrowserScreencastCommands['cancelBrowserScreencastForPage'] =
+    this.browserScreencastCommands.cancelBrowserScreencastForPage.bind(
+      this.browserScreencastCommands
+    )
 
   browserEval: RuntimeBrowserCommands['browserEval'] = this.browserCommands.browserEval.bind(
     this.browserCommands
