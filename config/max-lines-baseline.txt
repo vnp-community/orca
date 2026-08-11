@@ -38,6 +38,13 @@ inline frontend/src/main/runtime/orca-runtime-mobile-floor.ts
 # repo hooks/setup-script inspection (both textually adjacent) are explicitly
 # out of scope — left for follow-on tasks; see TASK-BIGFILE-042's task doc.
 inline frontend/src/main/runtime/orca-runtime-issue-tracking.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-043, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's repo-hooks/setup-script inspection method
+# block, already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. Only marginally over budget (302 vs 300 lines) — small follow-on
+# cleanup could bring it under without further splitting.
+inline frontend/src/main/runtime/orca-runtime-repo-hooks.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
