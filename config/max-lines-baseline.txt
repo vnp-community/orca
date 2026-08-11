@@ -91,6 +91,20 @@ inline frontend/src/main/runtime/orca-runtime-worktree-creation.ts
 # inspectTerminalProcess sits textually in the middle of this range but is
 # PTY-controller-adjacent, not repo lifecycle — deliberately excluded.
 inline frontend/src/main/runtime/orca-runtime-repo-lifecycle.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-051, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's headless mobile-session-tabs
+# materialization/sync cluster (listAllMobileSessionTabs + ~48 dedicated
+# private helpers), already covered by orca-runtime.ts's own grandfathered
+# max-lines disable. First of 3 mobile-session-tabs clusters —
+# createMobileSessionTerminal and notifyMobileSessionTabsChanged remain in
+# orca-runtime.ts, deferred to follow-on tasks. The pre-existing
+# fileCommands/gitCommands composition blocks (unrelated domains from
+# TASK-BIGFILE-008/009) sat textually in the middle of the original
+# range — deliberately excluded, stayed in orca-runtime.ts. This is the
+# PTY-lifecycle-core-adjacent domain the user explicitly chose to tackle
+# after accepting the higher risk (zero test coverage).
+inline frontend/src/main/runtime/orca-runtime-mobile-session-tabs.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
