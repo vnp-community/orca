@@ -191,6 +191,15 @@ inline frontend/src/main/runtime/orca-runtime-terminal-listing.ts
 # TASK-BIGFILE-070's terminal-listing — found via the same gap-analysis
 # sweep, outside the onPtyData-adjacent danger zone.
 inline frontend/src/main/runtime/orca-runtime-worktree-ps.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-072, BUG-FE-BIGFILE-002): extraction
+# of orca-runtime.ts's terminal-waiter domain (waitForTerminal + the
+# exit/tui-idle waiter resolution, polling-fallback, and teardown machinery
+# it shares with onPtyData/onPtyExit), already covered by orca-runtime.ts's
+# own grandfathered max-lines disable. Non-contiguous 3-segment move,
+# directly in the onPtyData/onPtyExit hot path — same risk tier as
+# TASK-BIGFILE-067/068/069.
+inline frontend/src/main/runtime/orca-runtime-terminal-waiter.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
