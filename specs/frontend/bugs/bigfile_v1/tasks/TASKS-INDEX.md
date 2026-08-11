@@ -98,6 +98,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 68 | [TASK-BIGFILE-068](./TASK-BIGFILE-068-orca-runtime-terminal-side-effects-domain.md) | Move (composition) — rủi ro cao | `orca-runtime.ts` → `orca-runtime-terminal-side-effects.ts` | L | 60, 63, 64, 67 | ✅ |
 | 69 | [TASK-BIGFILE-069](./TASK-BIGFILE-069-orca-runtime-agent-row-snapshot-domain.md) | Move (composition) — rủi ro cao | `orca-runtime.ts` → `orca-runtime-agent-row-snapshot.ts` | M | 68 | ✅ |
 | 70 | [TASK-BIGFILE-070](./TASK-BIGFILE-070-orca-runtime-terminal-listing-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-terminal-listing.ts` | L | 40, 51, 65 | ✅ |
+| 71 | [TASK-BIGFILE-071](./TASK-BIGFILE-071-orca-runtime-worktree-ps-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-worktree-ps.ts` | L | 40, 51, 65, 70 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn

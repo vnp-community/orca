@@ -183,6 +183,14 @@ inline frontend/src/main/runtime/orca-runtime-pty-title-tracker.ts
 # danger zone (TASK-BIGFILE-067/068/069) — lower risk, but still zero
 # test coverage.
 inline frontend/src/main/runtime/orca-runtime-terminal-listing.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-071, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's worktree.ps command block
+# (getWorktreePs + attachAgentRowsToSummaries), already covered by
+# orca-runtime.ts's own grandfathered max-lines disable. Same shape as
+# TASK-BIGFILE-070's terminal-listing — found via the same gap-analysis
+# sweep, outside the onPtyData-adjacent danger zone.
+inline frontend/src/main/runtime/orca-runtime-worktree-ps.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
