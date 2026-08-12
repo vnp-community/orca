@@ -41,6 +41,7 @@ import { RuntimePtyDataIngestCommands } from './orca-runtime-pty-data-ingest'
 import { RuntimeTerminalSendCommands } from './orca-runtime-terminal-send'
 import { RuntimeTerminalAgentStatusCommands } from './orca-runtime-terminal-agent-status'
 import { RuntimePtyExitCommands } from './orca-runtime-pty-exit'
+import { RuntimeSyncWindowGraphCommands } from './orca-runtime-sync-window-graph'
 import { detectAgentStatusFromTitle, isClaudeManagementTitle } from '../../shared/agent-detection'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { TerminalSideEffectBatch } from '../../shared/terminal-side-effect-facts'
@@ -126,14 +127,12 @@ import type {
   RuntimeTerminalFocus,
   RuntimeTerminalClose,
   RuntimeStatus,
-  RuntimeSyncWindowGraphResult,
   RuntimeWorktreePsSummary,
   RuntimeTerminalShow,
   RuntimeTerminalSummary,
   RuntimeSyncedLeaf,
   RuntimeMobileSessionTabsResult,
   RuntimeMobileSessionTabsSnapshot,
-  RuntimeSyncWindowGraph,
   RuntimeWorktreeListResult
 } from '../../shared/runtime-types'
 import type { AutomationService } from '../automations/service'
@@ -757,150 +756,25 @@ export class OrcaRuntimeService {
     }
   }
 
-  syncWindowGraph(windowId: number, graph: RuntimeSyncWindowGraph): RuntimeSyncWindowGraphResult {
-    if (this.graph.authoritativeWindowId === null) {
-      this.graph.authoritativeWindowId = windowId
-    }
-    if (windowId !== this.graph.authoritativeWindowId) {
-      throw new Error('Runtime graph publisher does not match the authoritative window')
-    }
+  private readonly syncWindowGraphCommands = new RuntimeSyncWindowGraphCommands({
+    getGraph: () => this.graph,
+    syncMobileSessionTabs: (tabs) => this.syncMobileSessionTabs(tabs),
+    notifyMobileSessionTabSnapshots: () => this.notifyMobileSessionTabSnapshots(),
+    nextTitleObservationSequence: () => this.nextTitleObservationSequence(),
+    getLeafKey: (tabId, leafId) => this.getLeafKey(tabId, leafId),
+    recordPtyWorktree: (ptyId, worktreeId, state) =>
+      this.recordPtyWorktree(ptyId, worktreeId, state),
+    makeRuntimePaneKey: (leaf) => this.makeRuntimePaneKey(leaf),
+    invalidateLeafHandle: (leafKey) => this.invalidateLeafHandle(leafKey),
+    rebuildLeafPtyIndex: () => this.rebuildLeafPtyIndex(),
+    refreshWritableFlags: () => this.refreshWritableFlags(),
+    adoptPreAllocatedHandle: (leaf) => this.adoptPreAllocatedHandle(leaf),
+    buildAgentOrchestrationByPaneKey: () => this.buildAgentOrchestrationByPaneKey(),
+    getStatus: () => this.getStatus()
+  })
 
-    this.graph.tabs = new Map(graph.tabs.map((tab) => [tab.tabId, tab]))
-    this.syncMobileSessionTabs(graph.mobileSessionTabs)
-    const nextLeaves = new Map<string, RuntimeLeafRecord>()
-    const graphSyncedAt = this.nextTitleObservationSequence()
-
-    // Why: renderer reloads can briefly republish the same leaf with no ptyId;
-    // keep live CLI handles usable while the UI graph rebuilds.
-    const preserveLivePtysDuringReload = this.graph.graphStatus === 'reloading'
-    for (const leaf of graph.leaves) {
-      const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
-      const existing = this.graph.leaves.get(leafKey)
-      const ptyId =
-        preserveLivePtysDuringReload && leaf.ptyId === null && existing?.ptyId
-          ? existing.ptyId
-          : leaf.ptyId
-      const ptyGeneration =
-        existing && existing.ptyId !== ptyId
-          ? existing.ptyGeneration + 1
-          : (existing?.ptyGeneration ?? 0)
-      const existingPty = ptyId ? this.graph.ptysById.get(ptyId) : undefined
-      const tailSource = existing?.ptyId === ptyId ? existing : existingPty
-
-      nextLeaves.set(leafKey, {
-        ...leaf,
-        ptyId,
-        ptyGeneration,
-        connected: ptyId !== null,
-        writable: this.graph.graphStatus === 'ready' && ptyId !== null,
-        lastOutputAt: tailSource?.lastOutputAt ?? null,
-        lastExitCode: tailSource?.lastExitCode ?? null,
-        tailBuffer: tailSource?.tailBuffer ?? [],
-        tailPartialLine: tailSource?.tailPartialLine ?? '',
-        tailPendingAnsi: tailSource?.tailPendingAnsi ?? '',
-        tailRedrawCursor: tailSource?.tailRedrawCursor ?? null,
-        tailTruncated: tailSource?.tailTruncated ?? false,
-        tailLinesTotal: tailSource?.tailLinesTotal ?? 0,
-        preview: tailSource?.preview ?? '',
-        waitBlockedAt: tailSource?.waitBlockedAt ?? null,
-        lastAgentStatus: tailSource?.lastAgentStatus ?? null,
-        lastOscTitle: tailSource?.lastOscTitle ?? null,
-        lastOscTitleAt: tailSource?.lastOscTitleAt ?? null,
-        paneTitleUpdatedAt:
-          existing?.ptyId === ptyId && existing.paneTitle === leaf.paneTitle
-            ? existing.paneTitleUpdatedAt
-            : graphSyncedAt
-      })
-
-      if (leaf.ptyId) {
-        this.recordPtyWorktree(leaf.ptyId, leaf.worktreeId, {
-          connected: true,
-          lastOutputAt: existing?.ptyId === leaf.ptyId ? existing.lastOutputAt : null,
-          preview: existing?.ptyId === leaf.ptyId ? existing.preview : '',
-          tabId: leaf.tabId,
-          paneKey: this.makeRuntimePaneKey(leaf)
-        })
-      }
-
-      if (existing && (existing.ptyId !== ptyId || existing.ptyGeneration !== ptyGeneration)) {
-        this.invalidateLeafHandle(leafKey)
-      }
-    }
-
-    // Why: computed BEFORE preserving stale leaves so preservation can refuse a
-    // leaf whose PTY the incoming graph already rebound to a live leaf. Two
-    // leaves on one PTY resolve to the same handle (handles are ptyId-keyed) and
-    // crash paired clients with a duplicate React key.
-    const nextPtyIds = new Set(
-      [...nextLeaves.values()].map((leaf) => leaf.ptyId).filter((ptyId): ptyId is string => !!ptyId)
-    )
-    for (const oldLeafKey of this.graph.leaves.keys()) {
-      if (!nextLeaves.has(oldLeafKey)) {
-        const oldLeaf = this.graph.leaves.get(oldLeafKey)
-        if (
-          preserveLivePtysDuringReload &&
-          oldLeaf?.ptyId &&
-          this.graph.handleByPtyId.has(oldLeaf.ptyId) &&
-          !nextPtyIds.has(oldLeaf.ptyId)
-        ) {
-          // Why: a CLI-created agent keeps using its exported handle even if
-          // the reloaded renderer has not rebound the pane yet.
-          nextLeaves.set(oldLeafKey, oldLeaf)
-          nextPtyIds.add(oldLeaf.ptyId)
-        } else if (oldLeaf?.ptyId && nextPtyIds.has(oldLeaf.ptyId)) {
-          // Why: the incoming graph already rebound this PTY to a live leaf (e.g.
-          // a woken agent re-keyed to a new leaf during renderer reload). Keeping
-          // the old leaf too would put two leaves on ONE PTY, which emit the same
-          // terminal handle and crash paired clients. Drop the stale leaf; if its
-          // handle is the shared ptyId-keyed one it belongs to the live leaf now,
-          // so release only this dead leaf key's alias. A leaf-unique handle has
-          // no next owner — invalidate it so in-flight CLI waiters fail fast
-          // instead of hanging on a dead leaf.
-          const oldHandle = this.graph.handleByLeafKey.get(oldLeafKey)
-          if (
-            oldHandle !== undefined &&
-            oldHandle === this.graph.handleByPtyId.get(oldLeaf.ptyId)
-          ) {
-            this.graph.handleByLeafKey.delete(oldLeafKey)
-          } else {
-            this.invalidateLeafHandle(oldLeafKey)
-          }
-        } else {
-          this.invalidateLeafHandle(oldLeafKey)
-        }
-      }
-    }
-
-    for (const [ptyId, leaf] of this.graph.detachedPreAllocatedLeaves) {
-      if (nextPtyIds.has(ptyId) || !this.graph.handleByPtyId.has(ptyId)) {
-        this.graph.detachedPreAllocatedLeaves.delete(ptyId)
-        continue
-      }
-      nextLeaves.set(this.getLeafKey(leaf.tabId, leaf.leafId), leaf)
-      nextPtyIds.add(ptyId)
-    }
-
-    this.graph.leaves = nextLeaves
-    this.rebuildLeafPtyIndex()
-    this.notifyMobileSessionTabSnapshots()
-    this.graph.graphStatus = 'ready'
-    this.refreshWritableFlags()
-    for (const leaf of this.graph.leaves.values()) {
-      this.adoptPreAllocatedHandle(leaf)
-    }
-
-    // Why: createTerminal waits for the renderer's graph sync to populate the
-    // new leaf so it can return a handle. Drain callbacks after leaves update.
-    for (const cb of [...this.graph.graphSyncCallbacks]) {
-      cb()
-    }
-
-    const agentOrchestrationByPaneKey = this.buildAgentOrchestrationByPaneKey()
-    return {
-      ...this.getStatus(),
-      ...(agentOrchestrationByPaneKey ? { agentOrchestrationByPaneKey } : {})
-    }
-  }
+  syncWindowGraph: RuntimeSyncWindowGraphCommands['syncWindowGraph'] =
+    this.syncWindowGraphCommands.syncWindowGraph.bind(this.syncWindowGraphCommands)
 
   async listMobileSessionTabs(worktreeSelector: string): Promise<RuntimeMobileSessionTabsResult> {
     const explicitWorktreeId = this.getValidatedExplicitWorktreeIdSelector(worktreeSelector)
