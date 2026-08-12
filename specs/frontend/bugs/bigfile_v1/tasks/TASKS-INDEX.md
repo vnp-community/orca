@@ -115,18 +115,18 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 
 | # | Task | Loại | File đích/nguồn | Effort | Phụ thuộc | Status |
 |---|---|---|---|---|---|---|
-| 225 | [TASK-BIGFILE-225](./TASK-BIGFILE-225-sourcecontrol-diff-comments-panel-state.md) | Move | `SourceControl.tsx` → hook `useSourceControlDiffCommentsPanelState` | — | 26 | ⬜ (sinh bởi 26, chưa thực thi) |
-| 226 | [TASK-BIGFILE-226](./TASK-BIGFILE-226-sourcecontrol-branch-compare-refresh.md) | Move | `SourceControl.tsx` → hook `useSourceControlBranchCompareRefresh` | — | 26 | ⬜ (sinh bởi 26, chưa thực thi) |
-| 235 | [TASK-BIGFILE-235](./TASK-BIGFILE-235-taskpage-gitlab-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageGitLabState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
-| 236 | [TASK-BIGFILE-236](./TASK-BIGFILE-236-taskpage-github-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageGitHubState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
-| 237 | [TASK-BIGFILE-237](./TASK-BIGFILE-237-taskpage-jira-draft-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageJiraDraftState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
-| 238 | [TASK-BIGFILE-238](./TASK-BIGFILE-238-taskpage-jira-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageJiraBrowseState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
-| 239 | [TASK-BIGFILE-239](./TASK-BIGFILE-239-taskpage-linear-draft-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearDraftState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
-| 240 | [TASK-BIGFILE-240](./TASK-BIGFILE-240-taskpage-linear-teams-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearTeamsState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
-| 241 | [TASK-BIGFILE-241](./TASK-BIGFILE-241-taskpage-linear-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearBrowseState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
+| 225 | [TASK-BIGFILE-225](./TASK-BIGFILE-225-sourcecontrol-diff-comments-panel-state.md) | Move | `SourceControl.tsx` → hook `useSourceControlDiffCommentsPanelState` | — | 26 | ✅ (`2f090c79b`) |
+| 226 | [TASK-BIGFILE-226](./TASK-BIGFILE-226-sourcecontrol-branch-compare-refresh.md) | Move | `SourceControl.tsx` → hook `useSourceControlBranchCompareRefresh` | — | 26 | ✅ (split thêm git-history-refresh sibling, `2f090c79b`) |
+| 235 | [TASK-BIGFILE-235](./TASK-BIGFILE-235-taskpage-gitlab-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageGitLabState` | — | 32 | ✅ (`b3318d223`) |
+| 236 | [TASK-BIGFILE-236](./TASK-BIGFILE-236-taskpage-github-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageGitHubState` | — | 32 | ✅ (phạm vi mở rộng, split 6 file, `b3318d223`) |
+| 237 | [TASK-BIGFILE-237](./TASK-BIGFILE-237-taskpage-jira-draft-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageJiraDraftState` | — | 32 | ✅ (`b3318d223`) |
+| 238 | [TASK-BIGFILE-238](./TASK-BIGFILE-238-taskpage-jira-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageJiraBrowseState` | — | 32 | ✅ (split 2 file, `b3318d223`) |
+| 239 | [TASK-BIGFILE-239](./TASK-BIGFILE-239-taskpage-linear-draft-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearDraftState` | — | 32 | ✅ (`b3318d223`) |
+| 240 | [TASK-BIGFILE-240](./TASK-BIGFILE-240-taskpage-linear-teams-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearTeamsState` | — | 32 | ✅ (`b3318d223`) |
+| 241 | [TASK-BIGFILE-241](./TASK-BIGFILE-241-taskpage-linear-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearBrowseState` | — | 32, 235, 239, 240 | 🚧 Deferred có chủ đích — domain lớn/dày effect nhất (51 useState/~15 effect), chưa thực thi |
 | 250 | [TASK-BIGFILE-250](./TASK-BIGFILE-250-ipc-pty-pane-key-registry-investigate.md) | Investigate | `ipc/pty.ts` pane-key-registry + provider-resolution state | L | thay thế 1–7 | ✅ (ghi chú thiết kế xong, sinh 251, 252 — `d64ff6d7c`) |
-| 251 | [TASK-BIGFILE-251](./TASK-BIGFILE-251-ipc-pty-host-env.md) | Move | `ipc/pty.ts` → `pty-host-env.ts` (phạm vi đã sửa) | — | 250 | ⬜ (chưa thực thi) |
-| 252 | [TASK-BIGFILE-252](./TASK-BIGFILE-252-ipc-pty-pane-key-registry.md) | Move (composition) | `ipc/pty.ts` → `pty-pane-key-registry.ts` (object/class) | — | 250 | ⬜ (chưa thực thi) |
+| 251 | [TASK-BIGFILE-251](./TASK-BIGFILE-251-ipc-pty-host-env.md) | Move | `ipc/pty.ts` → `pty-host-env.ts` (phạm vi đã sửa) | — | 250 | ✅ (`9141543f2`) |
+| 252 | [TASK-BIGFILE-252](./TASK-BIGFILE-252-ipc-pty-pane-key-registry.md) | Move (composition) | `ipc/pty.ts` → `pty-pane-key-registry.ts` (object/class) | — | 250 | ✅ (`9141543f2`) |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
@@ -226,9 +226,9 @@ trong task doc (đúng bài học từ vụ ipc/pty.ts trước đó). Kết qu�
   đợt sau, TASK-017 hoàn thành một phần (xem task doc riêng), TASK-034 kết
   luận split bị blocked (xem SOLUTION-FE-BIGFILE-006).
 - **7/7 task blocked (001–007) đã rà soát lại** — tất cả chuyển "⛔
-  Superseded", thay bằng 3 task mới tự đủ: TASK-BIGFILE-250 (Investigate),
-  251 và 252 (Move, đã sửa đúng phạm vi) — **cả 3 chưa thực thi**, để lại
-  cho đợt sau.
+  Superseded", thay bằng 3 task mới tự đủ: TASK-BIGFILE-250 (Investigate,
+  xong), 251 và 252 (Move, đã sửa đúng phạm vi — thực thi ở đợt 2, xem bên
+  dưới).
 - **Commit riêng theo từng nhóm file** (không phải 1-task-1-commit như quy
   ước gốc — 8 agent chạy tuần tự nhiều task cộng dồn trên cùng 1 file trong
   1 phiên, không tách lại được thành diff riêng từng task sau khi đã áp
@@ -255,6 +255,40 @@ trong task doc (đúng bài học từ vụ ipc/pty.ts trước đó). Kết qu�
   hiện và bổ sung baseline entry đầy đủ trong đợt này (commit
   `0b97bf047`), xác nhận lại bằng `check-max-lines-ratchet.mjs` 0-diff thật
   (647, đúng baseline gốc).
+
+## Đợt 2 — 9 task Move còn lại sau đợt 1 (2026-08-12, cùng ngày)
+
+Chạy 3 agent song song (`sourcecontrol-hooks` 225/226, `taskpage-hooks`
+235–241, `ipc-pty` 251/252) cho 9 task Move sinh ra từ đợt 1. Kết quả:
+
+- **8/9 task hoàn thành**, TASK-BIGFILE-241 **deferred có chủ đích** (không
+  phải blocked do state entangled như tiền lệ ipc/pty.ts — agent tự đánh
+  giá đây là domain lớn/dày effect nhất còn lại, 51 useState/~15 effect
+  spanning issues+pagination/projects/custom-views/board drag&drop, nên để
+  lại làm task riêng sau khi pattern đã ổn định qua 235–240). Phụ thuộc
+  235, 239, 240 — đều đã xong, có thể thực thi ngay khi muốn.
+- Một số task tự mở rộng phạm vi khi phát hiện phụ thuộc chéo không có
+  trong task doc gốc (TASK-236: cluster dialog/cache/PR-checks phải đi
+  cùng, split 6 file; TASK-238: cluster fallback tương tự, split 2 file;
+  TASK-226: phát hiện thêm 1 effect dọn dẹp git-history không nằm trong mô
+  tả gốc, xử lý bằng cách thêm `worktreeMap` làm input hook) — đều ghi rõ
+  trong summary + task doc, không âm thầm bỏ qua.
+- **Commit riêng theo nhóm**: `2f090c79b` (sourcecontrol-hooks),
+  `b3318d223` (taskpage-hooks), `9141543f2` (ipc-pty).
+- **✅ gitnexus đã tự phục hồi trong lúc đợt 2 chạy** (index được rebuild
+  lại — 178.783 symbol, up-to-date; nguyên nhân sập ở đợt 1 gần như chắc
+  chắn là graph store bị hỏng/không tương thích, không phải do độ phức tạp
+  câu truy vấn, vì `MATCH (n) RETURN count(n)` cũng segfault trước đó).
+  Tận dụng ngay: chạy lại `detect_changes({scope:"all"})` thật cho toàn bộ
+  thay đổi đợt 2 — risk **medium**, chỉ 2 process bị ảnh hưởng
+  (`TaskPage → GetWorktreeSnapshot`, `SourceControlInner →
+  GetWorktreeSnapshot`, đúng như kỳ vọng vì đó chính là 2 component bị sửa)
+  — không có gì HIGH/CRITICAL. Chạy thêm `context()`/`impact()` trên
+  `registerPtyHandlers` (nhóm rủi ro cao nhất, tiền lệ ipc/pty.ts) — risk
+  LOW, call graph nguyên vẹn. Bổ sung xác nhận cho phần verify bằng grep
+  thủ công mà 3 agent đã làm khi gitnexus còn down.
+- 1 baseline entry mới: `frontend/src/main/ipc/pty-host-env.ts` (409/300
+  dòng, đúng dự kiến của chính task doc TASK-BIGFILE-251).
 
 ## Tham khảo
 
