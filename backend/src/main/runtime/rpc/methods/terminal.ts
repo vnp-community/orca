@@ -2512,8 +2512,29 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           outputBatcher = createTerminalOutputBatcher((chunk) => {
             emit({ type: 'data', chunk })
           })
-          const unsubscribeStreamData = runtime.subscribeToTerminalData(ptyId, (data) => {
-            outputBatcher?.push(data)
+          // FIX (double-prompt report): unlike terminal.multiplex just below,
+          // this JSON fallback used to forward every live chunk unfiltered,
+          // even though read.tail/serialized.data above already covers
+          // whatever the PTY had already printed by the time this handler
+          // ran (e.g. a shell's startup prompt on a terminal a sibling
+          // client just spawned). subscribeToTerminalData's listener always
+          // carried seq/rawLength metadata -- this handler just never read
+          // it. Reuse the same getOutputAfterSnapshotSeq the binary path
+          // already relies on, so a chunk fully covered by the scrollback
+          // snapshot's seq is dropped, and a chunk straddling the boundary
+          // is trimmed to only its uncovered tail. Falls through to
+          // "forward everything" unchanged when seq isn't available
+          // (serialized === null), so this can only remove duplicates,
+          // never drop genuinely-new output.
+          const snapshotOutputSeq = serialized?.seq
+          const unsubscribeStreamData = runtime.subscribeToTerminalData(ptyId, (data, meta) => {
+            const uncoveredData = getOutputAfterSnapshotSeq(
+              { data, bytes: data.length, meta },
+              snapshotOutputSeq
+            )
+            if (uncoveredData) {
+              outputBatcher?.push(uncoveredData, meta)
+            }
           })
           // Why: this legacy JSON stream can feed a live xterm view too
           // (older web/desktop subscribers), so it conservatively registers
