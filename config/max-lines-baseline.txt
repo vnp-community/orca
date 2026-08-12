@@ -346,3 +346,9 @@ inline desktop/src/main/runtime/orca-runtime-service-types.ts
 # counted lines vs 300 budget). Further splitting was out of this Move
 # task's scope.
 inline frontend/src/main/ipc/pty-host-env.ts
+#
+# NEEDS PR REVIEW (added while syncing TASK-BIGFILE-251's ipc/pty.ts split
+# into backend/ and desktop/ — byte-identical copy of the frontend entry
+# directly above, same rationale.
+inline backend/src/main/ipc/pty-host-env.ts
+inline desktop/src/main/ipc/pty-host-env.ts
