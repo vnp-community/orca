@@ -1,0 +1,85 @@
+# ============================================================
+# docker-compose.orca.artifact.yml — ARTIFACT MODE variant of
+# docker-compose.orca.yml
+# ============================================================
+# Identical to docker-compose.orca.yml except `build.dockerfile` points at
+# Dockerfile.artifact (single-stage, no server-side compile — see that
+# file's header comment) and shm_size is dropped since there's no Vite
+# build running in-container anymore. Used by
+# deploy/dev/scripts/sync-to-server-artifact.sh; docker-compose.orca.yml
+# (source-sync + server-side build) is untouched and still works.
+# ============================================================
+
+services:
+
+  orca:
+    build:
+      context: ../../
+      dockerfile: deploy/dev/docker/backend/Dockerfile.artifact
+    image: vnpblc/orca-server:${ORCA_VERSION:-latest}
+    container_name: orca-server
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+    environment:
+      ORCA_DOMAIN: ${ORCA_DOMAIN:-b15.openledger.vn}
+      ORCA_PORT: ${ORCA_PORT:-6768}
+      ORCA_HTTP_PORT: ${ORCA_HTTP_PORT:-6769}
+      ORCA_USER_DATA_PATH: /data/orca
+      ORCA_VERSION: ${ORCA_VERSION:-0.0.0}
+      ORCA_APP_PATH: /opt/orca/app
+      NODE_ENV: production
+      ORCA_TRACE: ${ORCA_TRACE:-}
+      ORCA_SSH_MUX_DEBUG: ${ORCA_SSH_MUX_DEBUG:-}
+      ORCA_MULTI_USER: ${ORCA_MULTI_USER:-0}
+      ORCA_AUTH_MODE: ${ORCA_AUTH_MODE:-none}
+      ORCA_ADMIN_EMAIL: ${ORCA_ADMIN_EMAIL:-}
+      ORCA_ADMIN_PASSWORD: ${ORCA_ADMIN_PASSWORD:-}
+      ORCA_FLEET_METRICS_ENABLED: ${ORCA_FLEET_METRICS_ENABLED:-false}
+      ORCA_FLEET_ALERT_WEBHOOK_URL: ${ORCA_FLEET_ALERT_WEBHOOK_URL:-}
+      ORCA_SERVER_SECRET: ${ORCA_SERVER_SECRET:-}
+      ORCA_AGENT_API_SECRET: ${ORCA_AGENT_API_SECRET:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+
+    volumes:
+      - orca-data:/data/orca
+      - ./docker/backend/ssh:/home/orca/.ssh:ro
+      - orca-projects:/srv/projects
+
+    ports:
+      - "172.20.2.39:${ORCA_PORT:-6768}:6768"
+      - "172.20.2.39:${ORCA_HTTP_PORT:-6769}:6769"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${ORCA_HTTP_PORT:-6769}/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+    networks:
+      - orca-net
+
+networks:
+  orca-net:
+    driver: bridge
+
+volumes:
+  orca-data:
+    driver: local
+  orca-projects:
+    driver: local

@@ -630,13 +630,28 @@ export function createRemoteRuntimePtyTransport(
       !transportClosed &&
       generation === subscriptionGeneration &&
       isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)
+    // TEMP DIAG BUG-FE-PTY-001 (double-prompt follow-up): log a short preview
+    // of the snapshot and the first few live chunks so a duplicated prompt
+    // can be traced to "server sent it twice" (both previews show the same
+    // text) vs "client wrote it twice" (only one preview shows it).
+    let diagOnDataCallCount = 0
+    const DIAG_ON_DATA_LOG_LIMIT = 5
     const subscribeCallbacks: RemoteRuntimeMultiplexedTerminalCallbacks = {
       onData: (data, meta) => {
         if (isCurrentSubscription()) {
+          if (diagOnDataCallCount < DIAG_ON_DATA_LOG_LIMIT) {
+            diagOnDataCallCount += 1
+            logBugFePty001(
+              `subscribeToHandle onData tabId=${tabId} leafId=${leafId} handle=${subscribedHandle} gen=${generation} seq=${meta?.seq} preview=${JSON.stringify(data.slice(-80))}`
+            )
+          }
           outputProcessor.processData(data, storedCallbacks, undefined, meta)
         }
       },
       onSnapshot: (data, meta) => {
+        logBugFePty001(
+          `subscribeToHandle onSnapshot tabId=${tabId} leafId=${leafId} handle=${subscribedHandle} gen=${generation} seq=${meta?.seq} preview=${JSON.stringify(data.slice(-80))}`
+        )
         // Why: a snapshot with no body can still carry a pending mid-escape
         // tail that must be replayed so the next live chunk completes it.
         if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
