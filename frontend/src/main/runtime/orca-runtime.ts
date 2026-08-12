@@ -37,13 +37,13 @@ import { RuntimeTerminalListingCommands } from './orca-runtime-terminal-listing'
 import { RuntimeWorktreePsCommands } from './orca-runtime-worktree-ps'
 import { RuntimeTerminalWaiterCommands } from './orca-runtime-terminal-waiter'
 import { RuntimeTerminalCreateCommands } from './orca-runtime-terminal-create'
+import { RuntimePtyDataIngestCommands } from './orca-runtime-pty-data-ingest'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
   isCursorAgentTitle,
   isShellProcess
 } from '../../shared/agent-detection'
-import { extractOscTitleScanTail } from '../../shared/osc-title-scan-tail'
 import type { AgentStatus } from '../../shared/agent-detection'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { TerminalTitleTracker } from '../../shared/terminal-output-side-effects'
@@ -242,11 +242,7 @@ import {
   appendRecentPtyPathCandidates,
   recentTerminalPathCandidatesIncludePath,
   recentTerminalOutputIncludesPath,
-  buildPreview,
   type TerminalTailWaitState,
-  computeTerminalTailWaitState,
-  tailGainedNewerBlockedReason,
-  appendNormalizedToTailBuffer,
   assertTerminalInputWithinLimitWithYield,
   branchSelectorMatches,
   buildSendPayload,
@@ -264,13 +260,11 @@ import {
   isKnownReadyPromptPreview,
   mapExplicitAgentStateToRuntimeTerminalStatus,
   maxTimestamp,
-  normalizeTerminalChunk,
   parseRuntimeWorktreeId,
   readTerminalTail,
   type RetainedTailRedrawCursor,
   runtimePathsEqual,
   setsEqual,
-  tailStateMatches,
   terminalTitleBlocksExplicitAgentStatus
 } from './orca-runtime-tail-buffer'
 // Why: OrcaRuntimeService calls the vast majority of tail-buffer.ts's helpers
@@ -1985,211 +1979,37 @@ export class OrcaRuntimeService {
    * Handles incoming data from a PTY process, running agent detection,
    * updating terminal tail buffers, and triggering foreground agent refreshes.
    */
-  onPtyData(ptyId: string, data: string, at: number, sequenceChars = data.length): number {
-    const outputSequence =
-      (this.ptyTranscripts.ptyOutputSequenceById.get(ptyId) ?? 0) + sequenceChars
-    this.ptyTranscripts.ptyOutputSequenceById.set(ptyId, outputSequence)
-    const osc7Metadata = this.recordOsc7MetadataForPty(ptyId, data)
-    const cwd = osc7Metadata.cwd
-    const cwdChanged = osc7Metadata.cwdChanged
-    const agentStatusChunk = this.processAgentStatusOscForPty(ptyId, data)
-    this.recordRecentPtyOutputForPathProvenance(ptyId, data)
-    // Agent detection runs on raw data before leaf processing, since the
-    // tail buffer logic normalizes away the OSC sequences we need.
-    this.agentDetector?.onData(ptyId, data, at)
-    // Why: watch terminal output for advertised dev-server URLs (e.g. Vite's
-    // `Network: https://local.example.com:3001/`) so the workspace ports
-    // panel can surface them in place of the kernel bind address.
-    advertisedUrlWatcher.ingest(ptyId, data, at)
-    serveSimStateWatcher.ingestPtyOutput(ptyId, data)
-    // Why: reply ownership is captured per chunk, here at ingestion — the
-    // same module state and tick as the hidden-gate drop sites — and rides
-    // the writeChain link. A mark/setting/subscriber flip before the queued
-    // emulator write runs must not change who answers (terminal-query-
-    // authority.md invariant 1).
-    const forwardQueryReplies = this.shouldAnswerQueriesForLiveChunk(ptyId)
-    // Ordering invariant (DO NOT REORDER): maybeHydrateHeadlessFromRenderer
-    // MUST run before trackHeadlessTerminalData so the eager-state pattern
-    // (set headlessTerminals + writeChain head = seedPromise) is in place
-    // before the live byte's chain link is queued. Without this ordering,
-    // trackHeadlessTerminalData would lazy-create a fresh state at PTY dims
-    // that the later seed-resolve would overwrite, dropping the live byte.
-    // See docs/mobile-prefer-renderer-scrollback.md.
-    this.maybeHydrateHeadlessFromRenderer(ptyId)
-    // Our structure wins: OSC title/agent-status extraction runs through the
-    // shared per-PTY title tracker below (getOrCreatePtyTitleTrackerEntry →
-    // applyTrackedPtyTitle) in byte order, superseding main's inline
-    // extractLastOscTitleForPty block (#7880/#7852 title/status semantics are
-    // preserved via the tracker + detectAgentStatusFromTitle path).
-    this.trackHeadlessTerminalData(ptyId, data, outputSequence, forwardQueryReplies)
+  private readonly ptyDataIngestCommands = new RuntimePtyDataIngestCommands({
+    getGraph: () => this.graph,
+    getPtyTranscripts: () => this.ptyTranscripts,
+    getAgentDetector: () => this.agentDetector,
+    getDataListeners: () => this.dataListeners,
+    recordOsc7MetadataForPty: (ptyId, data) => this.recordOsc7MetadataForPty(ptyId, data),
+    processAgentStatusOscForPty: (ptyId, data) => this.processAgentStatusOscForPty(ptyId, data),
+    flushPendingTerminalSideEffectFacts: (ptyId, titleTrackerEntry) =>
+      this.flushPendingTerminalSideEffectFacts(ptyId, titleTrackerEntry),
+    shouldAnswerQueriesForLiveChunk: (ptyId) => this.shouldAnswerQueriesForLiveChunk(ptyId),
+    maybeHydrateHeadlessFromRenderer: (ptyId) => this.maybeHydrateHeadlessFromRenderer(ptyId),
+    trackHeadlessTerminalData: (ptyId, data, outputSequence, forwardQueryReplies) =>
+      this.trackHeadlessTerminalData(ptyId, data, outputSequence, forwardQueryReplies),
+    scheduleWaitBlockedCheck: (ptyId, text, at) => this.scheduleWaitBlockedCheck(ptyId, text, at),
+    getOrCreatePtyTitleTrackerEntry: (ptyId) => this.getOrCreatePtyTitleTrackerEntry(ptyId),
+    emitTerminalAgentStatusEvents: (ptyId, agentStatusChunk) =>
+      this.emitTerminalAgentStatusEvents(ptyId, agentStatusChunk),
+    touchMobileSessionSnapshotsForPty: (ptyId, options) =>
+      this.touchMobileSessionSnapshotsForPty(ptyId, options),
+    recordRecentPtyOutputForPathProvenance: (ptyId, data) =>
+      this.recordRecentPtyOutputForPathProvenance(ptyId, data),
+    getOrCreatePtyWorktreeRecord: (ptyId) => this.getOrCreatePtyWorktreeRecord(ptyId),
+    recordPtyWorktree: (ptyId, worktreeId, state) =>
+      this.recordPtyWorktree(ptyId, worktreeId, state),
+    getLeavesForPty: (ptyId) => this.getLeavesForPty(ptyId),
+    makeRuntimePaneKey: (leaf) => this.makeRuntimePaneKey(leaf)
+  })
 
-    const pty = this.getOrCreatePtyWorktreeRecord(ptyId)
-    const ptyTailBefore = pty
-      ? {
-          lines: pty.tailBuffer,
-          partialLine: pty.tailPartialLine,
-          pendingAnsi: pty.tailPendingAnsi,
-          redrawCursor: pty.tailRedrawCursor,
-          truncated: pty.tailTruncated,
-          linesTotal: pty.tailLinesTotal
-        }
-      : null
-    let ptyTailAfter: ReturnType<typeof appendNormalizedToTailBuffer> | null = null
-    if (pty) {
-      pty.connected = true
-      pty.disconnectedAt = null
-      pty.lastOutputAt = at
-      const normalized = normalizeTerminalChunk(data, pty.tailPendingAnsi)
-      pty.tailPendingAnsi = normalized.pendingAnsi
-      const nextTail = appendNormalizedToTailBuffer(
-        pty.tailBuffer,
-        pty.tailPartialLine,
-        normalized.text,
-        pty.tailRedrawCursor
-      )
-      ptyTailAfter = nextTail
-      pty.tailBuffer = nextTail.lines
-      pty.tailPartialLine = nextTail.partialLine
-      pty.tailRedrawCursor = nextTail.redrawCursor
-      pty.tailTruncated = pty.tailTruncated || nextTail.truncated
-      pty.tailLinesTotal += nextTail.newCompleteLines
-      pty.preview = buildPreview(pty.tailBuffer, pty.tailPartialLine)
-      this.scheduleWaitBlockedCheck(ptyId, normalized.text, at)
-    }
-
-    for (const leaf of this.getLeavesForPty(ptyId)) {
-      this.recordPtyWorktree(ptyId, leaf.worktreeId, {
-        connected: true,
-        lastOutputAt: pty?.lastOutputAt ?? at,
-        preview: pty?.preview ?? leaf.preview,
-        tabId: leaf.tabId,
-        paneKey: this.makeRuntimePaneKey(leaf)
-      })
-      leaf.connected = true
-      leaf.writable = this.graph.graphStatus === 'ready'
-      leaf.lastOutputAt = at
-      if (
-        pty &&
-        ptyTailBefore &&
-        ptyTailAfter &&
-        tailStateMatches(
-          leaf.tailBuffer,
-          leaf.tailPartialLine,
-          leaf.tailPendingAnsi,
-          leaf.tailRedrawCursor,
-          leaf.tailTruncated,
-          leaf.tailLinesTotal,
-          ptyTailBefore
-        )
-      ) {
-        // Why: the leaf and PTY record usually mirror the same terminal. Reuse
-        // the PTY tail update instead of splitting large output twice.
-        leaf.tailBuffer = pty.tailBuffer
-        leaf.tailPartialLine = pty.tailPartialLine
-        leaf.tailPendingAnsi = pty.tailPendingAnsi
-        leaf.tailRedrawCursor = pty.tailRedrawCursor
-        leaf.tailTruncated = pty.tailTruncated
-        leaf.tailLinesTotal = pty.tailLinesTotal
-        leaf.preview = pty.preview
-        leaf.waitBlockedAt = pty.waitBlockedAt
-        // Why undefined on this branch: the PTY record's wait scan is throttled
-        // (scheduleWaitBlockedCheck), so pty.tailWaitState is never populated;
-        // copying it here intentionally invalidates the leaf cache and the
-        // mismatch branch below recomputes an exact state on its next chunk.
-        leaf.tailWaitState = pty.tailWaitState
-      } else {
-        const normalized = normalizeTerminalChunk(data, leaf.tailPendingAnsi)
-        leaf.tailPendingAnsi = normalized.pendingAnsi
-        const previousWaitState =
-          leaf.tailWaitState?.fromTail === true
-            ? leaf.tailWaitState
-            : computeTerminalTailWaitState(leaf.tailBuffer, leaf.tailPartialLine, leaf.preview)
-        const nextTail = appendNormalizedToTailBuffer(
-          leaf.tailBuffer,
-          leaf.tailPartialLine,
-          normalized.text,
-          leaf.tailRedrawCursor
-        )
-        const nextWaitState = computeTerminalTailWaitState(
-          nextTail.lines,
-          nextTail.partialLine,
-          leaf.preview
-        )
-        if (tailGainedNewerBlockedReason(previousWaitState, nextWaitState, normalized.text)) {
-          leaf.waitBlockedAt = at
-        }
-        leaf.tailWaitState = nextWaitState
-        leaf.tailBuffer = nextTail.lines
-        leaf.tailPartialLine = nextTail.partialLine
-        leaf.tailRedrawCursor = nextTail.redrawCursor
-        leaf.tailTruncated = leaf.tailTruncated || nextTail.truncated
-        leaf.tailLinesTotal += nextTail.newCompleteLines
-        leaf.preview = buildPreview(leaf.tailBuffer, leaf.tailPartialLine)
-      }
-    }
-
-    // Why: feed the chunk's OSC titles through the shared per-PTY tracker in
-    // byte order — the same ordering the renderer transport uses — so
-    // coalesced working→idle transitions reach tui-idle waiters and
-    // pending-message delivery instead of being masked by the chunk's last
-    // title (issue #1083). Uses the OSC 9999-stripped cleanData like the
-    // renderer, so pure status chunks don't perturb the stale-title probe.
-    const titleTrackerEntry = this.getOrCreatePtyTitleTrackerEntry(ptyId)
-    const previousTitleScanTail = this.ptyTranscripts.oscTitleScanTailByPtyId.get(ptyId)
-    const titleInput = previousTitleScanTail
-      ? `${previousTitleScanTail}${agentStatusChunk.cleanData}`
-      : agentStatusChunk.cleanData
-    const nextTitleScanTail = extractOscTitleScanTail(titleInput)
-    if (nextTitleScanTail.length > 0) {
-      this.ptyTranscripts.oscTitleScanTailByPtyId.set(ptyId, nextTitleScanTail)
-    } else {
-      this.ptyTranscripts.oscTitleScanTailByPtyId.delete(ptyId)
-    }
-    titleTrackerEntry.applyingChunk = true
-    titleTrackerEntry.chunkTouchedSessionTabs = false
-    let retainedAgentStatusChanged = false
-    try {
-      titleTrackerEntry.tracker.handleChunk(agentStatusChunk.cleanData, {
-        titleScanData: titleInput
-      })
-      // Why: the Command Code scrape rides the same per-chunk batch (its facts
-      // trail the tracker's). cleanData keeps OSC 9999 payloads out of the
-      // detector's bounded recent-text window; the detector strips remaining
-      // control sequences itself, exactly like the renderer byte path.
-      titleTrackerEntry.commandCodeDetector?.observe(agentStatusChunk.cleanData)
-    } finally {
-      titleTrackerEntry.applyingChunk = false
-      try {
-        // Why: per-chunk cross-channel contract order is status → titles →
-        // bell — the chunk's agentStatus:set events must reach the renderer
-        // before its pty:sideEffect batch.
-        retainedAgentStatusChanged = this.emitTerminalAgentStatusEvents(ptyId, agentStatusChunk)
-      } finally {
-        // Why: flushed in the finally so a throwing tracker callback cannot
-        // strand this chunk's facts to be emitted under the next chunk's seq.
-        this.flushPendingTerminalSideEffectFacts(ptyId, titleTrackerEntry)
-      }
-    }
-    // Why: hook (OSC 9999) transitions often arrive without a title change, so
-    // headless-serve snapshots would never republish and paired remote clients
-    // kept the stale agent state until the next title change (#7970).
-    if (titleTrackerEntry.chunkTouchedSessionTabs || retainedAgentStatusChanged) {
-      this.touchMobileSessionSnapshotsForPty(ptyId)
-    }
-
-    const listeners = this.dataListeners.get(ptyId)
-    if (listeners) {
-      const meta = {
-        seq: outputSequence,
-        rawLength: data.length,
-        ...(cwdChanged && cwd !== null ? { cwd } : {})
-      }
-      for (const listener of listeners) {
-        listener(data, meta)
-      }
-    }
-    return outputSequence
-  }
+  onPtyData: RuntimePtyDataIngestCommands['onPtyData'] = this.ptyDataIngestCommands.onPtyData.bind(
+    this.ptyDataIngestCommands
+  )
 
   private readonly ptyWaitBlockedCheckCommands = new RuntimePtyWaitBlockedCheckCommands({
     getGraph: () => this.graph
