@@ -1,7 +1,7 @@
 # TASK-BIGFILE-012 — Investigate+Move: `worktree-list-helpers.ts`
 
 **Loại:** Investigate+Move (xác nhận độc lập trước khi cắt) · **Effort:** M
-**Phụ thuộc:** — · **Status:** ⬜ Todo
+**Phụ thuộc:** — · **Status:** ✅ Done
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-008-worktreelist.md`
 
 ## Input

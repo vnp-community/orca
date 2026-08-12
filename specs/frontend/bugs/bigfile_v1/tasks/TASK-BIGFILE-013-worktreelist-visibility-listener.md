@@ -1,6 +1,6 @@
 # TASK-BIGFILE-013 — Move: `worktree-list-visibility-listener.ts`
 
-**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ✅ Done
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-008-worktreelist.md`
 
 ## Input
