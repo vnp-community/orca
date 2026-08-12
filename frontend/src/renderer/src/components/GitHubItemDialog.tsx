@@ -226,6 +226,7 @@ import {
   validateTaskPageGitHubDuplicateTarget,
   type TaskPageGitHubCloseAction
 } from '@/components/task-page-github-status-actions'
+import type { ItemDialogTab } from './github-item-dialog-shared'
 
 // Why: the GH item dialog can be opened from any work-item list surface and
 // doesn't have the full owner/repo context the list's cache entry carries.
@@ -272,7 +273,9 @@ function getGitHubRepositoryLabelsUrl(itemUrl: string): string | null {
 
 const MonacoCodeExcerpt = lazy(() => import('@/components/editor/MonacoCodeExcerpt'))
 
-export type ItemDialogTab = 'conversation' | 'checks' | 'files'
+// Why: re-exported (not just imported above) so `@/components/GitHubItemDialog`
+// stays the import path for external consumers (e.g. TaskPage.tsx) after the move.
+export type { ItemDialogTab } from './github-item-dialog-shared'
 
 const CODE_CONTEXT_EXPAND_STEP = 5
 const CODE_CONTEXT_FALLBACK_LINES = 20

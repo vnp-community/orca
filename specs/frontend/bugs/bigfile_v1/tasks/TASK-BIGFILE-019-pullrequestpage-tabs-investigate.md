@@ -3,7 +3,10 @@
 **Loại:** Investigate (KHÔNG thực thi split ngay) · **Effort:** L
 **Phụ thuộc:** TASK-BIGFILE-017 đã xong (nên làm cùng lúc/ngay sau
 TASK-BIGFILE-018 để so sánh chéo 2 file)
-**Status:** ⬜ Todo
+**Status:** ✅ Done (ghi chú thiết kế — không sinh task Move mới, phân tích
+chung với TASK-BIGFILE-018 trong
+`../solutions/SOLUTION-FE-BIGFILE-005-githubitemdialog-and-pullrequestpage.md`
+mục "Giai đoạn 2")
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-005-githubitemdialog-and-pullrequestpage.md`
 (Giai đoạn 2)
 

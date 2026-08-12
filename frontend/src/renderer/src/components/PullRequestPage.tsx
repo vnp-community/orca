@@ -222,6 +222,7 @@ import {
 } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
+import type { ItemDialogTab } from './github-item-dialog-shared'
 
 // Why: the GH item dialog can be opened from any work-item list surface and
 // doesn't have the full owner/repo context the list's cache entry carries.
@@ -246,8 +247,6 @@ function parseOwnerRepoFromItemUrl(url: string): GitHubOwnerRepo | null {
 }
 
 const MonacoCodeExcerpt = lazy(() => import('@/components/editor/MonacoCodeExcerpt'))
-
-export type ItemDialogTab = 'conversation' | 'checks' | 'files'
 
 type MentionOption = {
   login: string

@@ -1,7 +1,10 @@
 # TASK-BIGFILE-018 — Investigate: `GitHubItemDialog.tsx` component chính
 
 **Loại:** Investigate (KHÔNG thực thi split ngay) · **Effort:** L
-**Phụ thuộc:** TASK-BIGFILE-017 đã xong · **Status:** ⬜ Todo
+**Phụ thuộc:** TASK-BIGFILE-017 đã xong · **Status:** ✅ Done (ghi chú thiết
+kế — không sinh task Move mới, xem lý do trong
+`../solutions/SOLUTION-FE-BIGFILE-005-githubitemdialog-and-pullrequestpage.md`
+mục "Giai đoạn 2")
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-005-githubitemdialog-and-pullrequestpage.md`
 (Giai đoạn 2)
 
