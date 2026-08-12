@@ -3,7 +3,8 @@
 **Loại:** Investigate (KHÔNG thực thi split ngay) · **Effort:** L
 **Phụ thuộc:** TASK-BIGFILE-033 đã xong (bắt buộc — cần test che phủ trước
 khi đọc/thiết kế split cho 1 hàm có lịch sử race-condition)
-**Status:** ⬜ Todo
+**Status:** ✅ Done (2026-08-11) — kết luận: KHÔNG sinh task Move con, xem
+`../solutions/SOLUTION-FE-BIGFILE-006-pty-connection.md` Bước 1–2
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-006-pty-connection.md`
 (Bước 1–2)
 

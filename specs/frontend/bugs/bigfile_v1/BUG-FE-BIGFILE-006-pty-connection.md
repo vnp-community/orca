@@ -74,3 +74,43 @@ head -1 pty-connection.ts                                → "/* oxlint-disable 
 - Investigation liên quan trực tiếp: memory
   `bug-fe-pty-001-investigation.md`, `specs/frontend/bugs/terminal-management./`
 - File liên quan: `remote-runtime-pty-transport.ts` (#99 trong bảng tổng)
+
+## Ghi chú TASK-BIGFILE-033 (test coverage trước khi tách) — 2026-08-11
+
+Đã đọc toàn bộ `pty-connection.ts` (7,600 dòng — không phải 6,650 như mô tả
+gốc, `connectPanePty` bắt đầu dòng 943 và chạy tới hết file, con số 6,650
+trong solution doc là ước lượng gần đúng, không lệch về bản chất) và
+`pty-connection.test.ts` (18,785 dòng, 427 test case đã có trước khi task
+này chạy). Xác nhận coverage cho 4 luồng yêu cầu:
+
+1. **Spawn mới local/SSH/remote-runtime**: đã có (nhiều test case, ví dụ
+   dòng ~13601–13772 cho remote-runtime, ~4494–4907 cho SSH, và các test
+   "genuine fresh spawn" cho local dùng `tabsByWorktree` với `ptyId: null`).
+2. **Retry khi `SSH_SESSION_EXPIRED`**: đã có test cho nhánh
+   deferred/non-deferred SSH reattach (dòng ~5854–5992, ~15900–15980). PHÁT
+   HIỆN THIẾU: nhánh `mirroredHostAttachRetried` (dòng 4343–4367 trong
+   `pty-connection.ts`, comment "FIX BUG-FE-PTY-001") — bound-single-retry
+   riêng cho lỗi `SSH_SESSION_EXPIRED` từ `onError` của 1 fresh (non-reattach)
+   spawn, khác với nhánh reattach-onError đã có test. Đã bổ sung 2 test case
+   mới ("retries a fresh (non-reattach) spawn once when a mirrored host
+   attach reports session-expired" và "surfaces the error instead of
+   retrying again when a retried mirrored host attach also expires") —
+   pass.
+3. **Reattach/daemon reattach**: đã có, nhiều test case (dòng ~5583–6777).
+4. **Race giữa local pane và host-session mirror pane cho cùng 1 leaf**:
+   XÁC NHẬN — `attachHostSessionMirror()` (implementation thật của việc
+   attach vào 1 host-published PTY handle) nằm ở
+   `remote-runtime-pty-transport.ts`, KHÔNG nằm trong `pty-connection.ts`.
+   Tuy nhiên phần retry-khi-mirror-chết (`mirroredHostAttachRetried`, mục 2
+   ở trên) VẪN nằm trong `pty-connection.ts` — đây chính là phần "race" thuộc
+   phạm vi file này (mirror publish trước khi attach hoàn tất → attach thấy
+   handle chết → retry 1 lần qua fresh spawn). Đã bổ sung test che phủ ở
+   mục 2. Phần còn lại của cơ chế race (grace-close, publish timing) đã có
+   test riêng trong `remote-runtime-pty-transport.test.ts` — ngoài phạm vi
+   task này.
+
+Kết luận: coverage đủ để tiến hành TASK-BIGFILE-034 (Investigate). 427 test
+case trong `pty-connection.test.ts` sau khi bổ sung (425 trước đó + 2 mới),
+tất cả pass. `oxlint` sạch trên file test. `tsc --noEmit` không phát sinh
+lỗi mới liên quan tới `pty-connection.ts`/`pty-connection.test.ts` (968 lỗi
+pre-existing không liên quan, xem memory `bug-fe-pty-001-investigation.md`).

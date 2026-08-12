@@ -1,7 +1,7 @@
 # TASK-BIGFILE-033 — Test: bổ sung coverage cho `pty-connection.ts` TRƯỚC khi tách
 
 **Loại:** Test (bắt buộc trước khi tách, không phải Move/Investigate)
-**Effort:** M · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Effort:** M · **Phụ thuộc:** — · **Status:** ✅ Done (2026-08-11)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-006-pty-connection.md` (Bước 0)
 
 ## Bối cảnh (đọc để hiểu lý do, không cần đọc lại toàn bộ solution doc)
@@ -42,6 +42,15 @@ chưa có) cho tối thiểu 4 luồng:
 
 ## Xác minh xong
 
-- [ ] `pnpm run test` (phạm vi file test liên quan) pass
-- [ ] `pnpm run typecheck && pnpm run lint`
-- [ ] Coverage cho 4 luồng ở trên (hoặc ghi chú rõ luồng nào không áp dụng)
+- [x] `pnpm run test` (phạm vi file test liên quan) pass — 427/427,
+      `pty-connection.test.ts` qua `vitest run --config config/vitest.config.ts`
+- [x] `pnpm run typecheck && pnpm run lint` — `oxlint` sạch trên file test;
+      `tsc --noEmit -p tsconfig.json` không có lỗi mới liên quan tới
+      `pty-connection.ts`/`pty-connection.test.ts` (968 lỗi pre-existing
+      không liên quan, xem memory `bug-fe-pty-001-investigation.md`)
+- [x] Coverage cho 4 luồng ở trên — xem ghi chú chi tiết trong
+      `../BUG-FE-BIGFILE-006-pty-connection.md`. Luồng 4 (race) chỉ áp dụng
+      1 phần: implementation thật của `attachHostSessionMirror` nằm ở
+      `remote-runtime-pty-transport.ts` (đã có test riêng); phần
+      `mirroredHostAttachRetried` (bound-retry) nằm trong `pty-connection.ts`
+      và đã được bổ sung 2 test case mới trong `pty-connection.test.ts`.
