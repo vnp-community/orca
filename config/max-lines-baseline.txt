@@ -2,6 +2,266 @@
 # This is a RATCHET: the list may only SHRINK. Do NOT add entries to get CI green —
 # split the oversized file instead (AGENTS.md → "Do Not Disable Max Lines").
 # Regenerate/prune: pnpm check:max-lines-ratchet --prune   (removes stale entries only)
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-008, BUG-FE-BIGFILE-002): this file
+# is a straight extraction of orca-runtime.ts's pre-existing tail region
+# (~1,945 lines moved verbatim, itself already covered by orca-runtime.ts's
+# own grandfathered max-lines disable) — net-new lines added are only the
+# import/export scaffolding. It still needs the "Giai doan 2/3" domain split
+# described in SOLUTION-FE-BIGFILE-002 to actually shrink below budget;
+# tracked there, not deferred silently.
+inline frontend/src/main/runtime/orca-runtime-tail-buffer.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-039, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's pre-existing removeManagedWorktree method
+# (~490 lines verbatim, itself already covered by orca-runtime.ts's own
+# grandfathered max-lines disable) plus its direct helper methods. The
+# 490-line method itself is a separate, un-tracked internal-refactor
+# candidate (split into smaller functions) — not addressed here to keep
+# this a pure Move; see TASK-BIGFILE-039's task doc.
+inline frontend/src/main/runtime/orca-runtime-branch-cleanup.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-037, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's mobile floor / remote-desktop / layout-queue
+# method block (~2,000 lines verbatim, itself already covered by
+# orca-runtime.ts's own grandfathered max-lines disable). The largest of the
+# 5 composition-pattern domains split off orca-runtime.ts to date; further
+# internal splitting (e.g. remote-desktop-viewer vs layout-state-machine vs
+# mobile-subscriber-tracking) is a separate, un-tracked refactor candidate —
+# not addressed here to keep this a pure Move; see TASK-BIGFILE-037's task doc.
+inline frontend/src/main/runtime/orca-runtime-mobile-floor.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-042, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's GitHub/GitLab issue-tracking + hosted-review
+# command-wrapper method block, already covered by orca-runtime.ts's own
+# grandfathered max-lines disable before this move. Jira wrapper methods and
+# repo hooks/setup-script inspection (both textually adjacent) are explicitly
+# out of scope — left for follow-on tasks; see TASK-BIGFILE-042's task doc.
+inline frontend/src/main/runtime/orca-runtime-issue-tracking.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-043, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's repo-hooks/setup-script inspection method
+# block, already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. Only marginally over budget (302 vs 300 lines) — small follow-on
+# cleanup could bring it under without further splitting.
+inline frontend/src/main/runtime/orca-runtime-repo-hooks.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-044, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's Linear integration method block (~1,975
+# lines, ~75 methods), already covered by orca-runtime.ts's own
+# grandfathered max-lines disable. The largest single domain moved off
+# orca-runtime.ts by both line count and method count — but also one of the
+# cleanest (nearly every dependency was a self-reference to another Linear
+# method; only 5 genuine external dependencies).
+inline frontend/src/main/runtime/orca-runtime-linear.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-046, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's project/project-group/folder-workspace/
+# nested-repo-import command block, already covered by orca-runtime.ts's own
+# grandfathered max-lines disable. addRepo/cloneRepo (repo lifecycle) sit
+# immediately after this block in the source but are a separate, larger
+# domain not yet extracted — kept as host dependencies here.
+inline frontend/src/main/runtime/orca-runtime-project-groups.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-047, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's worktree base-status/drift-reconciliation
+# and managed PR/MR base-resolution command block, already covered by
+# orca-runtime.ts's own grandfathered max-lines disable. Deliberately
+# excludes the PTY-adjacent worktree cluster (stopTerminalsForWorktree and
+# friends) and the scattered managed-worktree list/create/activate cluster —
+# per the user's explicit choice to avoid PTY-lifecycle-entangled code.
+inline frontend/src/main/runtime/orca-runtime-worktree-base-status.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-049, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's managed-worktree creation/activation
+# cluster (activateManagedWorktree, createManagedWorktree,
+# createManagedRemoteWorktree, and their dedicated startup/provisioning
+# private helpers), already covered by orca-runtime.ts's own grandfathered
+# max-lines disable. The largest and most PTY-entangled domain moved off
+# orca-runtime.ts in this effort (zero test coverage) — extracted only after
+# the user explicitly accepted that risk. createManagedWorktree alone is
+# ~990 lines, a separate, un-tracked refactor candidate not addressed here
+# to keep this a pure Move.
+inline frontend/src/main/runtime/orca-runtime-worktree-creation.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-050, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's repo lifecycle command block (add/create/
+# clone/show/update/remove/reorder + base-ref search/default), already
+# covered by orca-runtime.ts's own grandfathered max-lines disable.
+# inspectTerminalProcess sits textually in the middle of this range but is
+# PTY-controller-adjacent, not repo lifecycle — deliberately excluded.
+inline frontend/src/main/runtime/orca-runtime-repo-lifecycle.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-051, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's headless mobile-session-tabs
+# materialization/sync cluster (listAllMobileSessionTabs + ~48 dedicated
+# private helpers), already covered by orca-runtime.ts's own grandfathered
+# max-lines disable. First of 3 mobile-session-tabs clusters —
+# createMobileSessionTerminal and notifyMobileSessionTabsChanged remain in
+# orca-runtime.ts, deferred to follow-on tasks. The pre-existing
+# fileCommands/gitCommands composition blocks (unrelated domains from
+# TASK-BIGFILE-008/009) sat textually in the middle of the original
+# range — deliberately excluded, stayed in orca-runtime.ts. This is the
+# PTY-lifecycle-core-adjacent domain the user explicitly chose to tackle
+# after accepting the higher risk (zero test coverage).
+inline frontend/src/main/runtime/orca-runtime-mobile-session-tabs.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-052, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's mobile-session-terminal creation command
+# block, already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. Cluster 2 of 3 mobile-session-tabs clusters — cluster 1
+# (orca-runtime-mobile-session-tabs.ts, TASK-BIGFILE-051) is a sibling;
+# cluster 3 (notifyMobileSessionTabsChanged) not yet extracted.
+# waitForTerminalHandle/resolveHandleForTab/waitForLeafPtyId/
+# countLeavesInTab sit textually adjacent but are core createTerminal
+# plumbing shared with the desktop create path — deliberately excluded.
+inline frontend/src/main/runtime/orca-runtime-mobile-session-terminal.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-053, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's mobile-session-tabs notify/snapshot-merge/
+# client-payload-shaping command block (notifyMobileSessionTabsChanged and its
+# ~23 dedicated private helpers), already covered by orca-runtime.ts's own
+# grandfathered max-lines disable. Cluster 3 (last) of 3 mobile-session-tabs
+# clusters — cluster 1 (orca-runtime-mobile-session-tabs.ts, TASK-BIGFILE-051)
+# and cluster 2 (orca-runtime-mobile-session-terminal.ts, TASK-BIGFILE-052)
+# are siblings. getSummaryForRuntimeWorktreeId/buildTerminalSummary and
+# getAgentStatusForHandle-onward sit textually adjacent but are unrelated
+# listTerminals/getWorktreePs and general agent-status-for-pane-key infra —
+# deliberately excluded.
+inline frontend/src/main/runtime/orca-runtime-mobile-session-notify.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-055, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's mobile speech/dictation command block (11
+# methods), already covered by orca-runtime.ts's own grandfathered
+# max-lines disable. Field-span analysis (TASK-BIGFILE-054) confirmed this
+# domain is fully self-contained within the larger, deeply-entangled
+# Terminal/PTY/Agent-status core. Only marginally over budget (304 vs 300
+# lines).
+inline frontend/src/main/runtime/orca-runtime-mobile-dictation.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-064, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's headless (server-owned) PTY emulator
+# command block (seedHeadlessTerminal, maybeHydrateHeadlessFromRenderer,
+# trackHeadlessTerminalData, serialize*/dispose* helpers — 16 methods),
+# already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. One of the largest/riskiest domains moved off orca-runtime.ts
+# in this effort (14 host deps, zero test coverage) — extracted only
+# after the user explicitly accepted that risk, matching the scale of
+# TASK-BIGFILE-051's mobile-session-tabs cluster 1.
+inline frontend/src/main/runtime/orca-runtime-headless-terminal.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-065, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's worktree/workspace parent-lineage
+# resolution command block (resolveLineageForWorktreeCreate,
+# validateLineageParent, listWorktreeLineage, listWorkspaceLineage and
+# private helpers), already covered by orca-runtime.ts's own
+# grandfathered max-lines disable. resolveLineageForWorktreeCreate/
+# validateLineageParent are still called via OrcaRuntimeService's public
+# surface by the already-extracted worktree-base-status (TASK-BIGFILE-047)
+# and worktree-creation (TASK-BIGFILE-049) domains — forwarding fields,
+# not moved together.
+inline frontend/src/main/runtime/orca-runtime-worktree-lineage.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-067, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's per-PTY title-tracking/seeded-agent-status
+# command block (getTrackedRawTitleForPty, preferTrackedLastTitle,
+# applySeededAgentStatus, getOrCreatePtyTitleTrackerEntry,
+# applyTrackedPtyTitle, disposePtyTitleTracker, and a private helper),
+# already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. One of the highest-risk domains moved off orca-runtime.ts (15
+# host deps, onPtyData-adjacent hot path, zero test coverage) —
+# TASK-BIGFILE-057 cancelled this same extraction earlier; re-attempted
+# and completed after TASK-BIGFILE-060/064 narrowed the host surface,
+# with the user explicitly accepting the risk.
+inline frontend/src/main/runtime/orca-runtime-pty-title-tracker.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-070, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's terminal.list command block
+# (listTerminals + 6 buildTerminalVisual* visual-layout-tree helpers),
+# already covered by orca-runtime.ts's own grandfathered max-lines
+# disable. Found via gap-analysis outside the onPtyData-adjacent PTY-core
+# danger zone (TASK-BIGFILE-067/068/069) — lower risk, but still zero
+# test coverage.
+inline frontend/src/main/runtime/orca-runtime-terminal-listing.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-071, BUG-FE-BIGFILE-002): straight
+# extraction of orca-runtime.ts's worktree.ps command block
+# (getWorktreePs + attachAgentRowsToSummaries), already covered by
+# orca-runtime.ts's own grandfathered max-lines disable. Same shape as
+# TASK-BIGFILE-070's terminal-listing — found via the same gap-analysis
+# sweep, outside the onPtyData-adjacent danger zone.
+inline frontend/src/main/runtime/orca-runtime-worktree-ps.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-072, BUG-FE-BIGFILE-002): extraction
+# of orca-runtime.ts's terminal-waiter domain (waitForTerminal + the
+# exit/tui-idle waiter resolution, polling-fallback, and teardown machinery
+# it shares with onPtyData/onPtyExit), already covered by orca-runtime.ts's
+# own grandfathered max-lines disable. Non-contiguous 3-segment move,
+# directly in the onPtyData/onPtyExit hot path — same risk tier as
+# TASK-BIGFILE-067/068/069.
+inline frontend/src/main/runtime/orca-runtime-terminal-waiter.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-073, BUG-FE-BIGFILE-002): extraction
+# of orca-runtime.ts's terminal-create/split domain (createTerminal,
+# launchAgentTerminal, splitTerminal, splitPtyBackedTerminal, and their
+# exclusive handle-waiting helpers), already covered by orca-runtime.ts's
+# own grandfathered max-lines disable. Not in the onPtyData hot path, but
+# the densest single cluster in the file — ~30 collaborators across nearly
+# every already-extracted domain.
+inline frontend/src/main/runtime/orca-runtime-terminal-create.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-076, BUG-FE-BIGFILE-002): extraction
+# of orca-runtime.ts's terminal agent-status domain (getTerminalAgentStatus,
+# isTerminalRunningAgent, pane-key resolution, and orchestration-context
+# lookup — 22 methods organically scattered across ~2,700 lines of the
+# source file), already covered by orca-runtime.ts's own grandfathered
+# max-lines disable. Not in the onPtyData hot path.
+inline frontend/src/main/runtime/orca-runtime-terminal-agent-status.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-078, BUG-FE-BIGFILE-002): relocation
+# of orca-runtime.ts's pure pre-class type/function/error-class declarations
+# (RuntimeStore, RuntimeLeafRecord, RuntimePtyWorktreeRecord, RuntimeNotifier,
+# mergeRuntimeFolderWorkspace, ...) — none reference `this`. Different
+# technique from the composition-pattern Move used elsewhere: no host
+# interface, pure relocate + re-import/re-export, verified entirely by tsc.
+inline frontend/src/main/runtime/orca-runtime-service-types.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-015, BUG-FE-BIGFILE-010): straight
+# verbatim extraction of BrowserPane.tsx's pre-existing RemoteBrowserPagePane
+# component + its Remote*/Pending* types, itself already covered by
+# BrowserPane.tsx's own grandfathered max-lines disable before this move.
+# Further internal splitting is untracked, out of scope per
+# SOLUTION-FE-BIGFILE-010.
+inline frontend/src/renderer/src/components/browser-pane/browser-pane-remote.tsx
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-016, BUG-FE-BIGFILE-010): straight
+# verbatim extraction of BrowserPane.tsx's pre-existing BrowserPagePane
+# component, itself already covered by BrowserPane.tsx's own grandfathered
+# max-lines disable before this move. Further internal splitting is
+# untracked, out of scope per SOLUTION-FE-BIGFILE-010.
+inline frontend/src/renderer/src/components/browser-pane/browser-pane-local.tsx
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-021, BUG-FE-BIGFILE-004): straight
+# verbatim extraction of SourceControl.tsx's pre-existing CommitArea
+# component, itself already covered by SourceControl.tsx's own grandfathered
+# max-lines disable before this move. Internal split tracked in
+# SOLUTION-FE-BIGFILE-004.
+inline frontend/src/renderer/src/components/right-sidebar/source-control-commit-area.tsx
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-030, BUG-FE-BIGFILE-003): straight
+# verbatim extraction of TaskPage.tsx's pre-existing GitHub status/assignee
+# cell components (GHStatusCell, GitHubAssigneeAvatar,
+# GitHubIssueLabelSelector, GitHubIssueAssigneeSelector, GHAssigneesCell),
+# itself already covered by TaskPage.tsx's own grandfathered max-lines
+# disable before this move.
+inline frontend/src/renderer/src/components/task-page-github-assignee-cells.tsx
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-030, BUG-FE-BIGFILE-003): straight
+# verbatim extraction of TaskPage.tsx's pre-existing GitHub review/PR cell
+# components (ReviewChipAvatar, PRReviewCell, PRChecksCell, PRMergeCell) plus
+# private helpers, itself already covered by TaskPage.tsx's own grandfathered
+# max-lines disable before this move.
+inline frontend/src/renderer/src/components/task-page-github-review-cells.tsx
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
@@ -24,3 +284,71 @@ mobile-config src/components/mobile-rich-markdown-editor-html.ts
 mobile-config src/terminal/terminal-accessory-keys.ts
 mobile-config src/terminal/terminal-webview-html.ts
 mobile-config src/transport/rpc-client.ts
+#
+# NEEDS PR REVIEW (added while syncing BUG-FE-BIGFILE-002's orca-runtime.ts
+# split into backend/ and desktop/ — see
+# BUG-FE-BIGFILE-002-orca-runtime.md "Kết quả & điểm dừng"): byte-identical
+# copies of the frontend/ entries directly above/below this block. Correction
+# to a verification gap in that sync — the copy was checked with
+# check-max-lines-ratchet.mjs BEFORE `git add`, when the new files were still
+# untracked and invisible to `git ls-files`, so it silently passed without
+# actually covering these files; caught on a later, correctly-ordered re-run.
+inline backend/src/main/runtime/orca-runtime-tail-buffer.ts
+inline backend/src/main/runtime/orca-runtime-branch-cleanup.ts
+inline backend/src/main/runtime/orca-runtime-mobile-floor.ts
+inline backend/src/main/runtime/orca-runtime-issue-tracking.ts
+inline backend/src/main/runtime/orca-runtime-repo-hooks.ts
+inline backend/src/main/runtime/orca-runtime-linear.ts
+inline backend/src/main/runtime/orca-runtime-project-groups.ts
+inline backend/src/main/runtime/orca-runtime-worktree-base-status.ts
+inline backend/src/main/runtime/orca-runtime-worktree-creation.ts
+inline backend/src/main/runtime/orca-runtime-repo-lifecycle.ts
+inline backend/src/main/runtime/orca-runtime-mobile-session-tabs.ts
+inline backend/src/main/runtime/orca-runtime-mobile-session-terminal.ts
+inline backend/src/main/runtime/orca-runtime-mobile-session-notify.ts
+inline backend/src/main/runtime/orca-runtime-mobile-dictation.ts
+inline backend/src/main/runtime/orca-runtime-headless-terminal.ts
+inline backend/src/main/runtime/orca-runtime-worktree-lineage.ts
+inline backend/src/main/runtime/orca-runtime-pty-title-tracker.ts
+inline backend/src/main/runtime/orca-runtime-terminal-listing.ts
+inline backend/src/main/runtime/orca-runtime-worktree-ps.ts
+inline backend/src/main/runtime/orca-runtime-terminal-waiter.ts
+inline backend/src/main/runtime/orca-runtime-terminal-create.ts
+inline backend/src/main/runtime/orca-runtime-terminal-agent-status.ts
+inline backend/src/main/runtime/orca-runtime-service-types.ts
+inline desktop/src/main/runtime/orca-runtime-tail-buffer.ts
+inline desktop/src/main/runtime/orca-runtime-branch-cleanup.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-floor.ts
+inline desktop/src/main/runtime/orca-runtime-issue-tracking.ts
+inline desktop/src/main/runtime/orca-runtime-repo-hooks.ts
+inline desktop/src/main/runtime/orca-runtime-linear.ts
+inline desktop/src/main/runtime/orca-runtime-project-groups.ts
+inline desktop/src/main/runtime/orca-runtime-worktree-base-status.ts
+inline desktop/src/main/runtime/orca-runtime-worktree-creation.ts
+inline desktop/src/main/runtime/orca-runtime-repo-lifecycle.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-session-tabs.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-session-terminal.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-session-notify.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-dictation.ts
+inline desktop/src/main/runtime/orca-runtime-headless-terminal.ts
+inline desktop/src/main/runtime/orca-runtime-worktree-lineage.ts
+inline desktop/src/main/runtime/orca-runtime-pty-title-tracker.ts
+inline desktop/src/main/runtime/orca-runtime-terminal-listing.ts
+inline desktop/src/main/runtime/orca-runtime-worktree-ps.ts
+inline desktop/src/main/runtime/orca-runtime-terminal-waiter.ts
+inline desktop/src/main/runtime/orca-runtime-terminal-create.ts
+inline desktop/src/main/runtime/orca-runtime-terminal-agent-status.ts
+inline desktop/src/main/runtime/orca-runtime-service-types.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-251, BUG-FE-BIGFILE-011): straight
+# verbatim extraction of buildPtyHostEnv + 19 co-located host-env helper
+# symbols out of ipc/pty.ts, per the task doc's own designed scope (409
+# counted lines vs 300 budget). Further splitting was out of this Move
+# task's scope.
+inline frontend/src/main/ipc/pty-host-env.ts
+#
+# NEEDS PR REVIEW (added while syncing TASK-BIGFILE-251's ipc/pty.ts split
+# into backend/ and desktop/ — byte-identical copy of the frontend entry
+# directly above, same rationale.
+inline backend/src/main/ipc/pty-host-env.ts
+inline desktop/src/main/ipc/pty-host-env.ts

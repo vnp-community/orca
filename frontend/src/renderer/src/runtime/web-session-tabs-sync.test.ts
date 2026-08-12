@@ -2283,6 +2283,52 @@ describe('applyWebSessionTabsSnapshot', () => {
     expect(patch.activeTabIdByWorktree?.[WT]).not.toBe(pendingTab.id)
   })
 
+  // FIX BUG-FE-PTY-001: previously only nextRemotePtyIds.size > 0 (some OTHER
+  // ready pty anywhere) retired a pending-activation tab. When this tab's own
+  // mirror surface exists (parentTabId matches) but isn't 'ready' yet — and
+  // nothing else in the snapshot is ready either — the old check false-negatived,
+  // so the local tab AND its about-to-be-built mirror ('web-terminal-<id>')
+  // coexisted for one reconcile pass: two TerminalPane instances for the same
+  // leaf, both torn down together on the next React reconcile.
+  it('removes a null-pty pending activation tab once its own mirror surface exists, even before it is ready', () => {
+    const pendingTab: TerminalTab = {
+      id: 'local-pending-tab',
+      ptyId: null,
+      worktreeId: WT,
+      title: 'Terminal 1',
+      defaultTitle: 'Terminal 1',
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW - 1,
+      pendingActivationSpawn: true
+    }
+
+    const patch = applyWebSessionTabsSnapshot(
+      makeState({
+        tabsByWorktree: { [WT]: [pendingTab] },
+        activeTabId: pendingTab.id,
+        activeTabIdByWorktree: { [WT]: pendingTab.id }
+      }),
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: `${pendingTab.id}::${LEAF_ID}`,
+          title: 'Terminal 1',
+          parentTabId: pendingTab.id,
+          leafId: LEAF_ID,
+          isActive: true,
+          status: 'pending-handle',
+          terminal: null
+        }
+      ]),
+      ENV,
+      NOW
+    ) as Partial<WebSessionTabsSyncState>
+
+    expect(patch.tabsByWorktree?.[WT]?.map((tab) => tab.id)).not.toContain(pendingTab.id)
+  })
+
   it('hydrates active host browser tabs with remote page handles', () => {
     const patch = applyWebSessionTabsSnapshot(
       makeState(),

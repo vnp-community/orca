@@ -32,7 +32,12 @@ shift 2 2>/dev/null || true
 
 SSH_USER="ubuntu"
 SSH_KEY="$HOME/.ssh/id_ed25519"
-ORCA_WS_URL="wss://b15.openledger.vn/agent"
+# Why AGENT_ORCA_URL fallback: this used to be hardcoded, silently ignoring
+# `source deploy/agent/.env`'s AGENT_ORCA_URL (e.g. a LAN-direct URL for a
+# dev server co-located with the Orca Server) unless --orca-url was passed
+# explicitly on every single invocation -- easy to forget and revert a
+# deliberate LAN-direct setup back to the public domain on the next deploy.
+ORCA_WS_URL="${AGENT_ORCA_URL:-wss://b15.openledger.vn/agent}"
 ORCA_TOKEN_API="http://172.20.2.39:6769/api/agent-token"
 # Why: POST /api/agent-token requires `Authorization: Bearer <secret>` matching
 # ORCA_AGENT_API_SECRET on the Orca Server (see backend/src/server/agent-token-routes.ts).

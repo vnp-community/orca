@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: these activation cases share one mock store and assert ordering across startup, setup, issue commands, and default tabs. */
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SetupScriptLaunchMode } from '../../../shared/types'
 import { activateAndRevealWorktree, ensureWorktreeHasInitialTerminal } from './worktree-activation'
 import { resetHookCommandDelayedDeliveryForTests } from './hook-command-delayed-delivery'
@@ -11,6 +11,28 @@ const initialTabsByWorktree = useAppStore.getState().tabsByWorktree
 const initialGetKnownWorktreeById = useAppStore.getState().getKnownWorktreeById
 const initialPendingIssueCommandSplitByTabId =
   useAppStore.getState().pendingIssueCommandSplitByTabId
+const initialRepos = useAppStore.getState().repos
+const initialWorktreesByRepo = useAppStore.getState().worktreesByRepo
+
+// Why: most tests below exercise ensureWorktreeHasInitialTerminal's local-fallback
+// path against 'wt-1' without caring about runtime-owner resolution at all — they
+// predate isRepoOwnerDataLoadedForWorktree (worktree-runtime-owner.ts). Seed the
+// global store with 'wt-1' as an already-loaded, owner-less worktree by default
+// so that check resolves "loaded, no owner" instead of "not loaded yet" for
+// them, while still letting a test's own explicit activeRuntimeEnvironmentId
+// fall through (no executionHostId here to compete with it). Tests that care
+// about a devServer/runtime owner override repos/worktreesByRepo explicitly
+// via createMockStore (see the 'explicitly local worktrees while a runtime is
+// focused' test for the pattern).
+beforeEach(() => {
+  useAppStore.setState({
+    // Why: no executionHostId/connectionId/devServerId — an explicit-owner-less
+    // repo, not an explicit-local one, so tests that set a global
+    // activeRuntimeEnvironmentId still see it fall through as before.
+    repos: [{ id: 'repo-1' }],
+    worktreesByRepo: { 'repo-1': [{ id: 'wt-1', repoId: 'repo-1' }] }
+  } as unknown as Partial<AppStoreState>)
+})
 
 function setSetupScriptLaunchMode(mode: SetupScriptLaunchMode | null): void {
   useAppStore.setState((state) => ({
@@ -34,9 +56,25 @@ afterEach(() => {
   useAppStore.setState({
     tabsByWorktree: initialTabsByWorktree,
     getKnownWorktreeById: initialGetKnownWorktreeById,
-    pendingIssueCommandSplitByTabId: initialPendingIssueCommandSplitByTabId
+    pendingIssueCommandSplitByTabId: initialPendingIssueCommandSplitByTabId,
+    repos: initialRepos,
+    worktreesByRepo: initialWorktreesByRepo
   } as Partial<AppStoreState>)
 })
+
+// Why: 'wt-1' as an already-loaded, owner-less worktree — the default a test
+// should merge in via createMockStoreWithOwnerData whenever it overrides
+// `settings` (which switches ensureWorktreeHasInitialTerminal's ownerState
+// resolution from the real useAppStore to this mock store; see
+// isRepoOwnerDataLoadedForWorktree in worktree-runtime-owner.ts) but doesn't
+// itself care about runtime-owner resolution.
+const DEFAULT_OWNER_STATE_OVERRIDES = {
+  repos: [{ id: 'repo-1' }] as Record<string, unknown>[],
+  worktreesByRepo: { 'repo-1': [{ id: 'wt-1', repoId: 'repo-1' }] } as Record<
+    string,
+    Record<string, unknown>[]
+  >
+}
 
 function createMockStore(overrides: Record<string, unknown> = {}) {
   return {
@@ -54,6 +92,13 @@ function createMockStore(overrides: Record<string, unknown> = {}) {
     queueTabIssueCommandSplit: vi.fn(),
     ...overrides
   }
+}
+
+// Why: same as createMockStore, but for tests that override `settings` and
+// don't otherwise care about runtime-owner resolution — see
+// DEFAULT_OWNER_STATE_OVERRIDES above.
+function createMockStoreWithOwnerData(overrides: Record<string, unknown> = {}) {
+  return createMockStore({ ...DEFAULT_OWNER_STATE_OVERRIDES, ...overrides })
 }
 
 describe('ensureWorktreeHasInitialTerminal', () => {
@@ -440,7 +485,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
   })
 
   it('opens new agent workspace terminals in native chat when configured', () => {
-    const store = createMockStore({
+    const store = createMockStoreWithOwnerData({
       settings: {
         experimentalNativeChat: true,
         openAgentTabsInChatByDefault: true
@@ -470,7 +515,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
   })
 
   it('keeps draft startup payloads in terminal mode even when native chat is configured', () => {
-    const store = createMockStore({
+    const store = createMockStoreWithOwnerData({
       settings: {
         experimentalNativeChat: true,
         openAgentTabsInChatByDefault: true
@@ -498,7 +543,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
   it('opens the startup default tab in native chat when configured', () => {
     let createdIndex = 0
     const createTab = vi.fn(() => ({ id: `tab-${++createdIndex}` }))
-    const store = createMockStore({
+    const store = createMockStoreWithOwnerData({
       createTab,
       settings: {
         experimentalNativeChat: true,
@@ -526,7 +571,7 @@ describe('ensureWorktreeHasInitialTerminal', () => {
   it('keeps a draft startup default tab in terminal mode even when native chat is configured', () => {
     let createdIndex = 0
     const createTab = vi.fn(() => ({ id: `tab-${++createdIndex}` }))
-    const store = createMockStore({
+    const store = createMockStoreWithOwnerData({
       createTab,
       settings: {
         experimentalNativeChat: true,

@@ -222,7 +222,18 @@ export function createRpcDispatcher(
       }
 
       if (ws.readyState === 1 /* WebSocket.OPEN */) {
-        ws.send(encodeDataFrame(state, JSON.stringify(response)))
+        // TEMP DIAG BUG-FE-PTY-001
+        const frame = encodeDataFrame(state, JSON.stringify(response))
+        log.info(
+          `[DIAG BUG-FE-PTY-001] send response id=${rpc.id} method=${rpc.method} bytes=${frame.length} bufferedAmount=${ws.bufferedAmount} t=${Date.now()}`
+        )
+        ws.send(frame, (err) => {
+          if (err) {
+            log.error(`[DIAG BUG-FE-PTY-001] ws.send callback ERROR id=${rpc.id}: ${err.stack ?? err.message}`)
+          }
+        })
+      } else {
+        log.error(`[DIAG BUG-FE-PTY-001] skipped send — readyState=${ws.readyState} id=${rpc.id} method=${rpc.method}`)
       }
     },
   }
@@ -977,6 +988,21 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `pty.sendSignal unavailable: ${msg}`)
+      }
+    }
+
+    // ── pty.listProcesses ────────────────────────────────────────────────────
+    // Enumerate every PTY this daemon currently tracks. Backend's
+    // DevServerPtyProvider.listProcesses() uses this so its liveness sweep can
+    // detect a Dev-Server-hosted PTY that died without any client noticing
+    // (BUG-FE-PTY-001) — previously there was no agent-wide enumeration RPC.
+    case 'pty.listProcesses': {
+      try {
+        const { handlePtyListProcesses } = await import('./pty-daemon-client')
+        return (await handlePtyListProcesses(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.listProcesses unavailable: ${msg}`)
       }
     }
 
