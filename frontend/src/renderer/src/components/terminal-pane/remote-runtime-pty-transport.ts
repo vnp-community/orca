@@ -50,11 +50,7 @@ const DEFAULT_RUNTIME_TIMEOUT_MS = 15_000
 // Why: retry terminal.create once on timeout/cold-start error before surfacing
 // the error to the user. Relay may be warming up a fresh PTY worker.
 const COLD_START_MAX_RETRIES = 1
-const LONG_TIMEOUT_METHODS = new Set([
-  'terminal.create',
-  'terminal.subscribe',
-  'terminal.attach',
-])
+const LONG_TIMEOUT_METHODS = new Set(['terminal.create', 'terminal.subscribe', 'terminal.attach'])
 
 function isRemoteTerminalGoneMessage(message: string): boolean {
   return (
@@ -76,7 +72,20 @@ function isRemoteTerminalGoneMessage(message: string): boolean {
 // browser console transport create/destroy stacks). Give the mirror a short
 // window to claim the handle via attachHostSessionMirror() below before
 // actually closing it — a real cancelled launch just closes slightly later.
-const GRACE_CLOSE_DELAY_MS = 2_000
+//
+// Why 5000, not 2000 (live-prod regression found 2026-08-12): the mirror's
+// own TerminalPane mount can itself be deferred up to GRACE_MOUNT_DEFER_MS
+// (4000ms, terminal-pending-host-mirror-mount-gate.ts's fix #10) while
+// waiting for the mirror tab to appear — attachHostSessionMirror()/
+// claimGraceClose() below can't run until that component actually mounts.
+// With the old 2000ms value, this grace-close could — and, confirmed via
+// live backend logs, did — fire and destroy the PTY before mount-defer's
+// worst case even finished waiting, reproducing the exact "not found" race
+// this whole mechanism exists to prevent. Not imported from the mount-gate
+// module to avoid a transport→UI-layer dependency; keep the two constants'
+// relationship (this one > GRACE_MOUNT_DEFER_MS, with margin) in sync by
+// hand if either changes.
+const GRACE_CLOSE_DELAY_MS = 5_000
 const pendingGraceCloses = new Map<string, { timer: ReturnType<typeof setTimeout> }>()
 
 function scheduleGraceClose(handle: string, close: () => void): void {
@@ -134,7 +143,7 @@ export function createRemoteRuntimePtyTransport(
     onColdStartBegin,
     onColdStartRetry,
     onColdStartComplete,
-    onColdStartFailed,
+    onColdStartFailed
   } = opts
   let connected = false
   let destroyed = false
@@ -621,78 +630,78 @@ export function createRemoteRuntimePtyTransport(
       generation === subscriptionGeneration &&
       isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)
     const subscribeCallbacks: RemoteRuntimeMultiplexedTerminalCallbacks = {
-        onData: (data, meta) => {
-          if (isCurrentSubscription()) {
-            outputProcessor.processData(data, storedCallbacks, undefined, meta)
-          }
-        },
-        onSnapshot: (data, meta) => {
-          // Why: a snapshot with no body can still carry a pending mid-escape
-          // tail that must be replayed so the next live chunk completes it.
-          if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
-            outputProcessor.processData(data, storedCallbacks, {
-              replayingBufferedData: true,
-              suppressAttentionEvents: true,
-              ...(meta?.pendingEscapeTailAnsi
-                ? { pendingEscapeTailAnsi: meta.pendingEscapeTailAnsi }
-                : {})
-            })
-          }
-        },
-        onSubscribed: () => {
-          if (!isCurrentSubscription()) {
-            return
-          }
-          storedCallbacks.onConnect?.()
-          storedCallbacks.onStatus?.('shell')
-        },
-        onEnd: () => {
-          if (!isCurrentSubscription()) {
-            return
-          }
-          outputProcessor.clearAccumulatedState()
-          connected = false
-          handle = null
-          remotePtyId = null
-          multiplexedStream = null
-          multiplexedStreamHandle = null
-          clearPendingViewportClaim()
-          storedCallbacks.onExit?.(0)
-          storedCallbacks.onDisconnect?.()
-          if (subscribedPtyId) {
-            onPtyExit?.(subscribedPtyId)
-          }
-        },
-        onError: (message) => {
-          if (isCurrentSubscription()) {
-            handleRemoteTerminalError(message)
-          }
-        },
-        onFitOverrideChanged: (event) => {
-          if (isCurrentSubscription() && subscribedPtyId) {
-            setFitOverride(subscribedPtyId, event.mode, event.cols, event.rows)
-          }
-        },
-        onDriverChanged: (driver) => {
-          if (isCurrentSubscription() && subscribedPtyId) {
-            setDriverForPty(subscribedPtyId, driver)
-          }
-        },
-        onTransportClose: () => {
-          transportClosed = true
-          if (generation !== subscriptionGeneration) {
-            return
-          }
-          if (!isCurrentSubscription()) {
-            // isCurrentSubscription excludes the just-closed stream by design.
-            if (!isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)) {
-              return
-            }
-          }
-          multiplexedStream = null
-          multiplexedStreamHandle = null
-          scheduleResubscribeAfterTransportClose()
+      onData: (data, meta) => {
+        if (isCurrentSubscription()) {
+          outputProcessor.processData(data, storedCallbacks, undefined, meta)
         }
+      },
+      onSnapshot: (data, meta) => {
+        // Why: a snapshot with no body can still carry a pending mid-escape
+        // tail that must be replayed so the next live chunk completes it.
+        if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
+          outputProcessor.processData(data, storedCallbacks, {
+            replayingBufferedData: true,
+            suppressAttentionEvents: true,
+            ...(meta?.pendingEscapeTailAnsi
+              ? { pendingEscapeTailAnsi: meta.pendingEscapeTailAnsi }
+              : {})
+          })
+        }
+      },
+      onSubscribed: () => {
+        if (!isCurrentSubscription()) {
+          return
+        }
+        storedCallbacks.onConnect?.()
+        storedCallbacks.onStatus?.('shell')
+      },
+      onEnd: () => {
+        if (!isCurrentSubscription()) {
+          return
+        }
+        outputProcessor.clearAccumulatedState()
+        connected = false
+        handle = null
+        remotePtyId = null
+        multiplexedStream = null
+        multiplexedStreamHandle = null
+        clearPendingViewportClaim()
+        storedCallbacks.onExit?.(0)
+        storedCallbacks.onDisconnect?.()
+        if (subscribedPtyId) {
+          onPtyExit?.(subscribedPtyId)
+        }
+      },
+      onError: (message) => {
+        if (isCurrentSubscription()) {
+          handleRemoteTerminalError(message)
+        }
+      },
+      onFitOverrideChanged: (event) => {
+        if (isCurrentSubscription() && subscribedPtyId) {
+          setFitOverride(subscribedPtyId, event.mode, event.cols, event.rows)
+        }
+      },
+      onDriverChanged: (driver) => {
+        if (isCurrentSubscription() && subscribedPtyId) {
+          setDriverForPty(subscribedPtyId, driver)
+        }
+      },
+      onTransportClose: () => {
+        transportClosed = true
+        if (generation !== subscriptionGeneration) {
+          return
+        }
+        if (!isCurrentSubscription()) {
+          // isCurrentSubscription excludes the just-closed stream by design.
+          if (!isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)) {
+            return
+          }
+        }
+        multiplexedStream = null
+        multiplexedStreamHandle = null
+        scheduleResubscribeAfterTransportClose()
+      }
     }
     const subscribeArgs = {
       terminal: subscribedHandle,
@@ -772,24 +781,27 @@ export function createRemoteRuntimePtyTransport(
         const launchTokenToSend = options.launchToken ?? launchToken
         const launchAgentToSend = options.launchAgent ?? launchAgent
         // TM-001-B: Use retry-aware helper for terminal.create (cold-start resilience)
-        const created = await callRuntimeWithColdStartRetry<{ terminal: RuntimeTerminalCreate }>('terminal.create', {
-          worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
-          ...(commandToSend !== undefined ? { command: commandToSend } : {}),
-          ...(startupCommandDeliveryToSend !== undefined
-            ? { startupCommandDelivery: startupCommandDeliveryToSend }
-            : {}),
-          ...(envToSend !== undefined ? { env: envToSend } : {}),
-          ...(launchConfigToSend !== undefined ? { launchConfig: launchConfigToSend } : {}),
-          ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
-          ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
-          tabId,
-          leafId,
-          focus: false,
-          // Why: this transport is backing an already-mounted renderer pane;
-          // activation here is local state, not permission for remote UI reveal.
-          presentation: 'background',
-          ...(activate === true ? { activate: true } : {})
-        })
+        const created = await callRuntimeWithColdStartRetry<{ terminal: RuntimeTerminalCreate }>(
+          'terminal.create',
+          {
+            worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
+            ...(commandToSend !== undefined ? { command: commandToSend } : {}),
+            ...(startupCommandDeliveryToSend !== undefined
+              ? { startupCommandDelivery: startupCommandDeliveryToSend }
+              : {}),
+            ...(envToSend !== undefined ? { env: envToSend } : {}),
+            ...(launchConfigToSend !== undefined ? { launchConfig: launchConfigToSend } : {}),
+            ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
+            ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
+            tabId,
+            leafId,
+            focus: false,
+            // Why: this transport is backing an already-mounted renderer pane;
+            // activation here is local state, not permission for remote UI reveal.
+            presentation: 'background',
+            ...(activate === true ? { activate: true } : {})
+          }
+        )
         handle = created.terminal.handle
         if (destroyed) {
           // TEMP DIAG BUG-FE-PTY-001: this is the exact "created then
@@ -891,8 +903,9 @@ export function createRemoteRuntimePtyTransport(
       if (id && worktreeId && tabId) {
         const stream = multiplexedStream
         if (stream) {
-          stream.serializeBuffer?.({ scrollbackRows: 1000 })
-            .then(snap => {
+          stream
+            .serializeBuffer?.({ scrollbackRows: 1000 })
+            .then((snap) => {
               if (snap && worktreeId && tabId) {
                 void window.api.terminalSessions?.save?.({
                   worktreeId,
@@ -900,11 +913,13 @@ export function createRemoteRuntimePtyTransport(
                   leafId: leafId ?? undefined,
                   snapshotData: snap.data,
                   snapshotCols: snap.cols,
-                  snapshotRows: snap.rows,
+                  snapshotRows: snap.rows
                 })
               }
             })
-            .catch(() => { /* Non-fatal snapshot save */ })
+            .catch(() => {
+              /* Non-fatal snapshot save */
+            })
         }
       }
       closeMultiplexedStream()

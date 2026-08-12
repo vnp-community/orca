@@ -724,7 +724,9 @@ describe('createRemoteRuntimePtyTransport', () => {
         expect.objectContaining({ method: 'terminal.close' })
       )
 
-      await vi.advanceTimersByTimeAsync(2_000)
+      // GRACE_CLOSE_DELAY_MS is 5_000 (bumped from 2_000 2026-08-12 — see that
+      // constant's comment for why it must stay > GRACE_MOUNT_DEFER_MS).
+      await vi.advanceTimersByTimeAsync(5_000)
 
       expect(runtimeCall).toHaveBeenCalledWith({
         selector: 'env-1',
@@ -797,7 +799,10 @@ describe('createRemoteRuntimePtyTransport', () => {
       })
       await mirror.connect({ url: '', callbacks: {} })
 
-      await vi.advanceTimersByTimeAsync(2_000)
+      // GRACE_CLOSE_DELAY_MS is 5_000 (bumped from 2_000 2026-08-12) — advance
+      // past the full new window to confirm the mirror's claim genuinely
+      // cancelled the timer, not just that we didn't wait long enough.
+      await vi.advanceTimersByTimeAsync(5_000)
 
       expect(runtimeCall).not.toHaveBeenCalledWith(
         expect.objectContaining({ method: 'terminal.close' })
@@ -880,7 +885,9 @@ describe('createRemoteRuntimePtyTransport', () => {
       await vi.advanceTimersByTimeAsync(2_000)
       await connectPromise
 
-      expect(runtimeCall.mock.calls.filter((c) => c[0].method === 'terminal.create')).toHaveLength(2)
+      expect(runtimeCall.mock.calls.filter((c) => c[0].method === 'terminal.create')).toHaveLength(
+        2
+      )
       expect(onError).toHaveBeenCalledWith(expect.stringContaining('agent not connected'))
     } finally {
       vi.useRealTimers()
