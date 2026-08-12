@@ -1,7 +1,7 @@
 # TASK-BIGFILE-225 — Move: `useSourceControlDiffCommentsPanelState` hook
 
 **Loại:** Move — custom hook extraction · **Effort:** M · **Phụ thuộc:**
-TASK-BIGFILE-020..025 đã xong · **Status:** ⬜ Todo
+TASK-BIGFILE-020..025 đã xong · **Status:** ✅ Done
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-004-sourcecontrol.md` (Giai đoạn 2)
 
 ## Bối cảnh

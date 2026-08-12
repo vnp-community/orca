@@ -142,14 +142,9 @@ import { useConfirmationDialog } from '@/components/confirmation-dialog'
 import { formatDiffComment, formatDiffComments } from '@/lib/diff-comments-format'
 import { getDiffCommentLineLabel, getDiffCommentSource } from '@/lib/diff-comment-compat'
 import { DiffNotesSendMenu } from '@/components/editor/DiffNotesSendMenu'
-import {
-  countPendingDiffCommentsClear,
-  formatPendingDiffCommentsClearDescription,
-  resolvePendingDiffCommentsClear,
-  type PendingDiffCommentsClear
-} from './diff-comments-clear-dialog-state'
 import { readSourceControlLaunchRecipeAgentId } from '@/lib/source-control-launch-agent-selection'
-import { installWindowVisibilityInterval } from '@/lib/window-visibility-interval'
+import { useSourceControlDiffCommentsPanelState } from './use-source-control-diff-comments-panel'
+import { useSourceControlBranchCompareRefresh } from './use-source-control-branch-compare-refresh'
 import {
   notifyEditorExternalFileChange,
   requestEditorSaveQuiesce
@@ -169,7 +164,6 @@ import {
   generateRuntimeCommitMessage,
   generateRuntimePullRequestFields,
   getRuntimeGitBranchCompare,
-  getRuntimeGitHistory,
   stageRuntimeGitPath,
   unstageRuntimeGitPath,
   type RuntimeGitContext,
@@ -180,7 +174,7 @@ import { getRuntimeRepoBaseRefDefault } from '@/runtime/runtime-repo-client'
 
 import { stripBaseRef, useCreatePullRequestDialogFields } from './useCreatePullRequestDialogFields'
 import { resolveCreateReviewDraftTitle } from './create-review-draft-title'
-import { GitHistoryPanel, type GitHistoryPanelState } from './GitHistoryPanel'
+import { GitHistoryPanel } from './GitHistoryPanel'
 import { useGitHistoryCommitActions } from './useGitHistoryCommitActions'
 import { normalizeHostedReviewHeadRef } from '../../../../shared/hosted-review-refs'
 import { shouldForcePushWithLeaseForUpstream } from '../../../../shared/git-upstream-status'
@@ -308,14 +302,6 @@ import {
 // CommitArea itself is imported via the barrel export below, but
 // CreatePrIntentNotice is still used directly by SourceControlInner's state.
 import { CommitArea, type CreatePrIntentNotice } from './source-control-commit-area'
-// Why: shouldRefreshBranchCompareFor* moved to source-control-compare-summary.tsx
-// (TASK-BIGFILE-022); still called directly by SourceControlInner's polling logic.
-import {
-  shouldRefreshBranchCompareForRemoteStatus,
-  shouldRefreshBranchCompareForStatusHead,
-  type BranchCompareRemoteStatusSnapshot,
-  type BranchCompareStatusHeadSnapshot
-} from './source-control-compare-summary'
 // Why: ConflictSummaryCard/OperationBanner/TooManyChangesBanner moved to
 // source-control-banners.tsx (TASK-BIGFILE-023); still rendered directly by
 // SourceControlInner above.
@@ -410,7 +396,6 @@ export const SOURCE_CONTROL_ROW_ACTION_OVERLAY_CLASS =
 export const SOURCE_CONTROL_TREE_INDENT_PX = 12
 export const SOURCE_CONTROL_TREE_DIRECTORY_PADDING_PX = 8
 const SOURCE_CONTROL_TREE_FILE_PADDING_PX = 20
-const EMPTY_GIT_HISTORY_STATE: GitHistoryPanelState = { status: 'idle' }
 const DEFAULT_COLLAPSED_SECTIONS = ['history'] as const
 const SUBMODULE_WORKTREE_ONLY_LABEL = 'Stage inside submodule'
 const SUBMODULE_WORKTREE_ONLY_TOOLTIP =
@@ -423,7 +408,9 @@ function createDefaultCollapsedSections(): Set<string> {
   return new Set(DEFAULT_COLLAPSED_SECTIONS)
 }
 
-function useCopyFeedbackState<T>(resetValue: T): [T, (value: T) => void] {
+// Why: exported (not just used in this file) so extracted panel-state hooks
+// such as `useSourceControlDiffCommentsPanelState` can reuse it (TASK-BIGFILE-225).
+export function useCopyFeedbackState<T>(resetValue: T): [T, (value: T) => void] {
   const [value, setValue] = useState(resetValue)
   const resetTimerRef = useRef<number | null>(null)
   const mountedRef = useRef(true)
@@ -736,11 +723,25 @@ function SourceControlInner(): React.JSX.Element {
     () => formatDiffComments(diffCommentsForActive),
     [diffCommentsForActive]
   )
-  const [diffCommentsExpanded, setDiffCommentsExpanded] = useState(false)
-  const [diffCommentsCopied, showDiffCommentsCopied] = useCopyFeedbackState(false)
-  const [pendingDiffCommentsClear, setPendingDiffCommentsClear] =
-    useState<PendingDiffCommentsClear | null>(null)
-  const [isClearingDiffComments, setIsClearingDiffComments] = useState(false)
+  const diffCommentsPanel = useSourceControlDiffCommentsPanelState({
+    activeWorktreeId,
+    diffCommentsForActive,
+    diffCommentsPrompt,
+    clearDiffComments,
+    clearDiffCommentsForFile
+  })
+  const {
+    diffCommentsExpanded,
+    setDiffCommentsExpanded,
+    diffCommentsCopied,
+    setPendingDiffCommentsClear,
+    isClearingDiffComments,
+    handleCopyDiffComments,
+    pendingDiffCommentsClearCount,
+    resolvedPendingDiffCommentsClear,
+    pendingDiffCommentsClearDescription,
+    handleConfirmDiffCommentsClear
+  } = diffCommentsPanel
   const setSourceControlRoot = useCallback((node: HTMLDivElement | null) => {
     // Why: markdown-note reveal frames target the Source Control surface; cancel
     // them when that surface unmounts instead of from a passive Effect.
@@ -749,81 +750,6 @@ function SourceControlInner(): React.JSX.Element {
     }
     sourceControlRef.current = node
   }, [])
-
-  const handleCopyDiffComments = useCallback(async (): Promise<void> => {
-    if (diffCommentsForActive.length === 0) {
-      return
-    }
-    try {
-      await window.api.ui.writeClipboardText(diffCommentsPrompt)
-      showDiffCommentsCopied(true)
-    } catch {
-      // Why: swallow — clipboard write can fail when the window isn't focused.
-      // No dedicated error surface is warranted for a best-effort copy action.
-    }
-  }, [diffCommentsForActive, diffCommentsPrompt, showDiffCommentsCopied])
-
-  const pendingDiffCommentsClearCount = useMemo(() => {
-    return countPendingDiffCommentsClear(
-      pendingDiffCommentsClear,
-      activeWorktreeId,
-      diffCommentsForActive
-    )
-  }, [activeWorktreeId, diffCommentsForActive, pendingDiffCommentsClear])
-
-  const resolvedPendingDiffCommentsClear = resolvePendingDiffCommentsClear({
-    activeWorktreeId,
-    isClearing: isClearingDiffComments,
-    pending: pendingDiffCommentsClear,
-    pendingCount: pendingDiffCommentsClearCount
-  })
-  if (resolvedPendingDiffCommentsClear !== pendingDiffCommentsClear) {
-    // Why: the confirmation is purely local UI state; clear impossible
-    // confirmations before children observe a stale open dialog.
-    setPendingDiffCommentsClear(resolvedPendingDiffCommentsClear)
-  }
-
-  const pendingDiffCommentsClearDescription = formatPendingDiffCommentsClearDescription(
-    resolvedPendingDiffCommentsClear,
-    pendingDiffCommentsClearCount
-  )
-
-  const handleConfirmDiffCommentsClear = useCallback(async (): Promise<void> => {
-    const pending = resolvedPendingDiffCommentsClear
-    if (!pending || isClearingDiffComments || pending.worktreeId !== activeWorktreeId) {
-      return
-    }
-    if (pendingDiffCommentsClearCount === 0) {
-      setPendingDiffCommentsClear(null)
-      return
-    }
-    setIsClearingDiffComments(true)
-    try {
-      const ok =
-        pending.kind === 'all'
-          ? await clearDiffComments(pending.worktreeId)
-          : await clearDiffCommentsForFile(pending.worktreeId, pending.filePath)
-      if (ok) {
-        setPendingDiffCommentsClear(null)
-      } else {
-        toast.error(
-          translate(
-            'auto.components.right.sidebar.SourceControl.eae7a1da5f',
-            'Failed to clear notes.'
-          )
-        )
-      }
-    } finally {
-      setIsClearingDiffComments(false)
-    }
-  }, [
-    activeWorktreeId,
-    clearDiffComments,
-    clearDiffCommentsForFile,
-    isClearingDiffComments,
-    resolvedPendingDiffCommentsClear,
-    pendingDiffCommentsClearCount
-  ])
 
   const [filterExpanded, setFilterExpanded] = useState(false)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
@@ -957,14 +883,6 @@ function SourceControlInner(): React.JSX.Element {
   const activeRemoteActionSequence = activeWorktreeId
     ? (remoteActionErrorSequenceByWorktreeRef.current[activeWorktreeId] ?? null)
     : null
-  const [gitHistoryByWorktree, setGitHistoryByWorktree] = useState<
-    Record<string, GitHistoryPanelState>
-  >({})
-  const gitHistoryRequestSeqRef = useRef(0)
-  const gitHistoryRequestByWorktreeRef = useRef<Record<string, number>>({})
-  const gitHistoryState = activeWorktreeId
-    ? (gitHistoryByWorktree[activeWorktreeId] ?? EMPTY_GIT_HISTORY_STATE)
-    : EMPTY_GIT_HISTORY_STATE
   const isGitHistoryExpanded = !collapsedSections.has('history')
 
   useEffect(() => {
@@ -1791,7 +1709,9 @@ function SourceControlInner(): React.JSX.Element {
     setGenerateErrors((prev) => pruneRecord(prev))
     setCreatePrIntentInFlightByWorktree((prev) => pruneRecord(prev))
     setCreatePrIntentNotices((prev) => pruneRecord(prev))
-    setGitHistoryByWorktree((prev) => pruneRecord(prev))
+    // Why: gitHistoryByWorktree/gitHistoryRequestByWorktreeRef live in
+    // useSourceControlBranchCompareRefresh (TASK-BIGFILE-226) now, which
+    // prunes them itself via its own worktreeMap-triggered effect.
     // Refs don't need setState — mutate in place to drop stale keys.
     for (const key of Object.keys(commitInFlightRef.current)) {
       if (!worktreeMap.has(key)) {
@@ -1812,11 +1732,6 @@ function SourceControlInner(): React.JSX.Element {
       if (!worktreeMap.has(key)) {
         delete createPrIntentInFlightRef.current[key]
         delete createPrIntentRunTokenRef.current[key]
-      }
-    }
-    for (const key of Object.keys(gitHistoryRequestByWorktreeRef.current)) {
-      if (!worktreeMap.has(key)) {
-        delete gitHistoryRequestByWorktreeRef.current[key]
       }
     }
   }, [updateCommitDrafts, worktreeMap])
@@ -1850,8 +1765,7 @@ function SourceControlInner(): React.JSX.Element {
     setCollapsedTreeDirs(new Set())
     setBaseRefDialogOpen(false)
     setPendingDiscard(null)
-    setPendingDiffCommentsClear(null)
-    setIsClearingDiffComments(false)
+    diffCommentsPanel.resetDiffCommentsPanel()
     // Why: do NOT reset defaultBaseRef here. It is repo-scoped, not
     // worktree-scoped, and is resolved by the effect above on activeRepo
     // change. Resetting it to a hard-coded 'origin/main' on every worktree
@@ -1866,7 +1780,10 @@ function SourceControlInner(): React.JSX.Element {
     // clear in-flight state for the *incoming* worktree if the user is coming
     // back to a worktree mid-commit, re-enabling the button while the commit
     // still runs.
-  }, [activeWorktreeId])
+    // Why: `diffCommentsPanel.resetDiffCommentsPanel` has stable identity
+    // (useCallback with no deps inside the panel-state hook), so listing it
+    // does not add extra re-runs — it satisfies exhaustive-deps.
+  }, [activeWorktreeId, diffCommentsPanel.resetDiffCommentsPanel])
 
   // Why: returns true on success so compound actions ("Commit & Push" etc.)
   // can skip the follow-up remote operation when the commit itself failed.
@@ -1966,8 +1883,8 @@ function SourceControlInner(): React.JSX.Element {
           )
         }
         if (!options?.target) {
-          void refreshBranchCompareRef.current()
-          void refreshGitHistoryRef.current()
+          void branchCompare.refreshBranchCompare()
+          void branchCompare.refreshGitHistory()
         }
         return true
       } catch (error) {
@@ -2412,8 +2329,8 @@ function SourceControlInner(): React.JSX.Element {
         if (!options?.target) {
           refreshSourceControlAfterRemoteAction({
             refreshGitStatus: refreshActiveGitStatusAfterMutation,
-            refreshBranchCompare: refreshBranchCompareRef.current,
-            refreshGitHistory: refreshGitHistoryRef.current
+            refreshBranchCompare: branchCompare.refreshBranchCompare,
+            refreshGitHistory: branchCompare.refreshGitHistory
           })
         }
       }
@@ -2500,8 +2417,8 @@ function SourceControlInner(): React.JSX.Element {
         setAbortOperationInFlightByWorktree((prev) => ({ ...prev, [activeWorktreeId]: false }))
         refreshSourceControlAfterRemoteAction({
           refreshGitStatus: refreshActiveGitStatusAfterMutation,
-          refreshBranchCompare: refreshBranchCompareRef.current,
-          refreshGitHistory: refreshGitHistoryRef.current
+          refreshBranchCompare: branchCompare.refreshBranchCompare,
+          refreshGitHistory: branchCompare.refreshGitHistory
         })
       }
     },
@@ -4549,312 +4466,26 @@ function SourceControlInner(): React.JSX.Element {
     }
   }, [createPrHeaderAction, handleCreatePullRequest, runCreatePrIntent])
 
-  const branchCompareInFlightRef = useRef(false)
-  const branchCompareRerunRef = useRef(false)
-  const branchCompareRunPromiseRef = useRef<Promise<void> | null>(null)
-  const refreshBranchCompareRef = useRef<() => Promise<void>>(async () => {})
-  const branchCompareStatusHeadRef = useRef<BranchCompareStatusHeadSnapshot | null>(null)
-  const branchCompareRemoteStatusRef = useRef<BranchCompareRemoteStatusSnapshot | null>(null)
-
-  const runBranchCompare = useCallback(async () => {
-    if (!activeWorktreeId || !worktreePath || !compareBaseRef || isFolder) {
-      return
-    }
-
-    const requestKey = `${activeWorktreeId}:${compareBaseRef}:${Date.now()}`
-    const existingSummary =
-      useAppStore.getState().gitBranchCompareSummaryByWorktree[activeWorktreeId]
-
-    // Why: only show the loading spinner for the very first branch compare
-    // request, or when the base ref has changed (user picked a new one, or
-    // getBaseRefDefault corrected a stale cross-repo value).  Polling retries
-    // — whether the previous result was 'ready' *or* an error — keep the
-    // current UI visible until the new IPC result arrives.  Resetting to
-    // 'loading' on every poll when the compare is in an error state caused a
-    // visible loading→error→loading→error flicker.
-    const baseRefChanged = existingSummary && existingSummary.baseRef !== compareBaseRef
-    const shouldResetToLoading = !existingSummary || baseRefChanged
-    if (shouldResetToLoading) {
-      beginGitBranchCompareRequest(activeWorktreeId, requestKey, compareBaseRef)
-    } else {
-      beginGitBranchCompareRequest(activeWorktreeId, requestKey, compareBaseRef, {
-        preserveExistingSummary: true
-      })
-    }
-
-    try {
-      const connectionId = getConnectionId(activeWorktreeId ?? null) ?? undefined
-      const result = await getRuntimeGitBranchCompare(
-        {
-          // Why: route the branch compare by the repo OWNER host, not the focused runtime.
-          settings: activeRepoSettings,
-          worktreeId: activeWorktreeId,
-          worktreePath,
-          connectionId
-        },
-        compareBaseRef
-      )
-      setGitBranchCompareResult(activeWorktreeId, requestKey, result)
-    } catch (error) {
-      setGitBranchCompareResult(activeWorktreeId, requestKey, {
-        summary: {
-          baseRef: compareBaseRef,
-          baseOid: null,
-          compareRef: branchName,
-          headOid: null,
-          mergeBase: null,
-          changedFiles: 0,
-          status: 'error',
-          errorMessage: error instanceof Error ? error.message : 'Branch compare failed'
-        },
-        entries: []
-      })
-    }
-  }, [
-    activeRepoSettings,
+  const branchCompare = useSourceControlBranchCompareRefresh({
     activeWorktreeId,
-    beginGitBranchCompareRequest,
+    worktreePath,
+    isFolder,
+    isBranchVisible,
+    compareBaseRef,
+    activeRepoSettings,
     branchName,
-    compareBaseRef,
-    isFolder,
-    setGitBranchCompareResult,
-    worktreePath
-  ])
-
-  const refreshBranchCompare = useCallback(async () => {
-    if (branchCompareInFlightRef.current) {
-      branchCompareRerunRef.current = true
-      return branchCompareRunPromiseRef.current ?? undefined
-    }
-
-    branchCompareInFlightRef.current = true
-    const runPromise = (async (): Promise<void> => {
-      // Why: branch compare shells out to git from both event-driven refreshes
-      // and the fallback timer. Keep one compare chain in flight and
-      // collapse skipped ticks into one trailing refresh instead of stacking
-      // subprocesses while preserving the await contract for direct callers.
-      try {
-        await runBranchCompare()
-      } finally {
-        branchCompareInFlightRef.current = false
-        if (branchCompareRerunRef.current) {
-          branchCompareRerunRef.current = false
-          await refreshBranchCompareRef.current()
-        }
-      }
-    })()
-    branchCompareRunPromiseRef.current = runPromise
-    try {
-      await runPromise
-    } finally {
-      if (branchCompareRunPromiseRef.current === runPromise) {
-        branchCompareRunPromiseRef.current = null
-      }
-    }
-  }, [runBranchCompare])
-
-  refreshBranchCompareRef.current = refreshBranchCompare
-
-  const refreshGitHistory = useCallback(async (): Promise<void> => {
-    if (
-      !activeWorktreeId ||
-      !worktreePath ||
-      isFolder ||
-      !isBranchVisible ||
-      !isGitHistoryExpanded ||
-      !isGitHistoryVisible
-    ) {
-      return
-    }
-
-    const worktreeId = activeWorktreeId
-    const requestId = gitHistoryRequestSeqRef.current + 1
-    gitHistoryRequestSeqRef.current = requestId
-    gitHistoryRequestByWorktreeRef.current[worktreeId] = requestId
-    setGitHistoryByWorktree((prev) => {
-      const previous = prev[worktreeId]
-      return {
-        ...prev,
-        [worktreeId]: previous?.result
-          ? { status: 'refreshing', result: previous.result }
-          : { status: 'loading' }
-      }
-    })
-
-    try {
-      const connectionId = getConnectionId(worktreeId) ?? undefined
-      const result = await getRuntimeGitHistory(
-        {
-          // Why: route the history read by the repo OWNER host, not the focused runtime.
-          settings: activeRepoSettings,
-          worktreeId,
-          worktreePath,
-          connectionId
-        },
-        { limit: 50, baseRef: compareBaseRef }
-      )
-      if (gitHistoryRequestByWorktreeRef.current[worktreeId] !== requestId) {
-        return
-      }
-      setGitHistoryByWorktree((prev) => ({ ...prev, [worktreeId]: { status: 'ready', result } }))
-    } catch (error) {
-      if (gitHistoryRequestByWorktreeRef.current[worktreeId] !== requestId) {
-        return
-      }
-      const message = error instanceof Error ? error.message : 'Failed to load commits'
-      setGitHistoryByWorktree((prev) => {
-        const previous = prev[worktreeId]
-        return {
-          ...prev,
-          [worktreeId]: previous?.result
-            ? { status: 'error', result: previous.result, error: message }
-            : { status: 'error', error: message }
-        }
-      })
-    }
-  }, [
-    activeRepoSettings,
-    activeWorktreeId,
-    compareBaseRef,
-    isBranchVisible,
-    isFolder,
-    isGitHistoryExpanded,
-    isGitHistoryVisible,
-    worktreePath
-  ])
-
-  const refreshGitHistoryRef = useRef(refreshGitHistory)
-  refreshGitHistoryRef.current = refreshGitHistory
-
-  useEffect(() => {
-    if (!activeWorktreeId || !worktreePath || !isBranchVisible || !compareBaseRef || isFolder) {
-      branchCompareStatusHeadRef.current = null
-      return
-    }
-
-    const current = {
-      baseRef: compareBaseRef,
-      statusHead: activeGitStatusHead,
-      worktreeId: activeWorktreeId
-    }
-    const previous = branchCompareStatusHeadRef.current
-    branchCompareStatusHeadRef.current = current
-    if (shouldRefreshBranchCompareForStatusHead(previous, current)) {
-      void refreshBranchCompareRef.current()
-    }
-  }, [
+    remoteStatus,
     activeGitStatusHead,
-    activeWorktreeId,
-    compareBaseRef,
-    isBranchVisible,
-    isFolder,
-    worktreePath
-  ])
-
-  useEffect(() => {
-    if (!activeWorktreeId || !worktreePath || !isBranchVisible || !compareBaseRef || isFolder) {
-      branchCompareRemoteStatusRef.current = null
-      return
-    }
-
-    // Why: pushing a branch can move its remote-tracking base and ahead count
-    // without changing local HEAD, so the HEAD-change effect alone misses it.
-    const current = {
-      ahead: remoteStatus?.ahead ?? null,
-      baseRef: compareBaseRef,
-      behind: remoteStatus?.behind ?? null,
-      hasUpstream: remoteStatus?.hasUpstream ?? null,
-      upstreamName: remoteStatus?.upstreamName ?? null,
-      worktreeId: activeWorktreeId
-    }
-    const previous = branchCompareRemoteStatusRef.current
-    branchCompareRemoteStatusRef.current = current
-    if (shouldRefreshBranchCompareForRemoteStatus(previous, current)) {
-      void refreshBranchCompareRef.current()
-    }
-  }, [
-    activeWorktreeId,
-    compareBaseRef,
-    isBranchVisible,
-    isFolder,
-    remoteStatus?.ahead,
-    remoteStatus?.behind,
-    remoteStatus?.hasUpstream,
-    remoteStatus?.upstreamName,
-    worktreePath
-  ])
-
-  useEffect(() => {
-    if (!activeWorktreeId || !worktreePath || !isBranchVisible || !compareBaseRef || isFolder) {
-      return
-    }
-
-    // Why: git-status HEAD changes refresh branch compare immediately. Keep a
-    // visible-window fallback for base refs or remote updates that do not move HEAD.
-    return installWindowVisibilityInterval({
-      run: () => void refreshBranchCompareRef.current(),
-      intervalMs: BRANCH_REFRESH_INTERVAL_MS
-    })
-  }, [activeWorktreeId, compareBaseRef, isBranchVisible, isFolder, worktreePath])
-
-  useEffect(() => {
-    // Why: when the compare-base policy resolves to no base, runBranchCompare
-    // bails out; drop any stale summary so the
-    // committed-changes section and "vs" row disappear and only the working tree
-    // shows. Wait until upstream status has loaded so the summary doesn't flicker.
-    if (
-      !activeWorktreeId ||
-      !shouldClearBranchCompareForMissingBase({ isFolder, compareBaseRef, remoteStatus })
-    ) {
-      return
-    }
-    clearGitBranchCompare(activeWorktreeId)
-  }, [activeWorktreeId, clearGitBranchCompare, compareBaseRef, isFolder, remoteStatus])
-
-  useEffect(() => {
-    // Why: history shells out to git. Defer the first load until the user
-    // expands Commits so source control stays cheap for large/remote repos.
-    if (!isBranchVisible || !isGitHistoryExpanded || !isGitHistoryVisible) {
-      return
-    }
-    void refreshGitHistoryRef.current()
-  }, [
-    // Why: history is fetched with compareBaseRef, so re-run when the upstream
-    // compare base changes — effectiveBaseRef can stay put while it moves.
-    activeWorktreeId,
-    compareBaseRef,
-    isBranchVisible,
-    isFolder,
     isGitHistoryExpanded,
     isGitHistoryVisible,
-    worktreePath
-  ])
-
-  useEffect(() => {
-    // Why: gate on isBranchVisible so we don't spawn git processes while the
-    // sidebar is closed. Store-slice remote operations refresh upstream-status
-    // on success anyway, so the user's first sidebar open will show accurate
-    // state.
-    if (!activeWorktreeId || !worktreePath || isFolder || !isBranchVisible) {
-      return
-    }
-    const connectionId = getConnectionId(activeWorktreeId) ?? undefined
-    void fetchUpstreamStatus(
-      activeWorktreeId,
-      worktreePath,
-      connectionId,
-      activeWorktree?.pushTarget,
-      { runtimeTargetSettings: activeRepoSettings }
-    )
-  }, [
-    activeRepoSettings,
-    activeWorktree?.pushTarget,
-    activeWorktreeId,
-    fetchUpstreamStatus,
-    isBranchVisible,
-    isFolder,
-    worktreePath
-  ])
+    activeWorktreePushTarget: activeWorktree?.pushTarget,
+    worktreeMap,
+    beginGitBranchCompareRequest,
+    setGitBranchCompareResult,
+    clearGitBranchCompare,
+    fetchUpstreamStatus
+  })
+  const { refreshBranchCompare, refreshGitHistory, gitHistoryState } = branchCompare
 
   const toggleSection = useCallback((section: string) => {
     setCollapsedSections((prev) => {

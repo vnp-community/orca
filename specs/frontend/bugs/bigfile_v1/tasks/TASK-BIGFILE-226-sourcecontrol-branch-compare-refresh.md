@@ -3,7 +3,10 @@
 **Loại:** Move — custom hook extraction · **Effort:** L · **Phụ thuộc:**
 TASK-BIGFILE-020..025 đã xong, khuyến nghị chạy SAU TASK-BIGFILE-225 (xác
 nhận pattern hook + `reset()` hoạt động đúng trước khi làm cụm lớn hơn)
-**Status:** ⬜ Todo
+**Status:** ✅ Done (git-history refresh split into a sibling file
+`use-source-control-git-history-refresh.ts` to satisfy the 300-line cap;
+`worktreeMap` added as an extra hook input not in the original doc — see
+task file for rationale)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-004-sourcecontrol.md` (Giai đoạn 2)
 
 ## Bối cảnh
