@@ -4,7 +4,22 @@
 cơ học" ở TASK-BIGFILE-235, áp dụng y hệt ở đây) · **Effort:** L (lớn nhất
 trong 235–241 — làm CUỐI CÙNG, sau khi pattern đã xác nhận ổn định qua 6
 task trước)
-**Phụ thuộc:** TASK-BIGFILE-235, 239, 240 đã xong · **Status:** 🚧 Blocked (scope) — xem ghi chú kết quả nhóm taskpage-hooks (235-241), chưa thực thi trong phiên này, KHÔNG có thay đổi nào ở TaskPage.tsx cho task này
+**Phụ thuộc:** TASK-BIGFILE-235, 239, 240 đã xong · **Status:** ✅ Done — thực thi
+trong phiên này (gitnexus đã phục hồi). TaskPage.tsx 9259 → 8278 dòng (-981).
+Tách thành 12 file (`use-task-page-linear-browse-state.ts` orchestrator +
+`use-task-page-linear-issue-selection-state.ts`,
+`use-task-page-linear-issues-state.ts` + `-issues-fetch.ts`,
+`use-task-page-linear-projects-state.ts`,
+`use-task-page-linear-custom-views-state.ts`,
+`use-task-page-linear-context-resume.ts`,
+`use-task-page-linear-active-view-state.ts` + `-active-view-pagination.ts`,
+`use-task-page-linear-navigation-actions.ts` + `-workspace-change.ts`,
+`task-page-linear-collection-helpers.ts`), tất cả dưới ngân sách 300 dòng.
+Cụm "team-filtered issue pipeline" (filteredLinearIssues → pagination
+target-page effects → board drag&drop → grouped sections, ~250 dòng) CỐ Ý
+giữ lại trong TaskPage.tsx — phụ thuộc vòng thật với `linearTeamSelection`
+của TASK-BIGFILE-240, không thể tách mà không đổi hành vi (xem comment tại
+điểm gọi hook trong TaskPage.tsx).
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 2)
 **Sinh ra từ:** TASK-BIGFILE-032 (Investigate)
 

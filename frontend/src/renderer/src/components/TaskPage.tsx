@@ -4,7 +4,6 @@ selected repo, the task filters, and the work-item list stays readable in one
 place while this surface is still evolving. */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useShallow } from 'zustand/react/shallow'
 import {
   AlertCircle,
   ArrowDownUp,
@@ -102,10 +101,6 @@ import {
   getJiraProjectPickerDisplayLabel as getJiraProjectDisplayLabel
 } from '@/components/jira-project-picker-filter'
 import { parseTaskQuery, stripRepoQualifiers, withQualifier } from '../../../shared/task-query'
-import {
-  buildLinearTeamUrl,
-  getLinearOrganizationUrlKeyFromIssueUrl
-} from '../../../shared/linear-links'
 import PRFilterDropdowns, { type PRFilterChange } from '@/components/github/PRFilterDropdowns'
 import { GitHubMarkdownComposer } from '@/components/github/GitHubMarkdownComposer'
 import { buildGitHubRepoUrl } from '@/lib/github-links'
@@ -160,28 +155,13 @@ import {
   type TaskSourceContext
 } from '../../../shared/task-source-context'
 import { getLinearIssueWorkspaceName } from '../../../shared/workspace-name'
-import {
-  findTaskPageLinearIssue,
-  reconcileTaskPageLinearIssuesAfterLandingRefresh,
-  type TaskPageRepoSourceState
-} from '@/components/task-page-cache-selectors'
+import type { TaskPageRepoSourceState } from '@/components/task-page-cache-selectors'
 import { shouldHideTaskPageListChrome } from '@/components/task-page-list-chrome-visibility'
 import LinearIssueAttributeFilterDropdowns from '@/components/linear-issue-attribute-filter-dropdowns'
-import {
-  buildLinearIssueListReadArgs,
-  buildLinearIssueListRequestSignature,
-  isLinearIssueSearchActive,
-  shouldForceLinearIssueListRead
-} from '@/components/task-page-linear-issue-request'
 import {
   resolveLinearIssueEmptyKind,
   shouldOfferLinearIssueFetchMore
 } from '@/components/task-page-linear-issue-empty-state'
-import {
-  emptyLinearIssueAttributeFilter,
-  linearIssueAttributeFilterSignature,
-  type LinearIssueAttributeFilter
-} from '../../../shared/linear-issue-attribute-filter'
 import {
   resolveNewIssueOpenSeed,
   resolveUserRepoSwitchReset
@@ -192,6 +172,8 @@ import { useTaskPageJiraDraftState } from '@/components/use-task-page-jira-draft
 import { useTaskPageJiraBrowseState } from '@/components/use-task-page-jira-browse-state'
 import { useTaskPageLinearDraftState } from '@/components/use-task-page-linear-draft-state'
 import { useTaskPageLinearTeamsState } from '@/components/use-task-page-linear-teams-state'
+import { useTaskPageLinearBrowseState } from '@/components/use-task-page-linear-browse-state'
+import { useTaskPageLinearWorkspaceChange } from '@/components/use-task-page-linear-workspace-change'
 import {
   getDefaultPresetForGitHubTaskKind,
   scopeGitHubTaskSearch,
@@ -218,16 +200,9 @@ import type {
   GitHubWorkItem,
   GitLabWorkItem,
   JiraCreateField,
-  LinearCollectionResult,
-  LinearCustomViewModel,
-  LinearCustomViewSummary,
   JiraIssue,
   JiraProject,
   LinearIssue,
-  LinearProjectDetail,
-  LinearProjectSummary,
-  LinearTeam,
-  LinearWorkspaceSelection,
   LinearWorkflowState,
   Repo,
   TaskProvider,
@@ -253,7 +228,7 @@ import {
 import { jiraCreateIssue, jiraGetIssue } from '@/runtime/runtime-jira-client'
 import type { JiraIssueSortColumn } from './jira-issue-sorter'
 import { TaskPageJiraSortControls } from './task-page-jira-sort-controls'
-import type { LinearGroupSection, LinearIssueListRow, LinearProjectTab } from './task-page-types'
+import type { LinearGroupSection, LinearIssueListRow } from './task-page-types'
 import { LinearStateCell } from './task-page-linear-cells'
 import { TaskPageJiraErrorBanner } from './task-page-jira-banner'
 import {
@@ -287,12 +262,10 @@ import {
   LinearIcon,
   type LinearDisplayProperty,
   type LinearGroupBy,
-  type LinearMode,
   type LinearOrderBy,
   type LinearViewMode
 } from '@/components/task-page-localized-options'
 
-const TASK_SEARCH_DEBOUNCE_MS = 300
 const LINEAR_ITEM_LIMIT = 36
 
 const GITHUB_TASK_GRID_CLASS =
@@ -462,28 +435,6 @@ function formatRelativeTime(input: string): string {
 }
 
 export type { LinearGroupSection, LinearIssueListRow, LinearProjectTab } from './task-page-types'
-
-const LINEAR_CUSTOM_VIEW_MODELS = ['issue', 'project'] satisfies readonly LinearCustomViewModel[]
-
-function mergeLinearCollectionResults<T>(
-  results: LinearCollectionResult<T>[]
-): LinearCollectionResult<T> {
-  const errors = results.flatMap((result) => result.errors ?? [])
-  return {
-    items: results.flatMap((result) => result.items),
-    ...(errors.length > 0 ? { errors } : {}),
-    ...(results.some((result) => result.hasMore) ? { hasMore: true } : {})
-  }
-}
-
-const DEFAULT_LINEAR_DISPLAY_PROPERTIES: LinearDisplayProperty[] = [
-  'state',
-  'priority',
-  'assignee',
-  'team',
-  'labels',
-  'updated'
-]
 
 function getLinearStatusSectionState(section: LinearGroupSection): LinearIssue['state'] | null {
   if (!section.key.startsWith('status:')) {
@@ -796,22 +747,9 @@ export default function TaskPage(): React.JSX.Element {
   const preflightStatus = useAppStore((s) => s.preflightStatus)
   const preflightStatusChecked = useAppStore((s) => s.preflightStatusChecked)
   const preflightStatusContextKey = useAppStore((s) => s.preflightStatusContextKey)
-  const selectLinearWorkspace = useAppStore((s) => s.selectLinearWorkspace)
-  const searchLinearIssues = useAppStore((s) => s.searchLinearIssues)
-  const listLinearIssues = useAppStore((s) => s.listLinearIssues)
   const linearListInvalidationToken = useAppStore((s) => s.linearListInvalidationToken)
   const invalidateLinearIssueLists = useAppStore((s) => s.invalidateLinearIssueLists)
-  const getCachedLinearIssues = useAppStore((s) => s.getCachedLinearIssues)
   const listLinearTeams = useAppStore((s) => s.listLinearTeams)
-  const getCachedLinearProjects = useAppStore((s) => s.getCachedLinearProjects)
-  const listLinearProjectsFromStore = useAppStore((s) => s.listLinearProjects)
-  const fetchLinearProject = useAppStore((s) => s.fetchLinearProject)
-  const listLinearProjectIssues = useAppStore((s) => s.listLinearProjectIssues)
-  const getCachedLinearCustomViews = useAppStore((s) => s.getCachedLinearCustomViews)
-  const listLinearCustomViews = useAppStore((s) => s.listLinearCustomViews)
-  const fetchLinearCustomView = useAppStore((s) => s.fetchLinearCustomView)
-  const listLinearCustomViewIssues = useAppStore((s) => s.listLinearCustomViewIssues)
-  const listLinearCustomViewProjects = useAppStore((s) => s.listLinearCustomViewProjects)
   const patchLinearIssue = useAppStore((s) => s.patchLinearIssue)
   const checkLinearConnection = useAppStore((s) => s.checkLinearConnection)
   const refreshPreflightStatus = useAppStore((s) => s.refreshPreflightStatus)
@@ -1377,7 +1315,6 @@ export default function TaskPage(): React.JSX.Element {
   const taskSourceManuallyChangedRef = useRef(false)
   const lastPageTaskSourceRef = useRef(pageData.taskSource)
   const taskResumeAppliedRef = useRef(false)
-  const linearSearchPersistReadyRef = useRef(false)
   const [taskResumeApplied, setTaskResumeApplied] = useState(false)
 
   // Why: pageData.taskSource changes when the user clicks a specific source
@@ -1658,89 +1595,120 @@ export default function TaskPage(): React.JSX.Element {
     { runtimeEnvironmentId: newIssueOpen ? (newIssueRuntimeTarget?.environmentId ?? null) : null }
   )
 
-  const [selectedLinearIssueId, setSelectedLinearIssueId] = useState<string | null>(null)
-  const [selectedLinearIssueFallback, setSelectedLinearIssueFallback] =
-    useState<LinearIssue | null>(null)
-  const [selectedLinearIssueCanFloat, setSelectedLinearIssueCanFloat] = useState(false)
-
-  // Why: the Linear list keeps its own fetched array, while cell edits patch
-  // the shared caches. Subscribing to just the Linear caches lets the list and
-  // inline detail reflect optimistic mutations without a second durable cache.
-  const linearCacheSnapshot = useAppStore(
-    useShallow((s) => ({
-      issueCache: s.linearIssueCache,
-      searchCache: s.linearSearchCache,
-      listCache: s.linearListCache
-    }))
-  )
-  const cachedSelectedLinearIssue = findTaskPageLinearIssue(
-    linearCacheSnapshot.issueCache,
-    linearCacheSnapshot.searchCache,
-    linearCacheSnapshot.listCache,
-    selectedLinearIssueId
-  )
-  const selectedLinearIssue = selectedLinearIssueId
-    ? (cachedSelectedLinearIssue ?? selectedLinearIssueFallback)
-    : null
-  const linearDetailSourceContext = useMemo(() => {
-    if (
-      selectedLinearIssue &&
-      pageData.openLinearSourceContext?.provider === 'linear' &&
-      pageData.openLinearIssue?.id === selectedLinearIssue.id
-    ) {
-      return pageData.openLinearSourceContext
-    }
-    return linearTaskSourceContext
-  }, [
+  // Linear tab state — see use-task-page-linear-browse-state.ts
+  // (TASK-BIGFILE-241). The team-filtered issue pipeline (pagination
+  // target-page effects, board drag&drop, grouped sections) stays below,
+  // unmoved: it needs `linearTeamSelection` from useTaskPageLinearTeamsState
+  // (TASK-BIGFILE-240), which itself needs this hook's `linearIssueTeams`/
+  // `linearAttributeFilter` output — an unavoidable two-way read between the
+  // browse and teams domains that can only be resolved after both hook calls
+  // have run in the same render.
+  const {
+    selectedLinearIssueId,
+    selectedLinearIssueCanFloat,
+    selectedLinearIssue,
+    linearDetailSourceContext,
+    setSelectedLinearIssue,
+    setSelectedLinearIssueFallback,
+    clearSelectedLinearIssue,
+    openLinearDetailPage,
+    openRelatedLinearIssue,
+    linearMode,
+    setLinearMode,
+    linearIssues,
+    setLinearIssues,
+    setLinearIssueLimit,
+    linearIssuesHasMore,
+    linearLoading,
+    setLinearLoading,
+    setLinearError,
+    linearSearchInput,
+    setLinearSearchInput,
+    setAppliedLinearSearch,
+    linearAttributeFilter,
+    applyLinearAttributeFilter,
+    linearViewMode,
+    setLinearViewMode,
+    linearGroupBy,
+    setLinearGroupBy,
+    linearOrderBy,
+    setLinearOrderBy,
+    linearDisplayProperties,
+    linearTeamPropertyTouched,
+    toggleLinearDisplayProperty,
+    setLinearRefreshNonce,
+    linearProjectSearchInput,
+    setLinearProjectSearchInput,
+    setAppliedLinearProjectSearch,
+    linearProjectsResult,
+    setLinearProjectsResult,
+    linearProjectsLoading,
+    linearProjectsError,
+    setLinearProjectsError,
+    selectedLinearProject,
+    setSelectedLinearProject,
+    selectedLinearProjectDetail,
+    setSelectedLinearProjectDetail,
+    linearProjectDetailLoading,
+    linearProjectDetailError,
+    setLinearProjectDetailError,
+    linearProjectTab,
+    setLinearProjectTab,
+    linearProjectIssuesResult,
+    setLinearProjectIssuesResult,
+    linearCustomViewsResult,
+    setLinearCustomViewsResult,
+    linearCustomViewsLoading,
+    linearCustomViewsError,
+    setLinearCustomViewsError,
+    selectedLinearCustomView,
+    setSelectedLinearCustomView,
+    linearProjectParentView,
+    setLinearProjectParentView,
+    linearCustomViewIssuesResult,
+    setLinearCustomViewIssuesResult,
+    linearCustomViewProjectsResult,
+    setLinearCustomViewProjectsResult,
+    linearCustomViewContentsLoading,
+    linearCustomViewContentsError,
+    setLinearCustomViewContentsError,
+    activeLinearIssues,
+    activeLinearIssueLoading,
+    activeLinearIssueError,
+    activeLinearIssueHasCollectionError,
+    activeLinearIssueContextLabel,
+    activeLinearIssuePage,
+    activeLinearIssueLoadingTargetPage,
+    activeLinearIssueCanRequestMore,
+    activeLinearIssueLimit,
+    displayedLinearIssues,
+    linearIssueTeams,
+    linearSearchActive,
+    showLinearAttributeFilters,
+    setActiveLinearIssuePage,
+    setActiveLinearIssueLoadingTargetPage,
+    ensureActiveLinearIssueLimit,
+    patchScopedLinearIssue,
+    selectLinearMode,
+    openLinearProjectContext,
+    openLinearCustomViewContext,
+    linearBoardDraggingIssueId,
+    setLinearBoardDraggingIssueId,
+    linearBoardDragOverKey,
+    setLinearBoardDragOverKey,
+    linearBoardUpdatingIssueIds,
+    setLinearBoardUpdatingIssueIds,
+    linearContextResumeAttemptedRef
+  } = useTaskPageLinearBrowseState({
+    taskSource,
+    taskResumeApplied,
+    linearConnected,
+    selectedLinearWorkspaceId,
     linearTaskSourceContext,
-    pageData.openLinearIssue,
-    pageData.openLinearSourceContext,
-    selectedLinearIssue
-  ])
-
-  const setSelectedLinearIssue = useCallback(
-    (issue: LinearIssue | null, options?: { allowOutsideList?: boolean }) => {
-      setSelectedLinearIssueCanFloat(Boolean(issue && options?.allowOutsideList))
-      setSelectedLinearIssueId(issue?.id ?? null)
-      setSelectedLinearIssueFallback(issue)
-    },
-    []
-  )
-
-  const clearSelectedLinearIssue = useCallback(() => {
-    setSelectedLinearIssueCanFloat(false)
-    setSelectedLinearIssueId(null)
-    setSelectedLinearIssueFallback(null)
-  }, [])
-
-  useEffect(() => {
-    if (!pageData.openLinearIssue) {
-      clearSelectedLinearIssue()
-      return
-    }
-    setSelectedLinearIssue(pageData.openLinearIssue, { allowOutsideList: true })
-  }, [clearSelectedLinearIssue, pageData.openLinearIssue, setSelectedLinearIssue])
-
-  const openLinearDetailPage = useCallback(
-    (issue: LinearIssue) => {
-      openTaskPage(
-        {
-          taskSource: 'linear',
-          openLinearIssue: issue,
-          openLinearSourceContext: linearTaskSourceContext
-        },
-        { recordTasksInteraction: false }
-      )
-    },
-    [linearTaskSourceContext, openTaskPage]
-  )
-
-  const openRelatedLinearIssue = useCallback(
-    (issue: LinearIssue) => {
-      openLinearDetailPage(issue)
-    },
-    [openLinearDetailPage]
-  )
+    linearListInvalidationVersionForSource,
+    openLinearIssue: pageData.openLinearIssue,
+    openLinearSourceContext: pageData.openLinearSourceContext
+  })
 
   const closeTaskDetailPage = useCallback(() => {
     const state = useAppStore.getState()
@@ -1826,199 +1794,6 @@ export default function TaskPage(): React.JSX.Element {
     [jiraTaskSourceContext, openTaskPage]
   )
 
-  // Linear tab state
-  const [linearMode, setLinearMode] = useState<LinearMode>('issues')
-  const [linearIssues, setLinearIssues] = useState<LinearIssue[]>([])
-  const [linearIssueLimit, setLinearIssueLimit] = useState(LINEAR_ITEM_LIMIT)
-  const [linearIssuePage, setLinearIssuePage] = useState(0)
-  const [linearIssueLoadingTargetPage, setLinearIssueLoadingTargetPage] = useState<number | null>(
-    null
-  )
-  const [linearIssuesHasMore, setLinearIssuesHasMore] = useState(false)
-  const [linearLoading, setLinearLoading] = useState(false)
-  const [linearError, setLinearError] = useState<string | null>(null)
-  const [linearSearchInput, setLinearSearchInput] = useState('')
-  const [appliedLinearSearch, setAppliedLinearSearch] = useState('')
-  const [linearAttributeFilter, setLinearAttributeFilter] = useState<LinearIssueAttributeFilter>(
-    () => emptyLinearIssueAttributeFilter()
-  )
-  const linearAttributeFilterSignatureRef = useRef(
-    linearIssueAttributeFilterSignature(emptyLinearIssueAttributeFilter())
-  )
-  const [linearViewMode, setLinearViewMode] = useState<LinearViewMode>('list')
-  const [linearGroupBy, setLinearGroupBy] = useState<LinearGroupBy>('none')
-  const [linearOrderBy, setLinearOrderBy] = useState<LinearOrderBy>('priority')
-  const [linearDisplayProperties, setLinearDisplayProperties] = useState<
-    ReadonlySet<LinearDisplayProperty>
-  >(() => new Set(DEFAULT_LINEAR_DISPLAY_PROPERTIES))
-  const [linearTeamPropertyTouched, setLinearTeamPropertyTouched] = useState(false)
-  const [linearRefreshNonce, setLinearRefreshNonce] = useState(0)
-  const [linearProjectSearchInput, setLinearProjectSearchInput] = useState('')
-  const [appliedLinearProjectSearch, setAppliedLinearProjectSearch] = useState('')
-  const [linearProjectsResult, setLinearProjectsResult] = useState<
-    LinearCollectionResult<LinearProjectSummary>
-  >({ items: [] })
-  const [linearProjectsLoading, setLinearProjectsLoading] = useState(false)
-  const [linearProjectsError, setLinearProjectsError] = useState<string | null>(null)
-  const [selectedLinearProject, setSelectedLinearProject] = useState<LinearProjectSummary | null>(
-    null
-  )
-  const [selectedLinearProjectDetail, setSelectedLinearProjectDetail] =
-    useState<LinearProjectDetail | null>(null)
-  const [linearProjectDetailLoading, setLinearProjectDetailLoading] = useState(false)
-  const [linearProjectDetailError, setLinearProjectDetailError] = useState<string | null>(null)
-  const [linearProjectTab, setLinearProjectTab] = useState<LinearProjectTab>('overview')
-  const [linearProjectIssuesResult, setLinearProjectIssuesResult] = useState<
-    LinearCollectionResult<LinearIssue>
-  >({ items: [] })
-  const [linearProjectIssueLimit, setLinearProjectIssueLimit] = useState(LINEAR_ITEM_LIMIT)
-  const [linearProjectIssuePage, setLinearProjectIssuePage] = useState(0)
-  const [linearProjectIssueLoadingTargetPage, setLinearProjectIssueLoadingTargetPage] = useState<
-    number | null
-  >(null)
-  const [linearProjectIssuesLoading, setLinearProjectIssuesLoading] = useState(false)
-  const [linearProjectIssuesError, setLinearProjectIssuesError] = useState<string | null>(null)
-  const [linearCustomViewsResult, setLinearCustomViewsResult] = useState<
-    LinearCollectionResult<LinearCustomViewSummary>
-  >({ items: [] })
-  const [linearCustomViewsLoading, setLinearCustomViewsLoading] = useState(false)
-  const [linearCustomViewsError, setLinearCustomViewsError] = useState<string | null>(null)
-  const [selectedLinearCustomView, setSelectedLinearCustomView] =
-    useState<LinearCustomViewSummary | null>(null)
-  const [linearProjectParentView, setLinearProjectParentView] =
-    useState<LinearCustomViewSummary | null>(null)
-  const [linearCustomViewIssuesResult, setLinearCustomViewIssuesResult] = useState<
-    LinearCollectionResult<LinearIssue>
-  >({ items: [] })
-  const [linearCustomViewIssueLimit, setLinearCustomViewIssueLimit] = useState(LINEAR_ITEM_LIMIT)
-  const [linearCustomViewIssuePage, setLinearCustomViewIssuePage] = useState(0)
-  const [linearCustomViewIssueLoadingTargetPage, setLinearCustomViewIssueLoadingTargetPage] =
-    useState<number | null>(null)
-  const [linearCustomViewProjectsResult, setLinearCustomViewProjectsResult] = useState<
-    LinearCollectionResult<LinearProjectSummary>
-  >({ items: [] })
-  const [linearCustomViewContentsLoading, setLinearCustomViewContentsLoading] = useState(false)
-  const [linearCustomViewContentsError, setLinearCustomViewContentsError] = useState<string | null>(
-    null
-  )
-  const [linearBoardDraggingIssueId, setLinearBoardDraggingIssueId] = useState<string | null>(null)
-  const [linearBoardDragOverKey, setLinearBoardDragOverKey] = useState<string | null>(null)
-  const [linearBoardUpdatingIssueIds, setLinearBoardUpdatingIssueIds] = useState<
-    ReadonlySet<string>
-  >(() => new Set())
-  const lastLinearRequestRef = useRef<{ nonce: number; signature: string } | null>(null)
-  const landingLinearRefreshKeysRef = useRef<ReadonlySet<string>>(new Set())
-  const linearContextResumeAttemptedRef = useRef(false)
-
-  const patchScopedLinearIssue = useCallback((issueId: string, patch: Partial<LinearIssue>) => {
-    const patchResult = (result: LinearCollectionResult<LinearIssue>) => ({
-      ...result,
-      items: result.items.map((item) => (item.id === issueId ? { ...item, ...patch } : item))
-    })
-    setLinearProjectIssuesResult(patchResult)
-    setLinearCustomViewIssuesResult(patchResult)
-  }, [])
-
-  const selectLinearMode = useCallback(
-    (mode: LinearMode) => {
-      clearSelectedLinearIssue()
-      setSelectedLinearProject(null)
-      setSelectedLinearProjectDetail(null)
-      setSelectedLinearCustomView(null)
-      setLinearProjectParentView(null)
-      setLinearProjectIssuesResult({ items: [] })
-      setLinearProjectIssueLimit(LINEAR_ITEM_LIMIT)
-      setLinearProjectIssuePage(0)
-      setLinearProjectIssueLoadingTargetPage(null)
-      setLinearCustomViewIssuesResult({ items: [] })
-      setLinearCustomViewIssueLimit(LINEAR_ITEM_LIMIT)
-      setLinearCustomViewIssuePage(0)
-      setLinearCustomViewIssueLoadingTargetPage(null)
-      setLinearCustomViewProjectsResult({ items: [] })
-      setLinearMode(mode)
-      setTaskResumeState({ linearMode: mode, linearContext: undefined })
-    },
-    [clearSelectedLinearIssue, setTaskResumeState]
-  )
-
-  const openLinearProjectContext = useCallback(
-    (project: LinearProjectSummary, options?: { parentView?: LinearCustomViewSummary | null }) => {
-      if (!project.workspaceId) {
-        toast.error(
-          translate(
-            'auto.components.TaskPage.cba2a2b7fb',
-            'Linear project is missing workspace context.'
-          )
-        )
-        return
-      }
-      const parentView = options?.parentView ?? null
-      clearSelectedLinearIssue()
-      setLinearProjectParentView(parentView)
-      if (parentView) {
-        setSelectedLinearCustomView(parentView)
-      } else {
-        setSelectedLinearCustomView(null)
-        setLinearCustomViewProjectsResult({ items: [] })
-      }
-      setLinearProjectIssuesResult({ items: [] })
-      setLinearProjectIssueLimit(LINEAR_ITEM_LIMIT)
-      setLinearProjectIssuePage(0)
-      setLinearProjectIssueLoadingTargetPage(null)
-      setLinearCustomViewIssuesResult({ items: [] })
-      setLinearCustomViewIssueLimit(LINEAR_ITEM_LIMIT)
-      setLinearCustomViewIssuePage(0)
-      setLinearCustomViewIssueLoadingTargetPage(null)
-      setSelectedLinearProject(project)
-      setLinearProjectTab('overview')
-      setLinearMode('projects')
-      setTaskResumeState({
-        linearMode: 'projects',
-        linearContext: { kind: 'project', id: project.id, workspaceId: project.workspaceId }
-      })
-    },
-    [clearSelectedLinearIssue, setTaskResumeState]
-  )
-
-  const openLinearCustomViewContext = useCallback(
-    (view: LinearCustomViewSummary) => {
-      if (!view.workspaceId) {
-        toast.error(
-          translate(
-            'auto.components.TaskPage.669e419d65',
-            'Linear view is missing workspace context.'
-          )
-        )
-        return
-      }
-      clearSelectedLinearIssue()
-      setSelectedLinearProject(null)
-      setSelectedLinearProjectDetail(null)
-      setLinearProjectParentView(null)
-      setLinearProjectIssuesResult({ items: [] })
-      setLinearProjectIssueLimit(LINEAR_ITEM_LIMIT)
-      setLinearProjectIssuePage(0)
-      setLinearProjectIssueLoadingTargetPage(null)
-      setLinearCustomViewIssuesResult({ items: [] })
-      setLinearCustomViewIssueLimit(LINEAR_ITEM_LIMIT)
-      setLinearCustomViewIssuePage(0)
-      setLinearCustomViewIssueLoadingTargetPage(null)
-      setLinearCustomViewProjectsResult({ items: [] })
-      setSelectedLinearCustomView(view)
-      setLinearMode('views')
-      setTaskResumeState({
-        linearMode: 'views',
-        linearContext: {
-          kind: 'view',
-          id: view.id,
-          workspaceId: view.workspaceId,
-          model: view.model
-        }
-      })
-    },
-    [clearSelectedLinearIssue, setTaskResumeState]
-  )
-
   const handleJiraSort = useCallback(
     (column: JiraIssueSortColumn) => {
       if (jiraOrderBy === column) {
@@ -2085,226 +1860,7 @@ export default function TaskPage(): React.JSX.Element {
     visibleTaskProviders
   ])
 
-  useEffect(() => {
-    const context = taskResumeState?.linearContext
-    if (
-      linearContextResumeAttemptedRef.current ||
-      !taskResumeApplied ||
-      taskSource !== 'linear' ||
-      !linearConnected ||
-      !context
-    ) {
-      return
-    }
-    linearContextResumeAttemptedRef.current = true
-    let cancelled = false
-
-    if (context.kind === 'project') {
-      void fetchLinearProject(context.id, context.workspaceId, {
-        force: true,
-        sourceContext: linearTaskSourceContext
-      })
-        .then((project) => {
-          if (cancelled) {
-            return
-          }
-          if (!project) {
-            setSelectedLinearProject(null)
-            setSelectedLinearProjectDetail(null)
-            setLinearProjectParentView(null)
-            setLinearProjectsError('Saved Linear project was not found.')
-            setTaskResumeState({ linearContext: undefined })
-            return
-          }
-          setSelectedLinearProject(project)
-          setSelectedLinearProjectDetail(project)
-          setLinearMode('projects')
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setSelectedLinearProject(null)
-            setSelectedLinearProjectDetail(null)
-            setLinearProjectParentView(null)
-            setLinearProjectsError('Failed to restore saved Linear project.')
-            setTaskResumeState({ linearContext: undefined })
-          }
-        })
-      return () => {
-        cancelled = true
-      }
-    }
-
-    if (context.kind === 'view' && context.model) {
-      setLinearMode('views')
-      setLinearCustomViewsLoading(true)
-      setLinearCustomViewsError(null)
-      void fetchLinearCustomView(context.id, context.workspaceId, context.model, {
-        force: true,
-        sourceContext: linearTaskSourceContext
-      })
-        .then((restoredView) => {
-          if (cancelled) {
-            return
-          }
-          setLinearCustomViewsLoading(false)
-          if (!restoredView) {
-            setSelectedLinearCustomView(null)
-            setLinearCustomViewsError('Saved Linear view was not found.')
-            setTaskResumeState({ linearContext: undefined })
-            return
-          }
-          setSelectedLinearCustomView(restoredView)
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setSelectedLinearCustomView(null)
-            setLinearCustomViewsLoading(false)
-            setLinearCustomViewsError('Failed to restore saved Linear view.')
-            setTaskResumeState({ linearContext: undefined })
-          }
-        })
-      return () => {
-        cancelled = true
-      }
-    }
-    return undefined
-  }, [
-    fetchLinearCustomView,
-    fetchLinearProject,
-    listLinearCustomViews,
-    linearConnected,
-    linearTaskSourceContext,
-    setTaskResumeState,
-    taskResumeApplied,
-    taskResumeState?.linearContext,
-    taskSource
-  ])
-
   const defaultLinearTeamSelection = settings?.defaultLinearTeamSelection
-
-  const activeLinearIssues =
-    selectedLinearProject && linearProjectTab === 'issues'
-      ? linearProjectIssuesResult.items
-      : selectedLinearCustomView?.model === 'issue'
-        ? linearCustomViewIssuesResult.items
-        : linearIssues
-  const activeLinearIssueLoading =
-    selectedLinearProject && linearProjectTab === 'issues'
-      ? linearProjectIssuesLoading
-      : selectedLinearCustomView?.model === 'issue'
-        ? linearCustomViewContentsLoading
-        : linearLoading
-  const activeLinearIssueError =
-    linearStatus.credentialError ??
-    (selectedLinearProject && linearProjectTab === 'issues'
-      ? linearProjectIssuesError
-      : selectedLinearCustomView?.model === 'issue'
-        ? linearCustomViewContentsError
-        : linearError)
-  const activeLinearIssueCollectionErrors =
-    selectedLinearProject && linearProjectTab === 'issues'
-      ? linearProjectIssuesResult.errors
-      : selectedLinearCustomView?.model === 'issue'
-        ? linearCustomViewIssuesResult.errors
-        : undefined
-  const activeLinearIssueHasCollectionError = (activeLinearIssueCollectionErrors?.length ?? 0) > 0
-  const activeLinearIssueContextLabel = selectedLinearProject
-    ? `Project: ${selectedLinearProject.name}`
-    : selectedLinearCustomView?.model === 'issue'
-      ? `View: ${selectedLinearCustomView.name}`
-      : null
-  const canLoadMorePlainLinearIssues =
-    !activeLinearIssueContextLabel &&
-    appliedLinearSearch.trim().length === 0 &&
-    linearIssuesHasMore &&
-    linearIssueLimit < LINEAR_ISSUE_LIST_MAX
-  const canLoadMoreLinearProjectIssues =
-    selectedLinearProject !== null &&
-    linearProjectTab === 'issues' &&
-    Boolean(linearProjectIssuesResult.hasMore) &&
-    linearProjectIssueLimit < LINEAR_ISSUE_LIST_MAX
-  const canLoadMoreLinearCustomViewIssues =
-    selectedLinearCustomView?.model === 'issue' &&
-    Boolean(linearCustomViewIssuesResult.hasMore) &&
-    linearCustomViewIssueLimit < LINEAR_ISSUE_LIST_MAX
-  const activeLinearIssuePage =
-    selectedLinearProject && linearProjectTab === 'issues'
-      ? linearProjectIssuePage
-      : selectedLinearCustomView?.model === 'issue'
-        ? linearCustomViewIssuePage
-        : linearIssuePage
-  const activeLinearIssueLoadingTargetPage =
-    selectedLinearProject && linearProjectTab === 'issues'
-      ? linearProjectIssueLoadingTargetPage
-      : selectedLinearCustomView?.model === 'issue'
-        ? linearCustomViewIssueLoadingTargetPage
-        : linearIssueLoadingTargetPage
-  const activeLinearIssueCanLoadMore =
-    selectedLinearProject && linearProjectTab === 'issues'
-      ? canLoadMoreLinearProjectIssues
-      : selectedLinearCustomView?.model === 'issue'
-        ? canLoadMoreLinearCustomViewIssues
-        : canLoadMorePlainLinearIssues
-  const activeLinearIssueCanRequestMore =
-    activeLinearIssueCanLoadMore && !activeLinearIssueHasCollectionError
-  const activeLinearIssueLimit =
-    selectedLinearProject && linearProjectTab === 'issues'
-      ? linearProjectIssueLimit
-      : selectedLinearCustomView?.model === 'issue'
-        ? linearCustomViewIssueLimit
-        : linearIssueLimit
-
-  const displayedLinearIssues = useMemo(
-    () =>
-      activeLinearIssues.map(
-        (issue) =>
-          findTaskPageLinearIssue(
-            linearCacheSnapshot.issueCache,
-            linearCacheSnapshot.searchCache,
-            linearCacheSnapshot.listCache,
-            issue.id
-          ) ?? issue
-      ),
-    [
-      activeLinearIssues,
-      linearCacheSnapshot.issueCache,
-      linearCacheSnapshot.listCache,
-      linearCacheSnapshot.searchCache
-    ]
-  )
-
-  const linearIssueTeams = useMemo(() => {
-    const seen = new Set<string>()
-    const teams: LinearTeam[] = []
-    for (const issue of displayedLinearIssues) {
-      if (!issue.team.id || seen.has(issue.team.id)) {
-        continue
-      }
-      seen.add(issue.team.id)
-      teams.push({
-        id: issue.team.id,
-        workspaceId: issue.workspaceId,
-        workspaceName: issue.workspaceName,
-        name: issue.team.name,
-        key: issue.team.key,
-        url:
-          buildLinearTeamUrl({
-            organizationUrlKey: getLinearOrganizationUrlKeyFromIssueUrl(issue.url),
-            teamKey: issue.team.key
-          }) ?? undefined
-      })
-    }
-    return teams.sort((a, b) => a.name.localeCompare(b.name))
-  }, [displayedLinearIssues])
-
-  const applyLinearAttributeFilter = useCallback((next: LinearIssueAttributeFilter) => {
-    // Why: batch filter + limit/page reset in one transition so the fetch
-    // effect never issues an old expanded-limit request for the new filter.
-    setLinearAttributeFilter(next)
-    setLinearIssueLimit(LINEAR_ITEM_LIMIT)
-    setLinearIssuePage(0)
-    setLinearIssueLoadingTargetPage(null)
-  }, [])
 
   const {
     availableTeams,
@@ -2325,10 +1881,6 @@ export default function TaskPage(): React.JSX.Element {
     linearAttributeFilter,
     applyLinearAttributeFilter
   })
-
-  const linearSearchActive = isLinearIssueSearchActive(linearSearchInput, appliedLinearSearch)
-  const showLinearAttributeFilters =
-    linearMode === 'issues' && !activeLinearIssueContextLabel && !linearSearchActive
 
   const filteredLinearIssues = useMemo(() => {
     if (activeLinearIssueContextLabel) {
@@ -2367,46 +1919,6 @@ export default function TaskPage(): React.JSX.Element {
     !activeLinearIssueError &&
     linearIssueTotalPages > 1 &&
     !(activeLinearIssueLoading && activeLinearIssues.length === 0)
-
-  const setActiveLinearIssuePage = useCallback(
-    (page: number) => {
-      if (selectedLinearProject && linearProjectTab === 'issues') {
-        setLinearProjectIssuePage(page)
-      } else if (selectedLinearCustomView?.model === 'issue') {
-        setLinearCustomViewIssuePage(page)
-      } else {
-        setLinearIssuePage(page)
-      }
-    },
-    [linearProjectTab, selectedLinearCustomView?.model, selectedLinearProject]
-  )
-
-  const setActiveLinearIssueLoadingTargetPage = useCallback(
-    (page: number | null) => {
-      if (selectedLinearProject && linearProjectTab === 'issues') {
-        setLinearProjectIssueLoadingTargetPage(page)
-      } else if (selectedLinearCustomView?.model === 'issue') {
-        setLinearCustomViewIssueLoadingTargetPage(page)
-      } else {
-        setLinearIssueLoadingTargetPage(page)
-      }
-    },
-    [linearProjectTab, selectedLinearCustomView?.model, selectedLinearProject]
-  )
-
-  const ensureActiveLinearIssueLimit = useCallback(
-    (targetLimit: number) => {
-      const nextLimit = Math.min(clampLinearIssueListLimit(targetLimit), LINEAR_ISSUE_LIST_MAX)
-      if (selectedLinearProject && linearProjectTab === 'issues') {
-        setLinearProjectIssueLimit((limit) => Math.max(limit, nextLimit))
-      } else if (selectedLinearCustomView?.model === 'issue') {
-        setLinearCustomViewIssueLimit((limit) => Math.max(limit, nextLimit))
-      } else {
-        setLinearIssueLimit((limit) => Math.max(limit, nextLimit))
-      }
-    },
-    [linearProjectTab, selectedLinearCustomView?.model, selectedLinearProject]
-  )
 
   const handleLinearIssuePageChange = useCallback(
     (page: number) => {
@@ -2705,21 +2217,6 @@ export default function TaskPage(): React.JSX.Element {
       settings
     ]
   )
-
-  const toggleLinearDisplayProperty = useCallback((property: LinearDisplayProperty): void => {
-    if (property === 'team') {
-      setLinearTeamPropertyTouched(true)
-    }
-    setLinearDisplayProperties((prev) => {
-      const next = new Set(prev)
-      if (next.has(property)) {
-        next.delete(property)
-      } else {
-        next.add(property)
-      }
-      return next
-    })
-  }, [])
 
   const {
     newLinearProjectOpen,
@@ -3912,469 +3409,6 @@ export default function TaskPage(): React.JSX.Element {
     refreshPreflightStatus
   ])
 
-  // Why: debounce the Linear search input so we don't fire a request on every
-  // keystroke — matches the 300ms cadence used for GitHub search.
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    const timeout = window.setTimeout(() => {
-      setAppliedLinearSearch(linearSearchInput)
-    }, TASK_SEARCH_DEBOUNCE_MS)
-    return () => window.clearTimeout(timeout)
-  }, [linearSearchInput, taskResumeApplied])
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    if (!linearSearchPersistReadyRef.current) {
-      linearSearchPersistReadyRef.current = true
-      return
-    }
-    setTaskResumeState({ linearQuery: appliedLinearSearch.trim() })
-  }, [appliedLinearSearch, setTaskResumeState, taskResumeApplied])
-
-  useEffect(() => {
-    setLinearIssueLimit(LINEAR_ITEM_LIMIT)
-    setLinearIssuePage(0)
-    setLinearIssueLoadingTargetPage(null)
-  }, [
-    appliedLinearSearch,
-    linearMode,
-    selectedLinearCustomView?.id,
-    selectedLinearProject?.id,
-    selectedLinearWorkspaceId,
-    taskSource
-  ])
-
-  // Why: fetch Linear issues when the tab is active and connected. Empty search
-  // uses the plain `all` list with optional server-side attribute filters.
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    if (taskSource !== 'linear') {
-      return
-    }
-    if (linearMode !== 'issues') {
-      return
-    }
-    if (!linearConnected) {
-      return
-    }
-
-    let cancelled = false
-    setLinearError(null)
-
-    const trimmed = appliedLinearSearch.trim()
-    const effectiveLinearIssueLimit = clampLinearIssueListLimit(linearIssueLimit)
-    const searchActive = trimmed.length > 0
-    const listReadArgs = buildLinearIssueListReadArgs({
-      filter: 'all',
-      limit: effectiveLinearIssueLimit,
-      attributeFilter: linearAttributeFilter,
-      searchActive,
-      allowAttributeFilter: selectedLinearWorkspaceId !== 'all'
-    })
-    const readArgs = searchActive
-      ? ({ kind: 'search', query: trimmed, limit: LINEAR_ITEM_LIMIT } as const)
-      : listReadArgs
-    const cachedResult = getCachedLinearIssues(readArgs, { sourceContext: linearTaskSourceContext })
-    if (readArgs.kind === 'search') {
-      setLinearIssuesHasMore(false)
-      if (cachedResult) {
-        setLinearIssues(cachedResult as LinearIssue[])
-      }
-    } else if (cachedResult) {
-      const collection = cachedResult as LinearCollectionResult<LinearIssue>
-      setLinearIssues(collection.items)
-      setLinearIssuesHasMore(
-        Boolean(collection.hasMore) && effectiveLinearIssueLimit < LINEAR_ISSUE_LIST_MAX
-      )
-    }
-
-    const nextFilterSignature = linearIssueAttributeFilterSignature(linearAttributeFilter)
-    const previousFilterSignature = linearAttributeFilterSignatureRef.current
-    linearAttributeFilterSignatureRef.current = nextFilterSignature
-    const filterForce = shouldForceLinearIssueListRead({
-      previousFilterSignature,
-      nextFilterSignature,
-      refreshForced: false
-    })
-
-    const requestSignature = buildLinearIssueListRequestSignature({
-      sourceContext: linearTaskSourceContext,
-      workspaceId: selectedLinearWorkspaceId,
-      filter: 'all',
-      limit: effectiveLinearIssueLimit,
-      attributeFilter: linearAttributeFilter,
-      searchQuery: searchActive ? trimmed : undefined
-    })
-    const previousRequest = lastLinearRequestRef.current
-    const forceRefresh =
-      filterForce ||
-      (linearRefreshNonce > 0 &&
-        previousRequest?.nonce !== linearRefreshNonce &&
-        previousRequest?.signature === requestSignature)
-    lastLinearRequestRef.current = { nonce: linearRefreshNonce, signature: requestSignature }
-    const shouldProbeOnLanding =
-      !forceRefresh &&
-      cachedResult !== null &&
-      !landingLinearRefreshKeysRef.current.has(requestSignature)
-    if (shouldProbeOnLanding) {
-      landingLinearRefreshKeysRef.current = new Set([
-        ...landingLinearRefreshKeysRef.current,
-        requestSignature
-      ])
-    }
-
-    // Why: cached rows should remain visible on navigation. Only an explicit
-    // refresh or a true cache miss needs the blocking loading state.
-    setLinearLoading(forceRefresh || cachedResult === null)
-
-    const request =
-      readArgs.kind === 'search'
-        ? searchLinearIssues(readArgs.query, LINEAR_ITEM_LIMIT, {
-            force: forceRefresh || shouldProbeOnLanding,
-            sourceContext: linearTaskSourceContext
-          })
-        : listLinearIssues(listReadArgs, {
-            force: forceRefresh || shouldProbeOnLanding,
-            sourceContext: linearTaskSourceContext
-          })
-
-    void request
-      .then((result) => {
-        if (
-          cancelled ||
-          lastLinearRequestRef.current?.signature !== requestSignature ||
-          lastLinearRequestRef.current?.nonce !== linearRefreshNonce
-        ) {
-          return
-        }
-        if (readArgs.kind === 'search') {
-          const issues = result as LinearIssue[]
-          setLinearIssuesHasMore(false)
-          if (shouldProbeOnLanding) {
-            setLinearIssues((current) =>
-              reconcileTaskPageLinearIssuesAfterLandingRefresh(current, issues)
-            )
-          } else {
-            setLinearIssues(issues)
-          }
-        } else {
-          const collection = result as LinearCollectionResult<LinearIssue>
-          setLinearIssuesHasMore(
-            Boolean(collection.hasMore) && effectiveLinearIssueLimit < LINEAR_ISSUE_LIST_MAX
-          )
-          setLinearIssues((current) =>
-            shouldProbeOnLanding
-              ? reconcileTaskPageLinearIssuesAfterLandingRefresh(current, collection.items)
-              : collection.items
-          )
-        }
-        setLinearLoading(false)
-      })
-      .catch((err) => {
-        if (
-          cancelled ||
-          lastLinearRequestRef.current?.signature !== requestSignature ||
-          lastLinearRequestRef.current?.nonce !== linearRefreshNonce
-        ) {
-          return
-        }
-        setLinearError(err instanceof Error ? err.message : 'Failed to load Linear issues.')
-        setLinearLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-    // Why: searchLinearIssues and listLinearIssues are stable zustand selectors;
-    // depending on them would re-run the effect on unrelated store updates.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    taskSource,
-    linearMode,
-    linearConnected,
-    selectedLinearWorkspaceId,
-    appliedLinearSearch,
-    linearIssueLimit,
-    linearRefreshNonce,
-    linearAttributeFilter,
-    linearListInvalidationVersionForSource,
-    taskResumeApplied,
-    getCachedLinearIssues,
-    linearTaskSourceContext
-  ])
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    const timeout = window.setTimeout(() => {
-      setAppliedLinearProjectSearch(linearProjectSearchInput)
-    }, TASK_SEARCH_DEBOUNCE_MS)
-    return () => window.clearTimeout(timeout)
-  }, [linearProjectSearchInput, taskResumeApplied])
-
-  useEffect(() => {
-    if (!taskResumeApplied || taskSource !== 'linear' || linearMode !== 'projects') {
-      return
-    }
-    if (!linearConnected || selectedLinearProject) {
-      return
-    }
-    let cancelled = false
-    const query = appliedLinearProjectSearch.trim()
-    const cached = getCachedLinearProjects(query || undefined, LINEAR_ITEM_LIMIT, undefined, {
-      sourceContext: linearTaskSourceContext
-    })
-    if (cached) {
-      setLinearProjectsResult(cached)
-    }
-    const force = linearRefreshNonce > 0
-    setLinearProjectsLoading(force || cached === null)
-    setLinearProjectsError(null)
-    void listLinearProjectsFromStore(query || undefined, LINEAR_ITEM_LIMIT, undefined, {
-      force,
-      sourceContext: linearTaskSourceContext
-    })
-      .then((result) => {
-        if (!cancelled) {
-          setLinearProjectsResult(result)
-          setLinearProjectsLoading(false)
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLinearProjectsError(
-            error instanceof Error ? error.message : 'Failed to load projects.'
-          )
-          setLinearProjectsLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    taskResumeApplied,
-    taskSource,
-    linearMode,
-    linearConnected,
-    selectedLinearWorkspaceId,
-    selectedLinearProject,
-    appliedLinearProjectSearch,
-    linearRefreshNonce,
-    getCachedLinearProjects,
-    linearTaskSourceContext
-  ])
-
-  useEffect(() => {
-    if (!selectedLinearProject?.workspaceId) {
-      setSelectedLinearProjectDetail(null)
-      return
-    }
-    let cancelled = false
-    setLinearProjectDetailLoading(true)
-    setLinearProjectDetailError(null)
-    void fetchLinearProject(selectedLinearProject.id, selectedLinearProject.workspaceId, {
-      force: linearRefreshNonce > 0,
-      sourceContext: linearTaskSourceContext
-    })
-      .then((project) => {
-        if (!cancelled) {
-          setSelectedLinearProjectDetail(project)
-          setLinearProjectDetailLoading(false)
-          if (!project) {
-            setSelectedLinearProject(null)
-            setLinearProjectParentView(null)
-            setLinearProjectDetailError(null)
-            setLinearProjectsError('Project was not found.')
-            setTaskResumeState({ linearContext: undefined })
-          }
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLinearProjectDetailError(
-            error instanceof Error ? error.message : 'Failed to load project.'
-          )
-          setLinearProjectDetailLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [
-    fetchLinearProject,
-    linearRefreshNonce,
-    selectedLinearProject,
-    setTaskResumeState,
-    linearTaskSourceContext
-  ])
-
-  useEffect(() => {
-    if (!selectedLinearProject?.workspaceId || linearProjectTab !== 'issues') {
-      return
-    }
-    let cancelled = false
-    setLinearProjectIssuesLoading(true)
-    setLinearProjectIssuesError(null)
-    const effectiveLimit = clampLinearIssueListLimit(linearProjectIssueLimit)
-    void listLinearProjectIssues(
-      selectedLinearProject.id,
-      selectedLinearProject.workspaceId,
-      effectiveLimit,
-      { force: linearRefreshNonce > 0, sourceContext: linearTaskSourceContext }
-    )
-      .then((result) => {
-        if (!cancelled) {
-          setLinearProjectIssuesResult(result)
-          setLinearProjectIssuesLoading(false)
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLinearProjectIssuesError(
-            error instanceof Error ? error.message : 'Failed to load project issues.'
-          )
-          setLinearProjectIssuesLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [
-    linearProjectIssueLimit,
-    linearProjectTab,
-    linearRefreshNonce,
-    listLinearProjectIssues,
-    linearTaskSourceContext,
-    selectedLinearProject
-  ])
-
-  useEffect(() => {
-    if (!taskResumeApplied || taskSource !== 'linear' || linearMode !== 'views') {
-      return
-    }
-    if (!linearConnected || selectedLinearCustomView) {
-      return
-    }
-    let cancelled = false
-    const cachedResults = LINEAR_CUSTOM_VIEW_MODELS.map((model) =>
-      getCachedLinearCustomViews(model, LINEAR_ITEM_LIMIT, undefined, {
-        sourceContext: linearTaskSourceContext
-      })
-    )
-    const allCached = cachedResults.every(
-      (result): result is LinearCollectionResult<LinearCustomViewSummary> => result !== null
-    )
-    if (allCached) {
-      setLinearCustomViewsResult(mergeLinearCollectionResults(cachedResults))
-    }
-    const force = linearRefreshNonce > 0
-    setLinearCustomViewsLoading(force || !allCached)
-    setLinearCustomViewsError(null)
-    // Why: the Views tab already has a Model column, so listing both view
-    // models avoids a second, redundant Issues/Projects switch.
-    void Promise.all(
-      LINEAR_CUSTOM_VIEW_MODELS.map((model) =>
-        listLinearCustomViews(model, LINEAR_ITEM_LIMIT, undefined, {
-          force,
-          sourceContext: linearTaskSourceContext
-        })
-      )
-    )
-      .then((result) => {
-        if (!cancelled) {
-          setLinearCustomViewsResult(mergeLinearCollectionResults(result))
-          setLinearCustomViewsLoading(false)
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLinearCustomViewsError(
-            error instanceof Error ? error.message : 'Failed to load views.'
-          )
-          setLinearCustomViewsLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    taskResumeApplied,
-    taskSource,
-    linearMode,
-    linearConnected,
-    selectedLinearWorkspaceId,
-    selectedLinearCustomView,
-    linearRefreshNonce,
-    getCachedLinearCustomViews,
-    listLinearCustomViews,
-    linearTaskSourceContext
-  ])
-
-  useEffect(() => {
-    if (!selectedLinearCustomView?.workspaceId) {
-      setLinearCustomViewIssuesResult({ items: [] })
-      setLinearCustomViewProjectsResult({ items: [] })
-      return
-    }
-    let cancelled = false
-    setLinearCustomViewContentsLoading(true)
-    setLinearCustomViewContentsError(null)
-    const issueLimit = clampLinearIssueListLimit(linearCustomViewIssueLimit)
-    const request =
-      selectedLinearCustomView.model === 'issue'
-        ? listLinearCustomViewIssues(
-            selectedLinearCustomView.id,
-            selectedLinearCustomView.workspaceId,
-            issueLimit,
-            { force: linearRefreshNonce > 0, sourceContext: linearTaskSourceContext }
-          )
-        : listLinearCustomViewProjects(
-            selectedLinearCustomView.id,
-            selectedLinearCustomView.workspaceId,
-            LINEAR_ITEM_LIMIT,
-            { force: linearRefreshNonce > 0, sourceContext: linearTaskSourceContext }
-          )
-    void request
-      .then((result) => {
-        if (cancelled) {
-          return
-        }
-        if (selectedLinearCustomView.model === 'issue') {
-          setLinearCustomViewIssuesResult(result as LinearCollectionResult<LinearIssue>)
-        } else {
-          setLinearCustomViewProjectsResult(result as LinearCollectionResult<LinearProjectSummary>)
-        }
-        setLinearCustomViewContentsLoading(false)
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setLinearCustomViewContentsError(
-            error instanceof Error ? error.message : 'Failed to load view contents.'
-          )
-          setLinearCustomViewContentsLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [
-    linearRefreshNonce,
-    linearCustomViewIssueLimit,
-    listLinearCustomViewIssues,
-    listLinearCustomViewProjects,
-    linearTaskSourceContext,
-    selectedLinearCustomView
-  ])
-
   useEffect(() => {
     if (!taskResumeApplied || taskSource !== 'linear') {
       return
@@ -4442,44 +3476,29 @@ export default function TaskPage(): React.JSX.Element {
     [openComposerForLinearItem]
   )
 
-  const handleLinearWorkspaceChange = useCallback(
-    (workspaceId: LinearWorkspaceSelection): void => {
-      clearSelectedLinearIssue()
-      setSelectedLinearProject(null)
-      setSelectedLinearProjectDetail(null)
-      setSelectedLinearCustomView(null)
-      setLinearProjectParentView(null)
-      setLinearProjectTab('overview')
-      setLinearProjectsResult({ items: [] })
-      setLinearCustomViewsResult({ items: [] })
-      setLinearProjectIssuesResult({ items: [] })
-      setLinearCustomViewIssuesResult({ items: [] })
-      setLinearCustomViewProjectsResult({ items: [] })
-      setLinearProjectDetailError(null)
-      setLinearProjectsError(null)
-      setLinearCustomViewsError(null)
-      setLinearCustomViewContentsError(null)
-      setTaskResumeState({
-        linearMode,
-        linearContext: undefined
-      })
-      linearContextResumeAttemptedRef.current = false
-      setLinearIssues([])
-      setLinearError(null)
-      setLinearLoading(true)
-      void selectLinearWorkspace(workspaceId)
-        .then(() => {
-          setLinearTeamRefreshNonce((n) => n + 1)
-        })
-        .catch(() => {
-          setLinearLoading(false)
-          toast.error(
-            translate('auto.components.TaskPage.d0d570b306', 'Failed to switch Linear workspace.')
-          )
-        })
-    },
-    [clearSelectedLinearIssue, linearMode, selectLinearWorkspace, setTaskResumeState]
-  )
+  const { handleLinearWorkspaceChange } = useTaskPageLinearWorkspaceChange({
+    linearMode,
+    clearSelectedLinearIssue,
+    setSelectedLinearProject,
+    setSelectedLinearProjectDetail,
+    setSelectedLinearCustomView,
+    setLinearProjectParentView,
+    setLinearProjectTab,
+    setLinearProjectsResult,
+    setLinearProjectsError,
+    setLinearProjectIssuesResult,
+    setLinearProjectDetailError,
+    setLinearCustomViewsResult,
+    setLinearCustomViewsError,
+    setLinearCustomViewIssuesResult,
+    setLinearCustomViewProjectsResult,
+    setLinearCustomViewContentsError,
+    setLinearIssues,
+    setLinearError,
+    setLinearLoading,
+    linearContextResumeAttemptedRef,
+    setLinearTeamRefreshNonce
+  })
 
   const handleLinearTeamSelectionChange = useCallback(
     (next: ReadonlySet<string>, persisted: string[] | null): void => {

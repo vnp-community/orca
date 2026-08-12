@@ -97,6 +97,12 @@ describe('feature interaction writer boundaries', () => {
 
   it('suppresses Tasks surface telemetry for in-page provider switches and detail opens', () => {
     const source = componentSource('TaskPage.tsx')
+    // openLinearDetailPage/openRelatedLinearIssue live in
+    // use-task-page-linear-issue-selection-state.ts (TASK-BIGFILE-241), not
+    // TaskPage.tsx.
+    const linearIssueSelectionSource = componentSource(
+      'use-task-page-linear-issue-selection-state.ts'
+    )
     const suppression = 'recordTasksInteraction: false'
     const githubDetailSection = sourceBetween(
       source,
@@ -105,7 +111,11 @@ describe('feature interaction writer boundaries', () => {
     )
 
     const inPageNavigationSections = [
-      sourceBetween(source, 'const openLinearDetailPage', 'const openRelatedLinearIssue'),
+      sourceBetween(
+        linearIssueSelectionSource,
+        'const openLinearDetailPage',
+        'const openRelatedLinearIssue'
+      ),
       sourceBetween(source, 'taskSourceManuallyChangedRef.current = true', 'void updateSettings')
     ]
 
@@ -179,20 +189,22 @@ describe('feature interaction writer boundaries', () => {
     ).toContain(linearWriter)
 
     const taskPageSections = [
-      sourceBetween(
-        taskPageSource,
-        'const handleLinearBoardDrop',
-        'const toggleLinearDisplayProperty'
-      ),
+      // toggleLinearDisplayProperty moved into use-task-page-linear-issues-state.ts
+      // (TASK-BIGFILE-241); useTaskPageLinearDraftState's call site is the next
+      // stable marker still in TaskPage.tsx after handleLinearBoardDrop.
+      sourceBetween(taskPageSource, 'const handleLinearBoardDrop', 'useTaskPageLinearDraftState('),
       sourceBetween(
         taskPageSource,
         'const handleCreateNewLinearIssue',
         'const openComposerForLinearItem'
       ),
+      // handleLinearWorkspaceChange is now built by use-task-page-linear-workspace-change.ts
+      // (TASK-BIGFILE-241) and destructured at its call site, not declared with
+      // `const handleLinearWorkspaceChange =`.
       sourceBetween(
         taskPageSource,
         'const handleUseLinearItem',
-        'const handleLinearWorkspaceChange'
+        'const { handleLinearWorkspaceChange }'
       )
     ]
     for (const section of taskPageSections) {
