@@ -3,8 +3,30 @@
 **Loại:** Move (cơ học) · **Effort:** M
 **Phụ thuộc:** TASK-BIGFILE-015 (làm sau, để tránh 2 task cùng sửa
 `BrowserPane.tsx` song song và conflict dòng)
-**Status:** ⬜ Todo
+**Status:** ✅ Done
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-010-browserpane.md`
+
+## ⚠️ Kết quả thực thi (2026-08-12)
+
+`BrowserPagePane` thực tế chiếm dòng 649–3,815 (đến hết file, sau khi
+TASK-014/015 đã chạy trước trong cùng phiên) — khớp đúng "component còn lại
+đến hết file" như doc mô tả, ranh giới tuyệt đối lệch so với số dòng gốc
+(2,675–5,841) nhưng đó là hệ quả của việc TASK-014/015 đã xoá bớt phía trên,
+không phải sai lệch ranh giới của bản thân component. Đã co-locate thêm
+`preventAgentSendTargetOutsideDismiss` (giáp ngay trước, chỉ
+`BrowserPagePane` dùng — xem ghi chú ở TASK-015). `BrowserPane.tsx` sau khi
+xoá còn **513 dòng** (không phải ~120 như ước tính — do ~15 hàm/const phụ
+trợ dùng chung giữa Remote/Local phải NẰM LẠI và được export cho cả 2 file
+con import ngược, đúng theo thiết kế "export {...} cho 3 file trên" của
+solution doc, chỉ là số lượng hàm chia sẻ nhiều hơn ước tính "ranh giới rõ
+100%, không chia sẻ state" ban đầu). Toàn bộ các hàm này là pure function,
+không phải module-private state dùng chéo kiểu `ipc/pty.ts`, nên không có
+rủi ro HIGH/CRITICAL. Phát hiện + sửa 1 test phụ thuộc vị trí file:
+`BrowserAnnotationSendMenuContent.test.tsx` đọc source `BrowserPane.tsx` để
+đếm `<BrowserAnnotationSendMenuContent` — đã cập nhật trỏ sang
+`browser-pane-local.tsx` (nơi JSX thực sự nằm sau khi move). `gitnexus
+impact`/`detect_changes` không dùng được (MCP lỗi kết nối, CLI segfault) —
+dùng grep thủ công thay thế.
 
 ## Input
 

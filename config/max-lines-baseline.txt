@@ -225,6 +225,43 @@ inline frontend/src/main/runtime/orca-runtime-terminal-agent-status.ts
 # technique from the composition-pattern Move used elsewhere: no host
 # interface, pure relocate + re-import/re-export, verified entirely by tsc.
 inline frontend/src/main/runtime/orca-runtime-service-types.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-015, BUG-FE-BIGFILE-010): straight
+# verbatim extraction of BrowserPane.tsx's pre-existing RemoteBrowserPagePane
+# component + its Remote*/Pending* types, itself already covered by
+# BrowserPane.tsx's own grandfathered max-lines disable before this move.
+# Further internal splitting is untracked, out of scope per
+# SOLUTION-FE-BIGFILE-010.
+inline frontend/src/renderer/src/components/browser-pane/browser-pane-remote.tsx
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-016, BUG-FE-BIGFILE-010): straight
+# verbatim extraction of BrowserPane.tsx's pre-existing BrowserPagePane
+# component, itself already covered by BrowserPane.tsx's own grandfathered
+# max-lines disable before this move. Further internal splitting is
+# untracked, out of scope per SOLUTION-FE-BIGFILE-010.
+inline frontend/src/renderer/src/components/browser-pane/browser-pane-local.tsx
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-021, BUG-FE-BIGFILE-004): straight
+# verbatim extraction of SourceControl.tsx's pre-existing CommitArea
+# component, itself already covered by SourceControl.tsx's own grandfathered
+# max-lines disable before this move. Internal split tracked in
+# SOLUTION-FE-BIGFILE-004.
+inline frontend/src/renderer/src/components/right-sidebar/source-control-commit-area.tsx
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-030, BUG-FE-BIGFILE-003): straight
+# verbatim extraction of TaskPage.tsx's pre-existing GitHub status/assignee
+# cell components (GHStatusCell, GitHubAssigneeAvatar,
+# GitHubIssueLabelSelector, GitHubIssueAssigneeSelector, GHAssigneesCell),
+# itself already covered by TaskPage.tsx's own grandfathered max-lines
+# disable before this move.
+inline frontend/src/renderer/src/components/task-page-github-assignee-cells.tsx
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-030, BUG-FE-BIGFILE-003): straight
+# verbatim extraction of TaskPage.tsx's pre-existing GitHub review/PR cell
+# components (ReviewChipAvatar, PRReviewCell, PRChecksCell, PRMergeCell) plus
+# private helpers, itself already covered by TaskPage.tsx's own grandfathered
+# max-lines disable before this move.
+inline frontend/src/renderer/src/components/task-page-github-review-cells.tsx
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
@@ -247,3 +284,58 @@ mobile-config src/components/mobile-rich-markdown-editor-html.ts
 mobile-config src/terminal/terminal-accessory-keys.ts
 mobile-config src/terminal/terminal-webview-html.ts
 mobile-config src/transport/rpc-client.ts
+#
+# NEEDS PR REVIEW (added while syncing BUG-FE-BIGFILE-002's orca-runtime.ts
+# split into backend/ and desktop/ — see
+# BUG-FE-BIGFILE-002-orca-runtime.md "Kết quả & điểm dừng"): byte-identical
+# copies of the frontend/ entries directly above/below this block. Correction
+# to a verification gap in that sync — the copy was checked with
+# check-max-lines-ratchet.mjs BEFORE `git add`, when the new files were still
+# untracked and invisible to `git ls-files`, so it silently passed without
+# actually covering these files; caught on a later, correctly-ordered re-run.
+inline backend/src/main/runtime/orca-runtime-tail-buffer.ts
+inline backend/src/main/runtime/orca-runtime-branch-cleanup.ts
+inline backend/src/main/runtime/orca-runtime-mobile-floor.ts
+inline backend/src/main/runtime/orca-runtime-issue-tracking.ts
+inline backend/src/main/runtime/orca-runtime-repo-hooks.ts
+inline backend/src/main/runtime/orca-runtime-linear.ts
+inline backend/src/main/runtime/orca-runtime-project-groups.ts
+inline backend/src/main/runtime/orca-runtime-worktree-base-status.ts
+inline backend/src/main/runtime/orca-runtime-worktree-creation.ts
+inline backend/src/main/runtime/orca-runtime-repo-lifecycle.ts
+inline backend/src/main/runtime/orca-runtime-mobile-session-tabs.ts
+inline backend/src/main/runtime/orca-runtime-mobile-session-terminal.ts
+inline backend/src/main/runtime/orca-runtime-mobile-session-notify.ts
+inline backend/src/main/runtime/orca-runtime-mobile-dictation.ts
+inline backend/src/main/runtime/orca-runtime-headless-terminal.ts
+inline backend/src/main/runtime/orca-runtime-worktree-lineage.ts
+inline backend/src/main/runtime/orca-runtime-pty-title-tracker.ts
+inline backend/src/main/runtime/orca-runtime-terminal-listing.ts
+inline backend/src/main/runtime/orca-runtime-worktree-ps.ts
+inline backend/src/main/runtime/orca-runtime-terminal-waiter.ts
+inline backend/src/main/runtime/orca-runtime-terminal-create.ts
+inline backend/src/main/runtime/orca-runtime-terminal-agent-status.ts
+inline backend/src/main/runtime/orca-runtime-service-types.ts
+inline desktop/src/main/runtime/orca-runtime-tail-buffer.ts
+inline desktop/src/main/runtime/orca-runtime-branch-cleanup.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-floor.ts
+inline desktop/src/main/runtime/orca-runtime-issue-tracking.ts
+inline desktop/src/main/runtime/orca-runtime-repo-hooks.ts
+inline desktop/src/main/runtime/orca-runtime-linear.ts
+inline desktop/src/main/runtime/orca-runtime-project-groups.ts
+inline desktop/src/main/runtime/orca-runtime-worktree-base-status.ts
+inline desktop/src/main/runtime/orca-runtime-worktree-creation.ts
+inline desktop/src/main/runtime/orca-runtime-repo-lifecycle.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-session-tabs.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-session-terminal.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-session-notify.ts
+inline desktop/src/main/runtime/orca-runtime-mobile-dictation.ts
+inline desktop/src/main/runtime/orca-runtime-headless-terminal.ts
+inline desktop/src/main/runtime/orca-runtime-worktree-lineage.ts
+inline desktop/src/main/runtime/orca-runtime-pty-title-tracker.ts
+inline desktop/src/main/runtime/orca-runtime-terminal-listing.ts
+inline desktop/src/main/runtime/orca-runtime-worktree-ps.ts
+inline desktop/src/main/runtime/orca-runtime-terminal-waiter.ts
+inline desktop/src/main/runtime/orca-runtime-terminal-create.ts
+inline desktop/src/main/runtime/orca-runtime-terminal-agent-status.ts
+inline desktop/src/main/runtime/orca-runtime-service-types.ts
