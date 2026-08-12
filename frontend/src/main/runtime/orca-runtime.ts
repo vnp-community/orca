@@ -39,11 +39,11 @@ import { RuntimeTerminalWaiterCommands } from './orca-runtime-terminal-waiter'
 import { RuntimeTerminalCreateCommands } from './orca-runtime-terminal-create'
 import { RuntimePtyDataIngestCommands } from './orca-runtime-pty-data-ingest'
 import { RuntimeTerminalSendCommands } from './orca-runtime-terminal-send'
+import { RuntimeTerminalAgentStatusCommands } from './orca-runtime-terminal-agent-status'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
-  isCursorAgentTitle,
-  isShellProcess
+  isCursorAgentTitle
 } from '../../shared/agent-detection'
 import type { AgentStatus } from '../../shared/agent-detection'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
@@ -52,15 +52,12 @@ import type {
   TerminalSideEffectBatch,
   TerminalSideEffectFact
 } from '../../shared/terminal-side-effect-facts'
-import {
-  AGENT_STATUS_STALE_AFTER_MS,
-  type AgentStatusIpcPayload,
-  type ParsedAgentStatusPayload,
-  type AgentStatusOrchestrationContext,
-  type AgentStatusEntry
+import type {
+  AgentStatusIpcPayload,
+  ParsedAgentStatusPayload,
+  AgentStatusOrchestrationContext
 } from '../../shared/agent-status-types'
 import { hasCompatibleAgentTitleIdentity } from '../../shared/agent-title-owner'
-import { buildOrchestrationTaskDisplayMetadata } from '../../shared/orchestration-task-display'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -107,11 +104,6 @@ import { parseAppSshPtyId } from '../../shared/ssh-pty-id'
 import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import { buildAgentStartupPlan } from '../../shared/tui-agent-startup'
 import { repoIsRemote } from '../../shared/agent-launch-remote'
-import {
-  isAgentForegroundWrapperProcess,
-  isExpectedAgentProcess,
-  recognizeAgentProcess
-} from '../../shared/agent-process-recognition'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
 import {
   resolveTuiAgentLaunchArgs,
@@ -157,11 +149,9 @@ import { advertisedUrlWatcher } from '../ports/advertised-url-watcher'
 import type {
   RuntimeTerminalRead,
   RuntimeTerminalRename,
-  RuntimeTerminalAgentStatus,
   RuntimeTerminalPresentation,
   RuntimeTerminalFocus,
   RuntimeTerminalClose,
-  RuntimeTerminalResolvePane,
   RuntimeStatus,
   RuntimeSyncWindowGraphResult,
   RuntimeTerminalWait,
@@ -237,26 +227,17 @@ import {
   recentTerminalOutputIncludesPath,
   type TerminalTailWaitState,
   branchSelectorMatches,
-  buildTerminalWaitText,
-  classifyAgentTitle,
-  classifyLatestAgentTitle,
-  detectTerminalWaitBlockedReason,
   findResolvedWorktreeIdForPath,
-  getLatestAgentCandidateTitle,
-  getLatestAgentCandidateTitleInfo,
   getLatestLeafTitle,
   getLatestPtyTitle,
   getTerminalState,
   inferWorktreeIdFromPtyId,
-  isKnownReadyPromptPreview,
-  mapExplicitAgentStateToRuntimeTerminalStatus,
   maxTimestamp,
   parseRuntimeWorktreeId,
   readTerminalTail,
   type RetainedTailRedrawCursor,
   runtimePathsEqual,
-  setsEqual,
-  terminalTitleBlocksExplicitAgentStatus
+  setsEqual
 } from './orca-runtime-tail-buffer'
 // Why: OrcaRuntimeService calls the vast majority of tail-buffer.ts's helpers
 // directly throughout its body (terminal-wait detection, agent-title
@@ -581,9 +562,6 @@ function getAgentLaunchPlatformForRepo(
   }
   return isWindowsAbsolutePathLike(repo.path) ? 'win32' : 'linux'
 }
-
-const FOREGROUND_AGENT_WRAPPER_RETRY_INTERVAL_MS = 150
-const FOREGROUND_AGENT_WRAPPER_RETRY_TIMEOUT_MS = 6_500
 
 type RuntimeNotifier = {
   worktreesChanged(repoId: string, renamed?: { oldWorktreeId: string; newWorktreeId: string }): void
@@ -2777,26 +2755,51 @@ export class OrcaRuntimeService {
   // Why: orchestration records the pane key as the remint-stable assignee
   // identity at dispatch time; null (best-effort) rather than throwing so
   // dispatch still works for handles without a resolvable pane.
-  getTerminalPaneKey(handle: string): string | null {
-    return this.getPaneKeyForTerminalHandle(handle)
-  }
+  private readonly terminalAgentStatusCommands = new RuntimeTerminalAgentStatusCommands({
+    getGraph: () => this.graph,
+    getPtyController: () => this.ptyController,
+    getLivePtyForHandle: (handle) => this.getLivePtyForHandle(handle),
+    getLiveLeafForHandle: (handle) => this.getLiveLeafForHandle(handle),
+    getOrchestrationDbIfAvailable: () => this.getOrchestrationDbIfAvailable(),
+    getLeafKey: (tabId, leafId) => this.getLeafKey(tabId, leafId),
+    getRuntimeId: () => this.getRuntimeId(),
+    getLatestAgentStatusByPaneKey: () => this.latestAgentStatusByPaneKey,
+    issuePtyHandle: (pty) => this.issuePtyHandle(pty),
+    issueHandle: (leaf) => this.issueHandle(leaf),
+    getLeavesForPty: (ptyId) => this.getLeavesForPty(ptyId),
+    getAgentStatusSnapshot: () => this.getAgentStatusSnapshotFn?.() ?? []
+  })
 
-  resolveTerminalPane(paneKey: string): RuntimeTerminalResolvePane {
-    // Why: the renderer context menu only knows the stable pane key; main owns
-    // the runtime terminal handle that agents and CLI commands can address.
-    const handle = this.getTerminalHandleForPaneKey(paneKey)
-    if (!handle) {
-      throw new Error('terminal_not_found')
-    }
-    const record = this.graph.handles.get(handle)
-    const parsed = parsePaneKey(paneKey)
-    return {
-      handle,
-      tabId: record?.tabId ?? parsed?.tabId ?? '',
-      leafId: record?.leafId ?? parsed?.leafId ?? '',
-      ptyId: record?.ptyId ?? null
-    }
-  }
+  getTerminalPaneKey: RuntimeTerminalAgentStatusCommands['getTerminalPaneKey'] =
+    this.terminalAgentStatusCommands.getTerminalPaneKey.bind(this.terminalAgentStatusCommands)
+  resolveTerminalPane: RuntimeTerminalAgentStatusCommands['resolveTerminalPane'] =
+    this.terminalAgentStatusCommands.resolveTerminalPane.bind(this.terminalAgentStatusCommands)
+  getTerminalAgentStatus: RuntimeTerminalAgentStatusCommands['getTerminalAgentStatus'] =
+    this.terminalAgentStatusCommands.getTerminalAgentStatus.bind(this.terminalAgentStatusCommands)
+  getAgentStatusForHandle: RuntimeTerminalAgentStatusCommands['getAgentStatusForHandle'] =
+    this.terminalAgentStatusCommands.getAgentStatusForHandle.bind(this.terminalAgentStatusCommands)
+  getAgentStatusOrchestrationContextForPaneKey: RuntimeTerminalAgentStatusCommands['getAgentStatusOrchestrationContextForPaneKey'] =
+    this.terminalAgentStatusCommands.getAgentStatusOrchestrationContextForPaneKey.bind(
+      this.terminalAgentStatusCommands
+    )
+  getAgentStatusTerminalHandleForPaneKey: RuntimeTerminalAgentStatusCommands['getAgentStatusTerminalHandleForPaneKey'] =
+    this.terminalAgentStatusCommands.getAgentStatusTerminalHandleForPaneKey.bind(
+      this.terminalAgentStatusCommands
+    )
+  getAgentStatusLaunchConfigForPaneKey: RuntimeTerminalAgentStatusCommands['getAgentStatusLaunchConfigForPaneKey'] =
+    this.terminalAgentStatusCommands.getAgentStatusLaunchConfigForPaneKey.bind(
+      this.terminalAgentStatusCommands
+    )
+  isTerminalRunningAgent: RuntimeTerminalAgentStatusCommands['isTerminalRunningAgent'] =
+    this.terminalAgentStatusCommands.isTerminalRunningAgent.bind(this.terminalAgentStatusCommands)
+  getTerminalHandleForPaneKey: RuntimeTerminalAgentStatusCommands['getTerminalHandleForPaneKey'] =
+    this.terminalAgentStatusCommands.getTerminalHandleForPaneKey.bind(
+      this.terminalAgentStatusCommands
+    )
+  getAgentStatusOrchestrationContextForHandle: RuntimeTerminalAgentStatusCommands['getAgentStatusOrchestrationContextForHandle'] =
+    this.terminalAgentStatusCommands.getAgentStatusOrchestrationContextForHandle.bind(
+      this.terminalAgentStatusCommands
+    )
 
   async showTerminal(handle: string): Promise<RuntimeTerminalShow> {
     const pty = this.getLivePtyForHandle(handle)
@@ -2859,176 +2862,6 @@ export class OrcaRuntimeService {
   sendTerminalAgentPrompt: RuntimeTerminalSendCommands['sendTerminalAgentPrompt'] =
     this.terminalSendCommands.sendTerminalAgentPrompt.bind(this.terminalSendCommands)
 
-  async getTerminalAgentStatus(handle: string): Promise<RuntimeTerminalAgentStatus> {
-    const ptyId = this.getTerminalAgentStatusPtyId(handle)
-    const terminal = this.getTerminalAgentStatusSnapshot(handle, ptyId)
-    const explicitStatus = this.getFreshExplicitAgentStatusForHandle(handle)
-    const blockedByWaitText = detectTerminalWaitBlockedReason(terminal.waitText)
-    const liveTitleClearsBlockedText =
-      terminal.titleStatusIsLive &&
-      terminal.titleStatus !== null &&
-      terminal.titleStatus !== 'permission'
-    if (terminal.titleStatus === 'permission' && terminal.titleStatusIsLive) {
-      return { handle, isRunningAgent: true, status: 'permission' }
-    }
-    if (
-      blockedByWaitText &&
-      !liveTitleClearsBlockedText &&
-      (!explicitStatus ||
-        explicitStatus.status === 'permission' ||
-        (terminal.waitBlockedAt !== null && terminal.waitBlockedAt >= explicitStatus.updatedAt))
-    ) {
-      return { handle, isRunningAgent: true, status: 'permission' }
-    }
-    if (explicitStatus) {
-      // Why: permission titles can linger after hooks report the agent resumed.
-      // Fresh hook state is tighter, but current shell/management evidence wins.
-      const isRunningAgent =
-        !terminalTitleBlocksExplicitAgentStatus(terminal.title) &&
-        !(await this.terminalHasShellForegroundProcess(handle, ptyId))
-      this.assertTerminalAgentStatusPtyBinding(handle, ptyId)
-      return {
-        handle,
-        isRunningAgent,
-        status: isRunningAgent ? explicitStatus.status : null
-      }
-    }
-    if (terminal.titleStatus) {
-      return { handle, isRunningAgent: true, status: terminal.titleStatus }
-    }
-
-    const isRunningAgent = await this.isTerminalRunningAgent(handle)
-    this.assertTerminalAgentStatusPtyBinding(handle, ptyId)
-    return { handle, isRunningAgent, status: null }
-  }
-
-  private getTerminalAgentStatusPtyId(handle: string): string {
-    const pty = this.getLivePtyForHandle(handle)
-    if (pty) {
-      if (!pty.pty.connected) {
-        throw new Error('terminal_gone')
-      }
-      return pty.pty.ptyId
-    }
-    const { leaf } = this.getLiveLeafForHandle(handle)
-    if (getTerminalState(leaf) !== 'running') {
-      throw new Error('terminal_exited')
-    }
-    if (!leaf.ptyId) {
-      throw new Error('terminal_gone')
-    }
-    return leaf.ptyId
-  }
-
-  private assertTerminalAgentStatusPtyBinding(handle: string, expectedPtyId: string): void {
-    if (this.getTerminalAgentStatusPtyId(handle) === expectedPtyId) {
-      return
-    }
-    // Why: delayed process evidence belongs only to the PTY that started the
-    // read, while callers still rely on the established stale-handle contract.
-    throw new Error('terminal_handle_stale')
-  }
-
-  private getTerminalAgentStatusSnapshot(
-    handle: string,
-    expectedPtyId: string
-  ): {
-    waitText: string
-    waitBlockedAt: number | null
-    title: string | null
-    titleStatus: AgentStatus | null
-    titleStatusIsLive: boolean
-  } {
-    const pty = this.getLivePtyForHandle(handle)
-    if (pty) {
-      if (!pty.pty.connected || pty.pty.ptyId !== expectedPtyId) {
-        throw new Error('terminal_not_writable')
-      }
-      const leaf = this.getPrimaryLeafForPty(pty.pty.ptyId)
-      const leafTitle = leaf
-        ? getLatestAgentCandidateTitleInfo(
-            { title: leaf.paneTitle, updatedAt: leaf.paneTitleUpdatedAt },
-            { title: leaf.lastOscTitle, updatedAt: leaf.lastOscTitleAt }
-          )
-        : null
-      const ptyTitle =
-        leafTitle ??
-        getLatestAgentCandidateTitleInfo(
-          { title: pty.pty.title, updatedAt: pty.pty.titleUpdatedAt },
-          { title: pty.pty.lastOscTitle, updatedAt: pty.pty.lastOscTitleAt }
-        )
-      const waitText = buildTerminalWaitText(
-        pty.pty.tailBuffer,
-        pty.pty.tailPartialLine,
-        pty.pty.preview
-      )
-      return {
-        waitText,
-        waitBlockedAt: pty.pty.waitBlockedAt,
-        title: ptyTitle?.title ?? null,
-        titleStatus: ptyTitle
-          ? detectAgentStatusFromTitle(ptyTitle.title)
-          : pty.pty.lastAgentStatus,
-        titleStatusIsLive: ptyTitle !== null
-      }
-    }
-
-    const { leaf } = this.getLiveLeafForHandle(handle)
-    if (getTerminalState(leaf) !== 'running') {
-      throw new Error('terminal_exited')
-    }
-    if (!leaf.ptyId) {
-      throw new Error('terminal_gone')
-    }
-    if (leaf.ptyId !== expectedPtyId) {
-      throw new Error('terminal_not_writable')
-    }
-    const title = getLatestAgentCandidateTitleInfo(
-      { title: leaf.paneTitle, updatedAt: leaf.paneTitleUpdatedAt },
-      { title: leaf.lastOscTitle, updatedAt: leaf.lastOscTitleAt },
-      { title: this.graph.tabs.get(leaf.tabId)?.title, updatedAt: 0 }
-    )
-    return {
-      waitText: buildTerminalWaitText(leaf.tailBuffer, leaf.tailPartialLine, leaf.preview),
-      waitBlockedAt: leaf.waitBlockedAt,
-      title: title?.title ?? null,
-      titleStatus: title ? detectAgentStatusFromTitle(title.title) : leaf.lastAgentStatus,
-      titleStatusIsLive: (title?.updatedAt ?? 0) > 0
-    }
-  }
-
-  private async terminalHasShellForegroundProcess(handle: string, ptyId: string): Promise<boolean> {
-    if (!this.ptyController) {
-      return false
-    }
-    let foregroundProcess: string | null
-    try {
-      foregroundProcess = await this.ptyController.getForegroundProcess(ptyId)
-    } catch {
-      this.assertTerminalAgentStatusPtyBinding(handle, ptyId)
-      return false
-    }
-    this.assertTerminalAgentStatusPtyBinding(handle, ptyId)
-    if (!foregroundProcess || !isShellProcess(foregroundProcess)) {
-      return false
-    }
-    const confirmationController = this.ptyController
-    if (!confirmationController?.confirmForegroundProcess) {
-      return true
-    }
-    let confirmedProcess: string | null
-    try {
-      confirmedProcess = await confirmationController.confirmForegroundProcess(ptyId)
-    } catch {
-      this.assertTerminalAgentStatusPtyBinding(handle, ptyId)
-      return true
-    }
-    this.assertTerminalAgentStatusPtyBinding(handle, ptyId)
-    // Why: hook identity is generic; strong provider evidence only needs to
-    // prove that some recognized agent still owns this exact PTY.
-    return recognizeAgentProcess(confirmedProcess) === null
-  }
-
   private shouldDelayPtyBackedMobileSnapshotForForegroundAgent(
     pty: RuntimePtyWorktreeRecord,
     title: string
@@ -3067,49 +2900,6 @@ export class OrcaRuntimeService {
     this.ptyForegroundAgentRefreshCommands.refreshPtyForegroundAgentFromController.bind(
       this.ptyForegroundAgentRefreshCommands
     )
-
-  private getFreshExplicitAgentStatusForHandle(handle: string): {
-    status: NonNullable<RuntimeTerminalAgentStatus['status']>
-    updatedAt: number
-  } | null {
-    const paneKey = this.getPaneKeyForTerminalHandle(handle)
-    const now = Date.now()
-    let bestStatus: NonNullable<RuntimeTerminalAgentStatus['status']> | null = null
-    let bestUpdatedAt = -1
-
-    const consider = (
-      state: AgentStatusEntry['state'] | undefined,
-      updatedAt: number | null | undefined
-    ): void => {
-      if (!state) {
-        return
-      }
-      if (typeof updatedAt !== 'number' || now - updatedAt > AGENT_STATUS_STALE_AFTER_MS) {
-        return
-      }
-      const status = mapExplicitAgentStateToRuntimeTerminalStatus(state)
-      // Why: older retained permission rows can remain visible after the agent
-      // resumes. Prefer the newest explicit state; only let permission win ties.
-      if (updatedAt > bestUpdatedAt || (updatedAt === bestUpdatedAt && status === 'permission')) {
-        bestStatus = status
-        bestUpdatedAt = updatedAt
-      }
-    }
-
-    if (paneKey) {
-      const retained = this.latestAgentStatusByPaneKey.get(paneKey)
-      consider(retained?.payload.state, retained?.updatedAt)
-    }
-
-    for (const entry of this.getAgentStatusSnapshotFn?.() ?? []) {
-      if (entry.terminalHandle !== handle && (!paneKey || entry.paneKey !== paneKey)) {
-        continue
-      }
-      consider(entry.state, entry.receivedAt)
-    }
-
-    return bestStatus ? { status: bestStatus, updatedAt: bestUpdatedAt } : null
-  }
 
   private readonly terminalWaiterCommands = new RuntimeTerminalWaiterCommands({
     getGraph: () => this.graph,
@@ -5057,43 +4847,6 @@ export class OrcaRuntimeService {
 
   // Why: group address resolution (Section 4.5) needs to query per-handle agent
   // status without throwing on stale handles, so this returns null on any error.
-  getAgentStatusForHandle(handle: string): string | null {
-    try {
-      const ptyId = this.getTerminalAgentStatusPtyId(handle)
-      return this.getTerminalAgentStatusSnapshot(handle, ptyId).titleStatus
-    } catch {
-      return null
-    }
-  }
-
-  getAgentStatusOrchestrationContextForPaneKey(
-    paneKey: string
-  ): AgentStatusOrchestrationContext | undefined {
-    const handle = this.getTerminalHandleForPaneKey(paneKey)
-    if (!handle) {
-      return undefined
-    }
-    return this.getAgentStatusOrchestrationContextForHandle(handle)
-  }
-
-  getAgentStatusTerminalHandleForPaneKey(paneKey: string): string | undefined {
-    return this.getTerminalHandleForPaneKey(paneKey) ?? undefined
-  }
-
-  getAgentStatusLaunchConfigForPaneKey(
-    paneKey: string,
-    args?: { launchToken?: string }
-  ): SleepingAgentLaunchConfig | undefined {
-    const pty = this.getPtyRecordForPaneKey(paneKey)
-    if (!pty?.launchConfig) {
-      return undefined
-    }
-    if (pty.launchToken === null || pty.launchToken !== args?.launchToken) {
-      return undefined
-    }
-    return copySleepingAgentLaunchConfig(pty.launchConfig)
-  }
-
   private getOrchestrationDbIfAvailable(): OrchestrationDb | null {
     try {
       return this._orchestrationDb ?? this.getOrchestrationDb()
@@ -5133,117 +4886,6 @@ export class OrcaRuntimeService {
     return Object.keys(contexts).length > 0 ? contexts : undefined
   }
 
-  private getAgentStatusOrchestrationContextForHandle(
-    handle: string,
-    db = this.getOrchestrationDbIfAvailable()
-  ): AgentStatusOrchestrationContext | undefined {
-    // Why: active dispatches are authoritative for reused terminals. Completed
-    // context is only useful while the corresponding done/recent row can still
-    // be visible; after that it would stale-group unrelated future work.
-    const dispatch =
-      db?.getActiveDispatchForTerminal?.(handle) ??
-      this.getRecentCompletedDispatchForTerminal(handle, db)
-    if (!dispatch) {
-      return undefined
-    }
-    const task = db?.getTask?.(dispatch.task_id)
-    const display =
-      typeof task?.spec === 'string'
-        ? buildOrchestrationTaskDisplayMetadata({
-            spec: task.spec,
-            taskTitle: task.task_title,
-            displayName: task.display_name
-          })
-        : { taskTitle: '', displayName: '' }
-    const activeRun = dispatch.status === 'completed' ? undefined : db?.getActiveCoordinatorRun?.()
-    const parentTerminalHandle =
-      task?.created_by_terminal_handle ??
-      (activeRun?.coordinator_handle && activeRun.coordinator_handle !== handle
-        ? activeRun.coordinator_handle
-        : undefined)
-    const parentPaneKey = parentTerminalHandle
-      ? this.getPaneKeyForTerminalHandle(parentTerminalHandle)
-      : undefined
-
-    return {
-      taskId: dispatch.task_id,
-      dispatchId: dispatch.id,
-      ...(display.taskTitle ? { taskTitle: display.taskTitle } : {}),
-      ...(display.displayName ? { displayName: display.displayName } : {}),
-      ...(parentTerminalHandle ? { parentTerminalHandle } : {}),
-      ...(parentPaneKey ? { parentPaneKey } : {}),
-      ...(activeRun?.coordinator_handle ? { coordinatorHandle: activeRun.coordinator_handle } : {}),
-      ...(activeRun?.id ? { orchestrationRunId: activeRun.id } : {})
-    }
-  }
-
-  private getRecentCompletedDispatchForTerminal(
-    handle: string,
-    db = this.getOrchestrationDbIfAvailable()
-  ): ReturnType<OrchestrationDb['getLatestDispatchForTerminal']> {
-    const dispatch = db?.getLatestDispatchForTerminal?.(handle)
-    if (dispatch?.status !== 'completed' || !dispatch.completed_at) {
-      return undefined
-    }
-    const completedAtMs = Date.parse(
-      dispatch.completed_at.includes('T')
-        ? dispatch.completed_at
-        : `${dispatch.completed_at.replace(' ', 'T')}Z`
-    )
-    if (!Number.isFinite(completedAtMs)) {
-      return undefined
-    }
-    return Date.now() - completedAtMs <= AGENT_STATUS_STALE_AFTER_MS ? dispatch : undefined
-  }
-
-  private getTerminalHandleForPaneKey(paneKey: string): string | null {
-    const parsed = parsePaneKey(paneKey)
-    if (parsed) {
-      const leaf = this.graph.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId))
-      if (leaf?.ptyId) {
-        return this.issueHandle(leaf)
-      }
-    }
-    for (const pty of this.graph.ptysById.values()) {
-      if (pty.paneKey === paneKey) {
-        return this.issuePtyHandle(pty)
-      }
-    }
-    return null
-  }
-
-  private getPtyRecordForPaneKey(paneKey: string): RuntimePtyWorktreeRecord | null {
-    const parsed = parsePaneKey(paneKey)
-    if (parsed) {
-      const leaf = this.graph.leaves.get(this.getLeafKey(parsed.tabId, parsed.leafId))
-      const pty = leaf?.ptyId ? this.graph.ptysById.get(leaf.ptyId) : undefined
-      if (pty) {
-        return pty
-      }
-    }
-    for (const pty of this.graph.ptysById.values()) {
-      if (pty.paneKey === paneKey) {
-        return pty
-      }
-    }
-    return null
-  }
-
-  private getPaneKeyForTerminalHandle(handle: string): string | null {
-    const livePty = this.getLivePtyForHandle(handle)
-    if (livePty?.pty.paneKey) {
-      return livePty.pty.paneKey
-    }
-    const record = this.graph.handles.get(handle)
-    if (!record || record.runtimeId !== this.runtimeId) {
-      return null
-    }
-    if (!isTerminalLeafId(record.leafId)) {
-      return null
-    }
-    return makePaneKey(record.tabId, record.leafId)
-  }
-
   private setPtyManagementTitleFromObservedTitle(
     pty: RuntimePtyWorktreeRecord,
     title: string | null | undefined,
@@ -5276,168 +4918,6 @@ export class OrcaRuntimeService {
   // Claude management title is negative evidence for task-capable activity.
   // Check pane-scoped titles before tab fallback, then retained ready-tail text,
   // stale title status, and foreground process.
-  async isTerminalRunningAgent(handle: string): Promise<boolean> {
-    try {
-      const pty = this.getLivePtyForHandle(handle)
-      if (pty) {
-        const leaf = this.getPrimaryLeafForPty(pty.pty.ptyId)
-        return await this.isPtyRunningAgent(pty.pty, leaf)
-      }
-      const { leaf } = this.getLiveLeafForHandle(handle)
-      // Why: check both the leaf-level pane title (synced from the renderer's
-      // runtimePaneTitlesByTabId) and the tab-level title. The tab title already
-      // includes OSC-enriched agent indicators (e.g. ✳ prefix) synced from the
-      // renderer's xterm instance.
-      const paneTitle = getLatestLeafTitle(leaf, null)
-      const paneTitleClassification = classifyAgentTitle(paneTitle)
-      if (paneTitleClassification === 'agent') {
-        return true
-      }
-      const tabTitle = this.graph.tabs.get(leaf.tabId)?.title?.trim() || null
-      const tabTitleClassification = paneTitle === null ? classifyAgentTitle(tabTitle) : 'neutral'
-      if (tabTitleClassification === 'agent') {
-        return true
-      }
-      const waitText = buildTerminalWaitText(leaf.tailBuffer, leaf.tailPartialLine, leaf.preview)
-      if (isKnownReadyPromptPreview(waitText)) {
-        return true
-      }
-      const hasCurrentTitleEvidence = paneTitle !== null || tabTitle !== null
-      if (leaf.lastAgentStatus !== null && !hasCurrentTitleEvidence) {
-        return true
-      }
-      if (!leaf.ptyId || !this.ptyController) {
-        return false
-      }
-      const fg = await this.ptyController.getForegroundProcess(leaf.ptyId)
-      if (!fg) {
-        return false
-      }
-      // Why: Claude's management UI runs under the Claude process but is not a
-      // task-capable agent session. Suppress that process only; another foreground
-      // agent can take over before titles update.
-      const shouldSuppressClaudeForeground =
-        paneTitleClassification === 'management' || tabTitleClassification === 'management'
-      if (shouldSuppressClaudeForeground && isExpectedAgentProcess(fg, 'claude')) {
-        return false
-      }
-      // Why: review-note delivery auto-submits with Enter. A generic non-shell
-      // TUI can be focused in a terminal, but only known agent processes are safe.
-      return await this.isRecognizedForegroundAgentProcess(leaf.ptyId, fg, {
-        suppressClaude: shouldSuppressClaudeForeground
-      })
-    } catch {
-      return false
-    }
-  }
-
-  private async isPtyRunningAgent(
-    pty: RuntimePtyWorktreeRecord,
-    leaf: RuntimeLeafRecord | null = null
-  ): Promise<boolean> {
-    const leafTitle = leaf
-      ? getLatestAgentCandidateTitle(
-          { title: leaf.paneTitle, updatedAt: leaf.paneTitleUpdatedAt },
-          { title: leaf.lastOscTitle, updatedAt: leaf.lastOscTitleAt }
-        )
-      : null
-    const leafTitleClassification = classifyAgentTitle(leafTitle)
-    if (leafTitleClassification === 'agent') {
-      return true
-    }
-    const ptyTitle = getLatestAgentCandidateTitle(
-      { title: pty.title, updatedAt: pty.titleUpdatedAt },
-      { title: pty.lastOscTitle, updatedAt: pty.lastOscTitleAt }
-    )
-    const ptyTitleClassification = classifyAgentTitle(ptyTitle)
-    if (leafTitle === null && ptyTitleClassification === 'agent') {
-      return true
-    }
-    const managementTitleClassification = classifyLatestAgentTitle({
-      title: pty.managementTitle,
-      updatedAt: pty.managementTitleAt
-    })
-    const waitText = buildTerminalWaitText(pty.tailBuffer, pty.tailPartialLine, pty.preview)
-    if (isKnownReadyPromptPreview(waitText)) {
-      return true
-    }
-    // Why: stale status is only a fallback when no current title evidence
-    // exists; neutral titles such as shells should clear it.
-    if (
-      pty.lastAgentStatus !== null &&
-      leafTitle === null &&
-      ptyTitle === null &&
-      managementTitleClassification !== 'management'
-    ) {
-      return true
-    }
-    if (!this.ptyController) {
-      return false
-    }
-    const fg = await this.ptyController.getForegroundProcess(pty.ptyId)
-    if (!fg) {
-      return false
-    }
-    const shouldSuppressClaudeForeground =
-      leafTitle !== null
-        ? leafTitleClassification === 'management'
-        : managementTitleClassification === 'management'
-    if (shouldSuppressClaudeForeground && isExpectedAgentProcess(fg, 'claude')) {
-      return false
-    }
-    // Why: review-note delivery auto-submits with Enter. A generic non-shell
-    // TUI can be focused in a terminal, but only known agent processes are safe.
-    return await this.isRecognizedForegroundAgentProcess(pty.ptyId, fg, {
-      suppressClaude: shouldSuppressClaudeForeground
-    })
-  }
-
-  private async isRecognizedForegroundAgentProcess(
-    ptyId: string,
-    foregroundProcess: string,
-    options: { suppressClaude?: boolean } = {}
-  ): Promise<boolean> {
-    const initialRecognition = recognizeAgentProcess(foregroundProcess)
-    if (initialRecognition !== null) {
-      return !(
-        options.suppressClaude === true &&
-        isExpectedAgentProcess(initialRecognition.processName, 'claude')
-      )
-    }
-    if (!this.isAgentWrapperForegroundProcess(foregroundProcess) || !this.ptyController) {
-      return false
-    }
-    const startedAt = Date.now()
-    while (Date.now() - startedAt < FOREGROUND_AGENT_WRAPPER_RETRY_TIMEOUT_MS) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, FOREGROUND_AGENT_WRAPPER_RETRY_INTERVAL_MS)
-      )
-      const refreshedProcess = await this.ptyController.getForegroundProcess(ptyId)
-      const refreshedRecognition = recognizeAgentProcess(refreshedProcess)
-      if (refreshedRecognition !== null) {
-        return !(
-          options.suppressClaude === true &&
-          isExpectedAgentProcess(refreshedRecognition.processName, 'claude')
-        )
-      }
-      if (!refreshedProcess || !this.isAgentWrapperForegroundProcess(refreshedProcess)) {
-        return false
-      }
-    }
-    return false
-  }
-
-  private isAgentWrapperForegroundProcess(processName: string): boolean {
-    // Why: daemon/SSH PTYs can report the interpreter before their async
-    // command-line cache resolves to the actual agent binary. Retry only
-    // known wrappers, never arbitrary non-shell TUIs.
-    return isAgentForegroundWrapperProcess(processName)
-  }
-
-  private getPrimaryLeafForPty(ptyId: string): RuntimeLeafRecord | null {
-    return this.getLeavesForPty(ptyId)[0] ?? null
-  }
-
   private readonly terminalMessageWaiterCommands = new RuntimeTerminalMessageWaiterCommands({
     getLiveLeafForHandle: (handle) => this.getLiveLeafForHandle(handle),
     deliverPendingMessages: (leaf) => this.deliverPendingMessages(leaf)

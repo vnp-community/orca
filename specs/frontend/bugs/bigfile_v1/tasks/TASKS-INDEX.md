@@ -103,6 +103,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 73 | [TASK-BIGFILE-073](./TASK-BIGFILE-073-orca-runtime-terminal-create-domain.md) | Move (composition) — cụm entangled nhất (26 host dep) | `orca-runtime.ts` → `orca-runtime-terminal-create.ts` | L | 36, 37, 40, 51, 52 | ✅ |
 | 74 | [TASK-BIGFILE-074](./TASK-BIGFILE-074-orca-runtime-pty-data-ingest-domain.md) | Move (composition) — rủi ro cao nhất, hot path cao tần nhất file | `orca-runtime.ts` → `orca-runtime-pty-data-ingest.ts` | L | 51, 63, 64, 67, 68, 69 | ✅ |
 | 75 | [TASK-BIGFILE-075](./TASK-BIGFILE-075-orca-runtime-terminal-send-domain.md) | Move (composition) — rủi ro thấp, 3 host dep | `orca-runtime.ts` → `orca-runtime-terminal-send.ts` | M | — | ✅ |
+| 76 | [TASK-BIGFILE-076](./TASK-BIGFILE-076-orca-runtime-terminal-agent-status-domain.md) | Move (composition) — 22 method, 5 đoạn, phát hiện 2 lỗi thật | `orca-runtime.ts` → `orca-runtime-terminal-agent-status.ts` | L | 51, 65, 67, 71, 73 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
