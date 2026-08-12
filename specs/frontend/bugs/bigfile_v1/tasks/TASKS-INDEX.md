@@ -124,7 +124,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 239 | [TASK-BIGFILE-239](./TASK-BIGFILE-239-taskpage-linear-draft-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearDraftState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
 | 240 | [TASK-BIGFILE-240](./TASK-BIGFILE-240-taskpage-linear-teams-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearTeamsState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
 | 241 | [TASK-BIGFILE-241](./TASK-BIGFILE-241-taskpage-linear-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearBrowseState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
-| 250 | [TASK-BIGFILE-250](./TASK-BIGFILE-250-ipc-pty-pane-key-registry-investigate.md) | Investigate | `ipc/pty.ts` pane-key-registry + provider-resolution state | L | thay thế 1–7 | ⬜ (sinh 251, 252 — cả 3 chưa thực thi) |
+| 250 | [TASK-BIGFILE-250](./TASK-BIGFILE-250-ipc-pty-pane-key-registry-investigate.md) | Investigate | `ipc/pty.ts` pane-key-registry + provider-resolution state | L | thay thế 1–7 | ✅ (ghi chú thiết kế xong, sinh 251, 252 — `d64ff6d7c`) |
 | 251 | [TASK-BIGFILE-251](./TASK-BIGFILE-251-ipc-pty-host-env.md) | Move | `ipc/pty.ts` → `pty-host-env.ts` (phạm vi đã sửa) | — | 250 | ⬜ (chưa thực thi) |
 | 252 | [TASK-BIGFILE-252](./TASK-BIGFILE-252-ipc-pty-pane-key-registry.md) | Move (composition) | `ipc/pty.ts` → `pty-pane-key-registry.ts` (object/class) | — | 250 | ⬜ (chưa thực thi) |
 
