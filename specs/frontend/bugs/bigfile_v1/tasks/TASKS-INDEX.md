@@ -108,6 +108,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 78 | [TASK-BIGFILE-078](./TASK-BIGFILE-078-orca-runtime-service-types-extract.md) | Extract (pure type/function, KHÔNG composition) — giảm 635 dòng | `orca-runtime.ts` → `orca-runtime-service-types.ts` | L | — | ✅ |
 | 79 | [TASK-BIGFILE-079](./TASK-BIGFILE-079-orca-runtime-post-class-extract.md) | Extract (pure const/function, cuối file) | `orca-runtime.ts` → `orca-runtime-service-types.ts` | S | 78 | ✅ |
 | 80 | [TASK-BIGFILE-080](./TASK-BIGFILE-080-orca-runtime-sync-window-graph-domain.md) | Move (composition) — rủi ro cao, graph-sync hot path | `orca-runtime.ts` → `orca-runtime-sync-window-graph.ts` | M | 41 | ✅ |
+| 81 | [TASK-BIGFILE-081](./TASK-BIGFILE-081-orca-runtime-worktree-terminal-stop-domain.md) | Move (composition) — rủi ro trung bình | `orca-runtime.ts` → `orca-runtime-worktree-terminal-stop.ts` | M | — | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn

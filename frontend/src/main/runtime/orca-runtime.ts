@@ -42,6 +42,7 @@ import { RuntimeTerminalSendCommands } from './orca-runtime-terminal-send'
 import { RuntimeTerminalAgentStatusCommands } from './orca-runtime-terminal-agent-status'
 import { RuntimePtyExitCommands } from './orca-runtime-pty-exit'
 import { RuntimeSyncWindowGraphCommands } from './orca-runtime-sync-window-graph'
+import { RuntimeWorktreeTerminalStopCommands } from './orca-runtime-worktree-terminal-stop'
 import { detectAgentStatusFromTitle, isClaudeManagementTitle } from '../../shared/agent-detection'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { TerminalSideEffectBatch } from '../../shared/terminal-side-effect-facts'
@@ -195,8 +196,7 @@ import {
   maxTimestamp,
   parseRuntimeWorktreeId,
   readTerminalTail,
-  runtimePathsEqual,
-  setsEqual
+  runtimePathsEqual
 } from './orca-runtime-tail-buffer'
 // Why: OrcaRuntimeService calls the vast majority of tail-buffer.ts's helpers
 // directly throughout its body (terminal-wait detection, agent-title
@@ -3057,158 +3057,29 @@ export class OrcaRuntimeService {
     })
   }
 
-  async stopTerminalsForWorktree(worktreeSelector: string): Promise<{ stopped: number }> {
-    // Why: this mutates live PTYs, so the runtime must reject it while the
-    // renderer graph is reloading instead of acting on cached leaf ownership.
-    const graphEpoch = this.captureReadyGraphEpoch()
-    const worktree = await this.resolveWorktreeSelector(worktreeSelector)
-    this.assertStableReadyGraph(graphEpoch)
-    const ptyIds = new Set<string>()
-    for (const leaf of this.graph.leaves.values()) {
-      if (leaf.worktreeId === worktree.id && leaf.ptyId) {
-        ptyIds.add(leaf.ptyId)
-      }
-    }
-    for (const pty of this.graph.ptysById.values()) {
-      if (pty.worktreeId === worktree.id && pty.connected) {
-        ptyIds.add(pty.ptyId)
-      }
-    }
+  private readonly worktreeTerminalStopCommands = new RuntimeWorktreeTerminalStopCommands({
+    getGraph: () => this.graph,
+    getPtyController: () => this.ptyController,
+    resolveWorktreeSelector: (selector) => this.resolveWorktreeSelector(selector),
+    captureReadyGraphEpoch: () => this.captureReadyGraphEpoch(),
+    assertStableReadyGraph: (expectedGraphEpoch) => this.assertStableReadyGraph(expectedGraphEpoch),
+    refreshPtyWorktreeRecordsFromController: (resolvedWorktrees, targetWorktreeId) =>
+      this.refreshPtyWorktreeRecordsFromController(resolvedWorktrees, targetWorktreeId),
+    getResolvedWorktreeMap: () => this.getResolvedWorktreeMap()
+  })
 
-    let stopped = 0
-    for (const ptyId of ptyIds) {
-      if (this.ptyController?.kill(ptyId)) {
-        stopped += 1
-      }
-    }
-    return { stopped }
-  }
-
-  async stopExactTerminalsForWorktree(
-    worktreeSelector: string,
-    expectedPtyIds: readonly string[],
-    opts: { keepHistory?: boolean; targetOnly?: boolean } = {}
-  ): Promise<{
-    stopped: number
-    stoppedPtyIds: string[]
-    livePtyIds: string[]
-    postStopVerified: boolean
-    postStopFailure?: string
-    remainingLivePtyIds?: string[]
-  }> {
-    // Why: worktree sleep needs proof of the complete live set; pane hibernation
-    // only needs proof that its target PTY was live and is now gone.
-    const graphEpoch = this.captureReadyGraphEpoch()
-    const worktree = await this.resolveWorktreeSelector(worktreeSelector)
-    this.assertStableReadyGraph(graphEpoch)
-    const expected = new Set(expectedPtyIds.filter((ptyId) => ptyId.length > 0))
-    if (expected.size !== 1) {
-      throw new Error('terminal_exact_stop_requires_single_pty')
-    }
-    const resolvedWorktrees = [...(await this.getResolvedWorktreeMap()).values()]
-    const refreshedPtyLiveness =
-      await this.refreshPtyWorktreeRecordsFromController(resolvedWorktrees)
-    if (!refreshedPtyLiveness) {
-      throw new Error('terminal_liveness_unavailable')
-    }
-    const livePtyIds = this.getLivePtyIdsForWorktree(worktree.id, refreshedPtyLiveness)
-    const targetOnly = opts.targetOnly === true
-    const expectedIsLive = [...expected].every((ptyId) => livePtyIds.has(ptyId))
-    if (targetOnly ? !expectedIsLive : !setsEqual(livePtyIds, expected)) {
-      const error = Object.assign(new Error('terminal_stop_pty_set_mismatch'), {
-        livePtyIds: [...livePtyIds].sort(),
-        expectedPtyIds: [...expected].sort()
-      })
-      throw error
-    }
-
-    if (!this.ptyController?.stopAndWait) {
-      throw new Error('terminal_exact_stop_unavailable')
-    }
-
-    const stoppedPtyIds: string[] = []
-    for (const ptyId of [...expected].sort()) {
-      if (!(await this.ptyController.stopAndWait(ptyId, { keepHistory: opts.keepHistory }))) {
-        throw Object.assign(new Error('terminal_exact_stop_failed'), { ptyId })
-      }
-      stoppedPtyIds.push(ptyId)
-    }
-    const postStopLiveness = await this.refreshPtyWorktreeRecordsFromController(resolvedWorktrees)
-    if (!postStopLiveness) {
-      return {
-        stopped: stoppedPtyIds.length,
-        stoppedPtyIds,
-        livePtyIds: [...livePtyIds].sort(),
-        postStopVerified: false,
-        postStopFailure: 'terminal_liveness_unavailable'
-      }
-    }
-    const remainingLivePtyIds = this.getLivePtyIdsForWorktree(worktree.id, postStopLiveness)
-    const stoppedTargetsStillLive = [...expected].filter((ptyId) => remainingLivePtyIds.has(ptyId))
-    if (targetOnly ? stoppedTargetsStillLive.length > 0 : remainingLivePtyIds.size > 0) {
-      return {
-        stopped: stoppedPtyIds.length,
-        stoppedPtyIds,
-        livePtyIds: [...livePtyIds].sort(),
-        postStopVerified: false,
-        postStopFailure: 'terminal_exact_stop_still_live',
-        remainingLivePtyIds: [...remainingLivePtyIds].sort()
-      }
-    }
-    return {
-      stopped: stoppedPtyIds.length,
-      stoppedPtyIds,
-      livePtyIds: [...livePtyIds].sort(),
-      postStopVerified: true,
-      ...(targetOnly && remainingLivePtyIds.size > 0
-        ? { remainingLivePtyIds: [...remainingLivePtyIds].sort() }
-        : {})
-    }
-  }
-
-  private getLivePtyIdsForWorktree(
-    worktreeId: string,
-    freshPtyIds?: ReadonlySet<string>
-  ): Set<string> {
-    const ptyIds = new Set<string>()
-    for (const leaf of this.graph.leaves.values()) {
-      if (
-        leaf.worktreeId === worktreeId &&
-        leaf.connected &&
-        leaf.ptyId &&
-        (!freshPtyIds || freshPtyIds.has(leaf.ptyId))
-      ) {
-        ptyIds.add(leaf.ptyId)
-      }
-    }
-    for (const pty of this.graph.ptysById.values()) {
-      if (
-        pty.worktreeId === worktreeId &&
-        pty.connected &&
-        (!freshPtyIds || freshPtyIds.has(pty.ptyId))
-      ) {
-        ptyIds.add(pty.ptyId)
-      }
-    }
-    return ptyIds
-  }
-
-  async hasTerminalsForWorktree(worktreeSelector: string): Promise<boolean> {
-    const graphEpoch = this.captureReadyGraphEpoch()
-    const worktree = await this.resolveWorktreeSelector(worktreeSelector)
-    this.assertStableReadyGraph(graphEpoch)
-    for (const leaf of this.graph.leaves.values()) {
-      if (leaf.worktreeId === worktree.id && leaf.ptyId) {
-        return true
-      }
-    }
-    for (const pty of this.graph.ptysById.values()) {
-      if (pty.worktreeId === worktree.id && pty.connected) {
-        return true
-      }
-    }
-    return false
-  }
+  stopTerminalsForWorktree: RuntimeWorktreeTerminalStopCommands['stopTerminalsForWorktree'] =
+    this.worktreeTerminalStopCommands.stopTerminalsForWorktree.bind(
+      this.worktreeTerminalStopCommands
+    )
+  stopExactTerminalsForWorktree: RuntimeWorktreeTerminalStopCommands['stopExactTerminalsForWorktree'] =
+    this.worktreeTerminalStopCommands.stopExactTerminalsForWorktree.bind(
+      this.worktreeTerminalStopCommands
+    )
+  hasTerminalsForWorktree: RuntimeWorktreeTerminalStopCommands['hasTerminalsForWorktree'] =
+    this.worktreeTerminalStopCommands.hasTerminalsForWorktree.bind(
+      this.worktreeTerminalStopCommands
+    )
 
   markRendererReloading(windowId: number): void {
     if (windowId !== this.graph.authoritativeWindowId) {
