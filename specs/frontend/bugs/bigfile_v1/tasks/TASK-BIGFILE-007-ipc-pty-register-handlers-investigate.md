@@ -3,7 +3,7 @@
 **Loại:** Investigate (KHÔNG thực thi split ngay) · **Effort:** M
 **Phụ thuộc:** TASK-BIGFILE-001..006 đã xong (file nguồn lúc này còn ~3,730
 dòng thay vì 5,185)
-**Status:** ⛔ Blocked (chặn bởi 001–006, xem ghi chú dưới)
+**Status:** ⛔ Superseded — xem TASK-BIGFILE-250 (chặn bởi 001–006, xem ghi chú dưới)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-011-ipc-pty.md`
 
 ## ⛔ Blocked (2026-08-10) — chưa thể bắt đầu

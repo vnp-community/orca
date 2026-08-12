@@ -1,6 +1,6 @@
 # TASK-BIGFILE-005 — Move: `pty-renderer-delivery-debug.ts`
 
-**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ⛔ Blocked
+**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ⛔ Superseded — xem TASK-BIGFILE-250
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-011-ipc-pty.md`
 
 ## ⛔ Blocked (2026-08-10) — không thực thi
