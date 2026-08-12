@@ -857,6 +857,20 @@ export function createRemoteRuntimePtyTransport(
         // Why: debounced input is scoped by the current terminal handle at flush time.
         inputBatcher.clear()
       }
+      // FIX BUG-FE-PTY-001 (#13): connectPanePty (pty-connection.ts) prefers
+      // this ATTACH path over connect() whenever a leaf already has a known
+      // remote PTY id (the common case for a host-mirrored leaf whose
+      // sibling local tab just spawned it) -- but only connect()'s
+      // attachHostSessionMirror() ever called claimGraceClose(). A mirror
+      // that attaches here to a handle its sibling's connect() just
+      // scheduleGraceClose()'d never cancels that timer, so
+      // GRACE_CLOSE_DELAY_MS later the PTY gets closed out from under an
+      // actively-attached pane (live repro: transport attaches successfully,
+      // then gets torn down ~5s later with no user action). Claim it here
+      // too, mirroring attachHostSessionMirror()'s call at the same point.
+      if (nextHandle) {
+        claimGraceClose(nextHandle)
+      }
       handle = nextHandle
       if (!handle) {
         connected = false
