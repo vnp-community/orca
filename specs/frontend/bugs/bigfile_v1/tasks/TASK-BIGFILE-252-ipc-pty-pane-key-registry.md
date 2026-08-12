@@ -2,7 +2,7 @@
 
 **Loại:** Move (composition) — rủi ro trung bình, phải sửa đúng 6 điểm thao
 tác Map trực tiếp bên trong `registerPtyHandlers` thành gọi method
-**Effort:** M · **Phụ thuộc:** — · **Status:** ⬜ Chưa làm
+**Effort:** M · **Phụ thuộc:** — · **Status:** ✅ Đã làm
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-011-ipc-pty.md` (mục
 `pty-pane-key-registry.ts` cần viết lại theo task này — bản gốc mô tả 3
 hàm rời, KHÔNG đúng thực tế)

@@ -3,7 +3,7 @@
 **Loại:** Move (cơ học) · **Effort:** M (lớn hơn ước tính gốc của
 TASK-BIGFILE-003 vì phạm vi thực tế rộng hơn — 15 hàm helper thuần + 1 hằng
 số không liền kề, không chỉ `buildPtyHostEnv` một mình)
-**Phụ thuộc:** — · **Status:** ⬜ Chưa làm
+**Phụ thuộc:** — · **Status:** ✅ Đã làm
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-011-ipc-pty.md` (mục
 `pty-host-env.ts` cần cập nhật phạm vi theo task này khi merge)
 **Thay thế:** `TASK-BIGFILE-003` (⛔ Superseded — xem

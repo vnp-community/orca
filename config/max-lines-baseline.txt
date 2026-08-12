@@ -339,3 +339,10 @@ inline desktop/src/main/runtime/orca-runtime-terminal-waiter.ts
 inline desktop/src/main/runtime/orca-runtime-terminal-create.ts
 inline desktop/src/main/runtime/orca-runtime-terminal-agent-status.ts
 inline desktop/src/main/runtime/orca-runtime-service-types.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-251, BUG-FE-BIGFILE-011): straight
+# verbatim extraction of buildPtyHostEnv + 19 co-located host-env helper
+# symbols out of ipc/pty.ts, per the task doc's own designed scope (409
+# counted lines vs 300 budget). Further splitting was out of this Move
+# task's scope.
+inline frontend/src/main/ipc/pty-host-env.ts
