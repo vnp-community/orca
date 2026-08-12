@@ -186,6 +186,17 @@ Investigate — đó chính là lý do nó tách biệt khỏi task Move.
    dự kiến.
 5. 1 task = 1 commit riêng.
 
+## Điểm dừng sau TASK-BIGFILE-082 (2026-08-12)
+
+`orca-runtime.ts`: 26,730 → **4,742 dòng** (82.3%). Move/Extract cạn ứng
+viên; 2 kỹ thuật giảm wiring boilerplate còn lại (TASK-BIGFILE-083 `declare`
+field, TASK-BIGFILE-084 `interface`+`Pick` declaration merging) đều **thất
+bại và bị revert** — #083 vì `oxfmt` triệt tiêu lợi ích sau format thật,
+#084 vì `oxlint` mặc định chặn bằng `no-unsafe-declaration-merging` (rủi ro
+thật, không phải false positive). Không sinh thêm task Move/Extract mới cho
+`orca-runtime.ts` từ đây. Chi tiết đầy đủ:
+`../BUG-FE-BIGFILE-002-orca-runtime.md` → "Kết quả & điểm dừng".
+
 ## Tham khảo
 
 - Chiến lược & thứ tự đầy đủ: `../solutions/SOLUTION-FE-BIGFILE-001-strategy-and-sequencing.md`

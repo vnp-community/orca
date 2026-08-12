@@ -1,7 +1,9 @@
 # BUG-FE-BIGFILE-002 — `orca-runtime.ts` (26,730 dòng) — file lớn nhất `frontend/src`
 
 **Mức độ:** 🔴 Critical
-**Status:** 🔴 Open
+**Status:** 🟡 Paused (2026-08-12) — 26,730 → 4,742 dòng (82.3%), dừng lại vì
+2 kỹ thuật giảm tiếp còn lại đều không an toàn/không hiệu quả thật, xem
+"Kết quả & điểm dừng" ở cuối file
 **Solution:** [SOLUTION-FE-BIGFILE-002](./solutions/SOLUTION-FE-BIGFILE-002-orca-runtime.md)
 **Module:** `frontend/src/main/runtime/orca-runtime.ts`
 **Phát hiện:** 2026-08-10, `scripts/find-frontend-bigfiles.mjs` — xem tổng quan
@@ -84,6 +86,46 @@ grep -n "^export function" ...ts (sau dòng 24786)       → ~15 pure helper fun
      `orca-runtime-automation.ts`.
    - Worktree reconciliation logic → ứng viên tách tiếp theo sau khi 2 domain
      trên đã tách xong (giảm kích thước class đủ để nhìn rõ ranh giới còn lại).
+
+## Kết quả & điểm dừng (2026-08-12)
+
+82 task (TASK-BIGFILE-008, 009, 035–082) đưa `orca-runtime.ts` từ 26,730 →
+**4,742 dòng** (giảm 82.3%) bằng 2 kỹ thuật đã kiểm chứng an toàn: **Move**
+(composition pattern — `RuntimeXCommands` class + host interface + forwarding
+field, verify bằng diff-back-to-original + `tsc`) và **Extract** (di chuyển
+type/hàm thuần không phụ thuộc `this`). Chi tiết từng task xem
+`tasks/TASKS-INDEX.md`.
+
+Sau khi cạn ứng viên Move/Extract, phần còn lại (~1,100–1,300 dòng) là
+**wiring boilerplate cố hữu của kiến trúc composition**: 39 khối wiring +
+~545 forwarding field dạng
+`name: Type['name'] = this.xCommands.name.bind(this.xCommands)`. Đã thử 2 kỹ
+thuật giảm riêng phần này, cả 2 đều **thất bại và bị revert**:
+
+1. **`declare` field + mảng tên method dùng chung** (TASK-BIGFILE-083, revert
+   `92681cd46`): giảm được khi tự đo trước format, nhưng `oxfmt` (chạy qua
+   pre-commit hook) expand mảng tên đã compact thành 1 dòng/tên → kết quả
+   thật sau format là **tăng** dòng, không giảm. Bài học: luôn đo dòng SAU
+   `oxfmt --write`, không đo trước.
+2. **`interface OrcaRuntimeService extends Pick<Domain, Keys> {}` declaration
+   merging + hàm `forwardMethods` bind runtime** (TASK-BIGFILE-084, không
+   commit): tránh được nhược điểm của #1 (mảng tên đặt trong file domain,
+   không tính vào budget dòng của `orca-runtime.ts`), đo thật sau `oxfmt` cho
+   kết quả giảm ~110 dòng, `tsc` sạch (baseline 251 không đổi). Nhưng bị
+   `oxlint` cấu hình mặc định chặn bằng
+   `typescript(no-unsafe-declaration-merging)` — đúng rủi ro đã tự nhận diện
+   từ đầu (compiler không còn xác minh field được merge có thực sự init đúng
+   runtime hay không), không phải false positive. Rule fix gợi ý của chính
+   oxlint (`type X = {} & Pick<...>`) không dùng được vì `type` alias không
+   declaration-merge được với `class`.
+
+Cả 2 hướng đều bị revert sạch, `orca-runtime.ts` đứng ở 4,742 dòng. Người
+dùng xác nhận **dừng ở đây** (không tiếp tục nới rule oxlint an toàn hay thử
+thiết kế lại toàn bộ cơ chế composition) — phần còn lại không có cách giảm
+thêm mà vẫn an toàn với các công cụ/quy ước hiện có của dự án. Có thể mở lại
+sau nếu dự án đổi kiến trúc composition (vd. factory function trả object
+literal thay vì class + field forwarding) — chưa thiết kế, rủi ro cao hơn
+nhiều so với mọi kỹ thuật đã dùng trong 82 task trên.
 
 ## Tham khảo
 
