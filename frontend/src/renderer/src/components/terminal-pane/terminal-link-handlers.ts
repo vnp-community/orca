@@ -162,11 +162,28 @@ export function createFilePathLinkProvider(
               // stale local paths even when filesystem probing says "missing".
               if (!worktreeRootLink) {
                 const cachedExists = readTerminalPathExistsCache(pathExistsCache, cacheKey)
-                const exists =
-                  cachedExists ??
-                  (fileContext.connectionId || isRemoteRuntimePath
-                    ? await runtimePathExists(fileContext, resolved.absolutePath)
-                    : await window.api.shell.pathExists(resolved.absolutePath))
+                let exists: boolean
+                if (cachedExists !== undefined) {
+                  exists = cachedExists
+                } else {
+                  try {
+                    exists =
+                      fileContext.connectionId || isRemoteRuntimePath
+                        ? await runtimePathExists(fileContext, resolved.absolutePath)
+                        : await window.api.shell.pathExists(resolved.absolutePath)
+                  } catch {
+                    // Why: a hovered/detected path can legitimately point outside
+                    // the owning runtime worktree (e.g. text printed by a command
+                    // that isn't a project file) — runtimePathExists refuses to
+                    // silently fall back to a local check in that case and throws
+                    // instead. That's correct for real file operations but this
+                    // is only a "should this render as a clickable link" probe;
+                    // treat any failure to determine existence the same as
+                    // "doesn't exist" instead of an uncaught rejection that spams
+                    // the console on every hover (BUG-FE-PTY-001 adjacent report).
+                    exists = false
+                  }
+                }
                 writeTerminalPathExistsCache(pathExistsCache, cacheKey, exists)
                 if (!exists) {
                   return null

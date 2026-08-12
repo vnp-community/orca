@@ -1272,6 +1272,29 @@ describe('createFilePathLinkProvider range bounds', () => {
     expect(window.api.shell.pathExists).not.toHaveBeenCalled()
   })
 
+  it('does not throw when a hovered path on a remote-runtime worktree resolves outside it', async () => {
+    // Regression (BUG-FE-PTY-001 adjacent, live report): a path printed by a
+    // terminal command that isn't part of the project (e.g. a system path)
+    // resolves outside the owning remote-runtime worktree. runtimePathExists
+    // refuses to silently fall back to a local existence check in that case
+    // and throws "Remote file is outside the owning runtime worktree" — this
+    // used to be an unhandled rejection on every hover ("Uncaught (in
+    // promise) Error: ..."); it must now just mean "not a link".
+    setPlatform('Macintosh')
+    storeState.settings = { activeRuntimeEnvironmentId: 'env-1' }
+    vi.mocked(getConnectionId).mockReturnValue('ssh-1')
+    const { provider } = createProviderSetup([makeBufferLine('/etc/hostname')], new Map(), {
+      runtimeEnvironmentId: 'env-1'
+    })
+
+    const links = await new Promise<ILink[]>((resolve) => {
+      provider.provideLinks(1, (provided) => resolve(provided ?? []))
+    })
+
+    expect(links).toEqual([])
+    expect(runtimeEnvironmentCallMock).not.toHaveBeenCalled()
+  })
+
   it('linkifies a known worktree root printed with a trailing slash', async () => {
     setPlatform('Macintosh')
     storeState.worktreesByRepo = {
