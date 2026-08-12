@@ -217,6 +217,14 @@ inline frontend/src/main/runtime/orca-runtime-terminal-create.ts
 # source file), already covered by orca-runtime.ts's own grandfathered
 # max-lines disable. Not in the onPtyData hot path.
 inline frontend/src/main/runtime/orca-runtime-terminal-agent-status.ts
+#
+# NEEDS PR REVIEW (added by TASK-BIGFILE-078, BUG-FE-BIGFILE-002): relocation
+# of orca-runtime.ts's pure pre-class type/function/error-class declarations
+# (RuntimeStore, RuntimeLeafRecord, RuntimePtyWorktreeRecord, RuntimeNotifier,
+# mergeRuntimeFolderWorkspace, ...) — none reference `this`. Different
+# technique from the composition-pattern Move used elsewhere: no host
+# interface, pure relocate + re-import/re-export, verified entirely by tsc.
+inline frontend/src/main/runtime/orca-runtime-service-types.ts
 inline mobile/src/constants/marine-creatures.ts
 inline tests/e2e/helpers/terminal.ts
 inline tests/e2e/terminal-panes.spec.ts
