@@ -38,6 +38,7 @@ import { RuntimeWorktreePsCommands } from './orca-runtime-worktree-ps'
 import { RuntimeTerminalWaiterCommands } from './orca-runtime-terminal-waiter'
 import { RuntimeTerminalCreateCommands } from './orca-runtime-terminal-create'
 import { RuntimePtyDataIngestCommands } from './orca-runtime-pty-data-ingest'
+import { RuntimeTerminalSendCommands } from './orca-runtime-terminal-send'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -60,13 +61,6 @@ import {
 } from '../../shared/agent-status-types'
 import { hasCompatibleAgentTitleIdentity } from '../../shared/agent-title-owner'
 import { buildOrchestrationTaskDisplayMetadata } from '../../shared/orchestration-task-display'
-import { iterateTerminalInputChunks } from '../../shared/terminal-input'
-import {
-  AGENT_PROMPT_BRACKETED_PASTE_END,
-  AGENT_PROMPT_SUBMIT,
-  AGENT_PROMPT_SUBMIT_DELAY_MS,
-  buildAgentPromptPasteBytes
-} from '../../shared/agent-prompt-injection'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -164,7 +158,6 @@ import type {
   RuntimeTerminalRead,
   RuntimeTerminalRename,
   RuntimeTerminalAgentStatus,
-  RuntimeTerminalSend,
   RuntimeTerminalPresentation,
   RuntimeTerminalFocus,
   RuntimeTerminalClose,
@@ -243,9 +236,7 @@ import {
   recentTerminalPathCandidatesIncludePath,
   recentTerminalOutputIncludesPath,
   type TerminalTailWaitState,
-  assertTerminalInputWithinLimitWithYield,
   branchSelectorMatches,
-  buildSendPayload,
   buildTerminalWaitText,
   classifyAgentTitle,
   classifyLatestAgentTitle,
@@ -2857,83 +2848,16 @@ export class OrcaRuntimeService {
     return leaf.ptyId ? this.withVisibleSnapshotFallback(leaf.ptyId, read, opts) : read
   }
 
-  async sendTerminal(
-    handle: string,
-    action: {
-      text?: string
-      enter?: boolean
-      interrupt?: boolean
-    },
-    options: {
-      beforeWrite?: (ptyId: string) => void | Promise<void>
-      suffixFailureError?: string
-    } = {}
-  ): Promise<RuntimeTerminalSend> {
-    const pty = this.getLivePtyForHandle(handle)
-    if (pty) {
-      if (!pty.pty.connected) {
-        throw new Error('terminal_not_writable')
-      }
-      const payload = buildSendPayload(action)
-      if (payload === null) {
-        throw new Error('invalid_terminal_send')
-      }
-      await assertTerminalInputWithinLimitWithYield(action.text)
-      await this.writeTerminalAction(pty.pty.ptyId, action, payload, options)
-      return {
-        handle,
-        accepted: true,
-        bytesWritten: Buffer.byteLength(payload, 'utf8')
-      }
-    }
+  private readonly terminalSendCommands = new RuntimeTerminalSendCommands({
+    getPtyController: () => this.ptyController,
+    getLivePtyForHandle: (handle) => this.getLivePtyForHandle(handle),
+    getLiveLeafForHandle: (handle) => this.getLiveLeafForHandle(handle)
+  })
 
-    const { leaf } = this.getLiveLeafForHandle(handle)
-    if (!leaf.writable || !leaf.ptyId) {
-      throw new Error('terminal_not_writable')
-    }
-    const payload = buildSendPayload(action)
-    if (payload === null) {
-      throw new Error('invalid_terminal_send')
-    }
-    await assertTerminalInputWithinLimitWithYield(action.text)
-
-    await this.writeTerminalAction(leaf.ptyId, action, payload, options)
-
-    return {
-      handle,
-      accepted: true,
-      bytesWritten: Buffer.byteLength(payload, 'utf8')
-    }
-  }
-
-  async sendTerminalAgentPrompt(
-    handle: string,
-    prompt: string,
-    options: {
-      beforeWrite?: (ptyId: string) => void | Promise<void>
-      suffixFailureError?: string
-    } = {}
-  ): Promise<RuntimeTerminalSend> {
-    const payload = buildAgentPromptPasteBytes(prompt)
-    const bytesWritten = Buffer.byteLength(`${payload}${AGENT_PROMPT_SUBMIT}`, 'utf8')
-    const pty = this.getLivePtyForHandle(handle)
-    if (pty) {
-      if (!pty.pty.connected) {
-        throw new Error('terminal_not_writable')
-      }
-      await assertTerminalInputWithinLimitWithYield(payload)
-      await this.writeTerminalAgentPrompt(pty.pty.ptyId, payload, options)
-      return { handle, accepted: true, bytesWritten }
-    }
-
-    const { leaf } = this.getLiveLeafForHandle(handle)
-    if (!leaf.writable || !leaf.ptyId) {
-      throw new Error('terminal_not_writable')
-    }
-    await assertTerminalInputWithinLimitWithYield(payload)
-    await this.writeTerminalAgentPrompt(leaf.ptyId, payload, options)
-    return { handle, accepted: true, bytesWritten }
-  }
+  sendTerminal: RuntimeTerminalSendCommands['sendTerminal'] =
+    this.terminalSendCommands.sendTerminal.bind(this.terminalSendCommands)
+  sendTerminalAgentPrompt: RuntimeTerminalSendCommands['sendTerminalAgentPrompt'] =
+    this.terminalSendCommands.sendTerminalAgentPrompt.bind(this.terminalSendCommands)
 
   async getTerminalAgentStatus(handle: string): Promise<RuntimeTerminalAgentStatus> {
     const ptyId = this.getTerminalAgentStatusPtyId(handle)
@@ -3185,122 +3109,6 @@ export class OrcaRuntimeService {
     }
 
     return bestStatus ? { status: bestStatus, updatedAt: bestUpdatedAt } : null
-  }
-
-  private async writeTerminalAction(
-    ptyId: string,
-    action: { text?: string; enter?: boolean; interrupt?: boolean },
-    payload: string,
-    options: {
-      beforeWrite?: (ptyId: string) => void | Promise<void>
-      suffixFailureError?: string
-    } = {}
-  ): Promise<void> {
-    // Why: direct terminal.send can carry paste-sized text from RPC/mobile
-    // clients; chunk text before PTY/ConPTY while preserving suffix separation.
-    const hasText = typeof action.text === 'string' && action.text.length > 0
-    const hasSuffix = action.enter || action.interrupt
-    if (hasText) {
-      await this.writeTerminalInputChunks(ptyId, action.text!, options)
-    }
-    if (hasSuffix) {
-      const suffix = (action.enter ? '\r' : '') + (action.interrupt ? '\x03' : '')
-      if (hasText) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      }
-      try {
-        await options.beforeWrite?.(ptyId)
-      } catch (error) {
-        if (options.suffixFailureError) {
-          throw new Error(options.suffixFailureError)
-        }
-        throw error
-      }
-      const suffixWrote = this.ptyController?.write(ptyId, suffix) ?? false
-      if (!suffixWrote) {
-        throw new Error(options.suffixFailureError ?? 'terminal_not_writable')
-      }
-      return
-    }
-    if (hasText) {
-      return
-    }
-
-    await options.beforeWrite?.(ptyId)
-    const wrote = this.ptyController?.write(ptyId, payload) ?? false
-    if (!wrote) {
-      throw new Error('terminal_not_writable')
-    }
-  }
-
-  private async writeTerminalInputChunks(
-    ptyId: string,
-    text: string,
-    options: {
-      beforeWrite?: (ptyId: string) => void | Promise<void>
-    } = {}
-  ): Promise<void> {
-    const chunks = iterateTerminalInputChunks(text)
-    let chunk = chunks.next()
-    while (!chunk.done) {
-      await options.beforeWrite?.(ptyId)
-      const wrote = this.ptyController?.write(ptyId, chunk.value) ?? false
-      if (!wrote) {
-        throw new Error('terminal_not_writable')
-      }
-      chunk = chunks.next()
-      if (!chunk.done) {
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      }
-    }
-  }
-
-  private async writeTerminalAgentPrompt(
-    ptyId: string,
-    pastePayload: string,
-    options: {
-      beforeWrite?: (ptyId: string) => void | Promise<void>
-      suffixFailureError?: string
-    } = {}
-  ): Promise<void> {
-    let wrotePasteBytes = false
-    let completedPaste = false
-    try {
-      const chunks = iterateTerminalInputChunks(pastePayload)
-      let chunk = chunks.next()
-      while (!chunk.done) {
-        await options.beforeWrite?.(ptyId)
-        const wrote = this.ptyController?.write(ptyId, chunk.value) ?? false
-        if (!wrote) {
-          throw new Error('terminal_not_writable')
-        }
-        wrotePasteBytes = true
-        chunk = chunks.next()
-        if (!chunk.done) {
-          await new Promise((resolve) => setTimeout(resolve, 0))
-        }
-      }
-      completedPaste = true
-    } catch (error) {
-      if (wrotePasteBytes && !completedPaste) {
-        this.ptyController?.write(ptyId, AGENT_PROMPT_BRACKETED_PASTE_END)
-      }
-      throw error
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, AGENT_PROMPT_SUBMIT_DELAY_MS))
-    try {
-      await options.beforeWrite?.(ptyId)
-    } catch (error) {
-      if (options.suffixFailureError) {
-        throw new Error(options.suffixFailureError)
-      }
-      throw error
-    }
-    const suffixWrote = this.ptyController?.write(ptyId, AGENT_PROMPT_SUBMIT) ?? false
-    if (!suffixWrote) {
-      throw new Error(options.suffixFailureError ?? 'terminal_not_writable')
-    }
   }
 
   private readonly terminalWaiterCommands = new RuntimeTerminalWaiterCommands({
