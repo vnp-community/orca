@@ -3,7 +3,8 @@
 **Loại:** Move (cơ học) · **Effort:** S
 **Phụ thuộc:** TASK-BIGFILE-027 (dùng `task-page-types.ts` nếu
 `LinearStateCell` tham chiếu 3 type đã tách)
-**Status:** ⬜ Todo
+**Status:** ✅ Done (thêm `import` song song `export` — LinearStateCell dùng
+trong JSX của TaskPage chính, `export ... from` không tạo local binding)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 1)
 
 ## Input

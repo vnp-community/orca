@@ -1,6 +1,9 @@
 # TASK-BIGFILE-030 — Move: `task-page-github-cells.tsx`
 
-**Loại:** Move (cơ học) · **Effort:** M · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** M · **Phụ thuộc:** — · **Status:** ✅ Done
+(chia 2 file như dự kiến: task-page-github-assignee-cells.tsx 949 dòng,
+task-page-github-review-cells.tsx 986 dòng — cả 2 cần
+`eslint-disable max-lines` + baseline entry, xem verification.notes)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 1)
 
 ## Input

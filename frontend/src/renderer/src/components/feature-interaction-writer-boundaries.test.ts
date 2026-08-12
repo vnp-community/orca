@@ -52,11 +52,15 @@ describe('feature interaction writer boundaries', () => {
 
   it('records GitHub provider-depth for inline item mutation success paths', () => {
     const source = componentSource('TaskPage.tsx')
+    // GHAssigneesCell/PRReviewCell/PRMergeCell live in task-page-github-*-cells.tsx
+    // (TASK-BIGFILE-030), not TaskPage.tsx.
+    const assigneeCellsSource = componentSource('task-page-github-assignee-cells.tsx')
+    const reviewCellsSource = componentSource('task-page-github-review-cells.tsx')
     const githubWriter = "recordFeatureInteraction('github-tasks')"
     const mutationSections = [
-      sourceBetween(source, 'function GHAssigneesCell', 'const triggerContent ='),
-      sourceBetween(source, 'function PRReviewCell', 'const requestReviewer ='),
-      sourceBetween(source, 'function PRMergeCell', 'const handleAutoMerge'),
+      sourceBetween(assigneeCellsSource, 'function GHAssigneesCell', 'const triggerContent ='),
+      sourceBetween(reviewCellsSource, 'function PRReviewCell', 'const requestReviewer ='),
+      sourceBetween(reviewCellsSource, 'function PRMergeCell', 'const handleAutoMerge'),
       sourceBetween(
         source,
         'const handleOpenOrUseGitHubWorkItem',
@@ -71,11 +75,13 @@ describe('feature interaction writer boundaries', () => {
 
   it('threads GitHub task source context through inline task mutations', () => {
     const source = componentSource('TaskPage.tsx')
+    const assigneeCellsSource = componentSource('task-page-github-assignee-cells.tsx')
+    const reviewCellsSource = componentSource('task-page-github-review-cells.tsx')
     const sections = [
-      sourceBetween(source, 'function GHStatusCell', 'function GitHubAssigneeAvatar'),
-      sourceBetween(source, 'function GHAssigneesCell', 'const triggerContent ='),
-      sourceBetween(source, 'function PRReviewCell', 'function PRChecksCell'),
-      sourceBetween(source, 'function PRMergeCell', 'const handleAutoMerge'),
+      sourceBetween(assigneeCellsSource, 'function GHStatusCell', 'function GitHubAssigneeAvatar'),
+      sourceBetween(assigneeCellsSource, 'function GHAssigneesCell', 'const triggerContent ='),
+      sourceBetween(reviewCellsSource, 'function PRReviewCell', 'function PRChecksCell'),
+      sourceBetween(reviewCellsSource, 'function PRMergeCell', 'const handleAutoMerge'),
       sourceBetween(source, 'const handleCreateNewIssue', 'const handleCreateNewLinearProject')
     ]
 
@@ -163,11 +169,16 @@ describe('feature interaction writer boundaries', () => {
 
   it('records Linear provider-depth for inline edits, board drops, creation, and workspace use', () => {
     const taskPageSource = componentSource('TaskPage.tsx')
+    const linearCellsSource = componentSource('task-page-linear-cells.tsx')
     const drawerSource = componentSource('LinearItemDrawer.tsx')
     const linearWriter = "recordFeatureInteraction('linear-tasks')"
 
+    // LinearStateCell lives in task-page-linear-cells.tsx (TASK-BIGFILE-028), not TaskPage.tsx.
+    expect(
+      sourceBetween(linearCellsSource, 'export function LinearStateCell', 'return (')
+    ).toContain(linearWriter)
+
     const taskPageSections = [
-      sourceBetween(taskPageSource, 'function LinearStateCell', 'return ('),
       sourceBetween(
         taskPageSource,
         'const handleLinearBoardDrop',

@@ -1,6 +1,8 @@
 # TASK-BIGFILE-031 — Move: `task-page-pagination.tsx`
 
-**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ✅ Done
+(ranh giới thật 896–1000, gồm cả `getPageNumbers` — helper dùng riêng bởi
+PaginationBar, không có trong danh sách symbol gốc nhưng chuyển theo)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 1)
 
 ## Input

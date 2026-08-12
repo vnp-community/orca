@@ -1,6 +1,7 @@
 # TASK-BIGFILE-027 — Move: `task-page-types.ts`
 
-**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ✅ Done
+(ranh giới thật 600–610, KHÔNG phải 600–650 như ước tính — xem solution doc)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 1)
 
 ## Input

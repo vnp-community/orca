@@ -1,6 +1,7 @@
 # TASK-BIGFILE-029 — Move: `task-page-jira-banner.tsx`
 
-**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ✅ Done
+(ranh giới thật dịch sang 717–761 sau bước 027/028, thêm import song song export)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 1)
 
 ## Input
