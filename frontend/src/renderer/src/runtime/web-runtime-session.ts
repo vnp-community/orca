@@ -15,6 +15,7 @@ import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session-re
 import type { TerminalPaneLayoutNode, TuiAgent } from '../../../shared/types'
 import type { AppState } from '../store/types'
 import { getRuntimeEnvironmentIdForWorktree } from '../lib/worktree-runtime-owner'
+import { logBugFePty001 } from '../lib/bug-fe-pty-001-diagnostic-log'
 import { useAppStore } from '../store'
 import { unwrapRuntimeRpcResult } from './runtime-rpc-client'
 import { parseRemoteRuntimePtyId } from './runtime-terminal-stream'
@@ -641,8 +642,8 @@ export function closeWebRuntimeTerminal(ptyId: string | null | undefined): boole
   // createInitialPane mirror pane within ~5s of mount, with no matching
   // "transport CREATED"/"DESTROY" log — capture the real call stack to find
   // what's invoking this without a user click.
-  console.error(
-    `[DIAG BUG-FE-PTY-001] closeWebRuntimeTerminal called ptyId=${ptyId}\n${new Error('closeWebRuntimeTerminal call site').stack}`
+  logBugFePty001(
+    `closeWebRuntimeTerminal called ptyId=${ptyId}\n${new Error('closeWebRuntimeTerminal call site').stack}`
   )
   void window.api.runtimeEnvironments
     .call({

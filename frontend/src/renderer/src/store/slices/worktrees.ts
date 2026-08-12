@@ -30,6 +30,7 @@ import { findRepoForHost } from './repo-host-identity'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
+import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import {
   callRuntimeRpc,
   getActiveRuntimeTarget,
@@ -4604,8 +4605,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       // flight (pendingActivationSpawn true), and whether the pendingActivationSpawn
       // exclusion above actually prevents a double bump on live repro.
       if (worktreeId != null && tabs.length > 0) {
-        console.error(
-          `[DIAG BUG-FE-PTY-001] setActiveWorktree allDead-check worktreeId=${worktreeId} allDead=${allDead} tabs=${JSON.stringify(
+        logBugFePty001(
+          `setActiveWorktree allDead-check worktreeId=${worktreeId} allDead=${allDead} tabs=${JSON.stringify(
             tabs.map((tab) => ({
               id: tab.id,
               generation: tab.generation ?? 0,

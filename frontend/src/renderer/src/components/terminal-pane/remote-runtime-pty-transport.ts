@@ -35,6 +35,7 @@ import {
   createRemoteRuntimeViewportBatcher
 } from './remote-runtime-pty-batching'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import { setFitOverride } from '@/lib/pane-manager/mobile-fit-overrides'
 import { setDriverForPty } from '@/lib/pane-manager/mobile-driver-state'
 import { isWebTerminalSurfaceTabId, toHostSessionTabId } from '@/runtime/web-terminal-surface-id'
@@ -171,8 +172,8 @@ export function createRemoteRuntimePtyTransport(
   // TEMP DIAG BUG-FE-PTY-001: log every transport instantiation with its
   // tabId/leafId + call stack, to catch a second transport being created for
   // the same tab while the first one's terminal.create is still in flight.
-  console.error(
-    `[DIAG BUG-FE-PTY-001] transport CREATED tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId}\n${new Error('create call site').stack}`
+  logBugFePty001(
+    `transport CREATED tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId}\n${new Error('create call site').stack}`
   )
   // Why: tab/leaf ids identify the mirrored host pane, so every paired viewer
   // shares them. The instance suffix keeps one viewer's refresh off peer records.
@@ -807,8 +808,8 @@ export function createRemoteRuntimePtyTransport(
           // TEMP DIAG BUG-FE-PTY-001: this is the exact "created then
           // immediately destroyed" race — logs which tab/leaf raced and how
           // long the create() round-trip took before destroy() beat it.
-          console.error(
-            `[DIAG BUG-FE-PTY-001] connect() found destroyed=true right after terminal.create resolved — grace-closing PTY tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId} handle=${created.terminal.handle}`
+          logBugFePty001(
+            `connect() found destroyed=true right after terminal.create resolved — grace-closing PTY tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId} handle=${created.terminal.handle}`
           )
           // FIX BUG-FE-PTY-001: this is USUALLY a cancelled launch (rapid
           // tab-open/tab-close) — close the server PTY so it doesn't leak.
@@ -1057,8 +1058,8 @@ export function createRemoteRuntimePtyTransport(
       // TEMP DIAG BUG-FE-PTY-001: pairs with the "transport CREATED" log —
       // correlate by tabId/leafId to see whether a second transport for the
       // same tab triggered this teardown before connect() finished.
-      console.error(
-        `[DIAG BUG-FE-PTY-001] transport DESTROY called tabId=${tabId} leafId=${leafId} handle=${handle} connected=${connected}\n${new Error('destroy call site').stack}`
+      logBugFePty001(
+        `transport DESTROY called tabId=${tabId} leafId=${leafId} handle=${handle} connected=${connected}\n${new Error('destroy call site').stack}`
       )
       destroyed = true
       this.disconnect()
