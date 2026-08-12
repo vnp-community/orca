@@ -100,6 +100,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 70 | [TASK-BIGFILE-070](./TASK-BIGFILE-070-orca-runtime-terminal-listing-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-terminal-listing.ts` | L | 40, 51, 65 | ✅ |
 | 71 | [TASK-BIGFILE-071](./TASK-BIGFILE-071-orca-runtime-worktree-ps-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-worktree-ps.ts` | L | 40, 51, 65, 70 | ✅ |
 | 72 | [TASK-BIGFILE-072](./TASK-BIGFILE-072-orca-runtime-terminal-waiter-domain.md) | Move (composition) — rủi ro cao, non-contiguous | `orca-runtime.ts` → `orca-runtime-terminal-waiter.ts` | L | 41, 60, 63, 64, 67, 68, 69 | ✅ |
+| 73 | [TASK-BIGFILE-073](./TASK-BIGFILE-073-orca-runtime-terminal-create-domain.md) | Move (composition) — cụm entangled nhất (26 host dep) | `orca-runtime.ts` → `orca-runtime-terminal-create.ts` | L | 36, 37, 40, 51, 52 | ✅ |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
