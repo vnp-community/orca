@@ -4582,11 +4582,40 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       //
       // Generation is still only bumped when tabs have no live PTY — a live
       // tab remount would kill the user's running shell.
+      //
+      // Why exclude tab.pendingActivationSpawn (BUG-FE-PTY-001): this same
+      // reducer can re-run for the SAME worktree while an earlier bump's fresh
+      // spawn is still connecting (e.g. a host-mirrored tab's id swaps from
+      // its local uuid to `web-terminal-<hostTabId>` mid-flight, which changes
+      // the computed activeTabId below and re-passes the hasStateChange guard).
+      // tabHasLivePty alone can't tell "still connecting" from "actually
+      // dead", so without this guard the tab gets bumped a second time and
+      // TerminalPane remounts mid-connect, orphaning the PTY it was about to
+      // attach to (live repro: "SSH_SESSION_EXPIRED: agent-pty-N not found").
+      // A tab already tagged from the prior bump is definitionally still
+      // respawning, so skip it until updateTabPtyId consumes the tag.
       const tabs = s.tabsByWorktree[worktreeId ?? ''] ?? []
       const allDead =
         worktreeId != null &&
         tabs.length > 0 &&
-        tabs.every((tab) => !tabHasLivePty(s.ptyIdsByTabId, tab.id))
+        tabs.every((tab) => !tab.pendingActivationSpawn && !tabHasLivePty(s.ptyIdsByTabId, tab.id))
+      // TEMP DIAG BUG-FE-PTY-001: confirm whether setActiveWorktree re-runs for
+      // the same worktree while an earlier bump's fresh spawn is still in
+      // flight (pendingActivationSpawn true), and whether the pendingActivationSpawn
+      // exclusion above actually prevents a double bump on live repro.
+      if (worktreeId != null && tabs.length > 0) {
+        console.error(
+          `[DIAG BUG-FE-PTY-001] setActiveWorktree allDead-check worktreeId=${worktreeId} allDead=${allDead} tabs=${JSON.stringify(
+            tabs.map((tab) => ({
+              id: tab.id,
+              generation: tab.generation ?? 0,
+              ptyId: tab.ptyId,
+              pendingActivationSpawn: tab.pendingActivationSpawn ?? false,
+              hasLivePty: tabHasLivePty(s.ptyIdsByTabId, tab.id)
+            }))
+          )}`
+        )
+      }
       const isFirstActivation = worktreeId != null && !s.everActivatedWorktreeIds.has(worktreeId)
       const shouldTagTabs = worktreeId != null && tabs.length > 0 && isFirstActivation
       // Why: when every PTY for the worktree's tabs is dead, the existing
@@ -4682,7 +4711,13 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           if (tabs.length === 0) {
             return {}
           }
-          const allDead = tabs.every((tab) => !tabHasLivePty(s.ptyIdsByTabId, tab.id))
+          // Why exclude pendingActivationSpawn: same race as the allDead
+          // check above (BUG-FE-PTY-001) — this deferred re-check must not
+          // double-bump a tab whose fresh spawn from the initial activation
+          // is still in flight.
+          const allDead = tabs.every(
+            (tab) => !tab.pendingActivationSpawn && !tabHasLivePty(s.ptyIdsByTabId, tab.id)
+          )
           if (!allDead && !shouldTagTerminalTabs) {
             return {}
           }
