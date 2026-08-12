@@ -30,6 +30,14 @@ import { isValidHostTerminalTabId } from '../../shared/terminal-tab-id'
 import { isTerminalLeafId, makePaneKey, parsePaneKey } from '../../shared/stable-pane-id'
 import { SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV } from '../../shared/setup-agent-sequencing'
 import { copySleepingAgentLaunchConfig } from './orca-runtime'
+import { resolveBareAgentLaunchCommand } from './orca-runtime-service-types'
+import { repoIsRemote } from '../../shared/agent-launch-remote'
+import { buildAgentStartupPlan } from '../../shared/tui-agent-startup'
+import {
+  resolveTuiAgentLaunchArgs,
+  resolveTuiAgentLaunchEnv
+} from '../../shared/tui-agent-launch-defaults'
+import { resolveLocalWindowsAgentStartupShell } from '../../shared/windows-terminal-shell'
 import type { SleepingAgentLaunchConfig } from '../../shared/agent-session-resume'
 import type { TerminalPaneSplitSource } from '../../shared/feature-education-telemetry'
 import type { Repo, TuiAgent } from '../../shared/types'
@@ -100,10 +108,7 @@ export type RuntimeTerminalCreateCommandHost = {
   assertGraphReady(): void
   resolveWorktreeSelector(selector: string): Promise<ResolvedWorktree>
   resolveTerminalWorkspaceLaunchScope(selector: string): Promise<TerminalWorkspaceLaunchScope>
-  resolveAgentTerminalCreateOptions(
-    workspace: TerminalWorkspaceLaunchScope,
-    opts: TerminalCreateOptions
-  ): Promise<TerminalCreateOptions>
+  getAgentLaunchPlatformForWorkspace(scope: TerminalWorkspaceLaunchScope): NodeJS.Platform
   resolveWorkspaceTerminalStartupCwd(
     workspace: Pick<TerminalWorkspaceLaunchScope, 'path'>,
     requestedCwd?: string | null
@@ -223,7 +228,7 @@ export class RuntimeTerminalCreateCommands {
         throw new Error('runtime_unavailable')
       }
       const workspace = await this.host.resolveTerminalWorkspaceLaunchScope(worktreeSelector)
-      const launchOpts = await this.host.resolveAgentTerminalCreateOptions(workspace, opts)
+      const launchOpts = await this.resolveAgentTerminalCreateOptions(workspace, opts)
       const cwd =
         this.host.resolveWorkspaceTerminalStartupCwd(workspace, launchOpts.cwd) ?? workspace.path
       const preAllocatedHandle = this.host.createPreAllocatedTerminalHandle()
@@ -414,7 +419,7 @@ export class RuntimeTerminalCreateCommands {
       ? await this.host.resolveTerminalWorkspaceLaunchScope(worktreeSelector)
       : null
     const launchOpts = workspace
-      ? await this.host.resolveAgentTerminalCreateOptions(workspace, opts)
+      ? await this.resolveAgentTerminalCreateOptions(workspace, opts)
       : opts
     const worktreeId = workspace?.id
     const cwd = workspace
@@ -791,5 +796,78 @@ export class RuntimeTerminalCreateCommands {
       this.host.getGraph().graphSyncCallbacks.push(check)
       check()
     })
+  }
+
+  private async resolveAgentTerminalCreateOptions(
+    workspace: TerminalWorkspaceLaunchScope,
+    opts: TerminalCreateOptions
+  ): Promise<TerminalCreateOptions> {
+    // Why: raw shell commands like `codex exec` must remain user-authored shell.
+    // Only unmanaged, repo-backed, bare agent launches get Settings defaults.
+    const store = this.host.getStore()
+    if (
+      !opts.command ||
+      opts.env ||
+      opts.launchConfig ||
+      opts.launchAgent ||
+      opts.startupCommandDelivery ||
+      opts.claudeAgentTeamsSourceCommand ||
+      !workspace.repo ||
+      !store
+    ) {
+      return opts
+    }
+
+    const settings = store.getSettings()
+    const platform = this.host.getAgentLaunchPlatformForWorkspace(workspace)
+    const isRemote = repoIsRemote(workspace.repo)
+    const queuedShell = resolveLocalWindowsAgentStartupShell({
+      platform,
+      isRemote,
+      terminalWindowsShell: settings.terminalWindowsShell
+    })
+    const agent = resolveBareAgentLaunchCommand({
+      command: opts.command,
+      settings,
+      platform,
+      isRemote
+    })
+    if (!agent) {
+      return opts
+    }
+
+    const startupPlan = buildAgentStartupPlan({
+      agent,
+      prompt: '',
+      cmdOverrides: settings.agentCmdOverrides ?? {},
+      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
+      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+      platform,
+      shell: queuedShell,
+      isRemote,
+      allowEmptyPromptLaunch: true
+    })
+    if (!startupPlan) {
+      return opts
+    }
+
+    if (workspace.connectionId) {
+      await this.host.markRemoteWorkspaceTrustedForAgent(
+        agent,
+        workspace.connectionId,
+        workspace.path
+      )
+    } else {
+      this.host.markLocalWorkspaceTrustedForAgent(agent, workspace.path)
+    }
+
+    return {
+      ...opts,
+      command: startupPlan.launchCommand,
+      ...(startupPlan.env ? { env: startupPlan.env } : {}),
+      launchConfig: startupPlan.launchConfig,
+      launchAgent: agent,
+      startupCommandDelivery: startupPlan.startupCommandDelivery
+    }
   }
 }

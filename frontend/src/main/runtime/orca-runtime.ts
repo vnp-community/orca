@@ -80,13 +80,6 @@ import { TASK_PROVIDERS } from '../../shared/task-providers'
 import { isTerminalLeafId, makePaneKey, parsePaneKey } from '../../shared/stable-pane-id'
 import { parseAppSshPtyId } from '../../shared/ssh-pty-id'
 import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
-import { buildAgentStartupPlan } from '../../shared/tui-agent-startup'
-import { repoIsRemote } from '../../shared/agent-launch-remote'
-import {
-  resolveTuiAgentLaunchArgs,
-  resolveTuiAgentLaunchEnv
-} from '../../shared/tui-agent-launch-defaults'
-import { resolveLocalWindowsAgentStartupShell } from '../../shared/windows-terminal-shell'
 import { applyAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
 import { isWindowsAbsolutePathLike, isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import { resolveTerminalStartupCwd } from '../../shared/terminal-startup-cwd'
@@ -223,7 +216,6 @@ import type {
   RuntimePtyWorktreeRecord,
   RuntimeStore,
   RuntimeWorktreeScanResult,
-  TerminalCreateOptions,
   TerminalHandleRecord,
   TerminalWorkspaceLaunchScope
 } from './orca-runtime-service-types'
@@ -238,7 +230,6 @@ import {
   isCursorAgentOrchestrationTarget,
   listRuntimeFolderWorkspaces,
   PTY_CONTROLLER_LIST_TIMEOUT_MS,
-  resolveBareAgentLaunchCommand,
   withTimeoutResult,
   WorktreeIdRequiresFullPathError
 } from './orca-runtime-service-types'
@@ -2759,74 +2750,6 @@ export class OrcaRuntimeService {
     return { handle, tabId: leaf.tabId, title }
   }
 
-  private async resolveAgentTerminalCreateOptions(
-    workspace: TerminalWorkspaceLaunchScope,
-    opts: TerminalCreateOptions
-  ): Promise<TerminalCreateOptions> {
-    // Why: raw shell commands like `codex exec` must remain user-authored shell.
-    // Only unmanaged, repo-backed, bare agent launches get Settings defaults.
-    if (
-      !opts.command ||
-      opts.env ||
-      opts.launchConfig ||
-      opts.launchAgent ||
-      opts.startupCommandDelivery ||
-      opts.claudeAgentTeamsSourceCommand ||
-      !workspace.repo ||
-      !this.store
-    ) {
-      return opts
-    }
-
-    const settings = this.store.getSettings()
-    const platform = this.getAgentLaunchPlatformForWorkspace(workspace)
-    const isRemote = repoIsRemote(workspace.repo)
-    const queuedShell = resolveLocalWindowsAgentStartupShell({
-      platform,
-      isRemote,
-      terminalWindowsShell: settings.terminalWindowsShell
-    })
-    const agent = resolveBareAgentLaunchCommand({
-      command: opts.command,
-      settings,
-      platform,
-      isRemote
-    })
-    if (!agent) {
-      return opts
-    }
-
-    const startupPlan = buildAgentStartupPlan({
-      agent,
-      prompt: '',
-      cmdOverrides: settings.agentCmdOverrides ?? {},
-      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
-      platform,
-      shell: queuedShell,
-      isRemote,
-      allowEmptyPromptLaunch: true
-    })
-    if (!startupPlan) {
-      return opts
-    }
-
-    if (workspace.connectionId) {
-      await this.markRemoteWorkspaceTrustedForAgent(agent, workspace.connectionId, workspace.path)
-    } else {
-      this.markLocalWorkspaceTrustedForAgent(agent, workspace.path)
-    }
-
-    return {
-      ...opts,
-      command: startupPlan.launchCommand,
-      ...(startupPlan.env ? { env: startupPlan.env } : {}),
-      launchConfig: startupPlan.launchConfig,
-      launchAgent: agent,
-      startupCommandDelivery: startupPlan.startupCommandDelivery
-    }
-  }
-
   private readonly terminalCreateCommands = new RuntimeTerminalCreateCommands({
     getStore: () => this.store,
     getGraph: () => this.graph,
@@ -2839,8 +2762,8 @@ export class OrcaRuntimeService {
     resolveWorktreeSelector: (selector) => this.resolveWorktreeSelector(selector),
     resolveTerminalWorkspaceLaunchScope: (selector) =>
       this.resolveTerminalWorkspaceLaunchScope(selector),
-    resolveAgentTerminalCreateOptions: (workspace, opts) =>
-      this.resolveAgentTerminalCreateOptions(workspace, opts),
+    getAgentLaunchPlatformForWorkspace: (workspace) =>
+      this.getAgentLaunchPlatformForWorkspace(workspace),
     resolveWorkspaceTerminalStartupCwd: (workspace, requestedCwd) =>
       this.resolveWorkspaceTerminalStartupCwd(workspace, requestedCwd),
     buildTerminalWorkspaceEnv: (scope, baseEnv, paneKey, tabId, agentTeamsEnv) =>
