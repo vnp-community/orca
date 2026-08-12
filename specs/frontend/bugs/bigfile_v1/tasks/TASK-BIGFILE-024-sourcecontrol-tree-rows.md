@@ -1,6 +1,13 @@
 # TASK-BIGFILE-024 — Move: `source-control-tree-rows.tsx`
 
-**Loại:** Move (cơ học) · **Effort:** M · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** M · **Phụ thuộc:** — · **Status:** ✅ Done
+(2026-08-12 — đúng 2 symbol module-private nêu trong Input, KHÔNG chuyển
+`DiffLineCounts`/`SubmodulePlaceholderRow`/`UncommittedEntryRow` nằm cùng
+khoảng dòng gốc (ngoài scope). File mới import `ActionButton` NGƯỢC từ
+`./SourceControl` (circular, chưa tách ở lúc này — TASK-BIGFILE-025 chạy
+sau) — an toàn vì chỉ dùng trong JSX render, không ở module-eval time; xác
+minh bằng chạy toàn bộ 1257 test trong thư mục. Giảm 134 dòng, không đạt
+~595 vì lý do trên.)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-004-sourcecontrol.md` (Giai đoạn 1)
 
 ## Input

@@ -1,6 +1,11 @@
 # TASK-BIGFILE-020 — Move: `source-control-helpers.ts`
 
-**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ✅ Done
+(2026-08-12 — chỉ chuyển 12 export nêu trong Input, KHÔNG chuyển toàn bộ
+dòng 354–802: khoảng đó còn chứa nhiều const/type/hook module-private dùng
+chéo bởi `SourceControlInner` và các component khác trong file — xem
+`source-control-helpers.ts` để biết ranh giới thật. Giảm 209 dòng
+(8,370→8,161), không đạt ~450 vì lý do trên.)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-004-sourcecontrol.md` (Giai đoạn 1)
 
 ## Input

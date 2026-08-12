@@ -1,6 +1,7 @@
 # TASK-BIGFILE-023 — Move: `source-control-banners.tsx`
 
-**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** S · **Phụ thuộc:** — · **Status:** ✅ Done
+(2026-08-12 — đúng 3 symbol, giảm 160 dòng, khớp ước tính ~165.)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-004-sourcecontrol.md` (Giai đoạn 1)
 
 ## Input

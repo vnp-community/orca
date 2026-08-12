@@ -1,6 +1,11 @@
 # TASK-BIGFILE-022 — Move: `source-control-compare-summary.tsx`
 
-**Loại:** Move (cơ học) · **Effort:** M · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** M · **Phụ thuộc:** — · **Status:** ✅ Done
+(2026-08-12 — chỉ chuyển đúng 5 symbol nêu trong Input, KHÔNG chuyển
+`CompareUnavailable`/`SectionHeader`/`getLocalizedDiffCommentLineLabel`/
+`getLocalizedConflictKindLabel`/`DiffCommentsInlineList` nằm cùng khoảng
+dòng gốc — các hàm đó không thuộc scope 5 symbol và vẫn ở lại
+`SourceControl.tsx`. Giảm 156 dòng, không đạt ~475 vì lý do trên.)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-004-sourcecontrol.md` (Giai đoạn 1)
 
 ## Input

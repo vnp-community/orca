@@ -1,6 +1,11 @@
 # TASK-BIGFILE-021 — Move: `source-control-commit-area.tsx`
 
-**Loại:** Move (cơ học) · **Effort:** M · **Phụ thuộc:** — · **Status:** ⬜ Todo
+**Loại:** Move (cơ học) · **Effort:** M · **Phụ thuộc:** — · **Status:** ✅ Done
+(2026-08-12 — cũng chuyển `PRIMARY_ICONS` và type `CreatePrIntentNotice`/
+`CreatePrIntentTone` theo `CommitArea` vì chỉ dùng độc quyền bởi component
+này; file mới 546 dòng vượt ngân sách max-lines .tsx (400) do là verbatim
+extraction của phần vốn đã to — thêm `eslint-disable max-lines -- Why:`,
+đề xuất baseline riêng. Giảm 574 dòng, khớp ước tính ~500.)
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-004-sourcecontrol.md` (Giai đoạn 1)
 
 ## Input
