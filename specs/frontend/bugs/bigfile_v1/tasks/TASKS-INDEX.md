@@ -123,7 +123,7 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 238 | [TASK-BIGFILE-238](./TASK-BIGFILE-238-taskpage-jira-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageJiraBrowseState` | — | 32 | ✅ (split 2 file, `b3318d223`) |
 | 239 | [TASK-BIGFILE-239](./TASK-BIGFILE-239-taskpage-linear-draft-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearDraftState` | — | 32 | ✅ (`b3318d223`) |
 | 240 | [TASK-BIGFILE-240](./TASK-BIGFILE-240-taskpage-linear-teams-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearTeamsState` | — | 32 | ✅ (`b3318d223`) |
-| 241 | [TASK-BIGFILE-241](./TASK-BIGFILE-241-taskpage-linear-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearBrowseState` | — | 32, 235, 239, 240 | 🚧 Deferred có chủ đích — domain lớn/dày effect nhất (51 useState/~15 effect), chưa thực thi |
+| 241 | [TASK-BIGFILE-241](./TASK-BIGFILE-241-taskpage-linear-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearBrowseState` | — | 32, 235, 239, 240 | ✅ (split 11 file, `86fc1b2cd`) |
 | 250 | [TASK-BIGFILE-250](./TASK-BIGFILE-250-ipc-pty-pane-key-registry-investigate.md) | Investigate | `ipc/pty.ts` pane-key-registry + provider-resolution state | L | thay thế 1–7 | ✅ (ghi chú thiết kế xong, sinh 251, 252 — `d64ff6d7c`) |
 | 251 | [TASK-BIGFILE-251](./TASK-BIGFILE-251-ipc-pty-host-env.md) | Move | `ipc/pty.ts` → `pty-host-env.ts` (phạm vi đã sửa) | — | 250 | ✅ (`9141543f2`) |
 | 252 | [TASK-BIGFILE-252](./TASK-BIGFILE-252-ipc-pty-pane-key-registry.md) | Move (composition) | `ipc/pty.ts` → `pty-pane-key-registry.ts` (object/class) | — | 250 | ✅ (`9141543f2`) |
@@ -267,6 +267,31 @@ Chạy 3 agent song song (`sourcecontrol-hooks` 225/226, `taskpage-hooks`
   spanning issues+pagination/projects/custom-views/board drag&drop, nên để
   lại làm task riêng sau khi pattern đã ổn định qua 235–240). Phụ thuộc
   235, 239, 240 — đều đã xong, có thể thực thi ngay khi muốn.
+
+## Đợt 3 — TASK-BIGFILE-241, task cuối cùng còn lại (2026-08-12, cùng ngày)
+
+Thực thi task đã deferred ở đợt 2. Kết quả: split thành **11 file** (dưới
+budget 300 dòng mỗi file, không cần baseline entry mới) — `TaskPage.tsx`
+9259 → 8278 dòng. Phát hiện 1 phụ thuộc chéo không tránh được: cluster
+"team-filtered issue pipeline" (pagination + board drag&drop, ~250 dòng)
+cần `linearTeamSelection` từ hook TASK-240, mà hook đó lại cần
+`linearIssueTeams`/`linearAttributeFilter` từ chính domain này — giữ
+nguyên trong `TaskPage.tsx`, ghi chú rõ tại chỗ gọi. Commit `86fc1b2cd`.
+
+Verify độc lập (không chỉ tin báo cáo của agent thực thi): tsc
+`--composite false` sạch (251 baseline, 0-diff), oxlint sạch, vitest
+`feature-interaction-writer-boundaries.test.ts` 10/11 pass (1 fail
+pre-existing đã xác nhận qua `git log` là file không liên quan chưa đổi
+từ trước), `check:max-lines-ratchet` 0-diff (647), `gitnexus
+detect_changes({scope:"staged"})` risk medium, chỉ 1 process bị ảnh hưởng
+đúng như kỳ vọng (`TaskPage → GetWorktreeSnapshot`).
+
+**Chưa làm:** smoke test UI thủ công cho tab Linear (issues/pagination,
+project overview, custom views, board drag&drop) — không có app đang chạy
+trong môi trường này, khuyến nghị làm trước khi merge.
+
+**🎉 Đóng toàn bộ backlog `bigfile_v1`** — không còn task nào pending hay
+blocked trong bảng trên.
 - Một số task tự mở rộng phạm vi khi phát hiện phụ thuộc chéo không có
   trong task doc gốc (TASK-236: cluster dialog/cache/PR-checks phải đi
   cùng, split 6 file; TASK-238: cluster fallback tương tự, split 2 file;
