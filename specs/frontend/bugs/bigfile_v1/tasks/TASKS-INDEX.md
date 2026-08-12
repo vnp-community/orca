@@ -28,40 +28,40 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 
 | # | Task | Loại | File đích/nguồn | Effort | Phụ thuộc | Status |
 |---|---|---|---|---|---|---|
-| 1 | [TASK-BIGFILE-001](./TASK-BIGFILE-001-ipc-pty-pane-key-registry.md) | Move | `ipc/pty.ts` → `pty-pane-key-registry.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Blocked |
-| 2 | [TASK-BIGFILE-002](./TASK-BIGFILE-002-ipc-pty-startup-color-query.md) | Move | `ipc/pty.ts` → `pty-startup-color-query.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Blocked |
-| 3 | [TASK-BIGFILE-003](./TASK-BIGFILE-003-ipc-pty-host-env.md) | Move | `ipc/pty.ts` → `pty-host-env.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Blocked |
-| 4 | [TASK-BIGFILE-004](./TASK-BIGFILE-004-ipc-pty-ownership-registry.md) | Move | `ipc/pty.ts` → `pty-ownership-registry.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Blocked |
-| 5 | [TASK-BIGFILE-005](./TASK-BIGFILE-005-ipc-pty-renderer-delivery-debug.md) | Move | `ipc/pty.ts` → `pty-renderer-delivery-debug.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Blocked |
-| 6 | [TASK-BIGFILE-006](./TASK-BIGFILE-006-ipc-pty-provider-listener-binding.md) | Move | `ipc/pty.ts` → `pty-provider-listener-binding.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Blocked |
-| 7 | [TASK-BIGFILE-007](./TASK-BIGFILE-007-ipc-pty-register-handlers-investigate.md) | Investigate | `ipc/pty.ts` `registerPtyHandlers` | M | 1–6 | ⛔ Blocked (chặn bởi 1–6) |
+| 1 | [TASK-BIGFILE-001](./TASK-BIGFILE-001-ipc-pty-pane-key-registry.md) | Move | `ipc/pty.ts` → `pty-pane-key-registry.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Superseded — xem 250/252 (`d64ff6d7c`) |
+| 2 | [TASK-BIGFILE-002](./TASK-BIGFILE-002-ipc-pty-startup-color-query.md) | Move | `ipc/pty.ts` → `pty-startup-color-query.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Superseded — xem 250, xác nhận blocked thật (`d64ff6d7c`) |
+| 3 | [TASK-BIGFILE-003](./TASK-BIGFILE-003-ipc-pty-host-env.md) | Move | `ipc/pty.ts` → `pty-host-env.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Superseded — xem 251, thực ra an toàn (`d64ff6d7c`) |
+| 4 | [TASK-BIGFILE-004](./TASK-BIGFILE-004-ipc-pty-ownership-registry.md) | Move | `ipc/pty.ts` → `pty-ownership-registry.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Superseded — xem 250, xác nhận blocked thật (`d64ff6d7c`) |
+| 5 | [TASK-BIGFILE-005](./TASK-BIGFILE-005-ipc-pty-renderer-delivery-debug.md) | Move | `ipc/pty.ts` → `pty-renderer-delivery-debug.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Superseded — xem 250, lý do thật khác (closure-bridge) (`d64ff6d7c`) |
+| 6 | [TASK-BIGFILE-006](./TASK-BIGFILE-006-ipc-pty-provider-listener-binding.md) | Move | `ipc/pty.ts` → `pty-provider-listener-binding.ts` | S (thực tế: state dùng chéo pervasive) | — | ⛔ Superseded — xem 250, lý do thật khác (closure-bridge) (`d64ff6d7c`) |
+| 7 | [TASK-BIGFILE-007](./TASK-BIGFILE-007-ipc-pty-register-handlers-investigate.md) | Investigate | `ipc/pty.ts` `registerPtyHandlers` | M | 1–6 | ⛔ Superseded — gộp vào 250 (`d64ff6d7c`) |
 | 8 | [TASK-BIGFILE-008](./TASK-BIGFILE-008-orca-runtime-tail-buffer.md) | Move | `orca-runtime.ts` → `orca-runtime-tail-buffer.ts` | S (thực tế: L) | — | ✅ Done (`596be55bc`) |
 | 9 | [TASK-BIGFILE-009](./TASK-BIGFILE-009-orca-runtime-types.md) | Move | `orca-runtime.ts` → `orca-runtime-types.ts` | M | — | ✅ |
-| 10 | [TASK-BIGFILE-010](./TASK-BIGFILE-010-persistence-paths.md) | Move | `persistence.ts` → `persistence-paths.ts` | S | — | ⬜ |
-| 11 | [TASK-BIGFILE-011](./TASK-BIGFILE-011-persistence-migration.md) | Investigate+Move | `persistence.ts` → `persistence-migration.ts` | M | — | ⬜ |
-| 12 | [TASK-BIGFILE-012](./TASK-BIGFILE-012-worktreelist-helpers.md) | Investigate+Move | `WorktreeList.tsx` → `worktree-list-helpers.ts` | M | — | ⬜ |
-| 13 | [TASK-BIGFILE-013](./TASK-BIGFILE-013-worktreelist-visibility-listener.md) | Move | `WorktreeList.tsx` → `worktree-list-visibility-listener.ts` | S | — | ⬜ |
-| 14 | [TASK-BIGFILE-014](./TASK-BIGFILE-014-browserpane-annotation-card.md) | Move | `BrowserPane.tsx` → `browser-pane-annotation-card.tsx` | S | — | ⬜ |
-| 15 | [TASK-BIGFILE-015](./TASK-BIGFILE-015-browserpane-remote.md) | Move | `BrowserPane.tsx` → `browser-pane-remote.tsx` | M | — | ⬜ |
-| 16 | [TASK-BIGFILE-016](./TASK-BIGFILE-016-browserpane-local.md) | Move | `BrowserPane.tsx` → `browser-pane-local.tsx` | M | 15 | ⬜ |
-| 17 | [TASK-BIGFILE-017](./TASK-BIGFILE-017-github-item-dialog-shared.md) | Move | `GitHubItemDialog.tsx` + `PullRequestPage.tsx` → `github-item-dialog-shared.ts` | M | — | ⬜ |
-| 18 | [TASK-BIGFILE-018](./TASK-BIGFILE-018-githubitemdialog-tabs-investigate.md) | Investigate | `GitHubItemDialog.tsx` (component chính) | L | 17 | ⬜ |
-| 19 | [TASK-BIGFILE-019](./TASK-BIGFILE-019-pullrequestpage-tabs-investigate.md) | Investigate | `PullRequestPage.tsx` (component chính) | L | 17 | ⬜ |
-| 20 | [TASK-BIGFILE-020](./TASK-BIGFILE-020-sourcecontrol-helpers.md) | Move | `SourceControl.tsx` → `source-control-helpers.ts` | S | — | ⬜ |
-| 21 | [TASK-BIGFILE-021](./TASK-BIGFILE-021-sourcecontrol-commit-area.md) | Move | `SourceControl.tsx` → `source-control-commit-area.tsx` | M | — | ⬜ |
-| 22 | [TASK-BIGFILE-022](./TASK-BIGFILE-022-sourcecontrol-compare-summary.md) | Move | `SourceControl.tsx` → `source-control-compare-summary.tsx` | M | — | ⬜ |
-| 23 | [TASK-BIGFILE-023](./TASK-BIGFILE-023-sourcecontrol-banners.md) | Move | `SourceControl.tsx` → `source-control-banners.tsx` | S | — | ⬜ |
-| 24 | [TASK-BIGFILE-024](./TASK-BIGFILE-024-sourcecontrol-tree-rows.md) | Move | `SourceControl.tsx` → `source-control-tree-rows.tsx` | M | — | ⬜ |
-| 25 | [TASK-BIGFILE-025](./TASK-BIGFILE-025-sourcecontrol-action-button.md) | Move | `SourceControl.tsx` → `source-control-action-button.tsx` | S | — | ⬜ |
-| 26 | [TASK-BIGFILE-026](./TASK-BIGFILE-026-sourcecontrolinner-investigate.md) | Investigate | `SourceControl.tsx` `SourceControlInner` | L | 20–25 | ⬜ |
-| 27 | [TASK-BIGFILE-027](./TASK-BIGFILE-027-taskpage-types.md) | Move | `TaskPage.tsx` → `task-page-types.ts` | S | — | ⬜ |
-| 28 | [TASK-BIGFILE-028](./TASK-BIGFILE-028-taskpage-linear-cells.md) | Move | `TaskPage.tsx` → `task-page-linear-cells.tsx` | S | 27 | ⬜ |
-| 29 | [TASK-BIGFILE-029](./TASK-BIGFILE-029-taskpage-jira-banner.md) | Move | `TaskPage.tsx` → `task-page-jira-banner.tsx` | S | — | ⬜ |
-| 30 | [TASK-BIGFILE-030](./TASK-BIGFILE-030-taskpage-github-cells.md) | Move | `TaskPage.tsx` → `task-page-github-cells.tsx` | M | — | ⬜ |
-| 31 | [TASK-BIGFILE-031](./TASK-BIGFILE-031-taskpage-pagination.md) | Move | `TaskPage.tsx` → `task-page-pagination.tsx` | S | — | ⬜ |
-| 32 | [TASK-BIGFILE-032](./TASK-BIGFILE-032-taskpage-state-investigate.md) | Investigate | `TaskPage.tsx` component chính (83 state) | L | 27–31 | ⬜ |
-| 33 | [TASK-BIGFILE-033](./TASK-BIGFILE-033-pty-connection-test-coverage.md) | Test | `pty-connection.ts` | M | — | ⬜ |
-| 34 | [TASK-BIGFILE-034](./TASK-BIGFILE-034-pty-connection-branches-investigate.md) | Investigate | `pty-connection.ts` `connectPanePty` | L | 33 | ⬜ |
+| 10 | [TASK-BIGFILE-010](./TASK-BIGFILE-010-persistence-paths.md) | Move | `persistence.ts` → `persistence-paths.ts` | S | — | ✅ (`0ebe7f054`) |
+| 11 | [TASK-BIGFILE-011](./TASK-BIGFILE-011-persistence-migration.md) | Investigate+Move | `persistence.ts` → `persistence-migration.ts` | M | — | ✅ (`0ebe7f054`) |
+| 12 | [TASK-BIGFILE-012](./TASK-BIGFILE-012-worktreelist-helpers.md) | Investigate+Move | `WorktreeList.tsx` → `worktree-list-helpers.ts` | M | — | ✅ (`94c21b974`) |
+| 13 | [TASK-BIGFILE-013](./TASK-BIGFILE-013-worktreelist-visibility-listener.md) | Move | `WorktreeList.tsx` → `worktree-list-visibility-listener.ts` | S | — | ✅ (`94c21b974`) |
+| 14 | [TASK-BIGFILE-014](./TASK-BIGFILE-014-browserpane-annotation-card.md) | Move | `BrowserPane.tsx` → `browser-pane-annotation-card.tsx` | S | — | ✅ (`0b97bf047`) |
+| 15 | [TASK-BIGFILE-015](./TASK-BIGFILE-015-browserpane-remote.md) | Move | `BrowserPane.tsx` → `browser-pane-remote.tsx` | M | — | ✅ (`0b97bf047`) |
+| 16 | [TASK-BIGFILE-016](./TASK-BIGFILE-016-browserpane-local.md) | Move | `BrowserPane.tsx` → `browser-pane-local.tsx` | M | 15 | ✅ (`0b97bf047`) |
+| 17 | [TASK-BIGFILE-017](./TASK-BIGFILE-017-github-item-dialog-shared.md) | Move | `GitHubItemDialog.tsx` + `PullRequestPage.tsx` → `github-item-dialog-shared.ts` | M | — | 🟡 Done một phần — xem task doc (`629e99291`) |
+| 18 | [TASK-BIGFILE-018](./TASK-BIGFILE-018-githubitemdialog-tabs-investigate.md) | Investigate | `GitHubItemDialog.tsx` (component chính) | L | 17 | ✅ (không sinh task Move — xem SOLUTION-FE-BIGFILE-005, `629e99291`) |
+| 19 | [TASK-BIGFILE-019](./TASK-BIGFILE-019-pullrequestpage-tabs-investigate.md) | Investigate | `PullRequestPage.tsx` (component chính) | L | 17 | ✅ (không sinh task Move — xem SOLUTION-FE-BIGFILE-005, `629e99291`) |
+| 20 | [TASK-BIGFILE-020](./TASK-BIGFILE-020-sourcecontrol-helpers.md) | Move | `SourceControl.tsx` → `source-control-helpers.ts` | S | — | ✅ (`67fbe8f5c`) |
+| 21 | [TASK-BIGFILE-021](./TASK-BIGFILE-021-sourcecontrol-commit-area.md) | Move | `SourceControl.tsx` → `source-control-commit-area.tsx` | M | — | ✅ (`67fbe8f5c`) |
+| 22 | [TASK-BIGFILE-022](./TASK-BIGFILE-022-sourcecontrol-compare-summary.md) | Move | `SourceControl.tsx` → `source-control-compare-summary.tsx` | M | — | ✅ (`67fbe8f5c`) |
+| 23 | [TASK-BIGFILE-023](./TASK-BIGFILE-023-sourcecontrol-banners.md) | Move | `SourceControl.tsx` → `source-control-banners.tsx` | S | — | ✅ (`67fbe8f5c`) |
+| 24 | [TASK-BIGFILE-024](./TASK-BIGFILE-024-sourcecontrol-tree-rows.md) | Move | `SourceControl.tsx` → `source-control-tree-rows.tsx` | M | — | ✅ (`67fbe8f5c`) |
+| 25 | [TASK-BIGFILE-025](./TASK-BIGFILE-025-sourcecontrol-action-button.md) | Move | `SourceControl.tsx` → `source-control-action-button.tsx` | S | — | ✅ (`67fbe8f5c`) |
+| 26 | [TASK-BIGFILE-026](./TASK-BIGFILE-026-sourcecontrolinner-investigate.md) | Investigate | `SourceControl.tsx` `SourceControlInner` | L | 20–25 | ✅ (sinh task 225–226, `67fbe8f5c`) |
+| 27 | [TASK-BIGFILE-027](./TASK-BIGFILE-027-taskpage-types.md) | Move | `TaskPage.tsx` → `task-page-types.ts` | S | — | ✅ (`95d11f47a`) |
+| 28 | [TASK-BIGFILE-028](./TASK-BIGFILE-028-taskpage-linear-cells.md) | Move | `TaskPage.tsx` → `task-page-linear-cells.tsx` | S | 27 | ✅ (`95d11f47a`) |
+| 29 | [TASK-BIGFILE-029](./TASK-BIGFILE-029-taskpage-jira-banner.md) | Move | `TaskPage.tsx` → `task-page-jira-banner.tsx` | S | — | ✅ (`95d11f47a`) |
+| 30 | [TASK-BIGFILE-030](./TASK-BIGFILE-030-taskpage-github-cells.md) | Move | `TaskPage.tsx` → `task-page-github-cells.tsx` | M | — | ✅ (`95d11f47a`) |
+| 31 | [TASK-BIGFILE-031](./TASK-BIGFILE-031-taskpage-pagination.md) | Move | `TaskPage.tsx` → `task-page-pagination.tsx` | S | — | ✅ (`95d11f47a`) |
+| 32 | [TASK-BIGFILE-032](./TASK-BIGFILE-032-taskpage-state-investigate.md) | Investigate | `TaskPage.tsx` component chính (83 state) | L | 27–31 | ✅ (83/58 sai, thật 153/57; sinh task 235–241, `95d11f47a`) |
+| 33 | [TASK-BIGFILE-033](./TASK-BIGFILE-033-pty-connection-test-coverage.md) | Test | `pty-connection.ts` | M | — | ✅ (`81511109e`) |
+| 34 | [TASK-BIGFILE-034](./TASK-BIGFILE-034-pty-connection-branches-investigate.md) | Investigate | `pty-connection.ts` `connectPanePty` | L | 33 | ✅ (kết luận: split blocked — xem SOLUTION-FE-BIGFILE-006, `81511109e`) |
 | 35 | [TASK-BIGFILE-035](./TASK-BIGFILE-035-orca-runtime-service-domains-investigate.md) | Investigate | `orca-runtime.ts` `OrcaRuntimeService` | L | 8, 9 | ✅ (sinh task 36–40) |
 | 36 | [TASK-BIGFILE-036](./TASK-BIGFILE-036-orca-runtime-automation-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-automation.ts` | S | 8, 9 | ✅ |
 | 37 | [TASK-BIGFILE-037](./TASK-BIGFILE-037-orca-runtime-mobile-floor-domain.md) | Move (composition) | `orca-runtime.ts` → `orca-runtime-mobile-floor.ts` | L | 8, 9, khuyến nghị sau 36 | ✅ |
@@ -110,6 +110,23 @@ nghìn); task "Investigate" giới hạn rõ phạm vi đọc.
 | 80 | [TASK-BIGFILE-080](./TASK-BIGFILE-080-orca-runtime-sync-window-graph-domain.md) | Move (composition) — rủi ro cao, graph-sync hot path | `orca-runtime.ts` → `orca-runtime-sync-window-graph.ts` | M | 41 | ✅ |
 | 81 | [TASK-BIGFILE-081](./TASK-BIGFILE-081-orca-runtime-worktree-terminal-stop-domain.md) | Move (composition) — rủi ro trung bình | `orca-runtime.ts` → `orca-runtime-worktree-terminal-stop.ts` | M | — | ✅ |
 | 82 | [TASK-BIGFILE-082](./TASK-BIGFILE-082-resolve-agent-terminal-create-options-merge.md) | Move — gộp vào domain đã tồn tại (không tạo file mới) | `orca-runtime.ts` → `orca-runtime-terminal-create.ts` | S | 73, 78 | ✅ |
+
+**Task mới sinh từ các task Investigate ở đợt thực thi 2026-08-12 (số 083/084 đã bị huỷ ở nhánh `orca-runtime.ts`, không tái dùng — xem "Điểm dừng sau TASK-BIGFILE-082" bên dưới):**
+
+| # | Task | Loại | File đích/nguồn | Effort | Phụ thuộc | Status |
+|---|---|---|---|---|---|---|
+| 225 | [TASK-BIGFILE-225](./TASK-BIGFILE-225-sourcecontrol-diff-comments-panel-state.md) | Move | `SourceControl.tsx` → hook `useSourceControlDiffCommentsPanelState` | — | 26 | ⬜ (sinh bởi 26, chưa thực thi) |
+| 226 | [TASK-BIGFILE-226](./TASK-BIGFILE-226-sourcecontrol-branch-compare-refresh.md) | Move | `SourceControl.tsx` → hook `useSourceControlBranchCompareRefresh` | — | 26 | ⬜ (sinh bởi 26, chưa thực thi) |
+| 235 | [TASK-BIGFILE-235](./TASK-BIGFILE-235-taskpage-gitlab-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageGitLabState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
+| 236 | [TASK-BIGFILE-236](./TASK-BIGFILE-236-taskpage-github-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageGitHubState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
+| 237 | [TASK-BIGFILE-237](./TASK-BIGFILE-237-taskpage-jira-draft-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageJiraDraftState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
+| 238 | [TASK-BIGFILE-238](./TASK-BIGFILE-238-taskpage-jira-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageJiraBrowseState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
+| 239 | [TASK-BIGFILE-239](./TASK-BIGFILE-239-taskpage-linear-draft-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearDraftState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
+| 240 | [TASK-BIGFILE-240](./TASK-BIGFILE-240-taskpage-linear-teams-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearTeamsState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
+| 241 | [TASK-BIGFILE-241](./TASK-BIGFILE-241-taskpage-linear-browse-state-hook.md) | Move | `TaskPage.tsx` → hook `useTaskPageLinearBrowseState` | — | 32 | ⬜ (sinh bởi 32, chưa thực thi) |
+| 250 | [TASK-BIGFILE-250](./TASK-BIGFILE-250-ipc-pty-pane-key-registry-investigate.md) | Investigate | `ipc/pty.ts` pane-key-registry + provider-resolution state | L | thay thế 1–7 | ⬜ (sinh 251, 252 — cả 3 chưa thực thi) |
+| 251 | [TASK-BIGFILE-251](./TASK-BIGFILE-251-ipc-pty-host-env.md) | Move | `ipc/pty.ts` → `pty-host-env.ts` (phạm vi đã sửa) | — | 250 | ⬜ (chưa thực thi) |
+| 252 | [TASK-BIGFILE-252](./TASK-BIGFILE-252-ipc-pty-pane-key-registry.md) | Move (composition) | `ipc/pty.ts` → `pty-pane-key-registry.ts` (object/class) | — | 250 | ⬜ (chưa thực thi) |
 
 **Effort:** S = nhỏ (<30 phút, 1 file, <300 dòng di chuyển) · M = trung bình
 (vài trăm–~1,000 dòng, hoặc cần đọc thêm để xác nhận ranh giới) · L = lớn
@@ -196,6 +213,48 @@ bại và bị revert** — #083 vì `oxfmt` triệt tiêu lợi ích sau format
 thật, không phải false positive). Không sinh thêm task Move/Extract mới cho
 `orca-runtime.ts` từ đây. Chi tiết đầy đủ:
 `../BUG-FE-BIGFILE-002-orca-runtime.md` → "Kết quả & điểm dừng".
+
+## Đợt thực thi 25 task pending + rà soát 7 task blocked (2026-08-12)
+
+Chạy 8 agent song song (1 agent/nhóm file — 7 nhóm cho task 010–034 + 1 nhóm
+rà soát 001–007), mỗi agent tự đọc lại code thật thay vì tin số dòng cũ
+trong task doc (đúng bài học từ vụ ipc/pty.ts trước đó). Kết quả:
+
+- **25/25 task pending hoàn thành** — 18 Move thực thi thật (10–17, 20–25,
+  27–31, 33), 7 Investigate cho ra ghi chú thiết kế (18, 19, 26, 32, 34) —
+  trong đó 26 và 32 sinh thêm 9 task Move con mới (225, 226, 235–241) cho
+  đợt sau, TASK-017 hoàn thành một phần (xem task doc riêng), TASK-034 kết
+  luận split bị blocked (xem SOLUTION-FE-BIGFILE-006).
+- **7/7 task blocked (001–007) đã rà soát lại** — tất cả chuyển "⛔
+  Superseded", thay bằng 3 task mới tự đủ: TASK-BIGFILE-250 (Investigate),
+  251 và 252 (Move, đã sửa đúng phạm vi) — **cả 3 chưa thực thi**, để lại
+  cho đợt sau.
+- **Commit riêng theo từng nhóm file** (không phải 1-task-1-commit như quy
+  ước gốc — 8 agent chạy tuần tự nhiều task cộng dồn trên cùng 1 file trong
+  1 phiên, không tách lại được thành diff riêng từng task sau khi đã áp
+  dụng): `0ebe7f054` (persistence), `94c21b974` (worktreelist), `0b97bf047`
+  (browserpane), `629e99291` (github-pr), `67fbe8f5c` (sourcecontrol),
+  `95d11f47a` (taskpage), `81511109e` (pty-connection), `d64ff6d7c`
+  (ipc-pty rewrite).
+- **⚠️ gitnexus MCP và CLI không hoạt động trong TOÀN BỘ 8 agent** (`MCP
+  error -32000: Connection closed` / CLI segfault exit 139 ở mọi lệnh
+  `impact`/`detect_changes`/`context` có tham số repo). Không phải lỗi của
+  từng agent — hạ tầng gitnexus bị down cả phiên. Mọi agent đều tự thay thế
+  bằng `grep` thủ công toàn repo để xác minh blast-radius trước khi move,
+  ghi rõ trong từng task doc/commit message. Đây là **sai lệch so với quy
+  tắc bắt buộc** "MUST run impact analysis before editing any symbol" của
+  CLAUDE.md/AGENTS.md — chấp nhận được vì tooling down (không phải bỏ qua
+  chủ ý) và có phương án thay thế + ghi chép minh bạch, nhưng nên chạy
+  `gitnexus analyze` + `detect_changes({scope: "compare", base_ref: "main"})`
+  khi tool hồi phục để đối chiếu lại toàn bộ đợt này.
+- **Phát hiện + sửa 1 lỗ hổng xác minh từ đợt sync `backend`/`desktop` trước
+  đó** (`407deb6f3`, `e07fd1ded`): lúc đó `check-max-lines-ratchet.mjs` được
+  chạy khi các file mới còn chưa `git add` (untracked → vô hình với `git
+  ls-files`), nên báo "0-diff" giả — thực ra thiếu 46 baseline entry cho
+  các file `orca-runtime-*.ts` đã copy sang `backend/`+`desktop/`. Phát
+  hiện và bổ sung baseline entry đầy đủ trong đợt này (commit
+  `0b97bf047`), xác nhận lại bằng `check-max-lines-ratchet.mjs` 0-diff thật
+  (647, đúng baseline gốc).
 
 ## Tham khảo
 
