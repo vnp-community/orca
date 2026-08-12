@@ -721,3 +721,47 @@ export class WorktreeIdRequiresFullPathError extends Error {
     )
   }
 }
+
+// Why (BUG-FE-BIGFILE-002 / TASK-BIGFILE-079): the small const/helper cluster
+// that sat after the OrcaRuntimeService class body — same "no `this`" Extract
+// technique as the rest of this file, just relocated from the tail instead
+// of the head.
+export const DEFAULT_WORKTREE_LIST_LIMIT = 200
+export const DISCONNECTED_PTY_RECORD_MAX = 128
+export const PTY_CONTROLLER_LIST_TIMEOUT_MS = 3000
+
+export function getExplicitWorktreeIdSelector(selector: string | undefined): string | null {
+  if (!selector?.startsWith('id:')) {
+    return null
+  }
+  const id = selector.slice(3)
+  return id.length > 0 ? id : null
+}
+
+export function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null
+  return new Promise<T>((resolve) => {
+    timeout = setTimeout(() => resolve(fallback), timeoutMs)
+    promise.then(
+      (value) => resolve(value),
+      () => resolve(fallback)
+    )
+  }).finally(() => {
+    if (timeout) {
+      clearTimeout(timeout)
+    }
+  })
+}
+
+export function withTimeoutResult<T>(
+  promise: Promise<T>,
+  timeoutMs: number
+): Promise<{ ok: true; value: T } | { ok: false }> {
+  return withTimeout(
+    promise.then((value) => ({ ok: true, value }) as const),
+    timeoutMs,
+    {
+      ok: false
+    }
+  )
+}

@@ -232,10 +232,15 @@ import {
   AGENT_HOOK_RUNTIME_ENV_KEYS,
   addListenerToMap,
   copySleepingAgentLaunchConfig,
+  DEFAULT_WORKTREE_LIST_LIMIT,
+  DISCONNECTED_PTY_RECORD_MAX,
   getAgentLaunchPlatformForRepo,
+  getExplicitWorktreeIdSelector,
   isCursorAgentOrchestrationTarget,
   listRuntimeFolderWorkspaces,
+  PTY_CONTROLLER_LIST_TIMEOUT_MS,
   resolveBareAgentLaunchCommand,
+  withTimeoutResult,
   WorktreeIdRequiresFullPathError
 } from './orca-runtime-service-types'
 // Why (BUG-FE-BIGFILE-002 / TASK-BIGFILE-078): the pure types/functions/error
@@ -270,6 +275,7 @@ export {
   mergeRuntimeFolderWorkspace,
   omitUndefinedProperties,
   RuntimeLineageError,
+  withTimeout,
   WorktreeIdRequiresFullPathError
 } from './orca-runtime-service-types'
 
@@ -5028,46 +5034,6 @@ export class OrcaRuntimeService {
     const win = BrowserWindow.fromId(this.graph.authoritativeWindowId)
     return win && !win.isDestroyed() ? win : null
   }
-}
-
-const DEFAULT_WORKTREE_LIST_LIMIT = 200
-const DISCONNECTED_PTY_RECORD_MAX = 128
-const PTY_CONTROLLER_LIST_TIMEOUT_MS = 3000
-
-function getExplicitWorktreeIdSelector(selector: string | undefined): string | null {
-  if (!selector?.startsWith('id:')) {
-    return null
-  }
-  const id = selector.slice(3)
-  return id.length > 0 ? id : null
-}
-
-export function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  return new Promise<T>((resolve) => {
-    timeout = setTimeout(() => resolve(fallback), timeoutMs)
-    promise.then(
-      (value) => resolve(value),
-      () => resolve(fallback)
-    )
-  }).finally(() => {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-  })
-}
-
-function withTimeoutResult<T>(
-  promise: Promise<T>,
-  timeoutMs: number
-): Promise<{ ok: true; value: T } | { ok: false }> {
-  return withTimeout(
-    promise.then((value) => ({ ok: true, value }) as const),
-    timeoutMs,
-    {
-      ok: false
-    }
-  )
 }
 
 // FIX BUG-FE-BIGFILE-002 / TASK-BIGFILE-008: pure terminal-tail/output-scanning
