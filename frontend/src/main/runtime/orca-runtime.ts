@@ -43,7 +43,6 @@ import { RuntimeTerminalAgentStatusCommands } from './orca-runtime-terminal-agen
 import { RuntimePtyExitCommands } from './orca-runtime-pty-exit'
 import { RuntimeSyncWindowGraphCommands } from './orca-runtime-sync-window-graph'
 import { RuntimeWorktreeTerminalStopCommands } from './orca-runtime-worktree-terminal-stop'
-import { forwardMethods } from './orca-runtime-forward-methods'
 import { detectAgentStatusFromTitle, isClaudeManagementTitle } from '../../shared/agent-detection'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
 import type { TerminalSideEffectBatch } from '../../shared/terminal-side-effect-facts'
@@ -403,96 +402,6 @@ export class OrcaRuntimeService {
     registerTerminalViewAttributesApplier((attributes) => {
       this.headlessTerminalCommands.applyPushedViewAttributesToAll(attributes)
     })
-    this.wireForwardedMethods()
-  }
-
-  // Why (BUG-FE-BIGFILE-002 / TASK-BIGFILE-083): binds each already-extracted
-  // domain's public methods onto `this` via forwardMethods (see
-  // orca-runtime-forward-methods.ts) instead of one `declare`-paired
-  // `name: Type['name'] = this.instance.name.bind(this.instance)` field per
-  // method. Safe to call here: by the time the constructor body runs, every
-  // field initializer above it (including every `xCommands = new
-  // RuntimeXCommands(...)` composition instance) has already executed,
-  // regardless of textual order relative to the constructor (verified in a
-  // standalone Node.js field-initializer-order test during this effort).
-  // Runs once at construction; the resulting bound references are ordinary
-  // instance properties afterward, identical in shape and behavior to the
-  // `.bind()` fields they replace.
-  private wireForwardedMethods(): void {
-    forwardMethods(this, this.issueTrackingCommands, [
-      'addGitHubIssueCommentBySlug',
-      'addGitLabRepoIssueComment',
-      'addGitLabRepoMRComment',
-      'addGitLabRepoMRInlineComment',
-      'addRepoIssueComment',
-      'addRepoPRReviewComment',
-      'addRepoPRReviewCommentReply',
-      'clearGitHubProjectItemField',
-      'countRepoWorkItems',
-      'createGitLabRepoIssue',
-      'createHostedReview',
-      'createRepoIssue',
-      'deleteGitHubIssueCommentBySlug',
-      'diagnoseGitLabAuth',
-      'getGitHubProjectViewTable',
-      'getGitHubProjectWorkItemDetailsBySlug',
-      'getGitHubRateLimit',
-      'getGitLabRateLimit',
-      'getGitLabRepoJobTrace',
-      'getGitLabRepoWorkItemByPath',
-      'getGitLabRepoWorkItemDetails',
-      'getHostedReviewCreationEligibility',
-      'getHostedReviewForBranch',
-      'getRepoIssue',
-      'getRepoPRCheckDetails',
-      'getRepoPRChecks',
-      'getRepoPRComments',
-      'getRepoPRFileContents',
-      'getRepoPRForBranch',
-      'getRepoWorkItem',
-      'getRepoWorkItemByOwnerRepo',
-      'getRepoWorkItemDetails',
-      'listGitHubAssignableUsersBySlug',
-      'listGitHubIssueTypesBySlug',
-      'listGitHubLabelsBySlug',
-      'listGitHubProjects',
-      'listGitHubProjectViews',
-      'listGitLabRepoIssues',
-      'listGitLabRepoLabels',
-      'listGitLabRepoMRs',
-      'listGitLabRepoTodos',
-      'listGitLabRepoWorkItems',
-      'listRepoAssignableUsers',
-      'listRepoIssues',
-      'listRepoLabels',
-      'mergeGitLabRepoMR',
-      'mergeRepoPR',
-      'removeRepoPRReviewers',
-      'requestRepoPRReviewers',
-      'rerunRepoPRChecks',
-      'resolveGitHubProjectRef',
-      'resolveGitLabRepoMRDiscussion',
-      'resolveRepoReviewThread',
-      'retryGitLabRepoJob',
-      'setRepoPRAutoMerge',
-      'setRepoPRFileViewed',
-      'updateGitHubIssueBySlug',
-      'updateGitHubIssueCommentBySlug',
-      'updateGitHubIssueTypeBySlug',
-      'updateGitHubProjectItemField',
-      'updateGitHubPullRequestBySlug',
-      'updateGitLabRepoIssue',
-      'updateGitLabRepoMR',
-      'updateGitLabRepoMRReviewers',
-      'updateGitLabRepoMRState',
-      'updateRepoIssue',
-      'updateRepoPRDetails',
-      'updateRepoPRState',
-      'updateRepoPRTitle',
-      'getRepoSlug',
-      'getRepoUpstream',
-      'listRepoWorkItems'
-    ])
   }
 
   getLocalProvider(): IPtyProvider | null {
@@ -2369,78 +2278,152 @@ export class OrcaRuntimeService {
     getHostedReviewExecutionOptions: (repo) => this.getHostedReviewExecutionOptions(repo)
   })
 
-  declare addGitHubIssueCommentBySlug: RuntimeIssueTrackingCommands['addGitHubIssueCommentBySlug']
-  declare addGitLabRepoIssueComment: RuntimeIssueTrackingCommands['addGitLabRepoIssueComment']
-  declare addGitLabRepoMRComment: RuntimeIssueTrackingCommands['addGitLabRepoMRComment']
-  declare addGitLabRepoMRInlineComment: RuntimeIssueTrackingCommands['addGitLabRepoMRInlineComment']
-  declare addRepoIssueComment: RuntimeIssueTrackingCommands['addRepoIssueComment']
-  declare addRepoPRReviewComment: RuntimeIssueTrackingCommands['addRepoPRReviewComment']
-  declare addRepoPRReviewCommentReply: RuntimeIssueTrackingCommands['addRepoPRReviewCommentReply']
-  declare clearGitHubProjectItemField: RuntimeIssueTrackingCommands['clearGitHubProjectItemField']
-  declare countRepoWorkItems: RuntimeIssueTrackingCommands['countRepoWorkItems']
-  declare createGitLabRepoIssue: RuntimeIssueTrackingCommands['createGitLabRepoIssue']
-  declare createHostedReview: RuntimeIssueTrackingCommands['createHostedReview']
-  declare createRepoIssue: RuntimeIssueTrackingCommands['createRepoIssue']
-  declare deleteGitHubIssueCommentBySlug: RuntimeIssueTrackingCommands['deleteGitHubIssueCommentBySlug']
-  declare diagnoseGitLabAuth: RuntimeIssueTrackingCommands['diagnoseGitLabAuth']
-  declare getGitHubProjectViewTable: RuntimeIssueTrackingCommands['getGitHubProjectViewTable']
-  declare getGitHubProjectWorkItemDetailsBySlug: RuntimeIssueTrackingCommands['getGitHubProjectWorkItemDetailsBySlug']
-  declare getGitHubRateLimit: RuntimeIssueTrackingCommands['getGitHubRateLimit']
-  declare getGitLabRateLimit: RuntimeIssueTrackingCommands['getGitLabRateLimit']
-  declare getGitLabRepoJobTrace: RuntimeIssueTrackingCommands['getGitLabRepoJobTrace']
-  declare getGitLabRepoWorkItemByPath: RuntimeIssueTrackingCommands['getGitLabRepoWorkItemByPath']
-  declare getGitLabRepoWorkItemDetails: RuntimeIssueTrackingCommands['getGitLabRepoWorkItemDetails']
-  declare getHostedReviewCreationEligibility: RuntimeIssueTrackingCommands['getHostedReviewCreationEligibility']
-  declare getHostedReviewForBranch: RuntimeIssueTrackingCommands['getHostedReviewForBranch']
-  declare getRepoIssue: RuntimeIssueTrackingCommands['getRepoIssue']
-  declare getRepoPRCheckDetails: RuntimeIssueTrackingCommands['getRepoPRCheckDetails']
-  declare getRepoPRChecks: RuntimeIssueTrackingCommands['getRepoPRChecks']
-  declare getRepoPRComments: RuntimeIssueTrackingCommands['getRepoPRComments']
-  declare getRepoPRFileContents: RuntimeIssueTrackingCommands['getRepoPRFileContents']
-  declare getRepoPRForBranch: RuntimeIssueTrackingCommands['getRepoPRForBranch']
-  declare getRepoWorkItem: RuntimeIssueTrackingCommands['getRepoWorkItem']
-  declare getRepoWorkItemByOwnerRepo: RuntimeIssueTrackingCommands['getRepoWorkItemByOwnerRepo']
-  declare getRepoWorkItemDetails: RuntimeIssueTrackingCommands['getRepoWorkItemDetails']
-  declare listGitHubAssignableUsersBySlug: RuntimeIssueTrackingCommands['listGitHubAssignableUsersBySlug']
-  declare listGitHubIssueTypesBySlug: RuntimeIssueTrackingCommands['listGitHubIssueTypesBySlug']
-  declare listGitHubLabelsBySlug: RuntimeIssueTrackingCommands['listGitHubLabelsBySlug']
-  declare listGitHubProjects: RuntimeIssueTrackingCommands['listGitHubProjects']
-  declare listGitHubProjectViews: RuntimeIssueTrackingCommands['listGitHubProjectViews']
-  declare listGitLabRepoIssues: RuntimeIssueTrackingCommands['listGitLabRepoIssues']
-  declare listGitLabRepoLabels: RuntimeIssueTrackingCommands['listGitLabRepoLabels']
-  declare listGitLabRepoMRs: RuntimeIssueTrackingCommands['listGitLabRepoMRs']
-  declare listGitLabRepoTodos: RuntimeIssueTrackingCommands['listGitLabRepoTodos']
-  declare listGitLabRepoWorkItems: RuntimeIssueTrackingCommands['listGitLabRepoWorkItems']
-  declare listRepoAssignableUsers: RuntimeIssueTrackingCommands['listRepoAssignableUsers']
-  declare listRepoIssues: RuntimeIssueTrackingCommands['listRepoIssues']
-  declare listRepoLabels: RuntimeIssueTrackingCommands['listRepoLabels']
-  declare mergeGitLabRepoMR: RuntimeIssueTrackingCommands['mergeGitLabRepoMR']
-  declare mergeRepoPR: RuntimeIssueTrackingCommands['mergeRepoPR']
-  declare removeRepoPRReviewers: RuntimeIssueTrackingCommands['removeRepoPRReviewers']
-  declare requestRepoPRReviewers: RuntimeIssueTrackingCommands['requestRepoPRReviewers']
-  declare rerunRepoPRChecks: RuntimeIssueTrackingCommands['rerunRepoPRChecks']
-  declare resolveGitHubProjectRef: RuntimeIssueTrackingCommands['resolveGitHubProjectRef']
-  declare resolveGitLabRepoMRDiscussion: RuntimeIssueTrackingCommands['resolveGitLabRepoMRDiscussion']
-  declare resolveRepoReviewThread: RuntimeIssueTrackingCommands['resolveRepoReviewThread']
-  declare retryGitLabRepoJob: RuntimeIssueTrackingCommands['retryGitLabRepoJob']
-  declare setRepoPRAutoMerge: RuntimeIssueTrackingCommands['setRepoPRAutoMerge']
-  declare setRepoPRFileViewed: RuntimeIssueTrackingCommands['setRepoPRFileViewed']
-  declare updateGitHubIssueBySlug: RuntimeIssueTrackingCommands['updateGitHubIssueBySlug']
-  declare updateGitHubIssueCommentBySlug: RuntimeIssueTrackingCommands['updateGitHubIssueCommentBySlug']
-  declare updateGitHubIssueTypeBySlug: RuntimeIssueTrackingCommands['updateGitHubIssueTypeBySlug']
-  declare updateGitHubProjectItemField: RuntimeIssueTrackingCommands['updateGitHubProjectItemField']
-  declare updateGitHubPullRequestBySlug: RuntimeIssueTrackingCommands['updateGitHubPullRequestBySlug']
-  declare updateGitLabRepoIssue: RuntimeIssueTrackingCommands['updateGitLabRepoIssue']
-  declare updateGitLabRepoMR: RuntimeIssueTrackingCommands['updateGitLabRepoMR']
-  declare updateGitLabRepoMRReviewers: RuntimeIssueTrackingCommands['updateGitLabRepoMRReviewers']
-  declare updateGitLabRepoMRState: RuntimeIssueTrackingCommands['updateGitLabRepoMRState']
-  declare updateRepoIssue: RuntimeIssueTrackingCommands['updateRepoIssue']
-  declare updateRepoPRDetails: RuntimeIssueTrackingCommands['updateRepoPRDetails']
-  declare updateRepoPRState: RuntimeIssueTrackingCommands['updateRepoPRState']
-  declare updateRepoPRTitle: RuntimeIssueTrackingCommands['updateRepoPRTitle']
-  declare getRepoSlug: RuntimeIssueTrackingCommands['getRepoSlug']
-  declare getRepoUpstream: RuntimeIssueTrackingCommands['getRepoUpstream']
-  declare listRepoWorkItems: RuntimeIssueTrackingCommands['listRepoWorkItems']
+  addGitHubIssueCommentBySlug: RuntimeIssueTrackingCommands['addGitHubIssueCommentBySlug'] =
+    this.issueTrackingCommands.addGitHubIssueCommentBySlug.bind(this.issueTrackingCommands)
+  addGitLabRepoIssueComment: RuntimeIssueTrackingCommands['addGitLabRepoIssueComment'] =
+    this.issueTrackingCommands.addGitLabRepoIssueComment.bind(this.issueTrackingCommands)
+  addGitLabRepoMRComment: RuntimeIssueTrackingCommands['addGitLabRepoMRComment'] =
+    this.issueTrackingCommands.addGitLabRepoMRComment.bind(this.issueTrackingCommands)
+  addGitLabRepoMRInlineComment: RuntimeIssueTrackingCommands['addGitLabRepoMRInlineComment'] =
+    this.issueTrackingCommands.addGitLabRepoMRInlineComment.bind(this.issueTrackingCommands)
+  addRepoIssueComment: RuntimeIssueTrackingCommands['addRepoIssueComment'] =
+    this.issueTrackingCommands.addRepoIssueComment.bind(this.issueTrackingCommands)
+  addRepoPRReviewComment: RuntimeIssueTrackingCommands['addRepoPRReviewComment'] =
+    this.issueTrackingCommands.addRepoPRReviewComment.bind(this.issueTrackingCommands)
+  addRepoPRReviewCommentReply: RuntimeIssueTrackingCommands['addRepoPRReviewCommentReply'] =
+    this.issueTrackingCommands.addRepoPRReviewCommentReply.bind(this.issueTrackingCommands)
+  clearGitHubProjectItemField: RuntimeIssueTrackingCommands['clearGitHubProjectItemField'] =
+    this.issueTrackingCommands.clearGitHubProjectItemField.bind(this.issueTrackingCommands)
+  countRepoWorkItems: RuntimeIssueTrackingCommands['countRepoWorkItems'] =
+    this.issueTrackingCommands.countRepoWorkItems.bind(this.issueTrackingCommands)
+  createGitLabRepoIssue: RuntimeIssueTrackingCommands['createGitLabRepoIssue'] =
+    this.issueTrackingCommands.createGitLabRepoIssue.bind(this.issueTrackingCommands)
+  createHostedReview: RuntimeIssueTrackingCommands['createHostedReview'] =
+    this.issueTrackingCommands.createHostedReview.bind(this.issueTrackingCommands)
+  createRepoIssue: RuntimeIssueTrackingCommands['createRepoIssue'] =
+    this.issueTrackingCommands.createRepoIssue.bind(this.issueTrackingCommands)
+  deleteGitHubIssueCommentBySlug: RuntimeIssueTrackingCommands['deleteGitHubIssueCommentBySlug'] =
+    this.issueTrackingCommands.deleteGitHubIssueCommentBySlug.bind(this.issueTrackingCommands)
+  diagnoseGitLabAuth: RuntimeIssueTrackingCommands['diagnoseGitLabAuth'] =
+    this.issueTrackingCommands.diagnoseGitLabAuth.bind(this.issueTrackingCommands)
+  getGitHubProjectViewTable: RuntimeIssueTrackingCommands['getGitHubProjectViewTable'] =
+    this.issueTrackingCommands.getGitHubProjectViewTable.bind(this.issueTrackingCommands)
+  getGitHubProjectWorkItemDetailsBySlug: RuntimeIssueTrackingCommands['getGitHubProjectWorkItemDetailsBySlug'] =
+    this.issueTrackingCommands.getGitHubProjectWorkItemDetailsBySlug.bind(
+      this.issueTrackingCommands
+    )
+  getGitHubRateLimit: RuntimeIssueTrackingCommands['getGitHubRateLimit'] =
+    this.issueTrackingCommands.getGitHubRateLimit.bind(this.issueTrackingCommands)
+  getGitLabRateLimit: RuntimeIssueTrackingCommands['getGitLabRateLimit'] =
+    this.issueTrackingCommands.getGitLabRateLimit.bind(this.issueTrackingCommands)
+  getGitLabRepoJobTrace: RuntimeIssueTrackingCommands['getGitLabRepoJobTrace'] =
+    this.issueTrackingCommands.getGitLabRepoJobTrace.bind(this.issueTrackingCommands)
+  getGitLabRepoWorkItemByPath: RuntimeIssueTrackingCommands['getGitLabRepoWorkItemByPath'] =
+    this.issueTrackingCommands.getGitLabRepoWorkItemByPath.bind(this.issueTrackingCommands)
+  getGitLabRepoWorkItemDetails: RuntimeIssueTrackingCommands['getGitLabRepoWorkItemDetails'] =
+    this.issueTrackingCommands.getGitLabRepoWorkItemDetails.bind(this.issueTrackingCommands)
+  getHostedReviewCreationEligibility: RuntimeIssueTrackingCommands['getHostedReviewCreationEligibility'] =
+    this.issueTrackingCommands.getHostedReviewCreationEligibility.bind(this.issueTrackingCommands)
+  getHostedReviewForBranch: RuntimeIssueTrackingCommands['getHostedReviewForBranch'] =
+    this.issueTrackingCommands.getHostedReviewForBranch.bind(this.issueTrackingCommands)
+  getRepoIssue: RuntimeIssueTrackingCommands['getRepoIssue'] =
+    this.issueTrackingCommands.getRepoIssue.bind(this.issueTrackingCommands)
+  getRepoPRCheckDetails: RuntimeIssueTrackingCommands['getRepoPRCheckDetails'] =
+    this.issueTrackingCommands.getRepoPRCheckDetails.bind(this.issueTrackingCommands)
+  getRepoPRChecks: RuntimeIssueTrackingCommands['getRepoPRChecks'] =
+    this.issueTrackingCommands.getRepoPRChecks.bind(this.issueTrackingCommands)
+  getRepoPRComments: RuntimeIssueTrackingCommands['getRepoPRComments'] =
+    this.issueTrackingCommands.getRepoPRComments.bind(this.issueTrackingCommands)
+  getRepoPRFileContents: RuntimeIssueTrackingCommands['getRepoPRFileContents'] =
+    this.issueTrackingCommands.getRepoPRFileContents.bind(this.issueTrackingCommands)
+  getRepoPRForBranch: RuntimeIssueTrackingCommands['getRepoPRForBranch'] =
+    this.issueTrackingCommands.getRepoPRForBranch.bind(this.issueTrackingCommands)
+  getRepoWorkItem: RuntimeIssueTrackingCommands['getRepoWorkItem'] =
+    this.issueTrackingCommands.getRepoWorkItem.bind(this.issueTrackingCommands)
+  getRepoWorkItemByOwnerRepo: RuntimeIssueTrackingCommands['getRepoWorkItemByOwnerRepo'] =
+    this.issueTrackingCommands.getRepoWorkItemByOwnerRepo.bind(this.issueTrackingCommands)
+  getRepoWorkItemDetails: RuntimeIssueTrackingCommands['getRepoWorkItemDetails'] =
+    this.issueTrackingCommands.getRepoWorkItemDetails.bind(this.issueTrackingCommands)
+  listGitHubAssignableUsersBySlug: RuntimeIssueTrackingCommands['listGitHubAssignableUsersBySlug'] =
+    this.issueTrackingCommands.listGitHubAssignableUsersBySlug.bind(this.issueTrackingCommands)
+  listGitHubIssueTypesBySlug: RuntimeIssueTrackingCommands['listGitHubIssueTypesBySlug'] =
+    this.issueTrackingCommands.listGitHubIssueTypesBySlug.bind(this.issueTrackingCommands)
+  listGitHubLabelsBySlug: RuntimeIssueTrackingCommands['listGitHubLabelsBySlug'] =
+    this.issueTrackingCommands.listGitHubLabelsBySlug.bind(this.issueTrackingCommands)
+  listGitHubProjects: RuntimeIssueTrackingCommands['listGitHubProjects'] =
+    this.issueTrackingCommands.listGitHubProjects.bind(this.issueTrackingCommands)
+  listGitHubProjectViews: RuntimeIssueTrackingCommands['listGitHubProjectViews'] =
+    this.issueTrackingCommands.listGitHubProjectViews.bind(this.issueTrackingCommands)
+  listGitLabRepoIssues: RuntimeIssueTrackingCommands['listGitLabRepoIssues'] =
+    this.issueTrackingCommands.listGitLabRepoIssues.bind(this.issueTrackingCommands)
+  listGitLabRepoLabels: RuntimeIssueTrackingCommands['listGitLabRepoLabels'] =
+    this.issueTrackingCommands.listGitLabRepoLabels.bind(this.issueTrackingCommands)
+  listGitLabRepoMRs: RuntimeIssueTrackingCommands['listGitLabRepoMRs'] =
+    this.issueTrackingCommands.listGitLabRepoMRs.bind(this.issueTrackingCommands)
+  listGitLabRepoTodos: RuntimeIssueTrackingCommands['listGitLabRepoTodos'] =
+    this.issueTrackingCommands.listGitLabRepoTodos.bind(this.issueTrackingCommands)
+  listGitLabRepoWorkItems: RuntimeIssueTrackingCommands['listGitLabRepoWorkItems'] =
+    this.issueTrackingCommands.listGitLabRepoWorkItems.bind(this.issueTrackingCommands)
+  listRepoAssignableUsers: RuntimeIssueTrackingCommands['listRepoAssignableUsers'] =
+    this.issueTrackingCommands.listRepoAssignableUsers.bind(this.issueTrackingCommands)
+  listRepoIssues: RuntimeIssueTrackingCommands['listRepoIssues'] =
+    this.issueTrackingCommands.listRepoIssues.bind(this.issueTrackingCommands)
+  listRepoLabels: RuntimeIssueTrackingCommands['listRepoLabels'] =
+    this.issueTrackingCommands.listRepoLabels.bind(this.issueTrackingCommands)
+  mergeGitLabRepoMR: RuntimeIssueTrackingCommands['mergeGitLabRepoMR'] =
+    this.issueTrackingCommands.mergeGitLabRepoMR.bind(this.issueTrackingCommands)
+  mergeRepoPR: RuntimeIssueTrackingCommands['mergeRepoPR'] =
+    this.issueTrackingCommands.mergeRepoPR.bind(this.issueTrackingCommands)
+  removeRepoPRReviewers: RuntimeIssueTrackingCommands['removeRepoPRReviewers'] =
+    this.issueTrackingCommands.removeRepoPRReviewers.bind(this.issueTrackingCommands)
+  requestRepoPRReviewers: RuntimeIssueTrackingCommands['requestRepoPRReviewers'] =
+    this.issueTrackingCommands.requestRepoPRReviewers.bind(this.issueTrackingCommands)
+  rerunRepoPRChecks: RuntimeIssueTrackingCommands['rerunRepoPRChecks'] =
+    this.issueTrackingCommands.rerunRepoPRChecks.bind(this.issueTrackingCommands)
+  resolveGitHubProjectRef: RuntimeIssueTrackingCommands['resolveGitHubProjectRef'] =
+    this.issueTrackingCommands.resolveGitHubProjectRef.bind(this.issueTrackingCommands)
+  resolveGitLabRepoMRDiscussion: RuntimeIssueTrackingCommands['resolveGitLabRepoMRDiscussion'] =
+    this.issueTrackingCommands.resolveGitLabRepoMRDiscussion.bind(this.issueTrackingCommands)
+  resolveRepoReviewThread: RuntimeIssueTrackingCommands['resolveRepoReviewThread'] =
+    this.issueTrackingCommands.resolveRepoReviewThread.bind(this.issueTrackingCommands)
+  retryGitLabRepoJob: RuntimeIssueTrackingCommands['retryGitLabRepoJob'] =
+    this.issueTrackingCommands.retryGitLabRepoJob.bind(this.issueTrackingCommands)
+  setRepoPRAutoMerge: RuntimeIssueTrackingCommands['setRepoPRAutoMerge'] =
+    this.issueTrackingCommands.setRepoPRAutoMerge.bind(this.issueTrackingCommands)
+  setRepoPRFileViewed: RuntimeIssueTrackingCommands['setRepoPRFileViewed'] =
+    this.issueTrackingCommands.setRepoPRFileViewed.bind(this.issueTrackingCommands)
+  updateGitHubIssueBySlug: RuntimeIssueTrackingCommands['updateGitHubIssueBySlug'] =
+    this.issueTrackingCommands.updateGitHubIssueBySlug.bind(this.issueTrackingCommands)
+  updateGitHubIssueCommentBySlug: RuntimeIssueTrackingCommands['updateGitHubIssueCommentBySlug'] =
+    this.issueTrackingCommands.updateGitHubIssueCommentBySlug.bind(this.issueTrackingCommands)
+  updateGitHubIssueTypeBySlug: RuntimeIssueTrackingCommands['updateGitHubIssueTypeBySlug'] =
+    this.issueTrackingCommands.updateGitHubIssueTypeBySlug.bind(this.issueTrackingCommands)
+  updateGitHubProjectItemField: RuntimeIssueTrackingCommands['updateGitHubProjectItemField'] =
+    this.issueTrackingCommands.updateGitHubProjectItemField.bind(this.issueTrackingCommands)
+  updateGitHubPullRequestBySlug: RuntimeIssueTrackingCommands['updateGitHubPullRequestBySlug'] =
+    this.issueTrackingCommands.updateGitHubPullRequestBySlug.bind(this.issueTrackingCommands)
+  updateGitLabRepoIssue: RuntimeIssueTrackingCommands['updateGitLabRepoIssue'] =
+    this.issueTrackingCommands.updateGitLabRepoIssue.bind(this.issueTrackingCommands)
+  updateGitLabRepoMR: RuntimeIssueTrackingCommands['updateGitLabRepoMR'] =
+    this.issueTrackingCommands.updateGitLabRepoMR.bind(this.issueTrackingCommands)
+  updateGitLabRepoMRReviewers: RuntimeIssueTrackingCommands['updateGitLabRepoMRReviewers'] =
+    this.issueTrackingCommands.updateGitLabRepoMRReviewers.bind(this.issueTrackingCommands)
+  updateGitLabRepoMRState: RuntimeIssueTrackingCommands['updateGitLabRepoMRState'] =
+    this.issueTrackingCommands.updateGitLabRepoMRState.bind(this.issueTrackingCommands)
+  updateRepoIssue: RuntimeIssueTrackingCommands['updateRepoIssue'] =
+    this.issueTrackingCommands.updateRepoIssue.bind(this.issueTrackingCommands)
+  updateRepoPRDetails: RuntimeIssueTrackingCommands['updateRepoPRDetails'] =
+    this.issueTrackingCommands.updateRepoPRDetails.bind(this.issueTrackingCommands)
+  updateRepoPRState: RuntimeIssueTrackingCommands['updateRepoPRState'] =
+    this.issueTrackingCommands.updateRepoPRState.bind(this.issueTrackingCommands)
+  updateRepoPRTitle: RuntimeIssueTrackingCommands['updateRepoPRTitle'] =
+    this.issueTrackingCommands.updateRepoPRTitle.bind(this.issueTrackingCommands)
+  getRepoSlug: RuntimeIssueTrackingCommands['getRepoSlug'] =
+    this.issueTrackingCommands.getRepoSlug.bind(this.issueTrackingCommands)
+  getRepoUpstream: RuntimeIssueTrackingCommands['getRepoUpstream'] =
+    this.issueTrackingCommands.getRepoUpstream.bind(this.issueTrackingCommands)
+  listRepoWorkItems: RuntimeIssueTrackingCommands['listRepoWorkItems'] =
+    this.issueTrackingCommands.listRepoWorkItems.bind(this.issueTrackingCommands)
 
   private readonly repoHooksCommands = new RuntimeRepoHooksCommands({
     resolveRepoSelector: (selector) => this.resolveRepoSelector(selector)
