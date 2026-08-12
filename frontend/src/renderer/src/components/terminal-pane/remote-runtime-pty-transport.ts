@@ -650,7 +650,7 @@ export function createRemoteRuntimePtyTransport(
       },
       onSnapshot: (data, meta) => {
         logBugFePty001(
-          `subscribeToHandle onSnapshot tabId=${tabId} leafId=${leafId} handle=${subscribedHandle} gen=${generation} seq=${meta?.seq} preview=${JSON.stringify(data.slice(-80))}`
+          `subscribeToHandle onSnapshot tabId=${tabId} leafId=${leafId} handle=${subscribedHandle} gen=${generation} preview=${JSON.stringify(data.slice(-80))}`
         )
         // Why: a snapshot with no body can still carry a pending mid-escape
         // tail that must be replayed so the next live chunk completes it.
