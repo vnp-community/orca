@@ -40,6 +40,7 @@ import { RuntimeTerminalCreateCommands } from './orca-runtime-terminal-create'
 import { RuntimePtyDataIngestCommands } from './orca-runtime-pty-data-ingest'
 import { RuntimeTerminalSendCommands } from './orca-runtime-terminal-send'
 import { RuntimeTerminalAgentStatusCommands } from './orca-runtime-terminal-agent-status'
+import { RuntimePtyExitCommands } from './orca-runtime-pty-exit'
 import {
   detectAgentStatusFromTitle,
   isClaudeManagementTitle,
@@ -2575,98 +2576,33 @@ export class OrcaRuntimeService {
   onClientDisconnected: RuntimeMobileFloorCommands['onClientDisconnected'] =
     this.mobileFloorCommands.onClientDisconnected.bind(this.mobileFloorCommands)
 
-  onPtyExit(ptyId: string, exitCode: number): void {
-    advertisedUrlWatcher.unbindPty(ptyId)
-    serveSimStateWatcher.unbindPty(ptyId)
-    // Clean up new mobile state for this PTY
-    this.remoteTerminalViewSubscriberCommands.clearRemoteTerminalViewSubscriberCountForPty(ptyId)
-    this.ptyTranscripts.recentPtyOutputById.delete(ptyId)
-    this.clearWaitBlockedCheckState(ptyId)
-    this.ptyTranscripts.recentPtyPathCandidatesById.delete(ptyId)
-    this.ptyTranscripts.ptyOutputSequenceById.delete(ptyId)
-    this.ptyTranscripts.agentStatusOscProcessorsByPtyId.delete(ptyId)
-    this.ptyTranscripts.terminalSpawnCommandsByPtyId.delete(ptyId)
-    this.disposePtyTitleTracker(ptyId)
-    this.ptyTranscripts.oscTitleScanTailByPtyId.delete(ptyId)
-    this.ptyTranscripts.osc7ScanTailByPtyId.delete(ptyId)
-    this.ptyTranscripts.terminalCwdByPtyId.delete(ptyId)
-    this.ptyTranscripts.terminalFileUriHostnameByPtyId.delete(ptyId)
-    this.clearAgentRowSnapshotsForPty(ptyId)
-    // Why: a Claude agent-team leader whose PTY exits naturally (agent finished,
-    // process died, renderer reload) must release its team + nested panes map.
-    // Previously only explicit closeTerminal evicted it, so natural exits leaked
-    // one team per never-reused teamId for the runtime's lifetime.
-    const exitedTeamLeaderHandle = this.graph.handleByPtyId.get(ptyId)
-    if (exitedTeamLeaderHandle) {
-      this.claudeAgentTeams.removeTeamForLeaderHandle(exitedTeamLeaderHandle)
-    }
-    // Why: mobile floor/layout/remote-desktop state for this PTY moved to
-    // RuntimeMobileFloorCommands (TASK-BIGFILE-037) — delegate the cleanup.
-    this.mobileFloorCommands.clearStateForExitedPty(ptyId)
-    this.disposeHeadlessTerminal(ptyId)
-    this.agentDetector?.onExit(ptyId)
-    const pty = this.graph.ptysById.get(ptyId)
-    if (pty) {
-      pty.connected = false
-      pty.disconnectedAt = Date.now()
-      pty.lastExitCode = exitCode
-      this.terminalWaiterCommands.resolvePtyExitWaiters(pty, ptyId)
-      this.pruneDisconnectedPtyTranscript(pty)
-      this.touchMobileSessionSnapshotsForPty(ptyId, { immediate: true })
-    }
+  private readonly ptyExitCommands = new RuntimePtyExitCommands({
+    getGraph: () => this.graph,
+    getPtyTranscripts: () => this.ptyTranscripts,
+    getRawOrchestrationDb: () => this._orchestrationDb,
+    getAgentDetector: () => this.agentDetector,
+    getLeafKey: (tabId, leafId) => this.getLeafKey(tabId, leafId),
+    getLeavesForPty: (ptyId) => this.getLeavesForPty(ptyId),
+    clearRemoteTerminalViewSubscriberCountForPty: (ptyId) =>
+      this.remoteTerminalViewSubscriberCommands.clearRemoteTerminalViewSubscriberCountForPty(ptyId),
+    clearWaitBlockedCheckState: (ptyId) => this.clearWaitBlockedCheckState(ptyId),
+    disposePtyTitleTracker: (ptyId) => this.disposePtyTitleTracker(ptyId),
+    clearAgentRowSnapshotsForPty: (ptyId) => this.clearAgentRowSnapshotsForPty(ptyId),
+    removeTeamForLeaderHandle: (handle) => this.claudeAgentTeams.removeTeamForLeaderHandle(handle),
+    clearStateForExitedPty: (ptyId) => this.mobileFloorCommands.clearStateForExitedPty(ptyId),
+    disposeHeadlessTerminal: (ptyId) => this.disposeHeadlessTerminal(ptyId),
+    resolvePtyExitWaiters: (pty, ptyId) =>
+      this.terminalWaiterCommands.resolvePtyExitWaiters(pty, ptyId),
+    resolveExitWaiters: (leaf) => this.terminalWaiterCommands.resolveExitWaiters(leaf),
+    pruneDisconnectedPtyTranscript: (pty) => this.pruneDisconnectedPtyTranscript(pty),
+    touchMobileSessionSnapshotsForPty: (ptyId, options) =>
+      this.touchMobileSessionSnapshotsForPty(ptyId, options),
+    pruneDisconnectedPtyRecords: () => this.pruneDisconnectedPtyRecords()
+  })
 
-    for (const leaf of this.getLeavesForPty(ptyId)) {
-      this.graph.detachedPreAllocatedLeaves.delete(ptyId)
-      leaf.connected = false
-      leaf.writable = false
-      leaf.lastExitCode = exitCode
-      this.terminalWaiterCommands.resolveExitWaiters(leaf)
-      this.failActiveDispatchOnExit(leaf, exitCode)
-    }
-    this.pruneDisconnectedPtyRecords()
-  }
-
-  // Why: Section 7.2 — the runtime detects agent exit directly and updates
-  // dispatch contexts immediately, rather than waiting for the coordinator's
-  // next poll cycle. This catches agent crashes and unexpected exits within
-  // milliseconds. The task is set back to 'pending' so it can be re-dispatched.
-  private failActiveDispatchOnExit(leaf: RuntimeLeafRecord, exitCode: number): void {
-    if (!this._orchestrationDb) {
-      return
-    }
-
-    const handle = this.graph.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
-    if (!handle) {
-      return
-    }
-
-    const dispatch = this._orchestrationDb.getActiveDispatchForTerminal(handle)
-    if (!dispatch) {
-      return
-    }
-
-    const errorContext = `Agent exited with code ${exitCode}`
-    this._orchestrationDb.failDispatch(dispatch.id, errorContext)
-
-    // Why: create an escalation message so the coordinator is notified about
-    // the unexpected exit on its next check cycle, even if the circuit breaker
-    // hasn't tripped yet.
-    const run = this._orchestrationDb.getActiveCoordinatorRun()
-    if (run) {
-      this._orchestrationDb.insertMessage({
-        from: handle,
-        to: run.coordinator_handle,
-        subject: `Agent exited unexpectedly (code ${exitCode})`,
-        type: 'escalation',
-        priority: 'high',
-        payload: JSON.stringify({
-          taskId: dispatch.task_id,
-          exitCode,
-          handle
-        })
-      })
-    }
-  }
+  onPtyExit: RuntimePtyExitCommands['onPtyExit'] = this.ptyExitCommands.onPtyExit.bind(
+    this.ptyExitCommands
+  )
 
   private readonly terminalListingCommands = new RuntimeTerminalListingCommands({
     getGraph: () => this.graph,
