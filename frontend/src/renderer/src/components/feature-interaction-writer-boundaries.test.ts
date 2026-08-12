@@ -40,7 +40,7 @@ describe('feature interaction writer boundaries', () => {
     const providerWriter = /recordFeatureInteraction\('(github|gitlab|linear)-tasks'\)/
 
     const passiveSections = [
-      sourceBetween(source, 'const handleRefreshGithubTasks', 'const [newIssueOpen'),
+      sourceBetween(source, 'const handleRefreshGithubTasks', 'const newIssueTargetRepo'),
       sourceBetween(source, 'const handleLoadNextPage', 'const handleApplyTaskSearch'),
       sourceBetween(source, 'const handleApplyTaskSearch', 'const handleSetDefaultTaskPreset'),
       sourceBetween(source, 'const handleSelectGithubTaskKind', 'const handleResetGithubTaskSearch')
@@ -101,7 +101,7 @@ describe('feature interaction writer boundaries', () => {
     const githubDetailSection = sourceBetween(
       source,
       'const openGitHubDetailPage',
-      'const patchTaskPageWorkItemRows'
+      'const handleDialogReviewRequestsChange'
     )
 
     const inPageNavigationSections = [

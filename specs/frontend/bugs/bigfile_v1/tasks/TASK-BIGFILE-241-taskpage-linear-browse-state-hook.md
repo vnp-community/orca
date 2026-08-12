@@ -4,7 +4,7 @@
 cơ học" ở TASK-BIGFILE-235, áp dụng y hệt ở đây) · **Effort:** L (lớn nhất
 trong 235–241 — làm CUỐI CÙNG, sau khi pattern đã xác nhận ổn định qua 6
 task trước)
-**Phụ thuộc:** TASK-BIGFILE-235, 239, 240 đã xong · **Status:** ⬜ Todo
+**Phụ thuộc:** TASK-BIGFILE-235, 239, 240 đã xong · **Status:** 🚧 Blocked (scope) — xem ghi chú kết quả nhóm taskpage-hooks (235-241), chưa thực thi trong phiên này, KHÔNG có thay đổi nào ở TaskPage.tsx cho task này
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 2)
 **Sinh ra từ:** TASK-BIGFILE-032 (Investigate)
 

@@ -3,7 +3,7 @@
 **Loại:** Move (tách state thành custom hook — xem lưu ý "khác biệt với Move
 cơ học" ở TASK-BIGFILE-235, áp dụng y hệt ở đây) · **Effort:** L
 **Phụ thuộc:** TASK-BIGFILE-235 đã xong (xác nhận pattern hoạt động trên
-domain nhỏ trước) · **Status:** ⬜ Todo
+domain nhỏ trước) · **Status:** ✅ Done
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 2)
 **Sinh ra từ:** TASK-BIGFILE-032 (Investigate)
 

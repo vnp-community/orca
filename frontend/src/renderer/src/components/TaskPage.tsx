@@ -89,7 +89,6 @@ import RepoBadgeLabel from '@/components/repo/RepoBadgeLabel'
 import IssueSourceIndicator, { sameGitHubOwnerRepo } from '@/components/github/IssueSourceIndicator'
 import IssueSourceSelector, { issueSourceChipClass } from '@/components/github/IssueSourceSelector'
 import { LinearPriorityIcon } from '@/components/linear-priority-icon'
-import { reconcileLinearTeamSelection } from '@/components/task-page-linear-team-selection'
 import {
   getTaskSourceAvailabilityNotice,
   getTaskSourceContextSummary
@@ -135,11 +134,6 @@ import {
 } from '@/components/linear-project-view-surfaces'
 import JiraIssueWorkspace from '@/components/JiraIssueWorkspace'
 import { TaskPageJiraIssueList } from '@/components/task-page-jira-issue-list'
-import {
-  getSingleJiraProjectScope,
-  getTaskPageJiraStatusOrderScopeKey,
-  loadTaskPageJiraProjectStatusOrder
-} from '@/components/task-page-jira-status-order'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { cn } from '@/lib/utils'
 import {
@@ -167,27 +161,17 @@ import {
 } from '../../../shared/task-source-context'
 import { getLinearIssueWorkspaceName } from '../../../shared/workspace-name'
 import {
-  buildTaskPageRepoSourceState,
-  deriveTaskPageGitHubWorkItemsFetchOptions,
-  findTaskPageDialogWorkItem,
   findTaskPageLinearIssue,
   reconcileTaskPageLinearIssuesAfterLandingRefresh,
-  reconcileTaskPagePagesAfterLandingRefresh,
-  reconcileTaskPagePagesWithWorkItemsCache,
-  shouldResetTaskPagePaginationAfterLandingRefresh,
-  selectTaskPageWorkItemsCacheEntries,
-  shouldReplaceTaskPageItemsAfterRefresh,
   type TaskPageRepoSourceState
 } from '@/components/task-page-cache-selectors'
 import { shouldHideTaskPageListChrome } from '@/components/task-page-list-chrome-visibility'
 import LinearIssueAttributeFilterDropdowns from '@/components/linear-issue-attribute-filter-dropdowns'
-import { resolveLinearIssueAttributeFilterPrimaryTeam } from '@/components/linear-issue-attribute-filter-primary-team'
 import {
   buildLinearIssueListReadArgs,
   buildLinearIssueListRequestSignature,
   isLinearIssueSearchActive,
-  shouldForceLinearIssueListRead,
-  teamDerivedFacetsForPrimaryTeamChange
+  shouldForceLinearIssueListRead
 } from '@/components/task-page-linear-issue-request'
 import {
   resolveLinearIssueEmptyKind,
@@ -199,13 +183,20 @@ import {
   type LinearIssueAttributeFilter
 } from '../../../shared/linear-issue-attribute-filter'
 import {
-  isNewIssueDraftContentful,
   resolveNewIssueOpenSeed,
-  resolveUserRepoSwitchReset,
-  resolveVanishedNewIssueRepoReset
+  resolveUserRepoSwitchReset
 } from '@/components/task-page-new-issue-draft'
-import { findTaskPageJiraIssue } from '@/components/task-page-jira-cache-selectors'
 import { getRepoBackedTaskEmptyState } from '@/components/task-page-empty-state'
+import { useTaskPageGitLabState } from '@/components/use-task-page-gitlab-state'
+import { useTaskPageJiraDraftState } from '@/components/use-task-page-jira-draft-state'
+import { useTaskPageJiraBrowseState } from '@/components/use-task-page-jira-browse-state'
+import { useTaskPageLinearDraftState } from '@/components/use-task-page-linear-draft-state'
+import { useTaskPageLinearTeamsState } from '@/components/use-task-page-linear-teams-state'
+import {
+  getDefaultPresetForGitHubTaskKind,
+  scopeGitHubTaskSearch,
+  useTaskPageGitHubState
+} from '@/components/use-task-page-github-state'
 import {
   getDefaultTaskRepoSelection,
   getTaskProjectPickerGroups,
@@ -220,27 +211,18 @@ import {
   getTaskPageGitHubPRIconTone,
   isTaskPageGitHubDraftPR
 } from '@/components/task-page-github-work-item-status'
-import {
-  createTaskPageJiraLoadFailureState,
-  type TaskPageJiraLoadError
-} from '@/components/task-page-jira-load-state'
-import { deriveTaskPagePRCheckSummary } from '@/components/task-page-pr-check-summary'
 import { buildJiraCreateTextAdf } from '@/components/jira-create-adf'
 import type {
   GitHubOwnerRepo,
   GitHubAssignableUser,
   GitHubWorkItem,
-  GitLabTodo,
   GitLabWorkItem,
   JiraCreateField,
   LinearCollectionResult,
   LinearCustomViewModel,
   LinearCustomViewSummary,
   JiraIssue,
-  JiraIssueType,
   JiraProject,
-  JiraProjectStatusOrder,
-  JiraPriority,
   LinearIssue,
   LinearProjectDetail,
   LinearProjectSummary,
@@ -260,35 +242,16 @@ import {
 import { shouldSuppressEnterSubmit } from '@/lib/new-workspace-enter-guard'
 import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
 import { getScreenSubmitShortcutLabel, isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
-import {
-  useRepoAssignees,
-  useRepoLabels,
-  useTeamStates,
-  useTeamMembers,
-  useTeamLabels
-} from '@/hooks/useIssueMetadata'
+import { useRepoAssignees, useRepoLabels } from '@/hooks/useIssueMetadata'
 import {
   linearCreateProject,
   linearCreateIssue,
   linearGetIssue,
   linearTeamStates,
-  linearUpdateIssue,
-  linearListProjects
+  linearUpdateIssue
 } from '@/runtime/runtime-linear-client'
-import {
-  jiraCreateIssue,
-  jiraGetIssue,
-  jiraListCreateFields,
-  jiraListIssueTypes,
-  jiraListProjects,
-  jiraListPriorities
-} from '@/runtime/runtime-jira-client'
-import {
-  sortJiraIssues,
-  type JiraIssueSortColumn,
-  type JiraIssueSortDirection,
-  type JiraPrioritiesBySite
-} from './jira-issue-sorter'
+import { jiraCreateIssue, jiraGetIssue } from '@/runtime/runtime-jira-client'
+import type { JiraIssueSortColumn } from './jira-issue-sorter'
 import { TaskPageJiraSortControls } from './task-page-jira-sort-controls'
 import type { LinearGroupSection, LinearIssueListRow, LinearProjectTab } from './task-page-types'
 import { LinearStateCell } from './task-page-linear-cells'
@@ -321,9 +284,6 @@ import {
   getLinearViewOptions,
   getSourceOptions,
   type GitHubTaskKind,
-  type GitLabIssueFilter,
-  type GitLabTaskFilter,
-  type JiraPresetId,
   LinearIcon,
   type LinearDisplayProperty,
   type LinearGroupBy,
@@ -332,20 +292,8 @@ import {
   type LinearViewMode
 } from '@/components/task-page-localized-options'
 
-function isGitLabMRFilter(value: GitLabTaskFilter | GitLabIssueFilter): value is GitLabTaskFilter {
-  return value === 'opened' || value === 'merged' || value === 'closed' || value === 'all'
-}
-
-function isGitLabIssueFilter(
-  value: GitLabTaskFilter | GitLabIssueFilter
-): value is GitLabIssueFilter {
-  return value === 'opened' || value === 'assigned-to-me'
-}
-
 const TASK_SEARCH_DEBOUNCE_MS = 300
 const LINEAR_ITEM_LIMIT = 36
-const JIRA_ITEM_LIMIT = 50
-const PR_CHECKS_EAGER_PREFETCH_LIMIT = 20
 
 const GITHUB_TASK_GRID_CLASS =
   'min-w-[790px] grid-cols-[72px_minmax(320px,1fr)_84px_100px_92px_122px]'
@@ -457,22 +405,6 @@ function getTaskSourceHostAvailabilityForHost(
   }
 }
 
-function getTaskPageRepoCacheInput(repo: Repo): {
-  id: string
-  path: string
-  executionHostId?: string | null
-  sourceCacheScope?: string | null
-} {
-  const sourceContext = getTaskPageRepoSourceContext(repo, 'github')
-  return {
-    id: repo.id,
-    path: repo.path,
-    executionHostId: repo.executionHostId,
-    sourceCacheScope:
-      sourceContext?.provider === 'github' ? getTaskSourceCacheScope(sourceContext) : null
-  }
-}
-
 // Why: the sticky header's bg must be opaque (GITHUB_TASK_ROW_SURFACE_CLASS, not
 // bg-muted/50) or vertically-scrolled rows bleed through it. These left-sticky
 // cells additionally need a ::before gap-cover so horizontally-scrolled header
@@ -496,45 +428,10 @@ const GITHUB_TASK_STICKY_TITLE_CELL_CLASS = cn(
   GITHUB_TASK_ROW_HOVER_SURFACE_CLASS
 )
 
-function isPRFocusedTaskView(preset: TaskViewPresetId | null, query: string): boolean {
-  if (preset === 'prs' || preset === 'my-prs' || preset === 'review') {
-    return true
-  }
-  const parsed = parseTaskQuery(query)
-  return (
-    parsed.scope === 'pr' ||
-    parsed.state === 'merged' ||
-    parsed.draft ||
-    parsed.reviewRequested !== null ||
-    parsed.reviewedBy !== null
-  )
-}
-
 function normalizeGitHubTaskPreset(preset: TaskViewPresetId | null | undefined): TaskViewPresetId {
   // Why: the split Issues/PRs tabs no longer have a mixed "All" view, so
   // legacy saved defaults should land on the first tab instead of mixing rows.
   return !preset || preset === 'all' ? 'issues' : preset
-}
-
-function getGitHubTaskKind(preset: TaskViewPresetId | null, query: string): GitHubTaskKind {
-  return isPRFocusedTaskView(preset, query) ? 'prs' : 'issues'
-}
-
-function getDefaultPresetForGitHubTaskKind(kind: GitHubTaskKind): TaskViewPresetId {
-  return kind === 'prs' ? 'prs' : 'issues'
-}
-
-function scopeGitHubTaskSearch(query: string, kind: GitHubTaskKind): string {
-  const trimmed = query.trim()
-  if (!trimmed) {
-    return getTaskPresetQuery(getDefaultPresetForGitHubTaskKind(kind))
-  }
-  if (/\bis:(?:issue|pr|pull-request)\b/i.test(trimmed)) {
-    return trimmed
-  }
-  const parsed = parseTaskQuery(trimmed)
-  const inferredKind = parsed.scope === 'pr' ? 'prs' : parsed.scope === 'issue' ? 'issues' : kind
-  return `${inferredKind === 'prs' ? 'is:pr' : 'is:issue'} ${trimmed}`
 }
 
 // Why: Intl.RelativeTimeFormat allocation is non-trivial, and previously we
@@ -846,17 +743,6 @@ export {
   GitHubIssueLabelSelector
 } from './task-page-github-assignee-cells'
 
-function sameOptionalGitHubOwnerRepo(
-  left: GitHubOwnerRepo | null | undefined,
-  right: GitHubOwnerRepo | null | undefined
-): boolean {
-  const leftValue = left ?? null
-  const rightValue = right ?? null
-  return leftValue === null && rightValue === null
-    ? true
-    : sameGitHubOwnerRepo(leftValue, rightValue)
-}
-
 export { PRChecksCell, PRMergeCell, PRReviewCell } from './task-page-github-review-cells'
 
 export { PaginationBar } from './task-page-pagination'
@@ -903,15 +789,7 @@ export default function TaskPage(): React.JSX.Element {
   const allWorktrees = useAllWorktrees()
   const openModal = useAppStore((s) => s.openModal)
   const updateSettings = useAppStore((s) => s.updateSettings)
-  const fetchWorkItemsAcrossRepos = useAppStore((s) => s.fetchWorkItemsAcrossRepos)
-  const fetchPRChecks = useAppStore((s) => s.fetchPRChecks)
-  const getCachedWorkItems = useAppStore((s) => s.getCachedWorkItems)
   const setIssueSourcePreference = useAppStore((s) => s.setIssueSourcePreference)
-  // Why: bumped by `setIssueSourcePreference` after cache eviction so the
-  // fetch effect below re-runs and repopulates work-items against the new
-  // source. Eviction alone isn't enough because the effect's deps don't
-  // include `workItemsCache`.
-  const workItemsInvalidationNonce = useAppStore((s) => s.workItemsInvalidationNonce)
   const linearStatus = useAppStore((s) => s.linearStatus)
   const linearStatusChecked = useAppStore((s) => s.linearStatusChecked)
   const linearStatusContextKey = useAppStore((s) => s.linearStatusContextKey)
@@ -924,7 +802,6 @@ export default function TaskPage(): React.JSX.Element {
   const linearListInvalidationToken = useAppStore((s) => s.linearListInvalidationToken)
   const invalidateLinearIssueLists = useAppStore((s) => s.invalidateLinearIssueLists)
   const getCachedLinearIssues = useAppStore((s) => s.getCachedLinearIssues)
-  const getCachedLinearTeams = useAppStore((s) => s.getCachedLinearTeams)
   const listLinearTeams = useAppStore((s) => s.listLinearTeams)
   const getCachedLinearProjects = useAppStore((s) => s.getCachedLinearProjects)
   const listLinearProjectsFromStore = useAppStore((s) => s.listLinearProjects)
@@ -946,8 +823,6 @@ export default function TaskPage(): React.JSX.Element {
   const jiraStatusContextKey = useAppStore((s) => s.jiraStatusContextKey)
   const connectJira = useAppStore((s) => s.connectJira)
   const selectJiraSite = useAppStore((s) => s.selectJiraSite)
-  const searchJiraIssues = useAppStore((s) => s.searchJiraIssues)
-  const listJiraIssues = useAppStore((s) => s.listJiraIssues)
   const checkJiraConnection = useAppStore((s) => s.checkJiraConnection)
   const providerRuntimeContextKey = getProviderRuntimeContextKey(settings)
   const providerRuntimeContextKeyRef = useRef(providerRuntimeContextKey)
@@ -1502,9 +1377,7 @@ export default function TaskPage(): React.JSX.Element {
   const taskSourceManuallyChangedRef = useRef(false)
   const lastPageTaskSourceRef = useRef(pageData.taskSource)
   const taskResumeAppliedRef = useRef(false)
-  const githubSearchPersistReadyRef = useRef(false)
   const linearSearchPersistReadyRef = useRef(false)
-  const jiraSearchPersistReadyRef = useRef(false)
   const [taskResumeApplied, setTaskResumeApplied] = useState(false)
 
   // Why: pageData.taskSource changes when the user clicks a specific source
@@ -1545,182 +1418,99 @@ export default function TaskPage(): React.JSX.Element {
   // the user is on the GitHub task source — actual entry into Project mode is
   // gated on a non-null `activeProject` once they pick one.
   const projectModeVisible = taskSource === 'github'
-  const [githubMode, setGithubMode] = useState<'items' | 'project'>('items')
 
-  // ── GitLab task-source state ──────────────────────────────────────
-  // Why: parallel to Linear's slim per-source state. Skips workItemsCache
-  // and cross-repo aggregation in v1 — the GitLab list fetches directly
-  // from `window.api.gl.listMRs` / `listIssues` for the primary repo.
-  const [gitlabFilter, setGitlabFilter] = useState<GitLabTaskFilter | GitLabIssueFilter>('opened')
-  const [gitlabItems, setGitlabItems] = useState<GitLabWorkItem[]>([])
-  const [gitlabLoading, setGitlabLoading] = useState(false)
-  const [gitlabError, setGitlabError] = useState<string | null>(null)
-  const [gitlabRefreshNonce, setGitlabRefreshNonce] = useState(0)
-  // Why: opens GitLabItemDialog when a row is clicked. Separate state from
-  // gitlabItems so the dialog target survives a list refresh that might
-  // remove the item from the visible filter (e.g. closing an MR while
-  // it's open in the dialog).
-  const [gitlabDialogItem, setGitlabDialogItem] = useState<GitLabWorkItem | null>(null)
-
-  // Why: GitLab tab has two sub-views — the project's MR/issue list,
-  // and the user's cross-project Todos (gitlab.com/dashboard/todos).
-  // 'project' is default; 'todos' fetches a separate stream.
-  const [gitlabView, setGitlabView] = useState<'issues' | 'mrs' | 'todos'>('mrs')
-  const [gitlabTodos, setGitlabTodos] = useState<GitLabTodo[]>([])
-  const [gitlabTodosLoading, setGitlabTodosLoading] = useState(false)
-  const gitlabEmptyState = useMemo(
-    () =>
-      getRepoBackedTaskEmptyState({
-        provider: 'gitlab',
-        selectedRepoCount: selectedRepos.length,
-        gitlabView
-      }),
-    [gitlabView, selectedRepos.length]
-  )
-
-  const gitlabFilterIsValid =
-    gitlabView === 'issues'
-      ? isGitLabIssueFilter(gitlabFilter)
-      : gitlabView === 'mrs'
-        ? isGitLabMRFilter(gitlabFilter)
-        : true
-  const activeGitlabFilter = gitlabFilterIsValid ? gitlabFilter : 'opened'
-  // Why: Issues and MRs expose different filter sets; repair before commit so
-  // fetch Effects never issue `glab` with a stale filter from the other view.
-  if (!gitlabFilterIsValid) {
-    setGitlabFilter('opened')
-  }
-
-  const displayedGitLabItems = useMemo(() => {
-    if (gitlabView === 'issues') {
-      return gitlabItems.filter((item) => item.type === 'issue')
-    }
-    if (gitlabView === 'mrs') {
-      return gitlabItems.filter((item) => item.type === 'mr')
-    }
-    return gitlabItems
-  }, [gitlabItems, gitlabView])
-
-  const [taskSearchInput, setTaskSearchInput] = useState(initialTaskQuery)
-  const [appliedTaskSearch, setAppliedTaskSearch] = useState(initialTaskQuery)
-  const taskSearchInputRef = useRef<HTMLInputElement>(null)
-  const [activeTaskPreset, setActiveTaskPreset] = useState<TaskViewPresetId | null>(
-    defaultTaskViewPreset
-  )
-  const [tasksLoading, setTasksLoading] = useState(false)
-  const [tasksRefreshing, setTasksRefreshing] = useState(false)
-  const [tasksFiltering, setTasksFiltering] = useState(false)
-  const [tasksError, setTasksError] = useState<string | null>(null)
-  // Why: per-repo failure count surfaced through the "N of M" banner. IPC-level
-  // rejections populate tasksError instead — the two are mutually exclusive so
-  // a successful-with-partial-failure read and a hard-reject don't double-show.
-  const [failedCount, setFailedCount] = useState(0)
-  const [taskRefreshNonce, setTaskRefreshNonce] = useState(0)
-  // Why: the fetch effect uses this to detect when a nonce bump is from the
-  // user clicking the refresh button (force=true) vs. re-running for any
-  // other reason — e.g. a repo change while the nonce happens to be > 0.
-  const lastFetchedNonceRef = useRef(-1)
-  // Why: analogous to `lastFetchedNonceRef` for the invalidation nonce. A
-  // preference flip should force the dispatch past fetch-dedupe (same repos +
-  // same query, cache just evicted — without `force: true` the fan-out could
-  // collapse onto a stale in-flight request that resolved against the
-  // pre-flip source).
-  const lastFetchedInvalidationNonceRef = useRef(0)
-  const paginationGenerationRef = useRef(0)
-  // Why: entering Tasks with fresh cache should still verify remote status
-  // once, but the result is reconciled into existing rows to avoid a full
-  // table shuffle when only status/key fields changed.
-  const landingGitHubRefreshKeysRef = useRef<ReadonlySet<string>>(new Set())
-  // Why: pages holds all fetched pages of work items. Page 0 is seeded from
-  // cache for instant first paint; subsequent pages are loaded via date cursors.
-  const [pages, setPages] = useState<GitHubWorkItem[][]>(() => {
-    const trimmed = initialTaskQuery.trim()
-    const merged: GitHubWorkItem[] = []
-    for (const r of selectedRepos) {
-      const cached = getCachedWorkItems(
-        r.id,
-        PER_REPO_FETCH_LIMIT,
-        trimmed,
-        r.path,
-        getTaskPageRepoSourceContext(r, 'github')
-      )
-      if (cached) {
-        merged.push(...cached)
-      }
-    }
-    if (merged.length === 0) {
-      return [[]]
-    }
-    const page0 = [...merged]
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .slice(0, CROSS_REPO_DISPLAY_LIMIT)
-    return [page0]
+  const {
+    setGitlabFilter,
+    gitlabItems,
+    gitlabLoading,
+    gitlabError,
+    setGitlabRefreshNonce,
+    gitlabDialogItem,
+    setGitlabDialogItem,
+    gitlabView,
+    setGitlabView,
+    gitlabTodos,
+    gitlabTodosLoading,
+    gitlabEmptyState,
+    activeGitlabFilter,
+    displayedGitLabItems
+  } = useTaskPageGitLabState({
+    taskSource,
+    selectedRepos,
+    openGitLabWorkItem: pageData.openGitLabWorkItem,
+    getTaskPageRepoSourceContext
   })
-  const [currentPage, setCurrentPage] = useState(0)
-  const [paginationLoading, setPaginationLoading] = useState(false)
-  const [loadingTargetPage, setLoadingTargetPage] = useState<number | null>(null)
-  const [totalItemCount, setTotalItemCount] = useState<number | null>(null)
+
+  const taskSearchInputRef = useRef<HTMLInputElement>(null)
   const fetchWorkItemsNextPage = useAppStore((s) => s.fetchWorkItemsNextPage)
-  const countWorkItemsAcrossRepos = useAppStore((s) => s.countWorkItemsAcrossRepos)
 
-  useEffect(() => {
-    paginationGenerationRef.current += 1
-    setPaginationLoading(false)
-    setLoadingTargetPage(null)
-  }, [selectedRepos, appliedTaskSearch, workItemsInvalidationNonce])
+  const {
+    githubMode,
+    setGithubMode,
+    taskSearchInput,
+    setTaskSearchInput,
+    appliedTaskSearch,
+    setAppliedTaskSearch,
+    activeTaskPreset,
+    setActiveTaskPreset,
+    tasksLoading,
+    tasksRefreshing,
+    setTasksRefreshing,
+    tasksFiltering,
+    setTasksFiltering,
+    tasksError,
+    failedCount,
+    setTaskRefreshNonce,
+    pages,
+    setPages,
+    currentPage,
+    setCurrentPage,
+    paginationLoading,
+    setPaginationLoading,
+    loadingTargetPage,
+    setLoadingTargetPage,
+    totalItemCount,
+    paginationGenerationRef,
+    dialogInitialTab,
+    dialogWorkItem,
+    dialogRepoPath,
+    dialogSourceContext,
+    setDialogWorkItem,
+    patchTaskPageWorkItemRows,
+    perRepoSourceState,
+    retryingSourceKeys,
+    setRetryingSourceKeys,
+    newIssueOpen,
+    setNewIssueOpen,
+    newIssueTitle,
+    setNewIssueTitle,
+    newIssueBody,
+    setNewIssueBody,
+    newIssueLabels,
+    setNewIssueLabels,
+    newIssueAssignees,
+    setNewIssueAssignees,
+    newIssueSubmitting,
+    setNewIssueSubmitting,
+    newIssueRepoId,
+    setNewIssueRepoId,
+    activeGithubTaskKind,
+    filteredWorkItems,
+    showPRManagementColumns,
+    ensurePRChecksLoaded
+  } = useTaskPageGitHubState({
+    taskSource,
+    taskResumeApplied,
+    selectedRepos,
+    repoMap,
+    defaultTaskViewPreset,
+    initialTaskQuery,
+    openGitHubWorkItem: pageData.openGitHubWorkItem,
+    openGitHubInitialTab: pageData.openGitHubInitialTab,
+    openGitHubSourceContext: pageData.openGitHubSourceContext,
+    getTaskPageRepoSourceContext
+  })
 
-  // Why: clicking a GitHub row (or completing the create-issue flow) opens
-  // this dialog for a read/review surface. The dialog's "Use" button routes
-  // through the same direct-launch flow as the row-level "Use" CTA so
-  // behavior is consistent regardless of entry point.
-  const githubTaskDrawerWorkItem = useAppStore((s) => s.githubTaskDrawerWorkItem)
-  const setGithubTaskDrawerWorkItem = useAppStore((s) => s.setGithubTaskDrawerWorkItem)
-  const [dialogInitialTab, setDialogInitialTab] = useState<ItemDialogTab>('conversation')
-  const dialogWorkItemKey = githubTaskDrawerWorkItem
-    ? { id: githubTaskDrawerWorkItem.id, repoId: githubTaskDrawerWorkItem.repoId }
-    : null
-
-  const appliedWorkItemsCacheQuery = useMemo(
-    () => stripRepoQualifiers(appliedTaskSearch.trim()),
-    [appliedTaskSearch]
-  )
-  const selectedWorkItemsCacheEntries = useAppStore(
-    useShallow((s) =>
-      selectTaskPageWorkItemsCacheEntries(
-        s.workItemsCache,
-        selectedRepos.map(getTaskPageRepoCacheInput),
-        PER_REPO_FETCH_LIMIT,
-        appliedWorkItemsCacheQuery
-      )
-    )
-  )
-
-  // Why: derive the dialog's work item from the store cache so it reflects
-  // optimistic patches (e.g. table-cell status toggle). Falls back to the
-  // snapshot stored at click time for newly-created stubs not yet in the cache.
-  // Disambiguates by repoId so issues with the same number fetched from
-  // multiple repos (e.g. fork + non-fork, both routed through the same
-  // upstream) resolve to the clicked row's repo, not the first one scanned.
-  const cachedDialogWorkItem = useAppStore((s) =>
-    findTaskPageDialogWorkItem(s.workItemsCache, dialogWorkItemKey)
-  )
-  const dialogWorkItem = dialogWorkItemKey
-    ? (cachedDialogWorkItem ?? githubTaskDrawerWorkItem)
-    : null
-  const dialogRepoPath = dialogWorkItem ? (repoMap.get(dialogWorkItem.repoId)?.path ?? null) : null
-  const dialogSourceContext = useMemo(() => {
-    if (!dialogWorkItem) {
-      return null
-    }
-    if (
-      pageData.openGitHubSourceContext?.provider === 'github' &&
-      pageData.openGitHubWorkItem?.id === dialogWorkItem.id &&
-      pageData.openGitHubWorkItem.repoId === dialogWorkItem.repoId
-    ) {
-      return pageData.openGitHubSourceContext
-    }
-    return getTaskPageRepoSourceContext(repoMap.get(dialogWorkItem.repoId), 'github')
-  }, [dialogWorkItem, pageData.openGitHubSourceContext, pageData.openGitHubWorkItem, repoMap])
   const gitlabDialogRepo = useMemo(
     () =>
       gitlabDialogItem
@@ -1746,27 +1536,6 @@ export default function TaskPage(): React.JSX.Element {
     pageData.openGitLabSourceContext,
     pageData.openGitLabWorkItem
   ])
-
-  const setDialogWorkItem = useCallback(
-    (item: GitHubWorkItem | null, initialTab: ItemDialogTab = 'conversation') => {
-      setDialogInitialTab(item ? initialTab : 'conversation')
-      setGithubTaskDrawerWorkItem(item)
-    },
-    [setGithubTaskDrawerWorkItem]
-  )
-
-  useEffect(() => {
-    if (!pageData.openGitHubWorkItem) {
-      setDialogWorkItem(null)
-      return
-    }
-    setGithubMode('items')
-    setDialogWorkItem(pageData.openGitHubWorkItem, pageData.openGitHubInitialTab)
-  }, [pageData.openGitHubInitialTab, pageData.openGitHubWorkItem, setDialogWorkItem])
-
-  useEffect(() => {
-    setGitlabDialogItem(pageData.openGitLabWorkItem ?? null)
-  }, [pageData.openGitLabWorkItem])
 
   const openGitHubDetailPage = useCallback(
     (item: GitHubWorkItem, initialTab: ItemDialogTab = 'conversation') => {
@@ -1803,107 +1572,12 @@ export default function TaskPage(): React.JSX.Element {
     [openTaskPage, repoMap]
   )
 
-  const patchTaskPageWorkItemRows = useCallback(
-    (
-      itemKey: { id: string; repoId: string },
-      patch: Partial<GitHubWorkItem>,
-      shouldPatch?: (item: GitHubWorkItem) => boolean
-    ): void => {
-      setPages((current) => {
-        let changed = false
-        const nextPages = current.map((page) => {
-          let pageChanged = false
-          const nextPage = page.map((item) => {
-            if (item.id !== itemKey.id || item.repoId !== itemKey.repoId) {
-              return item
-            }
-            if (shouldPatch && !shouldPatch(item)) {
-              return item
-            }
-            pageChanged = true
-            changed = true
-            return { ...item, ...patch }
-          })
-          return pageChanged ? nextPage : page
-        })
-        return changed ? nextPages : current
-      })
-    },
-    []
-  )
   const handleDialogReviewRequestsChange = useCallback(
     (itemKey: { id: string; repoId: string }, reviewRequests: GitHubAssignableUser[]): void => {
       patchTaskPageWorkItemRows(itemKey, { reviewRequests })
     },
     [patchTaskPageWorkItemRows]
   )
-
-  // Why: feature 1 — render the "Issues from {owner}/{repo}" indicator per
-  // selected repo whose issue-source and PR-source slugs differ, and surface
-  // a per-repo retryable banner when the issue-side fetch failed. Both derive
-  // from the same `workItemsCache` entry the list already consumes, so no
-  // extra IPC round-trip is needed. The `TaskPageRepoSourceState` shape lives
-  // with the cache selectors so the render and guard code share one contract.
-  // Why: subscribe only to the cache entries this page can render. The selector
-  // returns entry references so Zustand shallow equality filters unrelated
-  // cache writes before they re-render the full tasks page.
-  const perRepoSourceState = useMemo<TaskPageRepoSourceState[]>(
-    () => buildTaskPageRepoSourceState(selectedRepos, selectedWorkItemsCacheEntries),
-    [selectedRepos, selectedWorkItemsCacheEntries]
-  )
-
-  useEffect(() => {
-    if (taskSource !== 'github' || githubMode !== 'items') {
-      return
-    }
-    // Why: inline/dialog edits patch `workItemsCache`; the paged table renders
-    // from a local snapshot so it needs the patched row objects copied across.
-    setPages((current) =>
-      reconcileTaskPagePagesWithWorkItemsCache(current, selectedWorkItemsCacheEntries)
-    )
-  }, [githubMode, selectedWorkItemsCacheEntries, taskSource])
-
-  // Why: surface a one-time toast per session per repo when the user's
-  // preferred `'upstream'` is no longer configured and we fell back to
-  // origin. Gated on a ref-backed set so repeated list refreshes don't
-  // re-toast. We deliberately do NOT auto-reset the preference — the user
-  // may re-add `upstream` later and expect it to pick up again.
-  const fellBackToastedRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    if (taskSource !== 'github') {
-      return
-    }
-    for (const [index, r] of selectedRepos.entries()) {
-      const entry = selectedWorkItemsCacheEntries[index]
-      if (!entry?.issueSourceFellBack) {
-        continue
-      }
-      if (fellBackToastedRef.current.has(r.id)) {
-        continue
-      }
-      const prSlug = entry.sources?.prs
-        ? `${entry.sources.prs.owner}/${entry.sources.prs.repo}`
-        : r.displayName
-      toast.message(
-        translate(
-          'auto.components.TaskPage.f4374519ae',
-          'Your preferred issue source (upstream) is no longer configured for {{value0}}. Using origin.',
-          { value0: prSlug }
-        )
-      )
-      fellBackToastedRef.current.add(r.id)
-    }
-  }, [selectedRepos, selectedWorkItemsCacheEntries, taskSource])
-
-  // Why: on a partial-failure retry the cache still holds successful-side
-  // data, so `tasksLoading` (which is gated on `anyUncached`) never flips
-  // true and the Retry button would otherwise give no feedback. Track
-  // retry-in-flight per selected source so that clicking Retry
-  // on one banner only flips that source's button into its "Retrying…"
-  // state — other still-failing banners stay in their "Retry" state rather
-  // than misleadingly flipping in lockstep. The fetch effect clears the set
-  // when the nonce-driven refresh settles.
-  const [retryingSourceKeys, setRetryingSourceKeys] = useState<ReadonlySet<string>>(() => new Set())
 
   const handleRetryIssuesFetch = useCallback(
     (sourceKey: string) => {
@@ -1930,13 +1604,6 @@ export default function TaskPage(): React.JSX.Element {
     setTasksRefreshing(true)
     setTaskRefreshNonce((current) => current + 1)
   }, [])
-  const [newIssueOpen, setNewIssueOpen] = useState(false)
-  const [newIssueTitle, setNewIssueTitle] = useState('')
-  const [newIssueBody, setNewIssueBody] = useState('')
-  const [newIssueLabels, setNewIssueLabels] = useState<string[]>([])
-  const [newIssueAssignees, setNewIssueAssignees] = useState<GitHubAssignableUser[]>([])
-  const [newIssueSubmitting, setNewIssueSubmitting] = useState(false)
-  const [newIssueRepoId, setNewIssueRepoId] = useState<string | null>(null)
   // Why: session-only draft slice backs recovery of an in-progress issue after
   // an accidental dismissal (outside click/Escape/Cancel) and across a Tasks
   // view unmount. Component `useState` stays the inputs' immediate source; the
@@ -1990,63 +1657,6 @@ export default function TaskPage(): React.JSX.Element {
     newIssueOpen ? (newIssueTargetRepo?.id ?? null) : null,
     { runtimeEnvironmentId: newIssueOpen ? (newIssueRuntimeTarget?.environmentId ?? null) : null }
   )
-
-  // Why: repo-scoped labels/assignees can't cross repos. A reactive clear keyed
-  // on the derived target id can't tell a restore apart from a user switch, so
-  // it would wipe just-restored fields and corrupt the recovery draft via the
-  // write-through below. Decompose by cause instead: this guard only handles the
-  // "chosen repo vanished from the selection" case (removed/deselected). A
-  // genuine user switch clears imperatively in the repo Select's handler; a
-  // restore always seeds an in-selection repoId, so neither path fires here.
-  useEffect(() => {
-    const reset = resolveVanishedNewIssueRepoReset(
-      newIssueRepoId,
-      selectedRepos.map((r) => r.id)
-    )
-    if (!reset) {
-      return
-    }
-    setNewIssueLabels([])
-    setNewIssueAssignees([])
-    setNewIssueRepoId(reset.repoId)
-  }, [newIssueRepoId, selectedRepos])
-
-  // Why: mirror the live fields into the session draft while the modal is open
-  // so an accidental dismissal doesn't lose input. Content-gate the write so an
-  // untouched open never pins a meaningless draft (repoId alone is not content),
-  // and clear any stale draft once the form is emptied back out.
-  useEffect(() => {
-    if (!newIssueOpen) {
-      return
-    }
-    if (
-      isNewIssueDraftContentful({
-        title: newIssueTitle,
-        body: newIssueBody,
-        labels: newIssueLabels,
-        assignees: newIssueAssignees
-      })
-    ) {
-      setNewIssueDraft({
-        title: newIssueTitle,
-        body: newIssueBody,
-        labels: newIssueLabels,
-        assignees: newIssueAssignees,
-        repoId: newIssueRepoId
-      })
-    } else {
-      clearNewIssueDraft()
-    }
-  }, [
-    newIssueOpen,
-    newIssueTitle,
-    newIssueBody,
-    newIssueLabels,
-    newIssueAssignees,
-    newIssueRepoId,
-    setNewIssueDraft,
-    clearNewIssueDraft
-  ])
 
   const [selectedLinearIssueId, setSelectedLinearIssueId] = useState<string | null>(null)
   const [selectedLinearIssueFallback, setSelectedLinearIssueFallback] =
@@ -2161,51 +1771,46 @@ export default function TaskPage(): React.JSX.Element {
     }))
   }, [clearSelectedLinearIssue, setDialogWorkItem])
 
-  const [selectedJiraIssueKey, setSelectedJiraIssueKey] = useState<string | null>(null)
-  const [selectedJiraIssueFallback, setSelectedJiraIssueFallback] = useState<JiraIssue | null>(null)
-  const jiraCacheSnapshot = useAppStore(
-    useShallow((s) => ({
-      issueCache: s.jiraIssueCache,
-      searchCache: s.jiraSearchCache
-    }))
-  )
-  const cachedSelectedJiraIssue = findTaskPageJiraIssue(
-    jiraCacheSnapshot.issueCache,
-    jiraCacheSnapshot.searchCache,
-    selectedJiraIssueKey,
-    {
-      sourceContext: jiraTaskSourceContext,
-      siteId: selectedJiraIssueFallback?.siteId ?? pageData.openJiraIssue?.siteId ?? null
-    }
-  )
-  const selectedJiraIssue = selectedJiraIssueKey
-    ? (cachedSelectedJiraIssue ?? selectedJiraIssueFallback)
-    : null
-  const jiraDetailSourceContext = useMemo(() => {
-    if (
-      selectedJiraIssue &&
-      pageData.openJiraSourceContext?.provider === 'jira' &&
-      pageData.openJiraIssue?.key === selectedJiraIssue.key &&
-      pageData.openJiraIssue.siteId === selectedJiraIssue.siteId
-    ) {
-      return pageData.openJiraSourceContext
-    }
-    return jiraTaskSourceContext
-  }, [
+  const {
+    setSelectedJiraIssueKey,
+    setSelectedJiraIssueFallback,
+    selectedJiraIssue,
+    jiraDetailSourceContext,
+    setSelectedJiraIssue,
+    jiraIssues,
+    setJiraIssues,
+    jiraLoading,
+    setJiraLoading,
+    jiraError,
+    setJiraError,
+    jiraErrorDetailsOpen,
+    setJiraErrorDetailsOpen,
+    jiraSearchInput,
+    setJiraSearchInput,
+    setAppliedJiraSearch,
+    activeJiraPreset,
+    setActiveJiraPreset,
+    setJiraRefreshNonce,
+    jiraOrderBy,
+    jiraOrderDirection,
+    setJiraOrderBy,
+    setJiraOrderDirection,
+    availableJiraProjects,
+    jiraProjectsLoading,
+    displayedJiraIssues,
+    displayedJiraStatusOrder,
+    sortedJiraIssues
+  } = useTaskPageJiraBrowseState({
+    taskSource,
+    taskResumeApplied,
+    jiraConnected,
+    settings,
+    selectedJiraSiteId,
     jiraTaskSourceContext,
-    pageData.openJiraIssue,
-    pageData.openJiraSourceContext,
-    selectedJiraIssue
-  ])
-
-  const setSelectedJiraIssue = useCallback((issue: JiraIssue | null) => {
-    setSelectedJiraIssueKey(issue?.key ?? null)
-    setSelectedJiraIssueFallback(issue)
-  }, [])
-
-  useEffect(() => {
-    setSelectedJiraIssue(pageData.openJiraIssue ?? null)
-  }, [pageData.openJiraIssue, setSelectedJiraIssue])
+    jiraTaskSourceScopeKey,
+    openJiraIssue: pageData.openJiraIssue,
+    openJiraSourceContext: pageData.openJiraSourceContext
+  })
 
   const openJiraDetailPage = useCallback(
     (issue: JiraIssue) => {
@@ -2240,8 +1845,6 @@ export default function TaskPage(): React.JSX.Element {
   const linearAttributeFilterSignatureRef = useRef(
     linearIssueAttributeFilterSignature(emptyLinearIssueAttributeFilter())
   )
-  const linearPrimaryTeamIdRef = useRef<string | null>(null)
-  const previousLinearWorkspaceIdForFiltersRef = useRef<string | null | undefined>(undefined)
   const [linearViewMode, setLinearViewMode] = useState<LinearViewMode>('list')
   const [linearGroupBy, setLinearGroupBy] = useState<LinearGroupBy>('none')
   const [linearOrderBy, setLinearOrderBy] = useState<LinearOrderBy>('priority')
@@ -2416,68 +2019,6 @@ export default function TaskPage(): React.JSX.Element {
     [clearSelectedLinearIssue, setTaskResumeState]
   )
 
-  // Jira tab state
-  const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([])
-  const [jiraLoading, setJiraLoading] = useState(false)
-  const [jiraError, setJiraError] = useState<TaskPageJiraLoadError | null>(null)
-  const [jiraErrorDetailsOpen, setJiraErrorDetailsOpen] = useState(false)
-  const [jiraSearchInput, setJiraSearchInput] = useState('')
-  const [appliedJiraSearch, setAppliedJiraSearch] = useState('')
-  const [activeJiraPreset, setActiveJiraPreset] = useState<JiraPresetId>('assigned')
-  const [jiraRefreshNonce, setJiraRefreshNonce] = useState(0)
-  const [jiraProjectStatusOrder, setJiraProjectStatusOrder] = useState<{
-    order: JiraProjectStatusOrder
-    scopeKey: string
-  } | null>(null)
-  const [jiraOrderBy, setJiraOrderBy] = useState<JiraIssueSortColumn>('updated')
-  const [jiraOrderDirection, setJiraOrderDirection] = useState<JiraIssueSortDirection>('desc')
-  const [jiraPrioritiesBySite, setJiraPrioritiesBySite] = useState<JiraPrioritiesBySite>(
-    () => new Map()
-  )
-  const jiraPrioritySiteIdsKey = useMemo(() => {
-    const siteIds =
-      selectedJiraSiteId && selectedJiraSiteId !== 'all'
-        ? [selectedJiraSiteId]
-        : jiraIssues.flatMap((issue) => (issue.siteId ? [issue.siteId] : []))
-    // Why: result refreshes replace the issue array; depend on the represented sites, not identity.
-    return JSON.stringify([...new Set(siteIds)].sort())
-  }, [jiraIssues, selectedJiraSiteId])
-
-  useEffect(() => {
-    if (taskSource !== 'jira' || !jiraConnected || jiraOrderBy !== 'priority') {
-      setJiraPrioritiesBySite((current) => (current.size === 0 ? current : new Map()))
-      return
-    }
-    let cancelled = false
-    const jiraPrioritySiteIds = JSON.parse(jiraPrioritySiteIdsKey) as string[]
-    void Promise.all(
-      jiraPrioritySiteIds.map(async (siteId) => {
-        try {
-          return [
-            siteId,
-            await jiraListPriorities(jiraTaskSourceContext ?? settings, siteId)
-          ] as const
-        } catch {
-          return [siteId, [] as JiraPriority[]] as const
-        }
-      })
-    ).then((prioritiesBySite) => {
-      if (!cancelled) {
-        setJiraPrioritiesBySite(new Map(prioritiesBySite))
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [
-    jiraConnected,
-    jiraOrderBy,
-    jiraPrioritySiteIdsKey,
-    jiraTaskSourceContext,
-    settings,
-    taskSource
-  ])
-
   const handleJiraSort = useCallback(
     (column: JiraIssueSortColumn) => {
       if (jiraOrderBy === column) {
@@ -2639,273 +2180,7 @@ export default function TaskPage(): React.JSX.Element {
     taskSource
   ])
 
-  // Why: fetch the full team list from the Linear API so the selector shows
-  // all teams the user belongs to, not just teams with issues in the current
-  // fetch window. Fetched once when the Linear tab is active and connected.
-  const [availableTeams, setAvailableTeams] = useState<LinearTeam[]>([])
-  const [linearTeamRefreshNonce, setLinearTeamRefreshNonce] = useState(0)
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    if (taskSource !== 'linear' || !linearConnected) {
-      setAvailableTeams([])
-      return
-    }
-    let cancelled = false
-    const cachedTeams = getCachedLinearTeams(selectedLinearWorkspaceId, {
-      sourceContext: linearTaskSourceContext
-    })
-    // Why: workspace switches must not leave the prior workspace's teams
-    // available for new-issue creation while the replacement fetch is pending,
-    // but a workspace-scoped cache can keep the selector usable immediately.
-    setAvailableTeams(cachedTeams ?? [])
-    void listLinearTeams(selectedLinearWorkspaceId, { sourceContext: linearTaskSourceContext })
-      .then((teams) => {
-        if (!cancelled) {
-          setAvailableTeams(teams)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          console.warn('[TaskPage] Failed to fetch Linear teams')
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    taskSource,
-    linearConnected,
-    selectedLinearWorkspaceId,
-    linearTeamRefreshNonce,
-    taskResumeApplied,
-    getCachedLinearTeams,
-    listLinearTeams,
-    linearTaskSourceContext
-  ])
-
-  const [availableJiraProjects, setAvailableJiraProjects] = useState<JiraProject[]>([])
-  const [jiraProjectsLoading, setJiraProjectsLoading] = useState(false)
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    if (taskSource !== 'jira' || !jiraConnected) {
-      setAvailableJiraProjects([])
-      setJiraProjectsLoading(false)
-      return
-    }
-    let cancelled = false
-    setAvailableJiraProjects([])
-    setJiraProjectsLoading(true)
-    void jiraListProjects(jiraTaskSourceContext ?? settings, selectedJiraSiteId)
-      .then((projects) => {
-        if (!cancelled) {
-          setAvailableJiraProjects(projects)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          console.warn('[TaskPage] Failed to fetch Jira projects')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setJiraProjectsLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [
-    settings,
-    taskSource,
-    jiraConnected,
-    selectedJiraSiteId,
-    taskResumeApplied,
-    jiraTaskSourceContext
-  ])
-
-  // Why: stable key for `selectedRepos` so the GitLab fetch effect below
-  // doesn't re-run on every parent re-render just because the array
-  // reference changed. The memoized string keys off id + path +
-  // connectionId — the only fields the effect actually reads.
-  const selectedReposKey = useMemo(
-    () =>
-      selectedRepos
-        .map((r) => `${r.id}|${r.path}|${r.connectionId ?? ''}|${r.executionHostId ?? ''}`)
-        .join(','),
-    [selectedRepos]
-  )
-
-  // Why: GitLab task-source data fetch. Issues and MRs are fetched
-  // separately (mirrors GitHub's separate Issues / PRs endpoints) so
-  // errors are isolated per tab and the backend doesn't need a combined
-  // merge+sort that can hide failures.
-  useEffect(() => {
-    if (taskSource !== 'gitlab') {
-      return
-    }
-    if (gitlabView === 'todos') {
-      return
-    }
-    const activeIssueFilter =
-      gitlabView === 'issues' && isGitLabIssueFilter(activeGitlabFilter) ? activeGitlabFilter : null
-    const activeMRFilter =
-      gitlabView === 'mrs' && isGitLabMRFilter(activeGitlabFilter) ? activeGitlabFilter : null
-    if (
-      (gitlabView === 'issues' && !activeIssueFilter) ||
-      (gitlabView === 'mrs' && !activeMRFilter)
-    ) {
-      return
-    }
-    // Why: folder-mode repos have no remotes to derive a GitLab project from;
-    // SSH-backed Git repos go through the same provider-aware IPC path.
-    const eligibleRepos = selectedRepos
-    if (eligibleRepos.length === 0) {
-      setGitlabItems([])
-      setGitlabLoading(false)
-      setGitlabError(null)
-      return
-    }
-    let stale = false
-    setGitlabLoading(true)
-    setGitlabError(null)
-
-    const fetchItems =
-      gitlabView === 'issues'
-        ? (repo: (typeof eligibleRepos)[0]) => {
-            const isAssignedToMe = activeIssueFilter === 'assigned-to-me'
-            return window.api.gl
-              .listIssues({
-                repoPath: repo.path,
-                repoId: repo.id,
-                sourceContext: getTaskPageRepoSourceContext(repo, 'gitlab'),
-                state: 'opened',
-                assignee: isAssignedToMe ? '@me' : undefined,
-                limit: 50
-              })
-              .then((result) => {
-                const typed = result as {
-                  items: GitLabWorkItem[]
-                  error?: { type?: string; message: string }
-                }
-                // Why: not_found just means "this repo isn't a GitLab project"
-                // (e.g. a GitHub-only repo in a mixed selection). Drop it
-                // silently so the GitLab list doesn't show false errors.
-                const error = typed.error?.type === 'not_found' ? undefined : typed.error
-                return { repoId: repo.id, items: typed.items, error }
-              })
-          }
-        : (repo: (typeof eligibleRepos)[0]) =>
-            window.api.gl
-              .listMRs({
-                repoPath: repo.path,
-                repoId: repo.id,
-                sourceContext: getTaskPageRepoSourceContext(repo, 'gitlab'),
-                state: activeMRFilter ?? 'opened',
-                page: 1,
-                perPage: 50
-              })
-              .then((result) => {
-                const typed = result as {
-                  items: GitLabWorkItem[]
-                  error?: { type?: string; message: string }
-                }
-                const error = typed.error?.type === 'not_found' ? undefined : typed.error
-                return { repoId: repo.id, items: typed.items, error }
-              })
-
-    void Promise.allSettled(eligibleRepos.map(fetchItems))
-      .then((results) => {
-        if (stale) {
-          return
-        }
-        const merged: GitLabWorkItem[] = []
-        const errs: string[] = []
-        for (const r of results) {
-          if (r.status !== 'fulfilled') {
-            errs.push(r.reason instanceof Error ? r.reason.message : String(r.reason))
-            continue
-          }
-          for (const item of r.value.items) {
-            merged.push({ ...item, repoId: r.value.repoId })
-          }
-          if (r.value.error) {
-            errs.push(r.value.error.message)
-          }
-        }
-        merged.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
-        setGitlabItems(merged)
-        // Why: only surface an error banner when EVERY eligible repo failed.
-        // Mixed selections often include non-GitLab repos, and a partial
-        // banner would hide the working rows.
-        if (errs.length > 0 && merged.length === 0) {
-          setGitlabError(errs[0])
-        }
-      })
-      .finally(() => {
-        if (!stale) {
-          setGitlabLoading(false)
-        }
-      })
-    return () => {
-      stale = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedReposKey encodes the only selectedRepos fields read above; keying off the array ref would re-run on every parent render.
-  }, [taskSource, gitlabView, activeGitlabFilter, gitlabRefreshNonce, selectedReposKey])
-
-  // Why: Todos fetch lives in its own effect — different trigger
-  // condition from the project view (no chip filter dependence) and a
-  // different data path (`gl.todos` is user-scoped, not repo-scoped).
-  useEffect(() => {
-    if (taskSource !== 'gitlab' || gitlabView !== 'todos') {
-      return
-    }
-    if (!primaryRepo?.path) {
-      setGitlabTodos([])
-      setGitlabTodosLoading(false)
-      return
-    }
-    let stale = false
-    setGitlabTodosLoading(true)
-    void window.api.gl
-      .todos({
-        repoPath: primaryRepo.path,
-        repoId: primaryRepo.id,
-        sourceContext: getTaskPageRepoSourceContext(primaryRepo, 'gitlab')
-      })
-      .then((todos) => {
-        if (!stale) {
-          setGitlabTodos(todos as GitLabTodo[])
-        }
-      })
-      .catch(() => {
-        if (!stale) {
-          setGitlabTodos([])
-        }
-      })
-      .finally(() => {
-        if (!stale) {
-          setGitlabTodosLoading(false)
-        }
-      })
-    return () => {
-      stale = true
-    }
-  }, [taskSource, gitlabView, gitlabRefreshNonce, primaryRepo])
-
   const defaultLinearTeamSelection = settings?.defaultLinearTeamSelection
-  const [linearTeamSelection, setLinearTeamSelection] = useState<ReadonlySet<string>>(() => {
-    if (!defaultLinearTeamSelection) {
-      return new Set<string>()
-    }
-    return new Set(defaultLinearTeamSelection)
-  })
 
   const activeLinearIssues =
     selectedLinearProject && linearProjectTab === 'issues'
@@ -3022,44 +2297,6 @@ export default function TaskPage(): React.JSX.Element {
     return teams.sort((a, b) => a.name.localeCompare(b.name))
   }, [displayedLinearIssues])
 
-  // Why: the full Linear team fetch is async and can temporarily be empty.
-  // Keep the selector usable from issue metadata until the complete list lands.
-  const linearTeamOptions = useMemo(() => {
-    if (availableTeams.length === 0) {
-      return linearIssueTeams
-    }
-    const issueTeamById = new Map(linearIssueTeams.map((team) => [team.id, team]))
-    return availableTeams.map((team) => {
-      if (team.url) {
-        return team
-      }
-      return {
-        ...team,
-        url: issueTeamById.get(team.id)?.url
-      }
-    })
-  }, [availableTeams, linearIssueTeams])
-
-  // Why: team IDs belong to one Linear workspace. Switching workspaces while a
-  // saved subset exists must not leave the task list filtered by stale team IDs.
-  useEffect(() => {
-    if (linearTeamOptions.length === 0) {
-      return
-    }
-    setLinearTeamSelection(
-      reconcileLinearTeamSelection(linearTeamOptions, defaultLinearTeamSelection)
-    )
-  }, [linearTeamOptions, defaultLinearTeamSelection])
-
-  const linearAttributePrimaryTeam = useMemo(
-    () =>
-      resolveLinearIssueAttributeFilterPrimaryTeam({
-        selectedTeamIds: [...linearTeamSelection],
-        availableTeams: linearTeamOptions
-      }),
-    [linearTeamOptions, linearTeamSelection]
-  )
-
   const applyLinearAttributeFilter = useCallback((next: LinearIssueAttributeFilter) => {
     // Why: batch filter + limit/page reset in one transition so the fetch
     // effect never issues an old expanded-limit request for the new filter.
@@ -3069,34 +2306,25 @@ export default function TaskPage(): React.JSX.Element {
     setLinearIssueLoadingTargetPage(null)
   }, [])
 
-  useEffect(() => {
-    const workspaceId = selectedLinearWorkspaceId ?? null
-    const previous = previousLinearWorkspaceIdForFiltersRef.current
-    previousLinearWorkspaceIdForFiltersRef.current = workspaceId
-    if (previous === undefined || previous === workspaceId) {
-      return
-    }
-    applyLinearAttributeFilter(emptyLinearIssueAttributeFilter())
-  }, [applyLinearAttributeFilter, selectedLinearWorkspaceId])
-
-  useEffect(() => {
-    const nextId = linearAttributePrimaryTeam?.id ?? null
-    const previousId = linearPrimaryTeamIdRef.current
-    linearPrimaryTeamIdRef.current = nextId
-    if (previousId === null || previousId === nextId) {
-      return
-    }
-    // Why: status/assignee/labels are team-scoped; clearing them is a filter change
-    // and must reset limit/page via applyLinearAttributeFilter (R6), not a bare set.
-    const next = teamDerivedFacetsForPrimaryTeamChange(linearAttributeFilter)
-    if (
-      linearIssueAttributeFilterSignature(linearAttributeFilter) ===
-      linearIssueAttributeFilterSignature(next)
-    ) {
-      return
-    }
-    applyLinearAttributeFilter(next)
-  }, [applyLinearAttributeFilter, linearAttributeFilter, linearAttributePrimaryTeam?.id])
+  const {
+    availableTeams,
+    setAvailableTeams,
+    setLinearTeamRefreshNonce,
+    linearTeamSelection,
+    setLinearTeamSelection,
+    linearTeamOptions,
+    linearAttributePrimaryTeam
+  } = useTaskPageLinearTeamsState({
+    taskSource,
+    taskResumeApplied,
+    linearConnected,
+    selectedLinearWorkspaceId,
+    linearTaskSourceContext,
+    defaultLinearTeamSelection,
+    linearIssueTeams,
+    linearAttributeFilter,
+    applyLinearAttributeFilter
+  })
 
   const linearSearchActive = isLinearIssueSearchActive(linearSearchInput, appliedLinearSearch)
   const showLinearAttributeFilters =
@@ -3493,179 +2721,72 @@ export default function TaskPage(): React.JSX.Element {
     })
   }, [])
 
-  const displayedJiraIssues = useMemo(
-    () =>
-      jiraIssues.map(
-        (issue) =>
-          findTaskPageJiraIssue(
-            jiraCacheSnapshot.issueCache,
-            jiraCacheSnapshot.searchCache,
-            issue.key,
-            {
-              sourceContext: jiraTaskSourceContext,
-              siteId: issue.siteId
-            }
-          ) ?? issue
-      ),
-    [jiraIssues, jiraCacheSnapshot.issueCache, jiraCacheSnapshot.searchCache, jiraTaskSourceContext]
-  )
-  const displayedJiraProjectScope = useMemo(
-    () => getSingleJiraProjectScope(displayedJiraIssues),
-    [displayedJiraIssues]
-  )
-  const displayedJiraStatusOrderScopeKey = displayedJiraProjectScope
-    ? getTaskPageJiraStatusOrderScopeKey(jiraTaskSourceScopeKey, displayedJiraProjectScope)
-    : null
-  const displayedJiraStatusOrder =
-    jiraProjectStatusOrder && displayedJiraStatusOrderScopeKey === jiraProjectStatusOrder.scopeKey
-      ? jiraProjectStatusOrder.order
-      : null
-
-  const sortedJiraIssues = useMemo(() => {
-    return sortJiraIssues(
-      displayedJiraIssues,
-      jiraOrderBy,
-      jiraOrderDirection,
-      jiraPrioritiesBySite
-    )
-  }, [displayedJiraIssues, jiraOrderBy, jiraOrderDirection, jiraPrioritiesBySite])
-  // New Linear project dialog state
-  const [newLinearProjectOpen, setNewLinearProjectOpen] = useState(false)
-  const [newLinearProjectName, setNewLinearProjectName] = useState('')
-  const [newLinearProjectDescription, setNewLinearProjectDescription] = useState('')
-  const [newLinearProjectContent, setNewLinearProjectContent] = useState('')
-  const [newLinearProjectTeamId, setNewLinearProjectTeamId] = useState<string | null>(null)
-  const [newLinearProjectLeadId, setNewLinearProjectLeadId] = useState<string | null>(null)
-  const [newLinearProjectMemberIds, setNewLinearProjectMemberIds] = useState<string[]>([])
-  const [newLinearProjectLabelIds, setNewLinearProjectLabelIds] = useState<string[]>([])
-  const [newLinearProjectPriority, setNewLinearProjectPriority] = useState<number>(0)
-  const [newLinearProjectStartDate, setNewLinearProjectStartDate] = useState('')
-  const [newLinearProjectTargetDate, setNewLinearProjectTargetDate] = useState('')
-  const [newLinearProjectSubmitting, setNewLinearProjectSubmitting] = useState(false)
-
-  const newLinearProjectTargetTeam = useMemo(
-    () => availableTeams.find((t) => t.id === newLinearProjectTeamId) ?? availableTeams[0] ?? null,
-    [availableTeams, newLinearProjectTeamId]
-  )
-  const newLinearProjectMembers = useTeamMembers(
-    newLinearProjectOpen ? (newLinearProjectTargetTeam?.id ?? null) : null,
-    settings,
-    newLinearProjectTargetTeam?.workspaceId
-  )
-  const newLinearProjectLabels = useTeamLabels(
-    newLinearProjectOpen ? (newLinearProjectTargetTeam?.id ?? null) : null,
-    settings,
-    newLinearProjectTargetTeam?.workspaceId
-  )
-
-  useEffect(() => {
-    setNewLinearProjectLeadId(null)
-    setNewLinearProjectMemberIds([])
-    setNewLinearProjectLabelIds([])
-  }, [newLinearProjectTargetTeam?.id, newLinearProjectTargetTeam?.workspaceId])
-
-  // New Linear issue dialog state
-  const [newLinearIssueOpen, setNewLinearIssueOpen] = useState(false)
-  const [newLinearIssueTitle, setNewLinearIssueTitle] = useState('')
-  const [newLinearIssueBody, setNewLinearIssueBody] = useState('')
-  const [newLinearIssueTeamId, setNewLinearIssueTeamId] = useState<string | null>(null)
-  const [newLinearIssueSubmitting, setNewLinearIssueSubmitting] = useState(false)
-
-  const [newLinearIssueStateId, setNewLinearIssueStateId] = useState<string | null>(null)
-  const [newLinearIssueAssigneeId, setNewLinearIssueAssigneeId] = useState<string | null>(null)
-  const [newLinearIssuePriority, setNewLinearIssuePriority] = useState<number>(0)
-  const [newLinearIssueProjectId, setNewLinearIssueProjectId] = useState<string | null>(null)
-  const [newLinearIssueLabelIds, setNewLinearIssueLabelIds] = useState<string[]>([])
-
-  const newLinearIssueTargetTeam = useMemo(
-    () => availableTeams.find((t) => t.id === newLinearIssueTeamId) ?? availableTeams[0] ?? null,
-    [availableTeams, newLinearIssueTeamId]
-  )
-
-  const [newLinearIssueProjects, setNewLinearIssueProjects] = useState<LinearProjectSummary[]>([])
-  const [newLinearIssueProjectsLoading, setNewLinearIssueProjectsLoading] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    if (!newLinearIssueOpen || !linearConnected || !newLinearIssueTargetTeam) {
-      setNewLinearIssueProjects([])
-      setNewLinearIssueProjectsLoading(false)
-      return
-    }
-    setNewLinearIssueProjectsLoading(true)
-    const targetWorkspaceId =
-      newLinearIssueTargetTeam.workspaceId ||
-      (selectedLinearWorkspaceId !== 'all' ? selectedLinearWorkspaceId : null)
-    linearListProjects(linearTaskSourceContext ?? settings, undefined, 100, targetWorkspaceId)
-      .then((p) => {
-        if (!cancelled) {
-          setNewLinearIssueProjects(p.items)
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) {
-          setNewLinearIssueProjectsLoading(false)
-        }
-      })
-    return () => {
-      // Why: project lists are workspace-scoped; stale responses must not
-      // populate the composer after a team/workspace switch.
-      cancelled = true
-    }
-  }, [
-    linearConnected,
+  const {
+    newLinearProjectOpen,
+    setNewLinearProjectOpen,
+    newLinearProjectName,
+    setNewLinearProjectName,
+    newLinearProjectDescription,
+    setNewLinearProjectDescription,
+    newLinearProjectContent,
+    setNewLinearProjectContent,
+    setNewLinearProjectTeamId,
+    newLinearProjectLeadId,
+    setNewLinearProjectLeadId,
+    newLinearProjectMemberIds,
+    setNewLinearProjectMemberIds,
+    newLinearProjectLabelIds,
+    setNewLinearProjectLabelIds,
+    newLinearProjectPriority,
+    setNewLinearProjectPriority,
+    newLinearProjectStartDate,
+    setNewLinearProjectStartDate,
+    newLinearProjectTargetDate,
+    setNewLinearProjectTargetDate,
+    newLinearProjectSubmitting,
+    setNewLinearProjectSubmitting,
+    newLinearProjectTargetTeam,
+    newLinearProjectMembers,
+    newLinearProjectLabels,
     newLinearIssueOpen,
+    setNewLinearIssueOpen,
+    newLinearIssueTitle,
+    setNewLinearIssueTitle,
+    newLinearIssueBody,
+    setNewLinearIssueBody,
+    newLinearIssueTeamId,
+    setNewLinearIssueTeamId,
+    newLinearIssueSubmitting,
+    setNewLinearIssueSubmitting,
+    newLinearIssueStateId,
+    setNewLinearIssueStateId,
+    newLinearIssueAssigneeId,
+    setNewLinearIssueAssigneeId,
+    newLinearIssuePriority,
+    setNewLinearIssuePriority,
+    newLinearIssueProjectId,
+    setNewLinearIssueProjectId,
+    newLinearIssueLabelIds,
+    setNewLinearIssueLabelIds,
     newLinearIssueTargetTeam,
+    newLinearIssueProjects,
+    setNewLinearIssueProjects,
+    newLinearIssueProjectsLoading,
+    setNewLinearIssueProjectsLoading,
+    newLinearStates,
+    newLinearMembers,
+    newLinearLabels,
+    linearConnectOpen,
+    setLinearConnectOpen
+  } = useTaskPageLinearDraftState({
+    settings,
+    linearConnected,
     linearTaskSourceContext,
-    settings,
-    selectedLinearWorkspaceId
-  ])
+    selectedLinearWorkspaceId,
+    availableTeams,
+    selectedLinearProject
+  })
 
-  useEffect(() => {
-    // Why: the selected team can change indirectly when the available Linear
-    // teams/workspace list refreshes, even if the explicit picker value did not.
-    setNewLinearIssueStateId(null)
-    setNewLinearIssueAssigneeId(null)
-    setNewLinearIssuePriority(0)
-    if (
-      selectedLinearProject &&
-      selectedLinearProject.workspaceId === newLinearIssueTargetTeam?.workspaceId
-    ) {
-      setNewLinearIssueProjectId(selectedLinearProject.id)
-    } else {
-      setNewLinearIssueProjectId(null)
-    }
-    setNewLinearIssueLabelIds([])
-  }, [newLinearIssueTargetTeam?.id, newLinearIssueTargetTeam?.workspaceId, selectedLinearProject])
-
-  const newLinearStates = useTeamStates(
-    linearConnected ? newLinearIssueTargetTeam?.id || null : null,
-    settings,
-    newLinearIssueTargetTeam?.workspaceId
-  )
-  const newLinearMembers = useTeamMembers(
-    linearConnected ? newLinearIssueTargetTeam?.id || null : null,
-    settings,
-    newLinearIssueTargetTeam?.workspaceId
-  )
-  const newLinearLabels = useTeamLabels(
-    linearConnected ? newLinearIssueTargetTeam?.id || null : null,
-    settings,
-    newLinearIssueTargetTeam?.workspaceId
-  )
-
-  useEffect(() => {
-    if (newLinearStates.data.length > 0 && !newLinearIssueStateId) {
-      const defaultState =
-        newLinearStates.data.find((s) => s.type === 'unstarted') || newLinearStates.data[0]
-      if (defaultState) {
-        setNewLinearIssueStateId(defaultState.id)
-      }
-    }
-  }, [newLinearStates.data, newLinearIssueStateId])
-
-  const [linearConnectOpen, setLinearConnectOpen] = useState(false)
   useContextualTour(
     'tasks',
     !dialogWorkItem &&
@@ -3679,7 +2800,6 @@ export default function TaskPage(): React.JSX.Element {
     'tasks_open'
   )
 
-  const activeGithubTaskKind = getGitHubTaskKind(activeTaskPreset, appliedTaskSearch)
   const appliedTaskQuery = useMemo(() => parseTaskQuery(appliedTaskSearch), [appliedTaskSearch])
   const selectedGitHubRepoExternalLink = useMemo(() => {
     if (selectedRepos.length !== 1) {
@@ -3696,31 +2816,68 @@ export default function TaskPage(): React.JSX.Element {
     return url ? { url, label: slug ? `${slug.owner}/${slug.repo}` : repo.displayName } : null
   }, [activeGithubTaskKind, perRepoSourceState, selectedRepos])
 
-  const [newJiraIssueOpen, setNewJiraIssueOpen] = useState(false)
-  const [newJiraIssueTitle, setNewJiraIssueTitle] = useState('')
-  const [newJiraIssueBody, setNewJiraIssueBody] = useState('')
-  const [newJiraIssueProjectId, setNewJiraIssueProjectId] = useState<string | null>(null)
-  const [newJiraIssueProjectComboboxOpen, setNewJiraIssueProjectComboboxOpen] = useState(false)
-  const [newJiraIssueProjectQuery, setNewJiraIssueProjectQuery] = useState('')
-  const [newJiraIssueProjectCommandValue, setNewJiraIssueProjectCommandValue] = useState('')
-  const [newJiraIssueTypeId, setNewJiraIssueTypeId] = useState<string | null>(null)
-  const [newJiraIssueSubmitting, setNewJiraIssueSubmitting] = useState(false)
-  const newJiraIssueProjectSearchInputRef = useRef<HTMLInputElement | null>(null)
-  const [availableJiraIssueTypes, setAvailableJiraIssueTypes] = useState<JiraIssueType[]>([])
-  const [jiraIssueTypesLoading, setJiraIssueTypesLoading] = useState(false)
-  const [jiraCreateFields, setJiraCreateFields] = useState<JiraCreateField[]>([])
-  const [jiraCreateFieldsLoading, setJiraCreateFieldsLoading] = useState(false)
-  const [jiraCreateFieldsError, setJiraCreateFieldsError] = useState<string | null>(null)
-  const [newJiraIssueCustomFieldValues, setNewJiraIssueCustomFieldValues] = useState<
-    Record<string, string>
-  >({})
-  const [jiraConnectOpen, setJiraConnectOpen] = useState(false)
-  const [jiraSiteUrlDraft, setJiraSiteUrlDraft] = useState('')
-  const [jiraEmailDraft, setJiraEmailDraft] = useState('')
-  const [jiraApiTokenDraft, setJiraApiTokenDraft] = useState('')
-  const [jiraConnectState, setJiraConnectState] = useState<'idle' | 'connecting' | 'error'>('idle')
-  const [jiraConnectError, setJiraConnectError] = useState<string | null>(null)
   const includeJiraSiteNameInProjectLabel = selectedJiraSiteId === 'all'
+  const sortedAvailableJiraProjects = useMemo(
+    () =>
+      [...availableJiraProjects].sort((a, b) =>
+        compareJiraProjectsByDisplayLabel(a, b, includeJiraSiteNameInProjectLabel)
+      ),
+    [availableJiraProjects, includeJiraSiteNameInProjectLabel]
+  )
+
+  const {
+    newJiraIssueOpen,
+    setNewJiraIssueOpen,
+    newJiraIssueTitle,
+    setNewJiraIssueTitle,
+    newJiraIssueBody,
+    setNewJiraIssueBody,
+    setNewJiraIssueProjectId,
+    newJiraIssueProjectComboboxOpen,
+    setNewJiraIssueProjectComboboxOpen,
+    newJiraIssueProjectQuery,
+    setNewJiraIssueProjectQuery,
+    newJiraIssueProjectCommandValue,
+    setNewJiraIssueProjectCommandValue,
+    newJiraIssueTypeId,
+    setNewJiraIssueTypeId,
+    newJiraIssueSubmitting,
+    setNewJiraIssueSubmitting,
+    newJiraIssueProjectSearchInputRef,
+    availableJiraIssueTypes,
+    setAvailableJiraIssueTypes,
+    jiraIssueTypesLoading,
+    setJiraIssueTypesLoading,
+    jiraCreateFields,
+    setJiraCreateFields,
+    jiraCreateFieldsLoading,
+    setJiraCreateFieldsLoading,
+    jiraCreateFieldsError,
+    setJiraCreateFieldsError,
+    newJiraIssueCustomFieldValues,
+    setNewJiraIssueCustomFieldValues,
+    jiraConnectOpen,
+    setJiraConnectOpen,
+    jiraSiteUrlDraft,
+    setJiraSiteUrlDraft,
+    jiraEmailDraft,
+    setJiraEmailDraft,
+    jiraApiTokenDraft,
+    setJiraApiTokenDraft,
+    jiraConnectState,
+    setJiraConnectState,
+    jiraConnectError,
+    setJiraConnectError,
+    newJiraIssueTargetProject,
+    newJiraIssueTargetType
+  } = useTaskPageJiraDraftState({
+    settings,
+    jiraConnected,
+    jiraTaskSourceContext,
+    sortedAvailableJiraProjects,
+    getJiraProjectSelectionKey
+  })
+
   const previousProviderRuntimeContextKeyRef = useRef(providerRuntimeContextKey)
 
   useEffect(() => {
@@ -3761,14 +2918,6 @@ export default function TaskPage(): React.JSX.Element {
     }
   }, [newJiraIssueOpen, newLinearIssueOpen, providerRuntimeContextKey])
 
-  const sortedAvailableJiraProjects = useMemo(
-    () =>
-      [...availableJiraProjects].sort((a, b) =>
-        compareJiraProjectsByDisplayLabel(a, b, includeJiraSiteNameInProjectLabel)
-      ),
-    [availableJiraProjects, includeJiraSiteNameInProjectLabel]
-  )
-
   const filteredNewJiraIssueProjects = useMemo(() => {
     return filterJiraProjectPickerProjects({
       projects: sortedAvailableJiraProjects,
@@ -3777,27 +2926,9 @@ export default function TaskPage(): React.JSX.Element {
     })
   }, [includeJiraSiteNameInProjectLabel, newJiraIssueProjectQuery, sortedAvailableJiraProjects])
 
-  const newJiraIssueTargetProject = useMemo(
-    () =>
-      sortedAvailableJiraProjects.find(
-        (project) => getJiraProjectSelectionKey(project) === newJiraIssueProjectId
-      ) ??
-      sortedAvailableJiraProjects[0] ??
-      null,
-    [newJiraIssueProjectId, sortedAvailableJiraProjects]
-  )
-
   const newJiraIssueTargetProjectSelectionKey = newJiraIssueTargetProject
     ? getJiraProjectSelectionKey(newJiraIssueTargetProject)
     : ''
-
-  const newJiraIssueTargetType = useMemo(
-    () =>
-      availableJiraIssueTypes.find((issueType) => issueType.id === newJiraIssueTypeId) ??
-      availableJiraIssueTypes[0] ??
-      null,
-    [availableJiraIssueTypes, newJiraIssueTypeId]
-  )
 
   const visibleJiraCreateFields = useMemo(
     () => jiraCreateFields.filter(isVisibleJiraCreateField),
@@ -3811,22 +2942,6 @@ export default function TaskPage(): React.JSX.Element {
       ),
     [newJiraIssueCustomFieldValues, visibleJiraCreateFields]
   )
-
-  useEffect(() => {
-    if (!newJiraIssueProjectComboboxOpen) {
-      return
-    }
-    const frame = requestAnimationFrame(() => {
-      const input = newJiraIssueProjectSearchInputRef.current
-      if (!input) {
-        return
-      }
-      input.focus()
-      const end = input.value.length
-      input.setSelectionRange(end, end)
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [newJiraIssueProjectComboboxOpen])
 
   const handleNewJiraIssueProjectComboboxOpenChange = useCallback(
     (open: boolean) => {
@@ -3872,115 +2987,6 @@ export default function TaskPage(): React.JSX.Element {
     [newJiraIssueProjectComboboxOpen, newJiraIssueTargetProjectSelectionKey]
   )
 
-  useEffect(() => {
-    if (!newJiraIssueOpen || !jiraConnected || !newJiraIssueTargetProject) {
-      setAvailableJiraIssueTypes([])
-      setJiraIssueTypesLoading(false)
-      return
-    }
-    let cancelled = false
-    setAvailableJiraIssueTypes([])
-    setJiraIssueTypesLoading(true)
-    void jiraListIssueTypes(
-      jiraTaskSourceContext ?? settings,
-      newJiraIssueTargetProject.id,
-      newJiraIssueTargetProject.siteId
-    )
-      .then((issueTypes) => {
-        if (cancelled) {
-          return
-        }
-        setAvailableJiraIssueTypes(issueTypes)
-        setNewJiraIssueTypeId(issueTypes[0]?.id ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) {
-          toast.error(
-            translate('auto.components.TaskPage.af2a8371de', 'Failed to load Jira issue types.')
-          )
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setJiraIssueTypesLoading(false)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [settings, jiraConnected, newJiraIssueOpen, newJiraIssueTargetProject, jiraTaskSourceContext])
-
-  useEffect(() => {
-    if (
-      !newJiraIssueOpen ||
-      !jiraConnected ||
-      !newJiraIssueTargetProject ||
-      !newJiraIssueTargetType
-    ) {
-      setJiraCreateFields([])
-      setJiraCreateFieldsLoading(false)
-      setJiraCreateFieldsError(null)
-      setNewJiraIssueCustomFieldValues({})
-      return
-    }
-    let cancelled = false
-    setJiraCreateFields([])
-    setJiraCreateFieldsLoading(true)
-    setJiraCreateFieldsError(null)
-    setNewJiraIssueCustomFieldValues({})
-    void jiraListCreateFields(
-      jiraTaskSourceContext ?? settings,
-      newJiraIssueTargetProject.id,
-      newJiraIssueTargetType.id,
-      newJiraIssueTargetProject.siteId
-    )
-      .then((fields) => {
-        if (!cancelled) {
-          setJiraCreateFields(fields)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setJiraCreateFieldsError('Failed to load required Jira fields.')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setJiraCreateFieldsLoading(false)
-        }
-      })
-    return () => {
-      // Why: create fields are scoped to project + issue type; ignore late
-      // responses after the user switches either selector.
-      cancelled = true
-    }
-  }, [
-    settings,
-    jiraConnected,
-    newJiraIssueOpen,
-    newJiraIssueTargetProject,
-    newJiraIssueTargetType,
-    jiraTaskSourceContext
-  ])
-
-  // Why: defense-in-depth safety net applied to the current page's items.
-  // The active tab scopes requests to issues or PRs, and this keeps stale
-  // cache rows from leaking across the split tabs.
-  const applyTypeFilter = useCallback(
-    (items: GitHubWorkItem[]) => {
-      return items.filter((item) => {
-        return activeGithubTaskKind === 'prs' ? item.type === 'pr' : item.type === 'issue'
-      })
-    },
-    [activeGithubTaskKind]
-  )
-
-  const currentPageItems = useMemo(() => pages[currentPage] ?? [], [pages, currentPage])
-
-  const filteredWorkItems = useMemo(
-    () => applyTypeFilter(currentPageItems),
-    [applyTypeFilter, currentPageItems]
-  )
   const showGitHubTaskSkeletons = tasksFiltering || (tasksLoading && filteredWorkItems.length === 0)
   const loadedGitHubAuthorLogins = useMemo(() => {
     const seen = new Set<string>()
@@ -4012,52 +3018,9 @@ export default function TaskPage(): React.JSX.Element {
     }
     return null
   }, [activeGithubTaskKind, perRepoSourceState])
-  const showPRManagementColumns = activeGithubTaskKind === 'prs'
   const githubTaskGridClass = showPRManagementColumns
     ? GITHUB_PR_TASK_GRID_CLASS
     : GITHUB_TASK_GRID_CLASS
-
-  const ensurePRChecksLoaded = useCallback(
-    (item: GitHubWorkItem): void => {
-      if (item.type !== 'pr' || item.checksSummary) {
-        return
-      }
-      const repo = repoMap.get(item.repoId)
-      if (!repo) {
-        return
-      }
-      const requestedHeadSha = item.headSha
-      const requestedPRRepo = item.prRepo ?? null
-      void fetchPRChecks(
-        repo.path,
-        item.number,
-        item.branchName,
-        item.headSha,
-        item.prRepo ?? null,
-        { repoId: repo.id, sourceContext: getTaskPageRepoSourceContext(repo, 'github') }
-      ).then((checks) => {
-        patchTaskPageWorkItemRows(
-          { id: item.id, repoId: item.repoId },
-          { checksSummary: deriveTaskPagePRCheckSummary(checks) },
-          (currentItem) =>
-            currentItem.type === 'pr' &&
-            currentItem.headSha === requestedHeadSha &&
-            sameOptionalGitHubOwnerRepo(currentItem.prRepo, requestedPRRepo)
-        )
-      })
-    },
-    [fetchPRChecks, patchTaskPageWorkItemRows, repoMap]
-  )
-
-  useEffect(() => {
-    if (taskSource !== 'github' || githubMode !== 'items' || !showPRManagementColumns) {
-      return
-    }
-
-    for (const item of filteredWorkItems.slice(0, PR_CHECKS_EAGER_PREFETCH_LIMIT)) {
-      ensurePRChecksLoaded(item)
-    }
-  }, [ensurePRChecksLoaded, filteredWorkItems, githubMode, showPRManagementColumns, taskSource])
 
   // Why: each page is bounded by both the per-repo fetch budget (so a single
   // repo can yield at most PER_REPO_FETCH_LIMIT rows per page) and the
@@ -4149,246 +3112,6 @@ export default function TaskPage(): React.JSX.Element {
     },
     [paginationLoading, selectedRepos, pages, appliedTaskSearch, fetchWorkItemsNextPage]
   )
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    const timeout = window.setTimeout(() => {
-      const scoped = scopeGitHubTaskSearch(taskSearchInput, activeGithubTaskKind)
-      if (scoped !== appliedTaskSearch) {
-        setTasksFiltering(true)
-      }
-      setAppliedTaskSearch(scoped)
-    }, TASK_SEARCH_DEBOUNCE_MS)
-    return () => window.clearTimeout(timeout)
-  }, [activeGithubTaskKind, appliedTaskSearch, taskSearchInput, taskResumeApplied])
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    if (!githubSearchPersistReadyRef.current) {
-      githubSearchPersistReadyRef.current = true
-      return
-    }
-    // Why: persist the debounced applied query regardless of the active
-    // preset. The preset-click handler writes the canonical query for that
-    // preset, so persisting again here is at worst idempotent. When the
-    // user types into the search box `handleTaskSearchChange` clears the
-    // preset, but persisting unconditionally also covers paths that change
-    // appliedTaskSearch without going through that handler.
-    setTaskResumeState({
-      githubItemsPreset: activeTaskPreset,
-      githubItemsQuery: appliedTaskSearch.trim()
-    })
-  }, [activeTaskPreset, appliedTaskSearch, setTaskResumeState, taskResumeApplied])
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    // Why: both early-return branches must clear `retryingSourceKeys` — if the
-    // user clicks Retry and then switches `taskSource` away from 'github' (or
-    // somehow ends up with zero repos selected) before the fetch dispatches,
-    // neither the `.then` nor the `.catch` below will fire, and the Retry
-    // button would stay stuck in its disabled/Retrying state indefinitely.
-    if (taskSource !== 'github' || githubMode !== 'items') {
-      setRetryingSourceKeys(new Set())
-      setTasksRefreshing(false)
-      setTasksFiltering(false)
-      return
-    }
-    if (selectedRepos.length === 0) {
-      setRetryingSourceKeys(new Set())
-      setTasksRefreshing(false)
-      setTasksFiltering(false)
-      return
-    } // unreachable — multi-combobox forbids empty
-
-    // Why: `repo:owner/name` qualifiers are silently dropped before fan-out
-    // because in cross-repo mode they would pin every per-repo fetch to a
-    // single repo and zero out the rest. See stripRepoQualifiers.
-    const q = stripRepoQualifiers(appliedTaskSearch.trim())
-    let cancelled = false
-
-    // Why: paint cached rows synchronously before awaiting the fan-out so
-    // selection changes don't leave the previous selection's rows on screen
-    // for a frame. Any repo without a cache entry simply contributes nothing
-    // to this pre-paint; the fetch will fill it in.
-    const preMerged: GitHubWorkItem[] = []
-    let anyUncached = false
-    let anyRepoCached = false
-    for (const r of selectedRepos) {
-      const cached = getCachedWorkItems(
-        r.id,
-        PER_REPO_FETCH_LIMIT,
-        q,
-        r.path,
-        getTaskPageRepoSourceContext(r, 'github')
-      )
-      if (cached === null) {
-        anyUncached = true
-      } else {
-        anyRepoCached = true
-        preMerged.push(...cached)
-      }
-    }
-    // Why: always replace — if preMerged is empty (e.g. query just changed and
-    // no repo has a cache entry for it), we clear the previous query's rows
-    // rather than leaving them on screen under the spinner.
-    const page0 =
-      preMerged.length > 0
-        ? [...preMerged]
-            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-            .slice(0, CROSS_REPO_DISPLAY_LIMIT)
-        : []
-    setPages([page0])
-    setCurrentPage(0)
-    setTotalItemCount(null)
-    setTasksError(null)
-    setFailedCount(0) // reset so a prior failure banner doesn't linger
-    setTasksLoading(anyUncached)
-
-    // Preserve the existing nonce-gated force behavior.
-    const forceRefresh = taskRefreshNonce !== lastFetchedNonceRef.current
-    lastFetchedNonceRef.current = taskRefreshNonce
-    // Why: a preference flip bumps `workItemsInvalidationNonce`. Treat that
-    // bump as a forced refresh so the fan-out bypasses the in-flight dedupe
-    // map — otherwise an overlapping request started before the flip could
-    // resolve the new fetch and repopulate the cache with pre-flip data.
-    const preferenceInvalidated =
-      workItemsInvalidationNonce !== lastFetchedInvalidationNonceRef.current
-    lastFetchedInvalidationNonceRef.current = workItemsInvalidationNonce
-    const forcedFetch = (forceRefresh && taskRefreshNonce > 0) || preferenceInvalidated
-    const repoArgs = selectedRepos.map((r) => ({
-      repoId: r.id,
-      path: r.path,
-      executionHostId: r.executionHostId,
-      sourceContext: getTaskPageRepoSourceContext(r, 'github')
-    }))
-    const landingRefreshKey = `${repoArgs.map((r) => `${r.repoId}:${r.path}`).join('|')}::${q}`
-    const shouldProbeOnLanding =
-      !forcedFetch && anyRepoCached && !landingGitHubRefreshKeysRef.current.has(landingRefreshKey)
-    if (shouldProbeOnLanding) {
-      landingGitHubRefreshKeysRef.current = new Set([
-        ...landingGitHubRefreshKeysRef.current,
-        landingRefreshKey
-      ])
-    }
-    // Why: manual refresh keeps cached rows visible, so the normal
-    // `tasksLoading` flag may stay false. Track the forced fetch separately
-    // so the toolbar still shows a refresh-in-progress affordance.
-    setTasksRefreshing(forcedFetch)
-
-    // Why: snapshot the retrying source keys at effect-dispatch so overlapping
-    // retries don't clear each other's pending state. An earlier cancelled
-    // effect settling after a newer retry starts would otherwise wipe the
-    // newer retry's source from the set. Clearing only the keys captured
-    // when this effect dispatched preserves later additions.
-    const dispatchedRetrySourceKeys = retryingSourceKeys
-    void fetchWorkItemsAcrossRepos(repoArgs, PER_REPO_FETCH_LIMIT, CROSS_REPO_DISPLAY_LIMIT, q, {
-      ...deriveTaskPageGitHubWorkItemsFetchOptions(forcedFetch, shouldProbeOnLanding)
-    })
-      .then(({ items, failedCount: failed }) => {
-        // Why: clear only the sources this effect was responsible for
-        // retrying (the snapshot captured at dispatch time). Overlapping
-        // retries — a second click while a prior fetch is still in flight
-        // — must not clear the newer source from the set, so we can't just
-        // reset the whole set here. The early-return branches above reset
-        // the whole set because those branches won't dispatch a fetch.
-        setRetryingSourceKeys((prev) => {
-          if (dispatchedRetrySourceKeys.size === 0) {
-            return prev
-          }
-          const next = new Set(prev)
-          for (const key of dispatchedRetrySourceKeys) {
-            next.delete(key)
-          }
-          return next
-        })
-        if (cancelled) {
-          return
-        }
-        if (shouldProbeOnLanding) {
-          const replaceFirstPage = shouldReplaceTaskPageItemsAfterRefresh(page0, items)
-          const resetPagination = shouldResetTaskPagePaginationAfterLandingRefresh(page0, items)
-          setPages((current) => reconcileTaskPagePagesAfterLandingRefresh(current, items))
-          if (replaceFirstPage || resetPagination) {
-            setCurrentPage(0)
-          }
-        } else {
-          setPages([items])
-          setCurrentPage(0)
-        }
-        setFailedCount(failed)
-        setTasksLoading(false)
-        setTasksRefreshing(false)
-        setTasksFiltering(false)
-      })
-      .catch((err) => {
-        // Why: fetchWorkItemsAcrossRepos swallows per-repo failures, so a
-        // reject here means an IPC-level or programmer error — surface it.
-        // Clear only the sources this effect was responsible for retrying
-        // (the snapshot captured at dispatch time). Overlapping retries —
-        // a second click while a prior fetch is still in flight — must
-        // not clear the newer source from the set, so we can't just reset
-        // the whole set here. The early-return branches above reset the
-        // whole set because those branches won't dispatch a fetch.
-        setRetryingSourceKeys((prev) => {
-          if (dispatchedRetrySourceKeys.size === 0) {
-            return prev
-          }
-          const next = new Set(prev)
-          for (const key of dispatchedRetrySourceKeys) {
-            next.delete(key)
-          }
-          return next
-        })
-        if (cancelled) {
-          return
-        }
-        setTasksError(err instanceof Error ? err.message : 'Failed to load GitHub work.')
-        setFailedCount(0) // the per-repo banner would be misleading next to tasksError
-        setTasksLoading(false)
-        setTasksRefreshing(false)
-        setTasksFiltering(false)
-      })
-
-    // Why: fire-and-forget count query in parallel with the items fetch.
-    // The search API is cached 120s server-side so this doesn't add
-    // meaningful latency or rate-limit pressure.
-    void countWorkItemsAcrossRepos(
-      selectedRepos.map((r) => ({
-        repoId: r.id,
-        path: r.path,
-        executionHostId: r.executionHostId,
-        sourceContext: getTaskPageRepoSourceContext(r, 'github')
-      })),
-      q
-    ).then((count) => {
-      if (!cancelled) {
-        setTotalItemCount(count)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-    // Why: getCachedWorkItems and fetchWorkItemsAcrossRepos are stable zustand
-    // selectors; depending on them would re-run the effect on unrelated store
-    // updates. `workItemsInvalidationNonce` is explicitly included so a
-    // preference flip (which only evicts cache) re-dispatches this effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedRepos,
-    appliedTaskSearch,
-    taskRefreshNonce,
-    taskSource,
-    githubMode,
-    workItemsInvalidationNonce,
-    taskResumeApplied
-  ])
 
   const applyPRFilterChange = useCallback(
     (change: PRFilterChange): void => {
@@ -5686,134 +4409,6 @@ export default function TaskPage(): React.JSX.Element {
     linearConnected,
     selectedLinearIssueCanFloat,
     selectedLinearIssueId,
-    taskResumeApplied,
-    taskSource
-  ])
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    const timeout = window.setTimeout(() => {
-      setAppliedJiraSearch(jiraSearchInput)
-    }, TASK_SEARCH_DEBOUNCE_MS)
-    return () => window.clearTimeout(timeout)
-  }, [jiraSearchInput, taskResumeApplied])
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    if (!jiraSearchPersistReadyRef.current) {
-      jiraSearchPersistReadyRef.current = true
-      return
-    }
-    setTaskResumeState({ jiraQuery: appliedJiraSearch.trim() })
-  }, [appliedJiraSearch, setTaskResumeState, taskResumeApplied])
-
-  useEffect(() => {
-    if (!taskResumeApplied) {
-      return
-    }
-    if (taskSource !== 'jira') {
-      return
-    }
-    if (!jiraConnected) {
-      return
-    }
-
-    let cancelled = false
-    setJiraLoading(true)
-    setJiraError(null)
-    setJiraErrorDetailsOpen(false)
-
-    const trimmed = appliedJiraSearch.trim()
-    const request =
-      trimmed.length > 0
-        ? searchJiraIssues(trimmed, JIRA_ITEM_LIMIT, { sourceContext: jiraTaskSourceContext })
-        : listJiraIssues(activeJiraPreset, JIRA_ITEM_LIMIT, {
-            sourceContext: jiraTaskSourceContext
-          })
-
-    void request
-      .then((issues) => {
-        if (cancelled) {
-          return
-        }
-        setJiraIssues(issues)
-        setJiraLoading(false)
-        const projectScope = getSingleJiraProjectScope(issues)
-        if (!projectScope) {
-          return
-        }
-        const statusOrderScopeKey = getTaskPageJiraStatusOrderScopeKey(
-          jiraTaskSourceScopeKey,
-          projectScope
-        )
-        void loadTaskPageJiraProjectStatusOrder(
-          jiraTaskSourceContext ?? settings,
-          jiraTaskSourceScopeKey,
-          projectScope
-        ).then((order) => {
-          if (!cancelled) {
-            setJiraProjectStatusOrder({
-              order,
-              scopeKey: statusOrderScopeKey
-            })
-          }
-        })
-      })
-      .catch((err) => {
-        if (cancelled) {
-          return
-        }
-        const failureState = createTaskPageJiraLoadFailureState(err)
-        setJiraIssues(failureState.issues)
-        setJiraError(failureState.error)
-        setJiraLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    taskSource,
-    jiraConnected,
-    selectedJiraSiteId,
-    appliedJiraSearch,
-    activeJiraPreset,
-    jiraRefreshNonce,
-    taskResumeApplied,
-    jiraTaskSourceContext,
-    jiraTaskSourceScopeKey
-  ])
-
-  useEffect(() => {
-    if (!taskResumeApplied || taskSource !== 'jira') {
-      return
-    }
-    if (!jiraConnected || displayedJiraIssues.length === 0) {
-      if (selectedJiraIssueKey !== null) {
-        setSelectedJiraIssueKey(null)
-      }
-      if (selectedJiraIssueFallback !== null) {
-        setSelectedJiraIssueFallback(null)
-      }
-      return
-    }
-    if (
-      selectedJiraIssueKey &&
-      !displayedJiraIssues.some((issue) => issue.key === selectedJiraIssueKey)
-    ) {
-      setSelectedJiraIssueKey(null)
-      setSelectedJiraIssueFallback(null)
-    }
-  }, [
-    displayedJiraIssues,
-    jiraConnected,
-    selectedJiraIssueFallback,
-    selectedJiraIssueKey,
     taskResumeApplied,
     taskSource
   ])

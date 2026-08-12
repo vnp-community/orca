@@ -2,7 +2,7 @@
 
 **Loại:** Move (tách state thành custom hook — KHÔNG phải move cơ học thuần
 như 027–031, xem lưu ý bên dưới) · **Effort:** M · **Phụ thuộc:** TASK-BIGFILE-027..031
-đã xong · **Status:** ⬜ Todo
+đã xong · **Status:** ✅ Done
 **Solution:** `../solutions/SOLUTION-FE-BIGFILE-003-taskpage.md` (Giai đoạn 2)
 **Sinh ra từ:** TASK-BIGFILE-032 (Investigate)
 
