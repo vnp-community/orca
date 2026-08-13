@@ -6,6 +6,9 @@
 > (mô hình `OrcaProject` nói chung) — tài liệu này đi sâu riêng vào
 > [F38 — Project Workspace](../features/F38-project-workspace.md): đối chiếu từng phần giữa đặc
 > tả và code thật, rồi đưa phương án hợp nhất.
+>
+> Phần Task/Automation/AI orchestration (F37, F14, và hệ điều phối multi-agent) được tách riêng
+> sang [task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md).
 
 ## 1. F38 mô tả gì
 
