@@ -13,6 +13,14 @@ import { randomUUID } from 'node:crypto'
 import type { IConnectionPool } from '../db/pool'
 import type { OrcaProfile } from './OrcaProfile'
 
+/** Row shape for `profile.listDepts` — admin dept picker (CompanyProfileAdmin/DeptProfileAdmin). */
+export type Department = {
+  id: string
+  companyId: string
+  name: string
+  parentDeptId: string | null
+}
+
 export class ProfileService {
   constructor(private readonly pool: IConnectionPool) {}
 
@@ -83,6 +91,18 @@ export class ProfileService {
       )
     )
     return id
+  }
+
+  /** List all departments across all companies (admin dept picker). */
+  async listDepartments(): Promise<Department[]> {
+    const rows = await this.pool.withConnection((db) =>
+      db.query<{ id: string; companyId: string; name: string; parentDeptId: string | null }>(
+        `SELECT id, company_id as companyId, name, parent_dept_id as parentDeptId
+         FROM orca_departments
+         ORDER BY name`
+      )
+    )
+    return rows as unknown as Department[]
   }
 
   /** Get a department's profile JSON. Returns null if not found. */

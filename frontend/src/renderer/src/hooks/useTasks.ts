@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
-import type { OrcaTask } from '../types/task-types'
+import type { OrcaTask } from '../../../shared/task-types'
 
 export function useTasks(projectId: string) {
   // Use Option B: flat filter since store doesn't have tasksByProject index yet

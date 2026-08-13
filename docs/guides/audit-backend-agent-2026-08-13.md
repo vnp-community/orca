@@ -69,10 +69,10 @@ file kèm theo audit này bám theo nguyên tắc này — xem
 | # | File | Trạng thái |
 |---|---|---|
 | 1 | `backend/src/main/profile/OrcaProfile.ts` | Chuẩn/thật |
-| 2 | `frontend/src/main/profile/OrcaProfile.ts` | Bản sao y hệt #1, **chết** (0 importer, vestigial Electron-main tree) |
-| 3 | `agent/src/main/profile/OrcaProfile.ts` | Bản sao y hệt #1, **chết** (0 importer trong `agent/src`) |
-| 4 | `frontend/src/shared/profile-types.ts` | Bản tách biệt, **0 importer ở bất kỳ đâu** |
-| 5 | `frontend/src/renderer/src/types/profile-types.ts` | **UI thật dùng bản này** — lệch backend nhiều nhất |
+| 2 | `frontend/src/main/profile/OrcaProfile.ts` | Bản sao y hệt #1 — **⚠️ đính chính**: KHÔNG phải 0 importer như ghi ban đầu — vẫn được `ProfileService.ts`/`ProfileResolver.ts` (sibling, cùng chết) import, và `frontend/src/shared/project-types.ts:50` inline-import `ResolvedProfile` từ file này. Xoá sẽ gây lỗi `TS2307` mới — cần migrate `project-types.ts` khỏi import này trước, chưa làm trong Giai đoạn 1 |
+| 3 | `agent/src/main/profile/OrcaProfile.ts` | Tương tự #2 — `agent/src/shared/project-types.ts:50` cũng inline-import từ file này, cùng lý do chưa xoá được |
+| 4 | `frontend/src/shared/profile-types.ts` | Bản tách biệt, **0 importer thật** — ✅ đã xoá trong Giai đoạn 1 |
+| 5 | `frontend/src/renderer/src/types/profile-types.ts` | **UI thật dùng bản này** — lệch backend nhiều nhất — ✅ đã khớp lại field/enum trong Giai đoạn 1 |
 
 Bảng lệch field chi tiết #5 vs #1: xem
 [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md) mục 4.

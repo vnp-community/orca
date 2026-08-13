@@ -4,6 +4,7 @@ import { useState, Suspense, lazy } from 'react'
 import { AdminLayout, type AdminRoute } from './AdminLayout'
 import { useAuthUser } from '../../hooks/useAuthSession'
 import { useLogout } from '../../hooks/useLogout'
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs'
 
 // Lazy-load each page to keep the initial bundle small
 const AdminDashboard = lazy(() => import('./AdminDashboard').then((m) => ({ default: m.AdminDashboard })))
@@ -16,12 +17,33 @@ const AuditPage      = lazy(() => import('./AuditPage').then((m) => ({ default: 
 const CompanyProfileAdmin = lazy(() =>
   import('../profile/CompanyProfileAdmin').then((m) => ({ default: m.CompanyProfileAdmin }))
 )
+const DeptProfileAdmin = lazy(() =>
+  import('../profile/DeptProfileAdmin').then((m) => ({ default: m.DeptProfileAdmin }))
+)
 const ProviderList = lazy(() =>
   import('../ai-provider/ProviderList').then((m) => ({ default: m.ProviderList }))
 )
 const FleetDashboard = lazy(() =>
   import('./fleet/fleet-dashboard').then((m) => ({ default: m.FleetDashboard }))
 )
+
+// TASK-FE-014: /profile hosts both company-wide and per-department profile
+// admin — DeptProfileAdmin was never mounted anywhere, so it's exposed here
+// as a tab rather than a new AdminRoute (keeps AdminLayout's route table untouched).
+function ProfileAdminPage() {
+  const [tab, setTab] = useState<'company' | 'departments'>('company')
+  return (
+    <div className="profile-admin-page">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'company' | 'departments')}>
+        <TabsList>
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="departments">Departments</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {tab === 'company' ? <CompanyProfileAdmin /> : <DeptProfileAdmin />}
+    </div>
+  )
+}
 
 function PageContent({
   route,
@@ -45,7 +67,7 @@ function PageContent({
   }
   if (route === '/sessions')      {return <SessionsPage />}
   if (route === '/audit')          {return <AuditPage />}
-  if (route === '/profile')        {return <CompanyProfileAdmin />}
+  if (route === '/profile')        {return <ProfileAdminPage />}
   if (route === '/ai-providers')   {return <ProviderList />}
   if (route === '/fleet')          {return <FleetDashboard />}
   return <AdminDashboard />

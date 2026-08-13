@@ -85,6 +85,15 @@ export type ServerBootstrapResult = {
    * WebSocket messages over the Unix socket.
    */
   rpcAuthToken: string
+  /**
+   * AutomationService — scheduler + dispatch for `automation.*` RPC methods.
+   * (D1 fix — docs/guides/fix-proposals-per-issue.md §D1)
+   */
+  automationService: import('./automations/service').AutomationService
+  /** ClaudeUsageStore — usage attribution for automation runs. */
+  claudeUsage: import('./claude-usage/store').ClaudeUsageStore
+  /** CodexUsageStore — usage attribution for automation runs. */
+  codexUsage: import('./codex-usage/store').CodexUsageStore
 }
 
 
@@ -426,11 +435,6 @@ export async function initializeOrcaServices(
   const _projectRouter = new ProjectServerRouter(projectService, devServerManager, relayConnectionPool)
   console.log('[ServerBootstrap] ✅ ProjectService + ProjectServerRouter initialized (v5.0)')
 
-  // Register project RPC methods [T01]
-  const { createProjectMethods } = await import('./project/project-rpc-handler')
-  rpcServer.addMethods(createProjectMethods(projectService, getUserRole))
-  console.log('[ServerBootstrap] ✅ Project RPC methods registered (v5.0)')
-
   // 11. AIProviderService + ProviderResolver + ProviderHealthChecker [v5.0 TDD-16]
   const { AIProviderService } = await import('./ai-providers/AIProviderService')
   const { ProviderResolver } = await import('./ai-providers/ProviderResolver')
@@ -462,6 +466,18 @@ export async function initializeOrcaServices(
   rpcServer.addMethods(createAIProviderMethods(aiProviderService, providerResolver))
   console.log('[ServerBootstrap] ✅ AIProviderService + ProviderResolver + ProviderHealthChecker initialized (v5.0)')
 
+  // B1 fix (docs/guides/fix-proposals-per-issue.md §B1): ProfileAwareAgentSpawner must exist
+  // before project RPC methods are registered — createProjectMethods' 3rd (optional) param
+  // wires project.agentSpawn; leaving it undefined made project.agentSpawn always throw
+  // AGENT_SPAWNER_NOT_AVAILABLE. Needs _projectRouter (step 10) + aiProviderService (step 11),
+  // so it can only be created here — TaskAgentExecutor (step 13) now reuses this instance.
+  const { ProfileAwareAgentSpawner } = await import('./project/ProfileAwareAgentSpawner')
+  const agentSpawner = new ProfileAwareAgentSpawner(_projectRouter, profileResolver, aiProviderService)
+
+  // Register project RPC methods [T01]
+  const { createProjectMethods } = await import('./project/project-rpc-handler')
+  rpcServer.addMethods(createProjectMethods(projectService, getUserRole, agentSpawner))
+  console.log('[ServerBootstrap] ✅ Project RPC methods registered (v5.0)')
 
   // 12. WorkflowOrchestrator + TemplateResolver + StepExecutors [v5.0 TDD-17]
   const { DAGBuilder } = await import('./workflow/DAGBuilder')
@@ -490,13 +506,13 @@ export async function initializeOrcaServices(
   const { TaskGrantService } = await import('./task/TaskGrantService')
   const { TaskAIPlanner } = await import('./task/TaskAIPlanner')
   const { TaskAgentExecutor } = await import('./task/TaskAgentExecutor')
-  const { ProfileAwareAgentSpawner } = await import('./project/ProfileAwareAgentSpawner')
   const { createTaskMethods } = await import('./task/task-rpc-handler')
   const taskDagValidator = new TaskDAGValidator(pool)
   const taskService = new TaskService(pool, taskDagValidator)
   const taskGrantService = new TaskGrantService(pool, taskService)
   const taskAIPlanner = new TaskAIPlanner(taskService, aiProviderService, _projectRouter)
-  const agentSpawner = new ProfileAwareAgentSpawner(_projectRouter, profileResolver, aiProviderService)
+  // Why: reuse the same agentSpawner instance wired into project.agentSpawn above (B1 fix)
+  // instead of constructing a second one.
   const taskAgentExecutor = new TaskAgentExecutor(taskService, agentSpawner, taskGrantService)
   rpcServer.addMethods(createTaskMethods(taskService, taskGrantService, taskAIPlanner, taskAgentExecutor))
   console.log('[ServerBootstrap] ✅ TaskService + TaskAgentExecutor initialized (v5.0)')
@@ -509,6 +525,34 @@ export async function initializeOrcaServices(
   )
   rpcServer.addMethods(createWorkspaceMethods(workspaceService))
   console.log('[ServerBootstrap] ✅ WorkspaceService initialized (v5.0)')
+
+  // 15. AutomationService [D1 fix — docs/guides/fix-proposals-per-issue.md §D1 /
+  // docs/guides/audit-backend-agent-2026-08-13.md §D3]: this was never instantiated in
+  // backend/src, so automation.runNow always threw runtime_unavailable and the rrule
+  // scheduler never ran on the server. Mirrors desktop/src/main/index.ts's wiring.
+  const { ClaudeUsageStore } = await import('./claude-usage/store')
+  const { CodexUsageStore } = await import('./codex-usage/store')
+  const claudeUsage = new ClaudeUsageStore(store)
+  const codexUsage = new CodexUsageStore(store)
+  const { AutomationService } = await import('./automations/service')
+  const automationService = new AutomationService(store, {
+    claudeUsage,
+    codexUsage,
+    // Why: unlike desktop (which only mirrors remote-host automations), this process
+    // IS the server that owns executing schedules for `remote_host_service` targets.
+    allowRemoteHostScheduling: true
+    // TODO(D1, docs/guides/fix-proposals-per-issue.md §D1): headlessDispatcher is
+    // intentionally left unset. Desktop's dispatcher (desktop/src/main/index.ts:~1810)
+    // creates a managed worktree and spawns an agent via runtimeService — porting
+    // that to this headless server needs its own design pass and is out of scope
+    // here. Without it, a due run simply falls back to `skipped_unavailable`
+    // (AutomationService.requestDispatch's existing no-dispatcher path) instead of
+    // throwing — still a strict improvement over today's 100%-throw state, since
+    // list/CRUD/precheck and the rrule scheduler itself now work.
+  })
+  automationService.start()
+  runtime.setAutomationService(automationService)
+  console.log('[ServerBootstrap] ✅ AutomationService initialized + scheduler started (D1 fix)')
 
   // 8. Wire FleetHealthMonitor (SOL-005 — CR-005: fleet health wiring)
   try {
@@ -573,8 +617,18 @@ export async function initializeOrcaServices(
     workflowOrchestrator,                                                         // TASK-029 ✅
     taskService,                                                                  // TASK-041 ✅
     rpcAuthToken: rpcServer.getAuthToken(),                                       // BUG-PC-001 ✅
+    automationService,                                                            // D1 fix ✅
+    claudeUsage,                                                                  // D1 fix ✅
+    codexUsage,                                                                   // D1 fix ✅
     async shutdown() {
       console.log('[ServerBootstrap] Shutting down...')
+      // Stop AutomationService's scheduler first, before rpcServer/db teardown below.
+      try {
+        automationService.stop()
+        console.log('[ServerBootstrap] ✅ AutomationService stopped')
+      } catch (err) {
+        console.warn('[ServerBootstrap] AutomationService stop error:', err)
+      }
       // Stop agent WS server first (clear pending slots)
       try {
         agentWsServer.stop()

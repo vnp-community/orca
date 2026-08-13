@@ -74,16 +74,25 @@ sửa route nằm ở backend's HTTP server).
 ### A5. 5 bản `OrcaProfile`/profile-types khác nhau
 
 **Nơi sửa: chủ yếu frontend, dữ liệu chuẩn giữ ở backend.** Theo nguyên tắc "backend lưu dữ liệu
-quản trị", `backend/src/main/profile/OrcaProfile.ts` là **nguồn chuẩn duy nhất**. Việc cần làm:
-1. Xoá 2 bản chết (`frontend/src/main/profile/OrcaProfile.ts`,
-   `agent/src/main/profile/OrcaProfile.ts`) và 1 bản mồ côi (`frontend/src/shared/
-   profile-types.ts`) — 0 importer, xoá an toàn.
+quản trị", `backend/src/main/profile/OrcaProfile.ts` là **nguồn chuẩn duy nhất**.
+
+**✅ Đã làm trong Giai đoạn 1**:
+1. Xoá `frontend/src/shared/profile-types.ts` (0 importer thật, xác nhận an toàn).
 2. Sửa `frontend/src/renderer/src/types/profile-types.ts` (bản UI thật đang dùng) khớp đúng
    field/enum của backend — đổi `disallowedCmds`→`disallowedCommands`,
-   `sessionTimeoutHours`→`maxSessionHours`. `require2FA`: ✅ đã quyết định thêm vào backend
-   `SecurityProfileSection` (xem [decisions-needed.md](./decisions-needed.md) mục 6) — giữ field
-   này ở frontend, chỉ chờ backend thêm xong. `integrations`/`fleet`: ⏳ còn mở, chưa quyết định
-   — tạm giữ nguyên ở frontend, chưa xoá cũng chưa thêm backend cho tới khi có câu trả lời.
+   `sessionTimeoutHours`→`maxSessionHours`, `agent.trustPreset` khớp enum backend, di chuyển
+   `agent.approvedModels`→`security.approvedModels`.
+
+**⚠️ Chưa xoá được `frontend/src/main/profile/OrcaProfile.ts` và `agent/src/main/profile/
+OrcaProfile.ts`** — đính chính: audit ban đầu ghi sai "0 importer". Thực tế cả 2 file vẫn được
+`frontend/src/shared/project-types.ts:50` (và bản `agent/` tương ứng) inline-import
+`ResolvedProfile` từ đó. Xoá ngay sẽ gây lỗi `TS2307` mới. Việc cần làm trước khi xoá được (chưa
+làm trong Giai đoạn 1): migrate `project-types.ts` sang định nghĩa `ResolvedProfile` cục bộ hoặc
+import từ nguồn khác không phải cây `main/` chết.
+
+`require2FA`: ✅ đã thêm vào backend `SecurityProfileSection` trong Giai đoạn 1 (xem
+[decisions-needed.md](./decisions-needed.md) mục 6). `integrations`/`fleet`: ⏳ còn mở, chưa
+quyết định — tạm giữ nguyên ở frontend.
 
 ### A6. `Team` chưa tồn tại như entity thật
 
@@ -141,10 +150,15 @@ phạm vi audit này, cần điều tra riêng bằng log thật khi bug tái di
 
 ### C1. 7 chỗ UI gọi sai tên RPC method (`tasks.*` thay vì `task.*`, `task.runAgent` thay vì `task.execute`)
 
-**Nơi sửa: frontend.** Sửa tên gọi tại `TaskPromptEditor.tsx`, `TaskDetail.tsx`, `useTask.ts` —
-đổi đúng theo bảng trong
+**✅ Đã sửa trong Giai đoạn 1** tại `TaskPromptEditor.tsx`, `TaskDetail.tsx`, `useTask.ts` — theo
+bảng trong
 [task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md)
-mục 4. Không đụng backend — backend đã đúng, đã có sẵn 18 method thật.
+mục 4. Không đụng backend — backend đã đúng, đã có sẵn 18 method thật. Khi sửa, phát hiện thêm
+2 việc ngoài phạm vi ban đầu: (a) một vài chỗ không chỉ sai TÊN mà còn sai SHAPE tham số (`task.update`
+cần `{taskId, patch}` lồng nhau, không phải spread phẳng; `task.execute` không nhận `prompt` —
+backend tự dựng prompt từ `promptTemplate`) — đã sửa cùng lúc; (b) `useTasks.ts` (số nhiều, khác
+`useTask.ts` số ít) cũng gọi sai `tasks.list` (đúng phải `task.list`) — **chưa sửa**, ngoài phạm
+vi được giao cho agent, cần làm ở đợt sau.
 
 ### C2. `TaskGraphPanel.tsx` là stub trống
 
@@ -157,9 +171,16 @@ progress hay tự suy luận trạng thái cha từ trạng thái con phía clie
 
 ### C3. 2 bản `OrcaTask` type không tương thích dùng lẫn trong 1 cụm UI
 
-**Nơi sửa: frontend.** Xoá `frontend/src/renderer/src/types/task-types.ts` (bản lệch), migrate
-toàn bộ `TaskDetail.tsx`/`TaskPromptEditor.tsx`/`TaskAIDecompose.tsx`/`TaskDAGView.tsx` sang
-import `@shared/task-types` (bản khớp backend) — cùng 1 sửa như C2.
+**✅ Đã làm trong Giai đoạn 1**: xoá `frontend/src/renderer/src/types/task-types.ts` (bản lệch),
+migrate `TaskDetail.tsx`/`TaskPromptEditor.tsx`/`TaskAIDecompose.tsx`/`TaskDAGView.tsx` sang
+import đường dẫn tương đối tới `frontend/src/shared/task-types.ts` (bản khớp backend).
+
+**⚠️ Phát hiện mới khi thực thi**: đề xuất ban đầu ghi `TaskCard.tsx`/`TaskGraph.tsx`/
+`TaskStatusBadge.tsx`/`TaskTreeView.tsx` "đã import đúng `@shared/task-types`" — sai. Alias
+`@shared/task-types` **không hề resolve được ở bất kỳ đâu trong repo** (không có tsconfig/vite
+path alias nào định nghĩa nó) — đây là lỗi tiền tồn tại, độc lập với Giai đoạn 1, ảnh hưởng đúng
+4 file này. Chưa sửa (ngoài phạm vi đã giao cho agent, cần việc riêng: đổi alias `@shared/*`
+sang đường dẫn tương đối, hoặc định nghĩa alias đó trong tsconfig/vite config).
 
 ### C4. Field liên kết cross-system (`worktreeId`/`agentSessionId`/`workflowExecutionId`) chưa tồn tại trên `OrcaTask`
 

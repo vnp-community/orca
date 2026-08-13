@@ -46,23 +46,26 @@ Team entity      OrcaProject     F38 Workspace   Task pipeline
    (độc lập, không có giai đoạn sau)
 ```
 
-## Giai đoạn 1 — Sửa ngay (làm trước tất cả, song song, không phụ thuộc)
+## Giai đoạn 1 — ✅ HOÀN THÀNH (2026-08-13)
 
-Chi tiết từng mục: [fix-proposals-per-issue.md](./fix-proposals-per-issue.md).
+Thực thi bằng 6 subagent song song (chia theo file, không đụng nhau), review tổng hợp bằng
+`gitnexus detect_changes` + tsc/oxlint/test baseline compare (dùng `git worktree` để so sánh an
+toàn, tránh race condition trên working tree chung). Chi tiết từng mục, kể cả phát hiện mới phát
+sinh khi thực thi: [fix-proposals-per-issue.md](./fix-proposals-per-issue.md).
 
-| # | Việc | Nơi sửa |
-|---|---|---|
-| 1.1 | Khởi tạo `AutomationService` trong `server-bootstrap.ts` — mở khoá scheduler | Backend |
-| 1.2 | Sửa `project.agentSpawn` (đăng ký thiếu tham số `agentSpawner`) | Backend |
-| 1.3 | `useProfile.ts`: `profile.getUser` → `profile.getUserProfile` | Frontend |
-| 1.4 | Thêm method `profile.listDepts` | Backend |
-| 1.5 | Sửa route `/admin` trong `http-server.ts` | Backend |
-| 1.6 | Import `DeptProfileAdmin` vào `AdminApp.tsx` router | Frontend |
-| 1.7 | Sửa 7 chỗ UI Task gọi sai tên RPC (`tasks.*` → `task.*`) | Frontend |
-| 1.8 | `WorkspaceContext`: `workspace.listFiles`→`workspace.refreshFileTree`; `git.status` đổi tham số (cần `worktreeId` — xem 3.4 bước 1) | Frontend |
-| 1.9 | Xoá 3 bản `OrcaProfile` chết (0 importer) | Frontend |
-| 1.10 | Hợp nhất 2 bản `OrcaTask`/`task-types.ts` — dùng `@shared/task-types` | Frontend |
-| 1.11 | Thêm `require2FA` vào backend `SecurityProfileSection` (quyết định #6) | Backend |
+| # | Việc | Nơi sửa | Trạng thái |
+|---|---|---|---|
+| 1.1 | Khởi tạo `AutomationService` trong `server-bootstrap.ts` — mở khoá scheduler | Backend | ✅ (headless dispatcher đầy đủ để lại `TODO`, xem fix-proposals D1) |
+| 1.2 | Sửa `project.agentSpawn` (đăng ký thiếu tham số `agentSpawner`) | Backend | ✅ |
+| 1.3 | `useProfile.ts`: `profile.getUser` → `profile.getUserProfile` | Frontend | ✅ (sửa cả test mock) |
+| 1.4 | Thêm method `profile.listDepts` | Backend | ✅ |
+| 1.5 | Sửa route `/admin` trong `http-server.ts` | Backend | ✅ (verify sống: `GET /admin-index.html` → 200) |
+| 1.6 | Import `DeptProfileAdmin` vào `AdminApp.tsx` router | Frontend | ✅ (dạng tab tại `/profile`) |
+| 1.7 | Sửa 7 chỗ UI Task gọi sai tên RPC (`tasks.*` → `task.*`) | Frontend | ✅ (+ sửa shape tham số sai kèm theo) |
+| 1.8 | `WorkspaceContext`: `workspace.listFiles`→`workspace.refreshFileTree` | Frontend | ✅ (`git.status` vẫn để nguyên, chờ Giai đoạn 2c cấp `worktreeId`) |
+| 1.9 | Xoá bản `OrcaProfile`/profile-types chết | Frontend | ⚠️ 1/3 — 2 file còn lại có importer thật, chưa xoá được (xem fix-proposals A5) |
+| 1.10 | Hợp nhất 2 bản `OrcaTask`/`task-types.ts` | Frontend | ✅ (phát hiện thêm: alias `@shared/task-types` vỡ ở 4 file khác, ngoài phạm vi) |
+| 1.11 | Thêm `require2FA` vào backend `SecurityProfileSection` | Backend | ✅ |
 
 **Điều kiện hoàn thành**: mỗi mục có 1 test xác nhận cụ thể (xem
 [roadmap cũ/fix-proposals](./fix-proposals-per-issue.md) cho từng case).

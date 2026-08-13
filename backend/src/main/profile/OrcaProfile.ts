@@ -45,6 +45,8 @@ export type SecurityProfileSection = {
   requireReviewBeforeCommit?: boolean
   /** Max agent session hours — company admin only */
   maxSessionHours?: number
+  /** Require 2FA for agent sessions — company admin only */
+  require2FA?: boolean
 }
 
 export type OrcaProfile = {

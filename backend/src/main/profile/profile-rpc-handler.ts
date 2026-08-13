@@ -280,6 +280,17 @@ export function createProfileMethods(
         return { id }
       }
     }),
+
+    // ── profile.listDepts ─────────────────────────────────────────────────────
+    // List all departments (admin dept picker: CompanyProfileAdmin/DeptProfileAdmin).
+    defineMethod({
+      name: 'profile.listDepts',
+      params: null,
+      handler: async (_params, ctx) => {
+        await requireAdmin(ctx, getUserRole)
+        return profileService.listDepartments()
+      }
+    }),
   ]
 }
 

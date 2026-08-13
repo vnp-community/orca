@@ -16,6 +16,36 @@ import { useAppStore } from '../store'
 
 type EventHandler = (payload: unknown) => void
 
+// ─── Backend↔FileNode adapter ──────────────────────────────────────────────
+// `workspace.refreshFileTree` returns a flat array of the requested dir's
+// entries (`isDir`-shaped), not a single rooted `FileNode` (`type`-shaped) —
+// map each entry and synthesize a root node for the requested path.
+
+type BackendFileTreeNode = {
+  name: string
+  path: string
+  isDir: boolean
+  children?: BackendFileTreeNode[]
+}
+
+function mapBackendFileTreeNode(node: BackendFileTreeNode): FileNode {
+  return {
+    name: node.name,
+    path: node.path,
+    type: node.isDir ? 'directory' : 'file',
+    children: node.children?.map(mapBackendFileTreeNode),
+  }
+}
+
+function toFileTree(nodes: BackendFileTreeNode[], rootPath: string): FileNode {
+  return {
+    name: rootPath,
+    path: rootPath,
+    type: 'directory',
+    children: nodes.map(mapBackendFileTreeNode),
+  }
+}
+
 export type WorkspaceContextValue = {
   // ── State ──────────────────────────────────────────────────────────────────
   project:              OrcaProject | null
@@ -91,7 +121,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const [proj, gitSt, tree, profile] = await Promise.all([
         callRuntimeRpc<OrcaProject>(target, 'project.get', { projectId }),
         callRuntimeRpc<GitStatus | null>(target, 'git.status', { projectId }).catch(() => null),
-        callRuntimeRpc<FileNode | null>(target, 'workspace.listFiles', { projectId, dirPath: '.' }).catch(() => null),
+        callRuntimeRpc<BackendFileTreeNode[]>(target, 'workspace.refreshFileTree', { projectId, path: '.' })
+          .then(nodes => toFileTree(nodes ?? [], '.'))
+          .catch(() => null),
         callRuntimeRpc<ResolvedProfile | null>(target, 'profile.getResolved', {}).catch(() => null),
       ])
 
@@ -132,12 +164,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!project) {return}
     try {
       const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      const tree = await callRuntimeRpc<FileNode>(
+      const resolvedPath = dirPath ?? '.'
+      const nodes = await callRuntimeRpc<BackendFileTreeNode[]>(
         target,
-        'workspace.listFiles',
-        { projectId: project.id, dirPath: dirPath ?? '.' }
+        'workspace.refreshFileTree',
+        { projectId: project.id, path: resolvedPath }
       )
-      setFileTree(tree)
+      setFileTree(toFileTree(nodes ?? [], resolvedPath))
     } catch {
       // Silently fail — stale tree remains visible
     }
