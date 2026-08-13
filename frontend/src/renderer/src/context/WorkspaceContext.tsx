@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -10,6 +11,7 @@ import {
 import type { OrcaProject, FileNode, GitStatus, Worktree } from '../types/workspace-types'
 import type { ResolvedProfile } from '../types/profile-types'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
+import { toRuntimeWorktreeSelector } from '../runtime/runtime-worktree-selector'
 import { useAppStore } from '../store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -118,9 +120,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const settings = useAppStore.getState().settings
       const target = getActiveRuntimeTarget(settings)
 
-      const [proj, gitSt, tree, profile] = await Promise.all([
+      // `git.status` needs a real `worktree` selector, which isn't known yet on
+      // project switch (worktree selection happens separately via the sidebar) —
+      // reset to null here and let the `currentWorktree` effect below fetch it.
+      const [proj, tree, profile] = await Promise.all([
         callRuntimeRpc<OrcaProject>(target, 'project.get', { projectId }),
-        callRuntimeRpc<GitStatus | null>(target, 'git.status', { projectId }).catch(() => null),
         callRuntimeRpc<BackendFileTreeNode[]>(target, 'workspace.refreshFileTree', { projectId, path: '.' })
           .then(nodes => toFileTree(nodes ?? [], '.'))
           .catch(() => null),
@@ -128,7 +132,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ])
 
       setProject(proj)
-      setGitStatus(gitSt ?? null)
+      setGitStatus(null)
       setFileTree(tree ?? null)
       setResolvedProfile(profile ?? null)
 
@@ -146,17 +150,30 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [emit])
 
   // ── refreshGitStatus ──────────────────────────────────────────────────────
+  // `git.status` is worktree-scoped (schema: { worktree: string }), not project-scoped —
+  // requires a selected worktree (F38 roadmap 2c.2).
 
   const refreshGitStatus = useCallback(async () => {
-    if (!project) {return}
+    if (!currentWorktree) {return}
     try {
       const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      const status = await callRuntimeRpc<GitStatus>(target, 'git.status', { projectId: project.id })
+      const status = await callRuntimeRpc<GitStatus>(target, 'git.status', {
+        worktree: toRuntimeWorktreeSelector(currentWorktree.id),
+      })
       setGitStatus(status)
     } catch {
       // Silently fail — status bar will show stale data
     }
-  }, [project])
+  }, [currentWorktree])
+
+  // Re-fetch git status whenever the selected worktree changes (sidebar sync, TDD-19c §2c.1).
+  useEffect(() => {
+    if (currentWorktree) {
+      void refreshGitStatus()
+    } else {
+      setGitStatus(null)
+    }
+  }, [currentWorktree, refreshGitStatus])
 
   // ── refreshFileTree ───────────────────────────────────────────────────────
 

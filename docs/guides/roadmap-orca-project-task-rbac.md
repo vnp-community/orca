@@ -99,7 +99,7 @@ mục "Đề xuất: OrcaProject là lớp SỞ HỮU + CHIA SẺ".
 | # | Việc | Nơi sửa | Trạng thái |
 |---|---|---|---|
 | 2c.1 | Nguồn `currentWorktree`: tái dùng lựa chọn worktree từ sidebar (`WorktreeList.tsx`, quyết định #8) | Frontend | ✅ |
-| 2c.2 | Hoàn tất 1.8 (`git.status` cần `worktreeId` thật) | Frontend | ⚠️ CHƯA — `git.status` vẫn gọi `{projectId}` thay vì `{worktree}` đúng schema; lỗi bị `.catch(() => null)` nuốt âm thầm. Follow-up còn mở. |
+| 2c.2 | Hoàn tất 1.8 (`git.status` cần `worktreeId` thật) | Frontend | ✅ (2026-08-13, follow-up) `WorkspaceContext`: `git.status` gọi `{worktree: toRuntimeWorktreeSelector(currentWorktree.id)}` đúng schema thật (`WorktreeSelector`, `backend/src/main/runtime/rpc/methods/git-params.ts`); `switchProject()` không còn gọi `git.status` sớm (chưa có worktree lúc đó) — thay bằng `useEffect` theo dõi `currentWorktree`, tự fetch lại khi worktree đổi (đồng bộ đúng với sidebar sync đã có ở 2c.1) |
 | 2c.3 | Nối tab Agent: `activeTab === 'agent' && <AgentPanel worktreeId={...} />` | Frontend | ✅ |
 | 2c.4 | Nối terminal panel — tái dùng `terminal-pane`/PTY infra hiện có | Frontend | ✅ |
 | 2c.5 | Ghép `ServerStatusBar` từ `RuntimeHostStatusRow`/`SshStatusSegment` có sẵn | Frontend | ✅ |
@@ -107,8 +107,8 @@ mục "Đề xuất: OrcaProject là lớp SỞ HỮU + CHIA SẺ".
 | 2c.7 | Mount `ProjectSwitcher`/`WorkspaceLayout` vào layout thật (`App.tsx`) — dùng **V5** (`WorkspaceContext.tsx`) theo quyết định #2 | Frontend | ✅ Mount tối thiểu, cộng thêm: nút "Project Workspace (Beta)" mới trong `SidebarNav.tsx` → `activeView: 'workspace'`. KHÔNG thay thế luồng Project/Repo sidebar hiện có. |
 | 2c.8 | Xoá `WorkspaceContextV6`/`WorkspaceContextBridge` | Frontend | ❌ KHÔNG làm — quyết định #2 chốt "giữ nguyên, không động". Xác nhận 0 importer thật (code chết vô hại), nhưng giữ nguyên cho kế hoạch nâng cấp sau, không xoá. |
 
-**Follow-up còn mở**: 2c.2 (`git.status` param) — xem
-[project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md) §3.
+**Follow-up đã đóng (2026-08-13)**: 2c.2 (`git.status` param) — nay dùng `worktree` selector
+thật, xem [project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md) §3.
 `ProjectSwitcher` đọc nhầm field `projects` (phát hiện lúc mount) đã **sửa ngay trong bước review
 cuối** (không để lại follow-up) — xem §2.7 cùng file: giờ fetch qua `project.list` RPC thật thay
 vì đọc field sai của `auth` slice.
@@ -132,19 +132,36 @@ mục 9.2/9.4.
 7 mảnh xây song song ở trên (Team, ProfileResolver, Admin UI, OrcaProject sharing, F38
 Agent/Terminal tab, Task execution pipeline, Task UI follow-ups) đã được nối vào
 `backend/src/main/server-bootstrap.ts` (TeamService, OrcaProjectSourceProjectService,
-TaskOrchestrationBridge) và `frontend/src/renderer/src/App.tsx` (mount F38 Workspace). Việc bị
-bỏ qua có chủ đích (không bắt buộc theo phạm vi tích hợp): migrate import `ResolvedProfile` trong
-`frontend/src/shared/project-types.ts`/`agent/src/shared/project-types.ts` khỏi bản `OrcaProfile`
-chết cục bộ (Giai đoạn 1, 1.9 còn ⚠️ 1/3) — không có tiền lệ import cross-package
-frontend/agent→backend trong repo, và shape `ResolvedProfile` đã lệch nhau (bản backend có thêm
-layer Team) — cần việc riêng, không phải đổi 1 dòng import.
+TaskOrchestrationBridge) và `frontend/src/renderer/src/App.tsx` (mount F38 Workspace).
 
-Việc đã biết từ trước nhưng ngoài phạm vi agent D3 được giao (vẫn treo): alias `@shared/task-types`
-không resolve được (không tsconfig/vite path nào định nghĩa `@shared/*`) — ảnh hưởng ít nhất 5
-file: `TaskCard.tsx`/`TaskGraph.tsx`/`TaskStatusBadge.tsx`/`TaskTreeView.tsx` (đã biết, xem
-[fix-proposals-per-issue.md](./fix-proposals-per-issue.md) mục C3) + phát hiện thêm
-`frontend/src/renderer/src/store/slices/task.ts` (chưa được liệt kê ở C3). Việc riêng: đổi sang
-đường dẫn tương đối, hoặc định nghĩa alias `@shared/*` trong tsconfig/vite config.
+## Follow-up round (2026-08-13, sau khi deploy 1.4.172)
+
+Tất cả follow-up còn mở từ bước tích hợp trên đã xử lý, trừ 1 việc cố ý để lại (giải thích bên
+dưới):
+
+1. **✅ `@shared/task-types` alias vỡ** — sửa cả 5 chỗ: 4 file đã biết
+   (`TaskCard.tsx`/`TaskGraph.tsx`/`TaskStatusBadge.tsx`/`TaskTreeView.tsx`, xong từ Giai đoạn 2)
+   + `frontend/src/renderer/src/store/slices/task.ts` (phát hiện thêm, đã sửa — dùng đường dẫn
+   tương đối `../../../../shared/task-types`, đúng convention 4 file kia đã dùng). **Phát hiện
+   thêm ngoài phạm vi ban đầu**: `desktop/src/renderer/src/store/slices/task.ts` có cùng bug hệt
+   (cùng alias vỡ, cùng `TaskSlice` wired thật vào `desktop/src/renderer/src/store/index.ts`) —
+   sửa luôn cùng cách, xác nhận qua tsc trước/sau (lỗi `TS2307 Cannot find module` biến mất, không
+   phát sinh lỗi mới).
+2. **✅ 2c.2 `git.status` param** — xem bảng Giai đoạn 2c ở trên.
+3. **⚠️ 1 phần — sync shape `ResolvedProfile`, KHÔNG migrate import**: `frontend/src/main/
+   profile/OrcaProfile.ts`/`agent/src/main/profile/OrcaProfile.ts` (2 bản chết còn lại từ 1.9) đã
+   được đồng bộ lại đúng shape backend thật (thêm `require2FA`, `ProfileSourceLayer` có
+   `team:<id>`) — đóng khoảng lệch type đã ghi trong audit, xác nhận `diff` với bản backend giờ
+   sạch (frontend byte-identical, agent chỉ còn 1 dòng cosmetic khác cú pháp không liên quan).
+   **Chưa migrate import** `project-types.ts` sang dùng trực tiếp type backend (vẫn cần việc
+   riêng — cross-package type import giữa `frontend`/`agent` → `backend` chưa có tiền lệ trong
+   repo, rủi ro cascade lỗi `TS6307` giống hệt lớp lỗi đã gặp với `WorkspaceContextV6` trước khi
+   xoá file đó, nên KHÔNG thử trong 1 lượt fix nhanh) — 2 file `OrcaProfile.ts` vẫn chưa xoá được,
+   1.9 vẫn ⚠️ 1/3.
+
+Verify: backend 117/117 pass (không đổi), frontend 0 regression (90 fail pre-existing y hệt,
+16311 pass), desktop xác nhận qua so sánh worktree baseline: 102 fail/136 test fail đều pre-existing
+y hệt (0 regression từ fix `slices/task.ts`).
 
 ## Giai đoạn 3b — UI cho Task graph (F37, chỉ sau Giai đoạn 2d)
 
