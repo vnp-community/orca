@@ -118,20 +118,38 @@ gốc của toàn bộ lớp bug "ambiguous host" gặp phải khi xoá project/
 client — xem commit `fix(frontend): stop paired web clients from double-fetching
 repos/groups/folder-workspaces`.
 
-## Lưu ý: 2 mô hình song song (hiện tại vs. F34/F38)
+## Lưu ý: 2 mô hình song song (hiện tại vs. `OrcaProject`/F34/F38)
 
-Codebase đang mang **2 mô hình project khác nhau cùng lúc**:
+Codebase đang mang **2 mô hình project khác nhau cùng lúc**, và mô hình thứ hai đã được xây
+xong phần lớn (không chỉ là ý tưởng trên giấy):
 
 1. **Mô hình hiện tại (mô tả ở trên)** — `Repo` + `Project` + `ProjectHostSetup`, sống trong
-   `frontend/src/renderer/src/store/slices/repos.ts`. Đây là mô hình **đang thực sự chạy**.
-2. **Mô hình tương lai `OrcaProject`** — đặc tả trong F34/F38 (1 Project gắn cứng 1 Dev Server
-   duy nhất, không có khái niệm multi-host). Đã có scaffolding dở dang trong
-   `frontend/src/renderer/src/store/slices/workspace-slice.ts` +
-   `frontend/src/renderer/src/components/project/ProjectSettings.tsx`, nhưng **không được
-   wire vào store** (đã gỡ khỏi `store/index.ts` — xem commit `fix(frontend): stop legacy
-   workspace-slice from shadowing removeProject/updateProject`) vì nó khai báo trùng tên
-   `removeProject`/`updateProject`/`projects` với mô hình hiện tại, âm thầm đè lên bản thật.
+   `frontend/src/renderer/src/store/slices/repos.ts`. Đa-host (1 project → N repo trên N host).
+   Đây là mô hình **duy nhất có UI thật** — sidebar, Settings, mọi thứ người dùng thấy.
 
-→ Khi triển khai tiếp F34/F38, cần dọn/migrate mô hình hiện tại thay vì để 2 mô hình cùng tồn
-tại — tái sử dụng key trùng tên (`projects`, `removeProject`...) sẽ tái diễn đúng lớp bug vừa
-fix trong phiên làm việc 2026-08-13.
+2. **Mô hình `OrcaProject`** (F34/F38, v5.0, TDD-15) — 1 project gắn **cứng đúng 1 Dev Server**
+   (`OrcaProject.devServerId` + `repoPath`), có thêm `ProjectMember`/role (`owner`/`member`/
+   `viewer`) và `visibility` (`private`/`team`/`company`) mà mô hình hiện tại chưa có.
+   - **Backend đã xong và đang chạy thật**: `frontend/src/main/project/ProjectService.ts`
+     (SQLite-backed, đủ CRUD + membership) expose qua RPC `project.*` trong
+     `ProjectServerRouter.ts`. Đây chính là nơi phát sinh log `UNAUTHENTICATED` gặp trong lúc
+     điều tra bug Remove Project — service có thật, có nhận traffic.
+   - **Frontend đã xây gần đủ nhưng không có lối vào UI**: `WorkspaceContext.tsx`
+     (`WorkspaceProvider`) được mount app-wide thật (`main.tsx` + `web/main-web-bootstrap.tsx`),
+     nhưng `project` state khởi tạo `null` và chỉ đổi khi có nơi gọi `switchProject()`. Nơi duy
+     nhất gọi `switchProject()` là `ProjectSwitcher.tsx`, và nơi tiêu thụ `useWorkspace()` là
+     `WorkspaceLayout.tsx`/`ProjectSettings.tsx` — nhưng **cả 3 component này không được
+     import/render ở bất kỳ đâu trong cây UI thật**, chỉ tồn tại trong file test của chính
+     chúng. Kết quả: provider sống nhưng luôn ở trạng thái "chờ", không ai từng kích hoạt.
+   - `workspace-slice.ts` (đã gỡ khỏi `store/index.ts` — xem commit `fix(frontend): stop
+     legacy workspace-slice from shadowing removeProject/updateProject`) là phần store-side
+     scaffolding của tính năng này; nó khai báo trùng tên `removeProject`/`updateProject`/
+     `projects` với mô hình hiện tại nên âm thầm đè lên bản thật.
+
+**2 rủi ro cần biết trước khi nối lại `ProjectSwitcher`/`WorkspaceLayout` vào layout thật:**
+- `frontend/src/renderer/src/types/workspace-types.ts` có 1 bản `OrcaProject` **lệch field**
+  so với bản thật trong `frontend/src/shared/project-types.ts` (ví dụ `visibility` khác giá
+  trị enum, timestamp `number` vs `Date`) — cần hợp nhất về 1 nguồn trước khi dùng lại.
+- Đừng tái sử dụng tên key trùng (`projects`, `removeProject`, `updateProject`...) khi wire
+  `workspace-slice.ts` (hoặc phiên bản thay thế) vào store — đó chính xác là bug vừa fix trong
+  phiên làm việc 2026-08-13.
