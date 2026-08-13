@@ -83,12 +83,27 @@ quản trị", `backend/src/main/profile/OrcaProfile.ts` là **nguồn chuẩn d
    `sessionTimeoutHours`→`maxSessionHours`, `agent.trustPreset` khớp enum backend, di chuyển
    `agent.approvedModels`→`security.approvedModels`.
 
-**⚠️ Chưa xoá được `frontend/src/main/profile/OrcaProfile.ts` và `agent/src/main/profile/
-OrcaProfile.ts`** — đính chính: audit ban đầu ghi sai "0 importer". Thực tế cả 2 file vẫn được
-`frontend/src/shared/project-types.ts:50` (và bản `agent/` tương ứng) inline-import
-`ResolvedProfile` từ đó. Xoá ngay sẽ gây lỗi `TS2307` mới. Việc cần làm trước khi xoá được (chưa
-làm trong Giai đoạn 1): migrate `project-types.ts` sang định nghĩa `ResolvedProfile` cục bộ hoặc
-import từ nguồn khác không phải cây `main/` chết.
+**✅ Đã xoá (2026-08-13, follow-up round 2)**: `frontend/src/main/profile/OrcaProfile.ts` và
+`agent/src/main/profile/OrcaProfile.ts`, cùng 2 file vệ tinh cô lập theo (`frontend/src/main/
+profile/{ProfileService,ProfileResolver}.ts` — 0 importer ngoài chính OrcaProfile.ts, xác nhận
+cả cụm 3 file là 1 đảo chết hoàn toàn tách biệt). Cách làm: tạo
+`frontend/src/shared/resolved-profile-type.ts` — mirror type thủ công của
+`backend/src/main/profile/OrcaProfile.ts` (comment giải thích lý do không import cross-package
+được: TS project boundary của `frontend`/`agent` không cho `src/shared/` reach vào `src/main/`
+hay sang package khác) — sửa `project-types.ts:50` trỏ vào đó thay vì inline-import vào file
+main/ chết. Bên `agent`: `agent/src/shared/project-types.ts` tự nó hoá ra cũng 0 importer thật
+(đã audit sai/bỏ sót — sửa nhầm coi nó là "còn sống" vì `ResolvedProfile` được dùng) → xoá thẳng
+file này thay vì viết mirror, kéo theo xoá được `OrcaProfile.ts` phía agent luôn.
+
+**Phát hiện thêm ngoài phạm vi 5 bản đã biết**: `agent/src/shared/profile-types.ts` — bản song
+sinh của `frontend/src/shared/profile-types.ts` (đã xoá ở Giai đoạn 1) nhưng bị bỏ sót phía
+`agent` khi đó (audit ban đầu chỉ kiểm `frontend`, không cross-check `agent`). Xác nhận 0 importer
+thật, đã xoá. Tổng cộng thực ra là **6 bản divergent**, không phải 5.
+
+Verify: tsc lỗi giảm thật (không phải noise cache) — frontend 973→962 (-11), agent 98→97 (-1),
+so sánh qua `git worktree` + xoá `tsconfig.tsbuildinfo` cả 2 phía. Test suite: frontend 0
+regression (90 fail pre-existing y hệt), agent 0 regression (3 fail/2 test fail pre-existing y
+hệt, xác nhận qua worktree baseline). **1.9 nay đã 3/3, đóng hoàn toàn.**
 
 `require2FA`: ✅ đã thêm vào backend `SecurityProfileSection` trong Giai đoạn 1 (xem
 [decisions-needed.md](./decisions-needed.md) mục 6). `integrations`/`fleet`: ⏳ còn mở, chưa

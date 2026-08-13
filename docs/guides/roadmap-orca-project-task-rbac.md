@@ -63,7 +63,7 @@ sinh khi thực thi: [fix-proposals-per-issue.md](./fix-proposals-per-issue.md).
 | 1.6 | Import `DeptProfileAdmin` vào `AdminApp.tsx` router | Frontend | ✅ (dạng tab tại `/profile`) |
 | 1.7 | Sửa 7 chỗ UI Task gọi sai tên RPC (`tasks.*` → `task.*`) | Frontend | ✅ (+ sửa shape tham số sai kèm theo) |
 | 1.8 | `WorkspaceContext`: `workspace.listFiles`→`workspace.refreshFileTree` | Frontend | ✅ (`git.status` vẫn để nguyên, chờ Giai đoạn 2c cấp `worktreeId`) |
-| 1.9 | Xoá bản `OrcaProfile`/profile-types chết | Frontend | ⚠️ 1/3 — 2 file còn lại có importer thật, chưa xoá được (xem fix-proposals A5) |
+| 1.9 | Xoá bản `OrcaProfile`/profile-types chết | Frontend | ✅ 3/3 (2026-08-13, follow-up round 2) — xem fix-proposals A5 |
 | 1.10 | Hợp nhất 2 bản `OrcaTask`/`task-types.ts` | Frontend | ✅ (phát hiện thêm: alias `@shared/task-types` vỡ ở 4 file khác, ngoài phạm vi) |
 | 1.11 | Thêm `require2FA` vào backend `SecurityProfileSection` | Backend | ✅ |
 
@@ -162,6 +162,18 @@ dưới):
 Verify: backend 117/117 pass (không đổi), frontend 0 regression (90 fail pre-existing y hệt,
 16311 pass), desktop xác nhận qua so sánh worktree baseline: 102 fail/136 test fail đều pre-existing
 y hệt (0 regression từ fix `slices/task.ts`).
+
+## Follow-up round 2 (2026-08-13) — đóng nốt 1.9
+
+Việc cố ý để mở ở cuối follow-up round 1 ("chưa migrate import, cần việc riêng") nay đã làm xong.
+Chi tiết đầy đủ: [fix-proposals-per-issue.md](./fix-proposals-per-issue.md) mục A5. Tóm tắt: tạo
+`frontend/src/shared/resolved-profile-type.ts` (mirror thủ công shape backend), xoá 3 file chết
+cô lập phía `frontend` (`OrcaProfile.ts`/`ProfileService.ts`/`ProfileResolver.ts` dưới
+`src/main/profile/`) + 3 file chết phía `agent` (`main/profile/OrcaProfile.ts`,
+`shared/project-types.ts`, và **phát hiện thêm** `shared/profile-types.ts` — bản song sinh của
+file đã xoá ở Giai đoạn 1 nhưng bị bỏ sót phía agent). **1.9 nay 3/3, đóng hoàn toàn** — không
+còn bản `OrcaProfile`/profile-types chết nào trong repo, canonical duy nhất là
+`backend/src/main/profile/OrcaProfile.ts`.
 
 ## Giai đoạn 3b — UI cho Task graph (F37, chỉ sau Giai đoạn 2d)
 
