@@ -23,6 +23,8 @@ import { migration0012PortForwardsPush } from './0012_port_forwards_push'
 import { migration0013WorkflowTraceCorrelation } from './0013_workflow_trace_correlation'
 import { migration0014WorkflowPauseState } from './0014_workflow_pause_state'
 import { migration0015AiProviderRotation } from './0015_ai_provider_rotation'
+import { migration0016TeamProjectSharingTaskExec } from './0016_team_project_sharing_task_exec'
+import { migration0017TeamProfileJson } from './0017_team_profile_json'
 import type { Migration } from './types'
 
 /** All migrations in version order. */
@@ -47,6 +49,10 @@ export const ALL_MIGRATIONS: readonly Migration[] = [
   migration0014WorkflowPauseState,
   // v5.1 — AI Provider Key Rotation (BUG-BE-HLD-014 — shadow-id staging + grace period)
   migration0015AiProviderRotation,
+  // v5.2 — Team metadata + priority, OrcaProject↔Project sharing, Task execution pipeline linkage
+  migration0016TeamProjectSharingTaskExec,
+  // v5.2 — Team profile storage (agent/editor/shell/mcp; ProfileResolver cascade-merge source)
+  migration0017TeamProfileJson,
 ]
 
 export { MigrationRunner } from './runner'

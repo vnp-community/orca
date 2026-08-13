@@ -224,4 +224,11 @@ export const Tracers = {
    *  updateVisibility()/share-token/shared route nào trong code hiện tại. Khai báo tên
    *  tracer để sẵn sàng khi tính năng sharing tồn tại, KHÔNG viết call site nào cho nó. */
   workflowShareFlow:          createTracer('workflow:share'),
+
+  // ─── OrcaProject Sharing (Backend-side, cross-user read) ───────────────────
+  /** orcaProjects.linkSourceProject/unlinkSourceProject/getProjectData — audit
+   *  trail for the cross-user read path (orcaProjectId, actingUserId, ownerUserId,
+   *  projectId). See docs/guides/terminal-workspace-project-devserver-architecture.md
+   *  "Điểm cần thiết kế cẩn thận nhất". */
+  orcaProjectSharingFlow: createTracer('orcaProject:sharing'),
 } as const

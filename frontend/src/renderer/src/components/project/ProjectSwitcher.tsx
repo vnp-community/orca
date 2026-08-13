@@ -1,7 +1,8 @@
 // ProjectSwitcher.tsx — Command-palette style project selector (TDD-FE-12)
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { useAppStore } from '../../store'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { Check, ChevronsUpDown, Loader2, Plus } from 'lucide-react'
 import { Button } from '../ui/button'
 import {
@@ -16,13 +17,24 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { cn } from '../../lib/utils'
 
+type OrcaProjectListItem = { id: string; name: string; devServerId: string }
+
 export function ProjectSwitcher() {
   const { project, switchProject, isInitializing } = useWorkspace()
-  const projects = useAppStore(s => (s as any).projects as any[] ?? [])
+  const [projects, setProjects] = useState<OrcaProjectListItem[]>([])
   const [open, setOpen]     = useState(false)
   const [search, setSearch] = useState('')
 
-  const filtered = (projects as { id: string; name: string; devServerId: string }[]).filter(p =>
+  // `useAppStore`'s `projects` field is session-grant string[], not OrcaProject[] —
+  // fetch the real OrcaProject list from the backend instead of reading that field.
+  useEffect(() => {
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    callRuntimeRpc<OrcaProjectListItem[]>(target, 'project.list', null)
+      .then(list => setProjects(list ?? []))
+      .catch(() => setProjects([]))
+  }, [])
+
+  const filtered = projects.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   )
 

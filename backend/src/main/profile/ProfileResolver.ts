@@ -1,14 +1,20 @@
 /**
- * ProfileResolver — 3-layer profile merge engine with 60s TTL cache (TDD-14)
+ * ProfileResolver — cascade profile merge engine with 60s TTL cache (TDD-14)
  *
  * Merge strategy (lowest → highest priority):
- *   Company → Department → User
+ *   Company → Department → Team(s) (ascending `priority`, higher wins) → User
+ *
+ * A user may belong to zero, one, or many Teams at once
+ * (docs/guides/user-profile-team-department-rbac.md §5.2). When two Teams
+ * disagree on a field, the Team with the higher `orca_team_members.priority`
+ * wins; `_sources` records the winning layer as `'team:<teamId>'` (not just
+ * `'team'`) so audit can tell exactly which Team overrode a field.
  *
  * Special sections:
- *   - security: always company-locked, user/dept cannot override
- *   - shell.pathAdditions: concatenated (company + dept + user)
- *   - shell.envVars: merged (company base, dept+user override)
- *   - mcp.servers: deduped by name (user wins on conflict)
+ *   - security: always company-locked, dept/Team/user cannot override
+ *   - shell.pathAdditions: concatenated (company + dept + teams + user)
+ *   - shell.envVars: merged (company base, dept/teams/user override)
+ *   - mcp.servers: deduped by name (highest-priority layer wins on conflict)
  *
  * Cache: 60s TTL per userId, invalidatable individually or in bulk.
  *
@@ -20,6 +26,7 @@ import type { ProfileService } from './ProfileService'
 import type {
   OrcaProfile,
   ResolvedProfile,
+  ProfileSourceLayer,
   McpServerConfig,
   AgentProfileSection,
   EditorProfileSection,
@@ -27,6 +34,12 @@ import type {
 } from './OrcaProfile'
 
 const PROFILE_TTL_MS = 60_000
+
+/** One cascade layer feeding a scalar-section merge, in lowest→highest priority order. */
+type ScalarLayer<T> = { label: ProfileSourceLayer; section: T | undefined }
+
+/** A user's team membership, already resolved to its profile JSON. */
+type TeamProfileLayer = { teamId: string; profile: OrcaProfile }
 
 type CacheEntry = {
   resolved: ResolvedProfile
@@ -39,8 +52,8 @@ export class ProfileResolver {
   constructor(private readonly profileService: ProfileService) {}
 
   /**
-   * Resolve the merged 3-layer profile for a user.
-   * Returns cached result if within TTL; otherwise fetches all 3 layers in parallel.
+   * Resolve the merged cascade profile for a user.
+   * Returns cached result if within TTL; otherwise fetches all layers in parallel.
    */
   async resolve(userId: string): Promise<ResolvedProfile> {
     const span = Tracers.profileResolveFlow.start({ userId })
@@ -53,17 +66,19 @@ export class ProfileResolver {
     }
     span.step('cacheCheck', { cacheHit: false })
 
-    // Fetch all 3 layers in parallel — không step riêng cho từng SELECT (CR-TRACE-000 §5)
-    const [companyProfile, deptProfile, userProfile] = await Promise.all([
+    // Fetch all layers in parallel — không step riêng cho từng SELECT (CR-TRACE-000 §5)
+    const [companyProfile, deptProfile, userProfile, teamProfiles] = await Promise.all([
       this.profileService.getCompanyProfileForUser(userId),
       this.profileService.getDeptProfileForUser(userId),
       this.profileService.getUserProfile(userId),
+      this.profileService.getTeamProfilesForUser(userId),
     ])
 
     // merge() thuần in-memory — KHÔNG có span/step riêng (CR-TRACE-000 §5)
     const resolved = this.merge(
       companyProfile ?? {},
       deptProfile ?? {},
+      teamProfiles,
       userProfile ?? {}
     )
 
@@ -94,11 +109,12 @@ export class ProfileResolver {
   private merge(
     company: OrcaProfile,
     dept: OrcaProfile,
+    teams: TeamProfileLayer[],
     user: OrcaProfile
   ): ResolvedProfile {
-    const sources: Record<string, 'company' | 'dept' | 'user'> = {}
+    const sources: Record<string, ProfileSourceLayer> = {}
 
-    // ── security: company-locked, user/dept cannot override ──────────────────
+    // ── security: company-locked, dept/Team/user cannot override ─────────────
     const security = company.security
       ? { ...company.security }
       : undefined
@@ -109,41 +125,53 @@ export class ProfileResolver {
       }
     }
 
-    // ── agent: scalar merge user > dept > company per-field ──────────────────
+    // ── agent: scalar merge, highest-priority layer with the key wins ────────
     const agent = this.mergeScalar<AgentProfileSection>(
-      company.agent,
-      dept.agent,
-      user.agent,
+      [
+        { label: 'company', section: company.agent },
+        { label: 'dept', section: dept.agent },
+        ...teams.map((t) => ({ label: `team:${t.teamId}` as ProfileSourceLayer, section: t.profile.agent })),
+        { label: 'user', section: user.agent },
+      ],
       'agent',
       sources
     )
 
-    // ── editor: scalar merge user > dept > company per-field ─────────────────
+    // ── editor: scalar merge, highest-priority layer with the key wins ───────
     const editor = this.mergeScalar<EditorProfileSection>(
-      company.editor,
-      dept.editor,
-      user.editor,
+      [
+        { label: 'company', section: company.editor },
+        { label: 'dept', section: dept.editor },
+        ...teams.map((t) => ({ label: `team:${t.teamId}` as ProfileSourceLayer, section: t.profile.editor })),
+        { label: 'user', section: user.editor },
+      ],
       'editor',
       sources
     )
 
     // ── shell: composite merge ────────────────────────────────────────────────
-    const shell = this.mergeShell(company.shell, dept.shell, user.shell, sources)
+    const shell = this.mergeShell(company.shell, dept.shell, teams, user.shell, sources)
 
-    // ── mcp.servers: dedup by name (user wins on conflict) ───────────────────
+    // ── mcp.servers: dedup by name (highest-priority layer wins on conflict) ─
     const mcpServers = this.mergeMcpServers(
-      company.mcp?.servers,
-      dept.mcp?.servers,
-      user.mcp?.servers,
+      [
+        { label: 'company', servers: company.mcp?.servers },
+        { label: 'dept', servers: dept.mcp?.servers },
+        ...teams.map((t) => ({ label: `team:${t.teamId}` as ProfileSourceLayer, servers: t.profile.mcp?.servers })),
+        { label: 'user', servers: user.mcp?.servers },
+      ],
       sources
     )
     const mcp = mcpServers.length > 0 ? { servers: mcpServers } : undefined
 
-    // ── envVars (legacy top-level): user > dept > company ────────────────────
+    // ── envVars (legacy top-level): highest-priority layer with the key wins ─
     const envVars = this.mergeEnvVars(
-      company.envVars,
-      dept.envVars,
-      user.envVars,
+      [
+        { label: 'company', vars: company.envVars },
+        { label: 'dept', vars: dept.envVars },
+        ...teams.map((t) => ({ label: `team:${t.teamId}` as ProfileSourceLayer, vars: t.profile.envVars })),
+        { label: 'user', vars: user.envVars },
+      ],
       'envVars',
       sources
     )
@@ -164,37 +192,32 @@ export class ProfileResolver {
   }
 
   /**
-   * Scalar merge: for each key in the section, user > dept > company.
-   * Records the winning layer in sources under `prefix.key`.
+   * Scalar merge: for each key in the section, the highest-priority layer
+   * (last in `layers`) that defines it wins. Records the winning layer's
+   * label in sources under `prefix.key`.
    */
   private mergeScalar<T extends Record<string, unknown>>(
-    company: T | undefined,
-    dept: T | undefined,
-    user: T | undefined,
+    layers: ScalarLayer<T>[],
     prefix: string,
-    sources: Record<string, 'company' | 'dept' | 'user'>
+    sources: Record<string, ProfileSourceLayer>
   ): T | undefined {
-    if (!company && !dept && !user) {return undefined}
+    const allKeys = new Set<string>()
+    for (const { section } of layers) {
+      for (const key of Object.keys(section ?? {})) {allKeys.add(key)}
+    }
+    if (allKeys.size === 0) {return undefined}
 
     const merged: Record<string, unknown> = {}
 
-    // Collect all keys across layers
-    const allKeys = new Set<string>([
-      ...Object.keys(company ?? {}),
-      ...Object.keys(dept ?? {}),
-      ...Object.keys(user ?? {}),
-    ])
-
     for (const key of allKeys) {
-      if (user && key in user && user[key] !== undefined) {
-        merged[key] = user[key]
-        sources[`${prefix}.${key}`] = 'user'
-      } else if (dept && key in dept && dept[key] !== undefined) {
-        merged[key] = dept[key]
-        sources[`${prefix}.${key}`] = 'dept'
-      } else if (company && key in company && company[key] !== undefined) {
-        merged[key] = company[key]
-        sources[`${prefix}.${key}`] = 'company'
+      // Scan from the end — last layer is highest priority.
+      for (let i = layers.length - 1; i >= 0; i--) {
+        const { label, section } = layers[i]
+        if (section && key in section && section[key] !== undefined) {
+          merged[key] = section[key]
+          sources[`${prefix}.${key}`] = label
+          break
+        }
       }
     }
 
@@ -203,38 +226,39 @@ export class ProfileResolver {
 
   /**
    * Shell section merge:
-   * - defaultShell: scalar (user > dept > company)
-   * - pathAdditions: concatenate (company + dept + user)
-   * - envVars: object merge (user overrides dept overrides company)
+   * - defaultShell: scalar (highest-priority layer with a value wins)
+   * - pathAdditions: concatenate (company + dept + teams + user)
+   * - envVars: object merge (later layers override earlier ones)
    */
   private mergeShell(
     company: ShellProfileSection | undefined,
     dept: ShellProfileSection | undefined,
+    teams: TeamProfileLayer[],
     user: ShellProfileSection | undefined,
-    sources: Record<string, 'company' | 'dept' | 'user'>
+    sources: Record<string, ProfileSourceLayer>
   ): ShellProfileSection | undefined {
-    if (!company && !dept && !user) {return undefined}
+    const layers: ScalarLayer<ShellProfileSection>[] = [
+      { label: 'company', section: company },
+      { label: 'dept', section: dept },
+      ...teams.map((t) => ({ label: `team:${t.teamId}` as ProfileSourceLayer, section: t.profile.shell })),
+      { label: 'user', section: user },
+    ]
+    if (layers.every((l) => !l.section)) {return undefined}
 
     const shell: ShellProfileSection = {}
 
-    // defaultShell: scalar
-    if (user?.defaultShell !== undefined) {
-      shell.defaultShell = user.defaultShell
-      sources['shell.defaultShell'] = 'user'
-    } else if (dept?.defaultShell !== undefined) {
-      shell.defaultShell = dept.defaultShell
-      sources['shell.defaultShell'] = 'dept'
-    } else if (company?.defaultShell !== undefined) {
-      shell.defaultShell = company.defaultShell
-      sources['shell.defaultShell'] = 'company'
+    // defaultShell: scalar — highest-priority layer with a value wins
+    for (let i = layers.length - 1; i >= 0; i--) {
+      const { label, section } = layers[i]
+      if (section?.defaultShell !== undefined) {
+        shell.defaultShell = section.defaultShell
+        sources['shell.defaultShell'] = label
+        break
+      }
     }
 
     // pathAdditions: concatenate all (company first, user last)
-    const paths: string[] = [
-      ...(company?.pathAdditions ?? []),
-      ...(dept?.pathAdditions ?? []),
-      ...(user?.pathAdditions ?? []),
-    ]
+    const paths = layers.flatMap(({ section }) => section?.pathAdditions ?? [])
     if (paths.length > 0) {
       shell.pathAdditions = paths
       sources['shell.pathAdditions'] = 'user' // user is last / highest priority
@@ -242,9 +266,7 @@ export class ProfileResolver {
 
     // envVars: object merge
     const envVars = this.mergeEnvVars(
-      company?.envVars,
-      dept?.envVars,
-      user?.envVars,
+      layers.map(({ label, section }) => ({ label, vars: section?.envVars })),
       'shell.envVars',
       sources
     )
@@ -256,63 +278,46 @@ export class ProfileResolver {
   }
 
   /**
-   * Merge env var dictionaries: user overrides dept overrides company.
+   * Merge env var dictionaries: later layers override earlier ones.
    */
   private mergeEnvVars(
-    company: Record<string, string> | undefined,
-    dept: Record<string, string> | undefined,
-    user: Record<string, string> | undefined,
+    layers: Array<{ label: ProfileSourceLayer; vars: Record<string, string> | undefined }>,
     prefix: string,
-    sources: Record<string, 'company' | 'dept' | 'user'>
+    sources: Record<string, ProfileSourceLayer>
   ): Record<string, string> | undefined {
-    if (!company && !dept && !user) {return undefined}
+    if (layers.every((l) => !l.vars)) {return undefined}
 
-    const merged: Record<string, string> = {
-      ...company,
-      ...dept,
-      ...user,
+    const merged: Record<string, string> = {}
+    for (const { vars } of layers) {
+      Object.assign(merged, vars)
     }
 
-    // Track sources for each key
-    for (const key of Object.keys(company ?? {})) {
-      if (!sources[`${prefix}.${key}`]) {sources[`${prefix}.${key}`] = 'company'}
-    }
-    for (const key of Object.keys(dept ?? {})) {
-      sources[`${prefix}.${key}`] = 'dept'
-    }
-    for (const key of Object.keys(user ?? {})) {
-      sources[`${prefix}.${key}`] = 'user'
+    // Track sources for each key — later layers overwrite earlier assignments,
+    // consistent with the merge order above.
+    for (const { label, vars } of layers) {
+      for (const key of Object.keys(vars ?? {})) {
+        sources[`${prefix}.${key}`] = label
+      }
     }
 
     return Object.keys(merged).length > 0 ? merged : undefined
   }
 
   /**
-   * Merge MCP server lists: dedup by name, user wins on conflict.
-   * Order: company servers first, then dept, then user (user overrides).
+   * Merge MCP server lists: dedup by name, highest-priority layer wins on conflict.
+   * Order: company servers first, then dept, then teams (ascending priority), then user.
    */
   private mergeMcpServers(
-    company: McpServerConfig[] | undefined,
-    dept: McpServerConfig[] | undefined,
-    user: McpServerConfig[] | undefined,
-    sources: Record<string, 'company' | 'dept' | 'user'>
+    layers: Array<{ label: ProfileSourceLayer; servers: McpServerConfig[] | undefined }>,
+    sources: Record<string, ProfileSourceLayer>
   ): McpServerConfig[] {
     const serverMap = new Map<string, McpServerConfig>()
 
-    // Company servers first (lowest priority)
-    for (const server of company ?? []) {
-      serverMap.set(server.name, server)
-      sources[`mcp.servers.${server.name}`] = 'company'
-    }
-    // Dept overrides company
-    for (const server of dept ?? []) {
-      serverMap.set(server.name, server)
-      sources[`mcp.servers.${server.name}`] = 'dept'
-    }
-    // User overrides dept+company
-    for (const server of user ?? []) {
-      serverMap.set(server.name, server)
-      sources[`mcp.servers.${server.name}`] = 'user'
+    for (const { label, servers } of layers) {
+      for (const server of servers ?? []) {
+        serverMap.set(server.name, server)
+        sources[`mcp.servers.${server.name}`] = label
+      }
     }
 
     return [...serverMap.values()]

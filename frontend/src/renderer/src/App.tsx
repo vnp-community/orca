@@ -309,6 +309,19 @@ const ActivityPrototypePage = lazy(() => import('./components/activity/ActivityP
 const Settings = lazy(() => import('./components/settings/Settings'))
 const SkillsPage = lazy(() => import('./components/skills/SkillsPage'))
 const WorkspaceSpacePage = lazy(() => import('./components/workspace-space/WorkspaceSpacePage'))
+// Giai đoạn 2c (F38) — additive-only "Project Workspace (Beta)" entry point.
+// Does not replace the Project/Repo sidebar flow (see roadmap 2c item 7 /
+// docs/guides/project-workspace-f38-doc-vs-code.md §4 step 8).
+const WorkspaceLayout = lazy(() =>
+  import('./components/workspace/WorkspaceLayout').then((module) => ({
+    default: module.WorkspaceLayout
+  }))
+)
+const ProjectSwitcher = lazy(() =>
+  import('./components/project/ProjectSwitcher').then((module) => ({
+    default: module.ProjectSwitcher
+  }))
+)
 const MobilePage = lazy(() => import('./components/mobile/MobilePage'))
 const QuickOpen = lazy(() => import('./components/QuickOpen'))
 const WorktreeJumpPalette = lazy(() => import('./components/WorktreeJumpPalette'))
@@ -2444,6 +2457,16 @@ function App(): React.JSX.Element {
                               {activeView === 'activity' ? <ActivityPrototypePage /> : null}
                               {activeView === 'space' ? <WorkspaceSpacePage /> : null}
                               {activeView === 'mobile' ? <MobilePage /> : null}
+                              {activeView === 'workspace' ? (
+                                <div className="flex h-full flex-col">
+                                  <div className="flex items-center gap-2 border-b p-2">
+                                    <ProjectSwitcher />
+                                  </div>
+                                  <div className="min-h-0 flex-1">
+                                    <WorkspaceLayout />
+                                  </div>
+                                </div>
+                              ) : null}
                               {activeView === 'terminal' &&
                               creationLayoutActive &&
                               activePendingCreationId ? (

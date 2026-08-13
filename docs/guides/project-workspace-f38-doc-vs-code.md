@@ -2,6 +2,21 @@
 
 **Cập nhật:** 2026-08-13
 
+> **✅ Đính chính 2026-08-13 (Giai đoạn 2c hoàn thành, bước tích hợp cuối)**: các mục 2, 3, 4, 5, 6
+> của phương án merge ở mục 4 dưới đây đã xong (Agent tab, terminal panel, `ServerStatusBar`,
+> `currentWorktree` từ sidebar, và mount vào `App.tsx`). Mục 7 (xoá `WorkspaceContextV6`/
+> `WorkspaceContextBridge`) **KHÔNG làm** — quyết định #2 chốt giữ nguyên, không động (đã có 1 lần
+> agent tích hợp xoá nhầm theo gợi ý cũ của mục này, phát hiện và khôi phục ngay trong cùng phiên
+> — xem ghi chú ở mục 3 bảng dưới). Ngoại lệ còn lại: mục 1 (`git.status` param `projectId`→
+> `worktree`) **CHƯA sửa** —
+> để nguyên có chủ đích theo commit `edf89c96e` ("cần `worktreeId` thật, phụ thuộc giai đoạn sau"
+> — nay `worktreeId` đã có qua sync sidebar, nhưng bản thân lời gọi `git.status` trong
+> `WorkspaceContext.tsx` vẫn truyền `{projectId}` thay vì `{worktree}`, lỗi vẫn bị `.catch(() =>
+> null)` nuốt âm thầm). Mount vào `App.tsx` **cộng thêm** một nút "Project Workspace (Beta)" mới
+> trong sidebar nav — dẫn tới `activeView: 'workspace'` — **không thay thế** luồng Project/Repo
+> sidebar hiện có. Chi tiết đầy đủ: [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md)
+> Giai đoạn 2c.
+
 > Nối tiếp [terminal-workspace-project-devserver-architecture.md](./terminal-workspace-project-devserver-architecture.md)
 > (mô hình `OrcaProject` nói chung) — tài liệu này đi sâu riêng vào
 > [F38 — Project Workspace](../features/F38-project-workspace.md): đối chiếu từng phần giữa đặc
@@ -121,18 +136,31 @@ không ai dùng được** — provider sống, cả 2 thế hệ (V5 lẫn V6) 
 
 ## 3. Đánh giá từng khác biệt — giữ code, sửa code, hay cần quyết định?
 
-| Khác biệt | Đề xuất | Vì sao |
-|---|---|---|
-| Explorer = panel cố định thay vì tab | **Cập nhật doc theo code** | Panel cố định tiện hơn — không mất Explorer khi chuyển tab. Đây là cải tiến, không phải thiếu sót. |
-| Tab "Agent" trống | **Sửa code** | Chỉ cần nối `AgentPanel` vào nhánh render + có `worktreeId` thật. `AgentPanel.tsx` đã sẵn, không viết lại. |
-| Terminal placeholder | **Sửa code** | Tái dùng hạ tầng PTY/terminal-pane đã có sẵn và chạy ổn ở app chính, không xây mới từ đầu. |
-| Tên file lệch (`ProjectSelector` vs `ProjectSwitcher`...) | **Cập nhật doc theo code** | Đổi tên code đang chạy để khớp doc cũ không có giá trị, chỉ tốn công. |
-| `WorkspaceContext` thiếu `devServer`/`connection` | **Cập nhật doc theo code** | 2 field đó có thể lấy qua `project.devServerId` sẵn có — không cần thêm field mới vào context. |
-| `ServerStatusBar.tsx` chưa xây | **Tái dùng, không xây mới** | Ghép `RuntimeHostStatusRow`/`SshStatusSegment` (đã chạy thật) vào Workspace thay vì viết component riêng trùng chức năng. |
-| Git subsystem rộng hơn doc | **Cập nhật doc theo code** | Ghi nhận đúng những gì đã xây — đây là phần hoàn thiện nhất, nên là phần đầu tiên tài liệu hoá tử tế. |
-| `currentWorktree` chưa bao giờ được set | **Cần quyết định trước** | Nguồn cấp `worktreeId` cho Workspace là gì — chọn từ sidebar hiện có, hay Workspace tự có bộ chọn worktree riêng? Chưa có câu trả lời trong doc lẫn code. |
-| `git.status`/`workspace.listFiles` gọi sai contract | **Sửa code, làm TRƯỚC mọi việc khác** | `git.status` cần đổi tham số từ `projectId` sang `worktree` đúng schema thật; `workspace.listFiles` cần đổi tên gọi thành 1 trong 4 method thật (`workspace.init/teardown/refreshFileTree/refreshGitStatus`) — nếu không sửa, mọi bước sau đều build trên nền tảng gọi API sai |
-| `WorkspaceContextV6`/`WorkspaceContextBridge` tồn tại song song, chưa từng dùng | **Cần quyết định trước** | Có ý định thay V5 bằng V6 không? Nếu không, nên xoá hẳn V6 thay vì để 2 bản cạnh tranh cùng tồn tại mãi |
+| Khác biệt | Đề xuất | Trạng thái | Vì sao |
+|---|---|---|---|
+| Explorer = panel cố định thay vì tab | **Cập nhật doc theo code** | ✅ (ghi nhận ở đây) | Panel cố định tiện hơn — không mất Explorer khi chuyển tab. Đây là cải tiến, không phải thiếu sót. |
+| Tab "Agent" trống | **Sửa code** | ✅ `WorkspaceLayout.tsx:81-85` nối `<AgentPanel worktreeId={currentWorktree.id} />` (rẽ nhánh `<NoWorktreeSelected />` khi chưa có worktree) | Chỉ cần nối `AgentPanel` vào nhánh render + có `worktreeId` thật. `AgentPanel.tsx` đã sẵn, không viết lại. |
+| Terminal placeholder | **Sửa code** | ✅ `WorkspaceLayout.tsx:105-114` dùng `WorkspaceTerminalPanel` (tái dùng PTY infra thật) | Tái dùng hạ tầng PTY/terminal-pane đã có sẵn và chạy ổn ở app chính, không xây mới từ đầu. |
+| Tên file lệch (`ProjectSelector` vs `ProjectSwitcher`...) | **Cập nhật doc theo code** | ✅ (ghi nhận ở đây, mục 2.3) | Đổi tên code đang chạy để khớp doc cũ không có giá trị, chỉ tốn công. |
+| `WorkspaceContext` thiếu `devServer`/`connection` | **Cập nhật doc theo code** | ✅ (ghi nhận ở đây, mục 2.4) | 2 field đó có thể lấy qua `project.devServerId` sẵn có — không cần thêm field mới vào context. |
+| `ServerStatusBar.tsx` chưa xây | **Tái dùng, không xây mới** | ✅ `WorkspaceLayout.tsx:25,127-129` ghép `SshStatusSegment` vào status bar | Ghép `RuntimeHostStatusRow`/`SshStatusSegment` (đã chạy thật) vào Workspace thay vì viết component riêng trùng chức năng. |
+| Git subsystem rộng hơn doc | **Cập nhật doc theo code** | ✅ (ghi nhận ở mục 2.5) | Ghi nhận đúng những gì đã xây — đây là phần hoàn thiện nhất, nên là phần đầu tiên tài liệu hoá tử tế. |
+| `currentWorktree` chưa bao giờ được set | **Quyết định #8: tái dùng sidebar** | ✅ `WorktreeList.tsx` sync `setCurrentWorktree()` từ lựa chọn sidebar (roadmap quyết định #8) | Nguồn cấp `worktreeId` cho Workspace là gì — chọn từ sidebar hiện có, hay Workspace tự có bộ chọn worktree riêng? Đã chốt: tái dùng sidebar. |
+| `git.status`/`workspace.listFiles` gọi sai contract | **Sửa code, làm TRƯỚC mọi việc khác** | ⚠️ 1/2 — `workspace.listFiles`→`workspace.refreshFileTree` đã sửa (Giai đoạn 1, 1.8); `git.status` vẫn truyền `{projectId}` thay vì `{worktree}` thật, lỗi bị `.catch(() => null)` nuốt âm thầm — CHƯA sửa, để lại follow-up | `git.status` cần đổi tham số từ `projectId` sang `worktree` đúng schema thật; `workspace.listFiles` cần đổi tên gọi thành 1 trong 4 method thật — nếu không sửa, mọi bước sau đều build trên nền tảng gọi API sai |
+| `WorkspaceContextV6`/`WorkspaceContextBridge` tồn tại song song, chưa từng dùng | **Giữ nguyên, không động** | ❌ KHÔNG xoá — quyết định #2 (2026-08-13) chốt giữ nguyên cho kế hoạch nâng cấp sau, dù xác nhận 0 importer thật qua gitnexus + grep (code chết vô hại, không phải bug) | F38 dùng V5. Có kế hoạch thay bằng V6 sau, chưa phải bây giờ — quyết định #2 rõ ràng là "giữ", không phải "xoá" |
+| Mount `ProjectSwitcher`/`WorkspaceLayout` vào layout thật | **Mount tối thiểu, không thay Project/Repo sidebar** | ✅ `App.tsx`: `activeView === 'workspace'` render `<ProjectSwitcher />` + `<WorkspaceLayout />`; nút mới "Project Workspace (Beta)" trong `SidebarNav.tsx` (không đụng luồng Project/Repo hiện có) | Bước cuối cùng — chỉ mount khi Agent/Terminal/ServerStatusBar/currentWorktree đã nối thật, để tránh lộ UI dở cho người dùng. |
+
+### 2.7 Bug phát hiện khi mount (2026-08-13), đã sửa trước khi ship: `ProjectSwitcher` đọc sai nguồn dữ liệu
+
+Agent tích hợp phát hiện `ProjectSwitcher.tsx:21` đọc `useAppStore(s => (s as any).projects as
+any[] ?? [])` — nhưng `projects` trên store chính (`slices/auth.ts`) là `string[]` (danh sách
+project ID trong session token), không phải mảng `OrcaProject {id, name, devServerId}`. Hậu quả:
+switcher luôn trống, hoặc ném `TypeError` nếu session có project ID (`.filter(p => p.name...)`
+trên string). Đây là bug thật đủ nghiêm trọng để hoãn ship — sửa ngay trước khi commit thay vì
+để lại follow-up: `ProjectSwitcher` giờ tự fetch qua `project.list` RPC (không tham số, trả
+`OrcaProject[]`, method thật đã có sẵn từ `backend/src/main/project/project-rpc-handler.ts`) lúc
+mount, thay vì đọc field sai của store. Test cập nhật theo (`ProjectSwitcher.test.tsx`, mock
+`callRuntimeRpc` thay vì mock field `projects` giả).
 
 ## 4. Phương án merge — theo mức độ ưu tiên
 
@@ -143,27 +171,28 @@ không?** Nếu không, nên dán nhãn rõ ràng (comment ở đầu mỗi file
 chết tiếp tục tích luỹ — matching bài học từ `workspace-slice.ts` (càng để lâu, càng dễ tái diễn
 kiểu bug "đè lên code thật" đã gặp tuần này.
 
-**Nếu quyết định tiếp tục, theo thứ tự:**
+**Quyết định: tiếp tục.** Trạng thái từng bước (2026-08-13, bước tích hợp cuối Giai đoạn 2c):
 
 1. **Sửa RPC contract sai** (`git.status` tham số, `workspace.listFiles` tên method) — làm
    trước tiên vì mọi bước sau đều phụ thuộc `WorkspaceContext` lấy được dữ liệu thật.
-2. **Viết lại F38 theo code thật** (không phải ngược lại) — cập nhật layout diagram, bảng "Yêu
-   cầu kỹ thuật" (tên file đúng), shape `WorkspaceContext`, và bổ sung mô tả Git subsystem đang
-   thiếu hoàn toàn trong doc gốc.
-3. **Quyết định nguồn `currentWorktree`** — đây là khoá cho cả tab Agent lẫn terminal panel.
-   Đề xuất: tái dùng cơ chế chọn worktree đã có ở sidebar chính (`WorktreeList.tsx`) thay vì xây
-   bộ chọn riêng cho Workspace.
-4. **Nối tab Agent**: thêm nhánh `activeTab === 'agent' && <AgentPanel worktreeId={...} />`,
-   dùng `worktreeId` từ bước 3.
-5. **Nối terminal panel**: tái dùng `terminal-pane`/PTY infra hiện có (đã chạy ổn định trong
-   app chính, không xây song song 1 hệ thống terminal thứ 2).
-6. **Ghép `ServerStatusBar`**: dùng lại `RuntimeHostStatusRow`/`SshStatusSegment` thay vì viết
-   mới.
-7. **Xoá `WorkspaceContextV6`/`WorkspaceContextBridge`** nếu quyết định không dùng (mục 3 bảng
-   trên) — tránh 2 hệ cạnh tranh tồn tại mãi.
-8. **Mount `ProjectSwitcher`/`WorkspaceLayout` vào layout thật** — bước cuối cùng, chỉ làm khi
-   1–7 đã xong, vì mount sớm sẽ lộ ngay các phần còn dở (tab Agent trống, terminal giả) cho
-   người dùng thật.
+   ⚠️ **1/2** — `workspace.listFiles` đã sửa (Giai đoạn 1, 1.8). `git.status` vẫn gọi sai
+   (`{projectId}` thay vì `{worktree}`), lỗi bị nuốt âm thầm — follow-up còn mở, xem mục 2.4/§3.
+2. **Viết lại F38 theo code thật** — ✅ file này (mục 2, 3 ở trên) đã cập nhật theo code thật.
+3. **Quyết định nguồn `currentWorktree`** — ✅ chốt tái dùng sidebar (`WorktreeList.tsx`, quyết
+   định #8 roadmap), đã nối (`WorktreeList.tsx` gọi `setCurrentWorktree()`).
+4. **Nối tab Agent** — ✅ `WorkspaceLayout.tsx:81-85`.
+5. **Nối terminal panel** — ✅ `WorkspaceLayout.tsx:105-114` (`WorkspaceTerminalPanel`).
+6. **Ghép `ServerStatusBar`** — ✅ `WorkspaceLayout.tsx:127-129` (`SshStatusSegment`).
+7. **Xoá `WorkspaceContextV6`/`WorkspaceContextBridge`** — ❌ KHÔNG làm, quyết định #2 chốt giữ
+   nguyên (0 importer thật, nhưng để dành cho kế hoạch nâng cấp sau).
+8. **Mount `ProjectSwitcher`/`WorkspaceLayout` vào layout thật** — ✅ mount tối thiểu: nút mới
+   "Project Workspace (Beta)" trong `SidebarNav.tsx` → `activeView: 'workspace'` → `App.tsx`
+   render `<ProjectSwitcher />` + `<WorkspaceLayout />`. Không thay thế luồng Project/Repo sidebar
+   hiện có (2 khái niệm song song, theo
+   [terminal-workspace-project-devserver-architecture.md](./terminal-workspace-project-devserver-architecture.md)).
+   Biết trước rủi ro: mục 2.7 (`ProjectSwitcher` chưa có nguồn dữ liệu `OrcaProject` thật) và mục 1
+   ở trên (`git.status` vẫn sai) vẫn còn — chấp nhận được vì nhãn "(Beta)", nằm trong
+   `RecoverableRenderErrorBoundary`, và không chặn luồng chính.
 
-**Rủi ro nếu làm ngược thứ tự** (mount trước, hoàn thiện sau): người dùng thấy tab Agent trống,
-terminal "coming soon" ngay khi vừa bật tính năng — trải nghiệm tệ hơn không có tính năng.
+**Rủi ro đã né được nhờ làm đúng thứ tự** (mount sau khi 2–7 xong): người dùng bấm vào nút Beta
+thấy Agent tab/terminal panel/status bar hoạt động thật — không còn placeholder/tab trống.

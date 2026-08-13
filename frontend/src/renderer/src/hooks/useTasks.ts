@@ -22,7 +22,7 @@ export function useTasks(projectId: string) {
     if (!projectId) {return}
     setIsLoading(true)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    callRuntimeRpc<OrcaTask[]>(target, 'tasks.list', { projectId })
+    callRuntimeRpc<OrcaTask[]>(target, 'task.list', { projectId })
       .then(tasks => {
         if (typeof setTasks === 'function') {
           // Since our setTasks currently replaces all tasks in the store (as per Option B flat approach),

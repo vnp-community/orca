@@ -217,4 +217,34 @@ export class ProfileService {
       )
     )
   }
+
+  // ── Team (cross-entity) ────────────────────────────────────────────────────
+
+  /**
+   * Get every team profile that applies to a user, ordered ascending by
+   * `orca_team_members.priority` (migration 0016) — lowest priority first, so
+   * ProfileResolver can fold them in cascade order and let the highest
+   * priority (last in the returned array) win on conflicting fields.
+   *
+   * Standalone query, independent of TeamService — a user may belong to zero,
+   * one, or many teams; an empty array is a normal result, not an error.
+   */
+  async getTeamProfilesForUser(
+    userId: string
+  ): Promise<Array<{ teamId: string; profile: OrcaProfile }>> {
+    const rows = await this.pool.withConnection((db) =>
+      db.query<{ teamId: string; profileJson: string }>(
+        `SELECT tm.team_id as teamId, t.profile_json as profileJson
+         FROM orca_team_members tm
+         JOIN orca_teams t ON t.id = tm.team_id
+         WHERE tm.user_id = ?
+         ORDER BY tm.priority ASC`,
+        [userId]
+      )
+    )
+    return rows.map((r) => ({
+      teamId: r.teamId,
+      profile: JSON.parse(r.profileJson) as OrcaProfile
+    }))
+  }
 }

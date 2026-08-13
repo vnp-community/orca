@@ -40,6 +40,8 @@ import {
   getRepoHeaderSectionEndByRepoId
 } from './worktree-header-section-boundaries'
 import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
+import { useWorkspace } from '@/context/WorkspaceContext'
+import type { Worktree as WorkspaceWorktree } from '@/types/workspace-types'
 import { PendingWorktreeRow } from './PendingWorktreeRow'
 import { SUPPRESS_WORKTREE_LIST_SCROLL_ADJUSTMENT_EVENT } from './WorktreeCardAgents'
 import { Button } from '@/components/ui/button'
@@ -308,6 +310,7 @@ export {
   canKeepImportedWorktreesHidden
 }
 export { installWorktreeVisibleRefreshVisibilityListener }
+export { toWorkspaceContextWorktree }
 
 type ProjectGroupNameDialogState =
   | { type: 'create-from-repo'; repo: Repo }
@@ -407,6 +410,20 @@ function getActiveSidebarWorkspaceId(
     return scope.worktreeId
   }
   return activeWorktreeId
+}
+
+// Why: Workspace (F38) reuses the sidebar's existing worktree selection
+// instead of building a separate picker (roadmap decision #8) — this adapts
+// the sidebar's rich Worktree (& GitWorktreeInfo) into WorkspaceContext's
+// smaller shape.
+function toWorkspaceContextWorktree(worktree: Worktree): WorkspaceWorktree {
+  return {
+    id: worktree.id,
+    path: worktree.path,
+    branch: worktree.branch,
+    isMain: worktree.isMainWorktree,
+    createdAt: worktree.createdAt
+  }
 }
 
 function getMountedWorktreeOptions(worktreeId: string, root?: ParentNode | null): HTMLElement[] {
@@ -5081,6 +5098,15 @@ const WorktreeList = React.memo(function WorktreeList({
     () => getActiveSidebarWorkspaceId(activeWorkspaceKey, activeWorktreeId),
     [activeWorkspaceKey, activeWorktreeId]
   )
+
+  // Why: sync WorkspaceContext's currentWorktree to the sidebar's selection
+  // (roadmap decision #8, docs/guides/project-workspace-f38-doc-vs-code.md
+  // §4 step 3) — Workspace has no picker of its own, it reuses this one.
+  const { setCurrentWorktree } = useWorkspace()
+  useEffect(() => {
+    const worktree = activeWorktreeId ? (worktreeMap.get(activeWorktreeId) ?? null) : null
+    setCurrentWorktree(worktree ? toWorkspaceContextWorktree(worktree) : null)
+  }, [activeWorktreeId, worktreeMap, setCurrentWorktree])
   const groupBy = useAppStore((s) => s.groupBy)
   const setGroupBy = useAppStore((s) => s.setGroupBy)
   const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)

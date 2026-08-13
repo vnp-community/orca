@@ -435,6 +435,21 @@ export async function initializeOrcaServices(
   const _projectRouter = new ProjectServerRouter(projectService, devServerManager, relayConnectionPool)
   console.log('[ServerBootstrap] ✅ ProjectService + ProjectServerRouter initialized (v5.0)')
 
+  // 10a. TeamService [Giai đoạn 2a] — org-level team CRUD + membership RPC.
+  const { TeamService } = await import('./team/TeamService')
+  const { createTeamMethods } = await import('./team/team-rpc-handler')
+  const teamService = new TeamService(pool)
+  rpcServer.addMethods(createTeamMethods(teamService, getUserRole))
+  console.log('[ServerBootstrap] ✅ TeamService + Team RPC methods registered (Giai đoạn 2a)')
+
+  // 10b. OrcaProjectSourceProjectService [Giai đoạn 2c] — OrcaProject sharing
+  // against a source Project/Repo. Reuses the projectService constructed above.
+  const { OrcaProjectSourceProjectService } = await import('./project/OrcaProjectSourceProjectService')
+  const { createOrcaProjectSharingMethods } = await import('./project/orca-project-sharing-rpc-handler')
+  const sourceProjectService = new OrcaProjectSourceProjectService(pool)
+  rpcServer.addMethods(createOrcaProjectSharingMethods(sourceProjectService, projectService, getUserRole))
+  console.log('[ServerBootstrap] ✅ OrcaProjectSourceProjectService + sharing RPC methods registered (Giai đoạn 2c)')
+
   // 11. AIProviderService + ProviderResolver + ProviderHealthChecker [v5.0 TDD-16]
   const { AIProviderService } = await import('./ai-providers/AIProviderService')
   const { ProviderResolver } = await import('./ai-providers/ProviderResolver')
@@ -506,14 +521,19 @@ export async function initializeOrcaServices(
   const { TaskGrantService } = await import('./task/TaskGrantService')
   const { TaskAIPlanner } = await import('./task/TaskAIPlanner')
   const { TaskAgentExecutor } = await import('./task/TaskAgentExecutor')
+  const { TaskOrchestrationBridge } = await import('./task/TaskOrchestrationBridge')
   const { createTaskMethods } = await import('./task/task-rpc-handler')
   const taskDagValidator = new TaskDAGValidator(pool)
   const taskService = new TaskService(pool, taskDagValidator)
   const taskGrantService = new TaskGrantService(pool, taskService)
   const taskAIPlanner = new TaskAIPlanner(taskService, aiProviderService, _projectRouter)
   // Why: reuse the same agentSpawner instance wired into project.agentSpawn above (B1 fix)
-  // instead of constructing a second one.
-  const taskAgentExecutor = new TaskAgentExecutor(taskService, agentSpawner, taskGrantService)
+  // instead of constructing a second one. `runtime` (OrcaRuntimeService, step 6 above)
+  // structurally satisfies TaskOrchestrationRuntime as-is — see TaskOrchestrationBridge.ts.
+  const taskOrchestrationBridge = new TaskOrchestrationBridge(taskService, runtime)
+  const taskAgentExecutor = new TaskAgentExecutor(
+    taskService, agentSpawner, taskGrantService, taskOrchestrationBridge
+  )
   rpcServer.addMethods(createTaskMethods(taskService, taskGrantService, taskAIPlanner, taskAgentExecutor))
   console.log('[ServerBootstrap] ✅ TaskService + TaskAgentExecutor initialized (v5.0)')
 

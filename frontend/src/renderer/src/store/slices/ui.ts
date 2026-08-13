@@ -507,7 +507,8 @@ const TOP_LEVEL_VIEW_LOOKUP: Record<TopLevelView, true> = {
   automations: true,
   space: true,
   skills: true,
-  mobile: true
+  mobile: true,
+  workspace: true
 }
 const KNOWN_TOP_LEVEL_VIEWS = new Set<string>(Object.keys(TOP_LEVEL_VIEW_LOOKUP))
 
@@ -631,6 +632,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeSettings:
     | 'terminal'
     | 'tasks'
@@ -639,6 +641,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeActivity:
     | 'terminal'
     | 'settings'
@@ -647,6 +650,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeAutomations:
     | 'terminal'
     | 'settings'
@@ -655,6 +659,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeSpace:
     | 'terminal'
     | 'settings'
@@ -663,6 +668,7 @@ export type UISlice = {
     | 'automations'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeSkills:
     | 'terminal'
     | 'settings'
@@ -671,6 +677,7 @@ export type UISlice = {
     | 'automations'
     | 'space'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeMobile:
     | 'terminal'
     | 'settings'
@@ -679,6 +686,7 @@ export type UISlice = {
     | 'automations'
     | 'space'
     | 'skills'
+    | 'workspace'
   setActiveView: (view: UISlice['activeView']) => void
   taskPageData: {
     preselectedRepoId?: string

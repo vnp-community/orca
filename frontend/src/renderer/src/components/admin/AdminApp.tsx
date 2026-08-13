@@ -26,6 +26,7 @@ const ProviderList = lazy(() =>
 const FleetDashboard = lazy(() =>
   import('./fleet/fleet-dashboard').then((m) => ({ default: m.FleetDashboard }))
 )
+const TeamAdmin = lazy(() => import('./TeamAdmin').then((m) => ({ default: m.TeamAdmin })))
 
 // TASK-FE-014: /profile hosts both company-wide and per-department profile
 // admin — DeptProfileAdmin was never mounted anywhere, so it's exposed here
@@ -69,6 +70,7 @@ function PageContent({
   if (route === '/audit')          {return <AuditPage />}
   if (route === '/profile')        {return <ProfileAdminPage />}
   if (route === '/ai-providers')   {return <ProviderList />}
+  if (route === '/teams')          {return <TeamAdmin />}
   if (route === '/fleet')          {return <FleetDashboard />}
   return <AdminDashboard />
 }
