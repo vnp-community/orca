@@ -88,6 +88,7 @@ import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { formatFolderWorkspaceCreateError } from '../../lib/folder-workspace-path-status'
 import { logRemoveProjectDiagnostic } from '@/lib/remove-project-diagnostic-log'
+import { isWebClientLocation } from '@/lib/web-client-location'
 
 const ERROR_TOAST_DURATION = 60_000
 const SAFE_AUTO_FORK_SYNC_COOLDOWN_MS = 10 * 60 * 1000
@@ -1743,7 +1744,13 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       return
     }
 
-    const environments = await listRuntimeEnvironmentsForAllHostLoad()
+    // Why: a paired web client has no distinct "local" host — the 'local'
+    // fetch above and runtimeEnvironments.list() both resolve to the same
+    // session-auth connection, so re-fetching it here would duplicate every
+    // repo into a phantom 'runtime:session-auth'-tagged row alongside the
+    // 'local' one already applied (the ambiguous-host errors on remove /
+    // workspace-delete traced back to exactly this duplication).
+    const environments = isWebClientLocation() ? [] : await listRuntimeEnvironmentsForAllHostLoad()
     // Why: unreachable remotes can spend the full connect timeout; merge each
     // resolved host through the state updater so parallel loads do not clobber.
     await Promise.all(
@@ -1801,7 +1808,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       return
     }
 
-    const environments = await listRuntimeEnvironmentsForAllHostLoad()
+    // Why: see the matching comment in fetchReposForAllHosts — a paired web
+    // client's runtimeEnvironments.list() is the same session-auth connection
+    // already fetched above as 'local', so looping it here would duplicate
+    // every group into a phantom 'runtime:session-auth'-tagged row.
+    const environments = isWebClientLocation() ? [] : await listRuntimeEnvironmentsForAllHostLoad()
     await Promise.all(
       environments.map(async (environment) => {
         try {
@@ -1857,7 +1868,12 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       return
     }
 
-    const environments = await listRuntimeEnvironmentsForAllHostLoad()
+    // Why: see the matching comment in fetchReposForAllHosts — a paired web
+    // client's runtimeEnvironments.list() is the same session-auth connection
+    // already fetched above as 'local', so looping it here would duplicate
+    // every folder workspace into a phantom 'runtime:session-auth'-tagged row
+    // (this is what surfaced as "Workspace identity is ambiguous across hosts").
+    const environments = isWebClientLocation() ? [] : await listRuntimeEnvironmentsForAllHostLoad()
     await Promise.all(
       environments.map(async (environment) => {
         try {
