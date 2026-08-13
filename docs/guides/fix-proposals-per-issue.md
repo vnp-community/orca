@@ -2,13 +2,45 @@
 
 **Cập nhật:** 2026-08-13
 
-> Nguồn: [audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md). Mỗi đề xuất
-> bám theo nguyên tắc kiến trúc mục tiêu: **frontend = hiển thị + tương tác người dùng**,
-> **backend = quản trị + lưu dữ liệu quản trị**, **agent = thực thi tác vụ + quản trị code trên
-> dev-server**. Case nào có xung đột/cần quyết định trước khi sửa → tách sang
+> Nguồn: [audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md). Case nào có
+> xung đột/cần quyết định trước khi sửa → tách sang
 > [decisions-needed.md](./decisions-needed.md), không đưa giải pháp 1 chiều ở đây. Kế hoạch
 > thực thi tổng hợp (thứ tự làm) xem
 > [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
+
+## Nguyên tắc kiến trúc — luồng dữ liệu 1 chiều, không đảo ngược
+
+**Backend và agent xử lý toàn bộ luồng nghiệp vụ (business logic), trả kết quả cho frontend qua
+API (RPC). Frontend chỉ gọi API và hiển thị — không tự tính toán/quyết định nghiệp vụ.**
+
+```
+agent (thực thi lệnh thật trên dev-server: PTY, git, fs, spawn agent CLI)
+   │  kết quả thô
+   ▼
+backend (nghiệp vụ: validate, tính progress/permission/trạng thái, lưu DB, quản trị)
+   │  API (RPC) — CHỈ trả dữ liệu đã xử lý xong, sẵn sàng hiển thị
+   ▼
+frontend (gọi API, render đúng những gì API trả về — KHÔNG tự tính toán lại)
+```
+
+Áp dụng cụ thể khi review từng đề xuất bên dưới:
+
+- **Sai tên/tham số RPC** (A1, B2, B3, C1) → sửa ở frontend là ĐÚNG, vì đây chỉ là gọi đúng tên
+  API có sẵn — không phải thêm nghiệp vụ vào frontend.
+- **Method/field/entity chưa tồn tại** (A2, A6, C4) → PHẢI thêm ở backend trước, frontend chỉ
+  gọi sau khi backend đã có — không tự tính toán tạm ở frontend để "chạy được trước".
+- **Type contract lệch nhau** (A5, C3) → nguồn chuẩn LUÔN là backend's type
+  (`backend/src/shared/*`, `backend/src/main/*/*.ts`). Đề xuất bổ sung: cân nhắc để frontend
+  **import trực tiếp** type từ `backend/src/shared/` (nếu build pipeline cho phép) thay vì duy
+  trì bản sao tay ở `frontend/src/shared/`/`frontend/src/renderer/src/types/` — đây chính là
+  nguyên nhân gốc của cả 5 bản `OrcaProfile` và 2 bản `OrcaTask` lệch nhau đã audit ra. Nếu
+  không thể import thẳng (build/bundle constraint), tối thiểu cần 1 test tự động so khớp 2 phía
+  (kiểu "contract test"), không để lệch âm thầm như đã xảy ra.
+- **UI component viết mới/hoàn thiện** (C2, D2) → chỉ được **gọi API + render** — không tính
+  `progressPercent` phía client (đã có `task.recalculateProgress` ở backend), không tự resolve
+  quyền phía client (đã có `task.resolvePermission`/`TaskGrantService` ở backend). Đã kiểm tra:
+  code frontend hiện tại **không có** vi phạm kiểu này (không tìm thấy tính toán progress hay
+  resolve permission phía client) — giữ nguyên tắc này khi viết code mới cho C2/D2.
 
 ## Nhóm A — Profile / RBAC
 
@@ -84,7 +116,11 @@ phụ thuộc quyết định nguồn `currentWorktree` (xem
 ### B4. Cụm UI Workspace/Git/CodeReview (~14+18 component) mồ côi
 
 **Nơi sửa: frontend (mount hoặc xoá), quyết định trước khi làm** — xem
-[decisions-needed.md](./decisions-needed.md) mục "F38 release hay shelve".
+[decisions-needed.md](./decisions-needed.md) mục "F38 release hay shelve". Nếu quyết định mount
+lại: audit từng component trong cụm theo đúng nguyên tắc luồng 1 chiều ở đầu tài liệu này trước
+khi bật cho người dùng thật — cụm này viết ra trước khi nguyên tắc được xác lập, chưa chắc đã
+tuân thủ (ví dụ cần kiểm tra `GitPanel.tsx`/`DiffViewer.tsx` có tự tính diff/merge-state phía
+client hay gọi đúng `git.*` API cho việc đó).
 
 ### B5. `WorkspaceContextV6` cạnh tranh, chưa từng dùng
 
@@ -112,7 +148,10 @@ mục 4. Không đụng backend — backend đã đúng, đã có sẵn 18 metho
 
 **Nơi sửa: frontend.** Viết implementation thật (hiện chỉ có comment "full implementation in
 TASK-V5-07"), dùng đúng `frontend/src/shared/task-types.ts` (bản khớp backend), không dùng bản
-lệch `renderer/src/types/task-types.ts`.
+lệch `renderer/src/types/task-types.ts`. **Chỉ gọi `task.list`/`task.getChildren`/
+`task.getSubtree` và render đúng `progressPercent`/`status` API trả về** — không tự tính lại
+progress hay tự suy luận trạng thái cha từ trạng thái con phía client (backend đã có
+`task.recalculateProgress` làm việc này).
 
 ### C3. 2 bản `OrcaTask` type không tương thích dùng lẫn trong 1 cụm UI
 
@@ -145,8 +184,10 @@ tại sẵn ở `orca-runtime.ts:589`, chỉ chưa ai gọi). Đây là bug ĐƠ
 ### D2. `WorkflowMonitor.tsx` là stub mồ côi — không ai điều khiển được `WorkflowOrchestrator` thật
 
 **Nơi sửa: frontend.** Viết implementation thật cho `WorkflowMonitor.tsx`, gọi đúng RPC
-`workflow.*` (đã có thật, đang chạy trên backend). Cần quyết định trước: mount ở đâu (cùng cụm
-`WorkspaceLayout` orphaned, hay 1 chỗ độc lập)? Xem
+`workflow.*` (đã có thật, đang chạy trên backend). **Chỉ hiển thị trạng thái/kết quả step API
+trả về** — không tự suy luận step nào "sẵn sàng chạy tiếp" hay tự tính trạng thái tổng thể của
+workflow phía client (đó là việc của `WorkflowOrchestrator`'s `buildWaves`/DAG logic ở backend).
+Cần quyết định trước: mount ở đâu (cùng cụm `WorkspaceLayout` orphaned, hay 1 chỗ độc lập)? Xem
 [decisions-needed.md](./decisions-needed.md).
 
 ### D3. `OrchestrationPane.tsx`/`OrchestrationSkillPromptDialog.tsx` trùng tên gây nhầm lẫn
@@ -175,3 +216,9 @@ mục 9.2/9.4 — cần quyết định thiết kế trước (2 con đường "
 mọi access-control/business-logic đều nằm ở `backend/` trước khi dispatch xuống agent (xác nhận
 ở audit mục A6, B7). Đây là điểm kiến trúc **đang đúng**, không cần thay đổi khi tiếp tục xây
 các phần còn thiếu.
+
+**Xác nhận khớp yêu cầu**: `agent` thực thi (PTY/git/fs/spawn agent CLI) → `backend` xử lý
+nghiệp vụ (validate, tính toán, lưu DB) và trả kết quả qua RPC (`profile.*`/`project.*`/
+`task.*`/`workflow.*`/`orchestration.*`/`automation.*`) → `frontend` chỉ gọi các RPC này và
+render, không tính toán lại. Toàn bộ 17 case ở trên đã được rà lại theo đúng chiều này — không
+có case nào đề xuất đặt nghiệp vụ vào frontend hay đặt quản trị/lưu trữ vào agent.
