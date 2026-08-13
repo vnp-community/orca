@@ -80,9 +80,10 @@ quản trị", `backend/src/main/profile/OrcaProfile.ts` là **nguồn chuẩn d
    profile-types.ts`) — 0 importer, xoá an toàn.
 2. Sửa `frontend/src/renderer/src/types/profile-types.ts` (bản UI thật đang dùng) khớp đúng
    field/enum của backend — đổi `disallowedCmds`→`disallowedCommands`,
-   `sessionTimeoutHours`→`maxSessionHours`, bỏ `integrations`/`fleet`/`require2FA` (không có
-   backend support) hoặc thêm các field đó vào backend nếu tính năng thật sự cần (xem
-   [decisions-needed.md](./decisions-needed.md)).
+   `sessionTimeoutHours`→`maxSessionHours`. `require2FA`: ✅ đã quyết định thêm vào backend
+   `SecurityProfileSection` (xem [decisions-needed.md](./decisions-needed.md) mục 6) — giữ field
+   này ở frontend, chỉ chờ backend thêm xong. `integrations`/`fleet`: ⏳ còn mở, chưa quyết định
+   — tạm giữ nguyên ở frontend, chưa xoá cũng chưa thêm backend cho tới khi có câu trả lời.
 
 ### A6. `Team` chưa tồn tại như entity thật
 
@@ -124,9 +125,10 @@ client hay gọi đúng `git.*` API cho việc đó).
 
 ### B5. `WorkspaceContextV6` cạnh tranh, chưa từng dùng
 
-**Nơi sửa: frontend.** Nếu không có kế hoạch chuyển sang V6 (chưa thấy bằng chứng), xoá
-`WorkspaceContextV6.tsx` + `WorkspaceContextBridge.ts` + flag `__ORCA_WORKSPACE_V6__` — code
-chết, không ai bật flag để dùng.
+**✅ Quyết định (2026-08-13): giữ nguyên, không động tới trong đợt này.** Có kế hoạch hoàn
+thiện V6 làm bản nâng cấp sau, nhưng chưa phải bây giờ — không xoá, không migrate. Khi hoàn
+thiện F38 (B4), tiếp tục dùng V5 (`WorkspaceContext.tsx`, đang được `main.tsx` mount) làm nền,
+không chuyển sang V6 trong đợt này.
 
 ### B6. `UNAUTHENTICATED` cho `project.*` RPC ở phiên web
 

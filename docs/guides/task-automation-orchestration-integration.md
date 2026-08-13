@@ -175,10 +175,43 @@ Tầng 1 — SOURCE (đã có, đang chạy)          Tầng 2 — PLAN (đã c�
 thật** — nhưng nó gọi thẳng `agentSpawner.spawn()` (như F38's Agent tab), **không** đi qua
 `runtime/orchestration/coordinator.ts`. Nghĩa là hiện có **2 con đường "chạy 1 task" độc lập,
 không giao nhau**: (a) `task.execute` → 1 agent chạy đơn, không có lead/worker; (b)
-`orchestration.run` → nhiều agent phối hợp qua `coordinator.ts`. Việc "①②③" đề xuất trước cần
-làm rõ: `OrcaTask` sẽ luôn chạy qua (a), hay có thể chọn chạy qua (b) khi cần phân rã cho nhiều
-worker? Đây là 1 quyết định thiết kế thật, xem
-[decisions-needed.md](./decisions-needed.md).
+`orchestration.run` → nhiều agent phối hợp qua `coordinator.ts`.
+
+### ✅ Quyết định (2026-08-13): hybrid, tự động chọn theo cấu trúc task
+
+Chọn (a) cho task đơn giản, (b) cho task phức tạp — **quyết định nằm bên trong
+`TaskAgentExecutor.executeTask()`**, dựa vào dữ liệu đã có sẵn trên chính task đó (không cần
+field/flag mới do người dùng tự chọn):
+
+```typescript
+// backend/src/main/task/TaskAgentExecutor.ts — logic đề xuất cho executeTask()
+async executeTask(taskId: string) {
+  const children = await this.taskService.getChildren(taskId)
+  const deps = await this.taskService.getDependencies(taskId)
+  const isComplex = children.length > 0 || deps.length > 0
+
+  if (!isComplex) {
+    // (a) Task đơn giản — không có subtask/dependency — 1 agent chạy đơn, như hiện tại
+    return this.agentSpawner.spawn(...)
+  }
+  // (b) Task phức tạp — có subtask hoặc dependency cần điều phối
+  // → seed 1 orchestration.run từ subtree của task này (getSubtree() đã có sẵn)
+  return this.dispatchToOrchestration(taskId)
+}
+```
+
+**Quy tắc "đơn giản" vs "phức tạp"**: task **không có** subtask con (`getChildren().length ===
+0`) và **không có** dependency edge nào (`getDependencies().length === 0`) → đơn giản, chạy (a).
+Ngược lại (có ít nhất 1 subtask hoặc 1 dependency) → phức tạp, chạy (b) — cần điều phối nhiều
+bước/nhiều agent nên giao cho `coordinator.ts`.
+
+**Việc cần làm khi triển khai `dispatchToOrchestration()`** (chưa tồn tại, cần xây mới):
+1. Gọi `taskService.getSubtree(taskId)` lấy toàn bộ cây con.
+2. Tạo `TaskRow` gốc trong `OrchestrationDb` (bảng riêng của orchestration), map từ
+   `OrcaTask.title`/`promptTemplate`/`aiContext` sang `spec`/`task_title`; map `subTaskIds` →
+   `TaskRow.deps` tương ứng.
+3. Lưu lại liên kết ngược — xem field mới cần thêm ở mục ③ (`OrcaTask.activeExecutionTaskId`).
+4. Gọi `orchestration.run` để `coordinator.ts` bắt đầu dispatch.
 
 ### 9.3 `TaskGrantService` đã tồn tại — không cần đề xuất "đừng tự phát minh TaskGrant" nữa
 
@@ -188,10 +221,17 @@ theo cây. Hiện có **2 hệ RBAC thật, không chia sẻ code**: `ProjectMem
 `orca_task_grants` (task-level, scope `'user'|'team'|'role'|'everyone'`). Xem đề xuất hợp nhất ở
 [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md) mục 5.3.
 
-### 9.4 Thứ tự triển khai
+### 9.4 Thứ tự triển khai (đã chốt đủ quyết định, sẵn sàng thực thi)
 
 1. Sửa 3 bug ở mục 9.1 trước — không cần thiết kế mới, chỉ sửa lỗi.
-2. Quyết định (a) vs (b) ở mục 9.2 — quyết định thiết kế, không tự triển khai.
-3. Nối ①②③ theo hướng đã chốt.
-4. UI (Tree/Board/Graph view) **sau cùng** — data flow đã chạy qua RPC/script trước, tránh lặp
+2. Thêm field mới vào `OrcaTask` (schema + migration): `activeExecutionTaskId: string | null`
+   (trỏ tới `TaskRow.id` bên `OrchestrationDb` khi task đang chạy qua đường (b)),
+   `agentSessionId: string | null` (khi chạy qua đường (a) — id phiên `agent.spawn`).
+3. Viết `TaskAgentExecutor.executeTask()`'s logic rẽ nhánh (a)/(b) theo quy tắc mục 9.2.
+4. Viết `dispatchToOrchestration()` — seed `TaskRow` từ `OrcaTask` subtree, gọi
+   `orchestration.run`.
+5. Viết listener ghi ngược: khi phiên (a) kết thúc → update `OrcaTask.status`/`actualHours`
+   trực tiếp; khi phiên (b) kết thúc (`merge_ready` cuối cùng từ `coordinator.ts`) → update
+   `OrcaTask.status` + xoá `activeExecutionTaskId`.
+6. UI (Tree/Board/Graph view) **sau cùng** — data flow đã chạy qua RPC/script trước, tránh lặp
    lỗi "tab bấm vào trống" như F38.

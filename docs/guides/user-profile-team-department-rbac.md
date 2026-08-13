@@ -119,10 +119,10 @@ Ngoài ra `DeptProfileAdmin.tsx` không được `AdminApp.tsx` import vào rout
 | `agent.trustPreset` | `'strict'\|'standard'\|'relaxed'\|'custom'` | `'minimal'\|'standard'\|'full'` | lệch enum |
 | `agent.approvedModels` | có | không có ở `agent` (nằm dưới `security`) | field đặt sai chỗ |
 | `editor.fontSize/fontFamily/keybindings` | có | **hoàn toàn không tồn tại** trên backend | ghi vào, không bao giờ đọc lại được |
-| `integrations.*` (githubOrg/linearWorkspace/prTemplate) | có | **section không tồn tại** | `ProfileResolver.merge()` không duyệt qua section này — **lưu được nhưng chết vĩnh viễn**, không bao giờ trả về trong `profile.getResolved` |
-| `fleet.*` | có | **section không tồn tại** | tương tự — chết vĩnh viễn nếu ghi |
+| `integrations.*` (githubOrg/linearWorkspace/prTemplate) | có | **section không tồn tại** | `ProfileResolver.merge()` không duyệt qua section này — **lưu được nhưng chết vĩnh viễn**, không bao giờ trả về trong `profile.getResolved` — ⏳ **còn mở**, chưa quyết định (xem [decisions-needed.md](./decisions-needed.md) mục 6) |
+| `fleet.*` | có | **section không tồn tại** | tương tự — chết vĩnh viễn nếu ghi — ⏳ **còn mở**, chưa quyết định |
 | `security.disallowedCmds` | tên này | `disallowedCommands` | lệch tên field |
-| `security.require2FA` | có | **không có field này** | vô nghĩa |
+| `security.require2FA` | có | **không có field này** | ✅ Quyết định: thêm vào backend `SecurityProfileSection` — xem [decisions-needed.md](./decisions-needed.md) mục 6 |
 | `security.sessionTimeoutHours` | tên này | `maxSessionHours` | lệch tên field |
 
 May mắn: `ProfileEditor.tsx` (component thật, được render) chỉ động tới `agent.preferredModel`
@@ -134,8 +134,8 @@ lệch chưa gây lỗi hiển thị cho user, nhưng đã "bake" sẵn vào typ
 ### 5.1 Việc CẦN SỬA NGAY (bug thật, không phải thiết kế mới)
 
 1. Sửa `useProfile.ts`: `profile.getUser` → `profile.getUserProfile`.
-2. Sửa/xoá `profile.listDepts` trong `CompanyProfileAdmin.tsx`/`DeptProfileAdmin.tsx` — hoặc
-   thêm method này vào backend nếu tính năng list-department thật sự cần (hiện chưa có).
+2. Thêm method `profile.listDepts` vào backend (`CompanyProfileAdmin.tsx`/`DeptProfileAdmin.tsx`
+   giữ nguyên cách gọi) — xem [fix-proposals-per-issue.md](./fix-proposals-per-issue.md) mục A2.
 3. Sửa route `/admin` trong `http-server.ts` — tách rõ `/admin/api/*` (Express, giữ nguyên) khỏi
    `/admin`/`/admin-index.html` (cần fallback về static file serve).
 4. Hợp nhất 5 bản `OrcaProfile`/profile-types — chọn `backend/src/main/profile/OrcaProfile.ts`
@@ -169,24 +169,21 @@ OrcaUser {
 }
 ```
 
-**Vấn đề cần quyết định rõ trước khi code**: 1 user có thể thuộc nhiều Team cùng lúc — khi merge
-profile cascade, Team nào thắng nếu cấu hình khác nhau? Đề xuất thêm `priority: number` vào
-`TeamMember`, ghi rõ trong `_sources` là `'team:<teamId>'` thay vì chỉ `'team'`.
+**✅ Quyết định (2026-08-13)**: 1 user có thể thuộc nhiều Team cùng lúc — khi merge profile
+cascade, Team nào thắng nếu cấu hình khác nhau? Đã chốt: thêm `priority: number` vào
+`TeamMember`, số cao thắng; `_sources` ghi rõ `'team:<teamId>'` thay vì chỉ `'team'` để audit
+được chính xác Team nào đã ghi đè field đó.
 
-### 5.3 RBAC cho Project/OrcaProject — cân nhắc lại so với đề xuất trước
+### 5.3 RBAC cho Project/OrcaProject
 
-Đề xuất trước (4-tầng visibility `private`/`team`/`department`/`company` + `ProjectMember`) vẫn
-hợp lý cho **Project/OrcaProject** — nhưng lưu ý: hệ **Task đã tự xây `TaskGrantService` độc
-lập**, KHÔNG dùng `ProjectMember` (xem
-[task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md)
-mục về `TaskGrantService`) — nghĩa là đề xuất "đừng tự phát minh RBAC riêng, dùng lại
-`ProjectMember`" đã **không được áp dụng** khi Task được xây. Hiện tại có **2 hệ RBAC thật, độc
-lập, không chia sẻ code**: `ProjectMember` (project-level) và `TaskGrantService`'s
-`orca_task_grants` (task-level, scope `'user'|'team'|'role'|'everyone'`, kế thừa theo cây cha).
+**✅ Quyết định (2026-08-13)**: `TaskGrantService` (task-level) và `ProjectMember`
+(project-level) **giữ nguyên 2 hệ tách biệt, không hợp nhất** — coi đây là chủ ý kiến trúc.
 
-→ Khi xây RBAC cho `OrcaProject` sharing layer, **cân nhắc dùng lại chính `TaskGrantService`'s
-model** (đã có sẵn, đã chạy, đã có cơ chế kế thừa theo cây) thay vì tạo `ProjectMember`-dựa-trên
-4-tầng mới — tránh tạo ra **hệ RBAC thứ 3** cho cùng 1 bài toán.
+Hệ quả cho `OrcaProject` sharing layer: **dùng `ProjectMember`** (đề xuất 4-tầng visibility
+`private`/`team`/`department`/`company` giữ nguyên như bản gốc), **không** tái dùng
+`TaskGrantService`'s model — vì quyết định #4 đã chốt giữ 2 hệ Task/Project tách biệt, việc kéo
+`TaskGrantService` sang dùng cho Project sẽ phá vỡ chính sự tách biệt đó. `OrcaProject` là mở
+rộng của khái niệm Project, nên đi theo `ProjectMember` là nhất quán.
 
 **Bảng năng lực theo role** (giữ nguyên đề xuất trước, áp dụng cho bất kỳ hệ grant nào được chọn):
 
