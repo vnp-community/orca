@@ -26,8 +26,6 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-ORCA_VERSION="$1"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="${SCRIPT_DIR}/.."
 REPO_ROOT="${DEPLOY_DIR}/../.."
@@ -36,6 +34,11 @@ REPO_ROOT="${DEPLOY_DIR}/../.."
 if [ -f "${DEPLOY_DIR}/.env" ]; then
     export $(grep -v '^#' "${DEPLOY_DIR}/.env" | xargs)
 fi
+
+# Why: must come after the .env load, not before — .env also sets
+# ORCA_VERSION (the currently-deployed version), and loading it after would
+# silently override the version this invocation was asked to deploy.
+ORCA_VERSION="$1"
 
 SERVER_HOST="${SERVER_HOST:?ERROR: SERVER_HOST not set}"
 SERVER_USER="${SERVER_USER:-ubuntu}"
