@@ -8,6 +8,7 @@ import {
 } from '../core'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
 import { Tracers } from '../../../../shared/trace/tracers'
+import { stripAnsiControlSequences } from '../../../../shared/commit-message-agent-output'
 import type { DriverState, OrcaRuntimeService } from '../../orca-runtime'
 import {
   TerminalStreamOpcode,
@@ -2527,13 +2528,37 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           // (serialized === null), so this can only remove duplicates,
           // never drop genuinely-new output.
           const snapshotOutputSeq = serialized?.seq
+          // Why (double-prompt follow-up): seq is not populated for
+          // devServer/SSH-relayed PTYs (serializeTerminalBufferFromAvailableState
+          // leaves it undefined for headless/agent-backed hosts), so the
+          // seq-based filter above is a no-op there -- confirmed live via the
+          // client always seeing meta.seq=undefined on this exact path. Fall
+          // back to a content-based check for ONLY the very first live chunk:
+          // it can be an exact re-print of the prompt line the scrollback
+          // snapshot already sent (fix #13's own scenario -- attaching to a
+          // PTY a sibling client just spawned moments earlier). Exact-match
+          // (not prefix/fuzzy) against the snapshot's own last line, checked
+          // once, so this can only ever drop a full duplicate -- never trim
+          // or mangle genuinely new output mixed in with it.
+          const scrollbackTailLine = read.tail.at(-1)?.trim()
+          let firstLiveChunkChecked = false
           const unsubscribeStreamData = runtime.subscribeToTerminalData(ptyId, (data, meta) => {
-            const uncoveredData = getOutputAfterSnapshotSeq(
+            let forwardData = getOutputAfterSnapshotSeq(
               { data, bytes: data.length, meta },
               snapshotOutputSeq
             )
-            if (uncoveredData) {
-              outputBatcher?.push(uncoveredData, meta)
+            if (
+              forwardData &&
+              !firstLiveChunkChecked &&
+              typeof snapshotOutputSeq !== 'number' &&
+              scrollbackTailLine &&
+              stripAnsiControlSequences(forwardData).trim() === scrollbackTailLine
+            ) {
+              forwardData = null
+            }
+            firstLiveChunkChecked = true
+            if (forwardData) {
+              outputBatcher?.push(forwardData, meta)
             }
           })
           // Why: this legacy JSON stream can feed a live xterm view too
