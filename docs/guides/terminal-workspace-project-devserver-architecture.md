@@ -8,6 +8,9 @@
 > [F34 — Project-Dev Server Binding](../features/F34-project-dev-server-binding.md) và
 > [F38 — Project Workspace](../features/F38-project-workspace.md), vốn vẫn đang ở trạng thái
 > "🚧 Phát triển" (v5.0+, chưa release). Xem mục [Lưu ý: 2 mô hình song song](#lưu-ý-2-mô-hình-song-song-hiện-tại-vs-f34f38) ở cuối.
+>
+> Phần RBAC/phân quyền (user, profile, team, department) cho 2 mô hình project này được tách
+> riêng sang [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md).
 
 ## 1. Dev Server (host chạy)
 
