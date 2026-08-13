@@ -9,6 +9,8 @@
 >
 > Phần Task/Automation/AI orchestration (F37, F14, và hệ điều phối multi-agent) được tách riêng
 > sang [task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md).
+> Kế hoạch thực thi (thứ tự, phụ thuộc) xem
+> [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
 
 ## 1. F38 mô tả gì
 

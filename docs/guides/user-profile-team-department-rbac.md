@@ -5,6 +5,8 @@
 > Tài liệu này mô tả identity/tổ chức hiện có trong code, chỉ ra khoảng trống, và đề xuất mô
 > hình RBAC cho `Project`/`OrcaProject` — nối tiếp
 > [terminal-workspace-project-devserver-architecture.md](./terminal-workspace-project-devserver-architecture.md).
+> Kế hoạch thực thi (thứ tự, phụ thuộc) xem
+> [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
 
 ## 1. Những gì đã có trong code hôm nay
 

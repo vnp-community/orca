@@ -13,6 +13,9 @@
 > riêng sang [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md).
 > Đối chiếu chi tiết F38 (đặc tả) với code Project Workspace thật, kèm phương án merge, xem
 > [project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md).
+>
+> Kế hoạch thực thi tổng hợp cho toàn bộ đề xuất trong `docs/guides/` — thứ tự, phụ thuộc, điểm
+> cần quyết định — xem [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
 
 ## 1. Dev Server (host chạy)
 

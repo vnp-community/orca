@@ -6,6 +6,8 @@
 > đối chiếu [F37 — Task Graph Management](../features/F37-task-graph-management.md) và
 > [F14 — Automations](../features/F14-automations.md) với code thật, xác định vị trí AI
 > orchestration, và đề xuất phương án liên kết.
+> Kế hoạch thực thi (thứ tự, phụ thuộc) xem
+> [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
 
 ## 1. "Task" là 3 khái niệm khác nhau trong codebase — không phải 1
 
