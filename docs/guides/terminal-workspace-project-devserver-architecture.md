@@ -153,3 +153,111 @@ xong phần lớn (không chỉ là ý tưởng trên giấy):
 - Đừng tái sử dụng tên key trùng (`projects`, `removeProject`, `updateProject`...) khi wire
   `workspace-slice.ts` (hoặc phiên bản thay thế) vào store — đó chính xác là bug vừa fix trong
   phiên làm việc 2026-08-13.
+
+### Quan hệ `OrcaProject` ↔ `Repo`/`Worktree` hiện tại: KHÔNG có
+
+Kiểm tra trực tiếp trong code: `OrcaProject.repoPath` chỉ là 1 chuỗi path thô, không tham chiếu
+`Repo.id` nào — `ProjectService.ts`/`project-types.ts` không import `Repo` ở đâu cả.
+`WorkspaceContext.tsx` có field `currentWorktree`, nhưng dùng 1 type `Worktree` **khác hẳn**
+(từ `workspace-types.ts`: chỉ `{id, path, branch, isMain, createdAt}`, không có `repoId`/
+`hostId`) so với `Worktree` thật trong `shared/types.ts`. Và `setCurrentWorktree()` **không
+được gọi ở bất kỳ đâu trong code thật** — state chết hoàn toàn.
+
+→ `OrcaProject` hiện tại là 1 ốc đảo cô lập, không có cầu nối thật nào tới `Repo`/`Worktree`
+đang chạy. Gộp phẳng 2 model (di chuyển toàn bộ dữ liệu JSON per-user sang SQL dùng chung) tốn
+kém và rủi ro không tương xứng lợi ích — xem đề xuất tích hợp thay vì gộp phẳng bên dưới.
+
+## Đề xuất: `OrcaProject` là lớp SỞ HỮU + CHIA SẺ, không gộp phẳng vào Repo/Worktree
+
+Thay vì gộp 2 model thành 1 (phải di chuyển toàn bộ dữ liệu JSON per-user sang SQL dùng chung —
+rủi ro cao, effort lớn), biến `OrcaProject` thành **tầng chứa trên cùng**, nhóm nhiều `Project`
+hiện có lại — không tự lưu `repoPath`/`devServerId` nữa, không đụng vào `Repo`/`Worktree` đang
+chạy ổn:
+
+```
+OrcaProject  (SQL, dùng chung — lớp SỞ HỮU + CHIA SẺ, không tự lưu repo/host)
+  id, name, visibility ('private'|'team'|'company'), members[] (owner/member/viewer)
+   │
+   │  1..N — 1 OrcaProject có thể gộp nhiều Project (vd: nhiều repo của cùng 1 team)
+   ▼
+Project  (model hiện tại, per-user JSON — GIỮ NGUYÊN không đổi)
+  id, displayName, sourceRepoIds[]
+   │
+   │  1..N — 1 Project có thể có repo trên nhiều host (đa-host, GIỮ NGUYÊN)
+   ▼
+Repo  (model hiện tại, gắn đúng 1 host qua executionHostId)
+  id, path, executionHostId
+   │
+   │  1..N — 1 Repo có nhiều worktree/branch
+   ▼
+Worktree  (model hiện tại)
+  id, repoId ──────► trỏ NGƯỢC lại đúng Repo cha (bidirectional, đã có sẵn)
+   │
+   │  1..N — mỗi worktree có thể mở nhiều tab terminal
+   ▼
+Terminal/PTY  (chạy trên host của worktree đó)
+```
+
+### Bảng nối mới (chỉ 1 bảng duy nhất cần thêm)
+
+```typescript
+// SQL, bảng MỚI DUY NHẤT cần tạo — mọi thứ khác giữ nguyên
+OrcaProjectSourceProject {
+  orcaProjectId: string     // FK -> OrcaProject.id
+  ownerUserId: string       // user sở hữu Project gốc (nơi có file JSON thật)
+  projectId: string         // FK logic -> Project.id trong file JSON của ownerUserId
+}
+
+// Type OrcaProject rút gọn — bỏ repoPath/devServerId khỏi type gốc hiện có
+OrcaProject {
+  id: string
+  name: string
+  description?: string
+  visibility: 'private' | 'team' | 'company'
+  createdBy: string
+  createdAt/updatedAt: Date
+}
+```
+
+### Luồng đọc-chéo-user
+
+```
+1. User A tạo Project P (repo/worktree như bình thường, vẫn trong file JSON của A)
+
+2. A gộp P vào 1 OrcaProject "Team Backend" (tạo mới hoặc đã có sẵn)
+   → ghi OrcaProjectSourceProject { orcaProjectId, ownerUserId: A, projectId: P.id }
+   → A tự động là 'owner' của OrcaProject đó (bảng ProjectMember có sẵn)
+
+3. A thêm B làm 'member' của OrcaProject "Team Backend"
+   → ghi ProjectMember { orcaProjectId, userId: B, role: 'member' }
+
+4. B mở app → gọi thêm orcaProjects.list() (bên cạnh repos.list() của chính B)
+   → trả về các OrcaProject mà B là member, kèm danh sách projectId nó chứa
+     (join OrcaProjectSourceProject)
+
+5. B muốn xem chi tiết Project P (thuộc OrcaProject "Team Backend")
+   → gọi orcaProjects.getProjectData({ orcaProjectId, projectId: P.id })
+   → backend: kiểm tra B có trong ProjectMember của orcaProjectId không
+             → nếu có, tra OrcaProjectSourceProject ra ownerUserId = A
+             → đọc /data/orca/users/A/orca-data.json, LỌC đúng Project P
+               (repo/worktree thuộc P), không trả nguyên file A
+             → trả về cho B
+
+6. B mở terminal trên 1 worktree thuộc P
+   → PTY chạy trên đúng host của worktree đó (không đổi tầng thực thi)
+   → session gắn nhãn (orcaProjectId, actingUserId: B, ownerUserId: A) để audit
+
+7. Phân quyền: viewer chỉ đọc; member tạo worktree/mở terminal/chạy agent;
+   owner (A) mới sửa/xoá OrcaProject, thêm/bớt member, đổi visibility
+```
+
+**Vì sao cách này an toàn hơn gộp phẳng**: `Repo`/`Project`/`Worktree`/`Terminal` giữ nguyên
+100% như đang chạy (đã kiểm chứng, vừa fix xong lớp bug hôm nay) — không cần viết migration di
+chuyển dữ liệu JSON per-user sang SQL dùng chung, không cần đổi code đường ống fetch trong
+`repos.ts`/`worktrees.ts`. Chỉ thêm 1 bảng nối (`OrcaProjectSourceProject`) và 1 tầng API mới
+cho việc đọc-chéo-user — phạm vi nhỏ, cô lập, dễ kiểm chứng.
+
+**Điểm cần thiết kế cẩn thận nhất**: bước 5 — tiến trình xử lý request của B phải đọc file của
+A. Cần 1 tầng gateway kiểm tra `ProjectSharing`/`OrcaProjectSourceProject` **trước** mỗi lần
+truy cập chéo, và **chỉ lọc đúng phần đã share** — không bao giờ trả nguyên file JSON của A ra
+ngoài, nếu không sẽ lộ toàn bộ project khác của A cho B.
