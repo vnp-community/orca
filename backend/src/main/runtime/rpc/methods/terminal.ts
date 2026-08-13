@@ -2547,14 +2547,22 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
               { data, bytes: data.length, meta },
               snapshotOutputSeq
             )
-            if (
-              forwardData &&
-              !firstLiveChunkChecked &&
-              typeof snapshotOutputSeq !== 'number' &&
-              scrollbackTailLine &&
-              stripAnsiControlSequences(forwardData).trim() === scrollbackTailLine
-            ) {
-              forwardData = null
+            if (forwardData && !firstLiveChunkChecked) {
+              const stripped = stripAnsiControlSequences(forwardData).trim()
+              const matched = Boolean(scrollbackTailLine) && stripped === scrollbackTailLine
+              // TEMP DIAG (double-prompt follow-up): the exact-match compare
+              // deployed in 5ad32a049 didn't trigger on the next live repro.
+              // Log the untruncated raw data, the stripped result, and the
+              // scrollback tail line so a byte-level diff finds whatever the
+              // strip regex is missing (a different OSC terminator, a bare
+              // 2-byte escape like charset-select, stray whitespace, etc.)
+              // before trying another guess.
+              console.error(
+                `[DIAG double-prompt] ptyId=${ptyId} matched=${matched} scrollbackTailLine=${JSON.stringify(scrollbackTailLine)} rawData=${JSON.stringify(forwardData)} strippedData=${JSON.stringify(stripped)}`
+              )
+              if (matched) {
+                forwardData = null
+              }
             }
             firstLiveChunkChecked = true
             if (forwardData) {
