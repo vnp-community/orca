@@ -11,6 +11,8 @@
 >
 > Phần RBAC/phân quyền (user, profile, team, department) cho 2 mô hình project này được tách
 > riêng sang [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md).
+> Đối chiếu chi tiết F38 (đặc tả) với code Project Workspace thật, kèm phương án merge, xem
+> [project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md).
 
 ## 1. Dev Server (host chạy)
 
