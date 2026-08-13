@@ -14,8 +14,12 @@
 > Đối chiếu chi tiết F38 (đặc tả) với code Project Workspace thật, kèm phương án merge, xem
 > [project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md).
 >
-> Kế hoạch thực thi tổng hợp cho toàn bộ đề xuất trong `docs/guides/` — thứ tự, phụ thuộc, điểm
-> cần quyết định — xem [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
+> Chi tiết audit đầy đủ (file:line, dùng `backend/`+`agent/` làm nguồn sự thật) xem
+> [audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md). Giải pháp từng bug
+> xem [fix-proposals-per-issue.md](./fix-proposals-per-issue.md). Điểm cần quyết định xem
+> [decisions-needed.md](./decisions-needed.md). Kế hoạch thực thi tổng hợp cho toàn bộ đề xuất
+> trong `docs/guides/` — thứ tự, phụ thuộc — xem
+> [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
 
 ## 1. Dev Server (host chạy)
 
@@ -126,54 +130,88 @@ gốc của toàn bộ lớp bug "ambiguous host" gặp phải khi xoá project/
 client — xem commit `fix(frontend): stop paired web clients from double-fetching
 repos/groups/folder-workspaces`.
 
-## Lưu ý: 2 mô hình song song (hiện tại vs. `OrcaProject`/F34/F38)
+## ⚠️ Đính chính 2026-08-13: `frontend/src/main/` KHÔNG PHẢI backend thật
 
-Codebase đang mang **2 mô hình project khác nhau cùng lúc**, và mô hình thứ hai đã được xây
-xong phần lớn (không chỉ là ý tưởng trên giấy):
+Bản gốc của mục dưới đây (viết trước 2026-08-13, cùng ngày) kết luận sai vì chỉ tra
+`frontend/src/main/project/ProjectService.ts` — đây là code Electron-desktop-main-process nằm
+trong package `frontend`, **không phải** server thật đang chạy production. Monorepo này có
+**4 package tách biệt** (`pnpm-workspace.yaml`): `frontend` (SPA renderer, build ra
+`frontend/out/web`), `backend` (server thật, build ra `backend/out/server`, đây là thứ chạy
+trong container `orca-server`), `agent` (chạy trên chính dev-server), `desktop` (Electron app
+thật, tách biệt khỏi `frontend`).
 
-1. **Mô hình hiện tại (mô tả ở trên)** — `Repo` + `Project` + `ProjectHostSetup`, sống trong
-   `frontend/src/renderer/src/store/slices/repos.ts`. Đa-host (1 project → N repo trên N host).
-   Đây là mô hình **duy nhất có UI thật** — sidebar, Settings, mọi thứ người dùng thấy.
+**Kết luận đúng, đã kiểm chứng lại bằng 4 subagent đọc trực tiếp `backend/src/main/` +
+`agent/src/`:** `backend/src/main/project/ProjectService.ts` (khác file, khác nội dung so với
+bản `frontend/src/main/`) **là service thật, được `backend/src/main/server-bootstrap.ts` khởi
+tạo và đăng ký RPC thật** (`project.list`, `project.get`, `project.create`, `project.update`,
+`project.delete`, `project.addMember`, `project.removeMember`, `project.updateMemberRole`,
+`project.getMembers`, `project.agentSpawn`). Có FK thật từ bảng `orca_tasks` sang
+`orca_v5_projects` — hệ Task (xem
+[task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md))
+được xây THẬT trên nền `OrcaProject`, không phải trên `Project`/`Repo` hiện tại.
 
-2. **Mô hình `OrcaProject`** (F34/F38, v5.0, TDD-15) — 1 project gắn **cứng đúng 1 Dev Server**
-   (`OrcaProject.devServerId` + `repoPath`), có thêm `ProjectMember`/role (`owner`/`member`/
-   `viewer`) và `visibility` (`private`/`team`/`company`) mà mô hình hiện tại chưa có.
-   - **Backend đã xong và đang chạy thật**: `frontend/src/main/project/ProjectService.ts`
-     (SQLite-backed, đủ CRUD + membership) expose qua RPC `project.*` trong
-     `ProjectServerRouter.ts`. Đây chính là nơi phát sinh log `UNAUTHENTICATED` gặp trong lúc
-     điều tra bug Remove Project — service có thật, có nhận traffic.
-   - **Frontend đã xây gần đủ nhưng không có lối vào UI**: `WorkspaceContext.tsx`
-     (`WorkspaceProvider`) được mount app-wide thật (`main.tsx` + `web/main-web-bootstrap.tsx`),
-     nhưng `project` state khởi tạo `null` và chỉ đổi khi có nơi gọi `switchProject()`. Nơi duy
-     nhất gọi `switchProject()` là `ProjectSwitcher.tsx`, và nơi tiêu thụ `useWorkspace()` là
-     `WorkspaceLayout.tsx`/`ProjectSettings.tsx` — nhưng **cả 3 component này không được
-     import/render ở bất kỳ đâu trong cây UI thật**, chỉ tồn tại trong file test của chính
-     chúng. Kết quả: provider sống nhưng luôn ở trạng thái "chờ", không ai từng kích hoạt.
+## Mô hình `OrcaProject` — trạng thái thật (đã kiểm chứng qua `backend/`)
+
+Codebase mang **2 mô hình project khác nhau cùng lúc**, cả hai đều **thật và đang chạy** —
+không phải 1 cái thật 1 cái ý tưởng như đính chính ở trên từng nói:
+
+1. **Mô hình `Repo`/`Project`/`ProjectHostSetup`** (mô tả ở mục 1–5 phía trên) — sống trong
+   `frontend/src/renderer/src/store/slices/repos.ts`, lưu per-user trong `orca-data.json`. Đa-host
+   (1 project → N repo trên N host). Đây là mô hình **duy nhất có UI thật** — sidebar, Settings.
+
+2. **Mô hình `OrcaProject`** (v5.0, TDD-15) — 1 project gắn **cứng đúng 1 Dev Server**
+   (`OrcaProject.devServerId` + `repoPath`), có `ProjectMember`/role (`owner`/`member`/`viewer`)
+   và `visibility` (`private`/`team`/`company`).
+   - **Backend hoàn chỉnh, đang chạy thật**: `backend/src/main/project/ProjectService.ts` +
+     `ProjectServerRouter.ts` — SQL thật (bảng `orca_v5_projects`/`orca_v5_project_members`,
+     migration `0007_projects.ts`), có `assertAccess()` kiểm tra quyền thật. Log
+     `UNAUTHENTICATED` gặp lúc điều tra bug Remove Project khớp chính xác với guard
+     `if (!ctx.userId) throw new Error('UNAUTHENTICATED')` trong `project-rpc-handler.ts` — đây
+     là **lỗi transport không forward `userId` cho phiên web**, không phải "chưa xây".
+   - **🐛 Bug thật: `project.agentSpawn` luôn lỗi.** `server-bootstrap.ts` đăng ký
+     `createProjectMethods(projectService, getUserRole)` chỉ với 2 tham số — thiếu tham số thứ 3
+     `agentSpawner` (optional nhưng cần cho method này hoạt động). `ProfileAwareAgentSpawner`
+     mãi sau mới được khởi tạo (dùng cho Task, không re-register vào Project methods) → mọi lời
+     gọi `project.agentSpawn` throw `AGENT_SPAWNER_NOT_AVAILABLE`.
+   - **Frontend đã xây gần đủ nhưng không có lối vào UI, và có RPC-contract sai**:
+     `WorkspaceContext.tsx` (`WorkspaceProvider`) mount app-wide thật, nhưng `switchProject()`
+     gọi 4 RPC — chỉ 2/4 đúng (`project.get` khớp method nhưng field trả về lệch kiểu:
+     `visibility` backend trả `'company'`, type renderer khai `'public'`; `createdAt` backend
+     trả `Date`/ISO string, type renderer khai `number`); 2 còn lại **luôn lỗi**: `git.status`
+     gọi sai tham số (`{projectId}` thay vì `{worktree}` schema thật yêu cầu) nên luôn fail
+     validation, và `workspace.listFiles` **không tồn tại** trên backend (RPC thật chỉ có
+     `workspace.init/teardown/refreshFileTree/refreshGitStatus`). Cả 2 lỗi bị `.catch(() =>
+     null)` nuốt âm thầm.
+   - Nơi duy nhất gọi `switchProject()` là `ProjectSwitcher.tsx`, nơi tiêu thụ `useWorkspace()`
+     là 1 cụm **~14 component thật** (`WorkspaceLayout.tsx`, `ProjectSettings.tsx`, `GitPanel.tsx`,
+     `FileViewer.tsx`, `FileContextMenu.tsx`, `BranchManager.tsx`, `GitHistory.tsx`,
+     `DiffViewer.tsx`, `FileSearchPanel.tsx`, `PullRequestList.tsx`, `PullRequestForm.tsx`,
+     `TaskPromptEditor.tsx`, `TaskDetail.tsx`, `CodeReviewPanel`, `commit-message-generator.tsx`)
+     — **không component nào trong cụm này được import/render ở bất kỳ đâu trong cây UI thật**
+     (`App.tsx` không tham chiếu tới bất kỳ cái nào). Provider sống, cụm consumer chết toàn bộ.
+   - Có 1 hệ **thứ 2 cạnh tranh**, `WorkspaceContextV6.tsx` + `WorkspaceContextBridge.ts`, gate
+     bằng flag `__ORCA_WORKSPACE_V6__` — nhưng `main.tsx` import thẳng `WorkspaceProvider` từ
+     `WorkspaceContext` (bản V5), bỏ qua bridge hoàn toàn → V6 tự nó cũng là code chết.
    - `workspace-slice.ts` (đã gỡ khỏi `store/index.ts` — xem commit `fix(frontend): stop
      legacy workspace-slice from shadowing removeProject/updateProject`) là phần store-side
-     scaffolding của tính năng này; nó khai báo trùng tên `removeProject`/`updateProject`/
-     `projects` với mô hình hiện tại nên âm thầm đè lên bản thật.
+     scaffolding **khác**, dùng type `OrcaProject` cục bộ riêng (`renderer/src/types/
+     workspace-types.ts`) — khác cả `frontend/src/shared/project-types.ts` VÀ
+     `backend/src/shared/project-types.ts`. Xem chi tiết phân biệt các bản type ở
+     [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md).
 
-**2 rủi ro cần biết trước khi nối lại `ProjectSwitcher`/`WorkspaceLayout` vào layout thật:**
-- `frontend/src/renderer/src/types/workspace-types.ts` có 1 bản `OrcaProject` **lệch field**
-  so với bản thật trong `frontend/src/shared/project-types.ts` (ví dụ `visibility` khác giá
-  trị enum, timestamp `number` vs `Date`) — cần hợp nhất về 1 nguồn trước khi dùng lại.
-- Đừng tái sử dụng tên key trùng (`projects`, `removeProject`, `updateProject`...) khi wire
-  `workspace-slice.ts` (hoặc phiên bản thay thế) vào store — đó chính xác là bug vừa fix trong
-  phiên làm việc 2026-08-13.
+### Quan hệ `OrcaProject` ↔ `Repo`/`Worktree` hiện tại: KHÔNG có — xác nhận lại kể cả trong backend thật
 
-### Quan hệ `OrcaProject` ↔ `Repo`/`Worktree` hiện tại: KHÔNG có
+`orca_v5_projects` (schema thật) chỉ có `dev_server_id` + `repo_path` (chuỗi path thô) — không
+FK tới `Repo.id`/`Worktree.id` nào. `ProjectService.ts`/`ProjectServerRouter.ts` (backend thật)
+không tham chiếu `repos.ts`/`worktrees.ts` slice ở đâu cả. FK thật duy nhất vào
+`orca_v5_projects` đến từ hệ Task (`orca_tasks.project_id`), không phải từ Repo/Worktree.
 
-Kiểm tra trực tiếp trong code: `OrcaProject.repoPath` chỉ là 1 chuỗi path thô, không tham chiếu
-`Repo.id` nào — `ProjectService.ts`/`project-types.ts` không import `Repo` ở đâu cả.
-`WorkspaceContext.tsx` có field `currentWorktree`, nhưng dùng 1 type `Worktree` **khác hẳn**
-(từ `workspace-types.ts`: chỉ `{id, path, branch, isMain, createdAt}`, không có `repoId`/
-`hostId`) so với `Worktree` thật trong `shared/types.ts`. Và `setCurrentWorktree()` **không
-được gọi ở bất kỳ đâu trong code thật** — state chết hoàn toàn.
-
-→ `OrcaProject` hiện tại là 1 ốc đảo cô lập, không có cầu nối thật nào tới `Repo`/`Worktree`
-đang chạy. Gộp phẳng 2 model (di chuyển toàn bộ dữ liệu JSON per-user sang SQL dùng chung) tốn
-kém và rủi ro không tương xứng lợi ích — xem đề xuất tích hợp thay vì gộp phẳng bên dưới.
+→ `OrcaProject` là 1 ốc đảo cô lập với `Repo`/`Worktree` — xác nhận đúng, kể cả sau khi tra lại
+đúng backend thật. Gộp phẳng 2 model (di chuyển toàn bộ dữ liệu JSON per-user sang SQL dùng
+chung) tốn kém và rủi ro không tương xứng lợi ích — xem đề xuất tích hợp thay vì gộp phẳng bên
+dưới. Đề xuất bên dưới **vẫn giữ nguyên giá trị** (chưa có gì xây theo hướng "sharing layer"
+này) — chỉ có phần "OrcaProject chưa xây" là sai, phần "chưa có cầu nối tới Repo/Worktree" và
+"nên tích hợp thay vì gộp phẳng" vẫn đúng.
 
 ## Đề xuất: `OrcaProject` là lớp SỞ HỮU + CHIA SẺ, không gộp phẳng vào Repo/Worktree
 

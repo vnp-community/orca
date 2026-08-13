@@ -11,6 +11,16 @@
 > sang [task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md).
 > Kế hoạch thực thi (thứ tự, phụ thuộc) xem
 > [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
+>
+> **⚠️ Đính chính 2026-08-13**: nội dung dưới đây về cấu trúc UI (`WorkspaceLayout.tsx` và cụm
+> `components/workspace/`) vẫn đúng — được đọc trực tiếp từ `frontend/src/renderer/`, không phải
+> từ tiền đề sai `frontend/src/main/`. Nhưng khẳng định ngầm định "chưa có backend đứng sau" là
+> **sai** — `backend/src/main/project/ProjectService.ts` là backend thật, đang chạy, có FK thật
+> từ hệ Task. Vấn đề thật sự không phải "chưa xây backend", mà là **`WorkspaceContext` gọi 2/4
+> RPC method sai** (`git.status` sai tham số luôn fail, `workspace.listFiles` không tồn tại) —
+> xem chi tiết mục A/B trong
+> [audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md) mục B5, và giải pháp
+> cụ thể trong [fix-proposals-per-issue.md](./fix-proposals-per-issue.md).
 
 ## 1. F38 mô tả gì
 
@@ -59,13 +69,26 @@ vào.
 | `RemoteFileViewer.tsx` | Không tồn tại — có `FileViewer.tsx` (chưa rõ tương đương chức năng) |
 | `ServerStatusBar.tsx` | Không tồn tại — **nhưng app đã có sẵn** `RuntimeHostStatusRow.tsx`/`SshStatusSegment.tsx` (status-bar chính, đang chạy thật) làm cùng việc |
 
-### 2.4 `WorkspaceContext` shape cũng lệch
+### 2.4 `WorkspaceContext` shape cũng lệch — VÀ 2/4 RPC method nó gọi thật sự lỗi
 
 Doc: `{ project, devServer, connection, resolvedProfile, currentWorktree }`.
 Code thật: `{ project, isOffline, isInitializing, gitStatus, fileTree, resolvedProfile,
 activeAgentSessionId, currentWorktree, switchProject, refreshGitStatus, refreshFileTree,
 setCurrentWorktree, emit, on }` — không có `devServer`/`connection`, có thêm
 `gitStatus`/`fileTree`/`isOffline`/`isInitializing` mà doc không mô tả.
+
+**Đã xác nhận bằng backend thật**: `switchProject()` gọi 4 RPC —
+
+| Call | Backend thật | Verdict |
+|---|---|---|
+| `project.get({projectId})` | Khớp, nhưng lệch kiểu trả về (`visibility:'company'` vs type khai `'public'`; `createdAt: Date` vs type khai `number`) | Chạy nhưng dữ liệu sai kiểu |
+| `git.status({projectId})` | Schema thật yêu cầu `worktree: string`, không phải `projectId` | **Luôn fail validation** |
+| `workspace.listFiles(...)` | **Không tồn tại** trên backend | **Luôn "method not found"** |
+| `profile.getResolved({})` | Khớp | OK |
+
+2 lỗi trên bị `.catch(() => null)` nuốt âm thầm — `WorkspaceContext` không bao giờ báo lỗi thật,
+chỉ lặng lẽ trả `null`. Chi tiết đầy đủ:
+[audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md) mục B5.
 
 ### 2.5 Code xây RỘNG hơn doc ở mảng Git
 
@@ -76,12 +99,25 @@ UI khá đầy đủ mà F38 hoàn toàn không mô tả chi tiết. Cộng thê
 `WorkspaceSkeletonLoader`, `WorkspaceTabBar` — tổng **18 file** trong `components/workspace/`,
 nhiều hơn hẳn 9 file doc liệt kê.
 
-### 2.6 Vẫn là "mounted nhưng không ai thấy" — như đã ghi ở guide trước
+### 2.6 "Mounted nhưng không ai thấy" — xác nhận lại, cụm còn LỚN hơn 18 file đã liệt kê
 
-`WorkspaceLayout.tsx`/`ProjectSwitcher.tsx`/`ProjectSettings.tsx` **không được import/render ở
-bất kỳ đâu trong cây UI thật** — chỉ tồn tại trong file test của chính chúng. Toàn bộ 18 file
-trên, dù chất lượng code không tệ (đặc biệt `AgentPanel.tsx`/Git subsystem), **hiện không ai
-dùng được**.
+Re-grep toàn bộ `frontend/src/renderer`: `WorkspaceLayout.tsx`/`ProjectSwitcher.tsx`/
+`ProjectSettings.tsx` **không được import/render ở bất kỳ đâu trong cây UI thật** — chỉ tồn tại
+trong file test của chính chúng, `App.tsx` không tham chiếu bất kỳ cái nào.
+
+**Mở rộng mới**: `WorkspaceContext`'s provider **có mount thật** (`main.tsx`,
+`web/main-web-bootstrap.tsx`), và `useWorkspace()` được dùng thật bởi thêm ~14 component ngoài
+18 file trong `components/workspace/`: `TaskPromptEditor.tsx`, `TaskDetail.tsx`,
+`CodeReviewPanel`, `commit-message-generator.tsx`, `annotation-panel.tsx` và những component
+Git đã liệt kê ở §2.5 — **không component nào trong toàn bộ cụm này reachable từ `App.tsx`**.
+
+Có thêm 1 hệ **thứ 2 cạnh tranh**: `WorkspaceContextV6.tsx` + `WorkspaceContextBridge.ts`
+(`getWorkspaceProvider()`/`getUseWorkspace()`, gate bằng flag `__ORCA_WORKSPACE_V6__`) — nhưng
+`main.tsx` import thẳng `WorkspaceProvider` từ bản V5 gốc, bỏ qua bridge hoàn toàn → V6 tự nó
+cũng là code chết, chưa từng được dùng dù có vẻ là ý định thay thế V5.
+
+→ Toàn bộ cụm này, dù chất lượng code không tệ (đặc biệt `AgentPanel.tsx`/Git subsystem), **hiện
+không ai dùng được** — provider sống, cả 2 thế hệ (V5 lẫn V6) cây consumer đều chết.
 
 ## 3. Đánh giá từng khác biệt — giữ code, sửa code, hay cần quyết định?
 
@@ -95,6 +131,8 @@ dùng được**.
 | `ServerStatusBar.tsx` chưa xây | **Tái dùng, không xây mới** | Ghép `RuntimeHostStatusRow`/`SshStatusSegment` (đã chạy thật) vào Workspace thay vì viết component riêng trùng chức năng. |
 | Git subsystem rộng hơn doc | **Cập nhật doc theo code** | Ghi nhận đúng những gì đã xây — đây là phần hoàn thiện nhất, nên là phần đầu tiên tài liệu hoá tử tế. |
 | `currentWorktree` chưa bao giờ được set | **Cần quyết định trước** | Nguồn cấp `worktreeId` cho Workspace là gì — chọn từ sidebar hiện có, hay Workspace tự có bộ chọn worktree riêng? Chưa có câu trả lời trong doc lẫn code. |
+| `git.status`/`workspace.listFiles` gọi sai contract | **Sửa code, làm TRƯỚC mọi việc khác** | `git.status` cần đổi tham số từ `projectId` sang `worktree` đúng schema thật; `workspace.listFiles` cần đổi tên gọi thành 1 trong 4 method thật (`workspace.init/teardown/refreshFileTree/refreshGitStatus`) — nếu không sửa, mọi bước sau đều build trên nền tảng gọi API sai |
+| `WorkspaceContextV6`/`WorkspaceContextBridge` tồn tại song song, chưa từng dùng | **Cần quyết định trước** | Có ý định thay V5 bằng V6 không? Nếu không, nên xoá hẳn V6 thay vì để 2 bản cạnh tranh cùng tồn tại mãi |
 
 ## 4. Phương án merge — theo mức độ ưu tiên
 
@@ -107,20 +145,24 @@ kiểu bug "đè lên code thật" đã gặp tuần này.
 
 **Nếu quyết định tiếp tục, theo thứ tự:**
 
-1. **Viết lại F38 theo code thật** (không phải ngược lại) — cập nhật layout diagram, bảng "Yêu
+1. **Sửa RPC contract sai** (`git.status` tham số, `workspace.listFiles` tên method) — làm
+   trước tiên vì mọi bước sau đều phụ thuộc `WorkspaceContext` lấy được dữ liệu thật.
+2. **Viết lại F38 theo code thật** (không phải ngược lại) — cập nhật layout diagram, bảng "Yêu
    cầu kỹ thuật" (tên file đúng), shape `WorkspaceContext`, và bổ sung mô tả Git subsystem đang
    thiếu hoàn toàn trong doc gốc.
-2. **Quyết định nguồn `currentWorktree`** — đây là khoá cho cả tab Agent lẫn terminal panel.
+3. **Quyết định nguồn `currentWorktree`** — đây là khoá cho cả tab Agent lẫn terminal panel.
    Đề xuất: tái dùng cơ chế chọn worktree đã có ở sidebar chính (`WorktreeList.tsx`) thay vì xây
    bộ chọn riêng cho Workspace.
-3. **Nối tab Agent**: thêm nhánh `activeTab === 'agent' && <AgentPanel worktreeId={...} />`,
-   dùng `worktreeId` từ bước 2.
-4. **Nối terminal panel**: tái dùng `terminal-pane`/PTY infra hiện có (đã chạy ổn định trong
+4. **Nối tab Agent**: thêm nhánh `activeTab === 'agent' && <AgentPanel worktreeId={...} />`,
+   dùng `worktreeId` từ bước 3.
+5. **Nối terminal panel**: tái dùng `terminal-pane`/PTY infra hiện có (đã chạy ổn định trong
    app chính, không xây song song 1 hệ thống terminal thứ 2).
-5. **Ghép `ServerStatusBar`**: dùng lại `RuntimeHostStatusRow`/`SshStatusSegment` thay vì viết
+6. **Ghép `ServerStatusBar`**: dùng lại `RuntimeHostStatusRow`/`SshStatusSegment` thay vì viết
    mới.
-6. **Mount `ProjectSwitcher`/`WorkspaceLayout` vào layout thật** — bước cuối cùng, chỉ làm khi
-   1–5 đã xong, vì mount sớm sẽ lộ ngay các phần còn dở (tab Agent trống, terminal giả) cho
+7. **Xoá `WorkspaceContextV6`/`WorkspaceContextBridge`** nếu quyết định không dùng (mục 3 bảng
+   trên) — tránh 2 hệ cạnh tranh tồn tại mãi.
+8. **Mount `ProjectSwitcher`/`WorkspaceLayout` vào layout thật** — bước cuối cùng, chỉ làm khi
+   1–7 đã xong, vì mount sớm sẽ lộ ngay các phần còn dở (tab Agent trống, terminal giả) cho
    người dùng thật.
 
 **Rủi ro nếu làm ngược thứ tự** (mount trước, hoàn thiện sau): người dùng thấy tab Agent trống,
