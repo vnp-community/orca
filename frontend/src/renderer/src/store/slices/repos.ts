@@ -2636,7 +2636,9 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       // Falling through to the local-clone branch below would silently clone
       // onto the Orca server's own filesystem instead of the Dev Server.
       if (parsedHost?.kind === 'devServer') {
-        throw new Error('Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.')
+        throw new Error(
+          'Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.'
+        )
       }
       const target = getProjectSetupRuntimeTarget(args.hostId)
       if (parsedHost?.kind !== 'ssh') {
@@ -2758,6 +2760,29 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         hostId: options?.hostId
       })
       if (!ownerRepo) {
+        // Why: this used to be a silent no-op — a duplicate repo id across hosts
+        // that findRepoForHost can't disambiguate (or an already-removed id)
+        // left "Remove Project" looking like it did nothing, with no signal in
+        // the UI or the console to explain why.
+        const matchingHostIds = get()
+          .repos.filter((repo) => repo.id === projectId)
+          .map((repo) => getRepoExecutionHostId(repo))
+        console.error(
+          `Failed to remove repo: could not resolve an owning host for repo ${projectId} ` +
+            `(requestedHostId=${options?.hostId ?? 'none'}, matchingHostIds=[${matchingHostIds.join(', ')}])`
+        )
+        toast.error(
+          translate(
+            'auto.store.slices.repos.removeProjectAmbiguousHost',
+            'Failed to remove project'
+          ),
+          {
+            description: translate(
+              'auto.store.slices.repos.removeProjectAmbiguousHostDescription',
+              'Could not determine which host owns this project. Try removing it from that host directly.'
+            )
+          }
+        )
         return
       }
       const ownerHostId = getRepoExecutionHostId(ownerRepo)
@@ -2944,7 +2969,16 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         }
       })
     } catch (err) {
+      // Why: previously swallowed entirely — a failed repo.rm (e.g. RPC timeout,
+      // unauthenticated runtime session) left the project visibly unremoved with
+      // no feedback that anything had gone wrong.
       console.error('Failed to remove repo:', err)
+      toast.error(
+        translate('auto.store.slices.repos.removeProjectFailed', 'Failed to remove project'),
+        {
+          description: err instanceof Error ? err.message : String(err)
+        }
+      )
     }
   },
 
