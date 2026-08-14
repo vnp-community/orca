@@ -51,6 +51,17 @@ type OrcaRuntimeRpcServerOptions = {
    * userData-derived path (o-<pid>-<runtimeId>.sock).
    */
   socketPath?: string
+  /**
+   * The single user this process's Unix socket serves — set from
+   * process.env.ORCA_USER_ID in multi-user mode (SessionManager injects it
+   * when forking the per-user child, see spawnUserProcess()). Attributed to
+   * every request handleMessage() dispatches, since only that one user's
+   * WsSessionRouter proxy (or their own CLI) can reach this socket (0600,
+   * per-user path). Without this, RPC methods gating on ctx.userId (project.*,
+   * team.*, task.* …) always see it as undefined and throw UNAUTHENTICATED —
+   * see docs/guides BUG-BE-RPC-001.
+   */
+  userId?: string
   // Why: Web mode proxy handlers (preflight.check, github.startAuthLogin, etc.)
   // need the relay manager at dispatch time. Passed in from server-bootstrap
   // so the RpcDispatcher can inject it into handler context.
@@ -439,6 +450,7 @@ export class OrcaRuntimeRpcServer {
   private readonly enableWebSocket: boolean
   private readonly wsPort: number
   private readonly socketPathOverride: string | undefined
+  private readonly userId: string | undefined
   private readonly webClientRoot: string | undefined
   private readonly authToken = randomBytes(24).toString('hex')
   private readonly keepaliveIntervalMs: number
@@ -478,6 +490,7 @@ export class OrcaRuntimeRpcServer {
     wsPort = ORCA_PORT ?? DEFAULT_WS_PORT,
     webClientRoot,
     socketPath,
+    userId,
     devServerManager,
     extraMethods,
     keepaliveIntervalMs = KEEPALIVE_INTERVAL_MS,
@@ -491,6 +504,7 @@ export class OrcaRuntimeRpcServer {
     this.enableWebSocket = enableWebSocket
     this.wsPort = wsPort
     this.socketPathOverride = socketPath
+    this.userId = userId
     this.webClientRoot = webClientRoot
     this.keepaliveIntervalMs = keepaliveIntervalMs
     this.longPollCap = longPollCap
@@ -983,7 +997,11 @@ export class OrcaRuntimeRpcServer {
     try {
       await this.dispatcher.dispatchStreaming(request, reply, {
         signal: longPoll ? context?.signal : undefined,
-        clientId: request.authToken
+        clientId: request.authToken,
+        // BUG-BE-RPC-001: this Unix socket serves exactly one user (0600, per-user
+        // path) — attribute every request to it so ctx.userId-gated methods
+        // (project.*, team.*, task.*, orcaProjects.*) work for real web sessions.
+        userId: this.userId
       })
     } finally {
       if (longPoll) {

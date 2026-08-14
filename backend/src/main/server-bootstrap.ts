@@ -401,6 +401,13 @@ export async function initializeOrcaServices(
     // overrides the default userData-derived socket so the process binds exactly
     // where SessionManager expects it (ORCA_SOCKET_PATH).
     ...(socketPath ? { socketPath } : {}),
+    // BUG-BE-RPC-001: SessionManager.spawnUserProcess() injects ORCA_USER_ID into
+    // this per-user child's env (session-manager.ts) — undefined outside
+    // multi-user mode, matching credUserId's own env read above. Without this,
+    // ctx.userId is always undefined for every request on this socket, so
+    // project.*/team.*/task.*/orcaProjects.* throw UNAUTHENTICATED for real
+    // web sessions no matter how the user actually authenticated.
+    userId: process.env['ORCA_USER_ID'],
     // Why: proxy methods (preflight.check, github.startAuthLogin, etc.) need
     // to reach the active relay for a given Dev Server.
     devServerManager
