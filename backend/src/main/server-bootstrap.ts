@@ -22,6 +22,7 @@ import { AuthManager } from './auth/auth-manager'
 import { initWebCredentialStore } from './credentials'
 import type { DatabaseConfig } from './db/config'
 import type { IConnectionPool } from './db/pool'
+import type { IDatabase } from './db/types'
 import { AgentWebSocketServer } from './dev-server/agent-ws-server'
 
 export type ServerBootstrapResult = {
@@ -291,12 +292,25 @@ export async function initializeOrcaServices(
   void stateRepo
 
   // 2c. Initialize AuthManager (auth subsystem — always initialized, routes active when ORCA_MULTI_USER=1)
-  // Opens a dedicated SQLite connection (not from pool) so sessions survive pool recycles.
-  const { SqliteAdapter: SqliteAuthAdapter } = await import('./db/sqlite/sqlite-adapter')
-  const authDbPath = dbConfig?.dialect === 'sqlite' && (dbConfig as Record<string, unknown>)['path']
-    ? (dbConfig as Record<string, unknown>)['path'] as string
-    : join(userDataPath, 'orca-server.db')
-  const authDb = new SqliteAuthAdapter(authDbPath)
+  // BUG-BE-RPC-003: when a shared network database is configured (dbConfig set, non-sqlite —
+  // same condition that picked GenericConnectionPool for `pool` above), auth MUST use that
+  // same shared pool too — orca_users/orca_sessions otherwise stay pinned to this process's
+  // own per-userData-path SQLite file (see docs/guides/postgres-shared-database-design.md),
+  // which breaks FK-referencing v5.0 tables (project_members, team_members, ...) for any
+  // user whose per-process SQLite orca_users row doesn't match the row created via login.
+  // Fall back to the original dedicated-SQLite-connection behavior otherwise (sessions
+  // surviving pool recycles) — zero behavior change for SQLite-fallback deployments.
+  let authDb: IDatabase
+  if (dbConfig && dbConfig.dialect !== 'sqlite') {
+    const { PooledDatabaseAdapter } = await import('./db/pooled-database-adapter')
+    authDb = await PooledDatabaseAdapter.create(pool)
+  } else {
+    const { SqliteAdapter: SqliteAuthAdapter } = await import('./db/sqlite/sqlite-adapter')
+    const authDbPath = dbConfig?.dialect === 'sqlite' && (dbConfig as Record<string, unknown>)['path']
+      ? (dbConfig as Record<string, unknown>)['path'] as string
+      : join(userDataPath, 'orca-server.db')
+    authDb = new SqliteAuthAdapter(authDbPath)
+  }
   const authManager = new AuthManager(authDb)
   // Seed initial admin user on first server boot (idempotent, non-fatal)
   try {

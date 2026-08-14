@@ -1,0 +1,116 @@
+# Postgres dùng chung — thiết kế + thực thi (BUG-BE-RPC-001/002/003)
+
+**Ngày:** 2026-08-14. Follow-up trực tiếp của [BUG-BE-RPC-001](./bug-be-rpc-001-userid-not-forwarded.md)/
+[BUG-BE-RPC-002](./bug-be-rpc-002-devservermanager-sync-get-in-user-process.md) — sau khi cả 2 fix
+đó lên production, `project.create` lộ lỗi kế tiếp: `FOREIGN KEY constraint failed`.
+
+## Root cause thật — BUG-BE-RPC-003: mỗi user-process có 1 DB SQLite cô lập riêng
+
+Với `ORCA_MULTI_USER=1` (chế độ web hiện tại), mỗi user đăng nhập được `SessionManager`
+`fork()` ra **1 process con riêng** (`spawnUserProcess()`), chạy `initializeOrcaServices()` lần
+thứ 2 (lần đầu là process chính `orca-server`). Khi KHÔNG cấu hình `ORCA_DB_URL` (mặc định trước
+hôm nay), `pool` (nơi `ProjectService`/`TeamService`/... sống) fallback về SQLite tại
+`join(userDataPath, 'orca-server.db')` — và `userDataPath` **khác nhau theo từng process**:
+process chính dùng `/data/orca`, mỗi user-process dùng `/data/orca/users/<userId>` riêng
+(`SessionManager.spawnUserProcess()` set `ORCA_USER_DATA_PATH`).
+
+**Hậu quả xác nhận bằng cách đọc trực tiếp 2 file SQLite trên server:**
+```
+/data/orca/orca-server.db                                    → orca_users: id=5540a296...  (DB trung tâm, dùng để login)
+/data/orca/users/5540a296.../orca-server.db → orca_users: id=a7d8a58f...  (DB riêng của process đó — user_id KHÁC)
+```
+Cùng 1 email (`admin@b15.openledger.vn`) nhưng **2 `id` khác nhau** — vì `ensureFirstAdminUser()`
+tự sinh `randomUUID()` ĐỘC LẬP ở mỗi file. `project.create` ghi `INSERT INTO
+orca_v5_project_members (..., user_id, ...)` với `user_id = ctx.userId` (= `5540a296...`, đúng
+đắn nhờ fix BUG-BE-RPC-001) — nhưng bảng `orca_users` TRONG CHÍNH user-process đó không có dòng
+nào khớp id này → `FOREIGN KEY constraint failed`.
+
+**Ảnh hưởng lớn hơn Create Project**: mọi tính năng thật sự CẦN chia sẻ dữ liệu giữa nhiều user
+(Team, OrcaProject sharing) không thể hoạt động đúng với kiến trúc SQLite-cô-lập-theo-process này
+dù BUG-BE-RPC-001/002 đã sửa xong — user A tạo Team, user B (process khác) sẽ không bao giờ thấy
+được, vì 2 file SQLite hoàn toàn tách biệt.
+
+## Quyết định: chuyển sang Postgres dùng chung (đã chốt, đã thực thi)
+
+## Phát hiện thêm khi thiết kế: `authDb` KHÔNG theo `dbConfig` — nếu chỉ trỏ `pool` sang Postgres sẽ hỏng đăng nhập
+
+`AuthManager`/`AuthUserStore` (login, session, `orca_users`/`orca_sessions`) dùng 1 connection
+`IDatabase` RIÊNG (`authDb = new SqliteAuthAdapter(authDbPath)`), **hoàn toàn tách khỏi `pool`**
+(nơi migrations thật sự chạy). `authDbPath`'s công thức chỉ theo `dbConfig.path` khi
+`dbConfig.dialect === 'sqlite'` — với dialect khác (Postgres), nó fallback về
+`join(userDataPath, 'orca-server.db')` **y hệt như trước**, tức vẫn SQLite-cô-lập-theo-process.
+
+Nếu chỉ đổi `pool` sang Postgres mà không sửa `authDb`: `orca_users`/`orca_sessions`'s schema
+(migration 0005) chỉ còn được tạo trong Postgres (vì migrations chạy qua `pool`) — user-process
+mới spawn sẽ có `authDb` trỏ vào 1 file SQLite **không có bảng `orca_users` nào cả** →
+**hỏng đăng nhập hoàn toàn** cho mọi user-process mới. Đây là lý do quyết định #1 (ban đầu) bị
+tạm dừng để thiết kế kỹ hơn trước khi code.
+
+## Fix: `PooledDatabaseAdapter` — cầu nối `IDatabase` ↔ `IConnectionPool`
+
+File mới: `backend/src/main/db/pooled-database-adapter.ts`. `AuthUserStore` được viết cho 1
+connection `IDatabase` luôn mở (gọi `this.db.prepare(sql)` rồi `.get()/.run()/.all()` ngay trong
+cùng 1 hàm async, không giữ statement qua nhiều thao tác khác nhau) — không phải cho
+`IConnectionPool`'s pattern `withConnection(fn)`. `PooledDatabaseAdapter` bọc 1 `IConnectionPool`
+thành `IDatabase` mà KHÔNG cần sửa `AuthUserStore`:
+
+- `prepare(sql)` **không** đụng tới pool — chỉ giữ lại chuỗi SQL (deferred).
+- `.get()/.run()/.all()` (gọi trên statement trả về) mới thật sự `pool.withConnection(...)` —
+  acquire, prepare thật, execute, release — mỗi lời gọi độc lập, đúng ngữ nghĩa pooling.
+- `.transaction()` **cố ý throw lỗi rõ ràng** thay vì chạy sai âm thầm — vì callback của
+  `IDatabase.transaction(fn)` không nhận `db` tham số, nếu bên trong gọi lại `prepare()` sẽ acquire
+  1 connection KHÁC (không transactional). `AuthUserStore` hiện không dùng `.transaction()` nên
+  không bị ảnh hưởng — chỉ chặn trước cho tương lai.
+- `.close()` là no-op — pool là tài nguyên DÙNG CHUNG (Project/Team/Task cũng dùng), không được
+  drain/destroy chỉ vì `AuthManager` gọi `close()`.
+
+`server-bootstrap.ts`: `authDb` giờ là `await PooledDatabaseAdapter.create(pool)` khi
+`dbConfig && dbConfig.dialect !== 'sqlite'` (đúng điều kiện đã chọn `GenericConnectionPool` cho
+`pool` phía trên) — **fallback y hệt hành vi cũ** (`SqliteAuthAdapter` riêng) khi không cấu hình
+DB dùng chung, không có gì đổi cho deployment không dùng Postgres.
+
+## Hạ tầng: Postgres container trong `deploy/dev`
+
+Thêm service `postgres` (`postgres:16-alpine`, volume riêng `orca-postgres-data`) vào cả 3 file
+compose (`docker-compose.orca.artifact.yml` — file THẬT đang deploy qua
+`sync-to-server-artifact.sh`; `docker-compose.orca.yml` — bản build-trên-server; `docker-compose.yml`
+— bản 1-server gộp Nginx, để đồng bộ, dù không phải bản đang dùng cho `b15.openledger.vn`).
+
+`orca` service thêm `ORCA_DB_URL: postgresql://${ORCA_DB_USER}:${ORCA_DB_PASSWORD}@postgres:5432/${ORCA_DB_NAME}`
++ `depends_on: postgres: condition: service_healthy`. `.env` thêm `ORCA_DB_USER`/`ORCA_DB_PASSWORD`
+(sinh bằng `openssl rand -hex 24`)/`ORCA_DB_NAME`.
+
+**Vì sao propagate đúng tới mọi user-process mà không cần sửa gì thêm**: `ORCA_DB_URL` chỉ cần
+set ở container-level env — `loadDatabaseConfig()` đọc `process.env` trực tiếp, và
+`SessionManager.spawnUserProcess()` fork mỗi user-process với `env: { ...process.env, ... }` —
+spread nguyên vẹn toàn bộ env của process chính, bao gồm `ORCA_DB_URL`.
+
+## ⚠️ Mất dữ liệu SQLite hiện có — chấp nhận được (dev/test server)
+
+Đây là server dev (`deploy/dev/`), toàn bộ dữ liệu hiện có là dữ liệu test trong phiên làm việc
+này (do các bug BUG-BE-RPC-001/002/003 nên hầu như chưa tạo được Project/Team nào thành công qua
+UI thật). Chuyển sang Postgres = bắt đầu từ database rỗng — `ensureFirstAdminUser()` sẽ tự tạo
+lại tài khoản admin với ĐÚNG `ORCA_ADMIN_EMAIL`/`ORCA_ADMIN_PASSWORD` đã có sẵn trong `.env`
+(`admin@b15.openledger.vn`) — đăng nhập tiếp tục hoạt động với cùng thông tin, không cần đổi gì
+phía người dùng.
+
+## Việc CỐ Ý không đụng: `WebCredentialStore`
+
+`WebCredentialStore` (token Bitbucket/Azure DevOps/Gitea mã hoá riêng từng user) dùng path theo
+`userDataPath` TƯƠNG TỰ, nhưng đây là THIẾT KẾ ĐÚNG — mỗi user nên có vault credential RIÊNG,
+không phải lỗi cần sửa giống `authDb`. Không migrate cái này sang Postgres.
+
+## Kế hoạch verify (bắt buộc trước khi coi là xong)
+
+1. Unit test `PooledDatabaseAdapter` (fake `IConnectionPool`) — xác nhận acquire/release đúng số
+   lần, `prepare()` không chạm pool, `.transaction()` throw rõ ràng, `.close()` không drain pool.
+2. Backend test suite đầy đủ không đổi hành vi (SQLite-fallback path không chạm tới).
+3. Deploy thật, đọc boot log xác nhận: `[DB Config] Using database from ORCA_DB_URL:
+   postgresql://...`, container `postgres` healthy trước khi `orca` start.
+4. Đăng nhập lại bằng `admin@b15.openledger.vn` — xác nhận vẫn vào được (admin được re-seed vào
+   Postgres rỗng).
+5. Thử Create Project thật qua UI — xác nhận KHÔNG còn `FOREIGN KEY constraint failed`.
+6. **Quan trọng nhất — verify đúng vấn đề gốc đã hết**: buộc spawn 1 user-process MỚI cho cùng
+   user đó (kill process cũ hoặc đợi idle timeout, hoặc reconnect sau khi container restart) rồi
+   xác nhận Project vừa tạo VẪN hiển thị đúng — chứng minh dữ liệu giờ thật sự dùng chung qua
+   Postgres, không còn cô lập theo process.
