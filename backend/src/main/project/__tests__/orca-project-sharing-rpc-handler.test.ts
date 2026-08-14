@@ -33,13 +33,17 @@ import type { PersistedState, Project, Repo } from '../../../shared/types'
 const FAKE_DEV_SERVER_ID = 'dev-server-001'
 
 function makeMockDSM(): DevServerManager {
+  const server = {
+    id: FAKE_DEV_SERVER_ID,
+    name: 'Test Server',
+    connectionType: 'direct-websocket',
+    status: 'connected'
+  }
   return {
-    get: vi.fn().mockReturnValue({
-      id: FAKE_DEV_SERVER_ID,
-      name: 'Test Server',
-      connectionType: 'direct-websocket',
-      status: 'connected'
-    })
+    get: vi.fn().mockReturnValue(server),
+    // ProjectService.create/update validate via list() (not sync get()) — see
+    // BUG-BE-RPC-002 — so User Process mode's async proxy works too.
+    list: vi.fn().mockResolvedValue([server])
   } as unknown as DevServerManager
 }
 

@@ -84,8 +84,13 @@ export class ProjectService {
       op: 'create', devServerId: params.devServerId, memberCount: 1 // creator luôn là owner đầu tiên
     })
 
-    // Validate devServerId
-    const server = this.devServerManager.get(params.devServerId)
+    // Validate devServerId — list() instead of get(): GatewayDevServerManagerProxy
+    // (User Process / multi-user web mode) doesn't support synchronous get() over
+    // IPC and always throws (BUG-BE-RPC-002). list() is awaitable in both modes —
+    // the real DevServerManager returns a plain array, awaiting a non-Promise
+    // value just resolves to it immediately.
+    const servers = await this.devServerManager.list()
+    const server = servers.find((s) => s.id === params.devServerId) ?? null
     span.step('validateDevServer', { devServerId: params.devServerId })
     if (!server) {
       span.fail('DEV_SERVER_NOT_FOUND', { devServerId: params.devServerId })
@@ -195,7 +200,10 @@ export class ProjectService {
     })
 
     if (patch.devServerId !== undefined) {
-      const server = this.devServerManager.get(patch.devServerId)
+      // See create()'s comment above — list() works in both real and User Process
+      // (GatewayDevServerManagerProxy) mode, sync get() does not (BUG-BE-RPC-002).
+      const servers = await this.devServerManager.list()
+      const server = servers.find((s) => s.id === patch.devServerId) ?? null
       span.step('validateDevServer', { devServerId: patch.devServerId })
       if (!server) {
         span.fail('DEV_SERVER_NOT_FOUND', { devServerId: patch.devServerId })
