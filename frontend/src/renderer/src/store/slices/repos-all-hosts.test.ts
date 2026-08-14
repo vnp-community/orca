@@ -389,19 +389,22 @@ describe('fetchReposForAllHosts', () => {
     expect(store.getState().projectHostSetups).toContainEqual(localProjectHostSetup)
   })
 
-  it('preserves runtime-owned project metadata during a local-only repo refresh', async () => {
-    const runtimeProject: Project = {
-      id: 'repo:remote-repo',
-      displayName: 'Runtime API project',
-      badgeColor: '#abc',
-      sourceRepoIds: ['remote-repo'],
-      createdAt: 3,
-      updatedAt: 4
-    }
+  // Why: 'project.list' used to be the legacy repo-derived-project RPC method
+  // this test simulated — the real backend repurposed that name for the v5.0
+  // OrcaProject membership model (a plain OrcaProject[] array, not
+  // {projects: [...]}) and deliberately dropped the old runtime handler (see
+  // project-runtime-rpc-methods.ts). fetchProjectHostSetupCompatibility no
+  // longer calls 'project.list' at all — 'projects' is always derived locally
+  // from `repos`, same as the fallback path. This test now asserts that
+  // corrected behavior: a runtime-owned repo still produces a project entry
+  // (via projectHostSetup.list, which is unaffected) that survives a
+  // local-only refresh, using its repo-derived metadata rather than
+  // RPC-provided metadata that no longer exists.
+  it('derives a runtime-owned project from repos and preserves it during a local-only repo refresh', async () => {
     const runtimeSetup: ProjectHostSetup = {
       ...localProjectHostSetup,
       id: 'runtime-setup',
-      projectId: runtimeProject.id,
+      projectId: 'repo:remote-repo',
       repoId: 'remote-repo',
       path: '/srv/repo',
       displayName: 'Runtime setup',
@@ -415,14 +418,6 @@ describe('fetchReposForAllHosts', () => {
           id: 'rpc-repo-list',
           ok: true,
           result: { repos: [remoteRepo] },
-          _meta: { runtimeId: 'runtime-remote' }
-        }
-      }
-      if (args.method === 'project.list') {
-        return {
-          id: 'rpc-project-list',
-          ok: true,
-          result: { projects: [runtimeProject] },
           _meta: { runtimeId: 'runtime-remote' }
         }
       }
@@ -452,10 +447,10 @@ describe('fetchReposForAllHosts', () => {
         .projects.map((project) => project.id)
         .sort()
     ).toEqual(['local-project', 'repo:remote-repo'])
-    expect(store.getState().projects.find((project) => project.id === runtimeProject.id)).toEqual(
+    expect(store.getState().projects.find((project) => project.id === 'repo:remote-repo')).toEqual(
       expect.objectContaining({
-        displayName: runtimeProject.displayName,
-        badgeColor: runtimeProject.badgeColor
+        displayName: remoteRepo.displayName,
+        badgeColor: remoteRepo.badgeColor
       })
     )
   })

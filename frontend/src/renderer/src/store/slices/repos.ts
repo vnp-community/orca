@@ -418,16 +418,25 @@ async function fetchProjectHostSetupCompatibility(
       }
     }
     await assertProjectHostSetupRuntimeCapability(target)
-    const [projectResponse, setupResponse] = await Promise.all([
-      callRuntimeRpc<{ projects: Project[] }>(target, 'project.list', undefined, {
-        timeoutMs: 15_000
-      }),
-      callRuntimeRpc<{ setups: ProjectHostSetup[] }>(target, 'projectHostSetup.list', undefined, {
-        timeoutMs: 15_000
-      })
-    ])
+    // Why (root cause of the 'session-auth' repos crash): 'project.list' used
+    // to be this legacy repo-derived-project RPC method, but
+    // backend/src/main/runtime/rpc/methods/project-runtime-rpc-methods.ts
+    // deliberately dropped it in favor of project-rpc-handler.ts's v5.0
+    // OrcaProject 'project.list' (a different concept — collaborative,
+    // membership-scoped projects, not desktop repo/host-setup derivation).
+    // That handler returns a plain OrcaProject[] array, not {projects: [...]}
+    // — calling it here silently produced {projects: undefined}. Only
+    // 'projectHostSetup.list' still serves the legacy shape this function
+    // needs; 'projects' is derived from `repos` the same way the catch
+    // fallback below does.
+    const setupResponse = await callRuntimeRpc<{ setups: ProjectHostSetup[] }>(
+      target,
+      'projectHostSetup.list',
+      undefined,
+      { timeoutMs: 15_000 }
+    )
     return {
-      projects: projectResponse.projects,
+      projects: projectHostSetupProjectionFromRepos(repos).projects,
       setups: setupResponse.setups.map((setup) => setupWithFetchedOwner(setup, target))
     }
   } catch {
