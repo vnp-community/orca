@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
+import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
 import { useAppStore } from '../../store'
 import { Button } from '../ui/button'
 import { Skeleton } from '../ui/skeleton'
@@ -9,61 +10,78 @@ import { Copy, X } from 'lucide-react'
 import { Editor } from '@monaco-editor/react'
 
 const LANGUAGE_MAP: Record<string, string> = {
-  ts: 'typescript', tsx: 'typescript',
-  js: 'javascript', jsx: 'javascript',
-  py: 'python', go: 'go', rs: 'rust',
-  css: 'css', scss: 'scss',
-  json: 'json', yaml: 'yaml', yml: 'yaml',
-  md: 'markdown', html: 'html',
-  sh: 'shell', bash: 'shell',
-  sql: 'sql',
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  py: 'python',
+  go: 'go',
+  rs: 'rust',
+  css: 'css',
+  scss: 'scss',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  md: 'markdown',
+  html: 'html',
+  sh: 'shell',
+  bash: 'shell',
+  sql: 'sql'
 }
 function detectLanguage(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
   return LANGUAGE_MAP[ext] ?? 'plaintext'
 }
 
-const MAX_FILE_SIZE = 500 * 1024   // 500KB
+const MAX_FILE_SIZE = 500 * 1024 // 500KB
 
 type FileViewerProps = {
   filePath: string
   onClose?: () => void
 }
 
-export function FileViewer({ filePath, onClose }: FileViewerProps) {
-  const { project } = useWorkspace()
-  const [content,   setContent]   = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error,     setError]     = useState<string | null>(null)
-  const [copied,    setCopied]    = useState(false)
+type RuntimeFileReadResult = { content: string; truncated: boolean; byteLength: number }
 
+export function FileViewer({ filePath, onClose }: FileViewerProps) {
+  const { currentWorktree } = useWorkspace()
+  const [content, setContent] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  // Why (same crash class as GitPanel.tsx's push): this used to call the
+  // nonexistent 'workspace.readFile' with a {projectId} shape — the real
+  // method is 'files.read' and requires a {worktree, relativePath} selector
+  // (backend/src/main/runtime/rpc/methods/files.ts); it rejects binary paths
+  // with a typed 'binary_file' error instead of returning null bytes.
   useEffect(() => {
-    if (!project || !filePath) {return}
+    if (!currentWorktree || !filePath) {
+      return
+    }
     setIsLoading(true)
     setError(null)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    callRuntimeRpc(target, 'workspace.readFile', { projectId: project.id, path: filePath })
-      .then(c => {
-        const str = c as string
-        const isBinary = str.includes('\u0000')
-        if (isBinary) {
-          setContent('[Binary file — cannot display]')
-        } else {
-          setContent(str)
-        }
+    callRuntimeRpc<RuntimeFileReadResult>(target, 'files.read', {
+      worktree: toRuntimeWorktreeSelector(currentWorktree.id),
+      relativePath: filePath
+    })
+      .then((result) => {
+        setContent(result.truncated ? `${result.content}\n\n[truncated]` : result.content)
       })
-      .catch(err => {
-        if (err?.code === 'FILE_TOO_LARGE') {
-          setContent('[File too large to display — max 5MB]')
+      .catch((err) => {
+        if (err?.message === 'binary_file') {
+          setContent('[Binary file — cannot display]')
         } else {
           setError(err?.message ?? 'Failed to read file')
         }
       })
       .finally(() => setIsLoading(false))
-  }, [project, filePath])
+  }, [currentWorktree, filePath])
 
   const copyToClipboard = async () => {
-    if (!content) {return}
+    if (!content) {
+      return
+    }
     await navigator.clipboard.writeText(content)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -103,8 +121,10 @@ export function FileViewer({ filePath, onClose }: FileViewerProps) {
             {error}
           </div>
         )}
-        {!isLoading && !error && content !== null && (
-          content.length > MAX_FILE_SIZE ? (
+        {!isLoading &&
+          !error &&
+          content !== null &&
+          (content.length > MAX_FILE_SIZE ? (
             <div className="p-4 text-sm text-muted-foreground">
               File too large to display ({Math.round(content.length / 1024)}KB &gt; 500KB)
             </div>
@@ -118,13 +138,12 @@ export function FileViewer({ filePath, onClose }: FileViewerProps) {
                 fontSize: 12,
                 scrollBeyondLastLine: false,
                 wordWrap: 'on',
-                lineNumbers: 'on',
+                lineNumbers: 'on'
               }}
               theme="vs-dark"
               height="100%"
             />
-          )
-        )}
+          ))}
       </div>
     </div>
   )
