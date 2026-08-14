@@ -626,15 +626,31 @@ function mergeProjectHostSetupCompatibility(
   derived: Pick<RepoSlice, 'projects' | 'projectHostSetups'>,
   fetched: ProjectHostSetupProjection
 ): Pick<RepoSlice, 'projects' | 'projectHostSetups'> {
-  const fetchedSetupOwners = new Set(fetched.setups.map(getProjectHostSetupOwnerKey))
+  // Why: seen live against the 'session-auth' web environment — despite every
+  // known producer of `fetched` (fetchProjectHostSetupCompatibility's success
+  // AND catch-fallback paths) always constructing {projects, setups} as real
+  // arrays, this crashed with "Cannot read properties of undefined (reading
+  // 'map')" here specifically (confirmed via the deployed bundle's minified
+  // source, not guesswork). Root cause not pinned down — guard defensively so
+  // a malformed payload degrades instead of crashing, and log it so the next
+  // occurrence shows the real shape.
+  if (!Array.isArray(fetched.setups) || !Array.isArray(fetched.projects)) {
+    console.error(
+      '[repos] mergeProjectHostSetupCompatibility received a malformed `fetched`:',
+      fetched
+    )
+  }
+  const fetchedSetups = Array.isArray(fetched.setups) ? fetched.setups : []
+  const fetchedProjects = Array.isArray(fetched.projects) ? fetched.projects : []
+  const fetchedSetupOwners = new Set(fetchedSetups.map(getProjectHostSetupOwnerKey))
   const derivedSetups = derived.projectHostSetups.filter(
     (setup) => !fetchedSetupOwners.has(getProjectHostSetupOwnerKey(setup))
   )
-  const projectHostSetups = mergeProjectHostSetupsByOwner(derivedSetups, fetched.setups)
+  const projectHostSetups = mergeProjectHostSetupsByOwner(derivedSetups, fetchedSetups)
   const setupProjectIds = new Set(projectHostSetups.map((setup) => setup.projectId))
-  const fetchedProjectIds = new Set(fetched.projects.map((project) => project.id))
+  const fetchedProjectIds = new Set(fetchedProjects.map((project) => project.id))
   return {
-    projects: mergeProjectCompatibilityProjects(derived.projects, fetched.projects).filter(
+    projects: mergeProjectCompatibilityProjects(derived.projects, fetchedProjects).filter(
       (project) => fetchedProjectIds.has(project.id) || setupProjectIds.has(project.id)
     ),
     projectHostSetups
