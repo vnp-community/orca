@@ -134,6 +134,50 @@ xác nhận Postgres adapter có tự chuyển đổi hay migration phải viế
 thể cần `IDatabase.capabilities.dialect` để rẽ nhánh SQL ngay trong từng migration, hoặc viết 1
 lớp trừu tượng SQL builder — cần thiết kế, không phải sửa nhỏ).
 
+## ✅ Cập nhật 2026-08-14 (tiếp): đã sửa xong, verify thật, đã bật lại
+
+Sau khi tắt tạm để phục hồi dịch vụ, đã audit + sửa dứt điểm cả 2 lớp lỗi tìm thấy:
+
+### 1. 7 file migration dùng SQL SQLite thuần
+
+`backend/src/main/db/migrations/sql-dialect.ts` (mới) — 3 helper thuần hàm (`nowTextDefaultSql`,
+`nowEpochMsDefaultSql`, `autoIncrementPrimaryKeySql`), rẽ nhánh theo `db.capabilities.dialect`.
+Áp dụng vào: `0001_initial_schema.ts`, `0002_add_automations.ts`, `0003_add_workspace_sessions.ts`,
+`0004_orca_app_tables.ts` (đều dùng `datetime('now')`), `0005_add_auth_schema.ts`,
+`0008_ai_providers.ts`, `0010_tasks.ts` (đều có `AUTOINCREMENT`, `0010` thêm `strftime(...)`).
+
+### 2. `pg-adapter.ts` chưa dịch placeholder — ảnh hưởng TOÀN BỘ query, không chỉ migration
+
+Phát hiện khi test thật: sau khi sửa xong (1), migration tự nó chạy được, nhưng bước
+`INSERT INTO schema_migrations (...) VALUES (?, ?, ?)` (chính `MigrationRunner`, không phải file
+migration nào) crash `syntax error at or near ","` — vì `pg` (driver Postgres) cần placeholder
+`$1, $2, $3`, không hiểu `?` (quy ước SQLite mà TOÀN BỘ codebase dùng, `AuthUserStore`,
+`ProjectService`, `TeamService`, ... không trừ chỗ nào). Sửa 1 chỗ duy nhất:
+`translatePlaceholders()` trong `pg-adapter.ts`, áp dụng cho mọi `query()`/`prepare()` — bỏ qua
+`?` nằm trong chuỗi literal (`'...'`) để không dịch nhầm.
+
+### 3. Cột `INTEGER` lưu epoch-milliseconds tràn số ở Postgres
+
+Phát hiện tiếp khi test insert thật: Postgres `INTEGER` là 32-bit (~2.1 tỷ), nhưng
+`Date.now()` (epoch ms, 13 chữ số) vượt xa giới hạn đó — SQLite's `INTEGER` không có giới hạn
+kiểu này (type affinity linh hoạt) nên không lộ ra khi chỉ test SQLite. Đổi toàn bộ cột
+timestamp (`created_at`, `updated_at`, `expires_at`, `added_at`, `due_date`, `paused_at`,
+`rotation_grace_until`, ...) từ `INTEGER` → `BIGINT` — an toàn cho cả 2 dialect (`BIGINT` ở
+SQLite vẫn chỉ là INTEGER affinity, hành vi giống hệt trước). Cột nhỏ thật sự (`port`, `enabled`,
+`priority`, boolean 0/1, ...) giữ nguyên `INTEGER`.
+
+### Verify thật trước khi bật lại (không chỉ tin tưởng, đã chạy thật)
+
+Dựng 1 Postgres cục bộ (`docker run postgres:16-alpine`), chạy `MigrationRunner` thật với
+`ALL_MIGRATIONS` (17 file) — áp dụng sạch. Test tiếp: `AuthUserStore.countAdmins()`-style query
+thật, insert vào bảng có `AUTOINCREMENT`-cũ (`orca_audit_log`), và **đúng luồng đã crash trong
+production** (`project.create`: insert `orca_users` → insert `orca_v5_projects` → insert
+`orca_v5_project_members` với FK) — tất cả chạy đúng, không lỗi.
+
+Đã bật lại `ORCA_DB_URL`/`depends_on: postgres` trong cả 3 file compose. Test thêm:
+`sql-dialect.test.ts` (9 case), `pg-adapter.test.ts` (6 case, gồm case chuỗi literal chứa `?`) —
+backend suite tổng 139/139 pass.
+
 ## Kế hoạch verify (bắt buộc trước khi coi là xong)
 
 1. Unit test `PooledDatabaseAdapter` (fake `IConnectionPool`) — xác nhận acquire/release đúng số

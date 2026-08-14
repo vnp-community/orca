@@ -28,8 +28,8 @@ export const migration0016TeamProjectSharingTaskExec: Migration = {
       CREATE TABLE IF NOT EXISTS orca_teams (
         id         TEXT    PRIMARY KEY,
         name       TEXT    NOT NULL,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL
       )
     `)
 
@@ -46,7 +46,7 @@ export const migration0016TeamProjectSharingTaskExec: Migration = {
         orca_project_id TEXT    NOT NULL REFERENCES orca_v5_projects(id) ON DELETE CASCADE,
         owner_user_id   TEXT    NOT NULL REFERENCES orca_users(id) ON DELETE CASCADE,
         project_id      TEXT    NOT NULL,
-        created_at      INTEGER NOT NULL,
+        created_at      BIGINT NOT NULL,
         PRIMARY KEY (orca_project_id, owner_user_id, project_id)
       )
     `)
