@@ -196,3 +196,20 @@ kiểu bug "đè lên code thật" đã gặp tuần này.
 
 **Rủi ro đã né được nhờ làm đúng thứ tự** (mount sau khi 2–7 xong): người dùng bấm vào nút Beta
 thấy Agent tab/terminal panel/status bar hoạt động thật — không còn placeholder/tab trống.
+
+## 5. 🐛 Bug thật phát hiện qua live test (2026-08-13, sau deploy 1.4.174), đã sửa
+
+Người dùng report: `Project Workspace (Beta) → Create new Project` bấm vào không hiển thị gì.
+Nguyên nhân: `ProjectSwitcher.tsx`'s `CommandItem` "Create New Project" **không có `onSelect`
+handler** — đây là phần scaffolding chưa từng được hoàn thiện từ trước khi cả cụm 18 file
+`components/workspace/` bị mount vào app thật, không bị catch bởi review vì không có test nào
+assert hành vi click cho item này (chỉ có `data-testid` để tồn tại trong DOM).
+
+**Đã sửa**: nối `onSelect` mở `CreateProjectDialog.tsx` (mới) — form tạo `OrcaProject` thật, gọi
+đúng `project.create` RPC (`name`, `description?`, `devServerId` (chọn từ `devServer.list`),
+`repoPath`, `visibility`), thành công thì `switchProject()` sang project vừa tạo + refetch list.
+Đây là ví dụ thứ 2 (sau bug `ProjectSwitcher` đọc sai field store) của cùng 1 lớp rủi ro: **mount
+xong không có nghĩa là đã test hết đường đi người dùng thật** — checklist "1–7 xong trước khi
+mount" chỉ đảm bảo các tab/panel không trống, không đảm bảo mọi nút bấm bên trong đã có handler.
+Khuyến nghị theo dõi thêm: cần 1 vòng test thủ công/E2E qua từng nút bấm trong `WorkspaceLayout`
+trước khi bỏ nhãn "(Beta)".

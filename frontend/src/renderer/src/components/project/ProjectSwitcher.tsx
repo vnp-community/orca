@@ -16,6 +16,7 @@ import {
 } from '../ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { cn } from '../../lib/utils'
+import { CreateProjectDialog } from './CreateProjectDialog'
 
 type OrcaProjectListItem = { id: string; name: string; devServerId: string }
 
@@ -24,14 +25,19 @@ export function ProjectSwitcher() {
   const [projects, setProjects] = useState<OrcaProjectListItem[]>([])
   const [open, setOpen]     = useState(false)
   const [search, setSearch] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+
+  const refetchProjects = () => {
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    return callRuntimeRpc<OrcaProjectListItem[]>(target, 'project.list', null)
+      .then(list => setProjects(list ?? []))
+      .catch(() => setProjects([]))
+  }
 
   // `useAppStore`'s `projects` field is session-grant string[], not OrcaProject[] —
   // fetch the real OrcaProject list from the backend instead of reading that field.
   useEffect(() => {
-    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    callRuntimeRpc<OrcaProjectListItem[]>(target, 'project.list', null)
-      .then(list => setProjects(list ?? []))
-      .catch(() => setProjects([]))
+    void refetchProjects()
   }, [])
 
   const filtered = projects.filter(p =>
@@ -88,13 +94,27 @@ export function ProjectSwitcher() {
               ))}
             </CommandGroup>
             <CommandSeparator />
-            <CommandItem data-testid="create-project-item">
+            <CommandItem
+              data-testid="create-project-item"
+              onSelect={() => {
+                setOpen(false)
+                setCreateOpen(true)
+              }}
+            >
               <Plus size={14} className="mr-2" />
               Create New Project
             </CommandItem>
           </CommandList>
         </Command>
       </PopoverContent>
+      <CreateProjectDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={created => {
+          void refetchProjects()
+          void switchProject(created.id)
+        }}
+      />
     </Popover>
   )
 }

@@ -37,6 +37,11 @@ vi.mock('../../ui/command', () => ({
 
 vi.mock('../../ui/button', () => ({ Button: (p: any) => <button {...p} /> }))
 
+vi.mock('../CreateProjectDialog', () => ({
+  CreateProjectDialog: (p: any) =>
+    p.open ? <div data-testid="create-project-dialog" /> : null
+}))
+
 describe('ProjectSwitcher', () => {
   const switchProject = vi.fn()
 
@@ -99,5 +104,14 @@ describe('ProjectSwitcher', () => {
     vi.mocked(callRuntimeRpc).mockRejectedValue(new Error('offline'))
     await act(async () => { render(<ProjectSwitcher />) })
     expect(screen.getByTestId('command-empty')).toBeInTheDocument()
+  })
+
+  it('"Create New Project" opens CreateProjectDialog and closes the popover', async () => {
+    await act(async () => { render(<ProjectSwitcher />) })
+    expect(screen.queryByTestId('create-project-dialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('create-project-item'))
+
+    expect(screen.getByTestId('create-project-dialog')).toBeInTheDocument()
   })
 })
