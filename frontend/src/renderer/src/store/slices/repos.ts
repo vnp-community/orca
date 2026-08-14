@@ -929,7 +929,21 @@ async function fetchRepoCatalogForTarget(
             reuseRecentCompatibilityFailure: true
           })
         ).repos
-  const repos = fetchedRepos.map((repo) => repoWithFetchedOwner(repo, target))
+  // Why: seen live against the 'session-auth' web environment — repo.list's
+  // handler always returns { repos: Repo[] } server-side, so an undefined/
+  // non-array payload here means a malformed or dropped RPC response, not a
+  // real empty catalog. Treat it as empty instead of throwing 'Cannot read
+  // properties of undefined (reading map)' out of fetchRuntimeEnvironmentRepos,
+  // which cascaded into an uncaught React render crash downstream.
+  if (!Array.isArray(fetchedRepos)) {
+    console.error(
+      `[repos] repo.list returned a non-array payload for target ${JSON.stringify(target)}:`,
+      fetchedRepos
+    )
+  }
+  const repos = (Array.isArray(fetchedRepos) ? fetchedRepos : []).map((repo) =>
+    repoWithFetchedOwner(repo, target)
+  )
   return {
     repos,
     projectHostSetupCompatibility: await fetchProjectHostSetupCompatibility(target, repos),
