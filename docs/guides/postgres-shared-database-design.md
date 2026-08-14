@@ -100,6 +100,40 @@ phía người dùng.
 `userDataPath` TƯƠNG TỰ, nhưng đây là THIẾT KẾ ĐÚNG — mỗi user nên có vault credential RIÊNG,
 không phải lỗi cần sửa giống `authDb`. Không migrate cái này sang Postgres.
 
+## ⚠️ Cập nhật 2026-08-14 (sau khi thử deploy thật): TẠM DỪNG — migrations không tương thích Postgres
+
+Deploy thật lên `b15.openledger.vn` phát hiện thêm 2 lớp lỗi liên tiếp, mỗi lớp phải sửa xong mới
+lộ ra lớp sau:
+
+1. **`pg` package chưa từng được cài** trong toàn bộ monorepo (`pnpm-lock.yaml` xác nhận 0 kết
+   quả) — dù `pg-adapter.ts` đã có sẵn code. Đã sửa: `pnpm add pg` (backend/package.json). Lộ
+   thêm 2 pre-existing gap không liên quan (root `config/patches/`, `config/scripts/
+   rebuild-native-deps.mjs` bị thiếu, chỉ có bản sao ở `desktop/config/` — Dockerfile.artifact tự
+   COPY nên production build không bị ảnh hưởng, nhưng `pnpm install` chạy trực tiếp trên máy dev
+   thì luôn fail) — đã copy nguyên trạng sang root để sửa luôn.
+
+2. **Migrations 0001-0017 là SQL SQLite thuần, không chạy được trên Postgres**: sau khi có `pg`,
+   server crash ngay ở bước migration: `function datetime(unknown) does not exist` (SQLite có
+   hàm `datetime()`, Postgres không có) — migration thất bại (log "non-fatal" nhưng hậu quả là
+   **`orca_users` không bao giờ được tạo**), server crash-loop ngay sau đó khi
+   `ensureFirstAdminUser()` cố query 1 bảng không tồn tại.
+
+**Đã tạm phục hồi dịch vụ**: comment `ORCA_DB_URL`/`depends_on: postgres` trong cả 3 file
+compose — server quay lại SQLite fallback (như trước khi có Postgres), xác nhận `dialect: sqlite`,
+healthy, 0 lỗi qua `/health`. **Giữ nguyên toàn bộ phần code đã viết** (`PooledDatabaseAdapter`,
+wiring trong `server-bootstrap.ts`, `postgres` service trong compose, `pg` dependency) — chỉ tắt
+đường dẫn kích hoạt (`ORCA_DB_URL`), sẵn sàng bật lại ngay khi migrations đã tương thích.
+
+**Việc còn lại trước khi bật lại** (chưa làm, ngoài phạm vi phiên hôm nay — cần rà soát kỹ, không
+vội): audit + sửa cả 17 file `backend/src/main/db/migrations/000*.ts` cho tương thích cả 2
+dialect — ít nhất cần xử lý: `datetime()`/`strftime()` (SQLite) → tương đương Postgres
+(`NOW()`, hoặc dùng `INTEGER`/epoch ms nhất quán như phần lớn migration đã làm, tránh gọi hàm
+ngày-giờ SQL-cụ-thể); `INTEGER PRIMARY KEY AUTOINCREMENT` (SQLite) → `SERIAL`/`GENERATED ALWAYS
+AS IDENTITY` (Postgres); kiểu `INTEGER` dùng làm boolean (SQLite không có `BOOLEAN` thật) — cần
+xác nhận Postgres adapter có tự chuyển đổi hay migration phải viết khác nhau theo dialect (có
+thể cần `IDatabase.capabilities.dialect` để rẽ nhánh SQL ngay trong từng migration, hoặc viết 1
+lớp trừu tượng SQL builder — cần thiết kế, không phải sửa nhỏ).
+
 ## Kế hoạch verify (bắt buộc trước khi coi là xong)
 
 1. Unit test `PooledDatabaseAdapter` (fake `IConnectionPool`) — xác nhận acquire/release đúng số
