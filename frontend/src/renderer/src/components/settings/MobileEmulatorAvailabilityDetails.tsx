@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl, shellPickDirectory } from '../../runtime/runtime-shell-client'
 type EmulatorAvailability = {
   platform: string
   simctl: { ok: boolean; message?: string }
@@ -70,7 +71,7 @@ export function MobileEmulatorAvailabilityDetails({
 
   const handleLocate = async (): Promise<void> => {
     try {
-      const picked = await window.api.shell.pickDirectory({
+      const picked = await shellPickDirectory({
         defaultPath: android.sdkPath ?? configuredPath ?? undefined
       })
       if (picked) {
@@ -141,7 +142,7 @@ export function MobileEmulatorAvailabilityDetails({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => void window.api.shell.openUrl(ANDROID_STUDIO_URL)}
+                  onClick={() => void shellOpenUrl(ANDROID_STUDIO_URL)}
                 >
                   {translate(
                     'auto.components.settings.MobileEmulatorSdkStatus.b94ff260e6',

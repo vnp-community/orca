@@ -15,7 +15,8 @@ import type { TaskService } from './TaskService'
 import type { OrcaTask } from '../../shared/task-types'
 import type { CoordinatorRuntime } from '../runtime/orchestration/coordinator'
 import { Coordinator } from '../runtime/orchestration/coordinator'
-import type { OrchestrationDb } from '../runtime/orchestration/db'
+// ADR-021 — "chỉ dùng 1 database": OrchestrationDb (SQLite) → PgOrchestrationDb (async).
+import type { PgOrchestrationDb } from '../runtime/orchestration/pg-db'
 import { buildTaskAgentPrompt } from './task-agent-prompt'
 import { recordOrchestrationRunCompletion } from './task-execution-result-listener'
 
@@ -28,7 +29,7 @@ import { recordOrchestrationRunCompletion } from './task-execution-result-listen
  * domain for 7 methods' worth of surface.
  */
 export type TaskOrchestrationRuntime = CoordinatorRuntime & {
-  getOrchestrationDb(): OrchestrationDb
+  getOrchestrationDb(): PgOrchestrationDb
 }
 
 export type DispatchOptions = {
@@ -58,13 +59,13 @@ export class TaskOrchestrationBridge {
     }
 
     const db = this.runtime.getOrchestrationDb()
-    const existingRun = db.getActiveCoordinatorRun()
+    const existingRun = await db.getActiveCoordinatorRun()
     if (existingRun) {
       throw new Error(`TASK_ORCHESTRATION_BUSY: coordinator already running (${existingRun.id})`)
     }
 
     const subtree = await this.taskService.getSubtree(taskId)
-    const rootRowId = this.seedTaskRows(db, root, subtree)
+    const rootRowId = await this.seedTaskRows(db, root, subtree)
 
     await this.taskService.update(taskId, { activeExecutionTaskId: rootRowId })
 
@@ -77,7 +78,7 @@ export class TaskOrchestrationBridge {
       pollIntervalMs: options.pollIntervalMs,
       maxConcurrent: options.maxConcurrent,
     })
-    const run = db.createCoordinatorRun({ spec: runSpec, coordinatorHandle })
+    const run = await db.createCoordinatorRun({ spec: runSpec, coordinatorHandle })
 
     // Why: fire-and-forget, matching orchestration.run's RPC handler
     // (orchestration-gates.ts) — the coordinator loop runs in the background;
@@ -107,7 +108,12 @@ export class TaskOrchestrationBridge {
    * are different id spaces in different SQLite databases (see audit §7b) —
    * only the dependency edge (deps) is part of the mapping this bridge owns.
    */
-  private seedTaskRows(db: OrchestrationDb, root: OrcaTask, subtree: OrcaTask[]): string {
+  // ADR-021: async now (PgOrchestrationDb.createTask() is I/O). Rows are
+  // still created depth-first, one at a time (not Promise.all'd) — deepest
+  // descendants must finish (and have their row id known) before a parent's
+  // createTask() call can list them in `deps`, so the sequential await order
+  // is load-bearing, not just a mechanical artifact of the sync→async port.
+  private async seedTaskRows(db: PgOrchestrationDb, root: OrcaTask, subtree: OrcaTask[]): Promise<string> {
     const childrenByParent = new Map<string, OrcaTask[]>()
     for (const task of subtree) {
       const key = task.parentId ?? ''
@@ -117,11 +123,11 @@ export class TaskOrchestrationBridge {
     }
 
     const rowIdByTaskId = new Map<string, string>()
-    const createRow = (task: OrcaTask): string => {
+    const createRow = async (task: OrcaTask): Promise<string> => {
       const childRowIds = (childrenByParent.get(task.id) ?? [])
         .map((child) => rowIdByTaskId.get(child.id))
         .filter((id): id is string => id !== undefined)
-      const row = db.createTask({
+      const row = await db.createTask({
         spec: buildTaskAgentPrompt(task),
         taskTitle: task.title,
         deps: childRowIds,
@@ -129,16 +135,16 @@ export class TaskOrchestrationBridge {
       rowIdByTaskId.set(task.id, row.id)
       return row.id
     }
-    const visit = (task: OrcaTask): void => {
+    const visit = async (task: OrcaTask): Promise<void> => {
       for (const child of childrenByParent.get(task.id) ?? []) {
-        visit(child)
+        await visit(child)
       }
-      createRow(task)
+      await createRow(task)
     }
 
     for (const task of subtree) {
       if (!rowIdByTaskId.has(task.id)) {
-        visit(task)
+        await visit(task)
       }
     }
     return createRow(root)

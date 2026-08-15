@@ -16,6 +16,7 @@
 import { randomUUID } from 'node:crypto'
 import { Tracers } from '../../shared/trace/tracers'
 import type { IConnectionPool } from '../db/pool'
+import type { BindValue } from '../db/types'
 import type { WorkflowDefinition, WorkflowStep } from './WorkflowTypes'
 
 const MAX_INHERIT_DEPTH = 5
@@ -46,6 +47,15 @@ export type TemplateRecord = {
   scope: string
   parentTemplateId?: string
   createdAt: Date
+}
+
+export type UpdateTemplateParams = {
+  templateId: string
+  ownerId: string
+  name?: string
+  definition?: WorkflowDefinition
+  scope?: string
+  parentTemplateId?: string
 }
 
 function rowToRecord(r: TemplateRow): TemplateRecord {
@@ -156,13 +166,74 @@ export class TemplateResolver {
   // inheritance chain (kể cả trong workflow.execute), không phải write path BL-WF-01.
 
   /**
+   * Update an existing workflow template. Only the owning user may update it —
+   * same ownership convention as the RPC layer's triggeredBy checks on
+   * workflow.cancel/pause/resume. Only fields present in `params` are changed;
+   * `version` is bumped and `updated_at` refreshed on every successful update
+   * (optimistic-concurrency counter — no compare-and-swap read yet, matches the
+   * absence of any such check on create()/resolve()).
+   *
+   * @throws Error TEMPLATE_NOT_FOUND if templateId does not exist
+   * @throws Error TEMPLATE_UPDATE_DENIED if ownerId does not own the template
+   */
+  async update(params: UpdateTemplateParams): Promise<void> {
+    const span = Tracers.workflowTemplateUpdateFlow.start({
+      templateId: params.templateId,
+      hasDefinition: !!params.definition,
+    })
+    try {
+      const rows = await this.pool.withConnection((db) =>
+        db.query<{ ownerId: string }>(
+          `SELECT owner_id as ownerId FROM orca_workflow_templates WHERE id = ?`,
+          [params.templateId]
+        )
+      )
+      const existing = rows[0]
+      if (!existing) {
+        throw new Error(`TEMPLATE_NOT_FOUND: "${params.templateId}"`)
+      }
+      if (existing.ownerId !== params.ownerId) {
+        throw new Error('TEMPLATE_UPDATE_DENIED: only the owning user can update this template')
+      }
+
+      const sets: string[] = ['updated_at = ?', 'version = version + 1']
+      const values: BindValue[] = [Date.now()]
+      if (params.name !== undefined) {
+        sets.push('name = ?')
+        values.push(params.name)
+      }
+      if (params.definition !== undefined) {
+        sets.push('definition_json = ?')
+        values.push(JSON.stringify(params.definition))
+      }
+      if (params.scope !== undefined) {
+        sets.push('scope = ?')
+        values.push(params.scope)
+      }
+      if (params.parentTemplateId !== undefined) {
+        sets.push('parent_template_id = ?')
+        values.push(params.parentTemplateId)
+      }
+      values.push(params.templateId)
+
+      await this.pool.withConnection((db) =>
+        db.query(`UPDATE orca_workflow_templates SET ${sets.join(', ')} WHERE id = ?`, values)
+      )
+      span.ok({ templateId: params.templateId })
+    } catch (err) {
+      span.fail(err)
+      throw err
+    }
+  }
+
+  /**
    * List templates by scope, optionally filtered by ownerId.
    */
   async list(scope: string, ownerId?: string): Promise<TemplateRecord[]> {
     let sql = `SELECT id, name, definition_json as definitionJson, owner_id as ownerId, scope,
                       parent_template_id as parentTemplateId, created_at as createdAt
                FROM orca_workflow_templates WHERE scope = ?`
-    const params: unknown[] = [scope]
+    const params: BindValue[] = [scope]
 
     if (ownerId) {
       sql += ' AND owner_id = ?'

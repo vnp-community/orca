@@ -187,6 +187,31 @@ export class ProfileService {
   }
 
   /**
+   * Get the `companyId` (= tenant id, ADR-021 §2) that a user belongs to —
+   * same JOIN as `getCompanyProfileForUser()` but returns the id itself
+   * rather than the profile JSON. Used by `TenantResolver`
+   * (main/tenancy/tenant-resolver.ts) to populate `RpcContext.tenantId`/
+   * `TenantContext` once per user-process at bootstrap (server-bootstrap.ts
+   * mirrors the existing once-per-process `ORCA_USER_ID` → `ctx.userId` wiring
+   * — see runtime/rpc/core.ts's `RpcContext.userId` doc comment for why that's
+   * safe: `ORCA_MULTI_USER=1` forks exactly one process per authenticated user).
+   * Returns null if the user has no department or the department has no company.
+   */
+  async getCompanyIdForUser(userId: string): Promise<string | null> {
+    const rows = await this.pool.withConnection((db) =>
+      db.query<{ companyId: string }>(
+        `SELECT c.id as companyId
+         FROM orca_users u
+         JOIN orca_departments d ON d.id = u.department_id
+         JOIN orca_companies c ON c.id = d.company_id
+         WHERE u.id = ?`,
+        [userId]
+      )
+    )
+    return rows[0]?.companyId ?? null
+  }
+
+  /**
    * Get the department profile that applies to a user.
    * JOIN: orca_users → orca_departments
    * Returns null if user has no department.

@@ -128,6 +128,7 @@ import { recordCreatedTerminalPaneSplit } from './terminal-pane-split-completion
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { seedStartupSessionRestoredBanner } from './session-restored-banner-pane-state'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function recordRuntimeCreatedTerminalPaneSplit(
   createdPane: unknown,
   args: {
@@ -843,7 +844,7 @@ export function useTerminalPaneLifecycle({
           guardParserHandler('osc-52-clipboard', (data) =>
             handleOsc52ClipboardRequest(data, {
               allowClipboardWrite: settingsRef.current?.terminalAllowOsc52Clipboard === true,
-              writeClipboardText: window.api.ui.writeClipboardText,
+              writeClipboardText: uiWriteClipboardText,
               onBlockedWrite: showOsc52ClipboardBlockedToast
             })
           )
@@ -1124,7 +1125,7 @@ export function useTerminalPaneLifecycle({
           if (!selection) {
             return
           }
-          void window.api.ui.writeClipboardText(selection).catch(() => {
+          void uiWriteClipboardText(selection).catch(() => {
             /* ignore clipboard write failures */
           })
         })

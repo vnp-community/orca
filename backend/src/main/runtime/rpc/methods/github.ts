@@ -2,6 +2,10 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
+import { checkOrcaStarred, starOrca } from '../../../github/client'
+import { appStarSourceSchema } from '../../../../shared/gh-star-source'
+import { track } from '../../../telemetry/client'
+import { getCohortAtEmit } from '../../../telemetry/cohort-classifier'
 
 const RepoSelector = z.object({
   repo: requiredString('Missing repo selector')
@@ -280,6 +284,10 @@ const SlugIssueCommentDelete = z.object({
   owner: requiredString('Missing owner'),
   repo: requiredString('Missing repo'),
   commentId: z.number().int().positive()
+})
+
+const StarOrca = z.object({
+  source: appStarSourceSchema
 })
 
 export const GITHUB_METHODS: RpcMethod[] = [
@@ -621,5 +629,26 @@ export const GITHUB_METHODS: RpcMethod[] = [
     name: 'github.project.deleteIssueCommentBySlug',
     params: SlugIssueCommentDelete,
     handler: async (params, { runtime }) => runtime.deleteGitHubIssueCommentBySlug(params)
+  }),
+  defineMethod({
+    name: 'github.checkOrcaStarred',
+    params: z.object({}),
+    handler: async () => checkOrcaStarred()
+  }),
+  defineMethod({
+    name: 'github.starOrca',
+    params: StarOrca,
+    handler: async (params) => {
+      const starred = await starOrca()
+      if (starred) {
+        // Why: mirrors desktop's gh:starOrca IPC handler — cohort context is
+        // attached here since this bypasses renderer telemetry IPC.
+        track('app_starred_orca', {
+          source: params.source,
+          ...getCohortAtEmit()
+        })
+      }
+      return starred
+    }
   })
 ]

@@ -216,6 +216,8 @@ export const Tracers = {
   // ─── CR-TRACE-017: Workflow Orchestration (Backend-side) ───────────────────
   /** BL-WF-01: template create/inherit */
   workflowTemplateCreateFlow: createTracer('workflow:templateCreate'),
+  /** BL-WF-01: template update — same write-path tracing convention as templateCreate */
+  workflowTemplateUpdateFlow: createTracer('workflow:templateUpdate'),
   /** BL-WF-02: span CHA — 1 per execution, sống suốt vòng đời execution */
   workflowExecuteFlow:        createTracer('workflow:execute'),
   /** BL-WF-02: span CON — 1 per step, mang field parentTraceId để group theo execution */

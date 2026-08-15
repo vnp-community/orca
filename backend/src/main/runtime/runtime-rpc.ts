@@ -62,6 +62,14 @@ type OrcaRuntimeRpcServerOptions = {
    * see docs/guides BUG-BE-RPC-001.
    */
   userId?: string
+  /**
+   * ADR-021 §3 — this socket's user's tenant (company) id, resolved once by
+   * server-bootstrap.ts (TenantResolver) from the same `userId` above, before
+   * this server is constructed. Forwarded to every dispatch exactly like
+   * `userId` — same single-user-per-process reasoning. `undefined` when
+   * `userId` is, or when the user has no department/company assigned.
+   */
+  tenantId?: string
   // Why: Web mode proxy handlers (preflight.check, github.startAuthLogin, etc.)
   // need the relay manager at dispatch time. Passed in from server-bootstrap
   // so the RpcDispatcher can inject it into handler context.
@@ -451,6 +459,7 @@ export class OrcaRuntimeRpcServer {
   private readonly wsPort: number
   private readonly socketPathOverride: string | undefined
   private readonly userId: string | undefined
+  private readonly tenantId: string | undefined
   private readonly webClientRoot: string | undefined
   private readonly authToken = randomBytes(24).toString('hex')
   private readonly keepaliveIntervalMs: number
@@ -491,6 +500,7 @@ export class OrcaRuntimeRpcServer {
     webClientRoot,
     socketPath,
     userId,
+    tenantId,
     devServerManager,
     extraMethods,
     keepaliveIntervalMs = KEEPALIVE_INTERVAL_MS,
@@ -505,6 +515,7 @@ export class OrcaRuntimeRpcServer {
     this.wsPort = wsPort
     this.socketPathOverride = socketPath
     this.userId = userId
+    this.tenantId = tenantId
     this.webClientRoot = webClientRoot
     this.keepaliveIntervalMs = keepaliveIntervalMs
     this.longPollCap = longPollCap
@@ -1001,7 +1012,10 @@ export class OrcaRuntimeRpcServer {
         // BUG-BE-RPC-001: this Unix socket serves exactly one user (0600, per-user
         // path) — attribute every request to it so ctx.userId-gated methods
         // (project.*, team.*, task.*, orcaProjects.*) work for real web sessions.
-        userId: this.userId
+        userId: this.userId,
+        // ADR-021 §3: resolved from this.userId at construction time (see
+        // OrcaRuntimeRpcServerOptions.tenantId doc comment).
+        tenantId: this.tenantId
       })
     } finally {
       if (longPoll) {

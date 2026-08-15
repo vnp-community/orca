@@ -66,6 +66,13 @@ export type PtySpawnOptions = {
   command?: string
   commandDelivery?: 'renderer' | 'provider'
   startupCommandDelivery?: StartupCommandDelivery
+  /** Authenticated caller identity — currently only consumed by the
+   *  gh/glab auth-login flow (github.startAuthLogin, gitlab.startAuthLogin,
+   *  onboarding.openGhAuthTerminal) so the remote agent/relay can namespace
+   *  GH_CONFIG_DIR/GLAB_CONFIG_DIR per user instead of sharing one default
+   *  config on a shared Dev Server. See BUG-BE-HLD-005 and
+   *  specs/agent/api/gaps-and-findings.md #5. */
+  userId?: string
   /** Minimal allowlisted launch ownership preserved by daemon reattach. */
   launchAgent?: TuiAgent
   /** Orca worktree identity. When present, the local provider scopes shell

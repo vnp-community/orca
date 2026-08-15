@@ -85,6 +85,7 @@ import {
 } from './combined-diff-scrollbar-drag'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type CachedCombinedDiffViewState = {
   entrySignature: string
   gitStatusSignature: string
@@ -1575,7 +1576,7 @@ export default function CombinedDiffViewer({
       return
     }
     try {
-      await window.api.ui.writeClipboardText(diffCommentsPrompt)
+      await uiWriteClipboardText(diffCommentsPrompt)
       if (!notesCopyMountedRef.current) {
         return
       }

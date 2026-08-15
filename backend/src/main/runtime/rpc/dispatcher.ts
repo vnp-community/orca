@@ -143,6 +143,13 @@ export class RpcDispatcher {
       // Why: userId is set by the WebSocket transport from the session token
       // so streaming handlers (subscribe methods) can scope their state to the user.
       userId?: string
+      // Why (ADR-021 §3): resolved from userId once per user-process at
+      // bootstrap (see runtime-rpc.ts's OrcaRuntimeRpcServer / RpcContext.tenantId
+      // doc comment) — only ever set alongside userId, never on its own, since
+      // it's derived from it. Not threaded into the streaming-handler ctx below
+      // (§185+) because userId isn't either — same pre-existing gap, out of
+      // scope for this change.
+      tenantId?: string
     }
   ): Promise<void> {
     const meta = this.meta()
@@ -174,7 +181,8 @@ export class RpcDispatcher {
           sendBinary: options?.sendBinary,
           registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
           devServerManager: this.devServerManager,
-          userId: options?.userId
+          userId: options?.userId,
+          tenantId: options?.tenantId
         })
         this.recordRuntimeFeatureInteraction(request.method, result, undefined, request.params)
         reply(JSON.stringify(successResponse(request.id, meta, result)))

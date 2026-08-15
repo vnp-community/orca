@@ -484,6 +484,19 @@ async function route(
       }
     }
 
+    // ── ai.provider.testConnection ───────────────────────────────────────────
+    // Called by AIProviderService.ts. Previously unimplemented
+    // (specs/agent/api/gaps-and-findings.md #1).
+    case 'ai.provider.testConnection': {
+      try {
+        const { handleTestConnection } = await import('./agent-credential-store')
+        return (await handleTestConnection(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ai.provider.testConnection unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: preflight.check ────────────────────────────────────────────────
     case 'preflight.check': {
       try {
@@ -843,6 +856,35 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `shell.eval unavailable: ${msg}`)
+      }
+    }
+
+    // ── shell.exec ───────────────────────────────────────────────────────────
+    // Workflow 'shell' step executor. Called by:
+    //   StepExecutors.executeShell() via relay.call('shell.exec', { script, env, traceId })
+    // Previously unimplemented (specs/agent/api/gaps-and-findings.md #1).
+    case 'shell.exec': {
+      try {
+        const { handleShellExec } = await import('./fs-agent-extensions')
+        return (await handleShellExec(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `shell.exec unavailable: ${msg}`)
+      }
+    }
+
+    // ── notification.send ────────────────────────────────────────────────────
+    // Workflow 'notification' step executor. Called by:
+    //   StepExecutors.executeNotification() via
+    //   relay.call('notification.send', { channel, message, traceId })
+    // Previously unimplemented (specs/agent/api/gaps-and-findings.md #1).
+    case 'notification.send': {
+      try {
+        const { handleNotificationSend } = await import('./notification-send-handler')
+        return (await handleNotificationSend(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `notification.send unavailable: ${msg}`)
       }
     }
 

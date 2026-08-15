@@ -37,6 +37,19 @@
 import type { AgentLogger } from './agent-logger'
 import { Tracers } from '../shared/trace/tracers'
 import { getForegroundProcessName } from './pty-shell-utils'
+import { buildStartupCommandSubmission } from '../shared/startup-command-submission'
+import { buildGhEnv, buildGlabEnv } from './external-api-connector'
+
+// Why: matches pty-handler.ts's STARTUP_COMMAND_WRITE_DELAY_MS (the SSH
+// relay's non-shell-ready-gated default) — a short pause for node-pty to
+// finish forking/exec before the write lands, not a real "is the shell
+// prompt ready" check. Part A doesn't (yet) wire the shell-ready OSC-marker
+// scanner pty-handler.ts uses for its more finicky multiline-prompt cases —
+// see specs/agent/api/gaps-and-findings.md #5 for why a fixed delay was
+// chosen as the right-sized fix here (closes the gh/glab auth-login bug
+// without porting pty-shell-launch.ts's profile-injection machinery, which
+// Part A doesn't use at all today).
+const STARTUP_COMMAND_WRITE_DELAY_MS = 50
 
 // ─── Trace propagation helper ───────────────────────────────────────────────
 // Agent WS JSON-RPC 2.0: traceId nested at params._trace.id (CR-TRACE-000 §3.3).
@@ -179,6 +192,22 @@ export async function handlePtyCreate(
   const ptyId = `agent-pty-${nextAgentPtyId++}`
   const paneKey = typeof params.paneKey === 'string' ? params.paneKey : undefined
   const tabId   = typeof params.tabId   === 'string' ? params.tabId   : undefined
+  // Why: 'provider' means the caller has no renderer terminal pane to type
+  // the command into (e.g. a headless gh/glab auth-login PTY) — the agent
+  // must submit it itself. See specs/agent/api/gaps-and-findings.md #5.
+  const command = typeof params.command === 'string' ? params.command : undefined
+  const commandDelivery = params.commandDelivery === 'provider' ? 'provider' : 'renderer'
+  const shouldProviderDeliverCommand = commandDelivery === 'provider' && command !== undefined
+  const userId = typeof params.userId === 'string' ? params.userId : undefined
+  // FIX BUG-BE-HLD-005 (Part A parity — this isolation previously only
+  // existed on the SSH relay's pty-handler.ts): gh/glab auth-login PTYs need
+  // per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR, otherwise every user's
+  // `gh auth login` on this Dev Server shares one default config. Prefix
+  // match (not exact) since `command` carries the full shell command line.
+  const providerEnv =
+    userId && command?.startsWith('gh ') ? buildGhEnv(userId, {}) :
+    userId && command?.startsWith('glab ') ? buildGlabEnv(userId, {}) :
+    undefined
 
   try {
     span.step('node-pty-spawn', { shell, cwd })
@@ -188,7 +217,14 @@ export async function handlePtyCreate(
       cols,
       rows,
       cwd,
-      env: { ...process.env, TERM: 'xterm-256color', ...envOverride } as NodeJS.ProcessEnv,
+      env: {
+        ...process.env,
+        TERM: 'xterm-256color',
+        ...envOverride,
+        // Why last: per-user isolation must win over a caller-supplied env
+        // override, the same precedence pty-handler.ts uses.
+        ...(providerEnv as Record<string, string> | undefined)
+      } as NodeJS.ProcessEnv,
     })
 
     const entry: AgentPtyEntry = { pty: term, cwd, cols, rows, shell, buf: '', paneKey, tabId, notify }
@@ -206,6 +242,21 @@ export async function handlePtyCreate(
       AGENT_PTY_MAP.delete(ptyId)
       entry.notify('pty.exit', { id: ptyId, exitCode, signal: signal ?? null })
     })
+
+    if (shouldProviderDeliverCommand) {
+      setTimeout(() => {
+        // Why: re-check liveness — the PTY may have already exited (or been
+        // destroyed) in the short window since spawn; writing to a dead
+        // node-pty instance throws.
+        if (!AGENT_PTY_MAP.has(ptyId)) {return}
+        const submit = process.platform === 'win32' ? '\r' : '\n'
+        try {
+          term.write(buildStartupCommandSubmission(command as string, { submit, bracketedPasteSafe: false }))
+        } catch (err: unknown) {
+          log.warn(`pty.create (agent): startup command delivery failed: id=${ptyId} err=${err instanceof Error ? err.message : String(err)}`)
+        }
+      }, STARTUP_COMMAND_WRITE_DELAY_MS)
+    }
 
     log.info(`pty.create (agent): id=${ptyId} cwd=${cwd} shell=${shell}`)
     span.ok({ ptyId, shell, cwd })

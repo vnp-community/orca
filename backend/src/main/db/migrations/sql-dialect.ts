@@ -76,3 +76,17 @@ export function autoIncrementPrimaryKeySql(dialect: Dialect): string {
       return 'INTEGER PRIMARY KEY AUTOINCREMENT'
   }
 }
+
+/**
+ * Schema-qualified table name for the ADR-021 service-schema migrations
+ * (0019+). Postgres has real `CREATE SCHEMA` namespacing (`schema.table`);
+ * SQLite has none, and MySQL/TiDB's "schema" means a whole separate database
+ * (a bigger, deliberately-deferred change — see 0019's module doc comment).
+ * On every non-Postgres dialect this falls back to a flat `schema_table` name
+ * so local SQLite dev and the migration runner itself don't fail — the table
+ * still exists and is queryable, just without real cross-schema isolation
+ * until that dialect gets its own ADR-021 follow-up.
+ */
+export function serviceQualifiedTable(dialect: Dialect, schema: string, table: string): string {
+  return dialect === 'postgresql' ? `${schema}.${table}` : `${schema}_${table}`
+}

@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto'
 import { Tracers } from '../../shared/trace/tracers'
 import type { TraceSpan } from '../../shared/trace'
 import type { IConnectionPool } from '../db/pool'
+import type { BindValue } from '../db/types'
 import type { ProjectServerRouter } from '../project/ProjectServerRouter'
 import type { DAGBuilder } from './DAGBuilder'
 // FIX §0: import CLASS thật thay vì tự định nghĩa alias Record<string, fn> trùng tên —
@@ -169,7 +170,7 @@ export class WorkflowOrchestrator {
    */
   async listExecutions(filters: ListExecutionsFilter = {}): Promise<WorkflowExecution[]> {
     const clauses: string[] = []
-    const params: unknown[] = []
+    const params: BindValue[] = []
 
     if (filters.projectId) {
       clauses.push('project_id = ?')

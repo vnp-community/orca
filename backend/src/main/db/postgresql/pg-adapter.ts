@@ -151,9 +151,9 @@ export class PostgreSQLAdapter implements IAsyncDatabase {
     }
   }
 
-  async query(sql: string, params?: BindValue[]): Promise<Record<string, unknown>[]> {
+  async query<T = Record<string, unknown>>(sql: string, params?: BindValue[]): Promise<T[]> {
     const result = await (this.client as any).query(translatePlaceholders(sql), params ?? [])
-    return result.rows
+    return result.rows as T[]
   }
 }
 

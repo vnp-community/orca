@@ -21,6 +21,7 @@ import type { AgentLogger } from './agent-logger'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { createTracer } from '../shared/trace'
 import { Tracers } from '../shared/trace/tracers'
+import { assertNoGitInjectionFlags } from './agent-git-exec-validator'
 
 const gitTracer = createTracer('agent:git')
 
@@ -103,6 +104,21 @@ export function validateGitArgs(args: string[]): void {
     throw new GitValidationError(
       'GIT_SHELL_METACHARACTER_IN_ARG',
       'git config --global/--system user.name|user.email is not allowed via git.exec — use preflight.setGitIdentity'
+    )
+  }
+
+  // Why: closes the git-native injection/RCE footguns the subcommand
+  // allowlist + shell-metacharacter check don't cover on their own (a
+  // `-c core.sshCommand=...` global flag, `--upload-pack=`/`--receive-pack=`,
+  // unrestricted `git config` writes, ...) — see
+  // agent-git-exec-validator.ts's header for the full rationale and
+  // specs/agent/api/gaps-and-findings.md #4.
+  try {
+    assertNoGitInjectionFlags(args)
+  } catch (err: unknown) {
+    throw new GitValidationError(
+      'GIT_DISALLOWED_SUBCOMMAND',
+      err instanceof Error ? err.message : String(err)
     )
   }
 

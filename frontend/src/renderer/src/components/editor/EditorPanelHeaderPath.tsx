@@ -16,6 +16,7 @@ import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '../tab-bar/SortableTab'
 import { useEditorHeaderFileRename } from './editor-header-file-rename'
 import { getEditorHeaderCopyState } from './editor-header'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const isMac = navigator.userAgent.includes('Mac')
 const isLinux = navigator.userAgent.includes('Linux')
 
@@ -162,7 +163,7 @@ export function EditorPanelHeaderPath({
             <>
               <DropdownMenuItem
                 onSelect={() => {
-                  void window.api.ui.writeClipboardText(activeFile.filePath)
+                  void uiWriteClipboardText(activeFile.filePath)
                 }}
               >
                 <Copy className="w-3.5 h-3.5 mr-1.5" />
@@ -170,7 +171,7 @@ export function EditorPanelHeaderPath({
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
-                  void window.api.ui.writeClipboardText(activeFile.relativePath)
+                  void uiWriteClipboardText(activeFile.relativePath)
                 }}
               >
                 <Copy className="w-3.5 h-3.5 mr-1.5" />

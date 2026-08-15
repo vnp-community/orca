@@ -6,6 +6,7 @@ import { resolveCursorAgentImeAnchor } from '@/lib/pane-manager/terminal-ime-anc
 import { detectAgentStatusFromTitle, agentTypeToIconAgent, isClaudeAgent } from '@/lib/agent-status'
 import { resolvePaneTitleDecision } from './terminal-title-evidence'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
+import { needsRuntimeSshPassphrasePrompt } from '@/runtime/runtime-ssh-client'
 import { useAppStore } from '@/store'
 import { getWorktreeMapFromState } from '@/store/selectors'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
@@ -92,6 +93,7 @@ import { subscribeToTerminalUserInput } from './terminal-user-input-signal'
 import { registerPtySerializer, registerPtyTitleSource } from './pty-buffer-serializer'
 import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
 import { inspectRuntimeTerminalProcess } from '@/runtime/runtime-terminal-inspection'
+import { connectRuntimeSsh } from '@/runtime/runtime-ssh-client'
 import {
   discardTerminalOutput,
   flushTerminalOutput,
@@ -761,7 +763,7 @@ async function waitForSshConnection(connectionId: string): Promise<SshConnectRes
 
   const promise: Promise<SshConnectResult> = (async (): Promise<SshConnectResult> => {
     try {
-      await window.api.ssh.connect({ targetId: connectionId })
+      await connectRuntimeSsh(useAppStore.getState().settings, connectionId)
       return { connected: true }
     } catch (err) {
       console.warn(`Deferred SSH reconnect failed for ${connectionId}:`, err)
@@ -6795,9 +6797,10 @@ export function connectPanePty(
           // as before.
           let needsPrompt = false
           try {
-            needsPrompt = await window.api.ssh.needsPassphrasePrompt({
-              targetId: connectionId
-            })
+            needsPrompt = await needsRuntimeSshPassphrasePrompt(
+              useAppStore.getState().settings,
+              connectionId
+            )
           } catch (err) {
             console.warn('[pty-connection] needsPassphrasePrompt probe failed:', err)
             // Why: if the probe fails, fall through to the existing auto-connect

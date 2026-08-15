@@ -69,7 +69,11 @@ import type {
   FolderWorkspace,
   MemorySnapshot
 } from '../../shared/types'
-import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
+import type {
+  RuntimeClientEvent,
+  MenuCommandPayload,
+  WindowStateChangedState
+} from '../../shared/runtime-client-events'
 import { toRuntimeActivateWorktreeEvent } from '../../shared/runtime-client-events'
 import type { SshConnectionState } from '../../shared/ssh-types'
 import type { FeatureInteractionId } from '../../shared/feature-interactions'
@@ -693,6 +697,29 @@ export class OrcaRuntimeService {
   // methods, so they need a public entry point onto the client-event stream.
   notifySshStateChanged(targetId: string, state: SshConnectionState): void {
     this.emitClientEvent({ type: 'sshStateChanged', targetId, state })
+  }
+
+  // Why: menu-bar clicks and global keyboard shortcuts originate in window/menu
+  // wiring (createMainWindow.ts, index.ts), not a runtime method, so they need
+  // the same public client-event entry point as SSH state above — a paired
+  // client mirroring this host's session has no Electron IPC channel for them.
+  notifyMenuCommand(payload: MenuCommandPayload): void {
+    this.emitClientEvent({ type: 'menuCommand', ...payload })
+  }
+
+  // Why: BrowserWindow maximize/fullscreen transitions and the powerMonitor
+  // resume signal originate in window wiring; bridge them the same way as
+  // menu commands above.
+  notifyWindowStateChanged(state: WindowStateChangedState): void {
+    this.emitClientEvent({ type: 'windowStateChanged', state })
+  }
+
+  // Why: two-phase worktree-create progress originates in the IPC-layer
+  // create flow (worktree-remote.ts), not a runtime method, so it needs the
+  // same public entry point onto the client-event stream as SSH state above —
+  // paired web/mobile runtime clients have no Electron IPC for this event.
+  notifyWorktreeCreateProgress(creationId: string | undefined, phase: 'fetching' | 'creating'): void {
+    this.emitClientEvent({ type: 'worktreeCreateProgress', creationId, phase })
   }
 
   // Why: renderer-initiated meta updates intentionally skip the renderer

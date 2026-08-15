@@ -16,6 +16,7 @@ import { getNotificationSoundOptions } from '@/components/notification-sound-opt
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 
+import { shellPickAudio } from '../../runtime/runtime-shell-client'
 const CHOOSE_CUSTOM_SOUND_VALUE = 'choose-custom-file'
 
 type NotificationSoundSelectValue =
@@ -71,7 +72,7 @@ export function NotificationSoundSection({
   const handleChooseCustomSound = async (): Promise<void> => {
     setIsPickingSound(true)
     try {
-      const soundPath = await window.api.shell.pickAudio()
+      const soundPath = await shellPickAudio()
       if (soundPath) {
         await onUpdateNotificationSettings({ customSoundId: 'custom', customSoundPath: soundPath })
         await previewSound('custom')

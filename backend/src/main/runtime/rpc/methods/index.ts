@@ -38,6 +38,8 @@ import { GITHUB_AUTH_METHODS } from './github-auth'
 import { GITLAB_AUTH_METHODS } from './gitlab-auth'
 import { CREDENTIAL_METHODS } from './credentials'
 import { DEV_SERVER_METHODS } from './dev-server'
+import { ANNOTATION_METHODS } from './annotation'
+import { FLEET_METHODS } from './fleet'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -81,5 +83,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...GITHUB_AUTH_METHODS,
   ...GITLAB_AUTH_METHODS,
   ...CREDENTIAL_METHODS,
-  ...DEV_SERVER_METHODS
+  ...DEV_SERVER_METHODS,
+  ...ANNOTATION_METHODS,
+  ...FLEET_METHODS
 ]

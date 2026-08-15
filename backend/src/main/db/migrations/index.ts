@@ -25,6 +25,14 @@ import { migration0014WorkflowPauseState } from './0014_workflow_pause_state'
 import { migration0015AiProviderRotation } from './0015_ai_provider_rotation'
 import { migration0016TeamProjectSharingTaskExec } from './0016_team_project_sharing_task_exec'
 import { migration0017TeamProfileJson } from './0017_team_profile_json'
+import { migration0018Annotations } from './0018_annotations'
+// ─── ADR-021 Phase 0 — unified Postgres / microservice-schema scaffolding ────
+import { migration0019ServiceSchemasTenantRetrofit } from './0019_service_schemas_tenant_retrofit'
+import { migration0020OrchestrationSchema } from './0020_orchestration_schema'
+import { migration0021AutomationSchema } from './0021_automation_schema'
+import { migration0022NotificationUsageSchema } from './0022_notification_usage_schema'
+import { migration0023UsageStateBlob } from './0023_usage_state_blob'
+import { migration0024OrcaDataStateBlob } from './0024_orca_data_state_blob'
 import type { Migration } from './types'
 
 /** All migrations in version order. */
@@ -53,6 +61,21 @@ export const ALL_MIGRATIONS: readonly Migration[] = [
   migration0016TeamProjectSharingTaskExec,
   // v5.2 — Team profile storage (agent/editor/shell/mcp; ProfileResolver cascade-merge source)
   migration0017TeamProfileJson,
+  // BL-CR-02 — Inline code-review annotations (orca_annotations backing annotation.list/annotation.create)
+  migration0018Annotations,
+  // ADR-021 Phase 0 — service schemas + tenant_id retrofit + orchestration/automation/
+  // notification/usage schema scaffolding (specs/backend/models/08-postgres-microservices-target-architecture.md)
+  migration0019ServiceSchemasTenantRetrofit,
+  migration0020OrchestrationSchema,
+  migration0021AutomationSchema,
+  migration0022NotificationUsageSchema,
+  // ADR-021 — whole-state blob table backing the actual ClaudeUsageStore/
+  // CodexUsageStore Postgres swap (see 0023's module doc comment for why this
+  // exists alongside 0022's granular tables instead of using them directly)
+  migration0023UsageStateBlob,
+  // ADR-021 — whole-state blob table backing the actual Store (persistence.ts)
+  // Postgres swap (see 0024's module doc comment)
+  migration0024OrcaDataStateBlob,
 ]
 
 export { MigrationRunner } from './runner'

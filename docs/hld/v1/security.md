@@ -2,7 +2,9 @@
 
 **Tài liệu:** Security Model của Orca  
 **Tham chiếu:** SRS Section 4.3, logic/agent-orchestration/, logic/mobile-companion/  
-**Cập nhật:** 2026-07-28
+**Cập nhật:** 2026-07-28 (corrections 2026-08-14, xem ghi chú dưới)
+
+> **Ghi chú đối chiếu code (2026-08-14):** Phần lớn tài liệu này mô tả đúng ý định thiết kế và khớp code hiện tại. Các mục có gắn nhãn ✅ (implemented) / 🚧 (proposed, chưa implement) / ❌ (đã xác nhận sai/không tồn tại trong code) đã được đối chiếu trực tiếp `file:line` với `backend/`, `agent/` qua 4 audit: `audit/backend/backend-vs-design-review.md`, `audit/agent/connection-wire-protocol-vs-design-review.md`, `audit/agent/credential-fswatch-telemetry-vs-design-review.md`, `audit/agent/rpc-dispatch-lifecycle-vs-design-review.md`. Một số gap mà các audit đó phát hiện (2026-08-08) đã được fix trong code kể từ đó — nơi nào đã fix, ghi chú "Fixed" kèm bug ref thay vì mô tả như một lỗ hổng đang mở.
 
 ---
 
@@ -169,6 +171,12 @@ requireAdmin() → requireAuth() + check role == 'admin' → 403 if not
 - `requireAuth`: WebSocket upgrade, all API routes
 - `requireAdmin`: `/admin/api/*`
 
+**HTTP-layer `requireAdmin` (above) is correctly enforced and always has been.** The RPC-layer admin checks are a separate code path and had a real gap:
+
+**Fixed 2026-08-09 (was a real permission-bypass bug — BUG-BE-HLD-001/002):** `requireAdmin(ctx)` in `backend/src/main/profile/profile-rpc-handler.ts` and `requireOwnerOrAdmin(...)` in `backend/src/main/project/project-rpc-handler.ts` previously only checked that the caller was authenticated (`ctx.userId` present), **not** that their role was `'admin'` — any logged-in user, including role `'developer'`, could call `profile.updateCompany`, `profile.updateDept`, `profile.createCompany`, `profile.createDept`, `profile.setUserDept`, and override project ownership checks. This has been fixed: both guards now resolve the caller's real org-level role via `AuthUserStore` (`getUserRole(ctx.userId)`, wired in `server-bootstrap.ts`) and throw `FORBIDDEN` unless `role === 'admin'` — see `backend/src/main/profile/profile-rpc-handler.ts:301-308`.
+
+**Still an open gap:** RBAC remains fragmented across ~4 independent mechanisms with no single policy table — HTTP `requireAdmin` middleware, RPC `requireAdmin`, RPC `requireOwnerOrAdmin`, and fleet-level `resolveUserPermissions()` (`shared/rbac-types.ts`) are separate, not-fully-consistent implementations. There is no `hasPermission(role, resource, action)` function as a single source of truth (BUG-BE-HLD-003, still open).
+
 ---
 
 ## 9. Admin Audit Log
@@ -189,43 +197,56 @@ requireAdmin() → requireAuth() + check role == 'admin' → 403 if not
 
 ## 10. Agent WebSocket Auth
 
-### relay-websocket (Orca → Agent)
+### relay-websocket (Orca → Agent) — ✅ implemented
 
 ```
-Orca → HTTP Upgrade: ws://agent:6799/orca-relay
-      Header: Authorization: Bearer <agentToken>
+Orca → HTTP Upgrade: ws://agent:6799/orca-relay   (agent is the WS server)
+      Header: Authorization: Bearer <agentToken>  (or ?token= query param)
 Agent validates token → accept/reject
 ```
+`agent/src/relay/agent-connection-relay.ts:44-45,96-129`. Token is mandatory — if `ORCA_AGENT_TOKEN` is unset the agent process refuses to start (`process.exit(1)`), no insecure default fallback.
 
-### direct-websocket (Agent → Orca)
+### direct-websocket (Agent → Orca) — ⚠️ port corrected, flow corrected
 
 ```
-Agent → HTTP Upgrade: ws://orca:6768/agent
-Orca sends: { type: 'handshake-request' }
-Agent sends: { type: 'agent.handshake', agentToken, name, version }
-Orca validates agentToken (lookup trong DevServer config)
-  - Valid → { type: 'handshake-ok', sessionId }
-  - Invalid → WS close (4001 Unauthorized)
+Agent → HTTP Upgrade: ws://orca:6769/agent        ← was documented as :6768, code uses httpPort (default 6769)
+Agent sends first: { jsonrpc: '2.0', id: 1, method: 'agent.handshake', params: { agentToken, capabilities } }
+Orca validates agentToken (SHA-256 hash lookup against pending slot, in-memory)
+  - Valid   → normal JSON-RPC response { result: { ok: true } } (no separate "handshake-ok" message type)
+  - Invalid → JSON-RPC error -33101 AuthFailed, then WS close(1008)  ← NOT custom code 4001
 ```
+Evidence: `backend/src/server/index.ts:46-47,106,108` (`AgentWebSocketServer` attaches to `httpPort`, not `rpcPort`); `backend/src/main/dev-server/ws-handshake.ts:180-203` (auth-failure error + `close(1008,...)`); `agent/src/relay/agent-session.ts:196-219` (agent sends the handshake request, Orca does not send `handshake-request` first as previously documented).
 
-**Token management:**
-- Tokens lưu trong DevServer config (NOT in main DB)
-- Token hiển thị một lần khi tạo (sau đó hashed)
-- Revoke: xoá token khỏi DevServer config
+**Token lifecycle/management — 🚧 the model below is PROPOSED, not implemented (ADR-015/ADR-019 territory). Real mechanism, as shipped today:**
+
+| Aspect | Real behavior |
+|---|---|
+| Issuance | Self-service: agent (or an operator script) calls `POST /api/agent-token` with header `Authorization: Bearer <ORCA_AGENT_API_SECRET>` — a single static shared secret set once on the Orca Server, **not** an admin-UI-generated per-connection credential (`backend/src/server/agent-token-routes.ts`) |
+| Token format | **Predictable**: `agt-<devServerId>-<timestamp>` (`generateAgentToken()`, `agent/src/shared/agent-wire-protocol.ts:89-91`) — not `crypto.randomBytes(32)` |
+| Storage | **No DB table.** In-memory `Map` (`pendingMeta`/`pendingSlots` in `agent-ws-server.ts` / `agent-token-routes.ts`) — token is hashed (SHA-256) before being kept in the map, so no plaintext sits in memory/heap dumps long-term |
+| Renewal | Agent-side `AgentTokenManager` proactively renews at 80% of TTL (`TOKEN_RENEW_RATIO=0.8`, default TTL 24h) and pre-fetches the next token, so reconnects rarely hit an expired-token path (`agent/src/relay/agent-token-manager.ts`) — this is more sophisticated than the docs below assume, but it is still all keyed off the one static `ORCA_AGENT_API_SECRET` |
+| Revocation | **None.** There is no `DELETE /admin/api/agent-tokens/:id` or equivalent — the only way to invalidate access is to rotate `ORCA_AGENT_API_SECRET` server-wide, which invalidates every dev server's ability to mint a *new* token but does not kill already-issued live connections |
+| Admin UI | None — no token is ever shown once in an Admin Panel; there is no per-dev-server token registry to browse or revoke from |
+
+**Known weaknesses of the real mechanism:** the token format is guessable given a known `devServerId`; there is no way to revoke a single compromised dev server's access without rotating the shared secret for the whole fleet; and issuance auth is a single long-lived shared secret rather than a scoped, per-connection credential. Treat `ORCA_AGENT_API_SECRET` with the same care as a root credential.
 
 ---
 
 ## 11. WebCredentialStore
 
-**Mục đích:** Lưu API tokens cho integrations (Bitbucket, Linear, Jira...) mà không expose sang user khác.
+**Mục đích:** Lưu API tokens cho integrations (Bitbucket, Linear, Jira, Azure DevOps, Gitea) mà không expose sang user khác.
 
 ```
 Encryption: AES-256-GCM
-Key derivation: Per-user key từ userId + server secret (ORCA_CREDENTIAL_KEY env)
+Key derivation: Per-user key từ userId + server secret (ORCA_SERVER_SECRET env)  ← corrected: real env var
 Storage: File `~/.orca/users/<userId>/credentials.enc`
 IV: Random 12 bytes per encryption op
 Auth tag: 16 bytes (GCM)
 ```
+
+`backend/src/main/credentials/index.ts:11,16` — the real env var is `ORCA_SERVER_SECRET`; `ORCA_CREDENTIAL_KEY` (as previously documented here) does not exist anywhere in code.
+
+**Scope — does NOT cover GitHub/GitLab.** `CredentialService` only handles `'bitbucket'|'azure-devops'|'gitea'|'linear'|'jira'`. GitHub and GitLab auth instead rely on the OS keychain used by the `gh`/`glab` CLIs — a different trust mechanism, not AES-256-GCM-encrypted through this store.
 
 **API:**
 - `credentials.set(service, token)` → encrypt + write file
@@ -281,32 +302,45 @@ ProfileResolver: lockedSections = ['security'] → always use company values
 
 ### 5.2 AI Provider Credential Security (ADR-008)
 
-**Threat model:**
+**Threat model — corrected against real code (`agent/src/relay/agent-credential-store.ts`, `agent/src/relay/agent-spawner.ts`):**
 ```
 Threat: Orca Server compromise → attacker reads AI API keys
-Mitigation: Keys NEVER stored on Orca Server. Only on Dev Server.
+Mitigation: Keys NEVER written to disk on Orca Server. Only the .enc file lives on Dev Server.
+⚠️ Caveat (not just doc drift — a real architectural fact): this mitigation covers storage
+   only. On the SPAWN/USE path, Orca Server must resolve the credential and forward it as a
+   PLAINTEXT `resolvedApiKey` param in the `agent.spawn` RPC call — the Dev Server agent has
+   no way to decrypt the Layer-1 (browser-encrypted) blob itself. If Orca Server omits
+   `resolvedApiKey`, agent spawn now fails fast with a clear error (fixed — previously it
+   silently injected undecryptable ciphertext as the API key, BUG-AG-HLD-002) rather than
+   succeeding. So: "Orca Server never sees plaintext" is true for the credential-write path,
+   FALSE for the spawn/use path. See `agent/src/relay/agent-spawner.ts:227-243`.
 
 Threat: Man-in-the-middle relay interception
 Mitigation: SSH tunnel encrypts relay traffic
 
 Threat: Dev Server filesystem read by unauthorized user
-Mitigation: Files at ~/.orca/ai-providers/<id>.enc (AES-256-GCM)
-            Key derived from ORCA_AI_CREDENTIAL_KEY (env var, not on disk)
+Mitigation: Files at ~/.orca/credentials/<accountId>.enc (AES-256-GCM)   ← corrected path
+            (previously documented as ~/.orca/ai-providers/<id>.enc — that path only exists
+            in `ai-provider-handler.ts`, which is dead code with 0 callers)
+            Key derived via scrypt(ORCA_AI_CREDENTIAL_KEY, salt) — salt is a random 16 bytes
+            generated per write and stored alongside the ciphertext, not accountId-derived
 
 Threat: Quota abuse (user uses company AI key for personal)
-Mitigation: quota tracking per accountId per day, 80% alert, hard limit
+Mitigation: quota tracking per accountId per day, 80% alert (implemented, see below), hard limit
 ```
 
-**Key rotation procedure:**
-1. Admin tạo new account với key mới
-2. 30s grace period: cả old và new account active
-3. Old account deactivated
-4. Background health check cron verify new key status
+**Key rotation procedure — ✅ implemented (`backend/src/main/ai-providers/AIProviderService.ts`):**
+1. Admin tạo new account với key mới → `aiProvider.rotateKey` RPC
+2. 30s grace period (`DEFAULT_ROTATION_GRACE_PERIOD_MS = 30_000`): cả old (status `'rotating'`) và new account active
+3. Old account deactivated once grace period elapses (`completeRotation()`, also triggered by crash-recovery health check)
+4. Audit log entry written on create/update/delete/credential-write
+
+**80% quota alert — ✅ implemented** (`ProviderHealthChecker.ts`, `QUOTA_ALERT_THRESHOLD_RATIO = 0.8`), debounced to once per account per day.
 
 **`ORCA_AI_CREDENTIAL_KEY` management:**
 - Không được commit vào git
-- Phải set trên mỗi Dev Server (khác với Orca Server secret)
-- Rotation: re-encrypt tất cả `.enc` files với key mới (migration script cần thiết)
+- Phải set trên mỗi Dev Server (khác với Orca Server secret `ORCA_SERVER_SECRET`)
+- Rotation: re-encrypt tất cả `.enc` files với key mới (migration script cần thiết) — this specific key-rotation-for-the-master-key-itself is not the same as the account key rotation described above, and remains a manual/undocumented procedure
 
 ---
 
@@ -414,7 +448,7 @@ Worktree access:
 | Agent WS token auth | ✅ | ADR-005 |
 | Credential AES-256-GCM per-user | ✅ | ADR-006 |
 | Profile lock (security section) | 🚧 | ADR-007 |
-| AI keys NEVER on Orca Server | 🚧 | ADR-008 |
+| AI keys NEVER on Orca Server | ⚠️ Partial — true for storage, false for spawn path (Orca Server forwards plaintext `resolvedApiKey`; see §5.2) | ADR-008 |
 | Workflow shell injection prevention | 🚧 | ADR-009 |
 | Task grant no escalation | 🚧 | ADR-010 |
 | Relay file path traversal prevention | 🚧 | ADR-011 |
@@ -423,6 +457,19 @@ Worktree access:
 ---
 
 ## Trust Boundary 5: Gateway ↔ Dev Server Agent (v6.0 NEW)
+
+> 🚧 **PROPOSED — not implemented.** Everything from here through the end of §12 describes the
+> target architecture of `docs/adrs/v1/ADR-015-signed-execution-context-gateway-agent.md` and
+> `docs/adrs/v2/ADR-017/018/019`, all of which self-declare `❌ Chưa implement` / `🚧 Proposed`.
+> Confirmed by direct code inspection (`agent/src/relay/context.ts:20-34`): there is no
+> `ContextVerifier`, `SignedExecutionContext`, `RpcExecutionContext`, or `_ctx` field anywhere in
+> `agent/src`. `RelayContext.registerRoot()` is an intentionally-empty no-op — the team explicitly
+> **removed** the equivalent agent-side path/FS allowlist (see `docs/relay-fs-allowlist-removal.md`,
+> cited directly in the code comment) and instead trusts the renderer/Orca-Server layer entirely,
+> because "a compromised renderer can already weaponize `pty.spawn` and `git.exec` to reach any
+> path the SSH user can reach." That is the REAL current trust model for the Gateway↔Agent
+> channel — not per-request HMAC-signed, TTL-bounded contexts. For the real agent authentication
+> mechanism in production today, see **§10 Agent WebSocket Auth** above.
 
 ```
 ┌──────────────── TRUST BOUNDARY 5: Gateway–Agent ──────────────────────┐
@@ -442,9 +489,9 @@ Worktree access:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 12. Dev Server Agent Security Model (v6.0)
+### 12. Dev Server Agent Security Model (v6.0) — 🚧 Proposed, not implemented (see banner above)
 
-#### 12.1 Agent Authentication
+#### 12.1 Agent Authentication — 🚧 Proposed. Real mechanism is documented in §10 above (self-service `POST /api/agent-token` + static `ORCA_AGENT_API_SECRET`, predictable token format, no DB, no revoke endpoint).
 
 | Aspect | Implementation |
 |--------|---------------|

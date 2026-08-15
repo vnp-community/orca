@@ -2451,6 +2451,24 @@ function deleteRemovedTerminalScrollbackSnapshots(
 
 export type StoreOptions = {
   dataFile?: string
+  /**
+   * ADR-021 §"chỉ dùng 1 database" — server mode pre-fetches this from
+   * Postgres (PgOrcaDataStatePersistence.loadRawState(), async) BEFORE
+   * constructing Store, since the constructor's own load() is synchronous
+   * and Postgres I/O cannot happen inside it. `null` means "no row yet"
+   * (fresh install) — same as "file does not exist" for the sync path this
+   * replaces. `undefined` (the default) means "not using Postgres — read
+   * dataFile normally," so Electron desktop mode is unaffected by this
+   * option existing. See orca-data-state-persistence.ts's module doc comment.
+   */
+  preloadedRawState?: PersistedState | null
+  /**
+   * ADR-021 — when set, writeToDiskAsync() calls this with its already-built
+   * (secrets-encrypted) JSON payload instead of writing dataFile. Debounce/
+   * hash-skip/generation-race logic in scheduleSave()/writeToDiskAsync() is
+   * unchanged; only the final "where do the bytes go" step is redirected.
+   */
+  persistOverride?: (payload: string) => Promise<void>
 }
 
 export class Store {
@@ -2474,6 +2492,13 @@ export class Store {
   private githubCacheDirty = false
   private gitUsernameCache = new Map<string, string>()
   private loadNeedsSave = false
+  // ADR-021 — see StoreOptions' doc comments. persistOverride is NOT
+  // readonly — hydrateFromPostgres() (called post-construction, since
+  // server-bootstrap.ts's DevServerManager already needs a live `store`
+  // reference before the DB pool exists — see that method's doc comment)
+  // sets it once the pool becomes available.
+  private readonly preloadedRawState: PersistedState | null | undefined
+  private persistOverride: ((payload: string) => Promise<void>) | undefined
   private settingsChangeListeners = new Set<
     (
       updates: Partial<GlobalSettings>,
@@ -2487,6 +2512,8 @@ export class Store {
     // Why: profile switching creates more than one possible state path. Capture
     // the path per Store instance so late async writes cannot follow a global path.
     this.dataFile = options.dataFile ?? getDataFile()
+    this.preloadedRawState = options.preloadedRawState
+    this.persistOverride = options.persistOverride
     const profileSnapshotRoot = getProfileTerminalScrollbackSnapshotRoot(this.dataFile)
     const legacySnapshotRoot = getProfileTerminalScrollbackSnapshotRoot(getDataFile())
     this.terminalScrollbackSnapshotStorage = {
@@ -2702,7 +2729,16 @@ export class Store {
     // users as fresh, flipping them to default-on in violation of the
     // social contract we installed them under.
     const dataFile = this.dataFile
-    const fileExistedOnLoad = existsSync(dataFile)
+    // ADR-021 §"chỉ dùng 1 database": when server-bootstrap.ts pre-fetched
+    // state from Postgres (StoreOptions.preloadedRawState !== undefined),
+    // that IS the "does a row already exist" signal — skip the file-existence
+    // check/read entirely and feed the pre-fetched object into the exact same
+    // migration/decrypt/defaults-merge pipeline below. See
+    // orca-data-state-persistence.ts's module doc comment.
+    const usingPreloadedState = this.preloadedRawState !== undefined
+    const fileExistedOnLoad = usingPreloadedState
+      ? this.preloadedRawState !== null
+      : existsSync(dataFile)
     logPersistenceStartupMilestone('persistence-load-start', {
       fileExists: fileExistedOnLoad
     })
@@ -2710,15 +2746,25 @@ export class Store {
     let result: PersistedState | null = null
     try {
       if (fileExistedOnLoad) {
-        const readStartedAt = performance.now()
-        const raw = readFileSync(dataFile, 'utf-8')
-        logPersistenceStartupMilestone('persistence-read-done', {
-          bytes: Buffer.byteLength(raw),
-          durationMs: Math.round(performance.now() - readStartedAt)
-        })
-        logPersistenceStartupMilestone('persistence-json-parse-start')
-        const parsed = JSON.parse(raw) as PersistedState
-        logPersistenceStartupMilestone('persistence-json-parse-done')
+        let parsed: PersistedState
+        if (usingPreloadedState) {
+          // Why no readFileSync/JSON.parse here: the bytes already went
+          // through JSON.parse once inside PgOrcaDataStatePersistence.loadRawState()
+          // (server-bootstrap.ts, before this constructor ran) — reparsing a
+          // JS object would be a no-op at best and a lossy round-trip at worst.
+          parsed = this.preloadedRawState as PersistedState
+          logPersistenceStartupMilestone('persistence-read-done', { bytes: -1, durationMs: 0 })
+        } else {
+          const readStartedAt = performance.now()
+          const raw = readFileSync(dataFile, 'utf-8')
+          logPersistenceStartupMilestone('persistence-read-done', {
+            bytes: Buffer.byteLength(raw),
+            durationMs: Math.round(performance.now() - readStartedAt)
+          })
+          logPersistenceStartupMilestone('persistence-json-parse-start')
+          parsed = JSON.parse(raw) as PersistedState
+          logPersistenceStartupMilestone('persistence-json-parse-done')
+        }
 
         // Why: secret settings are stored encrypted on disk via safeStorage.
         // Decrypt at the load boundary so the rest of the app sees plaintext.
@@ -3318,7 +3364,12 @@ export class Store {
     // because a user whose `orca-data.json` got corrupted is not a fresh
     // install of the telemetry release — they still count as existing and
     // must see the opt-in banner, not the default-on toast.
-    if (result === null && allowBackupRecovery) {
+    // ADR-021: backup recovery reads local .bak files — meaningless (and
+    // actively wrong) when the state source is Postgres, not this dataFile.
+    // A stale local backup from a previous non-Postgres run must never
+    // silently override real Postgres state on a parse failure; fall through
+    // to defaults instead, same as "no file and no backup" already does.
+    if (result === null && allowBackupRecovery && !usingPreloadedState) {
       let hasBackup = false
       for (let i = 0; i < BACKUP_COUNT; i++) {
         if (existsSync(backupPath(dataFile, i))) {
@@ -3512,6 +3563,55 @@ export class Store {
     }
   }
 
+  /**
+   * ADR-021 §"chỉ dùng 1 database" — switches this already-constructed Store
+   * to Postgres for all FUTURE reads/writes. Called once, post-construction,
+   * from server-bootstrap.ts after the DB pool exists.
+   *
+   * Why post-construction (not StoreOptions.preloadedRawState at construction
+   * time, like every other ADR-021 store): `DevServerManager` and several IPC
+   * handler registrations need a live `store` reference before the DB
+   * pool/tenantId are resolved in server-bootstrap.ts's current initialization
+   * order — reordering bootstrap to create the pool first would also have to
+   * move DevServerManager/RelayConnectionPool/WebCredentialStore construction,
+   * a much larger, riskier restructuring than this method. Called before
+   * `rpcServer.start()`, so no real client request can ever observe the
+   * pre-hydration (file-loaded or default) state.
+   *
+   * Two cases:
+   * - No row in Postgres yet (first boot with Postgres configured): seed it
+   *   with whatever the constructor already loaded (from the local file, or
+   *   defaults) — that value already went through the full 700+ line
+   *   migration/normalize pipeline in load(), unchanged.
+   * - A row exists: replace `this.state` with it. Deliberately NOT re-run
+   *   through load()'s full migration pipeline (that logic is entangled with
+   *   constructor-only fields like `loadNeedsSave` and is a return-a-new-
+   *   object function, not a re-invokable "migrate this object in place"
+   *   one) — only a shallow defaults merge
+   *   (`{...getDefaultPersistedState(), ...postgresState}`), so top-level
+   *   fields added by an app version newer than the Postgres row's last
+   *   write still get a default instead of `undefined`. Known gap vs. the
+   *   file path's per-field migrations (e.g. migrateTerminalScrollbackRows)
+   *   — acceptable because a Postgres row is always written by
+   *   buildStateToSave(), i.e. always already in *some* fully-migrated
+   *   shape, just possibly an older one; worth revisiting if a future
+   *   PersistedState field needs its own non-trivial migration logic to run
+   *   on a Postgres-sourced load, not just a default-fill.
+   */
+  async hydrateFromPostgres(persistence: {
+    loadRawState<T>(): Promise<T | null>
+    save(payload: string): Promise<void>
+  }): Promise<void> {
+    const existing = await persistence.loadRawState<PersistedState>()
+    if (existing) {
+      this.state = { ...getDefaultPersistedState(homedir()), ...existing }
+    } else {
+      await persistence.save(this.buildStateToSave())
+      this.lastWrittenStateHash = this.computeStateHash()
+    }
+    this.persistOverride = (payload) => persistence.save(payload)
+  }
+
   // Why githubCache is omitted: it is memory-only during the session (see
   // getGithubCacheFile) — excluding it from both the payload and the hash
   // keeps cache refreshes from ever touching the durable file.
@@ -3559,6 +3659,19 @@ export class Store {
       return
     }
     const payload = this.buildStateToSave()
+
+    // ADR-021 §"chỉ dùng 1 database": server mode redirects here instead of
+    // the file tmp-write+rename+backup-rotation path below — none of that
+    // (tmp files, atomic rename, .bak rotation) applies to a Postgres UPSERT,
+    // which is already atomic. Same generation/hash bookkeeping either way.
+    if (this.persistOverride) {
+      await this.persistOverride(payload)
+      if (this.writeGeneration === gen) {
+        this.lastWrittenStateHash = stateHash
+      }
+      return
+    }
+
     const dataFile = this.dataFile
     const dir = dirname(dataFile)
     await mkdir(dir, { recursive: true }).catch(() => {})

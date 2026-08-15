@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
+import { openRuntimeNotificationSystemSettings } from '@/runtime/runtime-notifications-client'
 
 // Why: agent completions can dispatch in bursts; one in-app pointer at the
 // broken OS setting per session teaches the fix without nagging.
@@ -31,7 +32,7 @@ export function showBlockedNotificationFallbackToast(): void {
           'Open System Settings'
         ),
         onClick: () => {
-          void window.api.notifications.openSystemSettings()
+          void openRuntimeNotificationSystemSettings()
         }
       }
     }

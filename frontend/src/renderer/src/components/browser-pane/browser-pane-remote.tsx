@@ -69,6 +69,8 @@ import {
   toDisplayUrl
 } from './BrowserPane'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export type BrowserTabPageState = Partial<
   Pick<
     BrowserPageState,
@@ -1681,7 +1683,7 @@ export function RemoteBrowserPagePane({
                       onClick={() => {
                         const targetUrl = normalizeExternalBrowserUrl(contextMenu.linkUrl!)
                         if (targetUrl) {
-                          void window.api.shell.openUrl(targetUrl)
+                          void shellOpenUrl(targetUrl)
                         }
                         setContextMenu(null)
                       }}
@@ -1695,7 +1697,7 @@ export function RemoteBrowserPagePane({
                       role="menuitem"
                       className="relative flex w-full cursor-default items-center gap-2 rounded-[7px] px-2 py-0.5 text-[12px] leading-5 font-medium outline-none select-none hover:bg-black/8 dark:hover:bg-white/14"
                       onClick={() => {
-                        void window.api.ui.writeClipboardText(contextMenu.linkUrl ?? '')
+                        void uiWriteClipboardText(contextMenu.linkUrl ?? '')
                         setContextMenu(null)
                       }}
                     >
@@ -1713,7 +1715,7 @@ export function RemoteBrowserPagePane({
                       role="menuitem"
                       className="relative flex w-full cursor-default items-center gap-2 rounded-[7px] px-2 py-0.5 text-[12px] leading-5 font-medium outline-none select-none hover:bg-black/8 dark:hover:bg-white/14"
                       onClick={() => {
-                        void window.api.ui.writeClipboardText(contextMenu.selectionText)
+                        void uiWriteClipboardText(contextMenu.selectionText)
                         setContextMenu(null)
                       }}
                     >
@@ -1759,7 +1761,7 @@ export function RemoteBrowserPagePane({
                   onClick={() => {
                     const targetUrl = normalizeExternalBrowserUrl(contextMenu.pageUrl)
                     if (targetUrl) {
-                      void window.api.shell.openUrl(targetUrl)
+                      void shellOpenUrl(targetUrl)
                     }
                     setContextMenu(null)
                   }}
@@ -1773,7 +1775,7 @@ export function RemoteBrowserPagePane({
                   role="menuitem"
                   className="relative flex w-full cursor-default items-center gap-2 rounded-[7px] px-2 py-0.5 text-[12px] leading-5 font-medium outline-none select-none hover:bg-black/8 dark:hover:bg-white/14"
                   onClick={() => {
-                    void window.api.ui.writeClipboardText(contextMenu.pageUrl)
+                    void uiWriteClipboardText(contextMenu.pageUrl)
                     setContextMenu(null)
                   }}
                 >

@@ -114,9 +114,9 @@ export class SqliteAdapter implements ISyncDatabase {
     }
   }
 
-  async query(sql: string, params?: BindValue[]): Promise<Record<string, unknown>[]> {
+  async query<T = Record<string, unknown>>(sql: string, params?: BindValue[]): Promise<T[]> {
     const stmt = this.prepare(sql) as SqliteStatement
-    return stmt.all(...(params ?? []))
+    return stmt.all(...(params ?? [])) as unknown as T[]
   }
 }
 

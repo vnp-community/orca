@@ -384,26 +384,53 @@ describe('agent.exec — stepId / parentTraceId (CR-TRACE-017)', () => {
   })
 })
 
-// ─── shell.exec / notification.send — documented gap (CR-TRACE-017) ──────────
-describe('shell.exec / notification.send — documented gap (CR-TRACE-017)', () => {
-  it('shell.exec returns MethodNotFound today (no agent-side handler exists)', async () => {
+// ─── shell.exec (CR-TRACE-017 gap closed — specs/agent/api/gaps-and-findings.md #1) ──
+describe('shell.exec', () => {
+  it('executes the script and returns stdout/exitCode', async () => {
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
     await dispatcher.dispatch(ws as any, createWireState(), {
       jsonrpc: '2.0', id: 1, method: 'shell.exec', params: { script: 'echo hi' },
     })
     const resp = lastResponseJson(ws) as any
-    expect(resp.error.code).toBe(AgentErrorCode.MethodNotFound)
+    expect(resp.error).toBeUndefined()
+    expect(resp.result.exitCode).toBe(0)
+    expect(resp.result.stdout.trim()).toBe('hi')
   })
 
-  it('notification.send returns MethodNotFound today (no agent-side handler exists)', async () => {
+  it('returns InvalidParams when script is missing', async () => {
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'shell.exec', params: {},
+    })
+    const resp = lastResponseJson(ws) as any
+    expect(resp.error.code).toBe(AgentErrorCode.InvalidParams)
+  })
+})
+
+// ─── notification.send (CR-TRACE-017 gap closed — specs/agent/api/gaps-and-findings.md #1) ──
+describe('notification.send', () => {
+  it('acknowledges the notification without erroring', async () => {
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
     await dispatcher.dispatch(ws as any, createWireState(), {
       jsonrpc: '2.0', id: 1, method: 'notification.send', params: { message: 'hi' },
     })
     const resp = lastResponseJson(ws) as any
-    expect(resp.error.code).toBe(AgentErrorCode.MethodNotFound)
+    expect(resp.error).toBeUndefined()
+    expect(resp.result.ok).toBe(true)
+    expect(typeof resp.result.delivered).toBe('boolean')
+  })
+
+  it('returns InvalidParams when message is missing', async () => {
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'notification.send', params: {},
+    })
+    const resp = lastResponseJson(ws) as any
+    expect(resp.error.code).toBe(AgentErrorCode.InvalidParams)
   })
 })
 

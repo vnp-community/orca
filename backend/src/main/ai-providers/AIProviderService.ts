@@ -13,6 +13,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { IConnectionPool } from '../db/pool'
+import type { BindValue } from '../db/types'
 import type { DevServerManager } from '../dev-server/dev-server-manager'
 import type { RelayConnectionPool } from '../dev-server/relay-connection-pool'
 import { Tracers } from '../../shared/trace/tracers'
@@ -197,7 +198,7 @@ export class AIProviderService {
       last_health_check as lastHealthCheck, quota_limit_day as quotaLimitDay,
       created_by as createdBy, created_at as createdAt, updated_at as updatedAt
     FROM orca_ai_provider_accounts WHERE dev_server_id = ?`
-    const params: unknown[] = [devServerId]
+    const params: BindValue[] = [devServerId]
     if (scope) {
       sql += ' AND scope = ?'
       params.push(scope)
@@ -225,7 +226,7 @@ export class AIProviderService {
   async updateAccount(accountId: string, patch: UpdateAccountParams, actorUserId?: string): Promise<void> {
     const now = Date.now()
     const sets: string[] = ['updated_at = ?']
-    const values: unknown[] = [now]
+    const values: BindValue[] = [now]
 
     if (patch.label !== undefined) { sets.push('label = ?'); values.push(patch.label) }
     if (patch.model !== undefined) { sets.push('model = ?'); values.push(patch.model) }

@@ -11,6 +11,7 @@ import { ProviderHostScopeControl } from './ProviderHostScopeControl'
 import { usePreflightCardStatuses } from './source-control-preflight-card-status'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 function ProviderAccountScopeDetails({
   children
 }: {
@@ -104,7 +105,7 @@ export function GitHubIntegrationCard(): React.JSX.Element {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.api.shell.openUrl('https://cli.github.com')}
+                  onClick={() => shellOpenUrl('https://cli.github.com')}
                 >
                   <ExternalLink className="size-3.5 mr-1.5" />
                   {translate(
@@ -139,9 +140,7 @@ export function GitHubIntegrationCard(): React.JSX.Element {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    window.api.shell.openUrl('https://cli.github.com/manual/gh_auth_login')
-                  }
+                  onClick={() => shellOpenUrl('https://cli.github.com/manual/gh_auth_login')}
                 >
                   <ExternalLink className="size-3.5 mr-1.5" />
                   {translate(
@@ -233,9 +232,7 @@ export function GitLabIntegrationCard(): React.JSX.Element {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    window.api.shell.openUrl('https://gitlab.com/gitlab-org/cli#installation')
-                  }
+                  onClick={() => shellOpenUrl('https://gitlab.com/gitlab-org/cli#installation')}
                 >
                   <ExternalLink className="size-3.5 mr-1.5" />
                   {translate(
@@ -271,7 +268,7 @@ export function GitLabIntegrationCard(): React.JSX.Element {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    window.api.shell.openUrl(
+                    shellOpenUrl(
                       'https://gitlab.com/gitlab-org/cli/-/blob/main/docs/source/auth/login.md'
                     )
                   }

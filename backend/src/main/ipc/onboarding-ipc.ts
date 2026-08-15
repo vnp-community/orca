@@ -8,6 +8,8 @@ import type { Store } from '../persistence'
 import { buildAgentDetectionCommands } from '../../shared/agent-detection-commands'
 import type { RemotePreflightStatus, WindowsTerminalCapabilities } from '../../shared/dev-server-types'
 import type { OnboardingChecklistState, PerServerChecklistState } from '../../shared/types'
+import { getRemotePtyProvider } from './pty'
+import { buildPosixShellCommand } from '../../shared/posix-shell-quote'
 
 // ── Cache ─────────────────────────────────────────────────────────────────────
 
@@ -241,7 +243,14 @@ export function registerOnboardingIpcHandlers(
   // ── onboarding.openGhAuthTerminal (Phase 2) ──────────────────────────────────
   // Why: gh auth login is interactive — run it in a remote PTY on the dev server
   // and stream the output back to the renderer via the existing PTY bridge.
-  // The relay's 'pty.create' method is used (same as terminal PTY sessions).
+  // Routed through the IPtyProvider registry (getRemotePtyProvider), not a raw
+  // relay.call('pty.spawn', ...): 'pty.spawn' only exists on relay-ssh dev
+  // servers — direct-websocket/relay-websocket (the default connection mode)
+  // only register 'pty.create', which the old code bypassed entirely,
+  // throwing MethodNotFound. getRemotePtyProvider() resolves to whichever
+  // provider (SshPtyProvider/DevServerPtyProvider) the connection type
+  // actually supports, and both now forward `command`/`commandDelivery`
+  // correctly. See specs/agent/api/gaps-and-findings.md #5.
 
   ipcMain.handle(
     'onboarding.openGhAuthTerminal',
@@ -249,18 +258,16 @@ export function registerOnboardingIpcHandlers(
       _event,
       params: { devServerId: string }
     ): Promise<{ ptyId: string; devServerId: string }> => {
-      const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) {throw new Error('Dev server not connected')}
-      // Why: call the relay's pty.spawn to spawn 'gh auth login' in a remote PTY.
+      const provider = getRemotePtyProvider(params.devServerId)
+      if (!provider) {throw new Error('Dev server not connected')}
       // The ptyId is returned to the renderer to subscribe to pty output events.
-      const ptyId = await relay.call<string>('pty.spawn', {
-        command: 'gh',
-        args: ['auth', 'login'],
-        env: {},
+      const result = await provider.spawn({
         cols: 120,
-        rows: 30
+        rows: 30,
+        command: buildPosixShellCommand(['gh', 'auth', 'login']),
+        commandDelivery: 'provider'
       })
-      return { ptyId, devServerId: params.devServerId }
+      return { ptyId: result.id, devServerId: params.devServerId }
     }
   )
 

@@ -22,6 +22,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { IConnectionPool } from '../db/pool'
+import type { BindValue } from '../db/types'
 import type { TaskDAGValidator } from './TaskDAGValidator'
 import type {
   OrcaTask,
@@ -96,7 +97,7 @@ export class TaskService {
 
   async update(taskId: string, patch: Partial<Omit<OrcaTask, 'id' | 'createdAt'>>): Promise<void> {
     const sets: string[] = ['updated_at = ?']
-    const values: unknown[] = [Date.now()]
+    const values: BindValue[] = [Date.now()]
 
     if (patch.title !== undefined) { sets.push('title = ?'); values.push(patch.title) }
     if (patch.description !== undefined) { sets.push('description = ?'); values.push(patch.description) }
@@ -255,7 +256,7 @@ export class TaskService {
 
   async list(filters: ListTasksFilter = {}): Promise<OrcaTask[]> {
     const clauses: string[] = []
-    const params: unknown[] = []
+    const params: BindValue[] = []
 
     if (filters.projectId) { clauses.push('project_id = ?'); params.push(filters.projectId) }
     if (filters.parentId !== undefined) { clauses.push('parent_id = ?'); params.push(filters.parentId) }

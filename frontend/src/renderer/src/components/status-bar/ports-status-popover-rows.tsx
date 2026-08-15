@@ -21,6 +21,7 @@ import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner
 import type { WorkspacePort } from '../../../../shared/workspace-ports'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 function PortAction({
   label,
   tooltipLabel = label,
@@ -149,7 +150,7 @@ export function PortRow({
       event.stopPropagation()
       recordFeatureInteraction('ports')
       const address = addressForPort(port)
-      void window.api.ui.writeClipboardText(address)
+      void uiWriteClipboardText(address)
       toast.success(
         translate(
           'auto.components.status.bar.ports.status.popover.rows.480d8f2347',

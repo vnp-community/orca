@@ -37,6 +37,7 @@ import {
 } from './terminal-link-open-hints'
 import { resolveKnownWorktreeRootPathLink } from './terminal-worktree-path-link'
 import { isTerminalLinkActivation } from './terminal-link-activation'
+import { shellPathExists } from '../../runtime/runtime-shell-client'
 
 export { openDetectedFilePath } from './terminal-file-open-routing'
 export { openFilePathLinkAtBufferPosition } from './terminal-file-link-hit-testing'
@@ -56,10 +57,7 @@ export type LinkHandlerDeps = {
   getRuntimeEnvironmentIdForPane?: (paneId: number) => string | null
 }
 
-type ProvidedFileLink = {
-  link: ILink
-  logicalLine: WrappedLogicalLine
-}
+type ProvidedFileLink = { link: ILink; logicalLine: WrappedLogicalLine }
 
 function rangesOverlap(left: ILink['range'], right: ILink['range']): boolean {
   const leftStartsAfterRightEnds =
@@ -170,7 +168,7 @@ export function createFilePathLinkProvider(
                     exists =
                       fileContext.connectionId || isRemoteRuntimePath
                         ? await runtimePathExists(fileContext, resolved.absolutePath)
-                        : await window.api.shell.pathExists(resolved.absolutePath)
+                        : await shellPathExists(resolved.absolutePath)
                   } catch {
                     // Why: a hovered/detected path can legitimately point outside
                     // the owning runtime worktree (e.g. text printed by a command

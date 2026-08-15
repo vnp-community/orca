@@ -140,7 +140,7 @@
 Tất cả ADRs được viết dựa trên phân tích:
 - **Codebase:** `src/main/`, `src/relay/`, `src/platform/`, `src/server/`, `src/agent/` (v6.0 new)
 - **Deploy:** `deploy/dev/agent/agent.js`, `deploy/agent/` (v6.0)
-- **HLD:** `docs/hld/README.md`, `C3-components.md`, `C4-code.md`, `security.md`
+- **HLD:** `docs/hld/v1/README.md`, `docs/hld/v1/C3-components.md`, `docs/hld/v1/C4-code.md`, `docs/hld/v1/security.md` (tầm nhìn v6.0/proposed) + `docs/hld/backend-server-architecture.md`, `docs/hld/dev-server-architecture.md`, `docs/hld/web-server-architecture.md` (kiến trúc hiện hành, đã cập nhật 2026-08-14)
 - **Features:** `docs/features/F01–F39`
 - **CRs:** `docs/crs/v2/dev-server/CR-DS-001–005`
 

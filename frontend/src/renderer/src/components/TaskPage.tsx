@@ -266,6 +266,7 @@ import {
   type LinearViewMode
 } from '@/components/task-page-localized-options'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 const LINEAR_ITEM_LIMIT = 36
 
 const GITHUB_TASK_GRID_CLASS =
@@ -3716,7 +3717,7 @@ export default function TaskPage(): React.JSX.Element {
                               if (!selectedLinearTeamForExternalLink?.url) {
                                 return
                               }
-                              void window.api.shell.openUrl(selectedLinearTeamForExternalLink.url)
+                              void shellOpenUrl(selectedLinearTeamForExternalLink.url)
                             }}
                             disabled={!selectedLinearTeamForExternalLink}
                             aria-label={
@@ -3884,7 +3885,7 @@ export default function TaskPage(): React.JSX.Element {
                             if (!selectedGitHubRepoExternalLink?.url) {
                               return
                             }
-                            void window.api.shell.openUrl(selectedGitHubRepoExternalLink.url)
+                            void shellOpenUrl(selectedGitHubRepoExternalLink.url)
                           }}
                           aria-label={
                             selectedGitHubRepoExternalLink
@@ -5169,9 +5170,7 @@ export default function TaskPage(): React.JSX.Element {
                                       )}
                                     </DropdownMenuItem>
                                   ) : null}
-                                  <DropdownMenuItem
-                                    onSelect={() => window.api.shell.openUrl(item.url)}
-                                  >
+                                  <DropdownMenuItem onSelect={() => shellOpenUrl(item.url)}>
                                     <ExternalLink className="size-4" />
                                     {translate(
                                       'auto.components.TaskPage.c1d1600362',
@@ -5242,9 +5241,7 @@ export default function TaskPage(): React.JSX.Element {
                                       )}
                                     </DropdownMenuItem>
                                   ) : null}
-                                  <DropdownMenuItem
-                                    onSelect={() => window.api.shell.openUrl(item.url)}
-                                  >
+                                  <DropdownMenuItem onSelect={() => shellOpenUrl(item.url)}>
                                     <ExternalLink className="size-4" />
                                     {translate(
                                       'auto.components.TaskPage.c1d1600362',
@@ -5331,11 +5328,11 @@ export default function TaskPage(): React.JSX.Element {
                       role="button"
                       tabIndex={0}
                       key={todo.id}
-                      onClick={() => void window.api.shell.openUrl(todo.targetUrl)}
+                      onClick={() => void shellOpenUrl(todo.targetUrl)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
-                          void window.api.shell.openUrl(todo.targetUrl)
+                          void shellOpenUrl(todo.targetUrl)
                         }
                       }}
                       className="grid w-full cursor-pointer gap-3 px-3 py-2 text-left grid-cols-[110px_minmax(0,3fr)_minmax(120px,1.2fr)_110px_50px] hover:bg-muted/50"
@@ -5493,7 +5490,7 @@ export default function TaskPage(): React.JSX.Element {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            void window.api.shell.openUrl(item.url)
+                            void shellOpenUrl(item.url)
                           }}
                           aria-label={translate(
                             'auto.components.TaskPage.bcdc1330b2',
@@ -5707,7 +5704,7 @@ export default function TaskPage(): React.JSX.Element {
                 }}
                 onOpenProject={(project) => {
                   if (project.url) {
-                    void window.api.shell.openUrl(project.url)
+                    void shellOpenUrl(project.url)
                   }
                 }}
                 onRefresh={() => setLinearRefreshNonce((n) => n + 1)}
@@ -5740,7 +5737,7 @@ export default function TaskPage(): React.JSX.Element {
                   onSelectProject={openLinearProjectContext}
                   onOpenProject={(project) => {
                     if (project.url) {
-                      void window.api.shell.openUrl(project.url)
+                      void shellOpenUrl(project.url)
                     }
                   }}
                   onUseProjectIssues={(project) => {
@@ -5780,7 +5777,7 @@ export default function TaskPage(): React.JSX.Element {
                   onSelectView={openLinearCustomViewContext}
                   onOpenView={(view) => {
                     if (view.url) {
-                      void window.api.shell.openUrl(view.url)
+                      void shellOpenUrl(view.url)
                     }
                   }}
                 />
@@ -5821,7 +5818,7 @@ export default function TaskPage(): React.JSX.Element {
                   <Button
                     variant="outline"
                     size="xs"
-                    onClick={() => void window.api.shell.openUrl(selectedLinearCustomView.url!)}
+                    onClick={() => void shellOpenUrl(selectedLinearCustomView.url!)}
                     className="gap-1 border-border/50 bg-background/70"
                   >
                     <ExternalLink className="size-3.5" />
@@ -5845,7 +5842,7 @@ export default function TaskPage(): React.JSX.Element {
                   }
                   onOpenProject={(project) => {
                     if (project.url) {
-                      void window.api.shell.openUrl(project.url)
+                      void shellOpenUrl(project.url)
                     }
                   }}
                   onUseProjectIssues={(project) => {
@@ -6265,7 +6262,7 @@ export default function TaskPage(): React.JSX.Element {
                                       size="icon-xs"
                                       onClick={(event) => {
                                         event.stopPropagation()
-                                        window.api.shell.openUrl(issue.url)
+                                        shellOpenUrl(issue.url)
                                       }}
                                       aria-label={translate(
                                         'auto.components.TaskPage.246bd64aed',
@@ -6526,7 +6523,7 @@ export default function TaskPage(): React.JSX.Element {
                                   size="icon-xs"
                                   onClick={(event) => {
                                     event.stopPropagation()
-                                    window.api.shell.openUrl(issue.url)
+                                    shellOpenUrl(issue.url)
                                   }}
                                   aria-label={translate(
                                     'auto.components.TaskPage.246bd64aed',
@@ -8227,9 +8224,7 @@ export default function TaskPage(): React.JSX.Element {
               <button
                 className="text-primary underline-offset-2 hover:underline"
                 onClick={() =>
-                  window.api.shell.openUrl(
-                    'https://id.atlassian.com/manage-profile/security/api-tokens'
-                  )
+                  shellOpenUrl('https://id.atlassian.com/manage-profile/security/api-tokens')
                 }
               >
                 {translate('auto.components.TaskPage.246c2b3dd3', 'Atlassian account settings')}

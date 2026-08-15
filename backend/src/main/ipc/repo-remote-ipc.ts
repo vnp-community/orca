@@ -9,7 +9,19 @@ import { randomUUID } from 'node:crypto'
 import type { DevServerManager } from '../dev-server/dev-server-manager'
 import type { Store } from '../persistence'
 import type { Repo } from '../../shared/types'
-import type { DirectoryEntry } from '../../relay/fs-handler-directory-browse'
+
+// Why local (not imported): this used to come from the dead vendored
+// backend/src/relay/fs-handler-directory-browse.ts (deleted — see
+// specs/agent/api/gaps-and-findings.md #9), whose only live reference
+// anywhere in backend/src/main was this type, used purely as a return-type
+// annotation for the agent's 'fs.listDirectory' RPC result shape.
+type DirectoryEntry = {
+  name: string
+  path: string
+  isDirectory: boolean
+  /** true if the directory contains a `.git` subfolder */
+  isGitRepo: boolean
+}
 
 // ── Channel names ──────────────────────────────────────────────────────────────
 

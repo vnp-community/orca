@@ -69,6 +69,8 @@ import {
   getActiveRuntimeTarget
 } from '../../runtime/runtime-rpc-client'
 import { syncRuntimeGitForkDefaultBranch } from '../../runtime/runtime-git-client'
+import { getRuntimeOnboardingState } from '../../runtime/runtime-onboarding-client'
+import { findRuntimeOrcaProfileProjects } from '../../runtime/runtime-orca-profiles-client'
 import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
 import { buildDismissedOnboardingFolderAgentStartup } from '@/lib/onboarding-folder-agent-startup'
 import { markOnboardingProjectAdded } from '@/lib/onboarding-project-checklist'
@@ -286,16 +288,23 @@ function formatProjectPresenceProfileNames(profileNames: readonly string[]): str
 
 async function warnIfProjectKnownInAnotherProfile(
   repo: Repo,
-  activeOrcaProfileId: string | null
+  activeOrcaProfileId: string | null,
+  settings: Pick<AppState, 'settings'>['settings']
 ): Promise<void> {
-  const findProjectProfiles = window.api.orcaProfiles?.findProjectProfiles
+  const target = getActiveRuntimeTarget(settings)
+  // Why: window.api.orcaProfiles is absent on the web build's preload; that
+  // only matters for the local-IPC path — an environment RPC target always
+  // has starNag/orcaProfiles coverage regardless of this process's preload.
+  if (target.kind !== 'environment' && !window.api.orcaProfiles?.findProjectProfiles) {
+    return
+  }
   // Why: without a loaded active profile ID the scan cannot exclude the
   // current profile and would false-positive on the project just added.
-  if (!findProjectProfiles || !activeOrcaProfileId) {
+  if (!activeOrcaProfileId) {
     return
   }
   try {
-    const result = await findProjectProfiles({
+    const result = await findRuntimeOrcaProfileProjects(settings, {
       path: repo.path,
       connectionId: repo.connectionId ?? null,
       executionHostId: getRepoExecutionHostId(repo),
@@ -2479,7 +2488,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         )
         // Why: the design requires the cross-profile advisory for SSH-added
         // projects too — the presence lookup already keys on connection/host.
-        await warnIfProjectKnownInAnotherProfile(repo, get().activeOrcaProfileId)
+        await warnIfProjectKnownInAnotherProfile(repo, get().activeOrcaProfileId, get().settings)
       }
       return repo
     } catch (err) {
@@ -2780,7 +2789,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       const folderWorktree = get().worktreesByRepo[repo.id]?.[0]
       if (folderWorktree) {
         const { activateAndRevealWorktree } = await import('../../lib/worktree-activation')
-        const onboarding = await window.api.onboarding.get().catch(() => null)
+        const onboarding = await getRuntimeOnboardingState(get().settings).catch(() => null)
         // Why: a new user can dismiss the wizard, then immediately add their
         // first folder from Landing. That path skips onboarding's completeRepo
         // hook, so carry the selected default agent into the first terminal here.
@@ -2852,7 +2861,8 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       if (isRuntimeOwnedSshTargetId(ownerRepo.connectionId)) {
         await cleanupEphemeralVmRuntimesForDeleted({
           workspaceIds: getKnownRepoWorktreeIds(get(), projectId, ownerHostId),
-          runtimeOwnedSshTargetIds: [ownerRepo.connectionId as string]
+          runtimeOwnedSshTargetIds: [ownerRepo.connectionId as string],
+          settings: settingsForRepoOwner(get(), projectId, ownerHostId)
         })
       }
       // Why: derive the runtime target from the owner's own settings, passing the

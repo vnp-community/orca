@@ -153,12 +153,6 @@ export async function initializeOrcaServices(
   const store = new Store()
   console.log('[ServerBootstrap] ✅ SQLite store initialized')
 
-  // 2a-pre. Initialize WebPushManager (Phase 3 — TASK-035)
-  // Why: initialized right after store so it can persist VAPID keys before any
-  // other service touches the store. pushManager is returned to server/index.ts.
-  const pushManager = new WebPushManager(store)
-  console.log('[ServerBootstrap] ✅ WebPushManager initialized')
-
   // 2a. Initialize DevServerManager + AgentWebSocketServer
   const { SshConnectionManager } = await import('./ssh/ssh-connection-manager')
   const sshManager = new SshConnectionManager({
@@ -267,6 +261,58 @@ export async function initializeOrcaServices(
   } catch (err) {
     console.warn('[ServerBootstrap] Migration failed (non-fatal):', (err as Error)?.message)
   }
+
+  // Why: annotation.list/annotation.create (BL-CR-02) need a DB handle but
+  // aren't constructor-injected like ProjectService — pool always exists by
+  // this point regardless of Electron/Web mode, so init unconditionally.
+  const { initAnnotationStore } = await import('./code-review/annotation-store')
+  initAnnotationStore(pool)
+
+  // ADR-021 §3 — resolve this process's tenantId before constructing the RPC
+  // server below, so it can be forwarded into every RpcContext the same way
+  // ORCA_USER_ID's userId already is (see OrcaRuntimeRpcServerOptions.tenantId
+  // doc comment). ProfileService is instantiated here (earlier than its other
+  // use below at step 9) purely to run this lookup — constructing it has no
+  // side effects (it only stores the pool reference), so hoisting it is safe;
+  // the same instance is reused at step 9 instead of creating a second one.
+  const { ProfileService: EarlyProfileService } = await import('./profile/ProfileService')
+  const profileServiceForTenantResolution = new EarlyProfileService(pool)
+  const { resolveTenantId } = await import('./tenancy/tenant-resolver')
+  const resolvedTenantId = await resolveTenantId(
+    profileServiceForTenantResolution,
+    process.env['ORCA_USER_ID']
+  )
+  if (process.env['ORCA_USER_ID']) {
+    console.log(
+      `[ServerBootstrap] ${resolvedTenantId ? '✅' : '⚠️ '} tenantId resolved for userId=${process.env['ORCA_USER_ID']}: ${resolvedTenantId ?? '(none — user has no department/company yet)'}`
+    )
+  }
+
+  // ADR-021 §"chỉ dùng 1 database" — switches the already-constructed `store`
+  // (step 2 above — constructed before `pool` existed, see
+  // Store.hydrateFromPostgres()'s doc comment for why) onto Postgres for all
+  // future reads/writes. Before rpcServer.start(), so no real request ever
+  // sees the pre-hydration state.
+  const { PgOrcaDataStatePersistence } = await import('./orca-data-state-persistence')
+  await store.hydrateFromPostgres(new PgOrcaDataStatePersistence(pool, resolvedTenantId))
+  console.log('[ServerBootstrap] ✅ Store hydrated from Postgres (backend: postgres)')
+
+  // 2a-pre. Initialize WebPushManager (Phase 3 — TASK-035; ADR-021 §"chỉ dùng 1
+  // database duy nhất" — Postgres-backed by default now, no more Store/JSON).
+  // Why moved here (was right after `store` construction, step 2): needs
+  // `pool`/`resolvedTenantId`, which don't exist that early. WebPushManager's
+  // methods are already async (ADR-021 Phase 1) so nothing downstream cares
+  // about the later construction point.
+  const { PgWebPushStore } = await import('./notifications/pg-web-push-store')
+  const { VapidKeySecretStore } = await import('./notifications/vapid-key-secret-store')
+  const vapidKeySecretStore = new VapidKeySecretStore(
+    userDataPath,
+    serverSecret ?? `orca-fallback-${userDataPath}`
+  )
+  const pushManager = new WebPushManager(
+    new PgWebPushStore(pool, vapidKeySecretStore, resolvedTenantId)
+  )
+  console.log('[ServerBootstrap] ✅ WebPushManager initialized (backend: postgres)')
 
   // Create state repository
   const { createStateRepository } = await import('./repositories/factory')
@@ -389,7 +435,12 @@ export async function initializeOrcaServices(
 
   // 6. Create OrcaRuntimeService
   const { OrcaRuntimeService } = await import('./runtime/orca-runtime')
-  const runtime = new OrcaRuntimeService(store, stats)
+  // ADR-021 §3 — lets getOrchestrationDb() construct a PgOrchestrationDb
+  // (pool/tenantId resolved above, before this point).
+  const runtime = new OrcaRuntimeService(store, stats, {
+    orchestrationPool: pool,
+    orchestrationTenantId: resolvedTenantId
+  })
   // Wire push manager so the runtime can dispatch web push on agent task complete.
   runtime.setPushManager(pushManager)
   console.log('[ServerBootstrap] ✅ OrcaRuntimeService created')
@@ -422,6 +473,8 @@ export async function initializeOrcaServices(
     // project.*/team.*/task.*/orcaProjects.* throw UNAUTHENTICATED for real
     // web sessions no matter how the user actually authenticated.
     userId: process.env['ORCA_USER_ID'],
+    // ADR-021 §3 — resolved above, before this constructor call.
+    tenantId: resolvedTenantId,
     // Why: proxy methods (preflight.check, github.startAuthLogin, etc.) need
     // to reach the active relay for a given Dev Server.
     devServerManager
@@ -434,9 +487,12 @@ export async function initializeOrcaServices(
   }
 
   // 9. ProfileService + ProfileResolver [v5.0 TDD-14]
-  const { ProfileService } = await import('./profile/ProfileService')
+  // Why reused, not `new`'d again: this is the same ProfileService instance
+  // constructed above for tenantId resolution (ADR-021 §3) — a second
+  // instance would work identically (constructor has no state beyond `pool`)
+  // but there's no reason to allocate one.
   const { ProfileResolver } = await import('./profile/ProfileResolver')
-  const profileService = new ProfileService(pool)
+  const profileService = profileServiceForTenantResolution
   const profileResolver = new ProfileResolver(profileService)
   console.log('[ServerBootstrap] ✅ ProfileService + ProfileResolver initialized (v5.0)')
 
@@ -573,10 +629,34 @@ export async function initializeOrcaServices(
   // scheduler never ran on the server. Mirrors desktop/src/main/index.ts's wiring.
   const { ClaudeUsageStore } = await import('./claude-usage/store')
   const { CodexUsageStore } = await import('./codex-usage/store')
-  const claudeUsage = new ClaudeUsageStore(store)
-  const codexUsage = new CodexUsageStore(store)
+  // ADR-021 — "chỉ dùng 1 database": Postgres-backed by default in server
+  // mode now (migration 0023's whole-state-blob tables), replacing
+  // orca-{claude,codex}-usage.json. See usage-state-persistence.ts's module
+  // doc comment.
+  const { PgUsageStatePersistence } = await import('./usage/pg-usage-state-persistence')
+  const claudeUsage = new ClaudeUsageStore(
+    store,
+    new PgUsageStatePersistence(pool, 'claude', resolvedTenantId)
+  )
+  const codexUsage = new CodexUsageStore(
+    store,
+    new PgUsageStatePersistence(pool, 'codex', resolvedTenantId)
+  )
   const { AutomationService } = await import('./automations/service')
-  const automationService = new AutomationService(store, {
+  // ADR-021 — automation persistence backend selection. Now defaults to
+  // 'postgres': PgAutomationStore.getRepo()/getProjectHostSetups() delegate
+  // to `store` (Postgres-hydrated as of Store.hydrateFromPostgres() above),
+  // which resolves the gap that used to block this default (see
+  // pg-automation-store.ts's module doc comment — "RESOLVED"). Escape hatch
+  // (`ORCA_AUTOMATION_BACKEND=json`) kept for rollback, not because the
+  // Postgres path is known-incomplete anymore.
+  const automationBackend = process.env['ORCA_AUTOMATION_BACKEND'] === 'json' ? 'json' : 'postgres'
+  const automationStoreDependency =
+    automationBackend === 'postgres'
+      ? new (await import('./automations/pg-automation-store')).PgAutomationStore(pool, resolvedTenantId, store)
+      : (await import('./automations/automation-store-store-adapter')).wrapStoreAsAutomationStoreDependency(store)
+  console.log(`[ServerBootstrap] AutomationService persistence backend: ${automationBackend}`)
+  const automationService = new AutomationService(automationStoreDependency, {
     claudeUsage,
     codexUsage,
     // Why: unlike desktop (which only mirrors remote-host automations), this process

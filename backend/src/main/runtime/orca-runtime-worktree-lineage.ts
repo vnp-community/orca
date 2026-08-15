@@ -22,7 +22,9 @@ import type {
   WorktreeLineageWarning
 } from '../../shared/types'
 import type { RuntimeTerminalShow } from '../../shared/runtime-types'
-import type { OrchestrationDb } from './orchestration/db'
+// ADR-021 — "chỉ dùng 1 database": both call sites in this file are already
+// inside `async` methods, so this is a mechanical await-adding conversion.
+import type { PgOrchestrationDb } from './orchestration/pg-db'
 import type { ResolvedWorktreeCacheEntry } from './orca-runtime-resolved-worktree-cache'
 import {
   RuntimeLineageError,
@@ -43,8 +45,8 @@ function extractOrchestrationTaskId(text?: string): string | undefined {
 
 export type RuntimeWorktreeLineageCommandHost = {
   getStore(): RuntimeStore | null
-  getOrchestrationDbField(): OrchestrationDb | null
-  getOrchestrationDbIfAvailable(): OrchestrationDb | null
+  getOrchestrationDbField(): PgOrchestrationDb | null
+  getOrchestrationDbIfAvailable(): PgOrchestrationDb | null
   listResolvedWorktrees(): Promise<ResolvedWorktree[]>
   resolveWorktreeSelector(selector: string): Promise<ResolvedWorktree>
   showTerminal(handle: string): Promise<RuntimeTerminalShow>
@@ -255,10 +257,10 @@ export class RuntimeWorktreeLineageCommands {
           `id:${terminal.worktreeId}`
         )
         const orchestrationDb = this.host.getOrchestrationDbField()
-        const activeDispatch = orchestrationDb?.getActiveDispatchForTerminal(
+        const activeDispatch = await orchestrationDb?.getActiveDispatchForTerminal(
           input.callerTerminalHandle
         )
-        const activeRun = orchestrationDb?.getActiveCoordinatorRun()
+        const activeRun = await orchestrationDb?.getActiveCoordinatorRun()
         if (activeDispatch) {
           candidates.push({
             source: 'orchestration-context',
@@ -374,11 +376,11 @@ export class RuntimeWorktreeLineageCommands {
     taskId: string
   ): Promise<WorktreeLineageCandidate | null> {
     const db = this.host.getOrchestrationDbIfAvailable()
-    const dispatch = db?.getDispatchContext(taskId)
+    const dispatch = await db?.getDispatchContext(taskId)
     // Why: agent-created task records may never be dispatched, but the
     // creating terminal still identifies the parent workspace for descendants.
     const parentHandle =
-      dispatch?.assignee_handle ?? db?.getTask(taskId)?.created_by_terminal_handle
+      dispatch?.assignee_handle ?? (await db?.getTask(taskId))?.created_by_terminal_handle
     if (!parentHandle) {
       return null
     }

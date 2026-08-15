@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { RemoteDirectoryBrowser } from '../remote-browser/RemoteDirectoryBrowser'
 import { useConnectedDevServers } from '../../store/slices/dev-servers'
 import { useAppStore } from '../../store'
+import { addRuntimeRepoRemote } from '../../runtime/runtime-repo-client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
 
   const handleBrowseSelect = async (path: string) => {
     try {
-      const result = await window.api.repos.addRemote({
+      const result = await addRuntimeRepoRemote(useAppStore.getState().settings, {
         connectionId: effectiveDevServerId,
         remotePath: path,
       })
@@ -136,7 +137,7 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
     setAddingError(null)
     for (const path of selectedScanPaths) {
       try {
-        const result = await window.api.repos.addRemote({
+        const result = await addRuntimeRepoRemote(useAppStore.getState().settings, {
           connectionId: effectiveDevServerId,
           remotePath: path,
         })

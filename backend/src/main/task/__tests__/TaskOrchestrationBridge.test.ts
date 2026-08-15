@@ -2,6 +2,14 @@
  * Tests for TaskOrchestrationBridge — the complex-task ((b)) path's seeding
  * of an OrchestrationDb TaskRow tree from an OrcaTask subtree, and its
  * write-back once the coordinator run converges.
+ *
+ * ADR-021 — "chỉ dùng 1 database": OrchestrationDb (raw `new
+ * OrchestrationDb(':memory:')`, SQLite-only) → PgOrchestrationDb backed by
+ * an in-memory SQLite `IConnectionPool` + migration 0020's DDL.
+ * PgOrchestrationDb works against any dialect (serviceQualifiedTable falls
+ * back to flat `orchestration_<table>` names on non-Postgres — see that
+ * migration's module doc comment), so this is still a fast, isolated,
+ * no-real-Postgres-required test — only the async/await shape changed.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -11,10 +19,10 @@ import { ALL_MIGRATIONS } from '../../db/migrations'
 import { TaskService } from '../TaskService'
 import { TaskDAGValidator } from '../TaskDAGValidator'
 import { TaskOrchestrationBridge, type TaskOrchestrationRuntime } from '../TaskOrchestrationBridge'
-import { OrchestrationDb } from '../../runtime/orchestration/db'
+import { PgOrchestrationDb } from '../../runtime/orchestration/pg-db'
 import type { CoordinatorRuntime } from '../../runtime/orchestration/coordinator'
 
-function createMockRuntime(db: OrchestrationDb): TaskOrchestrationRuntime & {
+function createMockRuntime(db: PgOrchestrationDb): TaskOrchestrationRuntime & {
   terminals: { handle: string; worktreeId: string; connected: boolean; writable: boolean }[]
 } {
   const mock: CoordinatorRuntime & { terminals: { handle: string; worktreeId: string; connected: boolean; writable: boolean }[] } = {
@@ -54,6 +62,18 @@ async function makeTaskService() {
   return service
 }
 
+// ADR-021: PgOrchestrationDb needs its own pool with migration 0020's DDL
+// applied (separate from makeTaskService()'s pool/migrations — same
+// isolation the standalone orchestration.db file gave before this port).
+async function makeOrchestrationDb(): Promise<PgOrchestrationDb> {
+  const pool = new SqliteSingleConnectionPool(':memory:')
+  await pool.withConnection(async (db) => {
+    const runner = new MigrationRunner(db, ALL_MIGRATIONS)
+    await runner.migrate()
+  })
+  return new PgOrchestrationDb(pool, undefined)
+}
+
 async function waitUntil(predicate: () => Promise<boolean>, timeoutMs = 2000, stepMs = 20): Promise<void> {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
@@ -65,15 +85,15 @@ async function waitUntil(predicate: () => Promise<boolean>, timeoutMs = 2000, st
 
 describe('TaskOrchestrationBridge', () => {
   let taskService: TaskService
-  let orchestrationDb: OrchestrationDb
+  let orchestrationDb: PgOrchestrationDb
 
   beforeEach(async () => {
     taskService = await makeTaskService()
-    orchestrationDb = new OrchestrationDb(':memory:')
+    orchestrationDb = await makeOrchestrationDb()
   })
 
-  afterEach(() => {
-    orchestrationDb.close()
+  afterEach(async () => {
+    await orchestrationDb.close()
   })
 
   it('throws TASK_NOT_FOUND for an unknown taskId', async () => {
@@ -103,7 +123,7 @@ describe('TaskOrchestrationBridge', () => {
     const bridge = new TaskOrchestrationBridge(taskService, runtime)
     const { taskRowId } = await bridge.dispatch(epic.id, { pollIntervalMs: 60_000 })
 
-    const rootRow = orchestrationDb.getTask(taskRowId)
+    const rootRow = await orchestrationDb.getTask(taskRowId)
     expect(rootRow).toBeDefined()
     expect(rootRow?.task_title).toBe('Epic')
     const rootDeps = JSON.parse(rootRow!.deps) as string[]
@@ -111,7 +131,7 @@ describe('TaskOrchestrationBridge', () => {
     // Root has children → starts 'pending' (waits for subtasks to complete first)
     expect(rootRow?.status).toBe('pending')
 
-    const allRows = orchestrationDb.listTasks()
+    const allRows = await orchestrationDb.listTasks()
     expect(allRows).toHaveLength(3) // epic + 2 subtasks
     const childRows = allRows.filter((r) => r.id !== taskRowId)
     expect(childRows).toHaveLength(2)
@@ -131,7 +151,7 @@ describe('TaskOrchestrationBridge', () => {
   })
 
   it('throws TASK_ORCHESTRATION_BUSY when a coordinator run is already active', async () => {
-    orchestrationDb.createCoordinatorRun({ spec: 'other run', coordinatorHandle: 'someone-else' })
+    await orchestrationDb.createCoordinatorRun({ spec: 'other run', coordinatorHandle: 'someone-else' })
 
     const epic = await taskService.create({
       title: 'Epic', type: 'epic', priority: 'high',
@@ -163,13 +183,13 @@ describe('TaskOrchestrationBridge', () => {
 
     // Find the seeded subtask TaskRow and complete it via a worker_done message
     // — the same mechanism runtime/orchestration/coordinator.test.ts uses.
-    const rows = orchestrationDb.listTasks()
+    const rows = await orchestrationDb.listTasks()
     const subRow = rows.find((r) => r.id !== rootRowId)!
     expect(subRow.task_title).toBe(sub.title)
 
-    await waitUntil(async () => orchestrationDb.getDispatchContext(subRow.id) !== undefined)
-    const dispatch = orchestrationDb.getDispatchContext(subRow.id)!
-    orchestrationDb.insertMessage({
+    await waitUntil(async () => (await orchestrationDb.getDispatchContext(subRow.id)) !== undefined)
+    const dispatch = (await orchestrationDb.getDispatchContext(subRow.id))!
+    await orchestrationDb.insertMessage({
       from: dispatch.assignee_handle ?? 'term_a',
       to: `task-executor:${epic.id}`,
       subject: 'Done',
@@ -180,11 +200,11 @@ describe('TaskOrchestrationBridge', () => {
     // Root TaskRow depends on subRow — once subRow completes, root becomes
     // ready, gets dispatched, and completes the same way.
     await waitUntil(async () => {
-      const rootDispatch = orchestrationDb.getDispatchContext(rootRowId)
+      const rootDispatch = await orchestrationDb.getDispatchContext(rootRowId)
       return rootDispatch !== undefined
     })
-    const rootDispatch = orchestrationDb.getDispatchContext(rootRowId)!
-    orchestrationDb.insertMessage({
+    const rootDispatch = (await orchestrationDb.getDispatchContext(rootRowId))!
+    await orchestrationDb.insertMessage({
       from: rootDispatch.assignee_handle ?? 'term_a',
       to: `task-executor:${epic.id}`,
       subject: 'Done',

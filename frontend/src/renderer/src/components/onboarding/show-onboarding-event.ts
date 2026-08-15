@@ -1,9 +1,11 @@
 import type { OnboardingState } from '../../../../shared/types'
+import { useAppStore } from '@/store'
+import { updateRuntimeOnboardingState } from '@/runtime/runtime-onboarding-client'
 
 const ONBOARDING_REOPENED_EVENT = 'orca:onboarding-reopened'
 
 export async function showOnboardingFromRenderer(): Promise<void> {
-  const nextOnboarding = await window.api.onboarding.update({
+  const nextOnboarding = await updateRuntimeOnboardingState(useAppStore.getState().settings, {
     closedAt: null,
     outcome: null,
     lastCompletedStep: -1,

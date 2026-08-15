@@ -97,8 +97,8 @@ export class PooledDatabaseAdapter implements IDatabase {
     // service sharing it (ProjectService, TeamService, ...).
   }
 
-  async query(sql: string, params?: BindValue[]): Promise<Record<string, unknown>[]> {
-    return this.pool.withConnection((db) => db.query(sql, params))
+  async query<T = Record<string, unknown>>(sql: string, params?: BindValue[]): Promise<T[]> {
+    return this.pool.withConnection((db) => db.query<T>(sql, params))
   }
 
   async transaction<T>(_fn: () => T | Promise<T>): Promise<T> {

@@ -321,6 +321,8 @@ import {
 // (TASK-BIGFILE-025); still rendered directly by SourceControlInner above.
 import { ActionButton } from './source-control-action-button'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export {
   appendCommitFailureCustomInstruction,
   appendPushFailureCustomInstruction,
@@ -2565,7 +2567,7 @@ function SourceControlInner(): React.JSX.Element {
                 'Open on {{value0}}',
                 { value0: copy.providerName }
               ),
-              onClick: () => window.api.shell.openUrl(result.url)
+              onClick: () => shellOpenUrl(result.url)
             }
           }
         )
@@ -3079,7 +3081,7 @@ function SourceControlInner(): React.JSX.Element {
           url: result.url
         })
         if (resolvedPrCreationDefaults.openAfterCreate) {
-          window.api.shell.openUrl(result.url)
+          shellOpenUrl(result.url)
         }
         return
       }
@@ -3105,7 +3107,7 @@ function SourceControlInner(): React.JSX.Element {
                 'Open on {{value0}}',
                 { value0: hostedReviewCreateCopy.providerName }
               ),
-              onClick: () => window.api.shell.openUrl(result.existingReview!.url)
+              onClick: () => shellOpenUrl(result.existingReview!.url)
             }
           }
         )
@@ -3305,7 +3307,7 @@ function SourceControlInner(): React.JSX.Element {
             }
           )
           if (openChecks && resolvedPrCreationDefaults.openAfterCreate) {
-            window.api.shell.openUrl(result.url)
+            shellOpenUrl(result.url)
           }
           setCreatePrIntentNoticeForWorktree(token.worktreeId, null)
           return true
@@ -6111,7 +6113,7 @@ function DiffCommentsInlineList({
   const handleCopyOne = useCallback(
     async (c: DiffComment): Promise<void> => {
       try {
-        await window.api.ui.writeClipboardText(formatDiffComment(c))
+        await uiWriteClipboardText(formatDiffComment(c))
         showCopiedId(c.id)
       } catch {
         // Why: swallow — clipboard write can fail when the window isn't focused.

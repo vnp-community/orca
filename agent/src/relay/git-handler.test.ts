@@ -2710,4 +2710,52 @@ describe('GitHandler', () => {
       ])
     })
   })
+
+  // Why: 'git.clone' used to have two independently-registered handlers with
+  // incompatible param shapes — RelayDispatcher.onRequest is
+  // last-registration-wins with no duplicate check, so the second
+  // registration silently shadowed the first (specs/agent/api/gaps-and-findings.md
+  // #3). This coverage locks in both shapes now being routed and validated
+  // by the single merged GitHandler.handleClone dispatch.
+  describe('git.clone (merged shapes)', () => {
+    it('clones via the { url, targetPath } shape (repo.cloneRemote)', async () => {
+      const sourceDir = path.join(tmpDir, 'source')
+      mkdirSync(sourceDir)
+      gitInit(sourceDir)
+      writeFileSync(path.join(sourceDir, 'file.txt'), 'hello\n')
+      gitCommit(sourceDir, 'initial')
+
+      const targetPath = path.join(tmpDir, 'cloned')
+      const result = await dispatcher.callRequest('git.clone', {
+        url: sourceDir,
+        targetPath
+      })
+      expect(result).toEqual({ path: targetPath })
+      expect(await fs.readFile(path.join(targetPath, 'file.txt'), 'utf-8')).toBe('hello\n')
+    })
+
+    it('rejects a leading "-" in url (argv injection guard)', async () => {
+      await expect(
+        dispatcher.callRequest('git.clone', {
+          url: '--upload-pack=evil',
+          targetPath: path.join(tmpDir, 'x')
+        })
+      ).rejects.toThrow('invalid url')
+    })
+
+    it('rejects a leading "-" in targetPath (argv injection guard)', async () => {
+      await expect(
+        dispatcher.callRequest('git.clone', {
+          url: 'https://example.com/repo.git',
+          targetPath: '-evil'
+        })
+      ).rejects.toThrow('invalid targetPath')
+    })
+
+    it('rejects a shape that matches neither the args-based nor url-based contract', async () => {
+      await expect(dispatcher.callRequest('git.clone', { foo: 'bar' })).rejects.toThrow(
+        'expected either'
+      )
+    })
+  })
 })

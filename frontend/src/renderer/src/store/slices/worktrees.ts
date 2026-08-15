@@ -38,6 +38,7 @@ import {
   RuntimeRpcCallError
 } from '../../runtime/runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
+import { cleanupRuntimeEphemeralVmWorkspace } from '../../runtime/runtime-ephemeral-vm-client'
 import { getHostedReviewCacheKey, refreshHostedReviewCard } from './hosted-review'
 import { isPositiveHostedReviewNumber } from '../../../../shared/hosted-review'
 import { getGitHubPRCacheKey, getLegacyGitHubPRCacheKey } from './github-cache-key'
@@ -3213,14 +3214,14 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         cleanupVm &&
         entry.request.ephemeralVmRuntimeId &&
         typeof window !== 'undefined' &&
-        window.api?.ephemeralVm?.cleanup
+        window.api?.ephemeralVm
       ) {
-        void window.api.ephemeralVm
-          .cleanup({ runtimeId: entry.request.ephemeralVmRuntimeId })
-          .catch(() => {
-            // Best effort: cancellation should not block on provider cleanup,
-            // and the Settings runtime list still exposes retry/manual cleanup.
-          })
+        void cleanupRuntimeEphemeralVmWorkspace(s.settings, {
+          runtimeId: entry.request.ephemeralVmRuntimeId
+        }).catch(() => {
+          // Best effort: cancellation should not block on provider cleanup,
+          // and the Settings runtime list still exposes retry/manual cleanup.
+        })
       }
       const { [creationId]: _removed, ...rest } = s.pendingWorktreeCreations
       return {
@@ -3350,7 +3351,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       // so a still-mounted SSH terminal pane can't connect to an already-gone relay and surface a
       // spurious "SSH connection is not active" toast during delete.
       const destroyedRuntimeSshTargetIds = await cleanupEphemeralVmRuntimesForDeleted({
-        workspaceIds: [worktreeId]
+        workspaceIds: [worktreeId],
+        settings: settingsForWorktreeOwner(get(), worktreeId)
       })
       // Remove the now-orphaned project that pointed at the destroyed runtime-owned SSH target so it
       // can't surface as a dead, never-connectable project in the composer.

@@ -13,6 +13,7 @@ import { getRuntimeGitRemoteFileUrl } from '@/runtime/runtime-git-client'
 import { formatPathLineReference } from './line-copy-path'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type MonacoGutterContextMenuProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -42,7 +43,7 @@ export function MonacoGutterContextMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent sideOffset={0} align="start">
         <DropdownMenuItem
-          onSelect={() => window.api.ui.writeClipboardText(formatPathLineReference(filePath, line))}
+          onSelect={() => uiWriteClipboardText(formatPathLineReference(filePath, line))}
         >
           <Copy className="w-3.5 h-3.5 mr-1.5" />
           {translate(
@@ -51,9 +52,7 @@ export function MonacoGutterContextMenu({
           )}
         </DropdownMenuItem>
         <DropdownMenuItem
-          onSelect={() =>
-            window.api.ui.writeClipboardText(formatPathLineReference(relativePath, line))
-          }
+          onSelect={() => uiWriteClipboardText(formatPathLineReference(relativePath, line))}
         >
           <Copy className="w-3.5 h-3.5 mr-1.5" />
           {translate(
@@ -83,7 +82,7 @@ export function MonacoGutterContextMenu({
               { relativePath, line }
             )
             if (url) {
-              window.api.ui.writeClipboardText(url)
+              uiWriteClipboardText(url)
             }
           }}
         >

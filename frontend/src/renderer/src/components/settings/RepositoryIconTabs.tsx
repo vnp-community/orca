@@ -11,6 +11,7 @@ import { getRepoLucideIconOptions } from '../repo/repo-icon'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 
+import { shellPickRepoIconImage } from '../../runtime/runtime-shell-client'
 const EMOJI_OPTIONS = ['🚀', '✨', '💻', '🧠', '📦', '🔧', '🎨', '🌐', '📊', '🔒', '⚡', '✅']
 
 type RepositoryIconTabsProps = {
@@ -35,7 +36,7 @@ export function RepositoryIconTabs({
 
   const handleUploadImage = async () => {
     try {
-      const result = await window.api.shell.pickRepoIconImage()
+      const result = await shellPickRepoIconImage()
       if (!result || !mountedRef.current) {
         return
       }

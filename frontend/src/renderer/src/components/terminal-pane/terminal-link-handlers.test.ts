@@ -25,9 +25,15 @@ import {
 } from '@/runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '@/runtime/runtime-rpc-client'
 
-const openUrlMock = vi.fn()
-const openFileUriMock = vi.fn()
-const openFilePathMock = vi.fn()
+// Why: vi.mock factories are hoisted above all top-level code, including
+// const declarations — vi.hoisted() lets the shell-wrapper mock below
+// reference these without hitting a temporal-dead-zone ReferenceError.
+const { openUrlMock, openFileUriMock, openFilePathMock, shellPathExistsMock } = vi.hoisted(() => ({
+  openUrlMock: vi.fn(),
+  openFileUriMock: vi.fn(),
+  openFilePathMock: vi.fn(),
+  shellPathExistsMock: vi.fn().mockResolvedValue(true)
+}))
 const openFileMock = vi.fn()
 const authorizeExternalPathMock = vi.fn()
 const statMock = vi.fn().mockResolvedValue({ isDirectory: false })
@@ -76,6 +82,16 @@ vi.mock('@/lib/connection-context', () => ({
   getConnectionId: vi.fn(() => null)
 }))
 
+// Why: SUT modules call the shell wrapper (runtime-shell-client), not
+// window.api.shell directly, so the mocks must intercept the wrapper —
+// stubbing window alone (below) no longer reaches these calls.
+vi.mock('@/runtime/runtime-shell-client', () => ({
+  shellOpenUrl: openUrlMock,
+  shellOpenFileUri: openFileUriMock,
+  shellOpenFilePath: openFilePathMock,
+  shellPathExists: shellPathExistsMock
+}))
+
 function setPlatform(userAgent: string): void {
   vi.stubGlobal('navigator', { userAgent })
 }
@@ -106,18 +122,13 @@ beforeEach(() => {
   })
   vi.mocked(getConnectionId).mockReturnValue(null)
   openFilePathMock.mockResolvedValue(true)
+  shellPathExistsMock.mockResolvedValue(true)
   storeState.settings = undefined
   storeState.worktreesByRepo = {}
   registerHttpLinkStoreAccessor(() => storeState)
   vi.stubGlobal('window', {
     dispatchEvent: vi.fn(),
     api: {
-      shell: {
-        openUrl: openUrlMock,
-        openFileUri: openFileUriMock,
-        openFilePath: openFilePathMock,
-        pathExists: vi.fn().mockResolvedValue(true)
-      },
       fs: {
         authorizeExternalPath: authorizeExternalPathMock,
         pathExists: fsPathExistsMock,
@@ -1251,7 +1262,7 @@ describe('createFilePathLinkProvider range bounds', () => {
     expect(links.map((link) => link.text)).toEqual(['/repo'])
     links[0]!.hover?.({} as MouseEvent, links[0]!.text)
 
-    expect(window.api.shell.pathExists).not.toHaveBeenCalled()
+    expect(shellPathExistsMock).not.toHaveBeenCalled()
     expect(linkTooltip.textContent).toBe(
       '/repo (⌘+click to switch workspace or ⇧⌘+click to open in Finder)'
     )
@@ -1269,7 +1280,7 @@ describe('createFilePathLinkProvider range bounds', () => {
     })
 
     expect(links).toEqual([])
-    expect(window.api.shell.pathExists).not.toHaveBeenCalled()
+    expect(shellPathExistsMock).not.toHaveBeenCalled()
   })
 
   it('does not throw when a hovered path on a remote-runtime worktree resolves outside it', async () => {
@@ -1432,7 +1443,7 @@ describe('createFilePathLinkProvider range bounds', () => {
   it('opens a single-row file path from a direct modifier-click fallback', async () => {
     setPlatform('Macintosh')
     const pathExists = createDeferred<boolean>()
-    vi.mocked(window.api.shell.pathExists).mockImplementation(() => pathExists.promise)
+    shellPathExistsMock.mockImplementation(() => pathExists.promise)
 
     const opened = openFilePathLinkAtBufferPosition(
       makeBuffer([makeBufferLine('package.json')]),
@@ -1450,7 +1461,7 @@ describe('createFilePathLinkProvider range bounds', () => {
     expect(opened).toBe(true)
     // Why: direct click fallback cannot wait for xterm's hover-time async
     // existence probe; openDetectedFilePath still stats before routing.
-    expect(window.api.shell.pathExists).not.toHaveBeenCalled()
+    expect(shellPathExistsMock).not.toHaveBeenCalled()
     expect(openFileMock).toHaveBeenCalledWith(
       expect.objectContaining({ filePath: '/tmp/package.json' }),
       { forceContentReload: true }
@@ -1609,7 +1620,7 @@ describe('createFilePathLinkProvider range bounds', () => {
   })
 
   it('returns an existing extensionless spaced prefix before trailing prose', async () => {
-    vi.mocked(window.api.shell.pathExists).mockImplementation(async (pathValue) => {
+    shellPathExistsMock.mockImplementation(async (pathValue) => {
       return pathValue === '/repo/My Folder'
     })
 
@@ -1619,7 +1630,7 @@ describe('createFilePathLinkProvider range bounds', () => {
   })
 
   it('uses the pane-specific cwd instead of a stale lifecycle startup cwd', async () => {
-    vi.mocked(window.api.shell.pathExists).mockImplementation(async (pathValue) => {
+    shellPathExistsMock.mockImplementation(async (pathValue) => {
       return pathValue === '/repo/package.json'
     })
     const { provider } = createProviderSetup([makeBufferLine('package.json')], new Map(), {
@@ -1632,7 +1643,7 @@ describe('createFilePathLinkProvider range bounds', () => {
     })
 
     expect(links.map((link) => link.text)).toEqual(['package.json'])
-    expect(window.api.shell.pathExists).toHaveBeenCalledWith('/repo/package.json')
+    expect(shellPathExistsMock).toHaveBeenCalledWith('/repo/package.json')
   })
 
   it('opens an existing extensionless spaced prefix from direct fallback cache', async () => {
@@ -2049,7 +2060,7 @@ describe('createFilePathLinkProvider range bounds', () => {
       filePath: `/repo/${middlePath}`,
       connectionId: 'ssh-wrapped'
     })
-    expect(window.api.shell.pathExists).not.toHaveBeenCalled()
+    expect(shellPathExistsMock).not.toHaveBeenCalled()
   })
 
   it('opens the same boundary path from direct clicks on both physical halves', async () => {
@@ -2111,7 +2122,7 @@ describe('createFilePathLinkProvider range bounds', () => {
     ]
     const provider = createProvider(rows)
     const exists = createDeferred<boolean>()
-    vi.mocked(window.api.shell.pathExists).mockImplementation(() => exists.promise)
+    shellPathExistsMock.mockImplementation(() => exists.promise)
     const callback = vi.fn()
 
     provider.provideLinks(1, callback)

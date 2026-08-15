@@ -4,11 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FolderWorkspace, ProjectGroup } from '../../../../shared/types'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import type * as NewWorkspaceModule from '@/lib/new-workspace'
+import * as runtimeRpcClient from '@/runtime/runtime-rpc-client'
 
 const mocks = vi.hoisted(() => ({
   activateAndRevealFolderWorkspace: vi.fn(),
   ensureAgentStartupInTerminal: vi.fn()
 }))
+
+vi.mock('@/runtime/runtime-rpc-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof runtimeRpcClient>()
+  return {
+    ...actual,
+    callRuntimeRpc: vi.fn().mockResolvedValue(undefined)
+  }
+})
 
 vi.mock('@/lib/worktree-activation', () => ({
   activateAndRevealFolderWorkspace: mocks.activateAndRevealFolderWorkspace
@@ -260,10 +269,15 @@ describe('submitFolderWorkspaceCreate', () => {
     expect(startup?.command).toBe('codex')
     expect(startup?.command).not.toContain(linkedWorkItem.url)
     expect(startup?.command).not.toContain('Review this before starting')
-    expect(window.api.agentTrust?.markTrusted).toHaveBeenCalledWith({
-      preset: 'codex',
-      workspacePath: '/repo/platform/hi'
-    })
+    expect(runtimeRpcClient.callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'local' },
+      'agentTrust.markTrusted',
+      {
+        preset: 'codex',
+        workspacePath: '/repo/platform/hi'
+      },
+      { timeoutMs: 15_000 }
+    )
     expect(mocks.ensureAgentStartupInTerminal).toHaveBeenCalledWith({
       worktreeId: folderWorkspaceKey('folder-workspace-1'),
       primaryTabId: 'tab-1',
@@ -311,11 +325,16 @@ describe('submitFolderWorkspaceCreate', () => {
       onOpenChange: vi.fn()
     })
 
-    expect(window.api.agentTrust?.markTrusted).toHaveBeenCalledWith({
-      preset: 'codex',
-      workspacePath: '/home/alice/platform/Trust remote folder draft',
-      connectionId: 'ssh-1'
-    })
+    expect(runtimeRpcClient.callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'local' },
+      'agentTrust.markTrusted',
+      {
+        preset: 'codex',
+        workspacePath: '/home/alice/platform/Trust remote folder draft',
+        connectionId: 'ssh-1'
+      },
+      { timeoutMs: 15_000 }
+    )
     expect(mocks.ensureAgentStartupInTerminal).toHaveBeenCalledWith(
       expect.objectContaining({
         worktreeId: folderWorkspaceKey('folder-workspace-1'),

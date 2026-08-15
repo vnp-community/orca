@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { insertRichMarkdownImageFromPath } from './rich-markdown-image-insert'
 import { extractIpcErrorMessage } from './rich-markdown-ipc-error-message'
 
+import { shellPickImage } from '../../runtime/runtime-shell-client'
 export function useLocalImagePick(
   editor: Editor | null,
   filePath: string,
@@ -21,7 +22,7 @@ export function useLocalImagePick(
     const insertPos = editor.state.selection.from
     const targetDom = editor.view.dom
     try {
-      const srcPath = await window.api.shell.pickImage()
+      const srcPath = await shellPickImage()
       if (!srcPath) {
         return
       }
