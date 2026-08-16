@@ -17,6 +17,7 @@ import { DevServerManager } from './dev-server/dev-server-manager'
 import { registerDevServerIpcHandlers } from './ipc/dev-server-ipc'
 import { registerOnboardingIpcHandlers } from './ipc/onboarding-ipc'
 import { registerRepoRemoteIpcHandlers } from './ipc/repo-remote-ipc'
+import { StarNagService, setActiveStarNagService } from './star-nag/service'
 import { WebPushManager } from './notifications/web-push-manager'
 import { AuthManager } from './auth/auth-manager'
 import { initWebCredentialStore } from './credentials'
@@ -686,6 +687,19 @@ export async function initializeOrcaServices(
   runtime.setClaudeUsageStore(claudeUsage)
   runtime.setCodexUsageStore(codexUsage)
   runtime.setOpenCodeUsageStore(openCodeUsage)
+
+  // Why: mirrors desktop/src/main/index.ts's StarNagService wiring — same
+  // placement, right after the usage stores are wired to runtime, since
+  // StarNagService only needs `store` + `stats` (both already constructed
+  // above). Registers the lazy singleton getActiveStarNagService() reads
+  // from runtime/rpc/methods/star-nag.ts's requireStarNagService() before
+  // any starNag.* RPC call lands.
+  const starNag = new StarNagService(store, stats)
+  setActiveStarNagService(starNag)
+  starNag.start()
+  starNag.registerIpcHandlers()
+  console.log('[ServerBootstrap] ✅ StarNagService initialized')
+
   const { AutomationService } = await import('./automations/service')
   // ADR-021 — automation persistence backend selection. Now defaults to
   // 'postgres': PgAutomationStore.getRepo()/getProjectHostSetups() delegate
@@ -788,6 +802,13 @@ export async function initializeOrcaServices(
     openCodeUsage,
     async shutdown() {
       console.log('[ServerBootstrap] Shutting down...')
+      try {
+        starNag.stop()
+        setActiveStarNagService(null)
+        console.log('[ServerBootstrap] ✅ StarNagService stopped')
+      } catch (err) {
+        console.warn('[ServerBootstrap] StarNagService stop error:', err)
+      }
       // Stop AutomationService's scheduler first, before rpcServer/db teardown below.
       try {
         automationService.stop()

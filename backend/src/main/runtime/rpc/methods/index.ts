@@ -47,6 +47,13 @@ import { TELEMETRY_METHODS } from './telemetry'
 import { CLAUDE_USAGE_METHODS } from './claude-usage'
 import { CODEX_USAGE_METHODS } from './codex-usage'
 import { OPEN_CODE_USAGE_METHODS } from './opencode-usage'
+import { STAR_NAG_METHODS } from './star-nag'
+import { CACHE_METHODS } from './cache'
+import { MEMORY_METHODS } from './memory'
+import { PLATFORM_METHODS } from './platform'
+import { FEEDBACK_METHODS } from './feedback'
+import { SPARSE_PRESET_METHODS } from './sparse-presets'
+import { DIAGNOSTICS_CRASH_BUNDLE_METHODS } from './diagnostics-crash-bundle'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -99,5 +106,12 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...TELEMETRY_METHODS,
   ...CLAUDE_USAGE_METHODS,
   ...CODEX_USAGE_METHODS,
-  ...OPEN_CODE_USAGE_METHODS
+  ...OPEN_CODE_USAGE_METHODS,
+  ...STAR_NAG_METHODS,
+  ...CACHE_METHODS,
+  ...MEMORY_METHODS,
+  ...PLATFORM_METHODS,
+  ...FEEDBACK_METHODS,
+  ...SPARSE_PRESET_METHODS,
+  ...DIAGNOSTICS_CRASH_BUNDLE_METHODS
 ]
