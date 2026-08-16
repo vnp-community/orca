@@ -28,12 +28,21 @@
  */
 
 // Keep in sync with "Group A" in specs/backend/api/desktop-only-rpc-parity-gaps.md.
+// Why 'cli'/'agentTrust' are gone from this list (2026-08-16): both moved to
+// a real backend-proxies-to-Dev-Server-Agent implementation — see
+// backend/src/main/runtime/rpc/methods/cli.ts and agent-trust.ts. A
+// "Unknown method" for either now is a REAL bug (e.g. no connected Dev
+// Server), not an expected desktop-only gap — do not re-add them here.
+// 'shell' stays: only shell.pick*/pathExists/copyFile's UI call sites were
+// rewired to a new in-app picker (DevServerFilePickerDialog) that bypasses
+// the RPC entirely in web mode; 2 call sites (chat attachment picker,
+// UntitledFileRenameDialog's directory pick) were NOT rewired yet and can
+// still hit 'shell.*' as Unknown method — remove 'shell' once those land too.
 const DESKTOP_ONLY_NAMESPACES: ReadonlySet<string> = new Set([
   'shell',
   'ephemeralVm',
   'mobile',
   'app',
-  'cli',
   'updater',
   'pet',
   'ui',
@@ -41,7 +50,6 @@ const DESKTOP_ONLY_NAMESPACES: ReadonlySet<string> = new Set([
   'developerPermissions',
   'e2e',
   'export',
-  'agentTrust',
   'localhostWorktreeLabels'
 ])
 

@@ -56,12 +56,11 @@ chung nhiều người, không phải máy cá nhân).
 
 | Namespace | # | Lý do |
 |---|---|---|
-| `shell.*` | 13 | Native file/folder dialog, mở file trong file manager/external editor — cần OS window của máy người dùng. |
-| `starNag.*` | 12 | Nhắc star repo GitHub qua overlay `BrowserWindow` gắn với desktop app. **Ngoại lệ**: phần lõi (`checkOrcaStarred` + `track()`) không phụ thuộc Electron, có thể port rút gọn nếu muốn giữ tính năng — xem mục C. |
-| `ephemeralVm.*` | 9 | Quản lý VM tạm trên máy local (attach/suspend/resume workspace, doctor/cleanup) — khái niệm máy ảo cục bộ. |
+| ~~`starNag.*`~~ | ~~12~~ | **Fixed** — xem bảng "Đã fix trong phiên này" ở trên. |
+| `ephemeralVm.*` | 9 | Điều tra sâu 2026-08-16 (xem `specs/backend/api/ephemeral-vm-server-mode-design.md`): KHÔNG port ngay được — cần Dev Server tự làm SSH client ra máy thứ 3 (agent chưa có) + bảng Postgres runtime state (chưa có). Đã đổi từ "vô nghĩa" sang "port được nhưng thiếu hạ tầng" — 3 phương án trong tài liệu thiết kế. |
 | `mobile.*` | 9 | Pairing app mobile qua QR/LAN — cần biết địa chỉ mạng LAN của MÁY DESKTOP, vô nghĩa với server từ xa. |
 | `app.*` | 6 | Keyboard input source id, dock badge count, floating-markdown file picker — API window/OS-level. |
-| `cli.*` | 6 | Cài/gỡ CLI tool (claude/codex...) TRÊN MÁY đang chạy Orca — server không phải máy làm việc của user. |
+| ~~`cli.*`~~ | ~~6~~ | **Fixed 2026-08-16** — port đầy đủ sang agent-relay, xem mục "Chuyển sang mô hình agent-proxy" bên dưới. Sửa lại nhận định sai ban đầu: đây là cài lệnh `orca` (của chính Orca), KHÔNG PHẢI CLI claude/codex. |
 | `updater.*` | 6 | Electron auto-updater — server deploy qua Docker, không áp dụng. |
 | `pet.*` | 4 | Tính năng "pet" cosmetic gắn với cửa sổ desktop. |
 | `ui.*` | 4 | Đọc/ghi clipboard native (Electron `clipboard` module) — trình duyệt có `navigator.clipboard` riêng, không cần qua backend. |
@@ -69,8 +68,10 @@ chung nhiều người, không phải máy cá nhân).
 | `developerPermissions.*` | 3 | Prompt xin quyền cấp OS (ví dụ Full Disk Access) — chỉ có trên máy desktop. |
 | `e2e.*` | 1 | Config test E2E, chỉ dùng khi dev/CI desktop. |
 | `export.htmlToPdf` | 1 | Cần `BrowserWindow.webContents.printToPDF` — không có ở headless Node (có thể thay bằng headless-browser riêng nếu thật sự cần, effort riêng). |
-| `agentTrust.markTrusted` | 1 | Quyết định "trust" 1 binary AI agent cục bộ trên máy — khái niệm máy-cụ-thể. |
-| `localhostWorktreeLabels.register` | 1 | Gắn nhãn cho port localhost — chỉ có ý nghĩa khi worktree chạy trên chính máy đang mở UI. |
+| ~~`agentTrust.markTrusted`~~ | ~~1~~ | **Fixed 2026-08-16** — nhận định ban đầu sai: backend đã sẵn có SSH-filesystem-provider (`remote-agent-trust-presets.ts`), port trực tiếp không cần agent-relay. |
+| `localhostWorktreeLabels.register` | 1 | **Xác nhận lại 2026-08-16, đúng như phân loại ban đầu, KHÔNG port được**: domain `*.localhost` theo RFC 6761 luôn resolve về máy trình duyệt của chính client, không bao giờ về server từ xa — port sẽ tạo URL không bao giờ truy cập được (không phải thiếu tính năng, mà là thiết kế không thể mang sang server mode với cơ chế URL này). |
+| ~~`shell.pickDirectory/pickAttachment/pickImage/pickRepoIconImage/pickAudio/pathExists/copyFile`~~ | ~~7~~ | **Fixed 2026-08-16 theo hướng khác** — không port RPC `shell.pick*` (vẫn không dùng dialog OS được), mà xây UI file-picker mới trong app (`DevServerFilePickerDialog`) browse trực tiếp qua Dev Server Agent. 4/6 UI trigger point đã rewire; `shell.*` vẫn còn trong danh sách "im lặng lỗi" vì 2 điểm chưa rewire (chat attachment, rename-dialog). |
+| `shell.openPath/openInFileManager/openInExternalEditor/openUrl/openFilePath/openFileUri` | 6 | Vẫn cần GUI của máy đang mở UI — không đổi phân loại. |
 
 ### B. Đáng cân nhắc port — rủi ro thấp, giá trị rõ (17 method)
 
@@ -95,14 +96,13 @@ thiết kế lại?
 
 | Namespace | # | Câu hỏi cần quyết định |
 |---|---|---|
-| `orcaProfiles.*` | 16 | Hệ thống profile/org **cloud** của Orca (auth, mời/xoá member org, chuyển project giữa org) — nghe như tính năng thật sự quan trọng, KHÔNG chỉ là desktop-local. Cần xác nhận: server mode có nên tự làm client của chính cloud API này, hay đã có cơ chế khác (`profile.*`/`ProfileService` hiện tại) đảm nhiệm vai trò tương đương rồi? |
-| `claudeAccounts.*` / `codexAccounts.*` | 11 | CHÍNH LÀ gap `rateLimits.*` đã nói ở trên — quản lý account CLI Claude/Codex đăng nhập TRÊN MÁY. Với server multi-user + remote Dev Server, "máy" nào mới đúng? Tương đương đã có sẵn và đang hoạt động là `AIProviderService`/`aiProvider.*` (đăng ký key theo tổ chức, không phải theo máy) — khả năng cao đây là 11 method KHÔNG nên port nguyên bản, mà nên hướng người dùng sang `aiProvider.*`. |
-| `agentStatus.*` | 5 | Theo dõi trạng thái agent đang chạy — có thể đã có phần tương đương qua `orchestration.*`/terminal agent-status hiện tại (session trước đã cố tình để `getAgentStatusOrchestrationContextForHandle` trả `undefined` ở server mode — xem ghi chú trong `orca-runtime-terminal-agent-status.ts`). Cần xác nhận có trùng lặp không trước khi port thêm. |
-| `remoteWorkspace.*` | 6 | "Remote workspace" + `listConnectedClients` — nghe giống khái niệm liên quan `mobile.*`/pairing, cần đọc kỹ trước khi quyết định có áp dụng được cho multi-user server không. |
-| `workspaceCleanup.*` | 4 | `hasKillableLocalProcesses` gợi ý đang thao tác process TRÊN MÁY chạy Orca — nếu đúng, thuộc nhóm A (desktop-only); cần đọc code xác nhận trước khi xếp loại chắc chắn. |
-| `workspaceSpace.*` | 2 | Phân tích dung lượng đĩa — của máy nào? Nếu là máy chạy Orca (server dùng chung) thì thông tin này không giúp ích cho user cá nhân; nếu ý là dung lượng trong worktree/Dev Server thì có thể port được. Cần đọc code. |
-| `minimaxCredentials.*` / `grokAccounts.getStatus` | 4 | Quản lý credential cho AI provider ngoài luồng chính — có thể nên gộp vào `aiProvider.*`/`AIProviderService` đã có, giống nhận định ở `claudeAccounts`/`codexAccounts`. |
-| `starNag.*` (phần lõi) | 3 | Nếu quyết định GIỮ tính năng nhắc star ở server mode: `starNag.starOrca`/`.dismiss`/`.later` không cần `BrowserWindow`, chỉ cần `checkOrcaStarred()` (GitHub API) + `track()` (đã có). Phần `subscribe`/`forceShow`/`agentValueMoment`... gắn UI-trigger cụ thể hơn, cần xem frontend có gọi thật hay chỉ desktop dùng. |
+| `orcaProfiles.*` | 16 | Hệ thống profile/org **cloud** của Orca (auth, mời/xoá member org, chuyển project giữa org) — nghe như tính năng thật sự quan trọng, KHÔNG chỉ là desktop-local. Cần xác nhận: server mode có nên tự làm client của chính cloud API này, hay đã có cơ chế khác (`profile.*`/`ProfileService` hiện tại) đảm nhiệm vai trò tương đương rồi? **Chưa điều tra thêm** — vẫn treo. |
+| `claudeAccounts.*` / `codexAccounts.*` | 11 | Điều tra sâu 2026-08-16: KHÔNG đơn giản như `cli.*`. Gắn với ~3500 dòng logic đồng bộ credential real-time (`ClaudeRuntimeAuthService`/`CodexRuntimeHomeService`, theo dõi PTY đang chạy để tránh race khi CLI tự refresh token) — port kiểu relay 1-call sẽ tái tạo đúng race condition code gốc tránh. Cũng phát hiện `add`/`reauthenticate` không dùng PTY như tưởng, chỉ `spawn()` đơn giản, bỏ qua URL OAuth CLI in ra — cần UI streaming PTY riêng (giống `WebModeCliAuthSection.tsx` đã có cho GitHub) mới dùng được ở server mode headless. **Cần 1 ADR riêng**, không phải quyết định "route sang aiProvider.*" đơn giản như đoán ban đầu. |
+| ~~`agentStatus.*`~~ | ~~5~~ | **Fixed 2026-08-16** — backend đã có `agentHookServer` byte-identical với desktop, port trực tiếp không cần agent-relay. Gap còn lại: hook event từ Dev Server Agent (WS) chưa wire vào `agentHookServer` (không thuộc phạm vi 5 method RPC này). |
+| `remoteWorkspace.*` | 6 | **Chưa điều tra** — vẫn treo. |
+| ~~`workspaceCleanup.*`~~ | ~~4~~ | **Fixed 3/4 (2026-08-16)** — `hasKillableLocalProcesses` đã connectionId-aware sẵn từ desktop, dùng lại `DevServerPtyProvider.listProcesses()` đã relay agent sẵn có. `.scan` cần port thêm 4 file phụ trợ (subsystem riêng), còn treo. |
+| `workspaceSpace.*` | 2 | Điều tra 2026-08-16: đúng là hợp lý port (không phải máy chạy Orca, mà dung lượng worktree trên Dev Server — desktop's `workspace-space-analysis.ts` đã hỗ trợ cả local lẫn SSH-remote). Nhưng cần port cả subsystem 960 dòng, không phải 1-2 method đơn lẻ — còn treo, để riêng thành việc lớn hơn. |
+| `minimaxCredentials.*` / `grokAccounts.getStatus` | 4 | **Chưa điều tra** — vẫn treo. |
 
 ## Trạng thái (cập nhật 2026-08-16)
 
@@ -125,3 +125,34 @@ sinh trong lúc port Nhóm B — `initObservability()` (diagnostics bundle) và
 `server-bootstrap.ts`, nên 2 tính năng này hoạt động ở tầng RPC nhưng chưa
 có dữ liệu thật cho tới khi ai đó quyết định wire chúng (giống gap
 `rateLimits.*`/`ClaudeAccountService`).
+
+## Đợt "chuyển sang mô hình agent-proxy" (2026-08-16, sau khi rà lại Nhóm A/C)
+
+Theo yêu cầu: những tính năng mà "máy chạy code" mới có ý nghĩa (không phải
+backend container dùng chung) nên chuyển thành backend-proxy-tới-agent thay
+vì port thẳng hoặc bỏ qua. Rà lại cả Nhóm A lẫn Nhóm C với góc nhìn này:
+
+**Port thành công theo mô hình mới** (commit `7df884e91`):
+- `cli.*` (6) — agent-relay thật, agent tự thực thi trên máy nó đứng.
+- `agentTrust.markTrusted` (1) — hoá ra dùng SSH-filesystem-provider backend
+  đã có sẵn, không cần agent-relay.
+- `agentStatus.*` (5), `workspaceCleanup.*` (3/4) — hoá ra backend đã có sẵn
+  hạ tầng (agentHookServer, DevServerPtyProvider.listProcesses relay), chỉ
+  thiếu RPC layer — port trực tiếp, không cần agent-relay mới.
+- `shell.pickDirectory/pickAttachment/pickImage/pickRepoIconImage/pickAudio/pathExists/copyFile`
+  (7) — không port RPC `shell.pick*` gốc, mà xây UI file-picker mới trong
+  app + relay `devServer.pathExists/readFile/copyFile` tới agent.
+
+**Điều tra sâu, quyết định KHÔNG port ngay (không ép code sai)**:
+- `ephemeralVm.*` (9) — thiếu SSH-client outbound ở agent + bảng Postgres.
+  Tài liệu thiết kế riêng: `specs/backend/api/ephemeral-vm-server-mode-design.md`.
+- `claudeAccounts.*`/`codexAccounts.*` (11) — sâu hơn nhận định ban đầu rất
+  nhiều (~3500 dòng logic đồng bộ credential), cần ADR riêng.
+- `workspaceSpace.*` (2), `workspaceCleanup.scan` (1) — hợp lý về mặt kiến
+  trúc nhưng cần port cả subsystem lớn (960+ dòng), không phải 1 method.
+
+**Xác nhận lại đúng, giữ nguyên phân loại KHÔNG port**:
+- `localhostWorktreeLabels.register` — lý do kỹ thuật chắc chắn (RFC 6761).
+
+**Chưa điều tra, vẫn treo**: `orcaProfiles.*` (16), `remoteWorkspace.*` (6),
+`minimaxCredentials.*`/`grokAccounts.getStatus` (4).
