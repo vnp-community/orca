@@ -82,19 +82,19 @@ export function rowToTask(r: TaskRow): OrcaTask {
 
 export const TASK_SELECT = `
   SELECT id,
-         project_id       as projectId,
-         parent_id        as parentId,
+         project_id       as "projectId",
+         parent_id        as "parentId",
          title, description, type, status, priority, labels, visibility,
-         reporter_id      as reporterId,
-         assignee_id      as assigneeId,
-         estimated_hours  as estimatedHours,
-         progress_percent as progressPercent,
-         ai_context       as aiContext,
-         prompt_template  as promptTemplate,
-         due_date         as dueDate,
-         active_execution_task_id as activeExecutionTaskId,
-         agent_session_id as agentSessionId,
-         created_at       as createdAt,
-         updated_at       as updatedAt
+         reporter_id      as "reporterId",
+         assignee_id      as "assigneeId",
+         estimated_hours  as "estimatedHours",
+         progress_percent as "progressPercent",
+         ai_context       as "aiContext",
+         prompt_template  as "promptTemplate",
+         due_date         as "dueDate",
+         active_execution_task_id as "activeExecutionTaskId",
+         agent_session_id as "agentSessionId",
+         created_at       as "createdAt",
+         updated_at       as "updatedAt"
   FROM orca_tasks
 `

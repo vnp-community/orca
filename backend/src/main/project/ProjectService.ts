@@ -146,13 +146,13 @@ export class ProjectService {
       db.query<ProjectRow>(
         `SELECT
            id, name, description,
-           dev_server_id as devServerId,
-           repo_path as repoPath,
-           default_branch as defaultBranch,
+           dev_server_id as "devServerId",
+           repo_path as "repoPath",
+           default_branch as "defaultBranch",
            visibility,
-           created_by as createdBy,
-           created_at as createdAt,
-           updated_at as updatedAt
+           created_by as "createdBy",
+           created_at as "createdAt",
+           updated_at as "updatedAt"
          FROM orca_v5_projects WHERE id = ?`,
         [projectId]
       )
@@ -170,13 +170,13 @@ export class ProjectService {
       db.query<ProjectRow>(
         `SELECT
            p.id, p.name, p.description,
-           p.dev_server_id as devServerId,
-           p.repo_path as repoPath,
-           p.default_branch as defaultBranch,
+           p.dev_server_id as "devServerId",
+           p.repo_path as "repoPath",
+           p.default_branch as "defaultBranch",
            p.visibility,
-           p.created_by as createdBy,
-           p.created_at as createdAt,
-           p.updated_at as updatedAt
+           p.created_by as "createdBy",
+           p.created_at as "createdAt",
+           p.updated_at as "updatedAt"
          FROM orca_v5_projects p
          JOIN orca_v5_project_members m ON m.project_id = p.id
          WHERE m.user_id = ?
@@ -296,10 +296,10 @@ export class ProjectService {
     const rows = await this.pool.withConnection((db) =>
       db.query<MemberRow>(
         `SELECT
-           project_id as projectId,
-           user_id as userId,
+           project_id as "projectId",
+           user_id as "userId",
            role,
-           added_at as addedAt
+           added_at as "addedAt"
          FROM orca_v5_project_members WHERE project_id = ?`,
         [projectId]
       )
@@ -312,10 +312,10 @@ export class ProjectService {
     const rows = await this.pool.withConnection((db) =>
       db.query<MemberRow>(
         `SELECT
-           project_id as projectId,
-           user_id as userId,
+           project_id as "projectId",
+           user_id as "userId",
            role,
-           added_at as addedAt
+           added_at as "addedAt"
          FROM orca_v5_project_members WHERE project_id = ? AND user_id = ?`,
         [projectId, userId]
       )

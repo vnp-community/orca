@@ -197,7 +197,7 @@ export class TaskService {
   async getDependencies(taskId: string): Promise<{ task: OrcaTask; edgeType: TaskEdgeType }[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<EdgeRow>(
-        `SELECT from_task_id as fromTaskId, to_task_id as toTaskId, edge_type as edgeType, created_at as createdAt
+        `SELECT from_task_id as "fromTaskId", to_task_id as "toTaskId", edge_type as "edgeType", created_at as "createdAt"
          FROM orca_task_edges WHERE from_task_id = ?`,
         [taskId]
       )
@@ -213,7 +213,7 @@ export class TaskService {
   async getDependents(taskId: string): Promise<{ task: OrcaTask; edgeType: TaskEdgeType }[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<EdgeRow>(
-        `SELECT from_task_id as fromTaskId, to_task_id as toTaskId, edge_type as edgeType, created_at as createdAt
+        `SELECT from_task_id as "fromTaskId", to_task_id as "toTaskId", edge_type as "edgeType", created_at as "createdAt"
          FROM orca_task_edges WHERE to_task_id = ?`,
         [taskId]
       )

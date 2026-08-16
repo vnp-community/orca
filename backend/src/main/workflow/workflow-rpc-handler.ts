@@ -139,7 +139,7 @@ export function createWorkflowMethods(
         let traceId: string | undefined
         if (pool) {
           const rows = await pool.withConnection((db) =>
-            db.query(`SELECT root_trace_id as rootTraceId FROM orca_workflow_executions WHERE id = ?`, [
+            db.query(`SELECT root_trace_id as "rootTraceId" FROM orca_workflow_executions WHERE id = ?`, [
               execution.id,
             ])
           )

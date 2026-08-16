@@ -43,9 +43,15 @@ export class PgOrcaDataStatePersistence {
 
   /** Returns the raw parsed state object, or `null` if no row exists yet (fresh install). */
   async loadRawState<TState>(): Promise<TState | null> {
+    // Why quoted alias: Postgres folds unquoted identifiers to lowercase
+    // (`as stateJson` comes back as the column `statejson`, not `stateJson`)
+    // — silently produced `row.stateJson === undefined` and
+    // `JSON.parse(undefined)` crashed every user-process boot in production
+    // (2026-08-16 incident). Double-quoting preserves the exact case on both
+    // Postgres and SQLite.
     const rows = await this.pool.withConnection((db) =>
       db.query<{ stateJson: string }>(
-        `SELECT state_json as stateJson FROM ${this.table(db.capabilities.dialect)}
+        `SELECT state_json as "stateJson" FROM ${this.table(db.capabilities.dialect)}
          WHERE tenant_id = ? AND user_id = ?`,
         [this.tenantId ?? '', this.userId]
       )
@@ -62,17 +68,15 @@ export class PgOrcaDataStatePersistence {
         `SELECT tenant_id FROM ${table} WHERE tenant_id = ? AND user_id = ?`,
         [this.tenantId ?? '', this.userId]
       )
-      if (existing.length > 0) {
-        await db.query(
-          `UPDATE ${table} SET state_json = ?, updated_at = ? WHERE tenant_id = ? AND user_id = ?`,
-          [payload, Date.now(), this.tenantId ?? '', this.userId]
-        )
-      } else {
-        await db.query(
-          `INSERT INTO ${table} (tenant_id, user_id, state_json, updated_at) VALUES (?, ?, ?, ?)`,
-          [this.tenantId ?? '', this.userId, payload, Date.now()]
-        )
-      }
+      existing.length > 0
+        ? await db.query(
+            `UPDATE ${table} SET state_json = ?, updated_at = ? WHERE tenant_id = ? AND user_id = ?`,
+            [payload, Date.now(), this.tenantId ?? '', this.userId]
+          )
+        : await db.query(
+            `INSERT INTO ${table} (tenant_id, user_id, state_json, updated_at) VALUES (?, ?, ?, ?)`,
+            [this.tenantId ?? '', this.userId, payload, Date.now()]
+          )
     })
   }
 }

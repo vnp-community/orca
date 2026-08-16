@@ -48,7 +48,7 @@ export class ProfileService {
   async getCompanyProfile(companyId: string): Promise<OrcaProfile | null> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ profileJson: string }>(
-        'SELECT profile_json as profileJson FROM orca_companies WHERE id = ?',
+        'SELECT profile_json as "profileJson" FROM orca_companies WHERE id = ?',
         [companyId]
       )
     )
@@ -97,7 +97,7 @@ export class ProfileService {
   async listDepartments(): Promise<Department[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ id: string; companyId: string; name: string; parentDeptId: string | null }>(
-        `SELECT id, company_id as companyId, name, parent_dept_id as parentDeptId
+        `SELECT id, company_id as "companyId", name, parent_dept_id as "parentDeptId"
          FROM orca_departments
          ORDER BY name`
       )
@@ -109,7 +109,7 @@ export class ProfileService {
   async getDeptProfile(deptId: string): Promise<OrcaProfile | null> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ profileJson: string }>(
-        'SELECT profile_json as profileJson FROM orca_departments WHERE id = ?',
+        'SELECT profile_json as "profileJson" FROM orca_departments WHERE id = ?',
         [deptId]
       )
     )
@@ -139,7 +139,7 @@ export class ProfileService {
   async getUserProfile(userId: string): Promise<OrcaProfile | null> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ profileJson: string }>(
-        'SELECT profile_json as profileJson FROM orca_user_profiles WHERE user_id = ?',
+        'SELECT profile_json as "profileJson" FROM orca_user_profiles WHERE user_id = ?',
         [userId]
       )
     )
@@ -174,7 +174,7 @@ export class ProfileService {
   async getCompanyProfileForUser(userId: string): Promise<OrcaProfile | null> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ profileJson: string }>(
-        `SELECT c.profile_json as profileJson
+        `SELECT c.profile_json as "profileJson"
          FROM orca_users u
          JOIN orca_departments d ON d.id = u.department_id
          JOIN orca_companies c ON c.id = d.company_id
@@ -198,9 +198,14 @@ export class ProfileService {
    * Returns null if the user has no department or the department has no company.
    */
   async getCompanyIdForUser(userId: string): Promise<string | null> {
+    // Why quoted alias: unquoted `as "companyId"` comes back as `companyid` on
+    // Postgres (identifiers are folded to lowercase unless quoted) — silently
+    // made this always return null (row.companyId undefined), so tenant
+    // resolution never succeeded (2026-08-16 incident, found while
+    // diagnosing a related crash in orca-data-state-persistence.ts).
     const rows = await this.pool.withConnection((db) =>
       db.query<{ companyId: string }>(
-        `SELECT c.id as companyId
+        `SELECT c.id as "companyId"
          FROM orca_users u
          JOIN orca_departments d ON d.id = u.department_id
          JOIN orca_companies c ON c.id = d.company_id
@@ -219,7 +224,7 @@ export class ProfileService {
   async getDeptProfileForUser(userId: string): Promise<OrcaProfile | null> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ profileJson: string }>(
-        `SELECT d.profile_json as profileJson
+        `SELECT d.profile_json as "profileJson"
          FROM orca_users u
          JOIN orca_departments d ON d.id = u.department_id
          WHERE u.id = ?`,
@@ -256,10 +261,10 @@ export class ProfileService {
    */
   async getTeamProfilesForUser(
     userId: string
-  ): Promise<Array<{ teamId: string; profile: OrcaProfile }>> {
+  ): Promise<{ teamId: string; profile: OrcaProfile }[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ teamId: string; profileJson: string }>(
-        `SELECT tm.team_id as teamId, t.profile_json as profileJson
+        `SELECT tm.team_id as "teamId", t.profile_json as "profileJson"
          FROM orca_team_members tm
          JOIN orca_teams t ON t.id = tm.team_id
          WHERE tm.user_id = ?

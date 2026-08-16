@@ -75,7 +75,7 @@ export class TeamService {
   async listTeams(): Promise<Team[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<TeamRow>(
-        `SELECT id, name, created_at as createdAt, updated_at as updatedAt
+        `SELECT id, name, created_at as "createdAt", updated_at as "updatedAt"
          FROM orca_teams
          ORDER BY name`
       )
@@ -87,7 +87,7 @@ export class TeamService {
   async getTeam(teamId: string): Promise<Team | null> {
     const rows = await this.pool.withConnection((db) =>
       db.query<TeamRow>(
-        `SELECT id, name, created_at as createdAt, updated_at as updatedAt
+        `SELECT id, name, created_at as "createdAt", updated_at as "updatedAt"
          FROM orca_teams WHERE id = ?`,
         [teamId]
       )
@@ -140,7 +140,7 @@ export class TeamService {
   async listMembers(teamId: string): Promise<TeamMember[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<TeamMemberRow>(
-        `SELECT team_id as teamId, user_id as userId, role, priority, added_at as addedAt
+        `SELECT team_id as "teamId", user_id as "userId", role, priority, added_at as "addedAt"
          FROM orca_team_members WHERE team_id = ?`,
         [teamId]
       )
@@ -155,7 +155,7 @@ export class TeamService {
   async listTeamsForUser(userId: string): Promise<TeamMember[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<TeamMemberRow>(
-        `SELECT team_id as teamId, user_id as userId, role, priority, added_at as addedAt
+        `SELECT team_id as "teamId", user_id as "userId", role, priority, added_at as "addedAt"
          FROM orca_team_members WHERE user_id = ?`,
         [userId]
       )

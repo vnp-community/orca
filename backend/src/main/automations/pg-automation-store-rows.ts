@@ -65,27 +65,27 @@ export type AutomationRunRow = {
   createdAt: number
 }
 
-export const AUTOMATION_COLUMNS = `id, name, prompt, precheck_json as precheckJson,
-  agent_id as agentId, run_context_json as runContextJson,
-  source_context_json as sourceContextJson, project_id as projectId,
-  execution_target_type as executionTargetType, execution_target_id as executionTargetId,
-  scheduler_owner as schedulerOwner, workspace_mode as workspaceMode,
-  workspace_id as workspaceId, base_branch as baseBranch,
-  setup_decision_json as setupDecisionJson, reuse_session as reuseSession,
-  timezone, rrule, dtstart, enabled, next_run_at as nextRunAt,
-  last_run_at as lastRunAt, missed_run_policy as missedRunPolicy,
-  missed_run_grace_minutes as missedRunGraceMinutes,
-  created_at as createdAt, updated_at as updatedAt`
+export const AUTOMATION_COLUMNS = `id, name, prompt, precheck_json as "precheckJson",
+  agent_id as "agentId", run_context_json as "runContextJson",
+  source_context_json as "sourceContextJson", project_id as "projectId",
+  execution_target_type as "executionTargetType", execution_target_id as "executionTargetId",
+  scheduler_owner as "schedulerOwner", workspace_mode as "workspaceMode",
+  workspace_id as "workspaceId", base_branch as "baseBranch",
+  setup_decision_json as "setupDecisionJson", reuse_session as "reuseSession",
+  timezone, rrule, dtstart, enabled, next_run_at as "nextRunAt",
+  last_run_at as "lastRunAt", missed_run_policy as "missedRunPolicy",
+  missed_run_grace_minutes as "missedRunGraceMinutes",
+  created_at as "createdAt", updated_at as "updatedAt"`
 
-export const AUTOMATION_RUN_COLUMNS = `id, automation_id as automationId,
-  run_context_json as runContextJson, source_context_json as sourceContextJson,
-  title, scheduled_for as scheduledFor, status, trigger, workspace_id as workspaceId,
-  workspace_display_name as workspaceDisplayName, session_kind as sessionKind,
-  chat_session_id as chatSessionId, terminal_session_id as terminalSessionId,
-  terminal_pane_key as terminalPaneKey, terminal_pty_id as terminalPtyId,
-  output_snapshot_json as outputSnapshotJson, precheck_result_json as precheckResultJson,
-  usage_json as usageJson, error, run_number as runNumber,
-  started_at as startedAt, dispatched_at as dispatchedAt, created_at as createdAt`
+export const AUTOMATION_RUN_COLUMNS = `id, automation_id as "automationId",
+  run_context_json as "runContextJson", source_context_json as "sourceContextJson",
+  title, scheduled_for as "scheduledFor", status, trigger, workspace_id as "workspaceId",
+  workspace_display_name as "workspaceDisplayName", session_kind as "sessionKind",
+  chat_session_id as "chatSessionId", terminal_session_id as "terminalSessionId",
+  terminal_pane_key as "terminalPaneKey", terminal_pty_id as "terminalPtyId",
+  output_snapshot_json as "outputSnapshotJson", precheck_result_json as "precheckResultJson",
+  usage_json as "usageJson", error, run_number as "runNumber",
+  started_at as "startedAt", dispatched_at as "dispatchedAt", created_at as "createdAt"`
 
 export function rowToAutomation(row: AutomationRow): Automation {
   return {

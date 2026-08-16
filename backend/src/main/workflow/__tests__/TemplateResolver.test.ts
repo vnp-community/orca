@@ -54,7 +54,7 @@ async function readRow(
 ): Promise<{ name: string; version: number; scope: string; ownerId: string; definitionJson: string } | undefined> {
   const rows = await pool.withConnection((db) =>
     db.query<{ name: string; version: number; scope: string; ownerId: string; definitionJson: string }>(
-      `SELECT name, version, scope, owner_id as ownerId, definition_json as definitionJson
+      `SELECT name, version, scope, owner_id as "ownerId", definition_json as "definitionJson"
        FROM orca_workflow_templates WHERE id = ?`,
       [id]
     )

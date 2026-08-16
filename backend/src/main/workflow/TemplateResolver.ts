@@ -95,8 +95,8 @@ export class TemplateResolver {
 
       const rows = await this.pool.withConnection((db) =>
         db.query<TemplateRow>(
-          `SELECT id, name, definition_json as definitionJson, owner_id as ownerId, scope,
-                  parent_template_id as parentTemplateId, created_at as createdAt
+          `SELECT id, name, definition_json as "definitionJson", owner_id as "ownerId", scope,
+                  parent_template_id as "parentTemplateId", created_at as "createdAt"
            FROM orca_workflow_templates WHERE id = ?`,
           [currentId]
         )
@@ -184,7 +184,7 @@ export class TemplateResolver {
     try {
       const rows = await this.pool.withConnection((db) =>
         db.query<{ ownerId: string }>(
-          `SELECT owner_id as ownerId FROM orca_workflow_templates WHERE id = ?`,
+          `SELECT owner_id as "ownerId" FROM orca_workflow_templates WHERE id = ?`,
           [params.templateId]
         )
       )
@@ -230,8 +230,8 @@ export class TemplateResolver {
    * List templates by scope, optionally filtered by ownerId.
    */
   async list(scope: string, ownerId?: string): Promise<TemplateRecord[]> {
-    let sql = `SELECT id, name, definition_json as definitionJson, owner_id as ownerId, scope,
-                      parent_template_id as parentTemplateId, created_at as createdAt
+    let sql = `SELECT id, name, definition_json as "definitionJson", owner_id as "ownerId", scope,
+                      parent_template_id as "parentTemplateId", created_at as "createdAt"
                FROM orca_workflow_templates WHERE scope = ?`
     const params: BindValue[] = [scope]
 

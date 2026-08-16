@@ -128,14 +128,14 @@ export class PgUsageStore {
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
     const rows = await this.pool.withConnection((db) =>
       db.query<SessionRow>(
-        `SELECT session_id as sessionId, user_id as userId, first_timestamp as firstTimestamp,
-                last_timestamp as lastTimestamp, model, last_cwd as lastCwd,
-                last_git_branch as lastGitBranch, primary_worktree_id as primaryWorktreeId,
-                primary_repo_id as primaryRepoId, turn_count as turnCount,
-                total_input_tokens as totalInputTokens, total_output_tokens as totalOutputTokens,
-                total_cache_read_tokens as totalCacheReadTokens,
-                total_cache_write_tokens as totalCacheWriteTokens,
-                location_breakdown_json as locationBreakdownJson
+        `SELECT session_id as "sessionId", user_id as "userId", first_timestamp as "firstTimestamp",
+                last_timestamp as "lastTimestamp", model, last_cwd as "lastCwd",
+                last_git_branch as "lastGitBranch", primary_worktree_id as "primaryWorktreeId",
+                primary_repo_id as "primaryRepoId", turn_count as "turnCount",
+                total_input_tokens as "totalInputTokens", total_output_tokens as "totalOutputTokens",
+                total_cache_read_tokens as "totalCacheReadTokens",
+                total_cache_write_tokens as "totalCacheWriteTokens",
+                location_breakdown_json as "locationBreakdownJson"
          FROM ${this.sessionsTable(provider, db.capabilities.dialect)}${where}`,
         params
       )
@@ -155,25 +155,23 @@ export class PgUsageStore {
         session.totalCacheReadTokens, session.totalCacheWriteTokens,
         JSON.stringify(session.locationBreakdown)
       ]
-      if (existing.length > 0) {
-        await db.query(
-          `UPDATE ${table} SET tenant_id = ?, user_id = ?, first_timestamp = ?, last_timestamp = ?,
-             model = ?, last_cwd = ?, last_git_branch = ?, primary_worktree_id = ?, primary_repo_id = ?,
-             turn_count = ?, total_input_tokens = ?, total_output_tokens = ?,
-             total_cache_read_tokens = ?, total_cache_write_tokens = ?, location_breakdown_json = ?
-           WHERE session_id = ?`,
-          [...params, session.sessionId]
-        )
-      } else {
-        await db.query(
-          `INSERT INTO ${table} (tenant_id, user_id, first_timestamp, last_timestamp, model, last_cwd,
-             last_git_branch, primary_worktree_id, primary_repo_id, turn_count, total_input_tokens,
-             total_output_tokens, total_cache_read_tokens, total_cache_write_tokens,
-             location_breakdown_json, session_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [...params, session.sessionId]
-        )
-      }
+      existing.length > 0
+        ? await db.query(
+            `UPDATE ${table} SET tenant_id = ?, user_id = ?, first_timestamp = ?, last_timestamp = ?,
+               model = ?, last_cwd = ?, last_git_branch = ?, primary_worktree_id = ?, primary_repo_id = ?,
+               turn_count = ?, total_input_tokens = ?, total_output_tokens = ?,
+               total_cache_read_tokens = ?, total_cache_write_tokens = ?, location_breakdown_json = ?
+             WHERE session_id = ?`,
+            [...params, session.sessionId]
+          )
+        : await db.query(
+            `INSERT INTO ${table} (tenant_id, user_id, first_timestamp, last_timestamp, model, last_cwd,
+               last_git_branch, primary_worktree_id, primary_repo_id, turn_count, total_input_tokens,
+               total_output_tokens, total_cache_read_tokens, total_cache_write_tokens,
+               location_breakdown_json, session_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [...params, session.sessionId]
+          )
     })
   }
 
@@ -256,11 +254,11 @@ export class PgUsageStore {
         cacheReadTokens: number
         cacheWriteTokens: number
       }>(
-        `SELECT user_id as userId, day, model, project_key as projectKey, project_label as projectLabel,
-                repo_id as repoId, worktree_id as worktreeId, turn_count as turnCount,
-                zero_cache_read_turn_count as zeroCacheReadTurnCount, input_tokens as inputTokens,
-                output_tokens as outputTokens, cache_read_tokens as cacheReadTokens,
-                cache_write_tokens as cacheWriteTokens
+        `SELECT user_id as "userId", day, model, project_key as "projectKey", project_label as "projectLabel",
+                repo_id as "repoId", worktree_id as "worktreeId", turn_count as "turnCount",
+                zero_cache_read_turn_count as "zeroCacheReadTurnCount", input_tokens as "inputTokens",
+                output_tokens as "outputTokens", cache_read_tokens as "cacheReadTokens",
+                cache_write_tokens as "cacheWriteTokens"
          FROM ${this.dailyTable(provider, db.capabilities.dialect)}${where}
          ORDER BY day DESC`,
         params

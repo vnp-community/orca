@@ -70,9 +70,8 @@ export class PgWebPushStore implements WebPushStoreDependency {
   async getWebPushSubscriptions(): Promise<WebPushSubscription[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<SubscriptionRow>(
-        `SELECT id, endpoint, auth, p256dh, user_agent as userAgent, added_at as addedAt
-         FROM ${this.subscriptionsTable(db.capabilities.dialect)}` +
-          (this.tenantId ? ' WHERE tenant_id = ?' : ''),
+        `SELECT id, endpoint, auth, p256dh, user_agent as "userAgent", added_at as "addedAt"
+         FROM ${this.subscriptionsTable(db.capabilities.dialect)}${this.tenantId ? ' WHERE tenant_id = ?' : ''}`,
         this.tenantId ? [this.tenantId] : []
       )
     )
@@ -108,8 +107,8 @@ export class PgWebPushStore implements WebPushStoreDependency {
   async getVapidKeys(): Promise<{ publicKey: string; privateKey: string } | null> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ publicKey: string }>(
-        `SELECT public_key as publicKey FROM ${this.vapidMetadataTable(db.capabilities.dialect)}
-         WHERE status = 'active'` + (this.tenantId ? ' AND tenant_id = ?' : ' AND tenant_id IS NULL'),
+        `SELECT public_key as "publicKey" FROM ${this.vapidMetadataTable(db.capabilities.dialect)}
+         WHERE status = 'active'${this.tenantId ? ' AND tenant_id = ?' : ' AND tenant_id IS NULL'}`,
         this.tenantId ? [this.tenantId] : []
       )
     )

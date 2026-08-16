@@ -93,11 +93,11 @@ export class AnnotationStore {
       db.query<AnnotationRow>(
         `SELECT
            id,
-           line_number as lineNumber,
-           file_path as filePath,
+           line_number as "lineNumber",
+           file_path as "filePath",
            body as content,
-           author_id as authorId,
-           created_at as createdAt
+           author_id as "authorId",
+           created_at as "createdAt"
          FROM orca_annotations
          WHERE ${conditions.join(' AND ')}
          ORDER BY created_at ASC`,

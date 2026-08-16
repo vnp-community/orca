@@ -293,9 +293,29 @@ export async function initializeOrcaServices(
   // Store.hydrateFromPostgres()'s doc comment for why) onto Postgres for all
   // future reads/writes. Before rpcServer.start(), so no real request ever
   // sees the pre-hydration state.
+  // FIX 2026-08-16: userId was missing here — every process (main AND every
+  // per-user child, since this call runs unconditionally regardless of
+  // isUserProcess) defaulted to PgOrcaDataStatePersistence's userId=''
+  // fallback, so ALL processes shared the exact same
+  // (tenant_id, user_id='') row. Real users would have silently seen (and
+  // overwritten) each other's Project/Repo/Worktree/Tab state.
   const { PgOrcaDataStatePersistence } = await import('./orca-data-state-persistence')
-  await store.hydrateFromPostgres(new PgOrcaDataStatePersistence(pool, resolvedTenantId))
-  console.log('[ServerBootstrap] ✅ Store hydrated from Postgres (backend: postgres)')
+  const storeStateUserId = process.env['ORCA_USER_ID'] ?? ''
+  try {
+    await store.hydrateFromPostgres(
+      new PgOrcaDataStatePersistence(pool, resolvedTenantId, storeStateUserId)
+    )
+    console.log(`[ServerBootstrap] ✅ Store hydrated from Postgres (backend: postgres, userId=${storeStateUserId || '(main)'})`)
+  } catch (err) {
+    // Non-fatal, same posture as migrations/tenant-resolution above — a
+    // hydration failure must not take down the whole (user-)process. Falls
+    // back to whatever Store's own synchronous file-based load() already
+    // populated `this.state` with.
+    console.error(
+      `[ServerBootstrap] ⚠️  Store.hydrateFromPostgres failed (non-fatal, using in-memory/file state instead), userId=${storeStateUserId || '(main)'}:`,
+      (err as Error)?.message
+    )
+  }
 
   // 2a-pre. Initialize WebPushManager (Phase 3 — TASK-035; ADR-021 §"chỉ dùng 1
   // database duy nhất" — Postgres-backed by default now, no more Store/JSON).

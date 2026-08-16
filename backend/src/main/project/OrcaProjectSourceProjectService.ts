@@ -85,7 +85,7 @@ export class OrcaProjectSourceProjectService {
   async listSourceProjects(orcaProjectId: string): Promise<SourceProjectRef[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<SourceProjectRow>(
-        `SELECT owner_user_id as ownerUserId, project_id as projectId
+        `SELECT owner_user_id as "ownerUserId", project_id as "projectId"
          FROM orca_project_source_projects
          WHERE orca_project_id = ?`,
         [orcaProjectId]
@@ -98,7 +98,7 @@ export class OrcaProjectSourceProjectService {
   async listOrcaProjectsForOwner(ownerUserId: string): Promise<string[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<{ orcaProjectId: string }>(
-        `SELECT DISTINCT orca_project_id as orcaProjectId
+        `SELECT DISTINCT orca_project_id as "orcaProjectId"
          FROM orca_project_source_projects
          WHERE owner_user_id = ?`,
         [ownerUserId]
