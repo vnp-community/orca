@@ -12,26 +12,37 @@
 // DevServerPtyProvider.listProcesses() already relays to the agent's
 // existing `pty.listProcesses` handler (agent/src/relay/pty-handler.ts).
 //
-// `scan` is INTENTIONALLY NOT ported here. Desktop's scanWorkspaceCleanup
-// (desktop/src/main/ipc/workspace-cleanup-scan.ts) is not a self-contained
-// operation — it walks `store.getRepos()` and pulls in
-// workspace-cleanup-scan-primitives.ts, workspace-cleanup-candidate.ts,
-// workspace-cleanup-activity.ts, and workspace-cleanup-disconnected-ssh.ts
-// (worktree activity heuristics, git-dirty/ahead-behind checks, candidate
-// fingerprinting/tiering). None of those exist in backend/src/main yet, even
-// though the lower-level building blocks they'd need (repo-worktrees.ts,
-// worktree-metadata-merge.ts, ssh-git-dispatch.ts, store.getRepos()) do.
-// Porting `scan` means porting that whole candidate-building subsystem, not
-// writing one relay/direct RPC method — treated as a separate, larger
-// follow-up rather than forced into this pass.
+// scan is a DIRECT port of desktop's scanWorkspaceCleanup
+// (desktop/src/main/ipc/workspace-cleanup-scan.ts) plus its four supporting
+// modules (workspace-cleanup-scan-primitives.ts, workspace-cleanup-candidate.ts,
+// workspace-cleanup-activity.ts, workspace-cleanup-disconnected-ssh.ts,
+// workspace-cleanup-git-evidence.ts — all copied verbatim into
+// backend/src/main/ipc/), now that the lower-level building blocks they need
+// (repo-worktrees.ts, ipc/worktree-logic.ts, providers/ssh-git-dispatch.ts,
+// git/status.ts, git/runner.ts's gitExecFileAsync, shared/workspace-cleanup.ts,
+// shared/worktree-id.ts) already exist server-side. Store access uses
+// getActiveOnboardingStore() rather than desktop's own RPC method
+// (runtime.getRuntimeStoreForRpc(), which does not exist on
+// OrcaRuntimeService — see its own pre-existing `tsc --noEmit` error in
+// desktop — so it is not the pattern to copy).
 import { z } from 'zod'
-import { defineMethod, type RpcAnyMethod } from '../core'
+import { defineMethod, defineStreamingMethod, type RpcAnyMethod } from '../core'
 import { OptionalString, requiredNumber, requiredString } from '../schemas'
-import type { WorkspaceCleanupLocalProcessResult } from '../../../../shared/workspace-cleanup'
+import type {
+  WorkspaceCleanupLocalProcessResult,
+  WorkspaceCleanupScanArgs
+} from '../../../../shared/workspace-cleanup'
 import { getActiveOnboardingStore } from '../../../ipc/onboarding-ipc'
 import { getRemotePtyProvider } from '../../../ipc/pty'
 import { listRegisteredPtys } from '../../../memory/pty-registry'
+import { scanWorkspaceCleanup } from '../../../ipc/workspace-cleanup-scan'
 import type { RpcContext } from '../core'
+
+const WorkspaceCleanupScanParams = z.object({
+  worktreeId: OptionalString,
+  skipGitWorktreeIds: z.array(z.string()).optional(),
+  scanId: OptionalString
+})
 
 const WorkspaceCleanupDismissalSchema = z.object({
   worktreeId: requiredString('Missing worktreeId'),
@@ -136,6 +147,27 @@ async function hasKillableProcesses(
 }
 
 export const WORKSPACE_CLEANUP_METHODS: readonly RpcAnyMethod[] = [
+  defineStreamingMethod({
+    name: 'workspaceCleanup.scan',
+    params: WorkspaceCleanupScanParams,
+    handler: async (params, _ctx, emit) => {
+      const store = getActiveOnboardingStore() ?? null
+      if (!store) {
+        emit({ type: 'result', result: { scannedAt: Date.now(), candidates: [], errors: [] } })
+        return
+      }
+      // Why: always emit progress for RPC callers, even when they omit a
+      // scanId — scanWorkspaceCleanup only reports progress when a scanId is set.
+      const args: WorkspaceCleanupScanArgs = {
+        ...params,
+        scanId: params.scanId ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      }
+      const result = await scanWorkspaceCleanup(store, args, {
+        onProgress: (progress) => emit({ type: 'progress', progress })
+      })
+      emit({ type: 'result', result })
+    }
+  }),
   defineMethod({
     name: 'workspaceCleanup.dismiss',
     params: WorkspaceCleanupDismissParams,

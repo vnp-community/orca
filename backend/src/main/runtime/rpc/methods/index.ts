@@ -58,6 +58,9 @@ import { CLI_METHODS } from './cli'
 import { AGENT_STATUS_METHODS } from './agent-status'
 import { WORKSPACE_CLEANUP_METHODS } from './workspace-cleanup'
 import { AGENT_TRUST_METHODS } from './agent-trust'
+import { WORKSPACE_SPACE_METHODS } from './workspace-space'
+import { GROK_ACCOUNTS_METHODS } from './grok-accounts'
+import { MINIMAX_CREDENTIALS_METHODS } from './minimax-credentials'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -121,5 +124,8 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...CLI_METHODS,
   ...AGENT_STATUS_METHODS,
   ...WORKSPACE_CLEANUP_METHODS,
-  ...AGENT_TRUST_METHODS
+  ...AGENT_TRUST_METHODS,
+  ...WORKSPACE_SPACE_METHODS,
+  ...GROK_ACCOUNTS_METHODS,
+  ...MINIMAX_CREDENTIALS_METHODS
 ]

@@ -38,6 +38,22 @@
 // the RPC entirely in web mode; 2 call sites (chat attachment picker,
 // UntitledFileRenameDialog's directory pick) were NOT rewired yet and can
 // still hit 'shell.*' as Unknown method — remove 'shell' once those land too.
+// 'orcaProfiles' added 2026-08-17 (see specs/backend/api/orca-profiles-server-mode-design.md):
+// desktop's local multi-profile switcher (Chrome/Firefox-style — one machine,
+// swappable local app identity, `switch` relaunches the whole process). Not
+// the same concept as backend's `profile.*`/ProfileService (Company→Dept→
+// Team→User Postgres cascade for an already-authenticated server user) — the
+// shared "profile" name is coincidental. No server-mode analogue exists for
+// "which local machine identity is this process currently running as."
+// 'remoteWorkspace' added 2026-08-17: syncs open tabs/panes for an SSH
+// target across multiple separate desktop app processes via a snapshot file
+// on the remote host's Dev Server Agent (see agent/src/relay/workspace-session-handler.ts).
+// The problem it solves — many local Stores needing sync through a third
+// machine — doesn't exist in server mode, where one backend's single
+// Postgres-backed WorkspaceSessionState is already the one source of truth
+// every browser client reads directly. Not the mobile-pairing bridge
+// (that's the unrelated 'mobile' namespace) and not a duplicate of
+// devServer.list ("which Dev Servers are connected" is a different concept).
 const DESKTOP_ONLY_NAMESPACES: ReadonlySet<string> = new Set([
   'shell',
   'ephemeralVm',
@@ -50,7 +66,9 @@ const DESKTOP_ONLY_NAMESPACES: ReadonlySet<string> = new Set([
   'developerPermissions',
   'e2e',
   'export',
-  'localhostWorktreeLabels'
+  'localhostWorktreeLabels',
+  'orcaProfiles',
+  'remoteWorkspace'
 ])
 
 const UNKNOWN_METHOD_PATTERN = /^Unknown method: ([a-zA-Z0-9_]+)\./
