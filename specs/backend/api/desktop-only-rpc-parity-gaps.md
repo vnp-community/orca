@@ -43,9 +43,8 @@ ngày — xem commit log `fix/pty-session-expired-on-pane-remount`):
 | `claudeUsage.*` / `codexUsage.*` | 16 | Port đầy đủ, có dữ liệu thật (Postgres, ADR-021). |
 | `openCodeUsage.*` | 8 | Port đầy đủ + migration Postgres mới (`0025_opencode_usage_state_blob.ts`). |
 
-**Đang báo lỗi live, chưa fix**: `starNag.onboardingCompleted` (và 11 method
-`starNag.*` khác cùng nhóm) — xem phân loại bên dưới, đề xuất port rút gọn
-(bỏ phần `BrowserWindow` native) chứ không port 1:1.
+| `starNag.*` | 12 | **Fixed 2026-08-16** — port đầy đủ (không chỉ rút gọn như đề xuất ban đầu; `checkOrcaStarred`/`starOrca`/`track()` đã có sẵn nên port full rẻ hơn dự kiến). 1 điều chỉnh thật: bỏ gate `if (!BrowserWindow)` trong `broadcastShow()` — server mode không bao giờ tạo `BrowserWindow` nên gate đó sẽ tắt hẳn tính năng. |
+| `cache.getGitHub`/`.setGitHub`, `sparsePresets.*`, `feedback.submit`, `memory.getSnapshot`, `platform.get`, `diagnostics.*` (bundle, 6), `notifications.*` (5 còn thiếu) | 20 | **Fixed 2026-08-16** — toàn bộ nhóm B đã port, xem commit `a04a9ec59`. `diagnostics.*` bundle: RPC thật nhưng `initObservability()` chưa gọi ở `server-bootstrap.ts` (giống tình trạng `telemetry.*` — bundle rỗng cho tới khi wire). `notifications.*` 5 method còn lại + phần `playSound` của desktop: trả "not applicable"/lý do rõ ràng thay vì throw, không có hành vi thật (đúng theo bản chất OS-native của chúng). |
 
 ## 147 method còn thiếu — phân loại theo khuyến nghị
 
@@ -105,22 +104,24 @@ thiết kế lại?
 | `minimaxCredentials.*` / `grokAccounts.getStatus` | 4 | Quản lý credential cho AI provider ngoài luồng chính — có thể nên gộp vào `aiProvider.*`/`AIProviderService` đã có, giống nhận định ở `claudeAccounts`/`codexAccounts`. |
 | `starNag.*` (phần lõi) | 3 | Nếu quyết định GIỮ tính năng nhắc star ở server mode: `starNag.starOrca`/`.dismiss`/`.later` không cần `BrowserWindow`, chỉ cần `checkOrcaStarred()` (GitHub API) + `track()` (đã có). Phần `subscribe`/`forceShow`/`agentValueMoment`... gắn UI-trigger cụ thể hơn, cần xem frontend có gọi thật hay chỉ desktop dùng. |
 
-## Đề xuất bước tiếp theo
+## Trạng thái (cập nhật 2026-08-16)
 
-1. **starNag.onboardingCompleted đang lỗi live** — mức độ thấp (không chặn
-   luồng chính), nhưng vẫn là 1 uncaught promise rejection trên console mỗi
-   lần có user mới hoàn tất onboarding. Khuyến nghị: port tối thiểu 3 method
-   không phụ thuộc `BrowserWindow` (`.dismiss`/`.later`/`.onboardingCompleted`)
-   để hết lỗi, hoặc bọc try/catch phía frontend nếu quyết định không cần
-   tính năng nhắc star ở server mode.
-2. **Nhóm B (17 method)** — an toàn để port khi có thời gian, độ ưu tiên
-   theo giá trị sử dụng thực tế (không có gì khẩn cấp).
-3. **Nhóm C (31 method)** — KHÔNG nên port trước khi có quyết định rõ ràng,
-   đặc biệt `orcaProfiles.*` (16 method, nghe như tính năng lớn) và
+1. ~~starNag.onboardingCompleted đang lỗi live~~ — **Fixed**, port đầy đủ 12
+   method (commit `a04a9ec59`).
+2. ~~Nhóm B (17-20 method)~~ — **Fixed**, toàn bộ đã port (commit `a04a9ec59`).
+3. **Nhóm C (31 method)** — vẫn KHÔNG nên port trước khi có quyết định rõ
+   ràng, đặc biệt `orcaProfiles.*` (16 method, nghe như tính năng lớn) và
    `claudeAccounts.*`/`codexAccounts.*` (11 method, nhiều khả năng trùng vai
    trò với `aiProvider.*` đã hoạt động).
-4. **Nhóm A (99 method)** — khuyến nghị không port. Nếu muốn hết sạch lỗi
-   console "Unknown method" cho các tính năng này khi có, cách rẻ hơn là
-   guard chung phía frontend (coi "Unknown method" cho các namespace này là
-   "tính năng không khả dụng ở chế độ hiện tại", không log lỗi đỏ) thay vì
-   viết 99 method backend không có tác dụng thật.
+4. **Nhóm A (99 method)** — **Fixed theo hướng khác**: không port, thay vào
+   đó thêm 1 listener `unhandledrejection` toàn cục ở frontend
+   (`desktop-only-rpc-error-suppressor.ts`, commit `b647b5119`) im lặng
+   console error cho đúng các namespace đã liệt kê ở đây khi backend trả
+   `method_not_found` — không viết 99 method backend không có tác dụng thật.
+
+**Còn treo, cần quyết định sản phẩm**: toàn bộ Nhóm C, cộng thêm 2 việc phát
+sinh trong lúc port Nhóm B — `initObservability()` (diagnostics bundle) và
+`initTelemetry()`/`initCohortClassifier()` (telemetry) đều CHƯA được gọi ở
+`server-bootstrap.ts`, nên 2 tính năng này hoạt động ở tầng RPC nhưng chưa
+có dữ liệu thật cho tới khi ai đó quyết định wire chúng (giống gap
+`rateLimits.*`/`ClaudeAccountService`).
