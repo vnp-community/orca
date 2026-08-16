@@ -43,6 +43,7 @@ import { FLEET_METHODS } from './fleet'
 import { RATE_LIMIT_METHODS } from './rate-limits'
 import { ONBOARDING_METHODS } from './onboarding'
 import { CRASH_REPORT_METHODS } from './crash-reports'
+import { TELEMETRY_METHODS } from './telemetry'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -91,5 +92,6 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...FLEET_METHODS,
   ...RATE_LIMIT_METHODS,
   ...ONBOARDING_METHODS,
-  ...CRASH_REPORT_METHODS
+  ...CRASH_REPORT_METHODS,
+  ...TELEMETRY_METHODS
 ]

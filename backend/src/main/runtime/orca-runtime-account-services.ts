@@ -25,6 +25,18 @@ export class RuntimeAccountServicesCommands {
     return this.accountServices
   }
 
+  // Why: server mode (backend/) never calls setAccountServices() today — the
+  // underlying ClaudeAccountService/CodexAccountService detect CLI accounts
+  // on the SAME machine Orca runs on, a desktop-only concept that doesn't
+  // map to a headless multi-user server (real accounts live on whichever
+  // remote Dev Server the user connects to, already covered by
+  // preflight.detectAgents/AIProviderService). rate-limits.ts's RPC methods
+  // use this to degrade to a safe empty state instead of throwing an
+  // uncaught rejection on every page load — see that file's callers.
+  hasAccountServices(): boolean {
+    return this.accountServices !== null
+  }
+
   getAccountsSnapshot(): AccountsSnapshot {
     const { claudeAccounts, codexAccounts, rateLimits } = this.requireAccountServices()
     return {
