@@ -2,10 +2,11 @@
  * PgUsageStatePersistence — Postgres-backed `UsageStatePersistence<TState>`
  * (ADR-021, "chỉ dùng 1 database")
  *
- * Whole-state JSON blob in `usage.{claude,codex}_usage_state_blob`
- * (migration 0023_usage_state_blob.ts), one row per (tenant, user). See
- * usage-state-persistence.ts's module doc comment for why a blob table
- * instead of the granular tables from migration 0022.
+ * Whole-state JSON blob in `usage.{claude,codex,opencode}_usage_state_blob`
+ * (migration 0023_usage_state_blob.ts for claude/codex, migration
+ * 0025_opencode_usage_state_blob.ts for opencode), one row per (tenant,
+ * user). See usage-state-persistence.ts's module doc comment for why a blob
+ * table instead of the granular tables from migration 0022.
  *
  * @module main/usage/pg-usage-state-persistence
  */
@@ -17,7 +18,7 @@ import type { UsageStatePersistence } from './usage-state-persistence'
 export class PgUsageStatePersistence<TState> implements UsageStatePersistence<TState> {
   constructor(
     private readonly pool: IConnectionPool,
-    private readonly provider: 'claude' | 'codex',
+    private readonly provider: 'claude' | 'codex' | 'opencode',
     private readonly tenantId: string | undefined,
     private readonly userId: string = ''
   ) {}

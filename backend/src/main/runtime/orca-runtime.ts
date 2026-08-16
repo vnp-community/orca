@@ -59,6 +59,9 @@ import { homedir } from 'node:os'
 import { PgOrchestrationDb } from './orchestration/pg-db'
 import { KeyedAsyncQueue } from './orchestration/keyed-async-queue'
 import type { IConnectionPool } from '../db/pool'
+import type { ClaudeUsageStore } from '../claude-usage/store'
+import type { CodexUsageStore } from '../codex-usage/store'
+import type { OpenCodeUsageStore } from '../opencode-usage/store'
 import { formatMessagesForInjection } from './orchestration/formatter'
 import type {
   CreateWorktreeResult,
@@ -312,6 +315,17 @@ export class OrcaRuntimeService {
   // never calls getOrchestrationDb() through this class (see below).
   private readonly orchestrationPool: IConnectionPool | null
   private readonly orchestrationTenantId: string | undefined
+  // Why: server-bootstrap.ts already constructs these for AutomationService's
+  // usage-attribution needs (D1 fix) but never exposed them on the runtime —
+  // claudeUsage.*/codexUsage.* RPC methods (runtime/rpc/methods/claude-usage.ts,
+  // codex-usage.ts) need direct access, same as desktop's
+  // runtime.getClaudeUsageStore()/getCodexUsageStore().
+  private claudeUsageStore: ClaudeUsageStore | null
+  private codexUsageStore: CodexUsageStore | null
+  // Why: same D1-fix gap as claudeUsageStore/codexUsageStore above —
+  // openCodeUsage.* RPC methods (runtime/rpc/methods/opencode-usage.ts) need
+  // direct access, same as desktop's runtime.getOpenCodeUsageStore().
+  private openCodeUsageStore: OpenCodeUsageStore | null
   // ADR-021 — shared by every event-driven (non-async-caller) orchestration-DB
   // call site: pty-exit, message-delivery, terminal-agent-status. Keyed by
   // terminal handle so two touches of the same handle's dispatch state never
@@ -391,11 +405,17 @@ export class OrcaRuntimeService {
       // can construct a PgOrchestrationDb; omitted in Electron desktop mode.
       orchestrationPool?: IConnectionPool
       orchestrationTenantId?: string
+      claudeUsage?: ClaudeUsageStore
+      codexUsage?: CodexUsageStore
+      openCodeUsage?: OpenCodeUsageStore
     }
   ) {
     this.store = store
     this.orchestrationPool = deps?.orchestrationPool ?? null
     this.orchestrationTenantId = deps?.orchestrationTenantId
+    this.claudeUsageStore = deps?.claudeUsage ?? null
+    this.codexUsageStore = deps?.codexUsage ?? null
+    this.openCodeUsageStore = deps?.openCodeUsage ?? null
     if (stats) {
       this.stats = stats
       this.agentDetector = new AgentDetector(stats)
@@ -628,6 +648,53 @@ export class OrcaRuntimeService {
 
   setAutomationService(service: AutomationService): void {
     this.automationService = service
+  }
+
+  getClaudeUsageStore(): ClaudeUsageStore {
+    if (!this.claudeUsageStore) {
+      throw new Error(
+        '[OrcaRuntimeService] getClaudeUsageStore() called without deps.claudeUsage — ' +
+          'server-bootstrap.ts must pass it when constructing OrcaRuntimeService.'
+      )
+    }
+    return this.claudeUsageStore
+  }
+
+  getCodexUsageStore(): CodexUsageStore {
+    if (!this.codexUsageStore) {
+      throw new Error(
+        '[OrcaRuntimeService] getCodexUsageStore() called without deps.codexUsage — ' +
+          'server-bootstrap.ts must pass it when constructing OrcaRuntimeService.'
+      )
+    }
+    return this.codexUsageStore
+  }
+
+  getOpenCodeUsageStore(): OpenCodeUsageStore {
+    if (!this.openCodeUsageStore) {
+      throw new Error(
+        '[OrcaRuntimeService] getOpenCodeUsageStore() called without deps.openCodeUsage — ' +
+          'server-bootstrap.ts must pass it when constructing OrcaRuntimeService.'
+      )
+    }
+    return this.openCodeUsageStore
+  }
+
+  // Why setters, not just constructor deps: server-bootstrap.ts constructs
+  // ClaudeUsageStore/CodexUsageStore/OpenCodeUsageStore after `runtime`
+  // already exists (they also need `pool`/`resolvedTenantId`, established
+  // later in the same function) — same ordering constraint
+  // setAutomationService() above already solves for AutomationService.
+  setClaudeUsageStore(store: ClaudeUsageStore): void {
+    this.claudeUsageStore = store
+  }
+
+  setCodexUsageStore(store: CodexUsageStore): void {
+    this.codexUsageStore = store
+  }
+
+  setOpenCodeUsageStore(store: OpenCodeUsageStore): void {
+    this.openCodeUsageStore = store
   }
 
   /** TASK-036: Inject a WebPushManager so agent-task-complete triggers web push. */

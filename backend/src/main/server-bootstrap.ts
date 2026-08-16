@@ -95,6 +95,8 @@ export type ServerBootstrapResult = {
   claudeUsage: import('./claude-usage/store').ClaudeUsageStore
   /** CodexUsageStore — usage attribution for automation runs. */
   codexUsage: import('./codex-usage/store').CodexUsageStore
+  /** OpenCodeUsageStore — backs openCodeUsage.* RPC methods. */
+  openCodeUsage: import('./opencode-usage/store').OpenCodeUsageStore
 }
 
 
@@ -658,10 +660,11 @@ export async function initializeOrcaServices(
   // scheduler never ran on the server. Mirrors desktop/src/main/index.ts's wiring.
   const { ClaudeUsageStore } = await import('./claude-usage/store')
   const { CodexUsageStore } = await import('./codex-usage/store')
+  const { OpenCodeUsageStore } = await import('./opencode-usage/store')
   // ADR-021 — "chỉ dùng 1 database": Postgres-backed by default in server
-  // mode now (migration 0023's whole-state-blob tables), replacing
-  // orca-{claude,codex}-usage.json. See usage-state-persistence.ts's module
-  // doc comment.
+  // mode now (migration 0023's whole-state-blob tables for claude/codex,
+  // migration 0025 for opencode), replacing orca-{claude,codex,opencode}-usage.json.
+  // See usage-state-persistence.ts's module doc comment.
   const { PgUsageStatePersistence } = await import('./usage/pg-usage-state-persistence')
   const claudeUsage = new ClaudeUsageStore(
     store,
@@ -671,6 +674,18 @@ export async function initializeOrcaServices(
     store,
     new PgUsageStatePersistence(pool, 'codex', resolvedTenantId)
   )
+  const openCodeUsage = new OpenCodeUsageStore(
+    store,
+    new PgUsageStatePersistence(pool, 'opencode', resolvedTenantId)
+  )
+  // Why: claudeUsage.*/codexUsage.*/openCodeUsage.* RPC methods
+  // (runtime/rpc/methods/) read through
+  // runtime.getClaudeUsageStore()/getCodexUsageStore()/getOpenCodeUsageStore()
+  // — wire them in now that all three stores exist (see those getters' doc
+  // comments for why this is a post-construction setter, not a constructor dep).
+  runtime.setClaudeUsageStore(claudeUsage)
+  runtime.setCodexUsageStore(codexUsage)
+  runtime.setOpenCodeUsageStore(openCodeUsage)
   const { AutomationService } = await import('./automations/service')
   // ADR-021 — automation persistence backend selection. Now defaults to
   // 'postgres': PgAutomationStore.getRepo()/getProjectHostSetups() delegate
@@ -770,6 +785,7 @@ export async function initializeOrcaServices(
     automationService,                                                            // D1 fix ✅
     claudeUsage,                                                                  // D1 fix ✅
     codexUsage,                                                                   // D1 fix ✅
+    openCodeUsage,
     async shutdown() {
       console.log('[ServerBootstrap] Shutting down...')
       // Stop AutomationService's scheduler first, before rpcServer/db teardown below.

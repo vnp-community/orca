@@ -33,6 +33,7 @@ import { migration0021AutomationSchema } from './0021_automation_schema'
 import { migration0022NotificationUsageSchema } from './0022_notification_usage_schema'
 import { migration0023UsageStateBlob } from './0023_usage_state_blob'
 import { migration0024OrcaDataStateBlob } from './0024_orca_data_state_blob'
+import { migration0025OpenCodeUsageStateBlob } from './0025_opencode_usage_state_blob'
 import type { Migration } from './types'
 
 /** All migrations in version order. */
@@ -76,6 +77,10 @@ export const ALL_MIGRATIONS: readonly Migration[] = [
   // ADR-021 — whole-state blob table backing the actual Store (persistence.ts)
   // Postgres swap (see 0024's module doc comment)
   migration0024OrcaDataStateBlob,
+  // ADR-021 — whole-state blob table backing OpenCodeUsageStore's Postgres
+  // swap, added after 0023 (claude/codex) since migrations are append-only
+  // (see 0025's module doc comment)
+  migration0025OpenCodeUsageStateBlob,
 ]
 
 export { MigrationRunner } from './runner'
