@@ -148,6 +148,15 @@ export async function initializeOrcaServices(
   initDataPath()
   console.log('[ServerBootstrap] ✅ Data path initialized')
 
+  // 1a. Best-effort crash capture for this server process (no Electron
+  // crashReporter in server mode — see crash-report-store.ts's header
+  // comment). Must run after initDataPath() so the store's default file path
+  // resolves under the correct userData dir. Additive only: still exits the
+  // process on a fatal error, same as Node's default uncaught-exception
+  // behavior, so the process supervisor's restart semantics are unchanged.
+  const { installServerCrashReportProcessHandlers } = await import('./crash-reporting/crash-report-store')
+  installServerCrashReportProcessHandlers()
+
   // 2. Initialize SQLite Store (legacy Electron-compatible persistence)
   const { Store } = await import('./persistence')
   const store = new Store()

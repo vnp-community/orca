@@ -1732,6 +1732,8 @@ export class OrcaRuntimeService {
     this.accountServicesCommands.setAccountServices.bind(this.accountServicesCommands)
   getAccountsSnapshot: RuntimeAccountServicesCommands['getAccountsSnapshot'] =
     this.accountServicesCommands.getAccountsSnapshot.bind(this.accountServicesCommands)
+  getRateLimitService: RuntimeAccountServicesCommands['getRateLimitService'] =
+    this.accountServicesCommands.getRateLimitService.bind(this.accountServicesCommands)
   refreshAccountsForMobile: RuntimeAccountServicesCommands['refreshAccountsForMobile'] =
     this.accountServicesCommands.refreshAccountsForMobile.bind(this.accountServicesCommands)
   selectClaudeAccount: RuntimeAccountServicesCommands['selectClaudeAccount'] =
