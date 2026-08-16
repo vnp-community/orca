@@ -54,6 +54,10 @@ import { PLATFORM_METHODS } from './platform'
 import { FEEDBACK_METHODS } from './feedback'
 import { SPARSE_PRESET_METHODS } from './sparse-presets'
 import { DIAGNOSTICS_CRASH_BUNDLE_METHODS } from './diagnostics-crash-bundle'
+import { CLI_METHODS } from './cli'
+import { AGENT_STATUS_METHODS } from './agent-status'
+import { WORKSPACE_CLEANUP_METHODS } from './workspace-cleanup'
+import { AGENT_TRUST_METHODS } from './agent-trust'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -113,5 +117,9 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...PLATFORM_METHODS,
   ...FEEDBACK_METHODS,
   ...SPARSE_PRESET_METHODS,
-  ...DIAGNOSTICS_CRASH_BUNDLE_METHODS
+  ...DIAGNOSTICS_CRASH_BUNDLE_METHODS,
+  ...CLI_METHODS,
+  ...AGENT_STATUS_METHODS,
+  ...WORKSPACE_CLEANUP_METHODS,
+  ...AGENT_TRUST_METHODS
 ]

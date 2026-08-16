@@ -14,6 +14,12 @@ export const Tracers = {
   mkdirFlow:     createTracer('devServer:mkdir'),
   /** Browser → RPC → IPC → Relay → Agent: rmdir */
   rmdirFlow:     createTracer('devServer:rmdir'),
+  /** Browser → RPC → IPC → Relay → Agent: path existence check */
+  pathExistsFlow: createTracer('devServer:pathExists'),
+  /** Browser → RPC → IPC → Relay → Agent: read file content */
+  readFileFlow:  createTracer('devServer:readFile'),
+  /** Browser → RPC → IPC → Relay → Agent: copy file */
+  copyFileFlow:  createTracer('devServer:copyFile'),
   /** Agent WebSocket lifecycle (connect / disconnect) */
   agentWsFlow:   createTracer('agentWs:lifecycle'),
   /** IPC proxy call from user-process to main-process */

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Github, Image, Link2 } from 'lucide-react'
 import type { RepoIcon } from '../../../../shared/repo-icon'
-import { faviconUrlFromWebsite } from '../../../../shared/repo-icon'
+import { faviconUrlFromWebsite, MAX_REPO_ICON_UPLOAD_BYTES } from '../../../../shared/repo-icon'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
@@ -10,6 +10,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { getRepoLucideIconOptions } from '../repo/repo-icon'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '../../lib/web-client-location'
+import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { DevServerFilePickerDialog } from '../remote-browser/DevServerFilePickerDialog'
+import { devServerReadFile } from '../../runtime/runtime-dev-server-shell-client'
 
 import { shellPickRepoIconImage } from '../../runtime/runtime-shell-client'
 const EMOJI_OPTIONS = ['🚀', '✨', '💻', '🧠', '📦', '🔧', '🎨', '🌐', '📊', '🔒', '⚡', '✅']
@@ -32,9 +36,21 @@ export function RepositoryIconTabs({
   onUseGitHubAvatar
 }: RepositoryIconTabsProps): React.JSX.Element {
   const [website, setWebsite] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
   const mountedRef = useMountedRef()
+  const activeDevServer = useActiveDevServer()
 
   const handleUploadImage = async () => {
+    // Why: there is no OS-native file dialog in server/web mode — browse the
+    // connected Dev Server's filesystem instead (see DevServerFilePickerDialog).
+    if (isWebClientLocation()) {
+      if (!activeDevServer) {
+        toast.error('Connect a Dev Server to browse its files.')
+        return
+      }
+      setPickerOpen(true)
+      return
+    }
     try {
       const result = await shellPickRepoIconImage()
       if (!result || !mountedRef.current) {
@@ -45,6 +61,43 @@ export function RepositoryIconTabs({
         src: result.dataUrl,
         source: 'upload',
         label: result.fileName
+      })
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : translate(
+              'auto.components.settings.RepositoryIconPicker.868c5c9b56',
+              'Failed to import repo icon'
+            )
+      )
+    }
+  }
+
+  const handlePickerSelect = async (path: string): Promise<void> => {
+    setPickerOpen(false)
+    if (!activeDevServer) {
+      return
+    }
+    try {
+      if (!path.toLowerCase().endsWith('.png')) {
+        throw new Error('Repo icons must be PNG files.')
+      }
+      const file = await devServerReadFile(activeDevServer.id, path)
+      if (!mountedRef.current) {
+        return
+      }
+      const byteLength = file.encoding === 'base64' ? atob(file.content).length : file.content.length
+      if (byteLength > MAX_REPO_ICON_UPLOAD_BYTES) {
+        throw new Error('Repo icon image must be 256KB or smaller.')
+      }
+      const contentBase64 = file.encoding === 'base64' ? file.content : btoa(file.content)
+      const fileName = path.split('/').pop() || 'icon.png'
+      onSetIcon({
+        type: 'image',
+        src: `data:image/png;base64,${contentBase64}`,
+        source: 'upload',
+        label: fileName
       })
     } catch (error) {
       toast.error(
@@ -81,6 +134,7 @@ export function RepositoryIconTabs({
   }
 
   return (
+    <>
     <Tabs defaultValue={initialTab} className="gap-3">
       <TabsList variant="line" className="h-8">
         <TabsTrigger value="avatar" className="h-7 text-xs">
@@ -201,5 +255,15 @@ export function RepositoryIconTabs({
         ))}
       </TabsContent>
     </Tabs>
+    <DevServerFilePickerDialog
+      open={pickerOpen}
+      mode="file"
+      extensions={['png']}
+      title="Choose a repo icon"
+      description="PNG uploads must be 256KB or smaller."
+      onSelect={(path) => void handlePickerSelect(path)}
+      onClose={() => setPickerOpen(false)}
+    />
+    </>
   )
 }

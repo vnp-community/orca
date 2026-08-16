@@ -310,7 +310,7 @@ async function route(
     case 'git.exec': {
       try {
         const { handleGitExec } = await import('./agent-git-handler')
-        return (await handleGitExec(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+        return (await handleGitExec(rpc.id, rpc.params ?? {}, config, log, ws)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `git.exec unavailable: ${msg}`)
@@ -508,6 +508,119 @@ async function route(
       }
     }
 
+    // ── preflight.detectAgents ───────────────────────────────────────────────
+    // Called by dev-server-relay-bridge.ts's detectAgents() (onboarding-ipc.ts).
+    // Previously Part-B-only; see specs/agent/api/gaps-and-findings.md #5.
+    case 'preflight.detectAgents': {
+      try {
+        const { handleDetectAgents } = await import('./agent-preflight-handler')
+        return (await handleDetectAgents(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.detectAgents unavailable: ${msg}`)
+      }
+    }
+
+    // ── preflight.detectWindowsTerminalCapabilities ──────────────────────────
+    case 'preflight.detectWindowsTerminalCapabilities': {
+      try {
+        const { handleDetectWindowsTerminalCapabilities } = await import('./agent-preflight-handler')
+        return (await handleDetectWindowsTerminalCapabilities(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.detectWindowsTerminalCapabilities unavailable: ${msg}`)
+      }
+    }
+
+    // ── preflight.detectGhosttyConfig ────────────────────────────────────────
+    case 'preflight.detectGhosttyConfig': {
+      try {
+        const { handleDetectGhosttyConfig } = await import('./agent-preflight-handler')
+        return (await handleDetectGhosttyConfig(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.detectGhosttyConfig unavailable: ${msg}`)
+      }
+    }
+
+    // ── preflight.setGitIdentity ─────────────────────────────────────────────
+    // BUG-AG-HLD-003 parity for Part A — stores identity per-connection
+    // (git-identity-registry.ts), consumed by git.exec's `commit` subcommand.
+    case 'preflight.setGitIdentity': {
+      try {
+        const { handleSetGitIdentity } = await import('./agent-preflight-handler')
+        return (await handleSetGitIdentity(rpc.id, rpc.params ?? {}, ws)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.setGitIdentity unavailable: ${msg}`)
+      }
+    }
+
+    // ─── cli.* (Orca ADR — server-mode CLI install on Dev Server) ───────────
+    // Backend relays cli.* to the Dev Server Agent instead of running it on
+    // the Orca backend container — see backend/src/main/runtime/rpc/methods/cli.ts
+    // and agent-cli-handler.ts for the full rationale.
+    case 'cli.getInstallStatus': {
+      try {
+        const { handleCliGetInstallStatus } = await import('./agent-cli-handler')
+        return (await handleCliGetInstallStatus(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.getInstallStatus unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.install': {
+      try {
+        const { handleCliInstall } = await import('./agent-cli-handler')
+        return (await handleCliInstall(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.install unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.remove': {
+      try {
+        const { handleCliRemove } = await import('./agent-cli-handler')
+        return (await handleCliRemove(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.remove unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.getWslInstallStatus': {
+      try {
+        const { handleCliGetWslInstallStatus } = await import('./agent-cli-handler')
+        return (await handleCliGetWslInstallStatus(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.getWslInstallStatus unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.installWsl': {
+      try {
+        const { handleCliInstallWsl } = await import('./agent-cli-handler')
+        return (await handleCliInstallWsl(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.installWsl unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.removeWsl': {
+      try {
+        const { handleCliRemoveWsl } = await import('./agent-cli-handler')
+        return (await handleCliRemoveWsl(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.removeWsl unavailable: ${msg}`)
+      }
+    }
+    // ─── end cli.* ───────────────────────────────────────────────────────────
+
     // ── v5.0: ai.provider.deleteCredential ───────────────────────────────────
     case 'ai.provider.deleteCredential': {
       try {
@@ -567,6 +680,20 @@ async function route(
       }
     }
 
+    // ── git.clone ─────────────────────────────────────────────────────────────
+    // Called by backend/src/main/ipc/repo-remote-ipc.ts's repo.cloneRemote,
+    // { url, targetPath }. Previously Part-B-only; see
+    // specs/agent/api/gaps-and-findings.md #5.
+    case 'git.clone': {
+      try {
+        const { handleGitClone } = await import('./agent-git-clone-handler')
+        return (await handleGitClone(rpc.id, rpc.params ?? {}, makeNotifier(ws, state))) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.clone unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: fs.stat ────────────────────────────────────────────────────────
     case 'fs.stat': {
       try {
@@ -599,6 +726,20 @@ async function route(
         return makeError(rpc.id, AgentErrorCode.ServerError, `fs.writeFile unavailable: ${msg}`)
       }
     }
+
+    // ─── fs.copyFile (web/server-mode DevServerFilePickerDialog support) ────
+    // Backs backend/src/main/runtime/rpc/methods/dev-server.ts's devServer.copyFile
+    // — see agent-shell-handler.ts for the full rationale.
+    case 'fs.copyFile': {
+      try {
+        const { handleFsCopyFile } = await import('./agent-shell-handler')
+        return (await handleFsCopyFile(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `fs.copyFile unavailable: ${msg}`)
+      }
+    }
+    // ─── end fs.copyFile ─────────────────────────────────────────────────────
 
     // ── v5.0: github.pr.create ───────────────────────────────────────────────
     case 'github.pr.create': {
@@ -696,6 +837,32 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `gitlab.auth.status unavailable: ${msg}`)
+      }
+    }
+
+    // ── github.exec / gitlab.exec ────────────────────────────────────────────
+    // Generic, allowlist-validated gh/glab CLI passthrough — backs the
+    // ADR-018 migration: backend/src/main/git/runner.ts's ghExecFileAsync/
+    // glabExecFileAsync now route here via a connection-scoped provider
+    // instead of spawning gh/glab in the backend process. See
+    // specs/agent/api/gaps-and-findings.md.
+    case 'github.exec': {
+      try {
+        const { handleGithubExec } = await import('./agent-github-cli-handler')
+        return (await handleGithubExec(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `github.exec unavailable: ${msg}`)
+      }
+    }
+
+    case 'gitlab.exec': {
+      try {
+        const { handleGitlabExec } = await import('./agent-gitlab-cli-handler')
+        return (await handleGitlabExec(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `gitlab.exec unavailable: ${msg}`)
       }
     }
 
@@ -814,6 +981,24 @@ async function route(
       }
     }
 
+    // ── agent.execPrompt ─────────────────────────────────────────────────────
+    // One-shot, non-interactive AI-CLI invocation from a workflow/task-step
+    // prompt request — distinct from agent.exec's generic "run this binary"
+    // contract above (which agent.exec's real callers depend on unchanged).
+    // Called by:
+    //   - StepExecutors.executeAgent() via relay.call('agent.execPrompt', {...})
+    //   - ProfileAwareAgentSpawner via relay.call('agent.execPrompt', {...})
+    // See specs/agent/api/gaps-and-findings.md.
+    case 'agent.execPrompt': {
+      try {
+        const { handleAgentExecPrompt } = await import('./agent-print-mode-exec')
+        return (await handleAgentExecPrompt(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `agent.execPrompt unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: ai.complete ─────────────────────────────────────────────────────
     // TG-002: Non-interactive AI completion for task planning (TaskAIPlanner.decompose)
     // and git commit message generation.
@@ -909,6 +1094,20 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `fs.rmdir unavailable: ${msg}`)
+      }
+    }
+
+    // ── fs.listDirectory ─────────────────────────────────────────────────────
+    // Called by backend/src/main/ipc/repo-remote-ipc.ts's
+    // repo.listRemoteDirectory/repo.scanRemote, { path, includeGitStatus? }.
+    // Previously Part-B-only; see specs/agent/api/gaps-and-findings.md #5.
+    case 'fs.listDirectory': {
+      try {
+        const { handleFsListDirectory } = await import('./fs-agent-directory-browse')
+        return (await handleFsListDirectory(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `fs.listDirectory unavailable: ${msg}`)
       }
     }
 
