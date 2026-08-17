@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package orca.workflow.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1";
+
+// WorkflowService owns templates + DAG execution/step dispatch. Also exposes
+// ExecuteAdHocStep so automation-service can reuse step execution directly
+// (closes TS Gap 3) without a fake-workflow indirection.
+// See specs/backend-go/services/workflow-service.md.
+service WorkflowService {
+  rpc CreateTemplate(CreateTemplateRequest) returns (CreateTemplateResponse);
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+  rpc GetExecution(GetExecutionRequest) returns (GetExecutionResponse);
+  rpc PauseExecution(PauseExecutionRequest) returns (PauseExecutionResponse);
+  rpc ResumeExecution(ResumeExecutionRequest) returns (ResumeExecutionResponse);
+  rpc ExecuteAdHocStep(ExecuteAdHocStepRequest) returns (ExecuteAdHocStepResponse);
+}
+
+enum StepType {
+  STEP_TYPE_UNSPECIFIED = 0;
+  STEP_TYPE_AGENT = 1;
+  STEP_TYPE_SHELL = 2;
+  STEP_TYPE_NOTIFICATION = 3;
+  STEP_TYPE_WEBHOOK = 4;
+  STEP_TYPE_CONDITION = 5;
+}
+
+message WorkflowTemplate {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string dag_json = 4;
+  string scope = 5; // company | team | personal
+}
+
+message CreateTemplateRequest {
+  string tenant_id = 1;
+  string name = 2;
+  string dag_json = 3;
+  string scope = 4;
+}
+
+message CreateTemplateResponse {
+  WorkflowTemplate template = 1;
+}
+
+message ExecuteRequest {
+  string template_id = 1;
+  string project_id = 2;
+  string root_trace_id = 3; // resumability across restart
+  string request_id = 4;
+}
+
+message WorkflowExecution {
+  string id = 1;
+  string template_id = 2;
+  string status = 3; // pending|running|paused|completed|failed
+  string root_trace_id = 4;
+}
+
+message ExecuteResponse {
+  WorkflowExecution execution = 1;
+}
+
+message GetExecutionRequest {
+  string id = 1;
+}
+
+message GetExecutionResponse {
+  WorkflowExecution execution = 1;
+}
+
+message PauseExecutionRequest {
+  string id = 1;
+}
+
+message PauseExecutionResponse {
+  WorkflowExecution execution = 1;
+}
+
+message ResumeExecutionRequest {
+  string id = 1;
+}
+
+message ResumeExecutionResponse {
+  WorkflowExecution execution = 1;
+}
+
+// ExecuteAdHocStep runs a single step (agent/shell/notification/webhook/condition)
+// outside of a full template — the mechanism automation-service's RunNow uses.
+message ExecuteAdHocStepRequest {
+  string tenant_id = 1;
+  StepType step_type = 2;
+  string step_config_json = 3;
+  string request_id = 4;
+}
+
+message StepResult {
+  string status = 1; // completed|failed
+  string output_json = 2;
+}
+
+message ExecuteAdHocStepResponse {
+  StepResult result = 1;
+}

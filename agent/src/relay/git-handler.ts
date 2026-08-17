@@ -321,6 +321,21 @@ export class GitHandler {
     this.dispatcher.onRequest('git.branchDiff', (p, context) => this.branchDiff(p, context))
     this.dispatcher.onRequest('git.commitDiff', (p, context) => this.commitDiff(p, context))
     this.dispatcher.onRequest('git.listWorktrees', (p, context) => this.listWorktrees(p, context))
+    // Alias: backend/src/main/workspace/WorkspaceService.ts calls 'git.worktree.list'
+    // (Part A's method name/shape: params { cwd }, result { worktrees: [...] }) via
+    // a raw relay.call() reachable on either connection type — register the same
+    // name here so it doesn't MethodNotFound on a relay-ssh-shaped connection.
+    // listWorktrees() reads params.repoPath (not cwd) and resolves a bare array
+    // (not { worktrees }) — adapt both directions rather than bare-alias it, since
+    // WorkspaceService.ts does `(result as {worktrees?})?.worktrees ?? []` and would
+    // silently see an empty list otherwise. See specs/agent/api/gaps-and-findings.md #4.
+    this.dispatcher.onRequest('git.worktree.list', async (p, context) => {
+      const worktrees = await this.listWorktrees(
+        { ...p, repoPath: (p.repoPath as string | undefined) ?? (p.cwd as string | undefined) },
+        context
+      )
+      return { worktrees }
+    })
     this.dispatcher.onRequest('git.addWorktree', (p) => this.addWorktree(p))
     this.dispatcher.onRequest('git.removeWorktree', (p) => this.removeWorktree(p))
     this.dispatcher.onRequest('git.worktreeIsClean', (p) => this.worktreeIsClean(p))

@@ -57,6 +57,7 @@ a direct WebSocket rather than SSH relay.
 | `git.worktree.list` | `:525` | `handleGitWorktreeList` — `agent-git-handler.ts:287` | `cwd?` | `{worktrees: WorktreeInfo[]}` | `git worktree list --porcelain`, parsed via `parseWorktreePorcelain` | none extra |
 | `git.worktree.add` | `:536` | `handleGitWorktreeAdd` — `:311` | `path, branch, createBranch?, cwd?` | delegates to `handleGitExec` result | `git worktree add [-b] <branch> <path>` | requires non-empty `path`/`branch`; `SHELL_METACHARACTERS` check; `validateWorktreePath` — path-traversal guard |
 | `git.worktree.remove` | `:547` | `handleGitWorktreeRemove` — `:365` | `path, force?, cwd?` | delegates to `handleGitExec` result | `git worktree remove [--force] <path>` | requires non-empty `path`; `SHELL_METACHARACTERS` check |
+| `git.clone` | `agent-rpc-dispatch.ts` (after `git.worktree.remove`) | `handleGitClone` — `agent-git-clone-handler.ts` (new, 2026-08-15 pass 5) | `url: string, targetPath: string` | `{path: targetPath}` | `git clone --progress -- <url> <targetPath>`, streams `git.clone.output` via `makeNotifier` | rejects a leading `-` or embedded NUL in `url`/`targetPath` (argv-injection guard); `buildRelayGitEnv()`. Was missing entirely on Part A until this fix — see [`gaps-and-findings.md`](./gaps-and-findings.md) #11. Only the `{url,targetPath}` shape is supported (Part A has no `progressId`-based args-shape caller) |
 
 **`ALLOWED_GIT_SUBCOMMANDS`** for Part A's `git.exec`/`git.execStream`
 (`agent-git-handler.ts:41-64`) — **21 subcommands**:
@@ -98,6 +99,7 @@ original request id. Fire-and-forget, no ack/credit window.
 | `fs.rmdir` | `handleFsRmdir` @554 | `path`, `recursive?` | `{ok:true, path}` | Removes dir (recursive via `rm -rf` if flagged) | **Weak, not real confinement** — only refuses if `config.workDir.startsWith(absPath) \|\| absPath === '/'` (blocks deleting workDir/its ancestors, or `/`); an unrelated absolute path outside workDir passes through |
 | `fs.watch` | `handleFsWatch` @683 | `path`; injected `notify` callback | `{ok:true, path}` | Refcounted watch registry (`AGENT_WATCH_MAP`); manual per-subdir `fs.watch()` on Linux (native `recursive` ignored there), single recursive watch on macOS/Windows | **None** on path; capped at `MAX_LINUX_WATCH_DIRS=4000` |
 | `fs.unwatch` | `handleFsUnwatch` @733 | `path` | `{ok:true}` | Decrements refcount, closes watcher(s) at 0 | n/a |
+| `fs.listDirectory` | `handleFsListDirectory` — `fs-agent-directory-browse.ts` (new, 2026-08-15 pass 5) | `path`, `includeGitStatus?` | `{entries:[{name,path,isDirectory:true,isGitRepo}],platform}` | Subdirectory-only listing for a folder picker — near-verbatim port of Part B's `FsDirectoryBrowserHandler.listDirectory` | **none** — raw `params.path` used directly, matching Part B's equally-unconfined behavior. Was missing entirely on Part A until this fix — see [`gaps-and-findings.md`](./gaps-and-findings.md) #11 |
 
 There is **no shared path-confinement helper** across these handlers — each
 resolves `isAbsolute(raw) ? raw : join(config.workDir, raw)` ad hoc; only

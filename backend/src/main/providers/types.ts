@@ -470,6 +470,30 @@ export type IGitProvider = {
   getHostPlatform?(): RemoteHostPlatform | null
 }
 
+// ─── Hosted CLI Provider (gh/glab) ────────────────────────────────────
+//
+// ADR-018: backend must never execute gh/glab itself — ghExecFileAsync/
+// glabExecFileAsync (src/main/git/runner.ts) route through this instead of
+// spawning locally. Throws on a non-zero exit, matching execFile's
+// convention (the ~130 existing callers all `try { await ghExecFileAsync(...)
+// } catch`). See specs/agent/api/gaps-and-findings.md.
+
+export type IHostedCliProvider = {
+  exec(
+    args: string[],
+    cwd: string | undefined,
+    userId: string | undefined,
+    options?: {
+      timeoutMs?: number
+      idempotent?: boolean
+      /** Small, explicit env overrides (e.g. GITLAB_HOST for a ported
+       *  self-hosted instance) — NOT the caller's full process.env, which
+       *  stays backend-local and is never forwarded over the RPC wire. */
+      env?: Record<string, string>
+    }
+  ): Promise<{ stdout: string; stderr: string }>
+}
+
 // ─── Provider Registry ──────────────────────────────────────────────
 
 /**

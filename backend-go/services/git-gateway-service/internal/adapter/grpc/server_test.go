@@ -1,0 +1,113 @@
+package grpc
+
+import (
+	"context"
+	"testing"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
+
+	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
+)
+
+// fakeResolver/fakeExecutor let this test exercise wire<->usecase
+// translation without touching a real ConnectionResolver/GitExecutor
+// implementation.
+type fakeResolver struct{ conn usecase.ResolvedConnection }
+
+func (f *fakeResolver) ResolveConnection(context.Context, string) (usecase.ResolvedConnection, error) {
+	return f.conn, nil
+}
+
+type fakeExecutor struct{}
+
+func (fakeExecutor) GetStatus(context.Context, string) (domain.GitStatus, error) {
+	return domain.GitStatus{
+		Branch: "main",
+		Files:  []domain.FileStatus{{Path: "a.txt", State: domain.FileStateModified}},
+	}, nil
+}
+
+func (fakeExecutor) GetDiff(context.Context, string, bool) (domain.DiffResult, error) {
+	return domain.DiffResult{UnifiedDiff: "diff --git a/a.txt b/a.txt"}, nil
+}
+
+func (fakeExecutor) Commit(context.Context, string, string, []string) (domain.CommitResult, error) {
+	return domain.CommitResult{CommitSHA: "deadbeef"}, nil
+}
+
+func (fakeExecutor) Push(context.Context, string, string, string) (domain.PushResult, error) {
+	return domain.PushResult{Success: true}, nil
+}
+
+func (fakeExecutor) Pull(context.Context, string) (domain.PullResult, error) {
+	return domain.PullResult{Success: true, HadConflicts: false}, nil
+}
+
+func newTestServer() *Server {
+	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	exec := fakeExecutor{}
+	return New(
+		usecase.NewGetStatus(resolver, exec, exec),
+		usecase.NewGetDiff(resolver, exec, exec),
+		usecase.NewCommit(resolver, exec, exec),
+		usecase.NewPush(resolver, exec, exec),
+		usecase.NewPull(resolver, exec, exec),
+		usecase.NewGenerateCommitMessage(),
+	)
+}
+
+func TestServer_GetStatus_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.GetStatus(context.Background(), &gitgatewayv1.GetStatusRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetBranch() != "main" {
+		t.Errorf("expected branch=main, got %q", resp.GetBranch())
+	}
+	if len(resp.GetFiles()) != 1 || resp.GetFiles()[0].GetState() != "modified" {
+		t.Errorf("unexpected files: %+v", resp.GetFiles())
+	}
+}
+
+func TestServer_GetStatus_MissingWorktreeID_ReturnsInvalidArgument(t *testing.T) {
+	s := newTestServer()
+	_, err := s.GetStatus(context.Background(), &gitgatewayv1.GetStatusRequest{})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestServer_Commit_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.Commit(context.Background(), &gitgatewayv1.CommitRequest{WorktreeId: "wt-1", Message: "fix"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetCommitSha() != "deadbeef" {
+		t.Errorf("expected commit_sha=deadbeef, got %q", resp.GetCommitSha())
+	}
+}
+
+func TestServer_Pull_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.Pull(context.Background(), &gitgatewayv1.PullRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() || resp.GetHadConflicts() {
+		t.Errorf("unexpected pull response: %+v", resp)
+	}
+}
+
+func TestServer_GenerateCommitMessage_ReturnsUnimplemented(t *testing.T) {
+	s := newTestServer()
+	_, err := s.GenerateCommitMessage(context.Background(), &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: "wt-1"})
+	if status.Code(err) != codes.Unimplemented {
+		t.Fatalf("expected Unimplemented, got %v", err)
+	}
+}

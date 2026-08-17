@@ -85,7 +85,7 @@ home-scoped `wslfs.*` filesystem bridge and hook-event forwarding only.
   registry with no live caller), and to find the reverse-direction handlers
   the backend registers for agent-initiated traffic.
 - **Cross-check, not exhaustive param-shape verification**: like the
-  frontend↔backend catalog (`specs/frontend/tdd/api/rpc-catalog.md`), this is
+  frontend↔backend catalog (`specs/frontend/api/rpc-catalog.md`), this is
   primarily a name-and-registration-level audit backed by direct source
   reads — it confirms a method exists and is called, and documents the
   params/returns visible in the handler signature, but does not runtime-test
@@ -106,7 +106,7 @@ home-scoped `wslfs.*` filesystem bridge and hook-event forwarding only.
 
 This directory documents the **wire-level RPC/API contract** between the two
 processes. It does not cover: the backend's own HTTP/RPC surface toward the
-frontend (see `specs/frontend/tdd/api/`), the agent's local-only PTY-daemon
+frontend (see `specs/frontend/api/`), the agent's local-only PTY-daemon
 IPC (a single-host implementation detail, only mentioned where it explains
 why `pty.*` exists twice), or product/UX-level behavior built on top of this
 RPC surface.

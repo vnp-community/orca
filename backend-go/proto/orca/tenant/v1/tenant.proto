@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package orca.tenant.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1;tenantv1";
+
+// TenantService owns companies, departments, user profiles (3-layer resolution), teams.
+// This is the origin of tenant_id for every other service. See specs/backend-go/services/tenant-service.md.
+service TenantService {
+  rpc CreateCompany(CreateCompanyRequest) returns (CreateCompanyResponse);
+  rpc ValidateTenant(ValidateTenantRequest) returns (ValidateTenantResponse);
+  rpc CreateDepartment(CreateDepartmentRequest) returns (CreateDepartmentResponse);
+  rpc SetUserDepartment(SetUserDepartmentRequest) returns (SetUserDepartmentResponse);
+  rpc GetResolvedProfile(GetResolvedProfileRequest) returns (GetResolvedProfileResponse);
+  rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse);
+  rpc AddTeamMember(AddTeamMemberRequest) returns (AddTeamMemberResponse);
+  rpc ListTeamMembers(ListTeamMembersRequest) returns (ListTeamMembersResponse);
+}
+
+message Company {
+  string id = 1;
+  string name = 2;
+  string settings_json = 3; // company-layer defaults, deep-merge base
+}
+
+message Department {
+  string id = 1;
+  string company_id = 2;
+  string name = 3;
+  string settings_json = 4;
+}
+
+message CreateCompanyRequest {
+  string name = 1;
+}
+
+message CreateCompanyResponse {
+  Company company = 1;
+}
+
+message ValidateTenantRequest {
+  string tenant_id = 1;
+}
+
+message ValidateTenantResponse {
+  bool exists = 1;
+}
+
+message CreateDepartmentRequest {
+  string company_id = 1;
+  string name = 2;
+}
+
+message CreateDepartmentResponse {
+  Department department = 1;
+}
+
+message SetUserDepartmentRequest {
+  string user_id = 1;
+  string department_id = 2;
+}
+
+message SetUserDepartmentResponse {}
+
+message GetResolvedProfileRequest {
+  string user_id = 1;
+}
+
+message GetResolvedProfileResponse {
+  string resolved_settings_json = 1; // company <- department <- user deep-merge result
+}
+
+message Team {
+  string id = 1;
+  string company_id = 2;
+  string name = 3;
+}
+
+message CreateTeamRequest {
+  string company_id = 1;
+  string name = 2;
+}
+
+message CreateTeamResponse {
+  Team team = 1;
+}
+
+message AddTeamMemberRequest {
+  string team_id = 1;
+  string user_id = 2;
+  int32 priority = 3;
+}
+
+message AddTeamMemberResponse {}
+
+message ListTeamMembersRequest {
+  string team_id = 1;
+}
+
+message TeamMember {
+  string user_id = 1;
+  int32 priority = 2;
+}
+
+message ListTeamMembersResponse {
+  repeated TeamMember members = 1;
+}

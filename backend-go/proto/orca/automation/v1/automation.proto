@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package orca.automation.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1;automationv1";
+
+// AutomationService owns schedule/trigger definitions + run history. Execution
+// always delegates to workflow-service.ExecuteAdHocStep (closes TS Gap 3 —
+// automation.runNow had no working execution path in TS).
+// See specs/backend-go/services/automation-service.md.
+service AutomationService {
+  rpc CreateAutomation(CreateAutomationRequest) returns (CreateAutomationResponse);
+  rpc RunNow(RunNowRequest) returns (RunNowResponse);
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+}
+
+message Automation {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string rrule = 4;
+  string step_config_json = 5;
+}
+
+message CreateAutomationRequest {
+  string tenant_id = 1;
+  string name = 2;
+  string rrule = 3;
+  string step_config_json = 4;
+}
+
+message CreateAutomationResponse {
+  Automation automation = 1;
+}
+
+message RunNowRequest {
+  string automation_id = 1;
+  string request_id = 2; // idempotency, since scheduler ticks are at-least-once
+}
+
+message AutomationRun {
+  string id = 1;
+  string automation_id = 2;
+  string status = 3; // running|completed|failed
+}
+
+message RunNowResponse {
+  AutomationRun run = 1;
+}
+
+message ListRunsRequest {
+  string automation_id = 1;
+  string page_token = 2;
+  int32 page_size = 3;
+}
+
+message ListRunsResponse {
+  repeated AutomationRun runs = 1;
+  string next_page_token = 2;
+}

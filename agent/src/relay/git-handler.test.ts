@@ -2045,6 +2045,37 @@ describe('GitHandler', () => {
     )
   })
 
+  // Why: backend/src/main/workspace/WorkspaceService.ts calls 'git.worktree.list'
+  // with { cwd } and reads result.worktrees — a name+shape adapter onto
+  // listWorktrees(), not a bare alias. See specs/agent/api/gaps-and-findings.md #4.
+  describe('git.worktree.list (Part A name alias)', () => {
+    it('accepts { cwd } and returns { worktrees: [...] }', async () => {
+      gitInit(tmpDir)
+      writeFileSync(path.join(tmpDir, 'file.txt'), 'hello')
+      gitCommit(tmpDir, 'initial')
+
+      const result = (await dispatcher.callRequest('git.worktree.list', {
+        cwd: tmpDir
+      })) as { worktrees: Record<string, unknown>[] }
+
+      expect(result.worktrees.length).toBeGreaterThanOrEqual(1)
+      expect(result.worktrees[0].isMainWorktree).toBe(true)
+    })
+
+    it('prefers repoPath over cwd when both are present', async () => {
+      gitInit(tmpDir)
+      writeFileSync(path.join(tmpDir, 'file.txt'), 'hello')
+      gitCommit(tmpDir, 'initial')
+
+      const result = (await dispatcher.callRequest('git.worktree.list', {
+        repoPath: tmpDir,
+        cwd: '/nonexistent'
+      })) as { worktrees: Record<string, unknown>[] }
+
+      expect(result.worktrees.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
   describe('worktreeIsClean', () => {
     it('can ignore untracked files', async () => {
       gitInit(tmpDir)

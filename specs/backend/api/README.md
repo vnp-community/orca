@@ -1,5 +1,10 @@
 # Backend API & Architecture
 
+- [`backend-hld-c4.md`](./backend-hld-c4.md) — High Level Design for
+  `backend/` in C4 format (Context, Container, Component), scoped to the
+  post-monorepo-split `backend/` package only. Built from the other docs in
+  this directory plus `docs/hld/backend-server-architecture.md`; supersedes
+  `docs/hld/v1/` for backend-specific detail.
 - [`business-capabilities.md`](./business-capabilities.md) — every business
   capability `backend/` currently provides, organized by domain: what it
   does, how the frontend reaches it, where the work actually happens today

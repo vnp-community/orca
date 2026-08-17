@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package orca.scmintegration.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1;scmintegrationv1";
+
+// ScmIntegrationService: GitHub/GitLab/Bitbucket/Azure DevOps/Gitea via direct
+// per-tenant OAuth API clients — NOT a CLI shell-out (closes TS Gap 1).
+// See specs/backend-go/services/scm-integration-service.md.
+service ScmIntegrationService {
+  rpc ListIssues(ListIssuesRequest) returns (ListIssuesResponse);
+  rpc CreatePullRequest(CreatePullRequestRequest) returns (CreatePullRequestResponse);
+  rpc ListPullRequests(ListPullRequestsRequest) returns (ListPullRequestsResponse);
+  rpc GetRateLimitStatus(GetRateLimitStatusRequest) returns (GetRateLimitStatusResponse);
+}
+
+enum ScmProvider {
+  SCM_PROVIDER_UNSPECIFIED = 0;
+  SCM_PROVIDER_GITHUB = 1;
+  SCM_PROVIDER_GITLAB = 2;
+  SCM_PROVIDER_BITBUCKET = 3;
+  SCM_PROVIDER_AZURE_DEVOPS = 4;
+  SCM_PROVIDER_GITEA = 5;
+}
+
+message Issue {
+  string id = 1;
+  string title = 2;
+  string state = 3;
+  string url = 4;
+}
+
+message ListIssuesRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+}
+
+message ListIssuesResponse {
+  repeated Issue issues = 1;
+}
+
+message CreatePullRequestRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  string title = 4;
+  string body = 5;
+  string head_branch = 6;
+  string base_branch = 7;
+  string request_id = 8;
+}
+
+message PullRequest {
+  string id = 1;
+  string url = 2;
+  string state = 3;
+}
+
+message CreatePullRequestResponse {
+  PullRequest pull_request = 1;
+}
+
+message ListPullRequestsRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+}
+
+message ListPullRequestsResponse {
+  repeated PullRequest pull_requests = 1;
+}
+
+message GetRateLimitStatusRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+}
+
+message GetRateLimitStatusResponse {
+  int32 remaining = 1;
+  int32 limit = 2;
+  int64 reset_unix = 3;
+}

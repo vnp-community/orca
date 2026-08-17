@@ -22,6 +22,7 @@ import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { createTracer } from '../shared/trace'
 import { Tracers } from '../shared/trace/tracers'
 import { assertNoGitInjectionFlags } from './agent-git-exec-validator'
+import { getConnectionGitIdentity, buildGitIdentityEnv } from './git-identity-registry'
 
 const gitTracer = createTracer('agent:git')
 
@@ -138,7 +139,8 @@ export async function handleGitExec(
   id: string | number | null,
   params: Record<string, unknown>,
   config: AgentConfig,
-  log: AgentLogger
+  log: AgentLogger,
+  ws?: WebSocket
 ): Promise<object> {
   const rawArgs = Array.isArray(params.args) ? params.args.map(String) : []
   const cwd     = typeof params.cwd === 'string' && params.cwd ? params.cwd : config.workDir
@@ -156,10 +158,19 @@ export async function handleGitExec(
     throw err
   }
 
+  // Why: BUG-AG-HLD-003 parity for Part A — preflight.setGitIdentity stores
+  // identity per-connection (git-identity-registry.ts), never global config.
+  // Only applied for `commit` (the one subcommand that reads author/committer
+  // identity) so every other subcommand's env is unchanged.
+  const identityEnv =
+    ws && rawArgs[0] === 'commit'
+      ? buildGitIdentityEnv(getConnectionGitIdentity(ws))
+      : {}
+
   return new Promise<object>((resolve) => {
     const child = spawn('git', rawArgs, {
       cwd,
-      env:   config.toolEnv,
+      env:   { ...config.toolEnv, ...identityEnv },
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: false,  // mandatory: no shell injection
     })
@@ -238,9 +249,13 @@ export async function handleGitExecStream(
     throw err
   }
 
+  // Why: BUG-AG-HLD-003 parity — see handleGitExec's identical comment.
+  const identityEnv =
+    rawArgs[0] === 'commit' ? buildGitIdentityEnv(getConnectionGitIdentity(ws)) : {}
+
   const child = spawn('git', rawArgs, {
     cwd,
-    env:   config.toolEnv,
+    env:   { ...config.toolEnv, ...identityEnv },
     stdio: ['pipe', 'pipe', 'pipe'],
     shell: false,
   })

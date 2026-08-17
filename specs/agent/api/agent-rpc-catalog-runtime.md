@@ -87,7 +87,8 @@ the default connection mode. Full before/after in
 | `agent.spawn` | `agent-rpc-dispatch.ts:690` (Part A only) | `agent-spawner.ts:337` | `model/modelId, taskId, userId, accountId, cwd?, resumeId?, worktreePath?, branchName?, cols?, rows?, trustPreset?, resolvedApiKey?` | `{type:'spawn.accepted'}` immediately (fire-and-forget); real result streams via notifications | Spawns interactive PTY-based AI CLI (claude/codex/gemini/opencode/ollama) via `resolveAgentSpec()`, tracked in `PTY_REGISTRY` | `ptyId=pty-${userId}-${taskId}-${Date.now()}`; API key only from param or pre-injected env; per-user `GH_CONFIG_DIR`/`GLAB_CONFIG_DIR` |
 | `agent.kill` | `:703` | `agent-spawner.ts:543` | `ptyId(required), signal?(default SIGTERM)` | `{ok:true}` idempotent | Kills tracked PTY | Windows: signal arg ignored |
 | `agent.sendInput` | `:716` | `agent-spawner.ts:586` | `ptyId(required), data:string` | `{ok:true}` | Writes to PTY stdin | No content validation beyond type check |
-| `agent.exec` | `:733-802` (inline, Part A only) | same file | `binary(required), args?, cwd?, stdin?, env?, timeoutMs?(clamped 1000-300000, default 300000), stepId?, taskId?, parentTraceId?` | `{stdout, stderr, exitCode, timedOut}` | Non-interactive spawn, no PTY. Used by `StepExecutors.executeAgent()`/`ProfileAwareAgentSpawner` | No output-size cap, no cancel companion RPC |
+| `agent.exec` | `:733-802` (inline, Part A only) | same file | `binary(required), args?, cwd?, stdin?, env?, timeoutMs?(clamped 1000-300000, default 300000), stepId?, taskId?, parentTraceId?` | Non-interactive "run this binary" primitive, no PTY. **No live backend caller as of 2026-08-16** (both former callers moved to `agent.execPrompt` below — see [`gaps-and-findings.md`](./gaps-and-findings.md) #10) | No output-size cap, no cancel companion RPC |
+| `agent.execPrompt` | new case (Part A only), `agent-rpc-dispatch.ts` | `agent-print-mode-exec.ts` | `prompt(required), worktreePath(required), trustPreset?, model?(default 'claude'), accountId?, env?, stepId?, traceId?, timeoutMs?(clamped 1000-900000, default 300000)` | `{stdout, stderr, exitCode, timedOut, stepId?}` | Resolves a workflow/task-step prompt into a one-shot AI-CLI invocation (`claude --print <prompt>`) — replaces `agent.exec` for `StepExecutors.executeAgent()`/`ProfileAwareAgentSpawner.spawn()`. **Only `model: 'claude'` is supported** — other models return `InvalidParams: ... UNSUPPORTED_MODEL_FOR_ONE_SHOT_EXEC` rather than guessing unverified non-interactive flags. See [`gaps-and-findings.md`](./gaps-and-findings.md) #10 | Credentials via `buildAgentEnv`/`readDecryptedKey` (never a plaintext key from backend); `trustPreset:'full'` appends `YOLO_TUI_AGENT_ARGS.claude` |
 | `agent.execNonInteractive` | `agent-exec-handler.ts:140` (Part B only) | `agent-exec-handler.ts:156` | `binary(required), args?, cwd?, stdin?, timeoutMs?(clamped 1000-300000, default 60000), env?, operation?` | `{stdout, stderr, exitCode, timedOut, canceled?, spawnError?}` | SSH-relay equivalent, used for AI commit-message generation; one in-flight job per `(operation,cwd)` lane | **Output capped 4MB/stream**; `.cmd`/`.bat` dangerous-metachar args rejected |
 | `agent.cancelExec` | `agent-exec-handler.ts:143` | `agent-exec-handler.ts:146` | `cwd, operation?` | `{canceled:boolean}` | Cancels matching lane's in-flight job | Lane key = `[operation,cwd]` |
 | `ai.complete` | `:808` | `ai-complete-handler.ts:47` | `prompt(required), format?(default text), taskId?, model?(param→config.defaultModel→env→'claude-opus-4-5'), accountId?, resolvedApiKey?` | `{content, model?}` | Single-shot completion for `TaskAIPlanner.decompose()` + commit-message gen; routes by model prefix, 120s timeout | Key priority: pre-injected env → `resolvedApiKey` → error; never logs prompt/response |
@@ -102,7 +103,8 @@ Encryption: two-layer -- Layer 1 (browser SubtleCrypto AES-GCM) + Layer 2
 `~/.orca/credentials/<accountId>.enc`. Agent never obtains the plaintext key.
 
 Confirmed real backend callers: `TaskAIPlanner.ts:62` (`ai.complete`);
-`StepExecutors.ts:107` / `ProfileAwareAgentSpawner.ts:130` (`agent.exec`);
+`StepExecutors.ts:107` / `ProfileAwareAgentSpawner.ts:130` (`agent.execPrompt`,
+as of 2026-08-16 — see [`gaps-and-findings.md`](./gaps-and-findings.md) #10);
 `AIProviderService.ts:315,378,446` (`ai.provider.writeCredential`);
 `AIProviderService.ts:374` (`ai.provider.readCredential`).
 
@@ -119,9 +121,20 @@ Confirmed real backend callers: `TaskAIPlanner.ts:62` (`ai.complete`);
 | `gitlab.mr.list` | `:657-665` → `:440-469` | `cwd?, userId?, state?(default opened)` | `{mrs, total}` | `glab mr list --output json` | read-only, 30s timeout |
 | `gitlab.pipeline.status` | `:646-654` → `:473-502` | `cwd?, userId?` | `{status, raw}` | `glab pipeline status --output json` | read-only, 30s timeout |
 | `gitlab.auth.status` | `:679-687` → `:506-534` | `userId?` | `{ok, stdout, stderr}` | `glab auth status` | `buildGlabEnv`, 10s timeout |
+| `github.exec` | new case (Part A only), `agent-rpc-dispatch.ts` | `args(required, string[]), cwd?, userId?, idempotent?, env?, timeoutMs?(clamped 1000-300000, default 30000)` | `{stdout, stderr, exitCode}` | Generic, allowlist-validated `gh <args>` passthrough — the ADR-018 migration target: `backend/src/main/git/runner.ts`'s `ghExecFileAsync` now routes every call here via a connection-scoped provider instead of spawning `gh` in the backend process, with no local-exec fallback. See [`gaps-and-findings.md`](./gaps-and-findings.md) #11 | `hosted-cli-api-allowlist.ts`'s `assertAllowedGhArgs` — subcommand allowlist (`pr`/`issue`/`repo`/`user`/`auth`/`api`) + argv-injection guard; for `api`/`graphql`, endpoint **path-class** allowlist (`repos/{owner}/{repo}[/...]`, `user/starred/{repo}`, `rate_limit`, `graphql`, `user`) + HTTP-method allowlist; `buildGhEnv` isolation |
+| `gitlab.exec` | new case (Part A only), `agent-rpc-dispatch.ts` | same shape as `github.exec` | `{stdout, stderr, exitCode}` | Generic, allowlist-validated `glab <args>` passthrough — mirrors `github.exec`. See [`gaps-and-findings.md`](./gaps-and-findings.md) #11 | `assertAllowedGlabArgs` — subcommand allowlist (`mr`/`issue`/`user`/`auth`/`api`); for `api`, path-class allowlist (`projects/{id}[/...]`, `user`) + HTTP-method allowlist; `buildGlabEnv` isolation |
 
 `git.pr.create` (git/fs catalog) is a deliberate alias of `github.pr.create` --
 same impl, same idempotency behavior.
+
+Confirmed real backend callers of `github.exec`/`gitlab.exec`: every one of
+the ~130 `backend/src/main/github/*.ts`/`gitlab/*.ts` call sites, indirectly,
+via `ghExecFileAsync`/`glabExecFileAsync` (`backend/src/main/git/runner.ts`)
+→ `DevServerGithubCliProvider`/`SshGithubCliProvider` (and the GitLab
+equivalents, `backend/src/main/providers/`). Per-user `userId` isolation
+is wired end-to-end but not yet actively populated by those ~130 callers —
+see [`gaps-and-findings.md`](./gaps-and-findings.md) #11's "Accepted scope
+limits".
 
 Isolation: `buildGhEnv(userId)` -> `GH_CONFIG_DIR='~/.config/gh/<userId>/'` +
 `GH_NO_UPDATE_NOTIFIER='1'` + `GH_PROMPT_DISABLED='1'`;
@@ -162,21 +175,37 @@ management, unrelated to one-shot notifications).
 
 ## `preflight.*`
 
-Two unrelated implementations share the method name `preflight.check`.
+`preflight.check` has two unrelated implementations (different contract,
+unresolved — see [`gaps-and-findings.md`](./gaps-and-findings.md) #4). The
+other four methods below **used to be Part-B-only** — since backend reaches
+the agent through raw `relay.call()` sites that don't know or care which
+connection type a given Dev Server uses (`onboarding-ipc.ts`,
+`dev-server-relay-bridge.ts:572`'s `detectAgents()`), that meant onboarding's
+git-identity setup, Ghostty detection, Windows terminal capability probing,
+and installed-CLI detection all failed on `direct-websocket` — **the
+default connection mode**. Fixed 2026-08-15 by adding Part A implementations
+— see [`compliance-audit-2026-08-15.md`](./compliance-audit-2026-08-15.md).
 
 | Method | Part | Impl | Params | Returns | Description | Security |
 |---|---|---|---|---|---|---|
 | `preflight.detectAgents` | B | `preflight-handler.ts:71-115` | `commands:{id,cmd,requiredCommands?,unsupportedRuntimes?}[]` | `{agents:string[], platform}` | Detects installed agent CLIs via PATH lookup | never executes the detected command |
+| `preflight.detectAgents` | A | `agent-rpc-dispatch.ts` (new case) → `agent-preflight-handler.ts:handleDetectAgents` | same as B | same as B | Same logic, reuses B's transport-agnostic `isCommandOnPathForRelay` (`preflight-handler.ts`, exported) directly — no duplication | same |
 | `preflight.detectWindowsTerminalCapabilities` | B | `:118-143` | none | `{wslAvailable, wslDistros, pwshAvailable, pwshVersion?, gitBashAvailable, gitBashPath?, hostPlatform}` | Probes WSL/PowerShell/Git-Bash | `execFile` (no shell) |
+| `preflight.detectWindowsTerminalCapabilities` | A | `agent-preflight-handler.ts:handleDetectWindowsTerminalCapabilities` | none | same as B | Reuses the same shared `agent/src/main/{pwsh,wsl,git-bash}.ts` probes B uses | same |
 | `preflight.detectGhosttyConfig` | B | `:193-204` | none | `{configPath, themeDir}` | Checks `~/.config/ghostty/{config,themes}` | pure `existsSync` |
+| `preflight.detectGhosttyConfig` | A | `agent-preflight-handler.ts:handleDetectGhosttyConfig` | none | same as B | Identical logic | pure `existsSync` |
 | `preflight.check` | B | `:208-286` | none | `{platform, gh:{...}, glab:{...}, git:{...}}` | Full gh/glab/git install+auth+identity check | failures swallowed to `installed:false` |
-| `preflight.check` | A (different contract, same name) | `agent-rpc-dispatch.ts:488` → `fs-agent-extensions.ts:262-304` | `{services:('github-cli'\|'ripgrep'\|'docker'\|'claude')[]}` | `Record<string,boolean>` | Binary-availability probe only, no auth/identity info | `spawn(binary,['--version'])`, 5s timeout |
-| `preflight.setGitIdentity` | B | `:297-305` | `{name(required), email(required)}` | void | Stores git identity scoped to the RPC connection (`clientId`), never `git config --global` | in-memory map, cleared on client detach |
+| `preflight.check` | A (different contract, same name) | `agent-rpc-dispatch.ts:501` → `fs-agent-extensions.ts:262-304` | `{services:('github-cli'\|'ripgrep'\|'docker'\|'claude')[]}` | `Record<string,boolean>` | Binary-availability probe only, no auth/identity info | `spawn(binary,['--version'])`, 5s timeout |
+| `preflight.setGitIdentity` | B | `:297-305` | `{name(required), email(required)}` | void | Stores git identity scoped to the RPC connection (`clientId`), never `git config --global` | in-memory `Map<number,...>` (`git-identity-registry.ts`), cleared on client detach |
+| `preflight.setGitIdentity` | A | `agent-preflight-handler.ts:handleSetGitIdentity` | same | void | Stores git identity scoped to the WebSocket connection (`git-identity-registry.ts`'s `setConnectionGitIdentity` — a `WeakMap<WebSocket,...>` variant, since Part A has no multi-tenant numeric `clientId`), consumed by `git.exec`'s `commit` subcommand (`agent-git-handler.ts`'s `handleGitExec`, injects `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` env vars) | in-memory `WeakMap`, garbage-collected with the closed connection |
 
-Confirmed backend caller talks to Part B: `backend/src/main/ipc/onboarding-ipc.ts`
--- `preflight.check` (:191), `preflight.setGitIdentity` (:215),
-`preflight.detectGhosttyConfig` (:235), `preflight.detectWindowsTerminalCapabilities`
-(:297), `preflight.detectAgents` (via `DevServerRelayBridge.detectAgents()`, :104,141).
+Backend callers (`backend/src/main/ipc/onboarding-ipc.ts` — `preflight.check`,
+`preflight.setGitIdentity`, `preflight.detectGhosttyConfig`,
+`preflight.detectWindowsTerminalCapabilities`; `dev-server-relay-bridge.ts:572`'s
+`detectAgents()` — `preflight.detectAgents`) reach the agent via a raw
+`relay.call()`, dispatched against whichever connection type that Dev Server
+actually uses — **not always Part B**, contrary to what this doc previously
+implied.
 
 ## `ports.*` (port/host scanning, Part B only)
 
@@ -290,6 +319,7 @@ No `execStream`/chunked-shell-output shape exists for `github.*`/`gitlab.*`/
 `agent/src/relay/agent-rpc-dispatch.ts`, `pty-handler.ts`, `pty-agent-bridge.ts`,
 `pty-daemon-protocol.ts`, `pty-daemon-server.ts`, `pty-daemon-client.ts`,
 `pty-shell-launch.ts`, `agent-spawner.ts`, `agent-exec-handler.ts`,
+`agent-preflight-handler.ts`, `preflight-handler.ts`, `git-identity-registry.ts`,
 `ai-complete-handler.ts`, `agent-credential-store.ts`,
 `notification-send-handler.ts`, `fs-agent-extensions.ts` (`handleShellExec`),
 `external-automations-handler.ts`, `external-api-connector.ts`,

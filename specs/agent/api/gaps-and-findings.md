@@ -6,6 +6,26 @@ behavior. Consolidated here (instead of scattered across the other files)
 because several of these span both directions and both transports. Each
 finding also has a pointer from the catalog file where it's most relevant.
 
+> **2026-08-15, later same day**: a follow-up compliance audit found this
+> file's method-name-level check was accurate but incomplete — it verified
+> the six connection-type-aware provider classes exhaustively but missed
+> several backend call sites that bypass them via a raw `relay.call()`
+> reachable against either connection type. It also found the real
+> `relay-ssh` binary ships from `desktop/src/relay/`, not `agent/src/relay/`,
+> which changes the practical impact of some fixes above. See
+> [`compliance-audit-2026-08-15.md`](./compliance-audit-2026-08-15.md) for
+> the full follow-up findings.
+
+> **2026-08-16, backend+agent architecture pass**: user directive this
+> session — `backend/` owns coordination/authorization/connections-to-other-
+> parties (Postgres-backed), `agent/` executes every detailed task (source,
+> filesystem, terminal, git, AI agents); `backend/` must never execute
+> dev-server work itself. Closed three items: `agent.exec`'s param-shape
+> mismatch (#1 below, new), the ADR-018 gh/glab-runs-in-backend violation
+> (#2 below, new — the big one), and the three small confirmed bugs from
+> the 2026-08-15 audit (port typo, two RPC-name mismatches). See "Findings
+> 1 & 2 (2026-08-16 pass)" below and the resolution table's new rows.
+
 ## Resolution status
 
 **2026-08-15, pass 1 (agent-only):** `backend/` was mid-restructure at the
@@ -28,6 +48,35 @@ larger, still-deferred contract-unification work. Note:
 `desktop/src/main/ipc/onboarding-ipc.ts` noted in pass 2) — not patched,
 per explicit scope instruction.
 
+**2026-08-15, pass 4 & 5 (agent-only, follow-up compliance audit):** a
+fresh re-audit ([`compliance-audit-2026-08-15.md`](./compliance-audit-2026-08-15.md))
+found `preflight.setGitIdentity`/`detectGhosttyConfig`/
+`detectWindowsTerminalCapabilities`/`detectAgents` (pass 4) and
+`git.clone`/`fs.listDirectory` (pass 5) missing from Part A
+(`agent-rpc-dispatch.ts`) — both real backend callers, both broken on
+`direct-websocket`/`relay-websocket` (the default connection mode). Both
+fixed agent-side; see that document's "Decisions made" §2 and §5 for
+implementation detail. All other newly-found gaps from that audit
+(`ai.provider.*`/`shell.exec`/`notification.send`/`ai.complete` missing on
+Part B, the `agent.exec` param-shape backend bug, the docs/ADR drift) were
+explicitly left out of this session's scope — see that document.
+
+**2026-08-16 (backend+agent):** picked up two of the previously-flagged
+`backend/`-scoped items now that `backend/` was back in scope, per the
+user's coordination/execution-split directive (see the note at the top of
+this file). #12 fixes `agent.exec`'s param-shape mismatch (StepExecutors.ts/
+ProfileAwareAgentSpawner.ts) via a new `agent.execPrompt` RPC. #13 closes
+the ADR-018 violation — `backend/` no longer executes `gh`/`glab` itself,
+ever (not even for repos with no dev-server connection — an explicit,
+stronger-than-`BUG-BE-HLD-004`'s-proposal product decision this session).
+Also closed three small, previously-confirmed-but-unfixed items from
+`compliance-audit-2026-08-15.md` §2/§3: the `agent-ws-server.ts` port typo
+(row 7), and the `git.worktree.list`/`fs.mkdir`+`fs.rmdir` Part-B name
+aliases (row 6 — Part A already had the former two; this closed the Part B
+side too, though Part B here is `agent/`'s own dead-in-production copy, see
+this file's item 4 note on that). See "Findings 1 & 2 (2026-08-16 pass)"
+below for full detail on #12/#13.
+
 | # | Finding | Status |
 |---|---|---|
 | 1 | Missing `shell.exec`/`notification.send`/`ai.provider.testConnection` handlers | ✅ **Fixed** (pass 1) — all three implemented agent-side |
@@ -39,6 +88,11 @@ per explicit scope instruction.
 | 7 | TDD docs stale | ✅ **Fixed** (pass 1) — `specs/agent/tdd/v5/00-index.md` now points here |
 | 8 | `AGENT_TIMEOUT_MS`/`TIMEOUT_MS` idle-timeout unenforced | ✅ **Fixed** (pass 1) — enforced on both Stack A and Stack B (agent-side) |
 | 9 | Backend's vendored `dispatcher.ts` unused | ✅ **Fixed** (pass 2) — confirmed dead, deleted |
+| 10 | `preflight.*` (4 methods) missing on Part A | ✅ **Fixed** (pass 4) — see [compliance audit](./compliance-audit-2026-08-15.md) §2.3 / Decisions §2 |
+| 11 | `git.clone`/`fs.listDirectory` missing on Part A | ✅ **Fixed** (pass 5) — see [compliance audit](./compliance-audit-2026-08-15.md) §2 row 5 / Decisions §5 |
+| 12 | `agent.exec` param-shape mismatch (`StepExecutors.ts`/`ProfileAwareAgentSpawner.ts`) | ✅ **Fixed** (2026-08-16) — new `agent.execPrompt` RPC; every `agent`-type workflow step and profile-based agent spawn was failing before this |
+| 13 | ADR-018: `backend/` executes `gh`/`glab` itself instead of delegating to `agent/` | ✅ **Fixed** (2026-08-16) — new `github.exec`/`gitlab.exec` RPCs + endpoint-allowlist validator (agent-side), 4 new `IHostedCliProvider` classes + no-local-fallback rewrite of `ghExecFileAsync`/`glabExecFileAsync` (backend-side). See §"Findings 1 & 2 (2026-08-16 pass)" for the accepted scope limits (userId isolation not fully threaded through all ~130 callers yet; two connectionless global rate-limit probes now degrade gracefully instead of running) |
+| 14 | `agent-ws-server.ts` port typo / `git.worktree.list` &amp; `fs.mkdir`/`fs.rmdir` Part-B aliases | ✅ **Fixed** (2026-08-16) — see [compliance audit](./compliance-audit-2026-08-15.md) §2 row 6, §3 item 7 |
 
 ## 1. Confirmed missing agent-side handlers (backend calls, no agent response)
 
@@ -389,6 +443,150 @@ full test suite (198 tests) were unchanged before/after (one pre-existing,
 unrelated failure in `push-api-routes.test.ts` — a web-push VAPID-key test,
 traced to in-flight changes elsewhere in the ongoing restructure, not this
 deletion).
+
+## 10. `agent.exec` param-shape mismatch (2026-08-16)
+
+**Status: ✅ Fixed.** `backend/src/main/workflow/StepExecutors.ts`'s
+`executeAgent()` sent `{stepId, prompt, worktreePath, trustPreset, traceId,
+accountId?, model?}` to `agent.exec` — a generic, tested "run this binary"
+RPC (`agent-rpc-dispatch.ts`) that only accepts `{binary, args, cwd, stdin,
+env, timeoutMs}` and has no concept of a prompt at all. Every `agent`-type
+workflow step failed with `InvalidParams: agent.exec: binary is required`.
+A second call site, `backend/src/main/project/ProfileAwareAgentSpawner.ts`,
+had the same root cause via a different symptom: it naively split a
+free-text prompt (e.g. a markdown task description from
+`buildTaskAgentPrompt()`) on whitespace to fake a `{binary, args}` pair —
+`binary` came out as `"#"` for a markdown heading.
+
+**Fix:** a new agent-side RPC, `agent.execPrompt`
+(`agent/src/relay/agent-print-mode-exec.ts`), distinct from `agent.exec`'s
+existing contract (which real callers depend on unchanged). It resolves the
+binary via `resolveAgentSpec()` (`agent-spawner.ts`), builds `claude`'s
+`--print <prompt>` non-interactive invocation (the one validated precedent
+in this codebase, from `agent-tool-registry.ts`'s `claude_code` tool),
+resolves credentials via the existing `buildAgentEnv()`/`readDecryptedKey()`
+path (never a plaintext key from backend), and returns
+`{stdout, stderr, exitCode, timedOut, stepId}`. **Only `claude` is
+supported today** — any other resolved model returns
+`InvalidParams: ... UNSUPPORTED_MODEL_FOR_ONE_SHOT_EXEC` rather than
+guessing unverified non-interactive flags for codex/gemini/opencode (their
+flags are marked "not smoke-tested" even for the existing interactive path).
+Both backend call sites now call `agent.execPrompt` instead of `agent.exec`.
+
+New tests: `agent/src/relay/agent-print-mode-exec.test.ts` (10),
+`agent-rpc-dispatch.test.ts`'s new `agent.execPrompt` describe block (2),
+`backend/src/main/workflow/__tests__/StepExecutors.test.ts` (4, new file),
+`backend/src/main/project/ProfileAwareAgentSpawner.test.ts` (3, new file).
+
+## 11. ADR-018: `backend/` executed `gh`/`glab` itself (2026-08-16)
+
+**Status: ✅ Fixed**, per an explicit user directive this session:
+`backend/` handles coordination/authorization/connections-to-other-parties;
+`agent/` executes every detailed task (source, filesystem, terminal, git,
+AI agents); `backend/` must never execute dev-server work itself — no
+exceptions, including repos with no dev-server connection at all (stronger
+than the pre-existing `BUG-BE-HLD-004` proposal, which only guarded
+`ORCA_MULTI_USER=1` and would have kept a local-exec fallback for
+unconnected repos).
+
+**What was broken:** ~130 call sites across `backend/src/main/github/*.ts`
+and `backend/src/main/gitlab/*.ts`, all funneling through two choke points
+in `backend/src/main/git/runner.ts` (`ghExecFileAsync`/`glabExecFileAsync`),
+spawned `gh`/`glab` **locally in the backend process** — the literal
+ADR-018 control/data-plane violation. A prior partial mitigation
+(`assertLocalGhCliAllowed`) only threw under `ORCA_MULTI_USER=1`; it never
+delegated anywhere.
+
+**Fix — agent side:**
+- New file `agent/src/relay/hosted-cli-api-allowlist.ts` — the one
+  genuinely new validation layer. `git.exec`'s subcommand whitelist
+  (`agent-git-exec-validator.ts`) doesn't translate directly: `gh api`/
+  `glab api` is a raw REST/GraphQL passthrough reachable to any endpoint,
+  not just the target repo. Validates `pr`/`issue`/`repo`/`user`/`auth`
+  subcommands as a simple allowlist (plus an argv-injection guard); for
+  `api`/`graphql`, validates the endpoint at **path-class** granularity
+  (`repos/{owner}/{repo}[/...]`, `user/starred/{repo}`, `rate_limit`,
+  `graphql`, `user` for GitHub; `projects/{id}[/...]`, `user` for GitLab) —
+  a deliberate choice over hand-enumerating every exact endpoint string
+  (~90 distinct call sites use dozens of different sub-paths; a literal
+  enumeration would be both huge and brittle). Also validates the HTTP
+  method against a small allowlist (GET/POST/PATCH/PUT/DELETE — all
+  legitimately used across real callers).
+- New files `agent-github-cli-handler.ts`/`agent-gitlab-cli-handler.ts` —
+  `handleGithubExec`/`handleGitlabExec`, validate then reuse the
+  already-correct `execGhCaptured`/`execGlabCaptured` (now exported from
+  `external-api-connector.ts`) for per-user `GH_CONFIG_DIR`/`GLAB_CONFIG_DIR`
+  isolation and retry/rate-limit handling.
+- `agent-rpc-dispatch.ts` registers `github.exec`/`gitlab.exec`.
+
+**Fix — backend side:**
+- `backend/src/main/providers/types.ts` — new `IHostedCliProvider` interface
+  (`exec(args, cwd, userId, options): Promise<{stdout, stderr}>`, throws on
+  non-zero exit — matches the ~130 existing callers' `try/catch` convention).
+- 4 new provider classes mirroring the existing `DevServerGitProvider`/
+  `SshGitProvider` split: `dev-server-github-cli-provider.ts`,
+  `dev-server-gitlab-cli-provider.ts`, `ssh-github-cli-provider.ts`,
+  `ssh-gitlab-cli-provider.ts` — registered in both
+  `dev-server-provider-lifecycle.ts` and `ssh-relay-session.ts`, alongside
+  the existing git/fs/pty providers.
+- New registry `hosted-cli-dispatch.ts`, mirroring `ssh-git-dispatch.ts`.
+- `ghExecFileAsync`/`glabExecFileAsync` (`runner.ts`) rewritten: look up the
+  provider for `options.connectionId`; **no provider (including no
+  connectionId at all) → throws `GH_CLI_NO_DEV_SERVER_CONNECTION`/
+  `GLAB_CLI_NO_DEV_SERVER_CONNECTION`, never falls back to local exec.**
+  Retry/backoff/rate-limit-breaker logic is preserved (legitimate
+  backend-owned coordination policy, distinct from *where* the exec
+  happens); WSL/host-fallback local-resolution logic was deleted as dead
+  code (the agent resolves its own host now) along with the now-unused
+  helpers that only served it.
+- `github-repository-identity.ts`'s `ghRepoExecOptions()` and
+  `gitlab-project-ref-resolution.ts`'s `glabRepoExecOptions()` now always
+  forward `connectionId` (previously dropped when set, since exec ran
+  locally instead) and unconditionally set `cwd: repoPath` (this is already
+  the agent-side path for connection-bound repos — the same one `git.exec`
+  already uses successfully for these repos).
+- `redirectPortedHostnameToEnv()` (glab's `--hostname host:port` →
+  `GITLAB_HOST` translation, needed because glab's own flag parser rejects
+  a ported hostname) now builds a **minimal** env override instead of
+  spreading the caller's full `process.env` — only `GITLAB_HOST` is ever
+  forwarded over the RPC wire, not the whole backend host's environment.
+
+**Accepted scope limits (documented, not silently punted):**
+- **`userId` isolation is not fully threaded through the ~130 callers
+  yet.** The mechanism exists end-to-end (`IHostedCliProvider.exec()`'s
+  `userId` param → `github.exec`/`gitlab.exec` RPC → `buildGhEnv`/
+  `buildGlabEnv`'s per-user `GH_CONFIG_DIR`/`GLAB_CONFIG_DIR`), and
+  `ghRepoExecOptions()`/`glabRepoExecOptions()` both accept an optional
+  `userId` param ready for future callers — but no `runtime/rpc/methods/
+  github.ts`/`gitlab.ts` handler threads `RpcContext.userId` down through
+  `OrcaRuntimeService` into the actual `github/*.ts`/`gitlab/*.ts`
+  functions yet. Until that's done, calls isolate under an empty-string
+  `GH_CONFIG_DIR`/`GLAB_CONFIG_DIR` bucket rather than a real per-user one.
+  Tracked as a follow-up, not a regression — the primary ADR-018 violation
+  (backend executing dev-server work at all) is fully closed regardless.
+- **Two connectionless global rate-limit probes degrade gracefully instead
+  of running**: `github/rate-limit.ts`'s `getRateLimit()` and
+  `gitlab/client.ts`'s `getGitLabRateLimit()` both query "the" gh/glab
+  CLI's rate limit with no repo/connectionId context at all (a pre-existing
+  design gap — there was never a "which auth context" concept for these).
+  Both already catch their own failures and return `{ok: false, error}`,
+  which the rate-limit circuit breaker treats as "unknown, proceed" — a
+  safe degradation, not a hard failure, but worth knowing this proactive
+  check is now inert until these are given a connectionId to check against.
+- **relay-ssh's real transport doesn't ship `github.exec`/`gitlab.exec`
+  yet** — same caveat as every other agent-only fix this session:
+  `desktop/src/relay/relay.ts`, not `agent/src/relay/relay.ts`, is what
+  actually runs for `relay-ssh` connections. The 4 new backend provider
+  classes and the SSH-transport agent RPC route are wired for architectural
+  completeness, but `SshGithubCliProvider`/`SshGitlabCliProvider` won't
+  have a live RPC counterpart until a dedicated `desktop/` session applies
+  the equivalent change there.
+
+New tests: `agent/src/relay/hosted-cli-api-allowlist.test.ts` (27),
+`agent-github-cli-handler.test.ts` (5), `agent-gitlab-cli-handler.test.ts`
+(5), `backend/src/main/git/runner-hosted-cli-exec.test.ts` (13, covers the
+no-provider-throws behavior directly, the retry/idempotency gate, and
+`redirectPortedHostnameToEnv`'s minimal-env-override behavior).
 
 ## Not investigated (out of scope for this pass)
 

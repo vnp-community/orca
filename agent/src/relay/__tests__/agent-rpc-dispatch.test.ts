@@ -384,6 +384,34 @@ describe('agent.exec — stepId / parentTraceId (CR-TRACE-017)', () => {
   })
 })
 
+// ─── agent.execPrompt — routes to agent-print-mode-exec.ts (specs/agent/api/gaps-and-findings.md) ──
+// Deep behavior coverage (real spawn, credential resolution, arg-building) lives
+// in agent-print-mode-exec.test.ts — these just confirm the RPC reaches it.
+describe("case 'agent.execPrompt'", () => {
+  it('returns InvalidParams when prompt/worktreePath are missing', async () => {
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.execPrompt', params: {},
+    })
+    const resp = lastResponseJson(ws) as any
+    expect(resp.error.code).toBe(AgentErrorCode.InvalidParams)
+    expect(resp.error.message).toContain('missing required field(s)')
+  })
+
+  it('returns InvalidParams for an unsupported (non-claude) model', async () => {
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as any, createWireState(), {
+      jsonrpc: '2.0', id: 1, method: 'agent.execPrompt',
+      params: { prompt: 'do it', worktreePath: '/tmp', model: 'gpt-4o' },
+    })
+    const resp = lastResponseJson(ws) as any
+    expect(resp.error.code).toBe(AgentErrorCode.InvalidParams)
+    expect(resp.error.message).toContain('UNSUPPORTED_MODEL_FOR_ONE_SHOT_EXEC')
+  })
+})
+
 // ─── shell.exec (CR-TRACE-017 gap closed — specs/agent/api/gaps-and-findings.md #1) ──
 describe('shell.exec', () => {
   it('executes the script and returns stdout/exitCode', async () => {

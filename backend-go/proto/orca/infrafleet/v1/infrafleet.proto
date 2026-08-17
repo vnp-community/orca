@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package orca.infrafleet.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1";
+
+// InfraFleetService owns SSH targets, dev server registry, connection lifecycle,
+// the provider registry (connectionId -> host dispatch), and fleet health.
+// See specs/backend-go/services/infra-fleet-service.md.
+service InfraFleetService {
+  rpc RegisterDevServer(RegisterDevServerRequest) returns (RegisterDevServerResponse);
+  rpc ResolveConnection(ResolveConnectionRequest) returns (ResolveConnectionResponse);
+  rpc CreateSshTarget(CreateSshTargetRequest) returns (CreateSshTargetResponse);
+  rpc GetFleetHealth(GetFleetHealthRequest) returns (GetFleetHealthResponse);
+  rpc ScanWorkspacePorts(ScanWorkspacePortsRequest) returns (ScanWorkspacePortsResponse);
+}
+
+enum ConnectionMode {
+  CONNECTION_MODE_UNSPECIFIED = 0;
+  CONNECTION_MODE_RELAY_SSH = 1;
+  CONNECTION_MODE_RELAY_WEBSOCKET = 2;
+  CONNECTION_MODE_DIRECT_WEBSOCKET = 3;
+}
+
+message DevServer {
+  string id = 1;
+  string tenant_id = 2;
+  string host = 3;
+  ConnectionMode mode = 4;
+}
+
+message RegisterDevServerRequest {
+  string tenant_id = 1;
+  string host = 2;
+  ConnectionMode mode = 3;
+}
+
+message RegisterDevServerResponse {
+  DevServer dev_server = 1;
+}
+
+// ResolveConnection is the core dispatch primitive every other service
+// (git-gateway-service, project-service, task-service) calls to answer
+// "which host owns this connectionId, and how do I reach it".
+message ResolveConnectionRequest {
+  string connection_id = 1;
+}
+
+message ResolveConnectionResponse {
+  bool connected = 1; // false => execute locally, no relay
+  DevServer dev_server = 2;
+}
+
+message CreateSshTargetRequest {
+  string tenant_id = 1;
+  string host = 2;
+  string user = 3;
+  string vault_ssh_role = 4; // Vault SSH secrets engine role for cert issuance
+}
+
+message CreateSshTargetResponse {
+  string ssh_target_id = 1;
+}
+
+message GetFleetHealthRequest {
+  string tenant_id = 1;
+}
+
+message DevServerHealth {
+  string dev_server_id = 1;
+  bool reachable = 2;
+  double cpu_percent = 3;
+  double ram_percent = 4;
+  double disk_percent = 5;
+  int64 latency_ms = 6;
+}
+
+message GetFleetHealthResponse {
+  repeated DevServerHealth statuses = 1;
+}
+
+message ScanWorkspacePortsRequest {
+  string connection_id = 1;
+  string worktree_id = 2;
+}
+
+message ScanWorkspacePortsResponse {
+  repeated int32 open_ports = 1;
+}

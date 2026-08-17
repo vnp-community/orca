@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package orca.orchestration.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1;orchestrationv1";
+
+// OrchestrationService: real-time multi-agent coordination (messages, gates,
+// dispatch contexts) — a distinct id space from task-service's tasks table.
+// See specs/backend-go/services/orchestration-service.md.
+service OrchestrationService {
+  rpc CreateDispatchContext(CreateDispatchContextRequest) returns (CreateDispatchContextResponse);
+  rpc CreateGate(CreateGateRequest) returns (CreateGateResponse);
+  rpc ResolveGate(ResolveGateRequest) returns (ResolveGateResponse);
+  // UpdateTaskStatusAndPromote is one atomic RPC (single DB transaction) —
+  // mirrors TS's updateTaskStatus -> promoteReadyTasks chain.
+  rpc UpdateTaskStatusAndPromote(UpdateTaskStatusAndPromoteRequest) returns (UpdateTaskStatusAndPromoteResponse);
+}
+
+message DispatchContext {
+  string id = 1;
+  string handle = 2; // KeyedAsyncQueue serialization key
+  string coordinator_run_id = 3;
+}
+
+message CreateDispatchContextRequest {
+  string handle = 1;
+  string coordinator_run_id = 2;
+}
+
+message CreateDispatchContextResponse {
+  DispatchContext context = 1;
+}
+
+message DecisionGate {
+  string id = 1;
+  string dispatch_context_id = 2;
+  string status = 3; // pending|resolved|failed
+}
+
+message CreateGateRequest {
+  string dispatch_context_id = 1;
+}
+
+message CreateGateResponse {
+  DecisionGate gate = 1;
+}
+
+message ResolveGateRequest {
+  string gate_id = 1;
+  string outcome_json = 2;
+}
+
+message ResolveGateResponse {
+  DecisionGate gate = 1;
+}
+
+message UpdateTaskStatusAndPromoteRequest {
+  string orchestration_task_id = 1;
+  string new_status = 2;
+}
+
+message UpdateTaskStatusAndPromoteResponse {
+  repeated string promoted_task_ids = 1;
+}
