@@ -321,6 +321,21 @@ export class GitHandler {
     this.dispatcher.onRequest('git.branchDiff', (p, context) => this.branchDiff(p, context))
     this.dispatcher.onRequest('git.commitDiff', (p, context) => this.commitDiff(p, context))
     this.dispatcher.onRequest('git.listWorktrees', (p, context) => this.listWorktrees(p, context))
+    // Alias: backend/src/main/workspace/WorkspaceService.ts calls 'git.worktree.list'
+    // (Part A's method name/shape: params { cwd }, result { worktrees: [...] }) via
+    // a raw relay.call() reachable on either connection type — register the same
+    // name here so it doesn't MethodNotFound on a relay-ssh-shaped connection.
+    // listWorktrees() reads params.repoPath (not cwd) and resolves a bare array
+    // (not { worktrees }) — adapt both directions rather than bare-alias it, since
+    // WorkspaceService.ts does `(result as {worktrees?})?.worktrees ?? []` and would
+    // silently see an empty list otherwise. See specs/agent/api/gaps-and-findings.md #4.
+    this.dispatcher.onRequest('git.worktree.list', async (p, context) => {
+      const worktrees = await this.listWorktrees(
+        { ...p, repoPath: (p.repoPath as string | undefined) ?? (p.cwd as string | undefined) },
+        context
+      )
+      return { worktrees }
+    })
     this.dispatcher.onRequest('git.addWorktree', (p) => this.addWorktree(p))
     this.dispatcher.onRequest('git.removeWorktree', (p) => this.removeWorktree(p))
     this.dispatcher.onRequest('git.worktreeIsClean', (p) => this.worktreeIsClean(p))
@@ -332,7 +347,7 @@ export class GitHandler {
       this.forceDeletePreservedBranch(p)
     )
     this.dispatcher.onRequest('git.exec', (p, context) => this.exec(p, context))
-    this.dispatcher.onRequest('git.clone', (p, context) => this.clone(p, context))
+    this.dispatcher.onRequest('git.clone', (p, context) => this.handleClone(p, context))
     this.dispatcher.onRequest('git.isGitRepo', (p) => this.isGitRepo(p))
     this.dispatcher.onNotification('git.responseAck', (p, context) => this.responseAck(p, context))
     this.dispatcher.onNotification('git.cancelResponseStream', (p, context) =>
@@ -1259,6 +1274,106 @@ export class GitHandler {
       ? await this.runWithGitReadCacheClear(run)
       : await run()
     return this.maybeStreamResponse({ stdout, stderr }, params, context)
+  }
+
+  // Why: 'git.clone' historically had two independently-registered handlers
+  // with incompatible param shapes (this validated {args,cwd,progressId} form
+  // used by SshGitProvider, and an unvalidated {url,targetPath} form used by
+  // repo.cloneRemote) — RelayDispatcher.onRequest is last-registration-wins
+  // with no duplicate check, so one silently shadowed the other. Merging both
+  // shapes behind one dispatch keeps both callers working and validated
+  // regardless of registration order. See specs/agent/api/gaps-and-findings.md #3.
+  private async handleClone(params: Record<string, unknown>, context?: RequestContext) {
+    if (Array.isArray(params.args)) {
+      return this.clone(params, context)
+    }
+    if (typeof params.url === 'string' && typeof params.targetPath === 'string') {
+      return this.cloneSimple(params as { url: string; targetPath: string }, context)
+    }
+    throw new Error(
+      "git.clone: expected either { args, cwd, progressId } or { url, targetPath }"
+    )
+  }
+
+  // Why: the {url,targetPath} shape used by repo.cloneRemote (clone a fresh
+  // repo by URL into a computed workspace path, no pre-existing cwd) had no
+  // argument validation at all before this fix — a leading '-' in either
+  // field would be interpreted as a git flag (argv injection) since it's
+  // passed straight to spawn(). Reject that the same way validateGitExecArgs
+  // does for the other clone shape.
+  private async cloneSimple(
+    params: { url: string; targetPath: string },
+    context?: RequestContext
+  ): Promise<{ path: string }> {
+    const { url, targetPath } = params
+    if (!url || url.startsWith('-') || url.includes('\0')) {
+      throw new Error('git.clone: invalid url')
+    }
+    if (!targetPath || targetPath.startsWith('-') || targetPath.includes('\0')) {
+      throw new Error('git.clone: invalid targetPath')
+    }
+    return await this.runWithGitReadCacheClear(
+      () => this.spawnCloneSimple(url, targetPath, context)
+    )
+  }
+
+  private async spawnCloneSimple(
+    url: string,
+    targetPath: string,
+    context?: RequestContext
+  ): Promise<{ path: string }> {
+    return await new Promise((resolve, reject) => {
+      const child = spawn('git', ['clone', '--progress', '--', url, targetPath], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: buildRelayGitEnv()
+      })
+      let stderr = ''
+      let settled = false
+      const cleanup = (): void => {
+        context?.signal?.removeEventListener('abort', onAbort)
+      }
+      const onAbort = (): void => {
+        child.kill()
+      }
+      context?.signal?.addEventListener('abort', onAbort, { once: true })
+
+      // Not typically used by `git clone`, but streamed for parity with the
+      // original repo.cloneRemote-facing handler this replaces.
+      child.stdout.on('data', (chunk: Buffer) => {
+        this.dispatcher.notify('git.clone.output', {
+          data: chunk.toString('utf-8'),
+          clientId: context?.clientId
+        })
+      })
+      child.stderr.on('data', (chunk: Buffer) => {
+        const text = chunk.toString('utf-8')
+        stderr += text
+        this.dispatcher.notify('git.clone.output', {
+          data: text,
+          clientId: context?.clientId
+        })
+      })
+      child.on('error', (err) => {
+        if (settled) {return}
+        settled = true
+        cleanup()
+        reject(new Error(`Failed to start git clone: ${err.message}`))
+      })
+      child.on('close', (code, signal) => {
+        if (settled) {return}
+        settled = true
+        cleanup()
+        if (context?.signal?.aborted) {
+          reject(new Error('Clone aborted'))
+          return
+        }
+        if (code === 0 && !signal) {
+          resolve({ path: targetPath })
+          return
+        }
+        reject(new Error(`Git clone failed: ${getGitCloneFailureMessage(stderr)}`))
+      })
+    })
   }
 
   private async clone(params: Record<string, unknown>, context?: RequestContext) {

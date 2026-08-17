@@ -13,6 +13,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { IConnectionPool } from '../db/pool'
+import type { BindValue } from '../db/types'
 import type { DevServerManager } from '../dev-server/dev-server-manager'
 import type { RelayConnectionPool } from '../dev-server/relay-connection-pool'
 import { Tracers } from '../../shared/trace/tracers'
@@ -177,10 +178,10 @@ export class AIProviderService {
     const rows = await this.pool.withConnection((db) =>
       db.query<AccountRow>(
         `SELECT
-           id, dev_server_id as devServerId, provider, scope, scope_ref_id as scopeRefId,
-           label, model, base_url as baseUrl, status,
-           last_health_check as lastHealthCheck, quota_limit_day as quotaLimitDay,
-           created_by as createdBy, created_at as createdAt, updated_at as updatedAt
+           id, dev_server_id as "devServerId", provider, scope, scope_ref_id as "scopeRefId",
+           label, model, base_url as "baseUrl", status,
+           last_health_check as "lastHealthCheck", quota_limit_day as "quotaLimitDay",
+           created_by as "createdBy", created_at as "createdAt", updated_at as "updatedAt"
          FROM orca_ai_provider_accounts WHERE id = ?`,
         [accountId]
       )
@@ -192,12 +193,12 @@ export class AIProviderService {
   /** List accounts for a dev server, optionally filtered by scope. */
   async listAccounts(devServerId: string, scope?: AIProviderScope): Promise<AIProviderAccount[]> {
     let sql = `SELECT
-      id, dev_server_id as devServerId, provider, scope, scope_ref_id as scopeRefId,
-      label, model, base_url as baseUrl, status,
-      last_health_check as lastHealthCheck, quota_limit_day as quotaLimitDay,
-      created_by as createdBy, created_at as createdAt, updated_at as updatedAt
+      id, dev_server_id as "devServerId", provider, scope, scope_ref_id as "scopeRefId",
+      label, model, base_url as "baseUrl", status,
+      last_health_check as "lastHealthCheck", quota_limit_day as "quotaLimitDay",
+      created_by as "createdBy", created_at as "createdAt", updated_at as "updatedAt"
     FROM orca_ai_provider_accounts WHERE dev_server_id = ?`
-    const params: unknown[] = [devServerId]
+    const params: BindValue[] = [devServerId]
     if (scope) {
       sql += ' AND scope = ?'
       params.push(scope)
@@ -211,10 +212,10 @@ export class AIProviderService {
     const rows = await this.pool.withConnection((db) =>
       db.query<AccountRow>(
         `SELECT
-           id, dev_server_id as devServerId, provider, scope, scope_ref_id as scopeRefId,
-           label, model, base_url as baseUrl, status,
-           last_health_check as lastHealthCheck, quota_limit_day as quotaLimitDay,
-           created_by as createdBy, created_at as createdAt, updated_at as updatedAt
+           id, dev_server_id as "devServerId", provider, scope, scope_ref_id as "scopeRefId",
+           label, model, base_url as "baseUrl", status,
+           last_health_check as "lastHealthCheck", quota_limit_day as "quotaLimitDay",
+           created_by as "createdBy", created_at as "createdAt", updated_at as "updatedAt"
          FROM orca_ai_provider_accounts ORDER BY created_at DESC`
       )
     )
@@ -225,7 +226,7 @@ export class AIProviderService {
   async updateAccount(accountId: string, patch: UpdateAccountParams, actorUserId?: string): Promise<void> {
     const now = Date.now()
     const sets: string[] = ['updated_at = ?']
-    const values: unknown[] = [now]
+    const values: BindValue[] = [now]
 
     if (patch.label !== undefined) { sets.push('label = ?'); values.push(patch.label) }
     if (patch.model !== undefined) { sets.push('model = ?'); values.push(patch.model) }
@@ -523,7 +524,7 @@ export class AIProviderService {
     const date = new Date().toISOString().slice(0, 10)
     const rows = await this.pool.withConnection((db) =>
       db.query<{ tokensUsed: number; requests: number; costUsd: number }>(
-        `SELECT tokens_used as tokensUsed, requests, cost_usd as costUsd
+        `SELECT tokens_used as "tokensUsed", requests, cost_usd as "costUsd"
          FROM orca_provider_usage WHERE account_id = ? AND date = ?`,
         [accountId, date]
       )

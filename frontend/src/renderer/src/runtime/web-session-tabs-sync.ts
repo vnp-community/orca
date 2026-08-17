@@ -610,6 +610,13 @@ function buildMirroredTerminalTabs(
         ...(quickCommandLabel ? { quickCommandLabel } : {}),
         ...(startupCwd ? { startupCwd } : {}),
         customTitle: existing?.customTitle ?? null,
+        // Why (BUG-FE-PTY-001): every reconcile pass rebuilds this tab object
+        // from scratch (isMirroredTerminalSurfaceId unconditionally retires
+        // the current mirror tab above), so a dropped generation here would
+        // silently reset TerminalPane's remount key even when the id itself
+        // doesn't change — forwarding it keeps setActiveWorktree's bump (see
+        // worktrees.ts) from being erased by the very next snapshot.
+        generation: existing?.generation,
         color,
         isPinned,
         ...(viewMode ? { viewMode } : {}),

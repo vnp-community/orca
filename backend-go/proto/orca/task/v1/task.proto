@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package orca.task.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv1";
+
+// TaskService owns the task DAG, edges, grants, comments. Does NOT own team
+// membership (tenant-service) or execution (infra-fleet-service/orchestration-service).
+// See specs/backend-go/services/task-service.md.
+service TaskService {
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc AddEdge(AddEdgeRequest) returns (AddEdgeResponse);
+  rpc Grant(GrantRequest) returns (GrantResponse);
+  rpc ResolvePermission(ResolvePermissionRequest) returns (ResolvePermissionResponse);
+  rpc Execute(TaskServiceExecuteRequest) returns (TaskServiceExecuteResponse);
+
+  // HasActiveExecutions answers "does this project have a task currently
+  // dispatched for execution (status=in_progress)" — added for Epic C
+  // (backend-go/docs/execution-plan.md §10) to close
+  // project-service.RebindDevServer's guard, previously a client-side
+  // no-op because this RPC didn't exist. See that RPC's Go doc comment
+  // (internal/usecase/has_active_executions.go) for the honest limit on
+  // what this can currently answer — task-service has no completion
+  // callback yet, so "in_progress" is one-way until that's built.
+  rpc HasActiveExecutions(HasActiveExecutionsRequest) returns (HasActiveExecutionsResponse);
+}
+
+message Task {
+  string id = 1;
+  string tenant_id = 2;
+  string title = 3;
+  string status = 4;
+  string parent_id = 5;
+  string project_id = 6; // added for Epic C's HasActiveExecutions — see that RPC's doc comment
+}
+
+message CreateTaskRequest {
+  string tenant_id = 1;
+  string title = 2;
+  string parent_id = 3;
+  string project_id = 4;
+}
+
+message CreateTaskResponse {
+  Task task = 1;
+}
+
+message GetTaskRequest {
+  string id = 1;
+}
+
+message GetTaskResponse {
+  Task task = 1;
+}
+
+enum EdgeType {
+  EDGE_TYPE_UNSPECIFIED = 0;
+  EDGE_TYPE_PARENT_CHILD = 1;
+  EDGE_TYPE_DEPENDS_ON = 2;
+}
+
+// AddEdge rejects cycles (domain-layer CycleDetector), see task-service.md.
+message AddEdgeRequest {
+  string from_task_id = 1;
+  string to_task_id = 2;
+  EdgeType type = 3;
+}
+
+message AddEdgeResponse {}
+
+enum GrantLevel {
+  GRANT_LEVEL_UNSPECIFIED = 0;
+  GRANT_LEVEL_OWNER = 1;
+  GRANT_LEVEL_ADMIN = 2;
+  GRANT_LEVEL_USER = 3;
+  GRANT_LEVEL_TEAM = 4;
+  GRANT_LEVEL_COMPANY = 5;
+}
+
+message GrantRequest {
+  string task_id = 1;
+  string subject_id = 2; // user or team id
+  GrantLevel level = 3;
+  bool apply_tree = 4;
+}
+
+message GrantResponse {}
+
+// ResolvePermission runs the BFS ancestor-resolution algorithm in domain/,
+// then the caller passes the result as OPA policy input for the final
+// allow/deny — see task-service.md security notes.
+message ResolvePermissionRequest {
+  string task_id = 1;
+  string user_id = 2;
+}
+
+message ResolvePermissionResponse {
+  GrantLevel effective_level = 1;
+}
+
+// Execute branches by complexity: simple tasks relay to infra-fleet-service
+// (agent.exec-equivalent), complex ones route through orchestration-service.
+message TaskServiceExecuteRequest {
+  string task_id = 1;
+  string request_id = 2;
+}
+
+message TaskServiceExecuteResponse {
+  string execution_ref = 1; // opaque handle into infra-fleet-service or orchestration-service
+}
+
+message HasActiveExecutionsRequest {
+  string project_id = 1;
+}
+
+message HasActiveExecutionsResponse {
+  bool has_active = 1;
+}

@@ -1,251 +1,135 @@
-# Orca Dev Server — README Triển khai
+# Orca Dev Server — backend-go + frontend
 
-> Thư mục này chỉ deploy **backend/** + **frontend/**. Deploy Agent (Dev Server Agent)
-> đã chuyển sang [`deploy/agent/`](../agent/README.md); build/đóng gói Desktop xem
-> [`deploy/desktop/`](../desktop/README.md); build/release Mobile xem
-> [`deploy/mobile/`](../mobile/README.md).
+> This directory now deploys **`backend-go/`** (17 Go microservices) +
+> **`frontend/`**. The previous TypeScript-backend deploy set that used to
+> live here has moved to [`deploy/old/`](../old/README.md) — it's untouched
+> and still works, kept as a reference / rollback path while `backend-go/`
+> is a scaffold (see [`backend-go/docs/execution-plan.md`](../../backend-go/docs/execution-plan.md)
+> for what "scaffold" means concretely). Deploy Agent (Dev Server Agent),
+> Desktop, and Mobile are unaffected — see `deploy/agent/`, `deploy/desktop/`,
+> `deploy/mobile/`.
 
-## Tổng quan
-
-Mô hình **rsync source → build server-side qua Docker → run minimal container**:
+## The flow
 
 ```
-[Máy Developer / CI]                  [Orca Server]
-─────────────────────                 ─────────────────────────────────────
-1. build-local.sh (tuỳ chọn)          4. docker compose up -d --build
-   ↓ build thử backend/+frontend/        ┌──────────────────────────┐
-   ↓ chỉ để bắt lỗi sớm                  │ orca (backend+frontend)  │
-                                         │   Dockerfile tự build    │ ← từ
-2. gen-certs.sh  (1 lần)                │   backend/ + frontend/   │   source
-   → docker/nginx/certs/server.crt      │  nginx (alpine 5MB)      │ ← TLS proxy
-                                         └──────────────────────────┘
-3. sync-to-server.sh <version>
-   → rsync source lên server (KHÔNG rsync artifact — Docker tự build)
+[Máy Developer / CI]                              [Orca Server]
+──────────────────────                            ─────────────────────────────────
+1. build-local.sh                                  4. docker compose pull (public images
+   → cross-compile 17 Go binaries                     only — nothing custom-built)
+     (CGO_ENABLED=0, linux/amd64)                   5. migrate.sh --remote (one-shot
+   → vite build frontend/                              migrate/migrate containers, profile
+                                                        "migrate")
+2. sync-to-server.sh <version>                      6. docker compose up -d
+   → rsync binaries + migrations +                     ┌──────────────────────────────┐
+     frontend build + deploy config                    │ 17 backend-go containers      │
+     (NOT source — backend-go/ source                  │  gcr.io/distroless/static     │ ← binary
+     never touches the server)                         │  (~2MB, no shell) + BIND-      │   bind-
+                                                         │  MOUNTED binary, read-only     │   mounted
+                                                         │ frontend (nginx:alpine) +      │ ← static
+                                                         │  BIND-MOUNTED dist/            │   assets
+                                                         │ postgres / vault / nats        │   mounted
+                                                         └──────────────────────────────┘
+3. (sync-to-server.sh calls the above for you)
 ```
 
-## Cấu trúc thư mục
+**No image is built for backend-go or the frontend at all** — every
+container runs a stock public image
+(`gcr.io/distroless/static-debian12:nonroot` for all 17 Go services,
+`nginx:1.27-alpine` for the frontend) with the locally-built binary /
+static bundle **bind-mounted** in read-only. This is the literal
+"smallest possible image" answer: there's no smaller option than not
+building a custom one. See `docker-compose.yml`'s header comment for the
+full rationale.
+
+## Structure
 
 ```
 deploy/dev/
-├── docker-compose.yml          # Chạy trên server
-├── docker-compose.orca.yml     # Biến thể 2-server (b15.openledger.vn)
-├── .env.example                # Config template (backend/nginx only —
-│                                #   agent config đã chuyển deploy/agent/.env.example)
-├── .env                        # Config thực (gitignored)
-├── .gitignore
-│
-├── scripts/
-│   ├── build-local.sh          # [LOCAL] Build thử backend/+frontend/ (pre-flight)
-│   ├── sync-to-server.sh       # [LOCAL] Rsync source lên server + docker build + restart
-│   ├── gen-certs.sh            # [LOCAL] Tạo self-signed TLS cert
-│   ├── setup-ssh-keys.sh       # [LOCAL] Setup SSH key: Orca Server → Dev Machine
-│   └── get-pairing-url.sh      # [LOCAL] Lấy Pairing URL/Code để vào web UI
-│
+├── docker-compose.yml           # postgres, vault, nats, 17 backend-go services, frontend, 13 migrate-* one-shots
+├── .env.example / .env          # config (backend-go + frontend only — agent config is deploy/agent/.env.example)
 ├── docker/
-│   ├── backend/
-│   │   ├── Dockerfile          # 2 build stage (backend/ + frontend/) + 1 runtime stage
-│   │   ├── entrypoint.sh       # Khởi động out/server/index.js
-│   │   └── ssh/                # SSH keys (gitignored)
-│   │       ├── id_ed25519      # Private key → dev servers
-│   │       └── config          # SSH config
-│   └── nginx/
-│       ├── nginx.conf          # Nginx global config
-│       ├── conf.d/
-│       │   └── orca.conf       # HTTPS + WebSocket proxy
-│       └── certs/              # TLS certs (gitignored)
-│           ├── server.crt
-│           └── server.key
-│
-└── specs/                      # Tài liệu kiến trúc
-    ├── 00-overview.md
-    └── ...
+│   ├── postgres/init-databases.sh   # creates the 13 per-service databases on first boot
+│   └── nginx/orca.conf              # frontend: serves the SPA + reverse-proxies /v1/* to api-gateway
+└── scripts/
+    ├── build-local.sh           # [LOCAL] cross-compile all 17 Go binaries + vite-build frontend
+    ├── sync-to-server.sh        # [LOCAL] build, rsync, pull images, migrate, up -d — the whole flow in one command
+    └── migrate.sh               # [LOCAL or --remote] run golang-migrate for one/all services
 ```
 
-## Quick Start
-
-### Lần đầu tiên
+## Quick start
 
 ```bash
-cd /path/to/orca   # root của Orca repo
+cd /path/to/orca
 
-# 1. Copy và điền config (backend/nginx)
+# 1. Config
 cp deploy/dev/.env.example deploy/dev/.env
-nano deploy/dev/.env
-# → Set ORCA_DOMAIN, SERVER_HOST, HTTP_PORT/HTTPS_PORT, DB, AI keys, etc.
-# Deploy Agent lên Dev Server? Xem deploy/agent/.env.example (DEV_SERVER_HOST, ...)
+nano deploy/dev/.env    # set POSTGRES_PASSWORD, SERVER_HOST, SERVER_KEY
 
-# 2. Tạo TLS certificate
-ORCA_DOMAIN=orca.vnpblc.internal \
-  bash deploy/dev/scripts/gen-certs.sh
+# 2. Deploy (builds locally, syncs, migrates, starts)
+bash deploy/dev/scripts/sync-to-server.sh 0.1.0
+```
 
-# 3. Chuẩn bị SSH key để Orca Server SSH vào Dev Machine
-bash deploy/dev/scripts/setup-ssh-keys.sh
-# → Sinh key tại deploy/dev/docker/backend/ssh/
-# → Authorize public key vào 172.20.2.31 tự động
-# → Sync SSH dir lên Orca Server (172.20.2.39)
+### Local-only (no remote server — test the stack on your own machine)
 
-# 4. Build Orca (chạy 1 lần, ~10-15 phút)
+```bash
+cp deploy/dev/.env.example deploy/dev/.env   # POSTGRES_PASSWORD is enough locally
 bash deploy/dev/scripts/build-local.sh
-
-# 5. Sync lên server + build Docker image + start
-bash deploy/dev/scripts/sync-to-server.sh --restart
-
-# 6. Lấy pairing URL
-ssh ubuntu@172.20.2.39 \
-  "docker logs orca-server 2>&1 | grep 'Web UI'"
+cd deploy/dev
+docker compose up -d postgres vault nats
+../../deploy/dev/scripts/migrate.sh
+docker compose up -d
 ```
 
-### Deploy sau khi có thay đổi code
+### Redeploy after a code change
 
 ```bash
-# Build lại
-bash deploy/dev/scripts/build-local.sh
-
-# Sync và restart (image KHÔNG rebuild, chỉ restart container)
-bash deploy/dev/scripts/sync-to-server.sh
-
-# Nếu Dockerfile thay đổi:
-bash deploy/dev/scripts/sync-to-server.sh --restart
+bash deploy/dev/scripts/sync-to-server.sh 0.1.1   # any changed services' binaries + frontend
 ```
 
-## Image Size
+Every run rebuilds and re-syncs **all** 17 services' binaries — cheap
+(static Go builds, seconds each) compared to the old Node/Vite flow, so
+there's no per-service incremental-build machinery here. If that stops
+being true at some point (build time becomes a real bottleneck),
+`build-local.sh <service-name>` already supports building one service only
+— wire that into `sync-to-server.sh` as an optional argument then.
 
-| Image | Base | Size |
-|-------|------|------|
-| `orca` runtime | `debian:bookworm-slim` | ~160 MB |
-| `nginx` proxy | `nginx:alpine` | ~5 MB |
+## Networking
 
-Container KHÔNG chứa build tools (Node.js, pnpm, TypeScript, v.v.) → image nhỏ nhất có thể.
+- Only **`frontend`** (nginx, port `FRONTEND_HTTP_PORT`, default 8080) and
+  **`api-gateway`** (port `API_GATEWAY_PUBLIC_PORT`, default 8081) are
+  exposed to the host. Every other service is reachable only on the
+  internal `orca-go-net` bridge network, per
+  [`specs/backend-go/architecture/08-inter-service-communication.md`](../../specs/backend-go/architecture/08-inter-service-communication.md).
+- The frontend nginx config proxies `/v1/*` (REST) and
+  `/v1/notifications/stream` (WebSocket) to `api-gateway` — the browser
+  never talks to an individual backend-go service directly.
+- TLS termination is **not** handled by either container here — it's
+  expected to sit in front of `frontend` at the host/gateway level (same
+  layering `deploy/old/gateway/` used). Add it there, or put a TLS-terminating
+  proxy in this compose file, once this deploy needs to be reachable outside
+  a trusted network.
 
-## Developer Access — Lấy Pairing URL
+## Known limitations (read before treating this as production)
 
-```bash
-# Cách đơn giản nhất: in URL + code
-bash deploy/dev/scripts/get-pairing-url.sh
-
-# Mở browser ngay (macOS/Linux)
-bash deploy/dev/scripts/get-pairing-url.sh --open
-
-# Tạo token mới (revoke token cũ chưa dùng)
-bash deploy/dev/scripts/get-pairing-url.sh --rotate
-
-# Chỉ lấy URL (dùng trong script/pipe)
-ORCA_URL=$(bash deploy/dev/scripts/get-pairing-url.sh --url)
-echo "${ORCA_URL}"
-
-# JSON output đầy đủ
-bash deploy/dev/scripts/get-pairing-url.sh --json
-```
-
-**Output:**
-```
-🔗 Orca Pairing Info
-═══════════════════════════════════════════════════════════
-
-Cách 1 — Mở URL trực tiếp (auto-connect):
-https://b15.openledger.vn/#pairing=eyJ2Ij...
-
-Cách 2 — Paste vào field "Pairing URL or code":
-eyJ2IjoyLCJlbmRwb2ludCI6IndzczovL...
-```
-
-## Quản lý trên Server
-
-```bash
-# SSH vào server
-ssh ubuntu@orca.vnpblc.internal
-
-# Trên server:
-cd ~/orca-deploy
-
-docker compose ps           # xem trạng thái
-docker compose logs -f orca # xem logs realtime
-docker compose restart orca # restart Orca
-docker compose down          # dừng tất cả
-docker compose up -d         # start lại
-
-# Xem pairing URL
-docker logs orca-server 2>&1 | grep "Web UI"
-
-# Monitor resource usage
-docker stats
-```
-
-## SSH Keys cho Dev Servers
-
-Orca Server (container tại 172.20.2.39) cần SSH vào Dev Machine (172.20.2.31)
-để relay filesystem, terminal, và git operations.
-
-### Cách nhanh (recommended) — dùng script
-
-```bash
-# Sinh key LOCAL + authorize vào dev server + sync lên Orca Server
-bash deploy/dev/scripts/setup-ssh-keys.sh
-
-# Chỉ authorize thêm một server khác:
-bash deploy/dev/scripts/setup-ssh-keys.sh --authorize 172.20.2.32
-
-# In public key để copy thủ công:
-bash deploy/dev/scripts/setup-ssh-keys.sh --print-pubkey
-
-# Test SSH từ Orca container → dev server:
-bash deploy/dev/scripts/setup-ssh-keys.sh --test
-```
-
-### Cách thủ công
-
-```bash
-# 1. Sinh key trên máy local
-mkdir -p deploy/dev/docker/backend/ssh
-ssh-keygen -t ed25519 \
-  -f deploy/dev/docker/backend/ssh/id_ed25519 \
-  -N "" \
-  -C "orca-server@172.20.2.39"
-
-# 2. Authorize lên dev server
-ssh-copy-id -i deploy/dev/docker/backend/ssh/id_ed25519.pub \
-  ubuntu@172.20.2.31
-
-# 3. Tạo SSH config
-cat > deploy/dev/docker/backend/ssh/config << 'EOF'
-Host dev-local
-    HostName 172.20.2.31
-    User ubuntu
-    IdentityFile /home/orca/.ssh/id_ed25519
-    UserKnownHostsFile /home/orca/.ssh/known_hosts
-    StrictHostKeyChecking accept-new
-EOF
-
-# 4. Lấy fingerprint
-ssh-keyscan -H 172.20.2.31 > deploy/dev/docker/backend/ssh/known_hosts
-
-# 5. Sync SSH dir lên Orca Server
-rsync -az deploy/dev/docker/backend/ssh/ \
-  ubuntu@172.20.2.39:~/orca-deploy/docker/backend/ssh/
-
-# 6. Restart container để mount SSH dir mới
-ssh ubuntu@172.20.2.39 \
-  "cd ~/orca-deploy && docker compose -f docker-compose.orca.yml restart orca"
-```
-
-### Thêm dev server vào Orca (sau khi SSH đã setup)
-
-```
-https://b15.openledger.vn
-→ Add Remote Host
-  Host:     172.20.2.31
-  Port:     22
-  Username: ubuntu
-→ Connect
-```
-
-Orca sẽ tự động SSH vào 172.20.2.31 và deploy relay process (`~/.orca-remote/`).
-
-### Files SSH (trong deploy/dev/docker/backend/ssh/)
-
-| File | Gitignore | Mô tả |
-|------|-----------|-------|
-| `id_ed25519` | ✅ YES | Private key — không commit |
-| `id_ed25519.pub` | ❌ no | Public key — an toàn commit |
-| `config` | ❌ no | SSH config — an toàn commit |
-| `known_hosts` | ❌ no | Host fingerprints — an toàn commit |
+- **Vault runs in dev mode** (`VAULT_DEV_ROOT_TOKEN_ID`, in-memory storage,
+  single node) — secrets do not survive a container restart, and this is
+  explicitly not the HA/auto-unseal setup
+  [`specs/backend-go/architecture/06-secrets-vault-architecture.md`](../../specs/backend-go/architecture/06-secrets-vault-architecture.md)
+  specifies for real production. Fine for a dev server; do not point real
+  tenant secrets at this.
+- **No mTLS / service mesh** — containers talk to each other in plaintext
+  over the `orca-go-net` bridge network. `architecture/07-security-architecture.md`
+  specifies mTLS via a service mesh for production; this Docker Compose
+  deploy has no mesh at all (that's a Kubernetes-shaped concern, not a
+  Compose one — see `specs/backend-go/architecture/10-deployment-infrastructure.md`
+  for the Kubernetes target this eventually graduates to).
+- **`read_only: true` on every backend-go container** — distroless images
+  have no writable layer need for a stateless-by-design Go service, but if
+  a future service genuinely needs to write local scratch files, add a
+  `tmpfs:` mount for that path rather than flipping `read_only` off
+  wholesale.
+- **Every backend-go service in this repository is itself a scaffold** —
+  several cross-service calls are stubs (see each service's own README and
+  [`backend-go/docs/execution-plan.md`](../../backend-go/docs/execution-plan.md)).
+  This deploy set makes the *infrastructure* real; it doesn't make the
+  *application* feature-complete.

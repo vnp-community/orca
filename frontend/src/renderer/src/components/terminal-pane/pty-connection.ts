@@ -6,6 +6,7 @@ import { resolveCursorAgentImeAnchor } from '@/lib/pane-manager/terminal-ime-anc
 import { detectAgentStatusFromTitle, agentTypeToIconAgent, isClaudeAgent } from '@/lib/agent-status'
 import { resolvePaneTitleDecision } from './terminal-title-evidence'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
+import { needsRuntimeSshPassphrasePrompt } from '@/runtime/runtime-ssh-client'
 import { useAppStore } from '@/store'
 import { getWorktreeMapFromState } from '@/store/selectors'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
@@ -29,6 +30,7 @@ import type { PtyBufferSnapshot, PtyConnectResult } from './pty-transport'
 import { createIpcPtyTransport } from './pty-transport'
 import { createRemoteRuntimePtyTransport } from './remote-runtime-pty-transport'
 import { getConnectionId } from '@/lib/connection-context'
+import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import {
   getCachedWindowsTerminalCapabilities,
@@ -91,6 +93,7 @@ import { subscribeToTerminalUserInput } from './terminal-user-input-signal'
 import { registerPtySerializer, registerPtyTitleSource } from './pty-buffer-serializer'
 import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
 import { inspectRuntimeTerminalProcess } from '@/runtime/runtime-terminal-inspection'
+import { connectRuntimeSsh } from '@/runtime/runtime-ssh-client'
 import {
   discardTerminalOutput,
   flushTerminalOutput,
@@ -666,6 +669,14 @@ function subscribeAgentTaskCompleteTrackingEnabled(listener: () => void): () => 
 }
 
 function recordPtyConnectDiagnostic(message: string): void {
+  // TEMP DIAG BUG-FE-PTY-001: the live repro shows a mirror transport
+  // created but never reaching any connectPanePty branch that calls
+  // transport.connect()/attach() (zero session.tabs.* RPCs in backend
+  // logs across the whole grace-close window) — persist every branch
+  // decision unconditionally (not gated by e2eConfig.exposeStore like the
+  // rest of this function) so the next repro's dump shows exactly which
+  // branch a given pane took, or that it took none at all.
+  logBugFePty001(`pty-connect ${message}`)
   if (!e2eConfig.exposeStore) {
     return
   }
@@ -752,7 +763,7 @@ async function waitForSshConnection(connectionId: string): Promise<SshConnectRes
 
   const promise: Promise<SshConnectResult> = (async (): Promise<SshConnectResult> => {
     try {
-      await window.api.ssh.connect({ targetId: connectionId })
+      await connectRuntimeSsh(useAppStore.getState().settings, connectionId)
       return { connected: true }
     } catch (err) {
       console.warn(`Deferred SSH reconnect failed for ${connectionId}:`, err)
@@ -6786,9 +6797,10 @@ export function connectPanePty(
           // as before.
           let needsPrompt = false
           try {
-            needsPrompt = await window.api.ssh.needsPassphrasePrompt({
-              targetId: connectionId
-            })
+            needsPrompt = await needsRuntimeSshPassphrasePrompt(
+              useAppStore.getState().settings,
+              connectionId
+            )
           } catch (err) {
             console.warn('[pty-connection] needsPassphrasePrompt probe failed:', err)
             // Why: if the probe fails, fall through to the existing auto-connect

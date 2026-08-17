@@ -9,12 +9,16 @@
  */
 
 import type { Migration } from './types'
+import { autoIncrementPrimaryKeySql } from './sql-dialect'
 
 export const migration0008AiProviders: Migration = {
   version: 8,
   name: 'ai_providers',
 
   async up(db) {
+    // BUG-BE-RPC-003: AUTOINCREMENT is SQLite-only — see sql-dialect.ts.
+    const autoIncrementPk = autoIncrementPrimaryKeySql(db.capabilities.dialect)
+
     // ── orca_ai_provider_accounts ─────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS orca_ai_provider_accounts (
@@ -27,11 +31,11 @@ export const migration0008AiProviders: Migration = {
         model             TEXT,
         base_url          TEXT,
         status            TEXT    NOT NULL DEFAULT 'pending',
-        last_health_check INTEGER,
+        last_health_check BIGINT,
         quota_limit_day   INTEGER NOT NULL DEFAULT 0,
         created_by        TEXT    NOT NULL,
-        created_at        INTEGER NOT NULL,
-        updated_at        INTEGER NOT NULL
+        created_at        BIGINT NOT NULL,
+        updated_at        BIGINT NOT NULL
       )
     `)
     await db.exec(`
@@ -42,7 +46,7 @@ export const migration0008AiProviders: Migration = {
     // ── orca_provider_usage ───────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS orca_provider_usage (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          ${autoIncrementPk},
         account_id  TEXT    NOT NULL REFERENCES orca_ai_provider_accounts(id) ON DELETE CASCADE,
         date        TEXT    NOT NULL,
         tokens_used INTEGER NOT NULL DEFAULT 0,

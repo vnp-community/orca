@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package orca.issuetracking.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1;issuetrackingv1";
+
+// IssueTrackingService: Jira/Linear direct API integration (already correct
+// shape in TS, faithful port). See specs/backend-go/services/issue-tracking-service.md.
+service IssueTrackingService {
+  rpc ListIssues(ListIssuesRequest) returns (ListIssuesResponse);
+  rpc CreateIssue(CreateIssueRequest) returns (CreateIssueResponse);
+  rpc LinkIssue(LinkIssueRequest) returns (LinkIssueResponse);
+}
+
+enum IssueProvider {
+  ISSUE_PROVIDER_UNSPECIFIED = 0;
+  ISSUE_PROVIDER_JIRA = 1;
+  ISSUE_PROVIDER_LINEAR = 2;
+}
+
+message Issue {
+  string id = 1;
+  string title = 2;
+  string state = 3;
+  string url = 4;
+}
+
+message ListIssuesRequest {
+  string tenant_id = 1;
+  IssueProvider provider = 2;
+  string project_key = 3;
+}
+
+message ListIssuesResponse {
+  repeated Issue issues = 1;
+}
+
+message CreateIssueRequest {
+  string tenant_id = 1;
+  IssueProvider provider = 2;
+  string project_key = 3;
+  string title = 4;
+  string description = 5;
+}
+
+message CreateIssueResponse {
+  Issue issue = 1;
+}
+
+// LinkIssue publishes an orca.issuetracking.link.created event rather than
+// writing directly into task-service/project-service's data (async, per
+// architecture/08-inter-service-communication.md).
+message LinkIssueRequest {
+  string issue_id = 1;
+  string task_id = 2;
+}
+
+message LinkIssueResponse {}

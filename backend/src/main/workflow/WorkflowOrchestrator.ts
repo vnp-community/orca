@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto'
 import { Tracers } from '../../shared/trace/tracers'
 import type { TraceSpan } from '../../shared/trace'
 import type { IConnectionPool } from '../db/pool'
+import type { BindValue } from '../db/types'
 import type { ProjectServerRouter } from '../project/ProjectServerRouter'
 import type { DAGBuilder } from './DAGBuilder'
 // FIX §0: import CLASS thật thay vì tự định nghĩa alias Record<string, fn> trùng tên —
@@ -145,17 +146,17 @@ export class WorkflowOrchestrator {
     const rows = await this.pool.withConnection((db) =>
       db.query<ExecutionRow>(
         `SELECT id,
-                definition_snapshot as definitionSnapshot,
+                definition_snapshot as "definitionSnapshot",
                 status,
-                inputs_json         as inputsJson,
-                current_wave        as currentWave,
-                triggered_by        as triggeredBy,
-                project_id          as projectId,
-                started_at          as startedAt,
-                completed_at        as completedAt,
-                paused_at           as pausedAt,
-                error_message       as errorMessage,
-                created_at          as createdAt
+                inputs_json         as "inputsJson",
+                current_wave        as "currentWave",
+                triggered_by        as "triggeredBy",
+                project_id          as "projectId",
+                started_at          as "startedAt",
+                completed_at        as "completedAt",
+                paused_at           as "pausedAt",
+                error_message       as "errorMessage",
+                created_at          as "createdAt"
          FROM orca_workflow_executions WHERE id = ?`,
         [executionId]
       )
@@ -169,7 +170,7 @@ export class WorkflowOrchestrator {
    */
   async listExecutions(filters: ListExecutionsFilter = {}): Promise<WorkflowExecution[]> {
     const clauses: string[] = []
-    const params: unknown[] = []
+    const params: BindValue[] = []
 
     if (filters.projectId) {
       clauses.push('project_id = ?')
@@ -188,17 +189,17 @@ export class WorkflowOrchestrator {
     const limit = filters.limit ?? 100
     const sql = `
       SELECT id,
-             definition_snapshot as definitionSnapshot,
+             definition_snapshot as "definitionSnapshot",
              status,
-             inputs_json         as inputsJson,
-             current_wave        as currentWave,
-             triggered_by        as triggeredBy,
-             project_id          as projectId,
-             started_at          as startedAt,
-             completed_at        as completedAt,
-             paused_at           as pausedAt,
-             error_message       as errorMessage,
-             created_at          as createdAt
+             inputs_json         as "inputsJson",
+             current_wave        as "currentWave",
+             triggered_by        as "triggeredBy",
+             project_id          as "projectId",
+             started_at          as "startedAt",
+             completed_at        as "completedAt",
+             paused_at           as "pausedAt",
+             error_message       as "errorMessage",
+             created_at          as "createdAt"
       FROM orca_workflow_executions ${where}
       ORDER BY created_at DESC LIMIT ?`
 
@@ -253,7 +254,7 @@ export class WorkflowOrchestrator {
     let span = this.rootSpans.get(executionId)
     if (!span) {
       const rows = await this.pool.withConnection((db) =>
-        db.query(`SELECT root_trace_id as rootTraceId FROM orca_workflow_executions WHERE id = ?`, [executionId])
+        db.query(`SELECT root_trace_id as "rootTraceId" FROM orca_workflow_executions WHERE id = ?`, [executionId])
       )
       const rootTraceId = (rows[0] as { rootTraceId: string | null } | undefined)?.rootTraceId ?? undefined
       span = Tracers.workflowExecuteFlow.start(
@@ -305,7 +306,7 @@ export class WorkflowOrchestrator {
       // Đọc lại root_trace_id đã persist — resume() giữ nguyên id cha qua restart
       // (CR-TRACE-000 §3.1), để step span cũ (trước restart) và mới nhóm chung 1 execution.
       const rows = await this.pool.withConnection((db) =>
-        db.query(`SELECT root_trace_id as rootTraceId FROM orca_workflow_executions WHERE id = ?`, [
+        db.query(`SELECT root_trace_id as "rootTraceId" FROM orca_workflow_executions WHERE id = ?`, [
           execution.id,
         ])
       )

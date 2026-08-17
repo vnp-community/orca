@@ -35,6 +35,7 @@ import {
   createRemoteRuntimeViewportBatcher
 } from './remote-runtime-pty-batching'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import { setFitOverride } from '@/lib/pane-manager/mobile-fit-overrides'
 import { setDriverForPty } from '@/lib/pane-manager/mobile-driver-state'
 import { isWebTerminalSurfaceTabId, toHostSessionTabId } from '@/runtime/web-terminal-surface-id'
@@ -50,11 +51,7 @@ const DEFAULT_RUNTIME_TIMEOUT_MS = 15_000
 // Why: retry terminal.create once on timeout/cold-start error before surfacing
 // the error to the user. Relay may be warming up a fresh PTY worker.
 const COLD_START_MAX_RETRIES = 1
-const LONG_TIMEOUT_METHODS = new Set([
-  'terminal.create',
-  'terminal.subscribe',
-  'terminal.attach',
-])
+const LONG_TIMEOUT_METHODS = new Set(['terminal.create', 'terminal.subscribe', 'terminal.attach'])
 
 function isRemoteTerminalGoneMessage(message: string): boolean {
   return (
@@ -76,7 +73,20 @@ function isRemoteTerminalGoneMessage(message: string): boolean {
 // browser console transport create/destroy stacks). Give the mirror a short
 // window to claim the handle via attachHostSessionMirror() below before
 // actually closing it — a real cancelled launch just closes slightly later.
-const GRACE_CLOSE_DELAY_MS = 2_000
+//
+// Why 5000, not 2000 (live-prod regression found 2026-08-12): the mirror's
+// own TerminalPane mount can itself be deferred up to GRACE_MOUNT_DEFER_MS
+// (4000ms, terminal-pending-host-mirror-mount-gate.ts's fix #10) while
+// waiting for the mirror tab to appear — attachHostSessionMirror()/
+// claimGraceClose() below can't run until that component actually mounts.
+// With the old 2000ms value, this grace-close could — and, confirmed via
+// live backend logs, did — fire and destroy the PTY before mount-defer's
+// worst case even finished waiting, reproducing the exact "not found" race
+// this whole mechanism exists to prevent. Not imported from the mount-gate
+// module to avoid a transport→UI-layer dependency; keep the two constants'
+// relationship (this one > GRACE_MOUNT_DEFER_MS, with margin) in sync by
+// hand if either changes.
+const GRACE_CLOSE_DELAY_MS = 5_000
 const pendingGraceCloses = new Map<string, { timer: ReturnType<typeof setTimeout> }>()
 
 function scheduleGraceClose(handle: string, close: () => void): void {
@@ -134,7 +144,7 @@ export function createRemoteRuntimePtyTransport(
     onColdStartBegin,
     onColdStartRetry,
     onColdStartComplete,
-    onColdStartFailed,
+    onColdStartFailed
   } = opts
   let connected = false
   let destroyed = false
@@ -162,8 +172,8 @@ export function createRemoteRuntimePtyTransport(
   // TEMP DIAG BUG-FE-PTY-001: log every transport instantiation with its
   // tabId/leafId + call stack, to catch a second transport being created for
   // the same tab while the first one's terminal.create is still in flight.
-  console.error(
-    `[DIAG BUG-FE-PTY-001] transport CREATED tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId}\n${new Error('create call site').stack}`
+  logBugFePty001(
+    `transport CREATED tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId}\n${new Error('create call site').stack}`
   )
   // Why: tab/leaf ids identify the mirrored host pane, so every paired viewer
   // shares them. The instance suffix keeps one viewer's refresh off peer records.
@@ -620,79 +630,94 @@ export function createRemoteRuntimePtyTransport(
       !transportClosed &&
       generation === subscriptionGeneration &&
       isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)
+    // TEMP DIAG BUG-FE-PTY-001 (double-prompt follow-up): log a short preview
+    // of the snapshot and the first few live chunks so a duplicated prompt
+    // can be traced to "server sent it twice" (both previews show the same
+    // text) vs "client wrote it twice" (only one preview shows it).
+    let diagOnDataCallCount = 0
+    const DIAG_ON_DATA_LOG_LIMIT = 5
     const subscribeCallbacks: RemoteRuntimeMultiplexedTerminalCallbacks = {
-        onData: (data, meta) => {
-          if (isCurrentSubscription()) {
-            outputProcessor.processData(data, storedCallbacks, undefined, meta)
+      onData: (data, meta) => {
+        if (isCurrentSubscription()) {
+          if (diagOnDataCallCount < DIAG_ON_DATA_LOG_LIMIT) {
+            diagOnDataCallCount += 1
+            logBugFePty001(
+              `subscribeToHandle onData tabId=${tabId} leafId=${leafId} handle=${subscribedHandle} gen=${generation} seq=${meta?.seq} preview=${JSON.stringify(data.slice(-80))}`
+            )
           }
-        },
-        onSnapshot: (data, meta) => {
-          // Why: a snapshot with no body can still carry a pending mid-escape
-          // tail that must be replayed so the next live chunk completes it.
-          if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
-            outputProcessor.processData(data, storedCallbacks, {
-              replayingBufferedData: true,
-              suppressAttentionEvents: true,
-              ...(meta?.pendingEscapeTailAnsi
-                ? { pendingEscapeTailAnsi: meta.pendingEscapeTailAnsi }
-                : {})
-            })
-          }
-        },
-        onSubscribed: () => {
-          if (!isCurrentSubscription()) {
-            return
-          }
-          storedCallbacks.onConnect?.()
-          storedCallbacks.onStatus?.('shell')
-        },
-        onEnd: () => {
-          if (!isCurrentSubscription()) {
-            return
-          }
-          outputProcessor.clearAccumulatedState()
-          connected = false
-          handle = null
-          remotePtyId = null
-          multiplexedStream = null
-          multiplexedStreamHandle = null
-          clearPendingViewportClaim()
-          storedCallbacks.onExit?.(0)
-          storedCallbacks.onDisconnect?.()
-          if (subscribedPtyId) {
-            onPtyExit?.(subscribedPtyId)
-          }
-        },
-        onError: (message) => {
-          if (isCurrentSubscription()) {
-            handleRemoteTerminalError(message)
-          }
-        },
-        onFitOverrideChanged: (event) => {
-          if (isCurrentSubscription() && subscribedPtyId) {
-            setFitOverride(subscribedPtyId, event.mode, event.cols, event.rows)
-          }
-        },
-        onDriverChanged: (driver) => {
-          if (isCurrentSubscription() && subscribedPtyId) {
-            setDriverForPty(subscribedPtyId, driver)
-          }
-        },
-        onTransportClose: () => {
-          transportClosed = true
-          if (generation !== subscriptionGeneration) {
-            return
-          }
-          if (!isCurrentSubscription()) {
-            // isCurrentSubscription excludes the just-closed stream by design.
-            if (!isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)) {
-              return
-            }
-          }
-          multiplexedStream = null
-          multiplexedStreamHandle = null
-          scheduleResubscribeAfterTransportClose()
+          outputProcessor.processData(data, storedCallbacks, undefined, meta)
         }
+      },
+      onSnapshot: (data, meta) => {
+        logBugFePty001(
+          `subscribeToHandle onSnapshot tabId=${tabId} leafId=${leafId} handle=${subscribedHandle} gen=${generation} preview=${JSON.stringify(data.slice(-80))}`
+        )
+        // Why: a snapshot with no body can still carry a pending mid-escape
+        // tail that must be replayed so the next live chunk completes it.
+        if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
+          outputProcessor.processData(data, storedCallbacks, {
+            replayingBufferedData: true,
+            suppressAttentionEvents: true,
+            ...(meta?.pendingEscapeTailAnsi
+              ? { pendingEscapeTailAnsi: meta.pendingEscapeTailAnsi }
+              : {})
+          })
+        }
+      },
+      onSubscribed: () => {
+        if (!isCurrentSubscription()) {
+          return
+        }
+        storedCallbacks.onConnect?.()
+        storedCallbacks.onStatus?.('shell')
+      },
+      onEnd: () => {
+        if (!isCurrentSubscription()) {
+          return
+        }
+        outputProcessor.clearAccumulatedState()
+        connected = false
+        handle = null
+        remotePtyId = null
+        multiplexedStream = null
+        multiplexedStreamHandle = null
+        clearPendingViewportClaim()
+        storedCallbacks.onExit?.(0)
+        storedCallbacks.onDisconnect?.()
+        if (subscribedPtyId) {
+          onPtyExit?.(subscribedPtyId)
+        }
+      },
+      onError: (message) => {
+        if (isCurrentSubscription()) {
+          handleRemoteTerminalError(message)
+        }
+      },
+      onFitOverrideChanged: (event) => {
+        if (isCurrentSubscription() && subscribedPtyId) {
+          setFitOverride(subscribedPtyId, event.mode, event.cols, event.rows)
+        }
+      },
+      onDriverChanged: (driver) => {
+        if (isCurrentSubscription() && subscribedPtyId) {
+          setDriverForPty(subscribedPtyId, driver)
+        }
+      },
+      onTransportClose: () => {
+        transportClosed = true
+        if (generation !== subscriptionGeneration) {
+          return
+        }
+        if (!isCurrentSubscription()) {
+          // isCurrentSubscription excludes the just-closed stream by design.
+          if (!isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)) {
+            return
+          }
+        }
+        multiplexedStream = null
+        multiplexedStreamHandle = null
+        scheduleResubscribeAfterTransportClose()
+      }
     }
     const subscribeArgs = {
       terminal: subscribedHandle,
@@ -772,31 +797,34 @@ export function createRemoteRuntimePtyTransport(
         const launchTokenToSend = options.launchToken ?? launchToken
         const launchAgentToSend = options.launchAgent ?? launchAgent
         // TM-001-B: Use retry-aware helper for terminal.create (cold-start resilience)
-        const created = await callRuntimeWithColdStartRetry<{ terminal: RuntimeTerminalCreate }>('terminal.create', {
-          worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
-          ...(commandToSend !== undefined ? { command: commandToSend } : {}),
-          ...(startupCommandDeliveryToSend !== undefined
-            ? { startupCommandDelivery: startupCommandDeliveryToSend }
-            : {}),
-          ...(envToSend !== undefined ? { env: envToSend } : {}),
-          ...(launchConfigToSend !== undefined ? { launchConfig: launchConfigToSend } : {}),
-          ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
-          ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
-          tabId,
-          leafId,
-          focus: false,
-          // Why: this transport is backing an already-mounted renderer pane;
-          // activation here is local state, not permission for remote UI reveal.
-          presentation: 'background',
-          ...(activate === true ? { activate: true } : {})
-        })
+        const created = await callRuntimeWithColdStartRetry<{ terminal: RuntimeTerminalCreate }>(
+          'terminal.create',
+          {
+            worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
+            ...(commandToSend !== undefined ? { command: commandToSend } : {}),
+            ...(startupCommandDeliveryToSend !== undefined
+              ? { startupCommandDelivery: startupCommandDeliveryToSend }
+              : {}),
+            ...(envToSend !== undefined ? { env: envToSend } : {}),
+            ...(launchConfigToSend !== undefined ? { launchConfig: launchConfigToSend } : {}),
+            ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
+            ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
+            tabId,
+            leafId,
+            focus: false,
+            // Why: this transport is backing an already-mounted renderer pane;
+            // activation here is local state, not permission for remote UI reveal.
+            presentation: 'background',
+            ...(activate === true ? { activate: true } : {})
+          }
+        )
         handle = created.terminal.handle
         if (destroyed) {
           // TEMP DIAG BUG-FE-PTY-001: this is the exact "created then
           // immediately destroyed" race — logs which tab/leaf raced and how
           // long the create() round-trip took before destroy() beat it.
-          console.error(
-            `[DIAG BUG-FE-PTY-001] connect() found destroyed=true right after terminal.create resolved — grace-closing PTY tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId} handle=${created.terminal.handle}`
+          logBugFePty001(
+            `connect() found destroyed=true right after terminal.create resolved — grace-closing PTY tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId} handle=${created.terminal.handle}`
           )
           // FIX BUG-FE-PTY-001: this is USUALLY a cancelled launch (rapid
           // tab-open/tab-close) — close the server PTY so it doesn't leak.
@@ -843,6 +871,20 @@ export function createRemoteRuntimePtyTransport(
       if (previousHandle && previousHandle !== nextHandle) {
         // Why: debounced input is scoped by the current terminal handle at flush time.
         inputBatcher.clear()
+      }
+      // FIX BUG-FE-PTY-001 (#13): connectPanePty (pty-connection.ts) prefers
+      // this ATTACH path over connect() whenever a leaf already has a known
+      // remote PTY id (the common case for a host-mirrored leaf whose
+      // sibling local tab just spawned it) -- but only connect()'s
+      // attachHostSessionMirror() ever called claimGraceClose(). A mirror
+      // that attaches here to a handle its sibling's connect() just
+      // scheduleGraceClose()'d never cancels that timer, so
+      // GRACE_CLOSE_DELAY_MS later the PTY gets closed out from under an
+      // actively-attached pane (live repro: transport attaches successfully,
+      // then gets torn down ~5s later with no user action). Claim it here
+      // too, mirroring attachHostSessionMirror()'s call at the same point.
+      if (nextHandle) {
+        claimGraceClose(nextHandle)
       }
       handle = nextHandle
       if (!handle) {
@@ -891,8 +933,9 @@ export function createRemoteRuntimePtyTransport(
       if (id && worktreeId && tabId) {
         const stream = multiplexedStream
         if (stream) {
-          stream.serializeBuffer?.({ scrollbackRows: 1000 })
-            .then(snap => {
+          stream
+            .serializeBuffer?.({ scrollbackRows: 1000 })
+            .then((snap) => {
               if (snap && worktreeId && tabId) {
                 void window.api.terminalSessions?.save?.({
                   worktreeId,
@@ -900,11 +943,13 @@ export function createRemoteRuntimePtyTransport(
                   leafId: leafId ?? undefined,
                   snapshotData: snap.data,
                   snapshotCols: snap.cols,
-                  snapshotRows: snap.rows,
+                  snapshotRows: snap.rows
                 })
               }
             })
-            .catch(() => { /* Non-fatal snapshot save */ })
+            .catch(() => {
+              /* Non-fatal snapshot save */
+            })
         }
       }
       closeMultiplexedStream()
@@ -1042,8 +1087,8 @@ export function createRemoteRuntimePtyTransport(
       // TEMP DIAG BUG-FE-PTY-001: pairs with the "transport CREATED" log —
       // correlate by tabId/leafId to see whether a second transport for the
       // same tab triggered this teardown before connect() finished.
-      console.error(
-        `[DIAG BUG-FE-PTY-001] transport DESTROY called tabId=${tabId} leafId=${leafId} handle=${handle} connected=${connected}\n${new Error('destroy call site').stack}`
+      logBugFePty001(
+        `transport DESTROY called tabId=${tabId} leafId=${leafId} handle=${handle} connected=${connected}\n${new Error('destroy call site').stack}`
       )
       destroyed = true
       this.disconnect()

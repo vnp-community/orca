@@ -10,6 +10,17 @@ export type UsageWorktreeRef = {
   displayName: string
 }
 
+/**
+ * ADR-021 Phase 1: narrow interface seam for ClaudeUsageStore/CodexUsageStore's
+ * `Store` dependency — verified by grep, `getRepos()` + `getAllWorktreeMeta()`
+ * (the latter via `loadKnownUsageWorktreesByRepo` below) is the complete
+ * surface both usage stores call. See automations/automation-store-dependency.ts's
+ * module doc comment for why this narrowing pattern exists (server mode's
+ * future Postgres-backed usage store — migration 0022's `usage` schema —
+ * needs to satisfy only this, not the full ~3900-line `Store` class).
+ */
+export type UsageStoreRepoSource = Pick<Store, 'getRepos' | 'getAllWorktreeMeta'>
+
 function getDefaultUsageWorktreeLabel(pathValue: string): string {
   return basename(pathValue)
 }

@@ -11,7 +11,7 @@
  */
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
-import type { GitStatus, GitWorktree, FileTreeNode } from '../../../main/workspace/WorkspaceService'
+import type { GitStatus, GitWorktree, FileTreeNode } from '@/lib/workspace-git-types'
 import type { OrcaTask } from '../../../shared/task-types'
 
 // ── Event bus types ────────────────────────────────────────────────────────────

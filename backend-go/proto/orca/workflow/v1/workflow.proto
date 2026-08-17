@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package orca.workflow.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1";
+
+// WorkflowService owns templates + DAG execution/step dispatch. Also exposes
+// ExecuteAdHocStep so automation-service can reuse step execution directly
+// (closes TS Gap 3) without a fake-workflow indirection.
+// See specs/backend-go/services/workflow-service.md.
+service WorkflowService {
+  rpc CreateTemplate(CreateTemplateRequest) returns (CreateTemplateResponse);
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+  rpc GetExecution(GetExecutionRequest) returns (GetExecutionResponse);
+  rpc PauseExecution(PauseExecutionRequest) returns (PauseExecutionResponse);
+  rpc ResumeExecution(ResumeExecutionRequest) returns (ResumeExecutionResponse);
+  rpc ExecuteAdHocStep(ExecuteAdHocStepRequest) returns (ExecuteAdHocStepResponse);
+
+  // CancelExecution transitions a pending/running/paused execution to
+  // cancelled — a terminal state, distinct from Pause (which is resumable).
+  // Added 2026-08-17, closing the last item of Epic C
+  // (backend-go/docs/execution-plan.md §2/§10) that was left deferred.
+  rpc CancelExecution(CancelExecutionRequest) returns (CancelExecutionResponse);
+
+  // ListTemplates lists this tenant's templates, optionally filtered by
+  // scope, keyset-paginated (matches annotation-service's ListAnnotations
+  // convention: opaque page_token = last-seen id).
+  rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse);
+
+  // ResolveTemplate walks a template's parent_template_id chain
+  // (company -> team -> personal, depth<=5, workflow-service.md §6) and
+  // returns the effective, inheritance-resolved template. See
+  // ResolveTemplateResponse's doc comment for this scaffold's inheritance
+  // policy.
+  rpc ResolveTemplate(ResolveTemplateRequest) returns (ResolveTemplateResponse);
+
+  // HasActiveExecutions answers "does this project have a non-terminal
+  // (pending/running/paused) workflow execution" — added for Epic C
+  // (backend-go/docs/execution-plan.md §10) to close
+  // project-service.RebindDevServer's guard, previously a client-side
+  // no-op because this RPC didn't exist.
+  rpc HasActiveExecutions(HasActiveExecutionsRequest) returns (HasActiveExecutionsResponse);
+}
+
+enum StepType {
+  STEP_TYPE_UNSPECIFIED = 0;
+  STEP_TYPE_AGENT = 1;
+  STEP_TYPE_SHELL = 2;
+  STEP_TYPE_NOTIFICATION = 3;
+  STEP_TYPE_WEBHOOK = 4;
+  STEP_TYPE_CONDITION = 5;
+}
+
+message WorkflowTemplate {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string dag_json = 4;
+  string scope = 5; // company | team | personal
+  string parent_template_id = 6; // empty = root of its inheritance chain; see ResolveTemplate
+}
+
+message CreateTemplateRequest {
+  string tenant_id = 1;
+  string name = 2;
+  string dag_json = 3;
+  string scope = 4;
+  string parent_template_id = 5; // optional; empty = no parent
+}
+
+message CreateTemplateResponse {
+  WorkflowTemplate template = 1;
+}
+
+message ExecuteRequest {
+  string template_id = 1;
+  string project_id = 2;
+  string root_trace_id = 3; // resumability across restart
+  string request_id = 4;
+}
+
+message WorkflowExecution {
+  string id = 1;
+  string template_id = 2;
+  string status = 3; // pending|running|paused|completed|failed|cancelled
+  string root_trace_id = 4;
+  string project_id = 5; // added for Epic C's HasActiveExecutions — see that RPC's doc comment
+}
+
+message ExecuteResponse {
+  WorkflowExecution execution = 1;
+}
+
+message GetExecutionRequest {
+  string id = 1;
+}
+
+message GetExecutionResponse {
+  WorkflowExecution execution = 1;
+}
+
+message PauseExecutionRequest {
+  string id = 1;
+}
+
+message PauseExecutionResponse {
+  WorkflowExecution execution = 1;
+}
+
+message ResumeExecutionRequest {
+  string id = 1;
+}
+
+message ResumeExecutionResponse {
+  WorkflowExecution execution = 1;
+}
+
+// ExecuteAdHocStep runs a single step (agent/shell/notification/webhook/condition)
+// outside of a full template — the mechanism automation-service's RunNow uses.
+message ExecuteAdHocStepRequest {
+  string tenant_id = 1;
+  StepType step_type = 2;
+  string step_config_json = 3;
+  string request_id = 4;
+}
+
+message StepResult {
+  string status = 1; // completed|failed
+  string output_json = 2;
+}
+
+message ExecuteAdHocStepResponse {
+  StepResult result = 1;
+}
+
+message HasActiveExecutionsRequest {
+  string project_id = 1;
+}
+
+message HasActiveExecutionsResponse {
+  bool has_active = 1;
+}
+
+message CancelExecutionRequest {
+  string id = 1;
+}
+
+message CancelExecutionResponse {
+  WorkflowExecution execution = 1;
+}
+
+message ListTemplatesRequest {
+  string scope = 1; // optional filter: company | team | personal, empty = all scopes
+  string page_token = 2;
+  int32 page_size = 3;
+}
+
+message ListTemplatesResponse {
+  repeated WorkflowTemplate templates = 1;
+  string next_page_token = 2;
+}
+
+message ResolveTemplateRequest {
+  string template_id = 1;
+}
+
+// ResolveTemplateResponse.template is the EFFECTIVE, post-inheritance
+// template: this scaffold's resolution policy (workflow-service.md §6
+// specifies the recursive-query shape but not a merge policy, so this is a
+// deliberate, documented choice, not an assumption) walks from template_id
+// up its parent_template_id chain, depth<=5, and returns the closest
+// (most-specific-first) template in that chain whose dag_json actually
+// defines at least one step — i.e. "the nearest non-empty ancestor wins,"
+// so a personal template that exists only to opt into its team/company
+// parent's steps (empty dag_json) correctly inherits rather than
+// resolving to nothing. chain returns every template walked, root-first
+// (index 0 = topmost ancestor reached, last = template_id itself), for
+// callers that want to show the inheritance path, not just the answer.
+message ResolveTemplateResponse {
+  WorkflowTemplate template = 1;
+  repeated WorkflowTemplate chain = 2;
+}

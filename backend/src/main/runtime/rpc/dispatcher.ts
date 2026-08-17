@@ -10,7 +10,6 @@ import {
   isStreamingMethod,
   type RpcAnyMethod,
   type RpcEnvelopeMeta,
-  type RpcRegistry,
   type RpcRequest,
   type RpcResponse
 } from './core'
@@ -46,7 +45,12 @@ export class RpcDispatcher {
   private registry: Map<string, RpcAnyMethod>
   private readonly devServerManager?: DevServerManager
 
-  constructor({ runtime, methods = ALL_RPC_METHODS, devServerManager, extraMethods }: DispatcherOptions) {
+  constructor({
+    runtime,
+    methods = ALL_RPC_METHODS,
+    devServerManager,
+    extraMethods
+  }: DispatcherOptions) {
     this.runtime = runtime
     const allMethods = extraMethods ? [...methods, ...extraMethods] : methods
     this.registry = new Map(buildRegistry(allMethods))
@@ -67,7 +71,10 @@ export class RpcDispatcher {
     }
   }
 
-  async dispatch(request: RpcRequest, options?: { signal?: AbortSignal; userId?: string }): Promise<RpcResponse> {
+  async dispatch(
+    request: RpcRequest,
+    options?: { signal?: AbortSignal; userId?: string }
+  ): Promise<RpcResponse> {
     const meta = this.meta()
     const method = this.registry.get(request.method)
     if (!method) {
@@ -136,6 +143,13 @@ export class RpcDispatcher {
       // Why: userId is set by the WebSocket transport from the session token
       // so streaming handlers (subscribe methods) can scope their state to the user.
       userId?: string
+      // Why (ADR-021 §3): resolved from userId once per user-process at
+      // bootstrap (see runtime-rpc.ts's OrcaRuntimeRpcServer / RpcContext.tenantId
+      // doc comment) — only ever set alongside userId, never on its own, since
+      // it's derived from it. Not threaded into the streaming-handler ctx below
+      // (§185+) because userId isn't either — same pre-existing gap, out of
+      // scope for this change.
+      tenantId?: string
     }
   ): Promise<void> {
     const meta = this.meta()
@@ -167,7 +181,8 @@ export class RpcDispatcher {
           sendBinary: options?.sendBinary,
           registerBinaryStreamHandler: options?.registerBinaryStreamHandler,
           devServerManager: this.devServerManager,
-          userId: options?.userId
+          userId: options?.userId,
+          tenantId: options?.tenantId
         })
         this.recordRuntimeFeatureInteraction(request.method, result, undefined, request.params)
         reply(JSON.stringify(successResponse(request.id, meta, result)))
@@ -252,7 +267,22 @@ export class RpcDispatcher {
     if (request.method.startsWith('emulator.')) {
       return mapEmulatorError(request.id, meta, error)
     }
-    return mapRuntimeError(request.id, meta, error)
+    const response = mapRuntimeError(request.id, meta, error)
+    // TEMP DIAG (Automations/onboarding RPC crash report): mapRuntimeError's
+    // fallback tags anything outside its known-code allowlist as
+    // 'runtime_error' -- the exact bucket a raw, unexpected TypeError (e.g.
+    // "Cannot read properties of undefined (reading 'state')", reported live
+    // from AutomationsPage right after closing the onboarding checklist)
+    // falls into. Nothing in this error path logs server-side today, so nothing
+    // survives from a past repro; log the full original error (with stack)
+    // only for this unexpected bucket, not the routine/expected passthrough
+    // codes, to avoid adding noise to every ordinary "not found"-style error.
+    if (!response.ok && response.error.code === 'runtime_error') {
+      console.error(
+        `[DIAG runtime_error] method=${request.method} error=${error instanceof Error ? (error.stack ?? error.message) : String(error)}`
+      )
+    }
+    return response
   }
 
   private invalidArgumentResponse(

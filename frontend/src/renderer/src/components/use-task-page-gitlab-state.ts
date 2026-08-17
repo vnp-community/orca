@@ -3,6 +3,12 @@ import { getRepoBackedTaskEmptyState } from '@/components/task-page-empty-state'
 import type { GitLabIssueFilter, GitLabTaskFilter } from '@/components/task-page-localized-options'
 import type { GitLabTodo, GitLabWorkItem, Repo, TaskProvider } from '../../../shared/types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
+import { useAppStore } from '@/store'
+import {
+  listRuntimeGitLabIssues,
+  listRuntimeGitLabMRs,
+  listRuntimeGitLabTodos
+} from '@/runtime/runtime-gitlab-client'
 
 // Why: kept module-private (not exported) — used only by the GitLab fetch
 // effect below, mirrors the original TaskPage.tsx placement.
@@ -145,15 +151,14 @@ export function useTaskPageGitLabState({
       gitlabView === 'issues'
         ? (repo: (typeof eligibleRepos)[0]) => {
             const isAssignedToMe = activeIssueFilter === 'assigned-to-me'
-            return window.api.gl
-              .listIssues({
-                repoPath: repo.path,
-                repoId: repo.id,
-                sourceContext: getTaskPageRepoSourceContext(repo, 'gitlab'),
-                state: 'opened',
-                assignee: isAssignedToMe ? '@me' : undefined,
-                limit: 50
-              })
+            return listRuntimeGitLabIssues(useAppStore.getState().settings, {
+              repoPath: repo.path,
+              repoId: repo.id,
+              sourceContext: getTaskPageRepoSourceContext(repo, 'gitlab'),
+              state: 'opened',
+              assignee: isAssignedToMe ? '@me' : undefined,
+              limit: 50
+            })
               .then((result) => {
                 const typed = result as {
                   items: GitLabWorkItem[]
@@ -167,15 +172,14 @@ export function useTaskPageGitLabState({
               })
           }
         : (repo: (typeof eligibleRepos)[0]) =>
-            window.api.gl
-              .listMRs({
-                repoPath: repo.path,
-                repoId: repo.id,
-                sourceContext: getTaskPageRepoSourceContext(repo, 'gitlab'),
-                state: activeMRFilter ?? 'opened',
-                page: 1,
-                perPage: 50
-              })
+            listRuntimeGitLabMRs(useAppStore.getState().settings, {
+              repoPath: repo.path,
+              repoId: repo.id,
+              sourceContext: getTaskPageRepoSourceContext(repo, 'gitlab'),
+              state: activeMRFilter ?? 'opened',
+              page: 1,
+              perPage: 50
+            })
               .then((result) => {
                 const typed = result as {
                   items: GitLabWorkItem[]
@@ -245,12 +249,11 @@ export function useTaskPageGitLabState({
     }
     let stale = false
     setGitlabTodosLoading(true)
-    void window.api.gl
-      .todos({
-        repoPath: primaryRepo.path,
-        repoId: primaryRepo.id,
-        sourceContext: getTaskPageRepoSourceContext(primaryRepo, 'gitlab')
-      })
+    void listRuntimeGitLabTodos(useAppStore.getState().settings, {
+      repoPath: primaryRepo.path,
+      repoId: primaryRepo.id,
+      sourceContext: getTaskPageRepoSourceContext(primaryRepo, 'gitlab')
+    })
       .then((todos) => {
         if (!stale) {
           setGitlabTodos(todos as GitLabTodo[])

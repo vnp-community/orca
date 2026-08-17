@@ -12,6 +12,7 @@ import {
   type FileExplorerSelectionMode
 } from './file-explorer-selection'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type UseFileExplorerSelectionResult = {
   selectedPath: string | null
   selectedPaths: Set<string>
@@ -114,9 +115,7 @@ export function useFileExplorerSelection(
       ? rowProjectionRef.current.getRowsByPaths(selectedPaths)
       : []
     const actionNodes = selectedNodes.length > 0 ? selectedNodes : [node]
-    void window.api.ui.writeClipboardText(
-      formatFileExplorerPathsForClipboard(actionNodes, pathKind)
-    )
+    void uiWriteClipboardText(formatFileExplorerPathsForClipboard(actionNodes, pathKind))
   }, [])
 
   return {

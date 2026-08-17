@@ -1,143 +1,486 @@
 # ============================================================
-# Orca Dev Server — Docker Compose (Gateway server-side)
+# docker-compose.yml — backend-go + frontend, MOUNT-based deploy
 # ============================================================
+# Flow this file implements (see scripts/build-local.sh + sync-to-server.sh):
+#   (1) build binary locally  →  (2) rsync to server  →  (3) mount into container
 #
-# Kiến trúc:  Nginx (HTTPS reverse proxy) + Orca (backend/ + frontend/, 1 container)
+# Every backend-go service and the frontend run from PUBLIC, UNMODIFIED
+# images — gcr.io/distroless/static-debian12 (~2MB, no shell, CA certs +
+# tzdata only) for the 17 Go services, nginx:1.27-alpine for the frontend.
+# No Dockerfile is built for either: the compiled binary / built static
+# assets are bind-mounted read-only into the stock image at a fixed path,
+# per the explicit "mount into container, smallest possible image"
+# requirement — there is no smaller image than "don't build a custom one at
+# all." See ../README.md for the full rationale and the production caveats
+# (Vault dev-mode, no mTLS/service-mesh here — this is the same
+# convenience-over-rigor tradeoff deploy/old made for the TS backend).
 #
-# Workflow:
-#   [Local Machine]
-#     1. (tuỳ chọn) ./scripts/build-local.sh   # build thử backend/+frontend/ để bắt lỗi sớm
-#     2. ./scripts/sync-to-server.sh <version>  # rsync source lên server
-#
-#   [Server] (file này) — docker/backend/Dockerfile tự build backend/ và
-#   frontend/ (2 stage riêng, xem comment đầu Dockerfile) rồi gộp vào 1 image:
-#     3. docker compose up -d --build     # build image + chạy containers
-#     4. docker compose logs orca         # check logs
-#
-# Developer kết nối:
-#   Browser → https://ORCA_DOMAIN/
-#   Orca Desktop App → paste orca://pair?code=...
-#
-# Ports:
-#   6768 — WebSocket/RPC (Orca clients kết nối)
-#   6769 — HTTP (web UI static files + /health/*)
+# Service catalog / DB ownership: specs/backend-go/services/00-service-catalog.md
 # ============================================================
+
+name: orca-go
+
+x-go-image: &go-image gcr.io/distroless/static-debian12:nonroot
+
+# Env vars every backend-go container gets, regardless of whether that
+# particular service reads all of them — harmless if unused, and avoids
+# needing to track which of the 17 services' stub gRPC-client adapters
+# picked which exact env var name (see docs/execution-plan.md Epic B/C —
+# several of these addresses are still stub-only on the Go side; wiring
+# the address here doesn't make the stub real, it just means "once that
+# service's client stops being a stub, it already has the right address").
+x-go-common-env: &go-common-env
+  VAULT_ADDR: http://vault:8200
+  VAULT_TOKEN: ${VAULT_TOKEN:-dev-root-token}
+  NATS_URL: nats://nats:4222
+  OTLP_ENDPOINT: ${OTLP_ENDPOINT:-}
+  AUTH_SERVICE_ADDR: auth-service:9090
+  TENANT_SERVICE_ADDR: tenant-service:9090
+  PROJECT_SERVICE_ADDR: project-service:9090
+  INFRA_FLEET_SERVICE_ADDR: infra-fleet-service:9090
+  GIT_GATEWAY_SERVICE_ADDR: git-gateway-service:9090
+  SCM_INTEGRATION_SERVICE_ADDR: scm-integration-service:9090
+  ISSUE_TRACKING_SERVICE_ADDR: issue-tracking-service:9090
+  AI_PROVIDER_SERVICE_ADDR: ai-provider-service:9090
+  WORKFLOW_SERVICE_ADDR: workflow-service:9090
+  TASK_SERVICE_ADDR: task-service:9090
+  ORCHESTRATION_SERVICE_ADDR: orchestration-service:9090
+  AUTOMATION_SERVICE_ADDR: automation-service:9090
+  ANNOTATION_SERVICE_ADDR: annotation-service:9090
+  NOTIFICATION_SERVICE_ADDR: notification-service:9090
+  USAGE_SERVICE_ADDR: usage-service:9090
+  CREDENTIAL_BROKER_SERVICE_ADDR: credential-broker-service:9090
+  CREDENTIAL_BROKER_ADDR: credential-broker-service:9090 # ai-provider-service's own (slightly differently-named) var — see docs/execution-plan.md
+
+x-go-defaults: &go-defaults
+  image: *go-image
+  entrypoint: ["/app/bin/orca"]
+  restart: unless-stopped
+  read_only: true # the whole point of distroless + mounted binary: no writable image layer needed
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "20m"
+      max-file: "3"
+  networks:
+    - orca-go-net
+
+x-migrate-defaults: &migrate-defaults
+  image: migrate/migrate:v4.17.0
+  profiles: ["migrate"] # never starts on a plain `docker compose up` — see scripts/migrate.sh
+  networks:
+    - orca-go-net
+  depends_on:
+    postgres:
+      condition: service_healthy
 
 services:
-
-  # ----------------------------------------------------------
-  # Orca Server — Node.js pure backend (server mode)
-  # Build từ source trên server (không cần Electron/Xvfb)
-  # ----------------------------------------------------------
-  orca:
-    build:
-      context: ../../
-      dockerfile: deploy/dev/docker/backend/Dockerfile
-    image: vnpblc/orca-server:${ORCA_VERSION:-latest}
-    container_name: orca-server
+  # ------------------------------------------------------------
+  # Infra: Postgres (database-per-service, one instance/many DBs for this
+  # dev-server deploy — see specs/backend-go/architecture/05-data-architecture.md
+  # on when physical instance-per-service is warranted instead), Vault
+  # (dev mode — see README for why that's an accepted tradeoff here, not
+  # for a real production deploy), NATS JetStream.
+  # ------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: orca-go-postgres
     restart: unless-stopped
-
     environment:
-      ORCA_DOMAIN: ${ORCA_DOMAIN:-172.20.2.31}
-      ORCA_PORT: ${ORCA_PORT:-6768}
-      ORCA_HTTP_PORT: ${ORCA_HTTP_PORT:-6769}
-      ORCA_USER_DATA_PATH: /data/orca
-      ORCA_VERSION: ${ORCA_VERSION:-0.0.0}
-      NODE_ENV: production
-
-      # AI API Keys (shared hoặc để trống, developer set qua UI)
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-
-      # Database configuration (uncomment for non-SQLite backends):
-      # ORCA_DB_URL: mysql://orca_user:${DB_PASSWORD:-}@db:3306/orca_dev
-      # ORCA_DB_URL: postgresql://orca_user:${DB_PASSWORD:-}@db:5432/orca_dev
-
+      POSTGRES_USER: orca
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required — set in .env}
+      POSTGRES_DB: postgres
     volumes:
-      # Persistent data: SQLite database, encryption keys, relay binaries
-      - orca-data:/data/orca
-
-      # SSH key để Orca Server SSH vào các Dev Servers (internal)
-      - ./docker/backend/ssh:/home/orca/.ssh:ro
-
-      # Project repos (mount từ host, NFS, hoặc volume)
-      - orca-projects:/srv/projects
-
-    expose:
-      - "${ORCA_PORT:-6768}"
-      - "${ORCA_HTTP_PORT:-6769}"
-
-    networks:
-      - orca-net
-
+      - orca-go-postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${ORCA_HTTP_PORT:-6769}/health/ready"]
-      interval: 30s
+      test: ["CMD-SHELL", "pg_isready -U orca"]
+      interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 15s
-
+      retries: 5
+      start_period: 10s
     security_opt:
       - no-new-privileges:true
-
     logging:
       driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
-
-  # ----------------------------------------------------------
-  # Nginx — HTTPS + WebSocket + HTTP reverse proxy
-  # Image: nginx:alpine (5MB — smallest official)
-  # ----------------------------------------------------------
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: orca-nginx
-    restart: unless-stopped
-
-    ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-
-    volumes:
-      - ./docker/nginx/conf.d/orca.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker/nginx/certs:/etc/nginx/certs:ro
-      - nginx-logs:/var/log/nginx
-
-    depends_on:
-      orca:
-        condition: service_healthy
-
+      options: { max-size: "20m", max-file: "3" }
     networks:
-      - orca-net
+      - orca-go-net
 
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: orca-go-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-dev-root-token}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/healthz"]
-      interval: 30s
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health?standbyok=true"]
+      interval: 10s
       timeout: 5s
-      retries: 3
-
+      retries: 5
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
     logging:
       driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "3"
+      options: { max-size: "20m", max-file: "3" }
+    networks:
+      - orca-go-net
 
-# ----------------------------------------------------------
-# Networks
-# ----------------------------------------------------------
+  nats:
+    image: nats:2.10-alpine
+    container_name: orca-go-nats
+    restart: unless-stopped
+    command: ["-js", "-m", "8222"] # -m enables the HTTP monitoring endpoint the healthcheck below needs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options: { max-size: "20m", max-file: "3" }
+    networks:
+      - orca-go-net
+
+  # ------------------------------------------------------------
+  # backend-go services — 13 own a database (bind-mount ./bin/<svc>/orca +
+  # DATABASE_DSN), 4 don't (git-gateway, scm-integration, issue-tracking,
+  # api-gateway — see specs/backend-go/services/00-service-catalog.md).
+  # Every container: same public distroless image, no build step, binary
+  # bind-mounted read-only at /app/bin/orca.
+  # ------------------------------------------------------------
+
+  auth-service:
+    <<: *go-defaults
+    container_name: orca-go-auth
+    volumes:
+      - ./bin/auth-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/auth?sslmode=disable
+      # First-boot admin bootstrap (internal/usecase/bootstrap.go) — no-op
+      # once any user exists; leave BOOTSTRAP_ADMIN_PASSWORD unset to
+      # auto-generate + log it once instead of setting it here.
+      BOOTSTRAP_TENANT_ID: ${BOOTSTRAP_TENANT_ID:-00000000-0000-0000-0000-000000000001}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+
+  tenant-service:
+    <<: *go-defaults
+    container_name: orca-go-tenant
+    volumes:
+      - ./bin/tenant-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/tenant?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+
+  project-service:
+    <<: *go-defaults
+    container_name: orca-go-project
+    volumes:
+      - ./bin/project-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/project?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+      workflow-service: { condition: service_started }
+      task-service: { condition: service_started }
+
+  infra-fleet-service:
+    <<: *go-defaults
+    container_name: orca-go-infra-fleet
+    volumes:
+      - ./bin/infra-fleet-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/infra?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+
+  ai-provider-service:
+    <<: *go-defaults
+    container_name: orca-go-ai-provider
+    volumes:
+      - ./bin/ai-provider-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/aiprovider?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+      credential-broker-service: { condition: service_started }
+
+  workflow-service:
+    <<: *go-defaults
+    container_name: orca-go-workflow
+    volumes:
+      - ./bin/workflow-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/workflow?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+      infra-fleet-service: { condition: service_started }
+
+  task-service:
+    <<: *go-defaults
+    container_name: orca-go-task
+    volumes:
+      - ./bin/task-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/task?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+      tenant-service: { condition: service_started }
+
+  orchestration-service:
+    <<: *go-defaults
+    container_name: orca-go-orchestration
+    volumes:
+      - ./bin/orchestration-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/orchestration?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+
+  automation-service:
+    <<: *go-defaults
+    container_name: orca-go-automation
+    volumes:
+      - ./bin/automation-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/automation?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+      workflow-service: { condition: service_started } # real gRPC client — see docs/execution-plan.md
+
+  annotation-service:
+    <<: *go-defaults
+    container_name: orca-go-annotation
+    volumes:
+      - ./bin/annotation-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/annotation?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+
+  notification-service:
+    <<: *go-defaults
+    container_name: orca-go-notification
+    volumes:
+      - ./bin/notification-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/notification?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      # VAPID Transit signing now goes through credential-broker-service's
+      # SignVapidPayload RPC (Epic B, docs/execution-plan.md §8) — this
+      # service no longer talks to Vault directly, so the vault dependency
+      # this block used to carry is gone, replaced by the real one.
+      credential-broker-service: { condition: service_started }
+      nats: { condition: service_healthy }
+
+  usage-service:
+    <<: *go-defaults
+    container_name: orca-go-usage
+    volumes:
+      - ./bin/usage-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/usage?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
+  credential-broker-service:
+    <<: *go-defaults
+    container_name: orca-go-credential-broker
+    volumes:
+      - ./bin/credential-broker-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/credential?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      vault: { condition: service_healthy }
+
+  # 3 services with no database:
+  git-gateway-service:
+    <<: *go-defaults
+    container_name: orca-go-git-gateway
+    volumes:
+      - ./bin/git-gateway-service/orca:/app/bin/orca:ro
+    environment: *go-common-env
+    depends_on:
+      infra-fleet-service: { condition: service_started }
+      project-service: { condition: service_started }
+
+  scm-integration-service:
+    <<: *go-defaults
+    container_name: orca-go-scm-integration
+    volumes:
+      - ./bin/scm-integration-service/orca:/app/bin/orca:ro
+    environment: *go-common-env
+    depends_on:
+      credential-broker-service: { condition: service_started }
+
+  issue-tracking-service:
+    <<: *go-defaults
+    container_name: orca-go-issue-tracking
+    volumes:
+      - ./bin/issue-tracking-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      # Epic G (docs/execution-plan.md): outbox-only database, not a
+      # queryable copy of issue data — see that service's
+      # internal/adapter/postgres package doc comment.
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuetracking?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      credential-broker-service: { condition: service_started }
+      nats: { condition: service_healthy }
+
+  api-gateway:
+    <<: *go-defaults
+    container_name: orca-go-api-gateway
+    read_only: false # writes nothing itself, but see README — kept false pending confirmation it needs no writable path; flip to true once verified
+    volumes:
+      - ./bin/api-gateway/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      PUBLIC_PORT: "8081"
+    ports:
+      # SERVER_BIND_IP lets a specific deploy reuse a specific host port/IP
+      # (e.g. to slot into an existing external gateway's hardcoded upstream
+      # — see ../README.md's "Reusing the old TS backend's ports" section)
+      # instead of always publishing on every interface.
+      - "${SERVER_BIND_IP:-0.0.0.0}:${API_GATEWAY_PUBLIC_PORT:-8081}:8081"
+    depends_on:
+      usage-service: { condition: service_started }
+      notification-service: { condition: service_started }
+      auth-service: { condition: service_started }
+
+  # ------------------------------------------------------------
+  # Frontend — stock nginx:alpine, built static assets bind-mounted
+  # read-only, config bind-mounted read-only. No custom image.
+  # ------------------------------------------------------------
+  frontend:
+    image: nginx:1.27-alpine
+    container_name: orca-go-frontend
+    restart: unless-stopped
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./docker/nginx/orca.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${SERVER_BIND_IP:-0.0.0.0}:${FRONTEND_HTTP_PORT:-8080}:8080"
+    depends_on:
+      - api-gateway
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options: { max-size: "20m", max-file: "3" }
+    networks:
+      - orca-go-net
+
+  # ------------------------------------------------------------
+  # Migrations — one-shot per DB-owning service, `profiles: [migrate]` so
+  # `docker compose up` never runs these; invoked explicitly by
+  # scripts/migrate.sh (called from sync-to-server.sh before `up -d`).
+  # Official migrate/migrate image (small, purpose-built) — not the
+  # distroless-static services above, which have no shell for this kind of
+  # one-shot tooling anyway.
+  # ------------------------------------------------------------
+  migrate-auth:
+    <<: *migrate-defaults
+    volumes: ["./bin/auth-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/auth?sslmode=disable", "up"]
+  migrate-tenant:
+    <<: *migrate-defaults
+    volumes: ["./bin/tenant-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/tenant?sslmode=disable", "up"]
+  migrate-project:
+    <<: *migrate-defaults
+    volumes: ["./bin/project-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/project?sslmode=disable", "up"]
+  migrate-infra:
+    <<: *migrate-defaults
+    volumes: ["./bin/infra-fleet-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/infra?sslmode=disable", "up"]
+  migrate-aiprovider:
+    <<: *migrate-defaults
+    volumes: ["./bin/ai-provider-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/aiprovider?sslmode=disable", "up"]
+  migrate-workflow:
+    <<: *migrate-defaults
+    volumes: ["./bin/workflow-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/workflow?sslmode=disable", "up"]
+  migrate-task:
+    <<: *migrate-defaults
+    volumes: ["./bin/task-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/task?sslmode=disable", "up"]
+  migrate-orchestration:
+    <<: *migrate-defaults
+    volumes: ["./bin/orchestration-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/orchestration?sslmode=disable", "up"]
+  migrate-automation:
+    <<: *migrate-defaults
+    volumes: ["./bin/automation-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/automation?sslmode=disable", "up"]
+  migrate-annotation:
+    <<: *migrate-defaults
+    volumes: ["./bin/annotation-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/annotation?sslmode=disable", "up"]
+  migrate-notification:
+    <<: *migrate-defaults
+    volumes: ["./bin/notification-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/notification?sslmode=disable", "up"]
+  migrate-usage:
+    <<: *migrate-defaults
+    volumes: ["./bin/usage-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/usage?sslmode=disable", "up"]
+  migrate-credential:
+    <<: *migrate-defaults
+    volumes: ["./bin/credential-broker-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/credential?sslmode=disable", "up"]
+  migrate-issuetracking:
+    <<: *migrate-defaults
+    volumes: ["./bin/issue-tracking-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuetracking?sslmode=disable", "up"]
+
 networks:
-  orca-net:
+  orca-go-net:
     driver: bridge
 
-# ----------------------------------------------------------
-# Volumes
-# ----------------------------------------------------------
 volumes:
-  orca-data:
-    driver: local
-  orca-projects:
-    driver: local
-  nginx-logs:
+  orca-go-postgres-data:
     driver: local

@@ -6,6 +6,7 @@
 import type { ClaudeRateLimitAccountsState, CodexRateLimitAccountsState } from '../../shared/types'
 import type { AccountsSnapshot } from './orca-runtime-types'
 import type { RuntimeAccountServices } from './orca-runtime'
+import type { RateLimitService } from '../rate-limits/service'
 
 // Why: every other extracted domain in this file takes a host object for its
 // cross-domain dependencies, but this one has none (accountServices is
@@ -24,6 +25,18 @@ export class RuntimeAccountServicesCommands {
     return this.accountServices
   }
 
+  // Why: server mode (backend/) never calls setAccountServices() today — the
+  // underlying ClaudeAccountService/CodexAccountService detect CLI accounts
+  // on the SAME machine Orca runs on, a desktop-only concept that doesn't
+  // map to a headless multi-user server (real accounts live on whichever
+  // remote Dev Server the user connects to, already covered by
+  // preflight.detectAgents/AIProviderService). rate-limits.ts's RPC methods
+  // use this to degrade to a safe empty state instead of throwing an
+  // uncaught rejection on every page load — see that file's callers.
+  hasAccountServices(): boolean {
+    return this.accountServices !== null
+  }
+
   getAccountsSnapshot(): AccountsSnapshot {
     const { claudeAccounts, codexAccounts, rateLimits } = this.requireAccountServices()
     return {
@@ -31,6 +44,13 @@ export class RuntimeAccountServicesCommands {
       codex: codexAccounts.listAccounts(),
       rateLimits: rateLimits.getState()
     }
+  }
+
+  // Why: RATE_LIMIT_METHODS (rpc/methods/rate-limits.ts) needs direct access to
+  // the shared RateLimitService instance -- same service getAccountsSnapshot()
+  // reads from, exposed for the desktop-parity rateLimits.* RPC namespace.
+  getRateLimitService(): RateLimitService {
+    return this.requireAccountServices().rateLimits
   }
 
   // Why: RateLimitService polls only when the Electron window is visible AND

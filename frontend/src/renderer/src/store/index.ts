@@ -42,7 +42,6 @@ import { createBootstrapSlice } from './slices/bootstrap'
 import { createAuthSlice } from './slices/auth'
 import { createDevServerSlice } from './slices/dev-servers'
 import { createOnboardingChecklistSlice } from './slices/onboarding-checklist'
-import { createWorkspaceSlice } from './slices/workspace-slice'
 import { createProfileSlice } from './slices/profile-slice'
 import { createAIProviderSlice } from './slices/ai-provider-slice'
 import { createGitPanelSlice } from './slices/git-panel'
@@ -53,6 +52,12 @@ import { createRemoteAgentSessionSlice } from './slices/remote-agent-sessions'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 
+// Why: createWorkspaceSlice (legacy OrcaProject scaffolding, superseded by
+// RepoSlice's real project system) used to spread here, after createRepoSlice.
+// It redeclared the same removeProject/updateProject/projects keys with a
+// no-op stub, which silently shadowed RepoSlice's real implementations for
+// every "Remove Project" caller in the app — no RPC, no error, no toast.
+// See frontend/src/renderer/src/store/slices/workspace-slice.ts.
 export const useAppStore = create<AppState>()((...a) => ({
   ...createRepoSlice(...a),
   ...createSparsePresetsSlice(...a),
@@ -96,14 +101,13 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createAuthSlice(...a),
   ...createDevServerSlice(...a),
   ...createOnboardingChecklistSlice(...a),
-  ...createWorkspaceSlice(...a),
   ...createProfileSlice(...a),
   ...createAIProviderSlice(...a),
   ...createGitPanelSlice(...a),
   ...createTaskSlice(...a),
   ...createWorkflowSlice(...a),
   ...createTraceSlice(...a),
-  ...createRemoteAgentSessionSlice(...a),
+  ...createRemoteAgentSessionSlice(...a)
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())

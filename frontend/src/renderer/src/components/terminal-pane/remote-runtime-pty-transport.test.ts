@@ -724,7 +724,9 @@ describe('createRemoteRuntimePtyTransport', () => {
         expect.objectContaining({ method: 'terminal.close' })
       )
 
-      await vi.advanceTimersByTimeAsync(2_000)
+      // GRACE_CLOSE_DELAY_MS is 5_000 (bumped from 2_000 2026-08-12 — see that
+      // constant's comment for why it must stay > GRACE_MOUNT_DEFER_MS).
+      await vi.advanceTimersByTimeAsync(5_000)
 
       expect(runtimeCall).toHaveBeenCalledWith({
         selector: 'env-1',
@@ -797,7 +799,61 @@ describe('createRemoteRuntimePtyTransport', () => {
       })
       await mirror.connect({ url: '', callbacks: {} })
 
-      await vi.advanceTimersByTimeAsync(2_000)
+      // GRACE_CLOSE_DELAY_MS is 5_000 (bumped from 2_000 2026-08-12) — advance
+      // past the full new window to confirm the mirror's claim genuinely
+      // cancelled the timer, not just that we didn't wait long enough.
+      await vi.advanceTimersByTimeAsync(5_000)
+
+      expect(runtimeCall).not.toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'terminal.close' })
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not close a PTY a sibling mirror claims via attach() instead of connect()', async () => {
+    // FIX BUG-FE-PTY-001 (#13): connectPanePty (pty-connection.ts) prefers
+    // attach() over connect() whenever the mirror leaf already has a known
+    // remote PTY id (buildMirroredTerminalTabs' ptyIdsByLeafId) — the common
+    // case for a host-mirrored leaf. Only connect()'s attachHostSessionMirror()
+    // used to call claimGraceClose(), so an attach() to a handle its sibling's
+    // connect() just grace-closed never cancelled that timer — live repro:
+    // the mirror attaches successfully, then gets torn down ~5s later with no
+    // user action, right when GRACE_CLOSE_DELAY_MS elapses.
+    vi.useFakeTimers()
+    try {
+      let resolveCreate: (value: unknown) => void = () => {}
+      runtimeCall.mockImplementation((args) => {
+        if (args.method === 'terminal.create') {
+          return new Promise((resolve) => {
+            resolveCreate = resolve
+          })
+        }
+        return Promise.resolve({ ok: true, result: {} })
+      })
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+
+      const original = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'wt-1',
+        tabId: 'tab-1',
+        leafId: 'pane:1'
+      })
+      const connect = original.connect({ url: '', callbacks: {} })
+      original.destroy?.()
+      resolveCreate({ ok: true, result: { terminal: { handle: 'shared-handle' } } })
+      await connect
+
+      const mirror = createRemoteRuntimePtyTransport('env-1', {
+        worktreeId: 'wt-1',
+        tabId: 'web-terminal-tab-1',
+        leafId: 'pane:1'
+      })
+      mirror.attach({ existingPtyId: 'remote:env-1@@shared-handle', callbacks: {} })
+
+      // GRACE_CLOSE_DELAY_MS is 5_000 — advance past the full window to
+      // confirm the attach() claim genuinely cancelled the sibling's timer.
+      await vi.advanceTimersByTimeAsync(5_000)
 
       expect(runtimeCall).not.toHaveBeenCalledWith(
         expect.objectContaining({ method: 'terminal.close' })
@@ -880,7 +936,9 @@ describe('createRemoteRuntimePtyTransport', () => {
       await vi.advanceTimersByTimeAsync(2_000)
       await connectPromise
 
-      expect(runtimeCall.mock.calls.filter((c) => c[0].method === 'terminal.create')).toHaveLength(2)
+      expect(runtimeCall.mock.calls.filter((c) => c[0].method === 'terminal.create')).toHaveLength(
+        2
+      )
       expect(onError).toHaveBeenCalledWith(expect.stringContaining('agent not connected'))
     } finally {
       vi.useRealTimers()

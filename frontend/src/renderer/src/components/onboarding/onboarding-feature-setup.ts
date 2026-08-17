@@ -20,6 +20,8 @@ import {
 } from '@/lib/orchestration-setup-state'
 import type { EventProps } from '../../../../shared/telemetry-events'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { getRuntimeCliInstallStatus, installRuntimeCli } from '@/runtime/runtime-cli-client'
 export type OnboardingFeatureSetupId =
   | 'browserUse'
   | 'computerUse'
@@ -167,10 +169,10 @@ export function createOnboardingFeatureSetupDeps(): OnboardingFeatureSetupDeps {
   }
 
   return {
-    getCliStatus: () => window.api.cli.getInstallStatus(),
+    getCliStatus: () => getRuntimeCliInstallStatus(),
     showCliRegistrationPrompt: showOrcaCliRegistrationPromptToast,
-    installCli: () => window.api.cli.install(),
-    writeClipboardText: (text) => window.api.ui.writeClipboardText(text),
+    installCli: () => installRuntimeCli(),
+    writeClipboardText: (text) => uiWriteClipboardText(text),
     getComputerUsePermissionStatus: () => window.api.computerUsePermissions.getStatus(),
     openComputerUsePermissionSetup: () => window.api.computerUsePermissions.openSetup(),
     setStorageItem: (key, value) => localStorage.setItem(key, value),

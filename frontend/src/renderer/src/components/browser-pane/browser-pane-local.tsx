@@ -158,6 +158,8 @@ import {
   toDisplayUrl
 } from './BrowserPane'
 
+import { uiWriteClipboardImage, uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenFilePath, shellOpenInFileManager, shellOpenUrl } from '../../runtime/runtime-shell-client'
 function preventAgentSendTargetOutsideDismiss(event: CustomEvent<{ originalEvent: Event }>) {
   const target = event.detail.originalEvent.target
   if (!(target instanceof Element)) {
@@ -481,7 +483,7 @@ export function BrowserPagePane({
     }
     if (!grab.contextMenu) {
       const text = formatGrabPayloadAsText(grab.payload)
-      void window.api.ui.writeClipboardText(text)
+      void uiWriteClipboardText(text)
       recordFeatureInteraction('browser-grab')
       showGrabToast('Copied', 'success', grab.payload)
     }
@@ -1706,13 +1708,13 @@ export function BrowserPagePane({
       const copyFromPayload = (payload: BrowserGrabPayload): void => {
         if (key === 'c') {
           const text = formatGrabPayloadAsText(payload)
-          void window.api.ui.writeClipboardText(text)
+          void uiWriteClipboardText(text)
           recordFeatureInteraction('browser-grab')
           showGrabToast('Copied', 'success', payload)
         } else {
           const dataUrl = payload.screenshot?.dataUrl
           if (dataUrl?.startsWith('data:image/png;base64,')) {
-            void window.api.ui.writeClipboardImage(dataUrl)
+            void uiWriteClipboardImage(dataUrl)
             recordFeatureInteraction('browser-grab')
             showGrabToast('Screenshotted', 'success', payload)
           } else {
@@ -1819,7 +1821,7 @@ export function BrowserPagePane({
       return
     }
     const text = formatGrabPayloadAsText(payload)
-    void window.api.ui.writeClipboardText(text)
+    void uiWriteClipboardText(text)
     recordFeatureInteraction('browser-grab')
     showGrabToast('Copied', 'success', payload)
     grab.rearm()
@@ -1835,7 +1837,7 @@ export function BrowserPagePane({
     if (!dataUrl?.startsWith('data:image/png;base64,')) {
       return
     }
-    void window.api.ui.writeClipboardImage(dataUrl)
+    void uiWriteClipboardImage(dataUrl)
     recordFeatureInteraction('browser-grab')
     showGrabToast('Screenshotted', 'success', payload)
     grab.rearm()
@@ -1884,7 +1886,7 @@ export function BrowserPagePane({
     if (!browserAnnotationsPrompt) {
       return
     }
-    void window.api.ui.writeClipboardText(browserAnnotationsPrompt)
+    void uiWriteClipboardText(browserAnnotationsPrompt)
     recordFeatureInteraction('browser-annotations')
     clearTimeout(annotationCopyTimerRef.current)
     setBrowserAnnotationsCopied(true)
@@ -2213,7 +2215,7 @@ export function BrowserPagePane({
       )
       return
     }
-    const opened = await window.api.shell.openFilePath(download.savePath)
+    const opened = await shellOpenFilePath(download.savePath)
     if (!opened) {
       setResourceNotice(
         translate(
@@ -2234,7 +2236,7 @@ export function BrowserPagePane({
       )
       return
     }
-    const result = await window.api.shell.openInFileManager(download.savePath)
+    const result = await shellOpenInFileManager(download.savePath)
     if (!result.ok) {
       setResourceNotice(
         translate(
@@ -2297,7 +2299,7 @@ export function BrowserPagePane({
                       onClick={() => {
                         const targetUrl = normalizeExternalBrowserUrl(contextMenu.linkUrl!)
                         if (targetUrl) {
-                          void window.api.shell.openUrl(targetUrl)
+                          void shellOpenUrl(targetUrl)
                         }
                         setContextMenu(null)
                       }}
@@ -2311,7 +2313,7 @@ export function BrowserPagePane({
                       role="menuitem"
                       className="relative flex w-full cursor-default items-center gap-2 rounded-[7px] px-2 py-0.5 text-[12px] leading-5 font-medium outline-none select-none hover:bg-black/8 dark:hover:bg-white/14"
                       onClick={() => {
-                        void window.api.ui.writeClipboardText(contextMenu.linkUrl ?? '')
+                        void uiWriteClipboardText(contextMenu.linkUrl ?? '')
                         setContextMenu(null)
                       }}
                     >
@@ -2329,7 +2331,7 @@ export function BrowserPagePane({
                       role="menuitem"
                       className="relative flex w-full cursor-default items-center gap-2 rounded-[7px] px-2 py-0.5 text-[12px] leading-5 font-medium outline-none select-none hover:bg-black/8 dark:hover:bg-white/14"
                       onClick={() => {
-                        void window.api.ui.writeClipboardText(contextMenu.selectionText)
+                        void uiWriteClipboardText(contextMenu.selectionText)
                         setContextMenu(null)
                       }}
                     >
@@ -2377,7 +2379,7 @@ export function BrowserPagePane({
                   onClick={() => {
                     const targetUrl = normalizeExternalBrowserUrl(contextMenu.pageUrl)
                     if (targetUrl) {
-                      void window.api.shell.openUrl(targetUrl)
+                      void shellOpenUrl(targetUrl)
                     }
                     setContextMenu(null)
                   }}
@@ -2391,7 +2393,7 @@ export function BrowserPagePane({
                   role="menuitem"
                   className="relative flex w-full cursor-default items-center gap-2 rounded-[7px] px-2 py-0.5 text-[12px] leading-5 font-medium outline-none select-none hover:bg-black/8 dark:hover:bg-white/14"
                   onClick={() => {
-                    void window.api.ui.writeClipboardText(contextMenu.pageUrl)
+                    void uiWriteClipboardText(contextMenu.pageUrl)
                     setContextMenu(null)
                   }}
                 >
@@ -2571,7 +2573,7 @@ export function BrowserPagePane({
               if (!externalUrl) {
                 return
               }
-              void window.api.shell.openUrl(externalUrl)
+              void shellOpenUrl(externalUrl)
             }}
             title={translate(
               'auto.components.browser.pane.BrowserPane.0f41bf80c7',
@@ -2960,7 +2962,7 @@ export function BrowserPagePane({
                           // error surface. Put the current URL on the clipboard from
                           // the recovery UI itself so they can retry elsewhere
                           // without having to discover the toolbar overflow first.
-                          void window.api.ui.writeClipboardText(currentBrowserUrl)
+                          void uiWriteClipboardText(currentBrowserUrl)
                           setResourceNotice('Copied the current page URL.')
                         }}
                       >
@@ -2988,7 +2990,7 @@ export function BrowserPagePane({
                             // browser profile. Keep this action in the failed-state
                             // overlay so recovery does not depend on toolbar affordance
                             // discovery while the guest itself is unusable.
-                            void window.api.shell.openUrl(externalUrl)
+                            void shellOpenUrl(externalUrl)
                           }}
                         >
                           <ExternalLink className="size-4" />
@@ -3304,7 +3306,7 @@ export function BrowserPagePane({
                             onSelect={() => {
                               const dataUrl = grabToast.payload?.screenshot?.dataUrl
                               if (dataUrl?.startsWith('data:image/png;base64,')) {
-                                void window.api.ui.writeClipboardImage(dataUrl)
+                                void uiWriteClipboardImage(dataUrl)
                                 setGrabToast((prev) =>
                                   prev
                                     ? {

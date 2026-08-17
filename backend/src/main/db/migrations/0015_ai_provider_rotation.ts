@@ -20,7 +20,7 @@ export const migration0015AiProviderRotation: Migration = {
   async up(db) {
     // Why: NULL means "not rotating". Set by rotateKey(), cleared by
     // completeRotation() — see AIProviderService.ts §rotateKey.
-    await db.exec(`ALTER TABLE orca_ai_provider_accounts ADD COLUMN rotation_grace_until INTEGER`)
+    await db.exec(`ALTER TABLE orca_ai_provider_accounts ADD COLUMN rotation_grace_until BIGINT`)
     await db.exec(`
       CREATE INDEX IF NOT EXISTS idx_orca_ai_providers_rotating
         ON orca_ai_provider_accounts(status, rotation_grace_until)

@@ -26,6 +26,7 @@ import {
   type AiVaultSessionResumeTargetState
 } from './ai-vault-session-resume'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function useAiVaultSessionLaunchActions({
   activeWorktree,
   activeWorktreeId,
@@ -65,7 +66,7 @@ export function useAiVaultSessionLaunchActions({
 
   const copyResumeCommand = useCallback(
     async (session: AiVaultSession, worktreeId?: string | null): Promise<void> => {
-      await window.api.ui.writeClipboardText(buildResumeCommand(session, worktreeId))
+      await uiWriteClipboardText(buildResumeCommand(session, worktreeId))
       toast.success(
         translate(
           'auto.components.right.sidebar.AiVaultPanel.resumeCommandCopied',

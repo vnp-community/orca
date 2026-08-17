@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useAppStore } from '@/store'
+import { setRuntimeOnboardingGitIdentity } from '@/runtime/runtime-onboarding-client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +34,11 @@ export function GitIdentityCard({ devServerId, hasUserName, hasUserEmail, onSave
     setSaving(true)
     setError(null)
     try {
-      await window.api.onboarding.setGitIdentity({ devServerId, name, email })
+      await setRuntimeOnboardingGitIdentity(useAppStore.getState().settings, {
+        devServerId,
+        name,
+        email
+      })
       onSaved()
     } catch (err) {
       setError((err as Error).message)

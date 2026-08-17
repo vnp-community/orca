@@ -78,6 +78,29 @@ describe('useWorkflow', () => {
     expect(startEvent?.fields.mode).toBe('update')
   })
 
+  it('saveTemplate with templateId → sends { templateId, name, definition: { steps }, scope, traceId } — NOT a flat spread of local (BUG-FE-RPC-006)', async () => {
+    mockStore.templates = [{ id: 't1', name: 'Existing', scope: 'personal', steps: [{ id: 's1' }] }]
+    const { useWorkflow } = await import('../useWorkflow')
+    const { result } = renderHook(() => useWorkflow('t1'))
+
+    await act(async () => {
+      await result.current.saveTemplate()
+    })
+
+    const callArgs = mockRpc.mock.calls[0]
+    const params = callArgs?.[2] as Record<string, unknown>
+    expect(params).toMatchObject({
+      templateId: 't1',
+      name: 'Existing',
+      scope: 'personal',
+      definition: { steps: [{ id: 's1' }] },
+    })
+    // The old buggy call flat-spread `local`, which would have put `id`/`scopeRefId`
+    // directly on params instead of nesting steps under `definition`.
+    expect(params.id).toBeUndefined()
+    expect(params.steps).toBeUndefined()
+  })
+
   it('saveTemplate forwards traceId: span.id into RPC params', async () => {
     mockRpc.mockResolvedValueOnce({ id: 'new-id' })
     const { events, stop } = captureTraceEvents()

@@ -13,6 +13,7 @@ import {
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { getMobileEmulatorCliPathNeedsAttention } from './mobile-emulator-agent-setup-cli-state'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeCliInstallStatus } from '@/runtime/runtime-cli-client'
 
 function getCliActionLabel(status: CliInstallStatus | null, busy: boolean): string {
   if (busy) {
@@ -77,7 +78,7 @@ export function useMobileEmulatorAgentSetupState(enabled = true): {
   const refreshCliStatus = useCallback(async (): Promise<void> => {
     setCliLoading(true)
     try {
-      const status = await window.api.cli.getInstallStatus()
+      const status = await getRuntimeCliInstallStatus()
       if (mountedRef.current) {
         setCliInstallStatus(status)
       }
@@ -136,7 +137,7 @@ export function useMobileEmulatorAgentSetupState(enabled = true): {
     setSetupRechecking(true)
     try {
       const [cliStatus, skillInstalled] = await Promise.all([
-        window.api.cli.getInstallStatus(),
+        getRuntimeCliInstallStatus(),
         refreshCliSkill()
       ])
       if (mountedRef.current) {

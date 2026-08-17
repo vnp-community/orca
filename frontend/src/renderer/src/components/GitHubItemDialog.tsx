@@ -228,6 +228,8 @@ import {
 } from '@/components/task-page-github-status-actions'
 import type { ItemDialogTab } from './github-item-dialog-shared'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 // Why: the GH item dialog can be opened from any work-item list surface and
 // doesn't have the full owner/repo context the list's cache entry carries.
 // Parsing the canonical `https://github.com/{owner}/{repo}/...` URL is the
@@ -2520,7 +2522,7 @@ function PRFilesCombinedDiffViewer({
   )
 
   const openFilesOnGitHub = useCallback(() => {
-    void window.api.shell.openUrl(`${prUrl.replace(/\/$/, '')}/files`)
+    void shellOpenUrl(`${prUrl.replace(/\/$/, '')}/files`)
   }, [prUrl])
 
   const handleAddLineComment = useCallback(
@@ -3388,7 +3390,7 @@ function ConversationTab({
                   variant="ghost"
                   size="icon-xs"
                   className="size-7"
-                  onClick={() => window.api.shell.openUrl(comment.url)}
+                  onClick={() => shellOpenUrl(comment.url)}
                   aria-label={translate(
                     'auto.components.GitHubItemDialog.a154ec5224',
                     'Open comment on GitHub'
@@ -3496,7 +3498,7 @@ function ConversationTab({
         type="button"
         className="min-w-0 truncate font-medium text-foreground underline underline-offset-2 hover:text-muted-foreground"
         title={getTimelineTargetLabel(target)}
-        onClick={() => window.api.shell.openUrl(target.url)}
+        onClick={() => shellOpenUrl(target.url)}
       >
         {getTimelineTargetLabel(target)}
       </button>
@@ -4154,7 +4156,7 @@ function PRActionsPanel({
                 {label}
               </DropdownMenuItem>
             ))}
-            <DropdownMenuItem onSelect={() => window.api.shell.openUrl(item.url)}>
+            <DropdownMenuItem onSelect={() => shellOpenUrl(item.url)}>
               <ExternalLink className="size-4" />
               {translate('auto.components.GitHubItemDialog.53fe19aefc', 'Open GitHub merge box')}
             </DropdownMenuItem>
@@ -5100,7 +5102,7 @@ function ChecksTab({
                   variant="ghost"
                   size="xs"
                   className="h-7 gap-1 px-2 text-[11px]"
-                  onClick={() => window.api.shell.openUrl(openUrl)}
+                  onClick={() => shellOpenUrl(openUrl)}
                 >
                   {translate('auto.components.GitHubItemDialog.5dddefdf58', 'Open in GitHub')}
                   <ExternalLink className="size-3" />
@@ -5526,7 +5528,7 @@ function GitHubLabelsSettingsLink({
         type="button"
         onClick={() => {
           onOpen?.()
-          void window.api.shell.openUrl(url)
+          void shellOpenUrl(url)
         }}
         className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       >
@@ -7129,7 +7131,7 @@ export default function GitHubItemDialog({
     try {
       // Why: Electron's clipboard IPC is reliable even when browser clipboard
       // APIs lose focus/activation inside nested overlay surfaces.
-      await window.api.ui.writeClipboardText(workItem.url)
+      await uiWriteClipboardText(workItem.url)
       if (!linkCopyMountedRef.current) {
         return
       }
@@ -7338,7 +7340,7 @@ export default function GitHubItemDialog({
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => window.api.shell.openUrl(workItem.url)}
+                      onClick={() => shellOpenUrl(workItem.url)}
                       aria-label={translate(
                         'auto.components.GitHubItemDialog.3fdf777817',
                         'Open on GitHub'
@@ -7402,7 +7404,7 @@ export default function GitHubItemDialog({
                           'Start new workspace'
                         )}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => window.api.shell.openUrl(workItem.url)}>
+                      <DropdownMenuItem onSelect={() => shellOpenUrl(workItem.url)}>
                         <ExternalLink className="size-4" />
                         {translate('auto.components.GitHubItemDialog.3fdf777817', 'Open on GitHub')}
                       </DropdownMenuItem>
@@ -7580,7 +7582,7 @@ export default function GitHubItemDialog({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => window.api.shell.openUrl(workItem.url)}
+                    onClick={() => shellOpenUrl(workItem.url)}
                     aria-label={translate(
                       'auto.components.GitHubItemDialog.3fdf777817',
                       'Open on GitHub'

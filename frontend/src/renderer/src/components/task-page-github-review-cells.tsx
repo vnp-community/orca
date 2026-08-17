@@ -67,6 +67,7 @@ import type {
   Repo
 } from '../../../shared/types'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 export function ReviewChipAvatar({
   reviewer
 }: {
@@ -979,7 +980,7 @@ export function PRMergeCell({
             {label}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuItem onSelect={() => window.api.shell.openUrl(item.url)}>
+        <DropdownMenuItem onSelect={() => shellOpenUrl(item.url)}>
           <ExternalLink className="size-4" />
           {translate('auto.components.TaskPage.37d60046e3', 'Open GitHub merge box')}
         </DropdownMenuItem>

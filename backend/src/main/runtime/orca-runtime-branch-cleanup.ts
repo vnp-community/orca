@@ -286,6 +286,64 @@ export class RuntimeBranchCleanupCommands {
     }
   }
 
+  // Why: forget-locally drops a workspace from Orca without any remote Git or
+  // filesystem work (mirrors desktop's worktrees:forgetLocal IPC handler) —
+  // it exists so a workspace pinned to a removed/disconnected SSH target,
+  // whose provider is gone and whose removeManagedWorktree therefore throws
+  // before any cleanup runs, can still be cleared. Shares the removal
+  // in-flight map with removeManagedWorktree so a concurrent remove/forget
+  // on the same id cannot both mutate metadata.
+  async forgetLocalManagedWorktree(worktreeSelector: string): Promise<RemoveWorktreeResult> {
+    const store = this.host.getStore()
+    if (!store) {
+      throw new Error('runtime_unavailable')
+    }
+    const removalTarget = await this.resolveWorktreeRemovalTarget(worktreeSelector)
+    const optionsKey = 'forget-local'
+    const inFlightRemoval = this.removeManagedWorktreeInFlight.get(removalTarget.id)
+    if (inFlightRemoval) {
+      if (inFlightRemoval.optionsKey === optionsKey) {
+        return inFlightRemoval.promise
+      }
+      throw new Error(`Worktree deletion already in progress: ${removalTarget.id}`)
+    }
+    const repo = store.getRepo(removalTarget.repoId)
+    if (repo && isFolderRepo(repo) && removalTarget.id === getRuntimeFolderWorkspaceRootId(repo)) {
+      throw new Error(
+        'Cannot delete the project root workspace. Remove the folder project instead.'
+      )
+    }
+
+    const forget = (async (): Promise<RemoveWorktreeResult> => {
+      const localProvider = this.host.getLocalProvider()
+      if (localProvider) {
+        // Why: best-effort PTY sweep; a dead SSH relay tombstones the lease
+        // and resolves synchronously, so this never hangs.
+        await killAllProcessesForWorktree(removalTarget.id, {
+          runtime: this.host.getRuntimeForTeardown(),
+          localProvider,
+          onPtyStopped: this.host.getOnPtyStopped() ?? undefined
+        }).catch((err) => {
+          console.warn(`[worktree-teardown] forget-local failed for ${removalTarget.id}:`, err)
+        })
+      }
+      this.host.clearOptimisticReconcileToken(removalTarget.id)
+      this.removeWorktreeMetadataAndHistory(store, removalTarget.id)
+      this.preservedBranchCleanupByWorktreeId.delete(removalTarget.id)
+      this.host.invalidateResolvedWorktreeCache()
+      this.host.notifyWorktreesChanged(removalTarget.repoId)
+      return {}
+    })()
+    this.removeManagedWorktreeInFlight.set(removalTarget.id, { optionsKey, promise: forget })
+    try {
+      return await forget
+    } finally {
+      if (this.removeManagedWorktreeInFlight.get(removalTarget.id)?.promise === forget) {
+        this.removeManagedWorktreeInFlight.delete(removalTarget.id)
+      }
+    }
+  }
+
   async forceDeletePreservedBranch(
     worktreeSelector: string,
     branchName: string,

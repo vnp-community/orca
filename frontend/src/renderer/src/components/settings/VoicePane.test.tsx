@@ -7,6 +7,7 @@ import type { DeveloperPermissionRequestResult } from '../../../../shared/develo
 import type { GlobalSettings } from '../../../../shared/types'
 import { getDefaultVoiceSettings } from '../../../../shared/constants'
 import { handleVoiceDictationToggle, VoicePane } from './VoicePane'
+import { requestRuntimeDeveloperPermission } from '@/runtime/runtime-developer-permissions-client'
 
 const { useAppStoreMock, useShortcutLabelMock } = vi.hoisted(() => ({
   useAppStoreMock: vi.fn(),
@@ -14,6 +15,10 @@ const { useAppStoreMock, useShortcutLabelMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('@/store', () => ({ useAppStore: useAppStoreMock }))
+
+vi.mock('@/runtime/runtime-developer-permissions-client', () => ({
+  requestRuntimeDeveloperPermission: vi.fn()
+}))
 
 vi.mock('@/hooks/useShortcutLabel', () => ({
   useShortcutLabel: useShortcutLabelMock
@@ -45,11 +50,9 @@ function makeSettings(voiceEnabled: boolean): GlobalSettings {
 function installWindowApi(
   requestMicrophonePermission: () => Promise<DeveloperPermissionRequestResult>
 ) {
+  vi.mocked(requestRuntimeDeveloperPermission).mockImplementation(requestMicrophonePermission)
   Object.assign(window, {
     api: {
-      developerPermissions: {
-        request: vi.fn(requestMicrophonePermission)
-      },
       speech: {
         getCatalog: vi.fn(async () => []),
         getOpenAiApiKeyStatus: vi.fn(async () => ({ configured: false })),
@@ -158,7 +161,7 @@ describe('VoicePane dictation switch', () => {
         voice: expect.objectContaining({ enabled: false })
       })
     )
-    expect(window.api.developerPermissions.request).not.toHaveBeenCalled()
+    expect(requestRuntimeDeveloperPermission).not.toHaveBeenCalled()
   })
 
   it('clicking the switch marks the voice tip seen before requesting microphone permission', async () => {

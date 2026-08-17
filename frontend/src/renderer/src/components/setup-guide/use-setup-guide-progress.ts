@@ -62,6 +62,7 @@ export function useSetupGuideProgress(
   const checkJiraConnection = useAppStore((s) => s.checkJiraConnection)
   const repos = useAppStore((s) => s.repos)
   const activeRepoId = useAppStore((s) => s.activeRepoId)
+  const devServers = useAppStore((s) => s.devServers)
   const expectedPreflightContextKey = useAppStore((s) =>
     localPreflightContextKey(getLocalPreflightContext(s))
   )
@@ -293,7 +294,8 @@ export function useSetupGuideProgress(
           orchestrationSkillInstalled || detectedOrchestrationSkillInstalled,
         gitRepoCount,
         worktreesByRepo,
-        hasSetupScript: currentSetupScriptProbe.hasSetupScript
+        hasSetupScript: currentSetupScriptProbe.hasSetupScript,
+        devServers
       }),
     [
       browserUseSkillInstalled,
@@ -309,7 +311,8 @@ export function useSetupGuideProgress(
       currentSetupScriptProbe.hasSetupScript,
       orchestrationSkillInstalled,
       settings,
-      worktreesByRepo
+      worktreesByRepo,
+      devServers
     ]
   )
   const historicalSplitTerminalDone = hasFeatureInteraction(

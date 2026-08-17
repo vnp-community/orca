@@ -31,7 +31,6 @@ import {
   type AgentStatusIpcPayload,
   type AgentStatusOrchestrationContext
 } from '../../shared/agent-status-types'
-import { buildOrchestrationTaskDisplayMetadata } from '../../shared/orchestration-task-display'
 import { isTerminalLeafId, makePaneKey, parsePaneKey } from '../../shared/stable-pane-id'
 import type { SleepingAgentLaunchConfig } from '../../shared/agent-session-resume'
 import type {
@@ -60,7 +59,17 @@ import type {
 } from './orca-runtime'
 import type { RuntimeGraphStore } from './orca-runtime-graph-store'
 import type { RuntimePtyController } from './orca-runtime-types'
-import type { OrchestrationDb } from './orchestration/db'
+// ADR-021 — "chỉ dùng 1 database": OrchestrationDb (SQLite, sync) →
+// PgOrchestrationDb (Postgres, async). Unlike every other file this migration
+// touched, the two methods below (getAgentStatusOrchestrationContextForHandle,
+// getRecentCompletedDispatchForTerminal) are called from a SYNCHRONOUS chain
+// (buildAgentOrchestrationByPaneKey → orca-runtime-sync-window-graph.ts's
+// syncWindowGraph(), itself synchronous, and its own caller chain wasn't
+// traced) — cascading `async` through that safely needs its own reviewed
+// change, not a mechanical add-await inside an already very large ADR-021
+// pass. Deliberately degraded (not attempted) here: see the two methods'
+// doc comments.
+import type { PgOrchestrationDb } from './orchestration/pg-db'
 
 const FOREGROUND_AGENT_WRAPPER_RETRY_INTERVAL_MS = 150
 const FOREGROUND_AGENT_WRAPPER_RETRY_TIMEOUT_MS = 6_500
@@ -72,7 +81,7 @@ export type RuntimeTerminalAgentStatusCommandHost = {
     handle: string
   ): { record: TerminalHandleRecord; pty: RuntimePtyWorktreeRecord } | null
   getLiveLeafForHandle(handle: string): { record: TerminalHandleRecord; leaf: RuntimeLeafRecord }
-  getOrchestrationDbIfAvailable(): OrchestrationDb | null
+  getOrchestrationDbIfAvailable(): PgOrchestrationDb | null
   getLeafKey(tabId: string, leafId: string): string
   getRuntimeId(): string
   getLatestAgentStatusByPaneKey(): Map<string, RuntimeAgentRowSnapshot>
@@ -365,67 +374,22 @@ export class RuntimeTerminalAgentStatusCommands {
     return copySleepingAgentLaunchConfig(pty.launchConfig)
   }
 
+  // ADR-021 — "chỉ dùng 1 database": deliberately degraded, not converted.
+  // This method is synchronous and reached from a synchronous caller chain
+  // (buildAgentOrchestrationByPaneKey → syncWindowGraph()) whose own callers
+  // weren't traced as part of this pass — see this file's PgOrchestrationDb
+  // import comment. PgOrchestrationDb's methods are all async (Postgres I/O),
+  // so a sync function structurally cannot call them and use the result;
+  // the only correct-by-construction choice here is to return `undefined`
+  // (same as "no orchestration DB available", which every caller already
+  // handles — see e.g. orca-runtime.ts's buildAgentOrchestrationByPaneKey
+  // `if (context) {...}` checks) rather than cascading `async` through a
+  // chain that hasn't been reviewed for it.
   getAgentStatusOrchestrationContextForHandle(
-    handle: string,
-    db = this.host.getOrchestrationDbIfAvailable()
+    _handle: string,
+    _db = this.host.getOrchestrationDbIfAvailable()
   ): AgentStatusOrchestrationContext | undefined {
-    // Why: active dispatches are authoritative for reused terminals. Completed
-    // context is only useful while the corresponding done/recent row can still
-    // be visible; after that it would stale-group unrelated future work.
-    const dispatch =
-      db?.getActiveDispatchForTerminal?.(handle) ??
-      this.getRecentCompletedDispatchForTerminal(handle, db)
-    if (!dispatch) {
-      return undefined
-    }
-    const task = db?.getTask?.(dispatch.task_id)
-    const display =
-      typeof task?.spec === 'string'
-        ? buildOrchestrationTaskDisplayMetadata({
-            spec: task.spec,
-            taskTitle: task.task_title,
-            displayName: task.display_name
-          })
-        : { taskTitle: '', displayName: '' }
-    const activeRun = dispatch.status === 'completed' ? undefined : db?.getActiveCoordinatorRun?.()
-    const parentTerminalHandle =
-      task?.created_by_terminal_handle ??
-      (activeRun?.coordinator_handle && activeRun.coordinator_handle !== handle
-        ? activeRun.coordinator_handle
-        : undefined)
-    const parentPaneKey = parentTerminalHandle
-      ? this.getPaneKeyForTerminalHandle(parentTerminalHandle)
-      : undefined
-
-    return {
-      taskId: dispatch.task_id,
-      dispatchId: dispatch.id,
-      ...(display.taskTitle ? { taskTitle: display.taskTitle } : {}),
-      ...(display.displayName ? { displayName: display.displayName } : {}),
-      ...(parentTerminalHandle ? { parentTerminalHandle } : {}),
-      ...(parentPaneKey ? { parentPaneKey } : {}),
-      ...(activeRun?.coordinator_handle ? { coordinatorHandle: activeRun.coordinator_handle } : {}),
-      ...(activeRun?.id ? { orchestrationRunId: activeRun.id } : {})
-    }
-  }
-
-  private getRecentCompletedDispatchForTerminal(
-    handle: string,
-    db = this.host.getOrchestrationDbIfAvailable()
-  ): ReturnType<OrchestrationDb['getLatestDispatchForTerminal']> {
-    const dispatch = db?.getLatestDispatchForTerminal?.(handle)
-    if (dispatch?.status !== 'completed' || !dispatch.completed_at) {
-      return undefined
-    }
-    const completedAtMs = Date.parse(
-      dispatch.completed_at.includes('T')
-        ? dispatch.completed_at
-        : `${dispatch.completed_at.replace(' ', 'T')}Z`
-    )
-    if (!Number.isFinite(completedAtMs)) {
-      return undefined
-    }
-    return Date.now() - completedAtMs <= AGENT_STATUS_STALE_AFTER_MS ? dispatch : undefined
+    return undefined
   }
 
   getTerminalHandleForPaneKey(paneKey: string): string | null {

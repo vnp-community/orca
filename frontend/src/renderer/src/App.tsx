@@ -42,6 +42,7 @@ import {
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
 import { useAppStore } from './store'
+import { getRuntimeOnboardingState } from './runtime/runtime-onboarding-client'
 import { useShallow } from 'zustand/react/shallow'
 import { isRemoteWorkspaceSnapshotApplyInProgress, useIpcEvents } from './hooks/useIpcEvents'
 import { useAutomationDispatchEvents } from './hooks/useAutomationDispatchEvents'
@@ -172,12 +173,19 @@ import { isGitRepoKind } from '../../shared/repo-kind'
 import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut-capture-notification'
 import { resolveMountedLazyModalIds, type LazyModalId } from './lazy-modal-mount-state'
 import { translate } from '@/i18n/i18n'
+import { setRemoteWorkspaceForConnectedTargets } from './runtime/runtime-remote-workspace-client'
+import {
+  connectRuntimeSsh,
+  getRuntimeSshState,
+  listRuntimeSshTargets
+} from '@/runtime/runtime-ssh-client'
 import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialog'
 import {
   hasRequestedBackgroundTerminalWorktreeMount,
   subscribeBackgroundTerminalWorktreeMountRequests
 } from './components/terminal/background-terminal-worktree-mount'
 
+import { uiGet, uiSet } from '@/runtime/runtime-ui-client'
 // Why: agents alive during a hard kill (crash, forced update install) need a
 // reasonably fresh resume record on disk; one minute bounds the lost window
 // without measurable per-tick cost (the capture skips unchanged records).
@@ -309,6 +317,19 @@ const ActivityPrototypePage = lazy(() => import('./components/activity/ActivityP
 const Settings = lazy(() => import('./components/settings/Settings'))
 const SkillsPage = lazy(() => import('./components/skills/SkillsPage'))
 const WorkspaceSpacePage = lazy(() => import('./components/workspace-space/WorkspaceSpacePage'))
+// Giai đoạn 2c (F38) — additive-only "Project Workspace (Beta)" entry point.
+// Does not replace the Project/Repo sidebar flow (see roadmap 2c item 7 /
+// docs/guides/project-workspace-f38-doc-vs-code.md §4 step 8).
+const WorkspaceLayout = lazy(() =>
+  import('./components/workspace/WorkspaceLayout').then((module) => ({
+    default: module.WorkspaceLayout
+  }))
+)
+const ProjectSwitcher = lazy(() =>
+  import('./components/project/ProjectSwitcher').then((module) => ({
+    default: module.ProjectSwitcher
+  }))
+)
 const MobilePage = lazy(() => import('./components/mobile/MobilePage'))
 const QuickOpen = lazy(() => import('./components/QuickOpen'))
 const WorktreeJumpPalette = lazy(() => import('./components/WorktreeJumpPalette'))
@@ -915,14 +936,14 @@ function App(): React.JSX.Element {
         )
         keybindingsPromise.catch(() => {})
         const onboardingPromise = timeRendererStartupStep('onboarding-get', () =>
-          window.api.onboarding.get()
+          getRuntimeOnboardingState(useAppStore.getState().settings)
         )
         onboardingPromise.catch(() => {})
         // Why: hydrate persisted UI immediately after ui.get() so first paint
         // reflects saved view settings before the catalog scans below. ui.get()
         // is awaited (not overlapped) because the hydrate must land before the
         // local-first catalog/session steps run.
-        const persistedUI = await timeRendererStartupStep('ui-get', () => window.api.ui.get())
+        const persistedUI = await timeRendererStartupStep('ui-get', () => uiGet())
         uiHydrated = timeRendererStartupSyncStep('hydrate-persisted-ui', () =>
           hydratePersistedUIAfterStartupRead({
             persistedUI,
@@ -1004,8 +1025,9 @@ function App(): React.JSX.Element {
           if (connectionIds.length > 0) {
             try {
               const SSH_RECONNECT_TIMEOUT_MS = 15_000
+              const startupSettings = useAppStore.getState().settings
               const allTargets = await timeRendererStartupStep('ssh-list-targets', () =>
-                window.api.ssh.listTargets()
+                listRuntimeSshTargets(startupSettings)
               )
               const targetMap = new Map(allTargets.map((t) => [t.id, t]))
               const targets = connectionIds.map((targetId) => ({
@@ -1033,7 +1055,7 @@ function App(): React.JSX.Element {
                   Promise.allSettled(
                     eagerTargets.map(({ targetId }) =>
                       Promise.race([
-                        window.api.ssh.connect({ targetId }),
+                        connectRuntimeSsh(startupSettings, targetId),
                         new Promise((_, reject) =>
                           setTimeout(
                             () => reject(new Error('SSH reconnect timeout')),
@@ -1072,7 +1094,7 @@ function App(): React.JSX.Element {
                   continue
                 }
                 try {
-                  const state = await window.api.ssh.getState({ targetId })
+                  const state = await getRuntimeSshState(startupSettings, targetId)
                   console.warn(
                     `[ssh-restore] Polled state for ${targetId}: status=${state?.status}`
                   )
@@ -1315,7 +1337,7 @@ function App(): React.JSX.Element {
         )
         if (hydratedTargetIds.length > 0) {
           void localWrite
-            .then(() => window.api.remoteWorkspace?.setForConnectedTargets({ hydratedTargetIds }))
+            .then(() => setRemoteWorkspaceForConnectedTargets(state.settings, { hydratedTargetIds }))
             .then((results) => {
               for (const { targetId, result } of results ?? []) {
                 applyRemoteWorkspacePatchStatus(targetId, result)
@@ -1424,7 +1446,7 @@ function App(): React.JSX.Element {
     }
 
     const timer = window.setTimeout(() => {
-      void window.api.ui.set({
+      void uiSet({
         sidebarWidth,
         rightSidebarOpen,
         rightSidebarTab,
@@ -2444,6 +2466,16 @@ function App(): React.JSX.Element {
                               {activeView === 'activity' ? <ActivityPrototypePage /> : null}
                               {activeView === 'space' ? <WorkspaceSpacePage /> : null}
                               {activeView === 'mobile' ? <MobilePage /> : null}
+                              {activeView === 'workspace' ? (
+                                <div className="flex h-full flex-col">
+                                  <div className="flex items-center gap-2 border-b p-2">
+                                    <ProjectSwitcher />
+                                  </div>
+                                  <div className="min-h-0 flex-1">
+                                    <WorkspaceLayout />
+                                  </div>
+                                </div>
+                              ) : null}
                               {activeView === 'terminal' &&
                               creationLayoutActive &&
                               activePendingCreationId ? (

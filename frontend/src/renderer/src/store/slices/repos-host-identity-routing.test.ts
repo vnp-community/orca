@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import { createTestStore, makeWorktree } from './store-test-helpers'
 import type { Project, ProjectHostSetup, Repo } from '../../../../shared/types'
 import {
@@ -6,6 +7,8 @@ import {
   type RuntimeEnvironmentCallRequest
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
+
+vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 
 const localDuplicate: Repo = {
   id: 'same-repo',
@@ -64,6 +67,7 @@ beforeEach(() => {
   reposUpdate.mockReset()
   reposReorder.mockReset()
   ptyKill.mockReset()
+  vi.mocked(toast.error).mockReset()
   runtimeEnvironmentCall.mockReset()
   runtimeEnvironmentTransportCall.mockReset()
   runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
@@ -421,5 +425,44 @@ describe('repo slice host identity routing', () => {
       params: { orderedIds: ['same-repo'] },
       timeoutMs: 15_000
     })
+  })
+
+  it('surfaces a toast instead of silently no-op-ing when a duplicate id has no owning host', async () => {
+    // Neither duplicate is on 'local' (the default focused host with no settings),
+    // and no explicit hostId is passed, so findRepoForHost can't disambiguate.
+    // Regression: this used to return early with nothing but a console.error,
+    // which looked to the user like clicking "Remove" did nothing at all.
+    const remoteA: Repo = { ...remoteDuplicate, executionHostId: 'runtime:env-1' }
+    const remoteB: Repo = { ...remoteDuplicate, path: '/other', executionHostId: 'runtime:env-2' }
+    const store = createTestStore()
+    store.setState({ repos: [remoteA, remoteB] })
+
+    await store.getState().removeProject('same-repo')
+
+    expect(store.getState().repos).toEqual([remoteA, remoteB])
+    expect(reposRemove).not.toHaveBeenCalled()
+    expect(reposRemoveForHost).not.toHaveBeenCalled()
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'repo.rm' })
+    )
+    expect(toast.error).toHaveBeenCalledTimes(1)
+  })
+
+  it('surfaces a toast when the repo.rm RPC itself fails, instead of silently swallowing it', async () => {
+    runtimeEnvironmentCall.mockRejectedValue(new Error('runtime session expired'))
+    const store = createTestStore()
+    store.setState({
+      settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
+      repos: [remoteDuplicate]
+    })
+
+    await store.getState().removeProject('same-repo')
+
+    // The failed RPC must not remove the row from local state.
+    expect(store.getState().repos).toEqual([remoteDuplicate])
+    expect(toast.error).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(toast.error).mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ description: 'runtime session expired' })
+    )
   })
 })

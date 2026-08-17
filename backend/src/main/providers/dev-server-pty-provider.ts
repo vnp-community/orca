@@ -124,7 +124,16 @@ export class DevServerPtyProvider implements IPtyProvider {
         rows: opts.rows,
         ...(opts.cwd ? { cwd: opts.cwd } : {}),
         ...(opts.env ? { env: opts.env } : {}),
+        ...(opts.envToDelete?.length ? { envToDelete: opts.envToDelete } : {}),
         ...(opts.shellOverride ? { shellOverride: opts.shellOverride } : {}),
+        // Why: previously dropped silently — any commandDelivery:'provider'
+        // caller (AI-agent terminal launches, pane splits, and gh/glab
+        // auth-login PTYs) got a bare shell with no command typed in on
+        // direct-websocket/relay-websocket dev servers. See
+        // specs/agent/api/gaps-and-findings.md #5.
+        ...(opts.command ? { command: opts.command } : {}),
+        ...(opts.commandDelivery ? { commandDelivery: opts.commandDelivery } : {}),
+        ...(opts.userId ? { userId: opts.userId } : {}),
         ...(opts.paneKey ? { paneKey: opts.paneKey } : {}),
         ...(opts.tabId ? { tabId: opts.tabId } : {})
       }

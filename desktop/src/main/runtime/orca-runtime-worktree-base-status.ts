@@ -18,6 +18,7 @@ import type {
   WorktreeMeta,
   WorktreeRemoteBranchConflictEvent
 } from '../../shared/types'
+import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
 import type { RemoteFetchResult, RemoteTrackingBase } from './orca-runtime-types'
 import type { Store } from '../persistence'
 import { randomUUID } from 'node:crypto'
@@ -87,6 +88,10 @@ export type RuntimeWorktreeBaseStatusCommandHost = {
     gitOptions?: { wslDistro?: string }
   ): Promise<RemoteTrackingBase | null>
   getNotifier(): RuntimeWorktreeBaseNotifier | null
+  // Why: paired web/mobile runtime clients have no Electron notifier IPC —
+  // bridge base-status/remote-branch-conflict onto the RPC client-events
+  // stream so they see the same live updates as the desktop renderer.
+  emitClientEvent(event: RuntimeClientEvent): void
 }
 
 export class RuntimeWorktreeBaseStatusCommands {
@@ -110,6 +115,7 @@ export class RuntimeWorktreeBaseStatusCommands {
 
   emitWorktreeBaseStatus(event: WorktreeBaseStatusEvent): void {
     this.host.getNotifier()?.worktreeBaseStatus?.(event)
+    this.host.emitClientEvent({ type: 'worktreeBaseStatus', ...event })
   }
 
   async reconcileWorktreeBaseStatus(args: {
@@ -128,13 +134,15 @@ export class RuntimeWorktreeBaseStatusCommands {
       if (!stillCurrent()) {
         return
       }
-      this.host.getNotifier()?.worktreeBaseStatus?.({
+      const fullEvent = {
         repoId: args.repoId,
         worktreeId: args.worktreeId,
         base: args.base.base,
         remote: args.base.remote,
         ...event
-      })
+      }
+      this.host.getNotifier()?.worktreeBaseStatus?.(fullEvent)
+      this.host.emitClientEvent({ type: 'worktreeBaseStatus', ...fullEvent })
     }
     const resolvePublishRemote = async (): Promise<string> => {
       // Why: repos whose canonical publish remote is named differently (e.g.
@@ -180,12 +188,14 @@ export class RuntimeWorktreeBaseStatusCommands {
           { cwd: args.repoPath }
         )
         if (stillCurrent()) {
-          this.host.getNotifier()?.worktreeRemoteBranchConflict?.({
+          const conflictEvent = {
             repoId: args.repoId,
             worktreeId: args.worktreeId,
             remote: publishRemote,
             branchName: args.branchName
-          })
+          }
+          this.host.getNotifier()?.worktreeRemoteBranchConflict?.(conflictEvent)
+          this.host.emitClientEvent({ type: 'worktreeRemoteBranchConflict', ...conflictEvent })
         }
       } catch {
         // No publish-remote conflict is the common case; stay quiet.

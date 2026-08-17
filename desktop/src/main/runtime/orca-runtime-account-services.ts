@@ -6,6 +6,9 @@
 import type { ClaudeRateLimitAccountsState, CodexRateLimitAccountsState } from '../../shared/types'
 import type { AccountsSnapshot } from './orca-runtime-types'
 import type { RuntimeAccountServices } from './orca-runtime'
+import type { ClaudeAccountService } from '../claude-accounts/service'
+import type { CodexAccountService } from '../codex-accounts/service'
+import type { RateLimitService } from '../rate-limits/service'
 
 // Why: every other extracted domain in this file takes a host object for its
 // cross-domain dependencies, but this one has none (accountServices is
@@ -76,5 +79,22 @@ export class RuntimeAccountServicesCommands {
         rateLimits
       })
     })
+  }
+
+  // Why: the mobile RPC bridge above only needs read/switch/remove, but the
+  // desktop-local RPC dispatcher (same process as ipcMain) wraps the full
+  // account/rate-limit surface -- including interactive login PTYs -- so
+  // those method files need the raw service instances, not just the narrow
+  // bridge above.
+  getClaudeAccountService(): ClaudeAccountService {
+    return this.requireAccountServices().claudeAccounts
+  }
+
+  getCodexAccountService(): CodexAccountService {
+    return this.requireAccountServices().codexAccounts
+  }
+
+  getRateLimitService(): RateLimitService {
+    return this.requireAccountServices().rateLimits
   }
 }

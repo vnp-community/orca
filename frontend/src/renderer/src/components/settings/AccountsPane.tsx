@@ -48,6 +48,17 @@ import {
   getAccountsOpencodeSearchEntries,
   getAccountsPaneSearchEntries
 } from './accounts-search'
+import {
+  addClaudeAccount,
+  cancelPendingClaudeAccountLogin,
+  reauthenticateClaudeAccount
+} from '../../runtime/runtime-claude-accounts-client'
+import { addCodexAccount, reauthenticateCodexAccount } from '../../runtime/runtime-codex-accounts-client'
+import {
+  clearMiniMaxCredentialsCookie,
+  getMiniMaxCredentialsStatus,
+  saveMiniMaxCredentialsCookie
+} from '../../runtime/runtime-minimax-credentials-client'
 import { GrokAccountsSection } from './GrokAccountsSection'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
@@ -412,7 +423,7 @@ export function AccountsPane({
 
   const refreshMiniMaxCredentialStatus = async (): Promise<void> => {
     try {
-      const status = await window.api.minimaxCredentials.getStatus()
+      const status = await getMiniMaxCredentialsStatus()
       setMiniMaxConfigured(status.configured)
     } catch (error) {
       console.error('Failed to load MiniMax credential status:', error)
@@ -428,7 +439,7 @@ export function AccountsPane({
     }
     setMiniMaxCredentialBusy(true)
     try {
-      const status = await window.api.minimaxCredentials.saveCookie(miniMaxCookieDraft.trim())
+      const status = await saveMiniMaxCredentialsCookie(miniMaxCookieDraft.trim())
       if (!status.configured) {
         throw new Error(
           translate(
@@ -459,7 +470,7 @@ export function AccountsPane({
   const clearMiniMaxCookie = async (): Promise<void> => {
     setMiniMaxCredentialBusy(true)
     try {
-      const status = await window.api.minimaxCredentials.clearCookie()
+      const status = await clearMiniMaxCredentialsCookie()
       setMiniMaxConfigured(status.configured)
       setMiniMaxCookieDraft('')
       recordFeatureInteraction('usage-tracking')
@@ -783,7 +794,7 @@ export function AccountsPane({
                 size="xs"
                 onClick={() =>
                   void runClaudeAccountAction('adding', () =>
-                    window.api.claudeAccounts.add({
+                    addClaudeAccount({
                       runtime: accountRuntime.runtime,
                       wslDistro: accountRuntime.wslDistro
                     })
@@ -810,7 +821,7 @@ export function AccountsPane({
                 <Button
                   variant="ghost"
                   size="xs"
-                  onClick={() => void window.api.claudeAccounts.cancelPendingLogin()}
+                  onClick={() => void cancelPendingClaudeAccountLogin()}
                   className="gap-1.5 text-muted-foreground hover:text-foreground"
                 >
                   <X className="size-3" />
@@ -952,9 +963,7 @@ export function AccountsPane({
                             void runClaudeAccountAction(
                               `reauth:${account.id}`,
                               () =>
-                                window.api.claudeAccounts.reauthenticate({
-                                  accountId: account.id
-                                }),
+                                reauthenticateClaudeAccount(account.id),
                               getProviderAccountRuntime(account)
                             )
                           }}
@@ -1087,7 +1096,7 @@ export function AccountsPane({
               size="xs"
               onClick={() =>
                 void runCodexAccountAction('adding', () =>
-                  window.api.codexAccounts.add({
+                  addCodexAccount({
                     runtime: accountRuntime.runtime,
                     wslDistro: accountRuntime.wslDistro
                   })
@@ -1314,9 +1323,7 @@ export function AccountsPane({
                             void runCodexAccountAction(
                               `reauth:${account.id}`,
                               () =>
-                                window.api.codexAccounts.reauthenticate({
-                                  accountId: account.id
-                                }),
+                                reauthenticateCodexAccount(account.id),
                               getProviderAccountRuntime(account)
                             )
                           }}

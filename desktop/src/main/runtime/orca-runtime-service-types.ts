@@ -155,6 +155,11 @@ export type RuntimeStore = {
     terminalMainSideEffectAuthority?: GlobalSettings['terminalMainSideEffectAuthority']
     terminalHiddenDeliveryGate?: GlobalSettings['terminalHiddenDeliveryGate']
     terminalModelQueryAuthority?: GlobalSettings['terminalModelQueryAuthority']
+    // Why: OrcaRuntimeService.getNotificationSettings() (used by
+    // rpc/methods/notifications.ts) needs the same notification gating
+    // settings the ipcMain 'notifications:*' handlers read directly off
+    // the full Store.
+    notifications?: GlobalSettings['notifications']
   }
   // Why: narrow to `unknown` return so test mocks can return void without
   // a cast. The runtime never reads the return value — the persisted value

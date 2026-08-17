@@ -74,6 +74,10 @@ vi.mock('sonner', () => ({
   }
 }))
 
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiWriteClipboardText: vi.fn().mockResolvedValue(undefined)
+}))
+
 import { PortRow } from './ports-status-popover-rows'
 
 const externalPort: WorkspacePort = {
@@ -99,9 +103,6 @@ describe('status bar port row open routing', () => {
     ;(window as unknown as { api: unknown }).api = {
       shell: {
         openUrl: openUrlMock
-      },
-      ui: {
-        writeClipboardText: vi.fn()
       }
     }
     openUrlMock.mockResolvedValue(undefined)

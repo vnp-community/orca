@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package orca.infrafleet.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1";
+
+// InfraFleetService owns SSH targets, dev server registry, connection lifecycle,
+// the provider registry (connectionId -> host dispatch), and fleet health.
+// See specs/backend-go/services/infra-fleet-service.md.
+service InfraFleetService {
+  rpc RegisterDevServer(RegisterDevServerRequest) returns (RegisterDevServerResponse);
+  rpc ResolveConnection(ResolveConnectionRequest) returns (ResolveConnectionResponse);
+  rpc CreateSshTarget(CreateSshTargetRequest) returns (CreateSshTargetResponse);
+  rpc GetFleetHealth(GetFleetHealthRequest) returns (GetFleetHealthResponse);
+  rpc ScanWorkspacePorts(ScanWorkspacePortsRequest) returns (ScanWorkspacePortsResponse);
+  // ListDevServers backs the frontend's devServer.list channel — the
+  // DevServerRepository.List method already existed but was never exposed
+  // over gRPC before Epic A's second pass.
+  rpc ListDevServers(ListDevServersRequest) returns (ListDevServersResponse);
+  // CreateConnection is the write path for infra.connections
+  // (migrations/0002_connections) — binds a dev server to a worktree/repo
+  // path, producing the connectionId ResolveConnection/Relay resolve
+  // against. Without this RPC, connections would be schema nobody writes to.
+  rpc CreateConnection(CreateConnectionRequest) returns (CreateConnectionResponse);
+  // Relay is the generic connectionId+method+params passthrough onto the Dev
+  // Server Agent execution plane — see usecase.Relay's doc comment for why
+  // this is a single generic RPC rather than one purpose-built RPC per
+  // caller (git-gateway-service's git.*, workflow-service's agent.exec/
+  // shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
+  // all go through this one).
+  rpc Relay(RelayRequest) returns (RelayResponse);
+}
+
+enum ConnectionMode {
+  CONNECTION_MODE_UNSPECIFIED = 0;
+  CONNECTION_MODE_RELAY_SSH = 1;
+  CONNECTION_MODE_RELAY_WEBSOCKET = 2;
+  CONNECTION_MODE_DIRECT_WEBSOCKET = 3;
+}
+
+message DevServer {
+  string id = 1;
+  string tenant_id = 2;
+  string host = 3;
+  ConnectionMode mode = 4;
+  // ssh_target_id links this dev server to the SshTarget sshconn.Connector
+  // dials for cert-based SSH auth — required when mode is
+  // CONNECTION_MODE_RELAY_SSH, empty for the other two modes. Closes the
+  // "DevServer<->SshTarget linkage the domain model doesn't have yet" gap
+  // this service's README flagged (Epic A third pass).
+  string ssh_target_id = 5;
+}
+
+message RegisterDevServerRequest {
+  string tenant_id = 1;
+  string host = 2;
+  ConnectionMode mode = 3;
+  string ssh_target_id = 4; // required when mode=CONNECTION_MODE_RELAY_SSH
+}
+
+message RegisterDevServerResponse {
+  DevServer dev_server = 1;
+}
+
+// ResolveConnection is the core dispatch primitive every other service
+// (git-gateway-service, project-service, task-service) calls to answer
+// "which host owns this connectionId, and how do I reach it".
+message ResolveConnectionRequest {
+  string connection_id = 1;
+}
+
+message ResolveConnectionResponse {
+  bool connected = 1; // false => execute locally, no relay
+  DevServer dev_server = 2;
+  // repo_path/worktree_id are the per-connection metadata stored on
+  // infra.connections (migrations/0002_connections) — empty when connected
+  // is false. Callers like git-gateway-service's RelayExecutor need
+  // repo_path alongside dev_server to know which path to operate on.
+  string repo_path = 3;
+  string worktree_id = 4;
+}
+
+message ListDevServersRequest {
+  // tenant_id is intentionally absent — pulled from request context (see
+  // RegisterDevServerInput's doc comment for the same convention), never
+  // trusted from the caller.
+}
+
+message ListDevServersResponse {
+  repeated DevServer dev_servers = 1;
+}
+
+message CreateConnectionRequest {
+  string dev_server_id = 1;
+  string repo_path = 2;
+  string worktree_id = 3;
+}
+
+message CreateConnectionResponse {
+  string connection_id = 1;
+}
+
+message RelayRequest {
+  string connection_id = 1;
+  string method = 2;
+  // params_json is a JSON-encoded object, mirroring
+  // devserveragent.Client.Exec's own generic map[string]any passthrough —
+  // no per-method typed message, since this RPC's whole point is not
+  // needing one per agent method. Empty means no params.
+  string params_json = 3;
+}
+
+message RelayResponse {
+  // result_json is the agent's JSON-RPC result, JSON-encoded verbatim.
+  string result_json = 1;
+}
+
+message CreateSshTargetRequest {
+  string tenant_id = 1;
+  string host = 2;
+  string user = 3;
+  string vault_ssh_role = 4; // Vault SSH secrets engine role for cert issuance
+}
+
+message CreateSshTargetResponse {
+  string ssh_target_id = 1;
+}
+
+message GetFleetHealthRequest {
+  string tenant_id = 1;
+}
+
+message DevServerHealth {
+  string dev_server_id = 1;
+  bool reachable = 2;
+  double cpu_percent = 3;
+  double ram_percent = 4;
+  double disk_percent = 5;
+  int64 latency_ms = 6;
+}
+
+message GetFleetHealthResponse {
+  repeated DevServerHealth statuses = 1;
+}
+
+message ScanWorkspacePortsRequest {
+  string connection_id = 1;
+  string worktree_id = 2;
+}
+
+message ScanWorkspacePortsResponse {
+  repeated int32 open_ports = 1;
+}

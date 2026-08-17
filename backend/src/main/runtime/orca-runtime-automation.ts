@@ -47,19 +47,25 @@ export class RuntimeAutomationCommands {
   constructor(private readonly host: RuntimeAutomationCommandHost) {}
 
   listAutomations(): Automation[] {
-    const list = this.host.getStore()?.listAutomations
-    if (!list) {
+    // Why: call listAutomations as a property ON the store, not via a
+    // reference extracted from it — persistence.ts's implementation reads
+    // `this.state`, and detaching the method loses that `this` binding
+    // (live repro: "Cannot read properties of undefined (reading 'state')"
+    // on every automation.list call for a devServer/environment-hosted
+    // repo). Same fix applied to every sibling method below.
+    const store = this.host.getStore()
+    if (!store?.listAutomations) {
       throw new Error('runtime_unavailable')
     }
-    return list()
+    return store.listAutomations()
   }
 
   listAutomationRuns(automationId?: string): AutomationRun[] {
-    const list = this.host.getStore()?.listAutomationRuns
-    if (!list) {
+    const store = this.host.getStore()
+    if (!store?.listAutomationRuns) {
       throw new Error('runtime_unavailable')
     }
-    return list(automationId)
+    return store.listAutomationRuns(automationId)
   }
 
   showAutomation(id: string): Automation {
@@ -71,15 +77,15 @@ export class RuntimeAutomationCommands {
   }
 
   async createAutomation(input: RuntimeAutomationCreateInput): Promise<Automation> {
-    const create = this.host.getStore()?.createAutomation
-    if (!create) {
+    const store = this.host.getStore()
+    if (!store?.createAutomation) {
       throw new Error('runtime_unavailable')
     }
     const target = await this.resolveAutomationTarget(input)
     if (input.reuseSession && target.workspaceMode !== 'existing') {
       throw new Error('Session reuse requires an existing workspace target.')
     }
-    return create({
+    return store.createAutomation({
       name: input.name,
       prompt: input.prompt,
       precheck: input.precheck,
@@ -167,20 +173,20 @@ export class RuntimeAutomationCommands {
     if (!targetChanged && patch.reuseSession && current.workspaceMode !== 'existing') {
       throw new Error('Session reuse requires an existing workspace target.')
     }
-    const update = this.host.getStore()?.updateAutomation
-    if (!update) {
+    const store = this.host.getStore()
+    if (!store?.updateAutomation) {
       throw new Error('runtime_unavailable')
     }
-    return update(id, patch)
+    return store.updateAutomation(id, patch)
   }
 
   deleteAutomation(id: string): { removed: boolean; id: string } {
-    const del = this.host.getStore()?.deleteAutomation
-    if (!del) {
+    const store = this.host.getStore()
+    if (!store?.deleteAutomation) {
       throw new Error('runtime_unavailable')
     }
     this.showAutomation(id)
-    del(id)
+    store.deleteAutomation(id)
     return { removed: true, id }
   }
 

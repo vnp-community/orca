@@ -53,8 +53,15 @@ import type {
 import { hasCompatibleAgentTitleIdentity } from '../../shared/agent-title-owner'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { OrchestrationDb } from './orchestration/db'
+// ADR-021 — "chỉ dùng 1 database": OrchestrationDb (SQLite) → PgOrchestrationDb
+// (Postgres, async). See pg-db.ts's module doc comment for the sync→async
+// atomicity work this required.
+import { PgOrchestrationDb } from './orchestration/pg-db'
+import { KeyedAsyncQueue } from './orchestration/keyed-async-queue'
+import type { IConnectionPool } from '../db/pool'
+import type { ClaudeUsageStore } from '../claude-usage/store'
+import type { CodexUsageStore } from '../codex-usage/store'
+import type { OpenCodeUsageStore } from '../opencode-usage/store'
 import { formatMessagesForInjection } from './orchestration/formatter'
 import type {
   CreateWorktreeResult,
@@ -69,7 +76,11 @@ import type {
   FolderWorkspace,
   MemorySnapshot
 } from '../../shared/types'
-import type { RuntimeClientEvent } from '../../shared/runtime-client-events'
+import type {
+  RuntimeClientEvent,
+  MenuCommandPayload,
+  WindowStateChangedState
+} from '../../shared/runtime-client-events'
 import { toRuntimeActivateWorktreeEvent } from '../../shared/runtime-client-events'
 import type { SshConnectionState } from '../../shared/ssh-types'
 import type { FeatureInteractionId } from '../../shared/feature-interactions'
@@ -298,7 +309,33 @@ export class OrcaRuntimeService {
   /** Web Push manager — optional; null until setPushManager() is called. TASK-036. */
   private pushManager: WebPushManager | null = null
   private agentDetector: AgentDetector | null = null
-  private _orchestrationDb: OrchestrationDb | null = null
+  private _orchestrationDb: PgOrchestrationDb | null = null
+  // ADR-021 §3 — set from deps.orchestrationPool/orchestrationTenantId at
+  // construction (server-bootstrap.ts); null in Electron desktop mode, which
+  // never calls getOrchestrationDb() through this class (see below).
+  private readonly orchestrationPool: IConnectionPool | null
+  private readonly orchestrationTenantId: string | undefined
+  // Why: server-bootstrap.ts already constructs these for AutomationService's
+  // usage-attribution needs (D1 fix) but never exposed them on the runtime —
+  // claudeUsage.*/codexUsage.* RPC methods (runtime/rpc/methods/claude-usage.ts,
+  // codex-usage.ts) need direct access, same as desktop's
+  // runtime.getClaudeUsageStore()/getCodexUsageStore().
+  private claudeUsageStore: ClaudeUsageStore | null
+  private codexUsageStore: CodexUsageStore | null
+  // Why: same D1-fix gap as claudeUsageStore/codexUsageStore above —
+  // openCodeUsage.* RPC methods (runtime/rpc/methods/opencode-usage.ts) need
+  // direct access, same as desktop's runtime.getOpenCodeUsageStore().
+  private openCodeUsageStore: OpenCodeUsageStore | null
+  // ADR-021 — shared by every event-driven (non-async-caller) orchestration-DB
+  // call site: pty-exit, message-delivery, terminal-agent-status. Keyed by
+  // terminal handle so two touches of the same handle's dispatch state never
+  // interleave, regardless of which code path triggered them. See
+  // keyed-async-queue.ts's module doc comment.
+  private readonly orchestrationDeliveryQueue = new KeyedAsyncQueue()
+
+  getOrchestrationDeliveryQueue(): KeyedAsyncQueue {
+    return this.orchestrationDeliveryQueue
+  }
   // Why: mobile clients subscribe to terminal output via terminal.subscribe.
   // These listeners fire on every onPtyData call, enabling real-time streaming
   // without polling. Keyed by ptyId for O(1) lookup per data event.
@@ -364,9 +401,21 @@ export class OrcaRuntimeService {
       // managed-Codex sessions. The runtime ctor runs in BOTH window and serve.
       getAdditionalAiVaultCodexHomePaths?: () => readonly string[]
       buildAgentHookPtyEnv?: () => Record<string, string>
+      // ADR-021 §3 — server-bootstrap.ts passes these so getOrchestrationDb()
+      // can construct a PgOrchestrationDb; omitted in Electron desktop mode.
+      orchestrationPool?: IConnectionPool
+      orchestrationTenantId?: string
+      claudeUsage?: ClaudeUsageStore
+      codexUsage?: CodexUsageStore
+      openCodeUsage?: OpenCodeUsageStore
     }
   ) {
     this.store = store
+    this.orchestrationPool = deps?.orchestrationPool ?? null
+    this.orchestrationTenantId = deps?.orchestrationTenantId
+    this.claudeUsageStore = deps?.claudeUsage ?? null
+    this.codexUsageStore = deps?.codexUsage ?? null
+    this.openCodeUsageStore = deps?.openCodeUsage ?? null
     if (stats) {
       this.stats = stats
       this.agentDetector = new AgentDetector(stats)
@@ -574,24 +623,78 @@ export class OrcaRuntimeService {
   runAutomationNow: RuntimeAutomationCommands['runAutomationNow'] =
     this.automationCommands.runAutomationNow.bind(this.automationCommands)
 
-  // Why: lazy initialization — the DB path depends on Electron's userData
-  // which may not be finalized until after app.ready. Also allows unit tests
-  // to inject an in-memory DB without touching the filesystem.
-  getOrchestrationDb(): OrchestrationDb {
+  // Why lazy (unchanged from the SQLite version): allows unit tests to
+  // inject a fake/in-memory-backed db via setOrchestrationDb() before the
+  // first real call. ADR-021: construction itself stays synchronous
+  // (PgOrchestrationDb's constructor just stores pool/tenantId — no I/O
+  // happens until a method is called), so this getter does NOT need to
+  // become async even though every method on the returned instance is.
+  getOrchestrationDb(): PgOrchestrationDb {
     if (!this._orchestrationDb) {
-      const { app } = require('electron')
-      const dbPath = join(app.getPath('userData'), 'orchestration.db')
-      this._orchestrationDb = new OrchestrationDb(dbPath)
+      if (!this.orchestrationPool) {
+        throw new Error(
+          '[OrcaRuntimeService] getOrchestrationDb() called without an orchestrationPool — ' +
+            'server-bootstrap.ts must pass deps.orchestrationPool when constructing OrcaRuntimeService.'
+        )
+      }
+      this._orchestrationDb = new PgOrchestrationDb(this.orchestrationPool, this.orchestrationTenantId)
     }
     return this._orchestrationDb
   }
 
-  setOrchestrationDb(db: OrchestrationDb): void {
+  setOrchestrationDb(db: PgOrchestrationDb): void {
     this._orchestrationDb = db
   }
 
   setAutomationService(service: AutomationService): void {
     this.automationService = service
+  }
+
+  getClaudeUsageStore(): ClaudeUsageStore {
+    if (!this.claudeUsageStore) {
+      throw new Error(
+        '[OrcaRuntimeService] getClaudeUsageStore() called without deps.claudeUsage — ' +
+          'server-bootstrap.ts must pass it when constructing OrcaRuntimeService.'
+      )
+    }
+    return this.claudeUsageStore
+  }
+
+  getCodexUsageStore(): CodexUsageStore {
+    if (!this.codexUsageStore) {
+      throw new Error(
+        '[OrcaRuntimeService] getCodexUsageStore() called without deps.codexUsage — ' +
+          'server-bootstrap.ts must pass it when constructing OrcaRuntimeService.'
+      )
+    }
+    return this.codexUsageStore
+  }
+
+  getOpenCodeUsageStore(): OpenCodeUsageStore {
+    if (!this.openCodeUsageStore) {
+      throw new Error(
+        '[OrcaRuntimeService] getOpenCodeUsageStore() called without deps.openCodeUsage — ' +
+          'server-bootstrap.ts must pass it when constructing OrcaRuntimeService.'
+      )
+    }
+    return this.openCodeUsageStore
+  }
+
+  // Why setters, not just constructor deps: server-bootstrap.ts constructs
+  // ClaudeUsageStore/CodexUsageStore/OpenCodeUsageStore after `runtime`
+  // already exists (they also need `pool`/`resolvedTenantId`, established
+  // later in the same function) — same ordering constraint
+  // setAutomationService() above already solves for AutomationService.
+  setClaudeUsageStore(store: ClaudeUsageStore): void {
+    this.claudeUsageStore = store
+  }
+
+  setCodexUsageStore(store: CodexUsageStore): void {
+    this.codexUsageStore = store
+  }
+
+  setOpenCodeUsageStore(store: OpenCodeUsageStore): void {
+    this.openCodeUsageStore = store
   }
 
   /** TASK-036: Inject a WebPushManager so agent-task-complete triggers web push. */
@@ -693,6 +796,29 @@ export class OrcaRuntimeService {
   // methods, so they need a public entry point onto the client-event stream.
   notifySshStateChanged(targetId: string, state: SshConnectionState): void {
     this.emitClientEvent({ type: 'sshStateChanged', targetId, state })
+  }
+
+  // Why: menu-bar clicks and global keyboard shortcuts originate in window/menu
+  // wiring (createMainWindow.ts, index.ts), not a runtime method, so they need
+  // the same public client-event entry point as SSH state above — a paired
+  // client mirroring this host's session has no Electron IPC channel for them.
+  notifyMenuCommand(payload: MenuCommandPayload): void {
+    this.emitClientEvent({ type: 'menuCommand', ...payload })
+  }
+
+  // Why: BrowserWindow maximize/fullscreen transitions and the powerMonitor
+  // resume signal originate in window wiring; bridge them the same way as
+  // menu commands above.
+  notifyWindowStateChanged(state: WindowStateChangedState): void {
+    this.emitClientEvent({ type: 'windowStateChanged', state })
+  }
+
+  // Why: two-phase worktree-create progress originates in the IPC-layer
+  // create flow (worktree-remote.ts), not a runtime method, so it needs the
+  // same public entry point onto the client-event stream as SSH state above —
+  // paired web/mobile runtime clients have no Electron IPC for this event.
+  notifyWorktreeCreateProgress(creationId: string | undefined, phase: 'fetching' | 'creating'): void {
+    this.emitClientEvent({ type: 'worktreeCreateProgress', creationId, phase })
   }
 
   // Why: renderer-initiated meta updates intentionally skip the renderer
@@ -1673,6 +1799,10 @@ export class OrcaRuntimeService {
     this.accountServicesCommands.setAccountServices.bind(this.accountServicesCommands)
   getAccountsSnapshot: RuntimeAccountServicesCommands['getAccountsSnapshot'] =
     this.accountServicesCommands.getAccountsSnapshot.bind(this.accountServicesCommands)
+  getRateLimitService: RuntimeAccountServicesCommands['getRateLimitService'] =
+    this.accountServicesCommands.getRateLimitService.bind(this.accountServicesCommands)
+  hasAccountServices: RuntimeAccountServicesCommands['hasAccountServices'] =
+    this.accountServicesCommands.hasAccountServices.bind(this.accountServicesCommands)
   refreshAccountsForMobile: RuntimeAccountServicesCommands['refreshAccountsForMobile'] =
     this.accountServicesCommands.refreshAccountsForMobile.bind(this.accountServicesCommands)
   selectClaudeAccount: RuntimeAccountServicesCommands['selectClaudeAccount'] =
@@ -1807,6 +1937,7 @@ export class OrcaRuntimeService {
     getGraph: () => this.graph,
     getPtyTranscripts: () => this.ptyTranscripts,
     getRawOrchestrationDb: () => this._orchestrationDb,
+    getOrchestrationDeliveryQueue: () => this.orchestrationDeliveryQueue,
     getAgentDetector: () => this.agentDetector,
     getLeafKey: (tabId, leafId) => this.getLeafKey(tabId, leafId),
     getLeavesForPty: (ptyId) => this.getLeavesForPty(ptyId),
@@ -3813,7 +3944,7 @@ export class OrcaRuntimeService {
 
   // Why: group address resolution (Section 4.5) needs to query per-handle agent
   // status without throwing on stale handles, so this returns null on any error.
-  private getOrchestrationDbIfAvailable(): OrchestrationDb | null {
+  private getOrchestrationDbIfAvailable(): PgOrchestrationDb | null {
     try {
       return this._orchestrationDb ?? this.getOrchestrationDb()
     } catch {
@@ -4121,17 +4252,36 @@ export class OrcaRuntimeService {
   // for unread orchestration messages addressed to that terminal and inject them
   // into the PTY. This is event-driven (no polling) because the runtime owns
   // both the message store and terminal status detection.
+  // ADR-021 — stays a synchronous void method (both call sites are closures
+  // handed to other event-driven command modules, not awaited) — the actual
+  // work is fired-and-forgotten through the KeyedAsyncQueue keyed by
+  // `handle`, so two idle-transition events for the same terminal (or an
+  // idle transition racing a pty-exit) can never interleave their
+  // orchestration-DB reads/writes. See keyed-async-queue.ts's module doc
+  // comment and orca-runtime-pty-exit.ts's identical pattern.
   private deliverPendingMessages(leaf: RuntimeLeafRecord): void {
     if (!this._orchestrationDb) {
       return
     }
-
     const handle = this.graph.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
     if (!handle) {
       return
     }
+    void this.orchestrationDeliveryQueue.run(handle, () =>
+      this.deliverOrchestrationMessagesToLeaf(handle, leaf)
+    )
+  }
 
-    const unread = this._orchestrationDb.getUndeliveredUnreadMessages(handle)
+  private async deliverOrchestrationMessagesToLeaf(
+    handle: string,
+    leaf: RuntimeLeafRecord
+  ): Promise<void> {
+    const db = this._orchestrationDb
+    if (!db) {
+      return
+    }
+
+    const unread = await db.getUndeliveredUnreadMessages(handle)
     if (unread.length === 0) {
       return
     }
@@ -4147,8 +4297,9 @@ export class OrcaRuntimeService {
     }
 
     // The active coordinator prompt is user-owned input, so push-on-idle must not synthesize Enter.
-    if (this._orchestrationDb.getActiveCoordinatorRun()?.coordinator_handle === handle) {
-      this._orchestrationDb.markAsDelivered(unread.map((m) => m.id))
+    const activeRun = await db.getActiveCoordinatorRun()
+    if (activeRun?.coordinator_handle === handle) {
+      await db.markAsDelivered(unread.map((m) => m.id))
       return
     }
 
@@ -4157,7 +4308,7 @@ export class OrcaRuntimeService {
       // Why: Cursor Agent treats injected PTY text as editable prompt input.
       // Push-on-idle may surface the message, but submitting it must stay
       // under user control.
-      this._orchestrationDb.markAsDelivered(unread.map((m) => m.id))
+      await db.markAsDelivered(unread.map((m) => m.id))
       return
     }
 
@@ -4172,21 +4323,30 @@ export class OrcaRuntimeService {
     // consumed this message." Flipping `read` on push-on-idle would hide the
     // message from the coordinator's next `check --unread`, which is the
     // exact bug feedback #2 reported. The two bits must stay independent.
+    //
+    // ADR-021: the 500ms delay is still a bare setTimeout, not queued —
+    // it's scoped to this one delivery's own ptyId/unread closure, not a
+    // second independent read/write of orchestration-DB state, so it can't
+    // race a *different* deliverPendingMessages call the way the reads above
+    // could. The queue's job was serializing entry into this function per
+    // handle, which already happened.
     const ptyId = leaf.ptyId
     setTimeout(() => {
-      try {
-        if (!leaf.writable) {
-          return
+      void (async () => {
+        try {
+          if (!leaf.writable) {
+            return
+          }
+          const submitted = this.ptyController?.write(ptyId, '\r') ?? false
+          if (submitted) {
+            await db.markAsDelivered(unread.map((m) => m.id))
+          }
+        } catch {
+          // Terminal may have closed during the delay — messages stay queued
+          // (delivered_at still NULL) and will be re-delivered on the next
+          // idle transition.
         }
-        const submitted = this.ptyController?.write(ptyId, '\r') ?? false
-        if (submitted) {
-          this._orchestrationDb?.markAsDelivered(unread.map((m) => m.id))
-        }
-      } catch {
-        // Terminal may have closed during the delay — messages stay queued
-        // (delivered_at still NULL) and will be re-delivered on the next
-        // idle transition.
-      }
+      })()
     }, 500)
   }
 

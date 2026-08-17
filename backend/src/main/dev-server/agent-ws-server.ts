@@ -22,6 +22,14 @@ import type { WsHandshakeInfo } from './ws-handshake'
 import { AGENT_WS_PATH, AGENT_CONNECT_TIMEOUT_MS } from '../../shared/agent-wire-protocol'
 import { Tracers } from '../../shared/trace/tracers'
 
+// Mirrors src/server/index.ts's rpcPort/httpPort derivation — this file has no
+// access to that module's local consts, and the two must never drift apart
+// since agents are told to connect to whichever port this computes.
+function agentWsPort(): number {
+  const rpcPort = Number.parseInt(process.env.ORCA_PORT ?? '6768', 10)
+  return Number.parseInt(process.env.ORCA_HTTP_PORT ?? String(rpcPort + 1), 10)
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type AgentConnectedInfo = WsHandshakeInfo
@@ -100,7 +108,9 @@ export class AgentWebSocketServer {
       onExpired(
         `direct-websocket: Agent did not connect within ${AGENT_CONNECT_TIMEOUT_MS / 1000}s. ` +
           `Configure your agent with:\n` +
-          `  ORCA_URL=ws://<orca-host>:6768${AGENT_WS_PATH}\n` +
+          // Agent WS listens on httpPort (rpcPort+1, default 6769 — see header comment),
+          // not rpcPort (6768, the browser/RPC WS) — matches src/server/index.ts's split.
+          `  ORCA_URL=ws://<orca-host>:${agentWsPort()}${AGENT_WS_PATH}\n` +
           `  AGENT_TOKEN=${agentToken}`
       )
     }, AGENT_CONNECT_TIMEOUT_MS)

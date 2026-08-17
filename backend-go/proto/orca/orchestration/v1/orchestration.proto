@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package orca.orchestration.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1;orchestrationv1";
+
+// OrchestrationService: real-time multi-agent coordination (messages, gates,
+// dispatch contexts) — a distinct id space from task-service's tasks table.
+// See specs/backend-go/services/orchestration-service.md.
+service OrchestrationService {
+  rpc CreateDispatchContext(CreateDispatchContextRequest) returns (CreateDispatchContextResponse);
+  rpc CreateGate(CreateGateRequest) returns (CreateGateResponse);
+  rpc ResolveGate(ResolveGateRequest) returns (ResolveGateResponse);
+  // UpdateTaskStatusAndPromote is one atomic RPC (single DB transaction) —
+  // mirrors TS's updateTaskStatus -> promoteReadyTasks chain.
+  rpc UpdateTaskStatusAndPromote(UpdateTaskStatusAndPromoteRequest) returns (UpdateTaskStatusAndPromoteResponse);
+}
+
+message DispatchContext {
+  string id = 1;
+  string handle = 2; // KeyedAsyncQueue serialization key
+  string coordinator_run_id = 3;
+  // orchestration_task_id round-trips the owning task id set on creation.
+  // See docs/execution-plan.md Epic C: added so callers can observe the FK
+  // they supplied on CreateDispatchContextRequest.
+  string orchestration_task_id = 4;
+}
+
+message CreateDispatchContextRequest {
+  string handle = 1;
+  string coordinator_run_id = 2;
+  // orchestration_task_id is the owning OrchestrationTask this dispatch
+  // attempt belongs to. Optional: an ad-hoc coordinator-only dispatch (no
+  // task yet) legitimately omits it. See docs/execution-plan.md Epic C —
+  // without this, dispatch_contexts.orchestration_task_id was always NULL
+  // and CreateGate could never resolve a task to block, failing closed with
+  // ORCH_DISPATCH_CONTEXT_NO_TASK for every dispatch context.
+  string orchestration_task_id = 3;
+}
+
+message CreateDispatchContextResponse {
+  DispatchContext context = 1;
+}
+
+message DecisionGate {
+  string id = 1;
+  string dispatch_context_id = 2;
+  string status = 3; // pending|resolved|failed
+  // question/options round-trip what the gate asked. See
+  // docs/execution-plan.md Epic C — the usecase/repository layer already
+  // accepted and persisted these; only the proto lacked the fields to carry
+  // them over the wire.
+  string question = 4;
+  repeated string options = 5;
+}
+
+message CreateGateRequest {
+  string dispatch_context_id = 1;
+  // orchestration_task_id is intentionally NOT threaded into the CreateGate
+  // usecase: it derives the owning task from dispatch_context_id itself via
+  // a locked read (see orchestration-service's create_gate.go), a
+  // deliberate derive-not-trust boundary. This field exists for API
+  // symmetry / future callers but the server does not read it — see
+  // docs/execution-plan.md Epic C.
+  string orchestration_task_id = 2;
+  // question/options: see docs/execution-plan.md Epic C — the
+  // usecase/repository layer already accepted these but the proto never
+  // carried them from the gRPC caller, so they always arrived empty.
+  string question = 3;
+  repeated string options = 4;
+}
+
+message CreateGateResponse {
+  DecisionGate gate = 1;
+}
+
+message ResolveGateRequest {
+  string gate_id = 1;
+  string outcome_json = 2;
+}
+
+message ResolveGateResponse {
+  DecisionGate gate = 1;
+}
+
+message UpdateTaskStatusAndPromoteRequest {
+  string orchestration_task_id = 1;
+  string new_status = 2;
+}
+
+message UpdateTaskStatusAndPromoteResponse {
+  repeated string promoted_task_ids = 1;
+}

@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package orca.annotation.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1;annotationv1";
+
+import "google/protobuf/timestamp.proto";
+
+// AnnotationService owns inline code-review comments anchored to a file+line.
+// See specs/backend-go/services/annotation-service.md.
+service AnnotationService {
+  rpc CreateAnnotation(CreateAnnotationRequest) returns (CreateAnnotationResponse);
+  rpc ListAnnotations(ListAnnotationsRequest) returns (ListAnnotationsResponse);
+  rpc UpdateAnnotation(UpdateAnnotationRequest) returns (UpdateAnnotationResponse);
+  rpc DeleteAnnotation(DeleteAnnotationRequest) returns (DeleteAnnotationResponse);
+}
+
+message Anchor {
+  string repo_id = 1;
+  string file_path = 2;
+  int32 line = 3;
+  string ref = 4; // commit sha or branch, best-effort
+}
+
+message Annotation {
+  string id = 1;
+  string tenant_id = 2;
+  string author_id = 3;
+  Anchor anchor = 4;
+  string content = 5;
+  bool resolved = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message CreateAnnotationRequest {
+  Anchor anchor = 1;
+  string content = 2;
+  string request_id = 3;
+}
+
+message CreateAnnotationResponse {
+  Annotation annotation = 1;
+}
+
+message ListAnnotationsRequest {
+  string repo_id = 1;
+  string file_path = 2; // optional filter
+  string page_token = 3;
+  int32 page_size = 4;
+}
+
+message ListAnnotationsResponse {
+  repeated Annotation annotations = 1;
+  string next_page_token = 2;
+}
+
+message UpdateAnnotationRequest {
+  string id = 1;
+  string content = 2;
+  bool resolved = 3;
+}
+
+message UpdateAnnotationResponse {
+  Annotation annotation = 1;
+}
+
+message DeleteAnnotationRequest {
+  string id = 1;
+}
+
+message DeleteAnnotationResponse {}

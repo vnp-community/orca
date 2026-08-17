@@ -1,0 +1,147 @@
+syntax = "proto3";
+
+package orca.auth.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1;authv1";
+
+import "google/protobuf/timestamp.proto";
+
+// AuthService owns users, sessions, RBAC/access-policies, audit log, admin console.
+// See specs/backend-go/services/auth-service.md.
+service AuthService {
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
+  rpc IssueServiceToken(IssueServiceTokenRequest) returns (IssueServiceTokenResponse);
+  // GetJWKS is public/unauthenticated by convention (Epic D): every service
+  // needs to fetch auth-service's signing keys to verify JWTs without a
+  // per-request call back, so this RPC deliberately requires no caller
+  // identity.
+  rpc GetJWKS(GetJWKSRequest) returns (GetJWKSResponse);
+
+  // Admin console
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse);
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+  rpc QueryAuditLog(QueryAuditLogRequest) returns (QueryAuditLogResponse);
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_USER = 1;
+  ROLE_ADMIN = 2;
+}
+
+message User {
+  string id = 1;
+  string tenant_id = 2;
+  string email = 3;
+  string name = 4;
+  Role role = 5;
+  bool is_active = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string session_token = 1;
+  User user = 2;
+}
+
+message LogoutRequest {
+  string session_token = 1;
+}
+
+message LogoutResponse {}
+
+message ValidateSessionRequest {
+  string session_token = 1;
+}
+
+message ValidateSessionResponse {
+  bool valid = 1;
+  User user = 2;
+}
+
+message IssueServiceTokenRequest {
+  string user_id = 1;
+  string audience = 2; // which service this JWT is intended for
+}
+
+message IssueServiceTokenResponse {
+  string jwt = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message GetJWKSRequest {}
+
+message GetJWKSResponse {
+  // JSON-serialized RFC 7517 JWK Set (`{"keys":[...]}`) — kept as an
+  // opaque string rather than a hand-modeled proto message, matching this
+  // codebase's existing convention for opaque external-format payloads
+  // (e.g. the Relay RPC's params_json/result_json).
+  string jwks_json = 1;
+}
+
+message CreateUserRequest {
+  string email = 1;
+  string name = 2;
+  string tenant_id = 3;
+  Role role = 4;
+}
+
+message CreateUserResponse {
+  User user = 1;
+}
+
+message ListUsersRequest {
+  string tenant_id = 1;
+  string page_token = 2;
+  int32 page_size = 3;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  string next_page_token = 2;
+}
+
+message UpdateUserRoleRequest {
+  string user_id = 1;
+  Role role = 2;
+}
+
+message UpdateUserRoleResponse {
+  User user = 1;
+}
+
+message RevokeSessionRequest {
+  string session_token = 1;
+}
+
+message RevokeSessionResponse {}
+
+message AuditEntry {
+  string id = 1;
+  string tenant_id = 2;
+  string actor_id = 3;
+  string action = 4;
+  string target = 5;
+  google.protobuf.Timestamp occurred_at = 6;
+}
+
+message QueryAuditLogRequest {
+  string tenant_id = 1;
+  google.protobuf.Timestamp since = 2;
+  string page_token = 3;
+  int32 page_size = 4;
+}
+
+message QueryAuditLogResponse {
+  repeated AuditEntry entries = 1;
+  string next_page_token = 2;
+}

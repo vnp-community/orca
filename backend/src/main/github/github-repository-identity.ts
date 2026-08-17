@@ -36,25 +36,29 @@ export function githubRepoContext(
   }
 }
 
-export function ghRepoExecOptions(context: GitHubRepoContext): {
+// ADR-018: ghExecFileAsync (src/main/git/runner.ts) now routes every call
+// through the connectionId's agent — connectionId must always flow through
+// here (previously dropped when set, since exec ran locally instead, gated
+// by the now-removed MULTI_USER_GH_CLI_NOT_SUPPORTED throw). cwd stays
+// repoPath unconditionally: for connection-bound repos this is already the
+// agent-side path, the same one git.exec already uses successfully for
+// these repos. See specs/agent/api/gaps-and-findings.md.
+export function ghRepoExecOptions(
+  context: GitHubRepoContext,
+  userId?: string
+): {
   cwd?: string
   encoding?: BufferEncoding
   wslDistro?: string
+  connectionId?: string
+  userId?: string
 } {
-  if (context.connectionId && process.env['ORCA_MULTI_USER'] === '1') {
-    // Why: an SSH-connectionId repo with no cwd means gh would run on the
-    // shared Orca Server host with no per-user isolation. See BUG-BE-HLD-004.
-    throw new Error(
-      'MULTI_USER_GH_CLI_NOT_SUPPORTED: gh CLI for SSH-connected repos must be ' +
-      'relayed to the Dev Server Agent in Web Server multi-user mode.'
-    )
+  return {
+    cwd: context.repoPath,
+    ...(context.wslDistro ? { wslDistro: context.wslDistro } : {}),
+    ...(context.connectionId ? { connectionId: context.connectionId } : {}),
+    ...(userId ? { userId } : {})
   }
-  return context.connectionId
-    ? {}
-    : {
-        cwd: context.repoPath,
-        ...(context.wslDistro ? { wslDistro: context.wslDistro } : {})
-      }
 }
 
 const OWNER_REPO_POSITIVE_CACHE_TTL_MS = 30_000

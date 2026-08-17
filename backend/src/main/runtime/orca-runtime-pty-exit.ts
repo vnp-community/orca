@@ -11,7 +11,14 @@ import type { AgentDetector } from '../stats/agent-detector'
 import type { RuntimeLeafRecord, RuntimePtyWorktreeRecord } from './orca-runtime'
 import type { RuntimeGraphStore } from './orca-runtime-graph-store'
 import type { RuntimePtyTranscriptStore } from './orca-runtime-pty-transcript-store'
-import type { OrchestrationDb } from './orchestration/db'
+// ADR-021 — "chỉ dùng 1 database": OrchestrationDb (SQLite) → PgOrchestrationDb
+// (async). onPtyExit() stays a synchronous void method (it's a raw PTY-exit
+// event handler) — failActiveDispatchOnExit() is fired-and-forgotten through
+// a KeyedAsyncQueue keyed by terminal handle instead, so a rapid exit/respawn
+// of the same handle can never interleave two dispatch-failure sequences
+// against the orchestration DB. See keyed-async-queue.ts's module doc comment.
+import type { PgOrchestrationDb } from './orchestration/pg-db'
+import type { KeyedAsyncQueue } from './orchestration/keyed-async-queue'
 
 export type RuntimePtyExitCommandHost = {
   getGraph(): RuntimeGraphStore
@@ -19,7 +26,12 @@ export type RuntimePtyExitCommandHost = {
   // Why: the raw field, not getOrchestrationDbIfAvailable() - dispatch-failure
   // handling on exit must not force-create an orchestration DB that doesn't
   // already exist (matches the original's direct this._orchestrationDb read).
-  getRawOrchestrationDb(): OrchestrationDb | null
+  getRawOrchestrationDb(): PgOrchestrationDb | null
+  // ADR-021 — shared across every orchestration-DB event-driven call site
+  // (pty-exit, message-delivery, terminal-agent-status), all keyed by
+  // terminal handle, so no two touch the same handle's dispatch state
+  // concurrently regardless of which code path triggered them.
+  getOrchestrationDeliveryQueue(): KeyedAsyncQueue
   getAgentDetector(): AgentDetector | null
   getLeafKey(tabId: string, leafId: string): string
   getLeavesForPty(ptyId: string): RuntimeLeafRecord[]
@@ -90,7 +102,20 @@ export class RuntimePtyExitCommands {
       leaf.writable = false
       leaf.lastExitCode = exitCode
       this.host.resolveExitWaiters(leaf)
-      this.failActiveDispatchOnExit(leaf, exitCode)
+      const handle = this.host
+        .getGraph()
+        .handleByLeafKey.get(this.host.getLeafKey(leaf.tabId, leaf.leafId))
+      if (handle) {
+        // Why fire-and-forget through the keyed queue, not `await` here:
+        // onPtyExit() is itself a synchronous void event handler (see class
+        // doc comment) — it cannot become async without cascading up through
+        // whatever raw PTY-exit source calls it. The queue guarantees this
+        // call and any other orchestration-DB write for the same `handle`
+        // (message delivery, another exit) still run strictly in order.
+        void this.host
+          .getOrchestrationDeliveryQueue()
+          .run(handle, () => this.failActiveDispatchOnExit(handle, exitCode))
+      }
     }
     this.host.pruneDisconnectedPtyRecords()
   }
@@ -99,33 +124,30 @@ export class RuntimePtyExitCommands {
   // dispatch contexts immediately, rather than waiting for the coordinator's
   // next poll cycle. This catches agent crashes and unexpected exits within
   // milliseconds. The task is set back to 'pending' so it can be re-dispatched.
-  private failActiveDispatchOnExit(leaf: RuntimeLeafRecord, exitCode: number): void {
+  // Why async (ADR-021) + `handle: string` (not `leaf`, unlike before): the
+  // caller resolves `handle` synchronously (graph lookups only) and hands
+  // this off to the KeyedAsyncQueue keyed by that handle — see onPtyExit()'s
+  // call site.
+  private async failActiveDispatchOnExit(handle: string, exitCode: number): Promise<void> {
     const db = this.host.getRawOrchestrationDb()
     if (!db) {
       return
     }
 
-    const handle = this.host
-      .getGraph()
-      .handleByLeafKey.get(this.host.getLeafKey(leaf.tabId, leaf.leafId))
-    if (!handle) {
-      return
-    }
-
-    const dispatch = db.getActiveDispatchForTerminal(handle)
+    const dispatch = await db.getActiveDispatchForTerminal(handle)
     if (!dispatch) {
       return
     }
 
     const errorContext = `Agent exited with code ${exitCode}`
-    db.failDispatch(dispatch.id, errorContext)
+    await db.failDispatch(dispatch.id, errorContext)
 
     // Why: create an escalation message so the coordinator is notified about
     // the unexpected exit on its next check cycle, even if the circuit breaker
     // hasn't tripped yet.
-    const run = db.getActiveCoordinatorRun()
+    const run = await db.getActiveCoordinatorRun()
     if (run) {
-      db.insertMessage({
+      await db.insertMessage({
         from: handle,
         to: run.coordinator_handle,
         subject: `Agent exited unexpectedly (code ${exitCode})`,

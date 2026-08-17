@@ -9,7 +9,9 @@ import {
 } from '../../../shared/ephemeral-vm-recipes'
 import { PROJECT_HOST_SETUP_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
 import { assertRuntimeEnvironmentCapability } from '@/runtime/runtime-rpc-client'
+import { cleanupRuntimeEphemeralVmWorkspace } from '@/runtime/runtime-ephemeral-vm-client'
 
 export type PrepareEphemeralVmWorkspaceTargetArgs = {
   repoId: string
@@ -125,7 +127,7 @@ export async function prepareEphemeralVmWorkspaceTarget(
 
 async function cleanupProvisionedRuntime(runtimeId: string): Promise<void> {
   try {
-    await window.api.ephemeralVm.cleanup({ runtimeId })
+    await cleanupRuntimeEphemeralVmWorkspace(useAppStore.getState().settings, { runtimeId })
   } catch {
     // Best effort: the caller still needs the original setup/provisioning error.
   }

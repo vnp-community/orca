@@ -49,7 +49,17 @@ export function useWorkflow(templateId?: string) {
     const span = Tracers.uiWorkflowTemplateSaveFlow.start({ mode: templateId ? 'update' : 'create' })
     try {
       if (templateId) {
-        await callRuntimeRpc(target, 'workflow.template.update', { templateId, ...local, traceId: span.id })
+        // BUG-FE-RPC-006: workflow.template.update expects { templateId, name?, definition?,
+        // scope?, traceId } — NOT a flat spread of `local` (which mixes in `id`/`scopeRefId`
+        // that the RPC schema doesn't accept). `definition` wraps `steps` to match the same
+        // shape workflow.template.create/resolve already store in definition_json.
+        await callRuntimeRpc(target, 'workflow.template.update', {
+          templateId,
+          name: local.name,
+          definition: { steps: local.steps ?? [] },
+          scope: local.scope,
+          traceId: span.id,
+        })
       } else {
         const created = await callRuntimeRpc<WorkflowDefinition>(target, 'workflow.template.create', { ...local, traceId: span.id })
         useAppStore.getState().addTemplate(created)

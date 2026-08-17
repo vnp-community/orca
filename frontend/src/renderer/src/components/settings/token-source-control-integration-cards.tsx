@@ -4,6 +4,7 @@ import { IntegrationCardDetails, IntegrationCardShell } from './integration-card
 import { usePreflightCardStatuses } from './source-control-preflight-card-status'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export function BitbucketIntegrationCard(): React.JSX.Element {
   const { statuses, unavailable, refresh } = usePreflightCardStatuses('bitbucket')
   const status = unavailable ? 'unavailable' : statuses.bitbucketStatus
@@ -96,9 +97,7 @@ export function BitbucketIntegrationCard(): React.JSX.Element {
               variant="outline"
               size="sm"
               onClick={() =>
-                window.api.shell.openUrl(
-                  'https://support.atlassian.com/bitbucket-cloud/docs/using-api-tokens/'
-                )
+                shellOpenUrl('https://support.atlassian.com/bitbucket-cloud/docs/using-api-tokens/')
               }
             >
               <ExternalLink className="size-3.5 mr-1.5" />
@@ -223,7 +222,7 @@ export function AzureDevOpsIntegrationCard(): React.JSX.Element {
               variant="outline"
               size="sm"
               onClick={() =>
-                window.api.shell.openUrl(
+                shellOpenUrl(
                   status === 'not-configured'
                     ? 'https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate'
                     : 'https://learn.microsoft.com/en-us/rest/api/azure/devops/git/pull-requests/get-pull-requests'
@@ -341,9 +340,7 @@ export function GiteaIntegrationCard(): React.JSX.Element {
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                window.api.shell.openUrl('https://docs.gitea.com/next/development/api-usage')
-              }
+              onClick={() => shellOpenUrl('https://docs.gitea.com/next/development/api-usage')}
             >
               <ExternalLink className="size-3.5 mr-1.5" />
               {translate(

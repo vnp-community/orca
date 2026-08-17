@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package orca.gitgateway.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1;gitgatewayv1";
+
+// GitGatewayService is a stateless dispatcher: resolve the worktree's owning
+// host via infra-fleet-service, execute locally or relay. Owns no data.
+// See specs/backend-go/services/git-gateway-service.md.
+service GitGatewayService {
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc GetDiff(GetDiffRequest) returns (GetDiffResponse);
+  rpc Commit(CommitRequest) returns (CommitResponse);
+  rpc Push(PushRequest) returns (PushResponse);
+  rpc Pull(PullRequest) returns (PullResponse);
+  rpc GenerateCommitMessage(GenerateCommitMessageRequest) returns (GenerateCommitMessageResponse);
+}
+
+message GetStatusRequest {
+  string worktree_id = 1;
+}
+
+message FileStatus {
+  string path = 1;
+  string state = 2; // modified/added/deleted/untracked/conflicted
+}
+
+message GetStatusResponse {
+  repeated FileStatus files = 1;
+  string branch = 2;
+}
+
+message GetDiffRequest {
+  string worktree_id = 1;
+  bool staged = 2;
+}
+
+message GetDiffResponse {
+  string unified_diff = 1;
+}
+
+message CommitRequest {
+  string worktree_id = 1;
+  string message = 2;
+  repeated string paths = 3; // empty = all staged
+}
+
+message CommitResponse {
+  string commit_sha = 1;
+}
+
+message PushRequest {
+  string worktree_id = 1;
+  string remote = 2;
+  string branch = 3;
+}
+
+message PushResponse {
+  bool success = 1;
+}
+
+message PullRequest {
+  string worktree_id = 1;
+}
+
+message PullResponse {
+  bool success = 1;
+  bool had_conflicts = 2;
+}
+
+// GenerateCommitMessage relays to wherever AI inference happens (execution
+// plane) — this service never runs inference itself.
+message GenerateCommitMessageRequest {
+  string worktree_id = 1;
+}
+
+message GenerateCommitMessageResponse {
+  string message = 1;
+}

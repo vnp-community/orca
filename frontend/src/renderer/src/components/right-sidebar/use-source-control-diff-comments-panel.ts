@@ -10,6 +10,7 @@ import {
 } from './diff-comments-clear-dialog-state'
 import { useCopyFeedbackState } from './SourceControl'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export type UseSourceControlDiffCommentsPanelStateInput = {
   activeWorktreeId: string | null
   diffCommentsForActive: DiffComment[]
@@ -45,7 +46,7 @@ export function useSourceControlDiffCommentsPanelState(
       return
     }
     try {
-      await window.api.ui.writeClipboardText(diffCommentsPrompt)
+      await uiWriteClipboardText(diffCommentsPrompt)
       showDiffCommentsCopied(true)
     } catch {
       // Why: swallow — clipboard write can fail when the window isn't focused.
