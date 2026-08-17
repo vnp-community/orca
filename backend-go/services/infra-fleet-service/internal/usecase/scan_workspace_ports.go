@@ -38,7 +38,7 @@ func (uc *ScanWorkspacePorts) Execute(ctx context.Context, in ScanWorkspacePorts
 	}
 
 	if in.ConnectionID != "" {
-		connected, devServer, resolveErr := uc.resolver.ResolveConnection(ctx, tenantID, in.ConnectionID)
+		connected, devServer, _, resolveErr := uc.resolver.ResolveConnection(ctx, tenantID, in.ConnectionID)
 		if resolveErr != nil {
 			return nil, apperrors.New(apperrors.KindInternal, "INFRA_RESOLVE_FAILED", "failed to resolve connection", resolveErr)
 		}

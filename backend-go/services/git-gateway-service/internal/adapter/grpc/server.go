@@ -7,10 +7,6 @@ package grpc
 
 import (
 	"context"
-	"errors"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
@@ -100,22 +96,18 @@ func (s *Server) Pull(ctx context.Context, req *gitgatewayv1.PullRequest) (*gitg
 	return &gitgatewayv1.PullResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
 }
 
-// GenerateCommitMessage always fails with codes.Unimplemented — per
-// git-gateway-service.md §3.1 this RPC relays to the Dev Server Agent's
-// ai.complete, which is not wired in this scaffold
-// (usecase.ErrGenerateCommitMessageNotImplemented). This bypasses
-// apperrors.ToGRPCStatus, whose Kind taxonomy has no Unimplemented case,
-// since this RPC is deliberately and permanently a stub in this scaffold
-// rather than a runtime failure mode that taxonomy models.
+// GenerateCommitMessage relays the worktree's staged diff to the Dev Server
+// Agent's ai.complete (per git-gateway-service.md §3.1) via
+// usecase.GenerateCommitMessage. A worktree with no relay connection maps
+// to codes.FailedPrecondition through the normal apperrors.ToGRPCStatus
+// path — no special-casing needed here now that the usecase always returns
+// a typed AppError rather than a permanent stub sentinel.
 func (s *Server) GenerateCommitMessage(ctx context.Context, req *gitgatewayv1.GenerateCommitMessageRequest) (*gitgatewayv1.GenerateCommitMessageResponse, error) {
-	_, err := s.generateCommitMessage.Execute(ctx, usecase.GenerateCommitMessageInput{WorktreeID: req.GetWorktreeId()})
-	if errors.Is(err, usecase.ErrGenerateCommitMessageNotImplemented) {
-		return nil, status.Error(codes.Unimplemented, err.Error())
-	}
+	message, err := s.generateCommitMessage.Execute(ctx, usecase.GenerateCommitMessageInput{WorktreeID: req.GetWorktreeId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.GenerateCommitMessageResponse{}, nil
+	return &gitgatewayv1.GenerateCommitMessageResponse{Message: message}, nil
 }
 
 func toProtoFileStatuses(files []domain.FileStatus) []*gitgatewayv1.FileStatus {

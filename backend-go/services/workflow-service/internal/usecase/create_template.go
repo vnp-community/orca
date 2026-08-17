@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -24,6 +25,10 @@ type CreateTemplateInput struct {
 	Name    string
 	DAGJSON string
 	Scope   string
+	// ParentTemplateID is optional — empty means this template is a root
+	// of its own inheritance chain. See domain.WorkflowTemplate's doc
+	// comment and usecase.ResolveTemplate.
+	ParentTemplateID string
 }
 
 // CreateTemplate is workflow-service's template authoring path.
@@ -41,9 +46,22 @@ func (uc *CreateTemplate) Execute(ctx context.Context, in CreateTemplateInput) (
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindUnauthenticated, "WORKFLOW_NO_TENANT", "no tenant in request context", err)
 	}
 
-	tmpl, err := domain.NewWorkflowTemplate(uuid.NewString(), tenantID, in.Name, in.DAGJSON, domain.Scope(in.Scope))
+	tmpl, err := domain.NewWorkflowTemplate(uuid.NewString(), tenantID, in.Name, in.DAGJSON, domain.Scope(in.Scope), in.ParentTemplateID)
 	if err != nil {
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_TEMPLATE", err.Error(), err)
+	}
+
+	// Explicit existence check (rather than relying on the FK constraint
+	// alone) so an unknown parent surfaces as a clean
+	// KindFailedPrecondition, matching task-service's CreateTask/ParentID
+	// convention — see that usecase for the identical pattern.
+	if tmpl.ParentTemplateID != "" {
+		if _, err := uc.repo.GetTemplate(ctx, tenantID, tmpl.ParentTemplateID); err != nil {
+			if errors.Is(err, domain.ErrTemplateNotFound) {
+				return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindFailedPrecondition, "WORKFLOW_PARENT_TEMPLATE_NOT_FOUND", "parent template does not exist", err)
+			}
+			return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_TEMPLATE_FETCH_FAILED", "failed to fetch parent template", err)
+		}
 	}
 
 	if err := uc.repo.CreateTemplate(ctx, tmpl); err != nil {

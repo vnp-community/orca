@@ -19,10 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CredentialBrokerService_WriteCredential_FullMethodName   = "/orca.credentialbroker.v1.CredentialBrokerService/WriteCredential"
-	CredentialBrokerService_ResolveCredential_FullMethodName = "/orca.credentialbroker.v1.CredentialBrokerService/ResolveCredential"
-	CredentialBrokerService_RotateCredential_FullMethodName  = "/orca.credentialbroker.v1.CredentialBrokerService/RotateCredential"
-	CredentialBrokerService_RevokeCredential_FullMethodName  = "/orca.credentialbroker.v1.CredentialBrokerService/RevokeCredential"
+	CredentialBrokerService_WriteCredential_FullMethodName          = "/orca.credentialbroker.v1.CredentialBrokerService/WriteCredential"
+	CredentialBrokerService_ResolveCredential_FullMethodName        = "/orca.credentialbroker.v1.CredentialBrokerService/ResolveCredential"
+	CredentialBrokerService_RotateCredential_FullMethodName         = "/orca.credentialbroker.v1.CredentialBrokerService/RotateCredential"
+	CredentialBrokerService_RevokeCredential_FullMethodName         = "/orca.credentialbroker.v1.CredentialBrokerService/RevokeCredential"
+	CredentialBrokerService_GetCredentialMetadata_FullMethodName    = "/orca.credentialbroker.v1.CredentialBrokerService/GetCredentialMetadata"
+	CredentialBrokerService_ResolveCredentialByOwner_FullMethodName = "/orca.credentialbroker.v1.CredentialBrokerService/ResolveCredentialByOwner"
+	CredentialBrokerService_RevokeCredentialByOwner_FullMethodName  = "/orca.credentialbroker.v1.CredentialBrokerService/RevokeCredentialByOwner"
+	CredentialBrokerService_SignVapidPayload_FullMethodName         = "/orca.credentialbroker.v1.CredentialBrokerService/SignVapidPayload"
 )
 
 // CredentialBrokerServiceClient is the client API for CredentialBrokerService service.
@@ -40,6 +44,49 @@ type CredentialBrokerServiceClient interface {
 	ResolveCredential(ctx context.Context, in *ResolveCredentialRequest, opts ...grpc.CallOption) (*ResolveCredentialResponse, error)
 	RotateCredential(ctx context.Context, in *RotateCredentialRequest, opts ...grpc.CallOption) (*RotateCredentialResponse, error)
 	RevokeCredential(ctx context.Context, in *RevokeCredentialRequest, opts ...grpc.CallOption) (*RevokeCredentialResponse, error)
+	// GetCredentialMetadata is a metadata-only read — id/tenant/owner/
+	// category/status/vault_path, NEVER a value. Added for Epic B
+	// (docs/execution-plan.md §8): ai-provider-service's
+	// usecase.CredentialBrokerClient.ResolveCredential port must never see
+	// plaintext (see that service's grpcclient package doc comment's
+	// SECURITY-CRITICAL note) but does need to observe a credential's
+	// current status. Distinct from ResolveCredential, which this RPC never
+	// calls into and shares no code path with beyond the metadata repository
+	// read itself.
+	GetCredentialMetadata(ctx context.Context, in *GetCredentialMetadataRequest, opts ...grpc.CallOption) (*GetCredentialMetadataResponse, error)
+	// ResolveCredentialByOwner is ResolveCredential's lookup-by-id, but keyed
+	// by (tenant_id, category, owner_id) instead — for callers that know
+	// which tenant+category+logical-owner they need a token for but were
+	// never handed an opaque credential_id (they didn't create the
+	// credential; they're the one that resolves it at call time). Added for
+	// Epic B: scm-integration-service (owner_id = provider name, e.g.
+	// "github") and issue-tracking-service (owner_id = provider name, e.g.
+	// "jira") both resolve this way — see those services' README "Known
+	// gaps" for the convention. Same authorized-caller list and fail-closed/
+	// audited semantics as ResolveCredential (see that RPC's doc comment);
+	// this is a different lookup key, not a different security posture.
+	ResolveCredentialByOwner(ctx context.Context, in *ResolveCredentialByOwnerRequest, opts ...grpc.CallOption) (*ResolveCredentialByOwnerResponse, error)
+	// RevokeCredentialByOwner is RevokeCredential's revoke-by-id counterpart,
+	// keyed by (tenant_id, category, owner_id) instead — for callers (e.g.
+	// scm-integration-service's RevokeAuth) that never received an opaque
+	// credential_id, the same way ResolveCredentialByOwner exists for the
+	// read side. Same fail-closed/audited semantics as RevokeCredential; a
+	// different lookup key, not a different security posture.
+	RevokeCredentialByOwner(ctx context.Context, in *RevokeCredentialByOwnerRequest, opts ...grpc.CallOption) (*RevokeCredentialByOwnerResponse, error)
+	// SignVapidPayload signs a Web Push VAPID JWT payload with a per-tenant
+	// Vault Transit key this service manages — added for Epic B so
+	// notification-service (previously the one documented exception, calling
+	// common/secrets.TransitEncrypt directly) no longer touches Vault at all.
+	// Deliberately narrow (one named operation, not a generic "Transit-sign
+	// anything" RPC) rather than folded into WriteCredential/
+	// ResolveCredential: a VAPID signing key is not tenant-supplied secret
+	// material with a lifecycle (write/rotate/revoke) the way an OAuth token
+	// is — it's a service-managed key this broker provisions implicitly on
+	// first use, scoped by tenant_id alone. See
+	// specs/backend-go/architecture/06-secrets-vault-architecture.md's
+	// updated "credential-broker-service's role" section for why this is
+	// documented as the fix, not an accepted deviation.
+	SignVapidPayload(ctx context.Context, in *SignVapidPayloadRequest, opts ...grpc.CallOption) (*SignVapidPayloadResponse, error)
 }
 
 type credentialBrokerServiceClient struct {
@@ -90,6 +137,46 @@ func (c *credentialBrokerServiceClient) RevokeCredential(ctx context.Context, in
 	return out, nil
 }
 
+func (c *credentialBrokerServiceClient) GetCredentialMetadata(ctx context.Context, in *GetCredentialMetadataRequest, opts ...grpc.CallOption) (*GetCredentialMetadataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCredentialMetadataResponse)
+	err := c.cc.Invoke(ctx, CredentialBrokerService_GetCredentialMetadata_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *credentialBrokerServiceClient) ResolveCredentialByOwner(ctx context.Context, in *ResolveCredentialByOwnerRequest, opts ...grpc.CallOption) (*ResolveCredentialByOwnerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveCredentialByOwnerResponse)
+	err := c.cc.Invoke(ctx, CredentialBrokerService_ResolveCredentialByOwner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *credentialBrokerServiceClient) RevokeCredentialByOwner(ctx context.Context, in *RevokeCredentialByOwnerRequest, opts ...grpc.CallOption) (*RevokeCredentialByOwnerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeCredentialByOwnerResponse)
+	err := c.cc.Invoke(ctx, CredentialBrokerService_RevokeCredentialByOwner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *credentialBrokerServiceClient) SignVapidPayload(ctx context.Context, in *SignVapidPayloadRequest, opts ...grpc.CallOption) (*SignVapidPayloadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SignVapidPayloadResponse)
+	err := c.cc.Invoke(ctx, CredentialBrokerService_SignVapidPayload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CredentialBrokerServiceServer is the server API for CredentialBrokerService service.
 // All implementations must embed UnimplementedCredentialBrokerServiceServer
 // for forward compatibility.
@@ -105,6 +192,49 @@ type CredentialBrokerServiceServer interface {
 	ResolveCredential(context.Context, *ResolveCredentialRequest) (*ResolveCredentialResponse, error)
 	RotateCredential(context.Context, *RotateCredentialRequest) (*RotateCredentialResponse, error)
 	RevokeCredential(context.Context, *RevokeCredentialRequest) (*RevokeCredentialResponse, error)
+	// GetCredentialMetadata is a metadata-only read — id/tenant/owner/
+	// category/status/vault_path, NEVER a value. Added for Epic B
+	// (docs/execution-plan.md §8): ai-provider-service's
+	// usecase.CredentialBrokerClient.ResolveCredential port must never see
+	// plaintext (see that service's grpcclient package doc comment's
+	// SECURITY-CRITICAL note) but does need to observe a credential's
+	// current status. Distinct from ResolveCredential, which this RPC never
+	// calls into and shares no code path with beyond the metadata repository
+	// read itself.
+	GetCredentialMetadata(context.Context, *GetCredentialMetadataRequest) (*GetCredentialMetadataResponse, error)
+	// ResolveCredentialByOwner is ResolveCredential's lookup-by-id, but keyed
+	// by (tenant_id, category, owner_id) instead — for callers that know
+	// which tenant+category+logical-owner they need a token for but were
+	// never handed an opaque credential_id (they didn't create the
+	// credential; they're the one that resolves it at call time). Added for
+	// Epic B: scm-integration-service (owner_id = provider name, e.g.
+	// "github") and issue-tracking-service (owner_id = provider name, e.g.
+	// "jira") both resolve this way — see those services' README "Known
+	// gaps" for the convention. Same authorized-caller list and fail-closed/
+	// audited semantics as ResolveCredential (see that RPC's doc comment);
+	// this is a different lookup key, not a different security posture.
+	ResolveCredentialByOwner(context.Context, *ResolveCredentialByOwnerRequest) (*ResolveCredentialByOwnerResponse, error)
+	// RevokeCredentialByOwner is RevokeCredential's revoke-by-id counterpart,
+	// keyed by (tenant_id, category, owner_id) instead — for callers (e.g.
+	// scm-integration-service's RevokeAuth) that never received an opaque
+	// credential_id, the same way ResolveCredentialByOwner exists for the
+	// read side. Same fail-closed/audited semantics as RevokeCredential; a
+	// different lookup key, not a different security posture.
+	RevokeCredentialByOwner(context.Context, *RevokeCredentialByOwnerRequest) (*RevokeCredentialByOwnerResponse, error)
+	// SignVapidPayload signs a Web Push VAPID JWT payload with a per-tenant
+	// Vault Transit key this service manages — added for Epic B so
+	// notification-service (previously the one documented exception, calling
+	// common/secrets.TransitEncrypt directly) no longer touches Vault at all.
+	// Deliberately narrow (one named operation, not a generic "Transit-sign
+	// anything" RPC) rather than folded into WriteCredential/
+	// ResolveCredential: a VAPID signing key is not tenant-supplied secret
+	// material with a lifecycle (write/rotate/revoke) the way an OAuth token
+	// is — it's a service-managed key this broker provisions implicitly on
+	// first use, scoped by tenant_id alone. See
+	// specs/backend-go/architecture/06-secrets-vault-architecture.md's
+	// updated "credential-broker-service's role" section for why this is
+	// documented as the fix, not an accepted deviation.
+	SignVapidPayload(context.Context, *SignVapidPayloadRequest) (*SignVapidPayloadResponse, error)
 	mustEmbedUnimplementedCredentialBrokerServiceServer()
 }
 
@@ -126,6 +256,18 @@ func (UnimplementedCredentialBrokerServiceServer) RotateCredential(context.Conte
 }
 func (UnimplementedCredentialBrokerServiceServer) RevokeCredential(context.Context, *RevokeCredentialRequest) (*RevokeCredentialResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeCredential not implemented")
+}
+func (UnimplementedCredentialBrokerServiceServer) GetCredentialMetadata(context.Context, *GetCredentialMetadataRequest) (*GetCredentialMetadataResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCredentialMetadata not implemented")
+}
+func (UnimplementedCredentialBrokerServiceServer) ResolveCredentialByOwner(context.Context, *ResolveCredentialByOwnerRequest) (*ResolveCredentialByOwnerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveCredentialByOwner not implemented")
+}
+func (UnimplementedCredentialBrokerServiceServer) RevokeCredentialByOwner(context.Context, *RevokeCredentialByOwnerRequest) (*RevokeCredentialByOwnerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeCredentialByOwner not implemented")
+}
+func (UnimplementedCredentialBrokerServiceServer) SignVapidPayload(context.Context, *SignVapidPayloadRequest) (*SignVapidPayloadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SignVapidPayload not implemented")
 }
 func (UnimplementedCredentialBrokerServiceServer) mustEmbedUnimplementedCredentialBrokerServiceServer() {
 }
@@ -221,6 +363,78 @@ func _CredentialBrokerService_RevokeCredential_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CredentialBrokerService_GetCredentialMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCredentialMetadataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CredentialBrokerServiceServer).GetCredentialMetadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CredentialBrokerService_GetCredentialMetadata_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CredentialBrokerServiceServer).GetCredentialMetadata(ctx, req.(*GetCredentialMetadataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CredentialBrokerService_ResolveCredentialByOwner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveCredentialByOwnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CredentialBrokerServiceServer).ResolveCredentialByOwner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CredentialBrokerService_ResolveCredentialByOwner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CredentialBrokerServiceServer).ResolveCredentialByOwner(ctx, req.(*ResolveCredentialByOwnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CredentialBrokerService_RevokeCredentialByOwner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeCredentialByOwnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CredentialBrokerServiceServer).RevokeCredentialByOwner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CredentialBrokerService_RevokeCredentialByOwner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CredentialBrokerServiceServer).RevokeCredentialByOwner(ctx, req.(*RevokeCredentialByOwnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CredentialBrokerService_SignVapidPayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SignVapidPayloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CredentialBrokerServiceServer).SignVapidPayload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CredentialBrokerService_SignVapidPayload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CredentialBrokerServiceServer).SignVapidPayload(ctx, req.(*SignVapidPayloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CredentialBrokerService_ServiceDesc is the grpc.ServiceDesc for CredentialBrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -243,6 +457,22 @@ var CredentialBrokerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeCredential",
 			Handler:    _CredentialBrokerService_RevokeCredential_Handler,
+		},
+		{
+			MethodName: "GetCredentialMetadata",
+			Handler:    _CredentialBrokerService_GetCredentialMetadata_Handler,
+		},
+		{
+			MethodName: "ResolveCredentialByOwner",
+			Handler:    _CredentialBrokerService_ResolveCredentialByOwner_Handler,
+		},
+		{
+			MethodName: "RevokeCredentialByOwner",
+			Handler:    _CredentialBrokerService_RevokeCredentialByOwner_Handler,
+		},
+		{
+			MethodName: "SignVapidPayload",
+			Handler:    _CredentialBrokerService_SignVapidPayload_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

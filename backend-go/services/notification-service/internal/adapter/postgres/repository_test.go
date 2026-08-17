@@ -102,3 +102,43 @@ func TestRepository_GetPublicKey_NoActiveKeyReturnsDomainError(t *testing.T) {
 		t.Fatalf("expected domain.ErrNoActiveVapidKey, got %v", err)
 	}
 }
+
+// TestRepository_MarkProcessed_FirstCallReservesEventID verifies the happy
+// path: a never-before-seen event ID is reserved and reported as new.
+func TestRepository_MarkProcessed_FirstCallReservesEventID(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	eventID := "11111111-1111-1111-1111-111111111111"
+	alreadyProcessed, err := repo.MarkProcessed(ctx, eventID, "orca.task.task.completed")
+	if err != nil {
+		t.Fatalf("mark processed: %v", err)
+	}
+	if alreadyProcessed {
+		t.Errorf("expected alreadyProcessed=false for a never-before-seen event ID")
+	}
+}
+
+// TestRepository_MarkProcessed_RedeliveryIsDetected verifies the
+// atomic-dedup contract ProcessedEventRepository documents: a second
+// MarkProcessed call for the same event ID (simulating JetStream
+// redelivery, or a concurrent replica racing the same message via its own
+// independent SubscribeEphemeral consumer) reports alreadyProcessed=true
+// via the INSERT ... ON CONFLICT DO NOTHING path, not an error.
+func TestRepository_MarkProcessed_RedeliveryIsDetected(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	eventID := "22222222-2222-2222-2222-222222222222"
+	if _, err := repo.MarkProcessed(ctx, eventID, "orca.task.task.completed"); err != nil {
+		t.Fatalf("first mark processed: %v", err)
+	}
+
+	alreadyProcessed, err := repo.MarkProcessed(ctx, eventID, "orca.task.task.completed")
+	if err != nil {
+		t.Fatalf("second mark processed: %v", err)
+	}
+	if !alreadyProcessed {
+		t.Errorf("expected alreadyProcessed=true for a redelivered event ID")
+	}
+}

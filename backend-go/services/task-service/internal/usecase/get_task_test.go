@@ -17,7 +17,7 @@ func TestGetTask_RequiresTenantContext(t *testing.T) {
 
 func TestGetTask_ReturnsAnExistingTask(t *testing.T) {
 	repo := newFakeTaskRepository()
-	task, _ := domain.NewTask("t1", "tenant-1", "Title", domain.StatusOpen, "")
+	task, _ := domain.NewTask("t1", "tenant-1", "Title", domain.StatusOpen, "", "")
 	repo.tasks["t1"] = task
 
 	uc := NewGetTask(repo)

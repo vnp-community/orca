@@ -38,24 +38,26 @@ func TestNewAnnotation_ValidatesInvariants(t *testing.T) {
 	validAnchor := Anchor{RepoID: "repo-1", FilePath: "main.go", Line: 10, Ref: "main"}
 
 	tests := []struct {
-		name     string
-		tenantID string
-		authorID string
-		anchor   Anchor
-		content  string
-		wantErr  error
+		name      string
+		tenantID  string
+		authorID  string
+		anchor    Anchor
+		content   string
+		requestID string
+		wantErr   error
 	}{
-		{"valid", "t1", "u1", validAnchor, "looks good", nil},
-		{"empty tenant", "", "u1", validAnchor, "looks good", ErrEmptyTenant},
-		{"empty author", "t1", "", validAnchor, "looks good", ErrEmptyTenant},
-		{"empty content", "t1", "u1", validAnchor, "", ErrEmptyContent},
-		{"invalid anchor", "t1", "u1", Anchor{RepoID: "", FilePath: "main.go", Line: 1}, "looks good", ErrEmptyRepoID},
-		{"negative anchor line", "t1", "u1", Anchor{RepoID: "repo-1", FilePath: "main.go", Line: -5}, "looks good", ErrNegativeLine},
+		{"valid", "t1", "u1", validAnchor, "looks good", "req-1", nil},
+		{"empty tenant", "", "u1", validAnchor, "looks good", "req-1", ErrEmptyTenant},
+		{"empty author", "t1", "", validAnchor, "looks good", "req-1", ErrEmptyTenant},
+		{"empty content", "t1", "u1", validAnchor, "", "req-1", ErrEmptyContent},
+		{"empty request id", "t1", "u1", validAnchor, "looks good", "", ErrEmptyRequestID},
+		{"invalid anchor", "t1", "u1", Anchor{RepoID: "", FilePath: "main.go", Line: 1}, "looks good", "req-1", ErrEmptyRepoID},
+		{"negative anchor line", "t1", "u1", Anchor{RepoID: "repo-1", FilePath: "main.go", Line: -5}, "looks good", "req-1", ErrNegativeLine},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewAnnotation("a1", tt.tenantID, tt.authorID, tt.anchor, tt.content, false, now, now)
+			_, err := NewAnnotation("a1", tt.tenantID, tt.authorID, tt.anchor, tt.content, false, tt.requestID, now, now)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -70,7 +72,7 @@ func TestNewAnnotation_ReturnsPopulatedAnnotation(t *testing.T) {
 	now := time.Now()
 	anchor := Anchor{RepoID: "repo-1", FilePath: "main.go", Line: 42, Ref: "abc123"}
 
-	got, err := NewAnnotation("a1", "t1", "u1", anchor, "nit: rename this", true, now, now)
+	got, err := NewAnnotation("a1", "t1", "u1", anchor, "nit: rename this", true, "req-1", now, now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,5 +84,8 @@ func TestNewAnnotation_ReturnsPopulatedAnnotation(t *testing.T) {
 	}
 	if got.Content != "nit: rename this" || !got.Resolved {
 		t.Errorf("unexpected content/resolved: %+v", got)
+	}
+	if got.RequestID != "req-1" {
+		t.Errorf("expected request id to round-trip, got %q", got.RequestID)
 	}
 }

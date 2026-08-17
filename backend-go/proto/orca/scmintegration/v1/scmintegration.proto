@@ -12,6 +12,18 @@ service ScmIntegrationService {
   rpc CreatePullRequest(CreatePullRequestRequest) returns (CreatePullRequestResponse);
   rpc ListPullRequests(ListPullRequestsRequest) returns (ListPullRequestsResponse);
   rpc GetRateLimitStatus(GetRateLimitStatusRequest) returns (GetRateLimitStatusResponse);
+
+  // Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
+  // flow terminating at an api-gateway-hosted /auth/{provider}/callback, NOT
+  // the TS PTY/CLI-login mechanism (gh auth login/glab auth login) it
+  // replaces. See specs/backend-go/services/scm-integration-service.md
+  // §9.1's sequence diagram for the exact 3-call shape below (StartOAuthFlow
+  // returns the authorization URL + state; CompleteOAuthFlow is called by
+  // api-gateway from the provider's redirect callback with the code+state).
+  rpc GetAuthStatus(GetAuthStatusRequest) returns (GetAuthStatusResponse);
+  rpc StartOAuthFlow(StartOAuthFlowRequest) returns (StartOAuthFlowResponse);
+  rpc CompleteOAuthFlow(CompleteOAuthFlowRequest) returns (CompleteOAuthFlowResponse);
+  rpc RevokeAuth(RevokeAuthRequest) returns (RevokeAuthResponse);
 }
 
 enum ScmProvider {
@@ -81,3 +93,67 @@ message GetRateLimitStatusResponse {
   int32 limit = 2;
   int64 reset_unix = 3;
 }
+
+// GetAuthStatus reports whether tenant_id currently has a usable credential
+// for provider — a cheap read (attempts credential-broker-service
+// resolution) so a client can show "connect your GitHub account" without
+// guessing from a failed ListIssues call.
+message GetAuthStatusRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+}
+
+message GetAuthStatusResponse {
+  bool connected = 1;
+}
+
+// StartOAuthFlow begins the §9.1 authorization-code web flow: this service
+// builds the provider's authorization URL and a signed, stateless state
+// token (no oauth_state table — see §5's data model, which deliberately
+// holds only rate_limit_cache/webhook_delivery_log); api-gateway redirects
+// the browser to authorization_url.
+message StartOAuthFlowRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  ScmProvider provider = 3;
+  // redirect_uri is api-gateway's own /auth/{provider}/callback URL for
+  // this environment — passed by the caller (not hardcoded here) since this
+  // service has no notion of api-gateway's public hostname per deployment.
+  string redirect_uri = 4;
+}
+
+message StartOAuthFlowResponse {
+  string authorization_url = 1;
+  // state is opaque to the caller — echoed back verbatim on
+  // CompleteOAuthFlow, never inspected or modified by api-gateway.
+  string state = 2;
+}
+
+// CompleteOAuthFlow is called from api-gateway's /auth/{provider}/callback
+// handler once the provider redirects the browser back with code+state.
+// Exchanges code for an access token and writes it to
+// credential-broker-service (CREDENTIAL_CATEGORY_SCM_OAUTH, owner_id =
+// provider name) — see this service's credentialbroker adapter package.
+message CompleteOAuthFlowRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  ScmProvider provider = 3;
+  string code = 4;
+  string state = 5;
+  // redirect_uri must exactly match the one passed to StartOAuthFlow — most
+  // providers' token endpoints validate this themselves, but it is also
+  // needed here to build the same exchange request.
+  string redirect_uri = 6;
+}
+
+message CompleteOAuthFlowResponse {
+  bool connected = 1;
+}
+
+// RevokeAuth disconnects a provider by revoking its stored credential.
+message RevokeAuthRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+}
+
+message RevokeAuthResponse {}

@@ -14,11 +14,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/common/testutil"
 	"github.com/stablyai/orca-go/services/usage-service/internal/domain"
 )
+
+// testOutboxEvent builds a minimal, valid domain.OutboxEvent for tests that
+// don't care about outbox content — just that SaveSession's transactional
+// enqueue doesn't break the rest of the write.
+func testOutboxEvent() domain.OutboxEvent {
+	return domain.OutboxEvent{ID: uuid.NewString(), Subject: "test.subject", OccurredAt: time.Now(), PayloadJSON: []byte(`{}`)}
+}
 
 func setupRepository(t *testing.T) *Repository {
 	t.Helper()
@@ -60,13 +68,13 @@ func TestRepository_SaveSession_IsIdempotentOnRequestID(t *testing.T) {
 		t.Fatalf("building session: %v", err)
 	}
 
-	if err := repo.SaveSession(ctx, session); err != nil {
+	if err := repo.SaveSession(ctx, session, testOutboxEvent()); err != nil {
 		t.Fatalf("first save: %v", err)
 	}
 	// Same RequestID, different ID — simulates a client retry after a
 	// timed-out-but-actually-succeeded write. Must not double-count.
 	session.ID = "s1-retry"
-	if err := repo.SaveSession(ctx, session); err != nil {
+	if err := repo.SaveSession(ctx, session, testOutboxEvent()); err != nil {
 		t.Fatalf("second save (retry): %v", err)
 	}
 
@@ -85,8 +93,8 @@ func TestRepository_ListSessions_FiltersByTenant(t *testing.T) {
 
 	s1, _ := domain.NewUsageSession("s1", "tenant-1", "user-1", domain.ProviderClaude, "wt-1", 10, 5, 0, 0, 0.01, time.Now(), time.Time{}, "req-1")
 	s2, _ := domain.NewUsageSession("s2", "tenant-2", "user-1", domain.ProviderClaude, "wt-1", 10, 5, 0, 0, 0.01, time.Now(), time.Time{}, "req-2")
-	_ = repo.SaveSession(ctx, s1)
-	_ = repo.SaveSession(ctx, s2)
+	_ = repo.SaveSession(ctx, s1, testOutboxEvent())
+	_ = repo.SaveSession(ctx, s2, testOutboxEvent())
 
 	sessions, _, err := repo.ListSessions(ctx, "tenant-1", "", "", 50)
 	if err != nil {
@@ -94,5 +102,48 @@ func TestRepository_ListSessions_FiltersByTenant(t *testing.T) {
 	}
 	if len(sessions) != 1 || sessions[0].TenantID != "tenant-1" {
 		t.Errorf("expected only tenant-1's session, got %+v", sessions)
+	}
+}
+
+// TestRepository_Outbox_EnqueueFetchMarkPublished exercises the Epic G
+// transactional-outbox round trip: SaveSession enqueues a row in the same
+// tx as the session write, FetchUnpublished sees it, and MarkPublished
+// removes it from future fetches — the exact cycle common/outbox.Relay
+// drives in production.
+func TestRepository_Outbox_EnqueueFetchMarkPublished(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	session, err := domain.NewUsageSession(
+		"s1", "tenant-1", "user-1", domain.ProviderClaude, "wt-1",
+		100, 50, 0, 0, 0.05, time.Now(), time.Now(), "req-1",
+	)
+	if err != nil {
+		t.Fatalf("building session: %v", err)
+	}
+	event := domain.OutboxEvent{ID: uuid.NewString(), Subject: "orca.usage.session.recorded", OccurredAt: time.Now(), PayloadJSON: []byte(`{"session_id":"s1"}`)}
+
+	if err := repo.SaveSession(ctx, session, event); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+
+	unpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("fetch unpublished: %v", err)
+	}
+	if len(unpublished) != 1 || unpublished[0].ID != event.ID || unpublished[0].Subject != event.Subject {
+		t.Fatalf("expected exactly the just-enqueued event, got %+v", unpublished)
+	}
+
+	if err := repo.MarkPublished(ctx, []string{event.ID}); err != nil {
+		t.Fatalf("mark published: %v", err)
+	}
+
+	stillUnpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("fetch unpublished after mark: %v", err)
+	}
+	if len(stillUnpublished) != 0 {
+		t.Errorf("expected no unpublished events after MarkPublished, got %+v", stillUnpublished)
 	}
 }

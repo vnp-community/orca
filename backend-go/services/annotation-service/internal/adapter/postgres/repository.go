@@ -32,11 +32,11 @@ func (r *Repository) CreateAnnotation(ctx context.Context, a domain.Annotation) 
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO annotation.annotations (
 			id, tenant_id, author_id, repo_id, file_path, line, ref,
-			content, resolved, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			content, resolved, request_id, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 	`,
 		a.ID, a.TenantID, a.AuthorID, a.Anchor.RepoID, a.Anchor.FilePath, a.Anchor.Line, a.Anchor.Ref,
-		a.Content, a.Resolved, a.CreatedAt, a.UpdatedAt,
+		a.Content, a.Resolved, a.RequestID, a.CreatedAt, a.UpdatedAt,
 	)
 	if err != nil {
 		return domain.Annotation{}, fmt.Errorf("postgres: insert annotation: %w", err)
@@ -44,10 +44,31 @@ func (r *Repository) CreateAnnotation(ctx context.Context, a domain.Annotation) 
 	return a, nil
 }
 
+// FindByRequestID looks up an existing annotation for (tenantID, requestID)
+// — CreateAnnotation's idempotency check, mirroring automation-service's
+// AutomationRunRepository.FindByRequestID.
+func (r *Repository) FindByRequestID(ctx context.Context, tenantID, requestID string) (domain.Annotation, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, tenant_id, author_id, repo_id, file_path, line, ref,
+		       content, resolved, request_id, created_at, updated_at
+		FROM annotation.annotations
+		WHERE tenant_id = $1 AND request_id = $2
+	`, tenantID, requestID)
+
+	a, err := scanAnnotation(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Annotation{}, false, nil
+	}
+	if err != nil {
+		return domain.Annotation{}, false, fmt.Errorf("postgres: find annotation by request id: %w", err)
+	}
+	return a, true, nil
+}
+
 func (r *Repository) ListAnnotations(ctx context.Context, tenantID, repoID, filePath, pageToken string, pageSize int32) ([]domain.Annotation, string, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, tenant_id, author_id, repo_id, file_path, line, ref,
-		       content, resolved, created_at, updated_at
+		       content, resolved, request_id, created_at, updated_at
 		FROM annotation.annotations
 		WHERE tenant_id = $1 AND repo_id = $2 AND ($3 = '' OR file_path = $3) AND id::text > $4
 		ORDER BY id
@@ -77,13 +98,34 @@ func (r *Repository) ListAnnotations(ctx context.Context, tenantID, repoID, file
 	return out, next, nil
 }
 
+// GetAnnotation fetches a single annotation by id, scoped to tenantID.
+// UpdateAnnotation/DeleteAnnotation's usecases call this first to read
+// author_id for the OPA author-only check before mutating.
+func (r *Repository) GetAnnotation(ctx context.Context, tenantID, id string) (domain.Annotation, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, tenant_id, author_id, repo_id, file_path, line, ref,
+		       content, resolved, request_id, created_at, updated_at
+		FROM annotation.annotations
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, id)
+
+	a, err := scanAnnotation(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Annotation{}, domain.ErrAnnotationNotFound
+	}
+	if err != nil {
+		return domain.Annotation{}, fmt.Errorf("postgres: get annotation: %w", err)
+	}
+	return a, nil
+}
+
 func (r *Repository) UpdateAnnotation(ctx context.Context, tenantID, id, content string, resolved bool) (domain.Annotation, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE annotation.annotations
 		SET content = $1, resolved = $2, updated_at = now()
 		WHERE tenant_id = $3 AND id = $4
 		RETURNING id, tenant_id, author_id, repo_id, file_path, line, ref,
-		          content, resolved, created_at, updated_at
+		          content, resolved, request_id, created_at, updated_at
 	`, content, resolved, tenantID, id)
 
 	a, err := scanAnnotation(row)
@@ -119,7 +161,7 @@ func scanAnnotation(row rowScanner) (domain.Annotation, error) {
 	var a domain.Annotation
 	if err := row.Scan(
 		&a.ID, &a.TenantID, &a.AuthorID, &a.Anchor.RepoID, &a.Anchor.FilePath, &a.Anchor.Line, &a.Anchor.Ref,
-		&a.Content, &a.Resolved, &a.CreatedAt, &a.UpdatedAt,
+		&a.Content, &a.Resolved, &a.RequestID, &a.CreatedAt, &a.UpdatedAt,
 	); err != nil {
 		return domain.Annotation{}, err
 	}

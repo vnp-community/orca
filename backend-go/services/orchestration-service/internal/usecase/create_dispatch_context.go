@@ -13,8 +13,9 @@ import (
 // message 1:1 — see architecture/03's note that usecase granularity mirrors
 // today's RPC methods so the TS->Go mapping stays traceable.
 type CreateDispatchContextInput struct {
-	Handle           string
-	CoordinatorRunID string
+	Handle              string
+	CoordinatorRunID    string
+	OrchestrationTaskID string // optional; see ports.go's DispatchContextRepository doc comment
 }
 
 // CreateDispatchContext is routed through the HandleSerializer keyed by
@@ -42,7 +43,7 @@ func (uc *CreateDispatchContext) Execute(ctx context.Context, in CreateDispatchC
 
 	var result domain.DispatchContext
 	err = uc.serializer.Do(ctx, in.Handle, func() error {
-		created, err := uc.repo.CreateDispatchContext(ctx, tenantID, in.Handle, in.CoordinatorRunID)
+		created, err := uc.repo.CreateDispatchContext(ctx, tenantID, in.Handle, in.CoordinatorRunID, in.OrchestrationTaskID)
 		if err != nil {
 			return err
 		}

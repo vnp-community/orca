@@ -51,6 +51,41 @@ type StepResult struct {
 	OutputJSON string
 }
 
+// AgentStepConfig is the Agent step type's config shape — the prompt-driven
+// agent invocation internal/adapter/infrafleetclient.AgentExecutor relays to
+// infra-fleet-service's Relay RPC (workflow-service.md §4).
+//
+// ConnectionID is a new field added in this pass: nothing in this scaffold
+// previously identified *which* infra-fleet-service connection (dev server +
+// worktree binding) an agent/shell/notification step should target — an
+// undocumented gap this build closes, naming the field to match
+// infra-fleet-service's own ConnectionID/connectionId convention (see its
+// internal/usecase/resolve_connection.go and relay.go).
+type AgentStepConfig struct {
+	ConnectionID string `json:"connectionId"`
+	Prompt       string `json:"prompt"`
+	WorktreePath string `json:"worktreePath,omitempty"`
+	TrustPreset  string `json:"trustPreset,omitempty"`
+}
+
+// ShellStepConfig is the Shell step type's config shape — a script relayed
+// to infra-fleet-service's Relay RPC for execution on the target connection.
+// ConnectionID: see AgentStepConfig's doc comment (same new-field rationale).
+type ShellStepConfig struct {
+	ConnectionID string            `json:"connectionId"`
+	Script       string            `json:"script"`
+	Env          map[string]string `json:"env,omitempty"`
+}
+
+// NotificationStepConfig is the Notification step type's config shape — a
+// message relayed to infra-fleet-service's Relay RPC for dispatch.
+// ConnectionID: see AgentStepConfig's doc comment (same new-field rationale).
+type NotificationStepConfig struct {
+	ConnectionID string `json:"connectionId"`
+	Channel      string `json:"channel"`
+	Message      string `json:"message"`
+}
+
 // StepExecutor is the domain-level strategy interface each step type
 // implements — one Execute per StepType, dispatched by
 // usecase.StepExecutorRegistry.Resolve.

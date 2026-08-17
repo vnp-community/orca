@@ -12,6 +12,8 @@ import (
 type fakeSshTargetRepository struct {
 	created   []domain.SshTarget
 	createErr error
+	byID      map[string]domain.SshTarget
+	getErr    error
 }
 
 func (f *fakeSshTargetRepository) Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error) {
@@ -20,6 +22,13 @@ func (f *fakeSshTargetRepository) Create(ctx context.Context, target domain.SshT
 	}
 	f.created = append(f.created, target)
 	return target, nil
+}
+
+func (f *fakeSshTargetRepository) Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error) {
+	if f.getErr != nil {
+		return domain.SshTarget{}, f.getErr
+	}
+	return f.byID[id], nil
 }
 
 func TestCreateSshTarget_RequiresTenantContext(t *testing.T) {

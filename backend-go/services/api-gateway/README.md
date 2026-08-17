@@ -42,23 +42,44 @@ JSON<->protobuf translation in `internal/adapter/httpgateway/usage_routes.go`
 — that codegen step isn't wired in this scaffold, so the usage routes are
 hand-written as the reference pattern instead.
 
-## Auth: placeholder, NOT production safe
+## Auth: real JWKS-verified JWTs + real session cookies (Epic D)
 
-`internal/usecase/validate_identity.go`'s `AuthValidator` extracts
-`tenant_id`/`sub` claims from a JWT (bearer token or session cookie value)
-**without verifying its signature**. Any caller can forge these claims and
-be trusted today. Before this service is production-ready it must:
+Both halves of auth are now real, not placeholders:
 
-1. Fetch `auth-service`'s JWKS and verify RS256 JWT signatures against it
-   (the `JWKSClient` port in `internal/usecase/ports.go` is defined but has
-   no real `internal/adapter/authclient` implementation yet).
-2. Resolve the browser session cookie against `auth-service`'s session
-   store, rather than parsing it as a JWT the way this placeholder does for
-   simplicity.
+1. **Bearer JWTs (mobile/CLI).** `internal/usecase/validate_identity.go`'s
+   `AuthValidator` verifies a short-lived RS256 JWT's signature — and its
+   `exp`/`iat`/`iss` — against `auth-service`'s published JWKS before
+   trusting any claim, via `common/jwtauth` and the real
+   `internal/adapter/authclient.JWKSClient` (implements the
+   `internal/usecase/ports.go` `JWKSClient` port: `GetJWKS` -> parse ->
+   cache ~5min -> resolve by `kid`). A stale-but-cached JWKS is served if a
+   refetch fails, rather than failing every in-flight verification on a
+   transient `auth-service` blip; a `kid`/signature/claims mismatch fails
+   closed (`ErrKeyLookupFailed`/`ErrSignatureVerificationFailed`/
+   `ErrMissingIdentityClaims`).
+2. **Browser session cookies.** The `orca_session` cookie is a raw opaque
+   session token, never a JWT — it's resolved against `auth-service`'s real
+   `ValidateSession` RPC via `internal/adapter/authclient.SessionValidator`,
+   not parsed as a JWT. `httpgateway.authMiddleware` and
+   `wsbridge.Handler.ServeHTTP` (see below) both try this cookie path
+   FIRST, falling back to `AuthValidator`'s bearer-JWT path only when no
+   cookie validates — a cookie-authenticated browser session has no bearer
+   JWT to present, so this ordering matters, not just the fallback itself.
 
-This is the same gap the design doc's §9 already frames as needing a real
-JWKS-verification path — it's called out here, in code comments on
-`AuthValidator`, and in the router's auth middleware, not silently skipped.
+**Fixed alongside this pass:** `wsbridge.Handler.ServeHTTP` previously
+called `AuthValidator.Validate` directly with no cookie-first attempt
+(unlike `authMiddleware`), which would have made `/v1/notifications/stream`
+unreachable for real cookie-authenticated browser sessions once
+`AuthValidator` stopped accepting unverified claims. It now takes a
+`Cookie CookieValidator` dependency and tries it first, same as
+`authMiddleware` (`cmd/server/main.go` wires the same `sessionValidator`
+into both).
+
+**Still not production-safe:**
+- No OPA authorization check ahead of routing (§9) — see "Other known gaps".
+- Outbound gRPC dials (including to `auth-service` for `GetJWKS`/
+  `ValidateSession`) use insecure transport credentials (local-dev only).
+- No CORS/origin allow-list on the WS upgrade (`InsecureSkipVerify: true`).
 
 ## Other known gaps
 
@@ -111,7 +132,9 @@ go test ./...   # unit tests only — no external deps; usage-service and
                  # fakes (internal/usecase), not real gRPC connections
 ```
 
-Covered: the rate limiter's per-tenant token-bucket behavior, the
-placeholder JWT claim extraction (valid/malformed/missing-claims cases),
-the WS<->gRPC frame pump loop, and the router's 501-stub response shape and
-401-unauthenticated behavior.
+Covered: the rate limiter's per-tenant token-bucket behavior, real
+JWKS-verified JWT validation (valid/tampered-signature/expired/
+unknown-kid/missing-claims cases, plus `JWKSClient`'s caching and
+stale-cache-survives-fetch-error behavior), `wsbridge.Handler`'s
+cookie-then-bearer-JWT auth ordering, the WS<->gRPC frame pump loop, and
+the router's 501-stub response shape and 401-unauthenticated behavior.

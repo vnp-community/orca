@@ -44,11 +44,12 @@ func New(
 func (s *Server) CreateAnnotation(ctx context.Context, req *annotationv1.CreateAnnotationRequest) (*annotationv1.CreateAnnotationResponse, error) {
 	anchor := req.GetAnchor()
 	annotation, err := s.createAnnotation.Execute(ctx, usecase.CreateAnnotationInput{
-		RepoID:   anchor.GetRepoId(),
-		FilePath: anchor.GetFilePath(),
-		Line:     anchor.GetLine(),
-		Ref:      anchor.GetRef(),
-		Content:  req.GetContent(),
+		RepoID:    anchor.GetRepoId(),
+		FilePath:  anchor.GetFilePath(),
+		Line:      anchor.GetLine(),
+		Ref:       anchor.GetRef(),
+		Content:   req.GetContent(),
+		RequestID: req.GetRequestId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

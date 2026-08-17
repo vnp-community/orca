@@ -20,6 +20,7 @@ import (
 
 	"github.com/stablyai/orca-go/common/testutil"
 	"github.com/stablyai/orca-go/services/credential-broker-service/internal/domain"
+	"github.com/stablyai/orca-go/services/credential-broker-service/internal/usecase"
 )
 
 func setupRepository(t *testing.T) *Repository {
@@ -88,6 +89,80 @@ func TestRepository_Get_NotFound(t *testing.T) {
 	_, err := repo.Get(context.Background(), uuid.NewString())
 	if !errors.Is(err, domain.ErrCredentialNotFound) {
 		t.Fatalf("expected ErrCredentialNotFound, got %v", err)
+	}
+}
+
+// TestRepository_RunInTx_CommitsBothOnSuccess proves RunInTx's metadata
+// mutation and audit append land together against a real Postgres
+// transaction, per credential-broker-service.md §8.
+func TestRepository_RunInTx_CommitsBothOnSuccess(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	m, err := domain.NewCredentialMetadata(
+		uuid.NewString(), uuid.NewString(), uuid.NewString(),
+		domain.CategoryScmOAuth, "credential/tenant-1/tx-commit", domain.StatusActive, now,
+	)
+	if err != nil {
+		t.Fatalf("building metadata: %v", err)
+	}
+
+	err = repo.RunInTx(ctx, func(ctx context.Context, metadataRepo usecase.CredentialMetadataRepository, auditRepo usecase.AuditRepository) error {
+		if err := metadataRepo.Create(ctx, m); err != nil {
+			return err
+		}
+		entry, err := domain.NewAccessAuditEntry(m.ID, "scm-integration-service", domain.ActionWrite, now)
+		if err != nil {
+			return err
+		}
+		return auditRepo.Append(ctx, entry)
+	})
+	if err != nil {
+		t.Fatalf("RunInTx: %v", err)
+	}
+
+	if _, err := repo.Get(ctx, m.ID); err != nil {
+		t.Errorf("expected the metadata row to be committed, got: %v", err)
+	}
+}
+
+// TestRepository_RunInTx_RollsBackBothOnFailure proves that when the audit
+// append inside RunInTx's fn fails, the metadata mutation that ran earlier
+// in the SAME fn call is rolled back too — the real-Postgres counterpart to
+// fakeTxRunner's in-memory rollback assertion in
+// internal/usecase/write_credential_test.go.
+func TestRepository_RunInTx_RollsBackBothOnFailure(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	m, err := domain.NewCredentialMetadata(
+		uuid.NewString(), uuid.NewString(), uuid.NewString(),
+		domain.CategoryScmOAuth, "credential/tenant-1/tx-rollback", domain.StatusActive, now,
+	)
+	if err != nil {
+		t.Fatalf("building metadata: %v", err)
+	}
+
+	sentinel := errors.New("audit append deliberately failed")
+	err = repo.RunInTx(ctx, func(ctx context.Context, metadataRepo usecase.CredentialMetadataRepository, auditRepo usecase.AuditRepository) error {
+		if err := metadataRepo.Create(ctx, m); err != nil {
+			return err
+		}
+		// Simulate the audit write failing after the metadata Create
+		// already ran, inside the same transaction.
+		return sentinel
+	})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("expected RunInTx to propagate the sentinel error, got: %v", err)
+	}
+
+	// The metadata Create must have been rolled back along with the
+	// (never-attempted) audit append — a real transaction, not two
+	// independent statements against the same pool.
+	if _, err := repo.Get(ctx, m.ID); !errors.Is(err, domain.ErrCredentialNotFound) {
+		t.Fatalf("expected the metadata Create to be rolled back, got err=%v", err)
 	}
 }
 

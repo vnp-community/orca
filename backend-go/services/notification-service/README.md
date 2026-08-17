@@ -50,10 +50,12 @@ publisher.
   `VapidKeyRepository`. Hand-written SQL, same rationale as
   `usage-service`.
 - `internal/adapter/vaultsigner/` — implements the `VaultSigner` port
-  against `common/secrets.Client.TransitEncrypt`. **Not yet called from
-  any RPC path** — wired into the gRPC `Server` composition (stored, ready
-  for the future `DeliverPush` usecase) but no mobile-push delivery
-  usecase exists in this slice. See "Known gaps".
+  against a real `credential-broker-service` connection's `SignVapidPayload`
+  RPC (Epic B, 2026-08-17 — previously called `common/secrets.Client.TransitEncrypt`
+  directly; see "credential-broker-service is wired" below). **Not yet
+  called from any RPC path** — wired into the gRPC `Server` composition
+  (stored, ready for the future `DeliverPush` usecase) but no mobile-push
+  delivery usecase exists in this slice. See "Known gaps".
 - `internal/adapter/grpc/` — implements the generated
   `notificationv1.NotificationServiceServer`, including
   `StreamNotifications`: a real, working server-streaming handler that
@@ -68,9 +70,26 @@ publisher.
   `usage-service`), the event-consumer loop started as a background
   goroutine sharing the server's shutdown `ctx` (its `WaitGroup` is waited
   on during graceful shutdown, after `grpcServer.GracefulStop()`), gRPC
-  server with the shared interceptor chain, health/readiness HTTP server
-  (`/readyz` includes a `vault` checker reporting whether a Vault client
-  is configured, without making a live Vault call on every poll).
+  server with the shared interceptor chain, health/readiness HTTP server.
+
+## `credential-broker-service` is wired (Epic B, 2026-08-17)
+
+This service used to call `common/secrets.Client.TransitEncrypt` directly
+against Vault for VAPID signing — the one service in this scaffold with a
+documented exception to
+[`architecture/06-secrets-vault-architecture.md`](../../../specs/backend-go/architecture/06-secrets-vault-architecture.md)'s
+"no other service talks to Vault directly for tenant secret material" rule
+(that doc's own "What goes in Vault" table said as much, in direct
+contradiction with its "`credential-broker-service`'s role" section a few
+paragraphs down — a real, documented inconsistency, not a hypothetical
+one). `internal/adapter/vaultsigner.Signer` now calls
+`credential-broker-service`'s `SignVapidPayload` RPC instead — this
+service no longer constructs a Vault client or imports `common/secrets` at
+all. The Transit key name convention (`"vapid-signing-" + tenantID`) is
+unchanged, so existing tenant keys keep working; only the process
+boundary moved. See `credentialbroker.proto`'s doc comment on
+`SignVapidPayload` for why it's a narrow, purpose-named RPC rather than a
+generic Transit passthrough.
 
 ## Running locally
 
@@ -95,50 +114,53 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
-- **The broadcaster is real, but single-replica only.** `internal/adapter/broadcaster.Broadcaster`
-  fans out correctly to every `StreamNotifications` subscriber connected to
-  *this* process, but a subscriber connected to a different replica of a
-  horizontally-scaled `notification-service` never sees the event — the
-  registry lives entirely in one process's memory. Per
-  notification-service.md §7, `api-gateway` is stateless-by-design and was
-  described as needing "no session-affinity awareness"; that assumption
-  breaks once this service itself is scaled beyond one replica. Solving it
-  needs either sticky routing at `api-gateway` (pin a user's stream to the
-  replica holding their subscription) or a distributed fan-out mechanism
-  (e.g. this service also publishing translated `NotificationEvent`s to a
-  NATS subject every replica subscribes to, so `Broadcast` becomes
-  "publish, then locally fan out on receipt" instead of a direct in-memory
-  call). Neither is implemented here — flag before this service is
-  deployed with `replicas > 1`.
-- **VAPID Transit signing needs a real Vault instance to actually sign.**
-  `internal/adapter/vaultsigner.Signer` wraps
-  `common/secrets.Client.TransitEncrypt` — construction never fails (Vault
-  connectivity isn't checked until a call is made), so the service starts
-  cleanly even with `VAULT_ADDR` unset or Vault unreachable. Calling
-  `SignVapidPayload` in that state returns a clearly wrapped error rather
-  than silently falling back to any local/plaintext signing path — there
-  is no local fallback for this key, by design (§9). The `/readyz` `vault`
-  checker only reports whether a client object was constructed, not live
-  Vault reachability, to avoid making a Transit call on every health poll.
+- **The broadcaster is real and now correct across replicas — Epic F
+  resolved this** (docs/execution-plan.md §2 Epic F, 2026-08-17).
+  `internal/adapter/broadcaster.Broadcaster` itself is still purely
+  in-process (`Broadcast` only ever reaches subscribers connected to *this*
+  process) — that part didn't need to change. What was actually broken:
+  `internal/adapter/eventbus.Consumer` used to give every replica the SAME
+  durable JetStream consumer name for each subscribed subject, which
+  JetStream treats as one shared work queue — only ONE replica ever
+  received a given domain event, so only that replica's `Broadcast` call
+  ever fired. Fixed by switching to
+  `commoneventbus.Consumer.SubscribeEphemeral` (new in this pass): each
+  replica gets its own private, unnamed JetStream consumer, so every
+  replica independently receives every event and calls `Broadcast` against
+  its own locally-connected subscribers — cluster-wide fan-out achieved at
+  the NATS layer, no new subject, no republish hop, no sticky-routing
+  requirement on `api-gateway`. Trade-off, documented rather than hidden: an
+  ephemeral consumer has no durable cursor, so a replica that was down when
+  an event was published never catches up on it after restarting — correct
+  for this service's already-stated no-offline-replay-queue posture (§2),
+  not a new gap.
+- **VAPID Transit signing needs a real Vault instance behind
+  `credential-broker-service` to actually sign.** `SignVapidPayload` returns
+  a clearly wrapped error if `credential-broker-service` is unreachable or
+  its own Vault connection fails — there is no local fallback for this key,
+  by design (§9). See `credential-broker-service`'s own README for the
+  Vault-side detail (`common/secrets.TransitEncrypt` standing in for a
+  dedicated Transit "sign" operation is now that service's gap to track,
+  not this one's).
 - **No `DeliverPush` usecase in this slice.** `VaultSigner` and the mobile
   push path (`deliver_push.go`, APNs/FCM clients, Web Push protocol
   framing per notification-service.md §6) aren't implemented — this slice
   covers subscription CRUD, VAPID public-key distribution, event
   consumption/translation, and WS fan-out only. `adapter/grpc.Server`
   holds a `VaultSigner` field ready for that usecase to be wired in later.
-- **`common/secrets.TransitEncrypt` stands in for a dedicated Transit
-  "sign" operation.** `common/secrets` exposes `TransitEncrypt`/
-  `TransitDecrypt` today, not Vault's asymmetric-key `sign` endpoint.
-  `vaultsigner.Signer` uses `TransitEncrypt` as the available equivalent —
-  swap it for a real `transit/sign/<key>` call once `common/secrets` grows
-  one.
-- **No `processed_events` dedup table.** notification-service.md §5/§8
-  describes a `notification.processed_events` table for JetStream
-  redelivery dedup; this slice's migrations only cover
-  `push_subscriptions`/`vapid_key_metadata`. `HandleIncomingEvent` is not
-  currently idempotent against redelivery of the same event ID — add the
-  dedup table and a check in `HandleIncomingEvent` before relying on
-  at-least-once JetStream delivery not double-broadcasting.
+- ~~**No `processed_events` dedup table.**~~ — **closed**
+  (docs/execution-plan.md §3 Phase 1): `migrations/0002_processed_events.{up,down}.sql`
+  adds `notification.processed_events` exactly per notification-service.md
+  §5/§8 (`event_id UUID PRIMARY KEY`, `subject`, `processed_at`, indexed on
+  `processed_at` for future pruning). `usecase.ProcessedEventRepository`'s
+  `MarkProcessed` is implemented in `internal/adapter/postgres` as a single
+  `INSERT ... ON CONFLICT DO NOTHING` — an atomic reserve, not a racy
+  check-then-insert, because `SubscribeEphemeral` gives every replica its
+  own independent JetStream consumer (Epic F), so a redelivered message can
+  race across replicas, not just within one process. `HandleIncomingEvent.Execute`
+  calls it first: a redelivery/race loser is logged at debug and returned
+  as a successful no-op (not re-broadcast, not an error), so the eventbus
+  adapter ACKs it instead of NAK-ing it back into another redelivery loop.
 - **No per-user notification-preference filtering** — explicitly out of
   scope per notification-service.md §2; every translated event is
   broadcast to every recipient the payload names, unconditionally.

@@ -671,6 +671,461 @@ func (x *GetRateLimitStatusResponse) GetResetUnix() int64 {
 	return 0
 }
 
+// GetAuthStatus reports whether tenant_id currently has a usable credential
+// for provider — a cheap read (attempts credential-broker-service
+// resolution) so a client can show "connect your GitHub account" without
+// guessing from a failed ListIssues call.
+type GetAuthStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      ScmProvider            `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAuthStatusRequest) Reset() {
+	*x = GetAuthStatusRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAuthStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAuthStatusRequest) ProtoMessage() {}
+
+func (x *GetAuthStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAuthStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetAuthStatusRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetAuthStatusRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *GetAuthStatusRequest) GetProvider() ScmProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return ScmProvider_SCM_PROVIDER_UNSPECIFIED
+}
+
+type GetAuthStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Connected     bool                   `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAuthStatusResponse) Reset() {
+	*x = GetAuthStatusResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAuthStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAuthStatusResponse) ProtoMessage() {}
+
+func (x *GetAuthStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAuthStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetAuthStatusResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetAuthStatusResponse) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+// StartOAuthFlow begins the §9.1 authorization-code web flow: this service
+// builds the provider's authorization URL and a signed, stateless state
+// token (no oauth_state table — see §5's data model, which deliberately
+// holds only rate_limit_cache/webhook_delivery_log); api-gateway redirects
+// the browser to authorization_url.
+type StartOAuthFlowRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	TenantId string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId   string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Provider ScmProvider            `protobuf:"varint,3,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
+	// redirect_uri is api-gateway's own /auth/{provider}/callback URL for
+	// this environment — passed by the caller (not hardcoded here) since this
+	// service has no notion of api-gateway's public hostname per deployment.
+	RedirectUri   string `protobuf:"bytes,4,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartOAuthFlowRequest) Reset() {
+	*x = StartOAuthFlowRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartOAuthFlowRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartOAuthFlowRequest) ProtoMessage() {}
+
+func (x *StartOAuthFlowRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartOAuthFlowRequest.ProtoReflect.Descriptor instead.
+func (*StartOAuthFlowRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *StartOAuthFlowRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *StartOAuthFlowRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *StartOAuthFlowRequest) GetProvider() ScmProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return ScmProvider_SCM_PROVIDER_UNSPECIFIED
+}
+
+func (x *StartOAuthFlowRequest) GetRedirectUri() string {
+	if x != nil {
+		return x.RedirectUri
+	}
+	return ""
+}
+
+type StartOAuthFlowResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	AuthorizationUrl string                 `protobuf:"bytes,1,opt,name=authorization_url,json=authorizationUrl,proto3" json:"authorization_url,omitempty"`
+	// state is opaque to the caller — echoed back verbatim on
+	// CompleteOAuthFlow, never inspected or modified by api-gateway.
+	State         string `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartOAuthFlowResponse) Reset() {
+	*x = StartOAuthFlowResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartOAuthFlowResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartOAuthFlowResponse) ProtoMessage() {}
+
+func (x *StartOAuthFlowResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartOAuthFlowResponse.ProtoReflect.Descriptor instead.
+func (*StartOAuthFlowResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *StartOAuthFlowResponse) GetAuthorizationUrl() string {
+	if x != nil {
+		return x.AuthorizationUrl
+	}
+	return ""
+}
+
+func (x *StartOAuthFlowResponse) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+// CompleteOAuthFlow is called from api-gateway's /auth/{provider}/callback
+// handler once the provider redirects the browser back with code+state.
+// Exchanges code for an access token and writes it to
+// credential-broker-service (CREDENTIAL_CATEGORY_SCM_OAUTH, owner_id =
+// provider name) — see this service's credentialbroker adapter package.
+type CompleteOAuthFlowRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	TenantId string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId   string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Provider ScmProvider            `protobuf:"varint,3,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
+	Code     string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
+	State    string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
+	// redirect_uri must exactly match the one passed to StartOAuthFlow — most
+	// providers' token endpoints validate this themselves, but it is also
+	// needed here to build the same exchange request.
+	RedirectUri   string `protobuf:"bytes,6,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CompleteOAuthFlowRequest) Reset() {
+	*x = CompleteOAuthFlowRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteOAuthFlowRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteOAuthFlowRequest) ProtoMessage() {}
+
+func (x *CompleteOAuthFlowRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteOAuthFlowRequest.ProtoReflect.Descriptor instead.
+func (*CompleteOAuthFlowRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CompleteOAuthFlowRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *CompleteOAuthFlowRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *CompleteOAuthFlowRequest) GetProvider() ScmProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return ScmProvider_SCM_PROVIDER_UNSPECIFIED
+}
+
+func (x *CompleteOAuthFlowRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *CompleteOAuthFlowRequest) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *CompleteOAuthFlowRequest) GetRedirectUri() string {
+	if x != nil {
+		return x.RedirectUri
+	}
+	return ""
+}
+
+type CompleteOAuthFlowResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Connected     bool                   `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CompleteOAuthFlowResponse) Reset() {
+	*x = CompleteOAuthFlowResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteOAuthFlowResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteOAuthFlowResponse) ProtoMessage() {}
+
+func (x *CompleteOAuthFlowResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteOAuthFlowResponse.ProtoReflect.Descriptor instead.
+func (*CompleteOAuthFlowResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *CompleteOAuthFlowResponse) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+// RevokeAuth disconnects a provider by revoking its stored credential.
+type RevokeAuthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      ScmProvider            `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAuthRequest) Reset() {
+	*x = RevokeAuthRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAuthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAuthRequest) ProtoMessage() {}
+
+func (x *RevokeAuthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAuthRequest.ProtoReflect.Descriptor instead.
+func (*RevokeAuthRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RevokeAuthRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RevokeAuthRequest) GetProvider() ScmProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return ScmProvider_SCM_PROVIDER_UNSPECIFIED
+}
+
+type RevokeAuthResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAuthResponse) Reset() {
+	*x = RevokeAuthResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAuthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAuthResponse) ProtoMessage() {}
+
+func (x *RevokeAuthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAuthResponse.ProtoReflect.Descriptor instead.
+func (*RevokeAuthResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{17}
+}
+
 var File_orca_scmintegration_v1_scmintegration_proto protoreflect.FileDescriptor
 
 const file_orca_scmintegration_v1_scmintegration_proto_rawDesc = "" +
@@ -718,20 +1173,51 @@ const file_orca_scmintegration_v1_scmintegration_proto_rawDesc = "" +
 	"\tremaining\x18\x01 \x01(\x05R\tremaining\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1d\n" +
 	"\n" +
-	"reset_unix\x18\x03 \x01(\x03R\tresetUnix*\xb0\x01\n" +
+	"reset_unix\x18\x03 \x01(\x03R\tresetUnix\"t\n" +
+	"\x14GetAuthStatusRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12?\n" +
+	"\bprovider\x18\x02 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\"5\n" +
+	"\x15GetAuthStatusResponse\x12\x1c\n" +
+	"\tconnected\x18\x01 \x01(\bR\tconnected\"\xb1\x01\n" +
+	"\x15StartOAuthFlowRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12?\n" +
+	"\bprovider\x18\x03 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\x12!\n" +
+	"\fredirect_uri\x18\x04 \x01(\tR\vredirectUri\"[\n" +
+	"\x16StartOAuthFlowResponse\x12+\n" +
+	"\x11authorization_url\x18\x01 \x01(\tR\x10authorizationUrl\x12\x14\n" +
+	"\x05state\x18\x02 \x01(\tR\x05state\"\xde\x01\n" +
+	"\x18CompleteOAuthFlowRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12?\n" +
+	"\bprovider\x18\x03 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\tR\x04code\x12\x14\n" +
+	"\x05state\x18\x05 \x01(\tR\x05state\x12!\n" +
+	"\fredirect_uri\x18\x06 \x01(\tR\vredirectUri\"9\n" +
+	"\x19CompleteOAuthFlowResponse\x12\x1c\n" +
+	"\tconnected\x18\x01 \x01(\bR\tconnected\"q\n" +
+	"\x11RevokeAuthRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12?\n" +
+	"\bprovider\x18\x02 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\"\x14\n" +
+	"\x12RevokeAuthResponse*\xb0\x01\n" +
 	"\vScmProvider\x12\x1c\n" +
 	"\x18SCM_PROVIDER_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13SCM_PROVIDER_GITHUB\x10\x01\x12\x17\n" +
 	"\x13SCM_PROVIDER_GITLAB\x10\x02\x12\x1a\n" +
 	"\x16SCM_PROVIDER_BITBUCKET\x10\x03\x12\x1d\n" +
 	"\x19SCM_PROVIDER_AZURE_DEVOPS\x10\x04\x12\x16\n" +
-	"\x12SCM_PROVIDER_GITEA\x10\x052\xea\x03\n" +
+	"\x12SCM_PROVIDER_GITEA\x10\x052\xa8\a\n" +
 	"\x15ScmIntegrationService\x12c\n" +
 	"\n" +
 	"ListIssues\x12).orca.scmintegration.v1.ListIssuesRequest\x1a*.orca.scmintegration.v1.ListIssuesResponse\x12x\n" +
 	"\x11CreatePullRequest\x120.orca.scmintegration.v1.CreatePullRequestRequest\x1a1.orca.scmintegration.v1.CreatePullRequestResponse\x12u\n" +
 	"\x10ListPullRequests\x12/.orca.scmintegration.v1.ListPullRequestsRequest\x1a0.orca.scmintegration.v1.ListPullRequestsResponse\x12{\n" +
-	"\x12GetRateLimitStatus\x121.orca.scmintegration.v1.GetRateLimitStatusRequest\x1a2.orca.scmintegration.v1.GetRateLimitStatusResponseBRZPgithub.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1;scmintegrationv1b\x06proto3"
+	"\x12GetRateLimitStatus\x121.orca.scmintegration.v1.GetRateLimitStatusRequest\x1a2.orca.scmintegration.v1.GetRateLimitStatusResponse\x12l\n" +
+	"\rGetAuthStatus\x12,.orca.scmintegration.v1.GetAuthStatusRequest\x1a-.orca.scmintegration.v1.GetAuthStatusResponse\x12o\n" +
+	"\x0eStartOAuthFlow\x12-.orca.scmintegration.v1.StartOAuthFlowRequest\x1a..orca.scmintegration.v1.StartOAuthFlowResponse\x12x\n" +
+	"\x11CompleteOAuthFlow\x120.orca.scmintegration.v1.CompleteOAuthFlowRequest\x1a1.orca.scmintegration.v1.CompleteOAuthFlowResponse\x12c\n" +
+	"\n" +
+	"RevokeAuth\x12).orca.scmintegration.v1.RevokeAuthRequest\x1a*.orca.scmintegration.v1.RevokeAuthResponseBRZPgithub.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1;scmintegrationv1b\x06proto3"
 
 var (
 	file_orca_scmintegration_v1_scmintegration_proto_rawDescOnce sync.Once
@@ -746,7 +1232,7 @@ func file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_scmintegration_v1_scmintegration_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_scmintegration_v1_scmintegration_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_orca_scmintegration_v1_scmintegration_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_orca_scmintegration_v1_scmintegration_proto_goTypes = []any{
 	(ScmProvider)(0),                   // 0: orca.scmintegration.v1.ScmProvider
 	(*Issue)(nil),                      // 1: orca.scmintegration.v1.Issue
@@ -759,6 +1245,14 @@ var file_orca_scmintegration_v1_scmintegration_proto_goTypes = []any{
 	(*ListPullRequestsResponse)(nil),   // 8: orca.scmintegration.v1.ListPullRequestsResponse
 	(*GetRateLimitStatusRequest)(nil),  // 9: orca.scmintegration.v1.GetRateLimitStatusRequest
 	(*GetRateLimitStatusResponse)(nil), // 10: orca.scmintegration.v1.GetRateLimitStatusResponse
+	(*GetAuthStatusRequest)(nil),       // 11: orca.scmintegration.v1.GetAuthStatusRequest
+	(*GetAuthStatusResponse)(nil),      // 12: orca.scmintegration.v1.GetAuthStatusResponse
+	(*StartOAuthFlowRequest)(nil),      // 13: orca.scmintegration.v1.StartOAuthFlowRequest
+	(*StartOAuthFlowResponse)(nil),     // 14: orca.scmintegration.v1.StartOAuthFlowResponse
+	(*CompleteOAuthFlowRequest)(nil),   // 15: orca.scmintegration.v1.CompleteOAuthFlowRequest
+	(*CompleteOAuthFlowResponse)(nil),  // 16: orca.scmintegration.v1.CompleteOAuthFlowResponse
+	(*RevokeAuthRequest)(nil),          // 17: orca.scmintegration.v1.RevokeAuthRequest
+	(*RevokeAuthResponse)(nil),         // 18: orca.scmintegration.v1.RevokeAuthResponse
 }
 var file_orca_scmintegration_v1_scmintegration_proto_depIdxs = []int32{
 	0,  // 0: orca.scmintegration.v1.ListIssuesRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
@@ -768,19 +1262,31 @@ var file_orca_scmintegration_v1_scmintegration_proto_depIdxs = []int32{
 	0,  // 4: orca.scmintegration.v1.ListPullRequestsRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
 	5,  // 5: orca.scmintegration.v1.ListPullRequestsResponse.pull_requests:type_name -> orca.scmintegration.v1.PullRequest
 	0,  // 6: orca.scmintegration.v1.GetRateLimitStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	2,  // 7: orca.scmintegration.v1.ScmIntegrationService.ListIssues:input_type -> orca.scmintegration.v1.ListIssuesRequest
-	4,  // 8: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:input_type -> orca.scmintegration.v1.CreatePullRequestRequest
-	7,  // 9: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:input_type -> orca.scmintegration.v1.ListPullRequestsRequest
-	9,  // 10: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:input_type -> orca.scmintegration.v1.GetRateLimitStatusRequest
-	3,  // 11: orca.scmintegration.v1.ScmIntegrationService.ListIssues:output_type -> orca.scmintegration.v1.ListIssuesResponse
-	6,  // 12: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:output_type -> orca.scmintegration.v1.CreatePullRequestResponse
-	8,  // 13: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:output_type -> orca.scmintegration.v1.ListPullRequestsResponse
-	10, // 14: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:output_type -> orca.scmintegration.v1.GetRateLimitStatusResponse
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	0,  // 7: orca.scmintegration.v1.GetAuthStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 8: orca.scmintegration.v1.StartOAuthFlowRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 9: orca.scmintegration.v1.CompleteOAuthFlowRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 10: orca.scmintegration.v1.RevokeAuthRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	2,  // 11: orca.scmintegration.v1.ScmIntegrationService.ListIssues:input_type -> orca.scmintegration.v1.ListIssuesRequest
+	4,  // 12: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:input_type -> orca.scmintegration.v1.CreatePullRequestRequest
+	7,  // 13: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:input_type -> orca.scmintegration.v1.ListPullRequestsRequest
+	9,  // 14: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:input_type -> orca.scmintegration.v1.GetRateLimitStatusRequest
+	11, // 15: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:input_type -> orca.scmintegration.v1.GetAuthStatusRequest
+	13, // 16: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:input_type -> orca.scmintegration.v1.StartOAuthFlowRequest
+	15, // 17: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:input_type -> orca.scmintegration.v1.CompleteOAuthFlowRequest
+	17, // 18: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:input_type -> orca.scmintegration.v1.RevokeAuthRequest
+	3,  // 19: orca.scmintegration.v1.ScmIntegrationService.ListIssues:output_type -> orca.scmintegration.v1.ListIssuesResponse
+	6,  // 20: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:output_type -> orca.scmintegration.v1.CreatePullRequestResponse
+	8,  // 21: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:output_type -> orca.scmintegration.v1.ListPullRequestsResponse
+	10, // 22: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:output_type -> orca.scmintegration.v1.GetRateLimitStatusResponse
+	12, // 23: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:output_type -> orca.scmintegration.v1.GetAuthStatusResponse
+	14, // 24: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:output_type -> orca.scmintegration.v1.StartOAuthFlowResponse
+	16, // 25: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:output_type -> orca.scmintegration.v1.CompleteOAuthFlowResponse
+	18, // 26: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:output_type -> orca.scmintegration.v1.RevokeAuthResponse
+	19, // [19:27] is the sub-list for method output_type
+	11, // [11:19] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_orca_scmintegration_v1_scmintegration_proto_init() }
@@ -794,7 +1300,7 @@ func file_orca_scmintegration_v1_scmintegration_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_scmintegration_v1_scmintegration_proto_rawDesc), len(file_orca_scmintegration_v1_scmintegration_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

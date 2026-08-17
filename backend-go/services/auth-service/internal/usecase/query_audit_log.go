@@ -26,14 +26,15 @@ type QueryAuditLogOutput struct {
 type QueryAuditLog struct {
 	users UserRepository
 	audit AuditRepository
+	opa   OPAClient
 }
 
-func NewQueryAuditLog(users UserRepository, audit AuditRepository) *QueryAuditLog {
-	return &QueryAuditLog{users: users, audit: audit}
+func NewQueryAuditLog(users UserRepository, audit AuditRepository, opa OPAClient) *QueryAuditLog {
+	return &QueryAuditLog{users: users, audit: audit, opa: opa}
 }
 
 func (uc *QueryAuditLog) Execute(ctx context.Context, in QueryAuditLogInput) (QueryAuditLogOutput, error) {
-	if _, err := requireAdminActor(ctx, uc.users); err != nil {
+	if _, err := requireAdminActor(ctx, uc.users, uc.opa); err != nil {
 		return QueryAuditLogOutput{}, err
 	}
 

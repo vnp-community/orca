@@ -118,14 +118,23 @@ func (s *Server) GetResolvedProfile(ctx context.Context, req *tenantv1.GetResolv
 }
 
 func (s *Server) CreateTeam(ctx context.Context, req *tenantv1.CreateTeamRequest) (*tenantv1.CreateTeamResponse, error) {
+	settings, err := unmarshalSettings(req.GetSettingsJson())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "TENANT_INVALID_TEAM_SETTINGS", "settings_json is not valid JSON", err))
+	}
 	team, err := s.createTeam.Execute(ctx, usecase.CreateTeamInput{
 		CompanyID: req.GetCompanyId(),
 		Name:      req.GetName(),
+		Settings:  settings,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &tenantv1.CreateTeamResponse{Team: toProtoTeam(team)}, nil
+	proto, err := toProtoTeam(team)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.CreateTeamResponse{Team: proto}, nil
 }
 
 func (s *Server) AddTeamMember(ctx context.Context, req *tenantv1.AddTeamMemberRequest) (*tenantv1.AddTeamMemberResponse, error) {
@@ -168,10 +177,10 @@ func toProtoDepartment(d domain.Department) (*tenantv1.Department, error) {
 	return &tenantv1.Department{Id: d.ID, CompanyId: d.CompanyID, Name: d.Name, SettingsJson: settingsJSON}, nil
 }
 
-// toProtoTeam has no settings to marshal — tenant.proto's Team message
-// doesn't carry a settings_json field in this reduced surface (see README
-// "Known gaps"), even though domain.Team.Settings exists for the team layer
-// of ResolveProfile.
-func toProtoTeam(t domain.Team) *tenantv1.Team {
-	return &tenantv1.Team{Id: t.ID, CompanyId: t.CompanyID, Name: t.Name}
+func toProtoTeam(t domain.Team) (*tenantv1.Team, error) {
+	settingsJSON, err := marshalSettings(t.Settings)
+	if err != nil {
+		return nil, apperrors.New(apperrors.KindInternal, "TENANT_MARSHAL_TEAM_FAILED", "failed to marshal team settings", err)
+	}
+	return &tenantv1.Team{Id: t.ID, CompanyId: t.CompanyID, Name: t.Name, SettingsJson: settingsJSON}, nil
 }

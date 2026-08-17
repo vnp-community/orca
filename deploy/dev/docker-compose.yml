@@ -167,6 +167,12 @@ services:
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/auth?sslmode=disable
+      # First-boot admin bootstrap (internal/usecase/bootstrap.go) — no-op
+      # once any user exists; leave BOOTSTRAP_ADMIN_PASSWORD unset to
+      # auto-generate + log it once instead of setting it here.
+      BOOTSTRAP_TENANT_ID: ${BOOTSTRAP_TENANT_ID:-00000000-0000-0000-0000-000000000001}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
     depends_on:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
@@ -295,7 +301,11 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/notification?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
+      # VAPID Transit signing now goes through credential-broker-service's
+      # SignVapidPayload RPC (Epic B, docs/execution-plan.md §8) — this
+      # service no longer talks to Vault directly, so the vault dependency
+      # this block used to carry is gone, replaced by the real one.
+      credential-broker-service: { condition: service_started }
       nats: { condition: service_healthy }
 
   usage-service:
@@ -323,7 +333,7 @@ services:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
 
-  # 4 services with no database:
+  # 3 services with no database:
   git-gateway-service:
     <<: *go-defaults
     container_name: orca-go-git-gateway
@@ -348,8 +358,14 @@ services:
     container_name: orca-go-issue-tracking
     volumes:
       - ./bin/issue-tracking-service/orca:/app/bin/orca:ro
-    environment: *go-common-env
+    environment:
+      <<: *go-common-env
+      # Epic G (docs/execution-plan.md): outbox-only database, not a
+      # queryable copy of issue data — see that service's
+      # internal/adapter/postgres package doc comment.
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuetracking?sslmode=disable
     depends_on:
+      postgres: { condition: service_healthy }
       credential-broker-service: { condition: service_started }
       nats: { condition: service_healthy }
 
@@ -456,6 +472,10 @@ services:
     <<: *migrate-defaults
     volumes: ["./bin/credential-broker-service/migrations:/migrations:ro"]
     command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/credential?sslmode=disable", "up"]
+  migrate-issuetracking:
+    <<: *migrate-defaults
+    volumes: ["./bin/issue-tracking-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuetracking?sslmode=disable", "up"]
 
 networks:
   orca-go-net:

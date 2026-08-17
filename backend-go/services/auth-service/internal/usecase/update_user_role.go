@@ -15,14 +15,15 @@ type UpdateUserRole struct {
 	users UserRepository
 	audit AuditRepository
 	clock Clock
+	opa   OPAClient
 }
 
-func NewUpdateUserRole(users UserRepository, audit AuditRepository, clock Clock) *UpdateUserRole {
-	return &UpdateUserRole{users: users, audit: audit, clock: clock}
+func NewUpdateUserRole(users UserRepository, audit AuditRepository, clock Clock, opa OPAClient) *UpdateUserRole {
+	return &UpdateUserRole{users: users, audit: audit, clock: clock, opa: opa}
 }
 
 func (uc *UpdateUserRole) Execute(ctx context.Context, userID string, role domain.Role) (domain.User, error) {
-	actor, err := requireAdminActor(ctx, uc.users)
+	actor, err := requireAdminActor(ctx, uc.users, uc.opa)
 	if err != nil {
 		return domain.User{}, err
 	}

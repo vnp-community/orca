@@ -23,12 +23,16 @@ type RebindDevServer struct {
 	repo            ProjectRepository
 	workflowChecker WorkflowExecutionChecker
 	taskChecker     TaskExecutionChecker
+	opa             OPAClient
 }
 
-func NewRebindDevServer(repo ProjectRepository, workflowChecker WorkflowExecutionChecker, taskChecker TaskExecutionChecker) *RebindDevServer {
-	return &RebindDevServer{repo: repo, workflowChecker: workflowChecker, taskChecker: taskChecker}
+func NewRebindDevServer(repo ProjectRepository, workflowChecker WorkflowExecutionChecker, taskChecker TaskExecutionChecker, opa OPAClient) *RebindDevServer {
+	return &RebindDevServer{repo: repo, workflowChecker: workflowChecker, taskChecker: taskChecker, opa: opa}
 }
 
+// Execute requires the caller's project role to be owner, or global admin —
+// project-service.md §9's owner-only tier, and this RPC's own sequence
+// diagram ("PS->>PS: assertAccess — owner/admin only (OPA)").
 func (uc *RebindDevServer) Execute(ctx context.Context, in RebindDevServerInput) (domain.Project, error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
@@ -36,6 +40,9 @@ func (uc *RebindDevServer) Execute(ctx context.Context, in RebindDevServerInput)
 	}
 	if in.NewDevServerID == "" {
 		return domain.Project{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_INVALID_DEV_SERVER", "new_dev_server_id is required", nil)
+	}
+	if err := requireProjectAccess(ctx, uc.repo, uc.opa, in.ProjectID, projectActionOwnerOnly); err != nil {
+		return domain.Project{}, err
 	}
 
 	// Both checks are synchronous gRPC calls per project-service.md §3 (saga

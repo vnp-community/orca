@@ -23,6 +23,10 @@ type Server struct {
 	createPullRequest  *usecase.CreatePullRequest
 	listPullRequests   *usecase.ListPullRequests
 	getRateLimitStatus *usecase.GetRateLimitStatus
+	getAuthStatus      *usecase.GetAuthStatus
+	startOAuthFlow     *usecase.StartOAuthFlow
+	completeOAuthFlow  *usecase.CompleteOAuthFlow
+	revokeAuth         *usecase.RevokeAuth
 }
 
 func New(
@@ -30,12 +34,20 @@ func New(
 	createPullRequest *usecase.CreatePullRequest,
 	listPullRequests *usecase.ListPullRequests,
 	getRateLimitStatus *usecase.GetRateLimitStatus,
+	getAuthStatus *usecase.GetAuthStatus,
+	startOAuthFlow *usecase.StartOAuthFlow,
+	completeOAuthFlow *usecase.CompleteOAuthFlow,
+	revokeAuth *usecase.RevokeAuth,
 ) *Server {
 	return &Server{
 		listIssues:         listIssues,
 		createPullRequest:  createPullRequest,
 		listPullRequests:   listPullRequests,
 		getRateLimitStatus: getRateLimitStatus,
+		getAuthStatus:      getAuthStatus,
+		startOAuthFlow:     startOAuthFlow,
+		completeOAuthFlow:  completeOAuthFlow,
+		revokeAuth:         revokeAuth,
 	}
 }
 
@@ -100,6 +112,55 @@ func (s *Server) GetRateLimitStatus(ctx context.Context, req *scmintegrationv1.G
 		Limit:     int32(status.Limit),
 		ResetUnix: status.ResetAt.Unix(),
 	}, nil
+}
+
+func (s *Server) GetAuthStatus(ctx context.Context, req *scmintegrationv1.GetAuthStatusRequest) (*scmintegrationv1.GetAuthStatusResponse, error) {
+	connected, err := s.getAuthStatus.Execute(ctx, usecase.GetAuthStatusInput{
+		TenantID: req.GetTenantId(),
+		Provider: toDomainProvider(req.GetProvider()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.GetAuthStatusResponse{Connected: connected}, nil
+}
+
+func (s *Server) StartOAuthFlow(ctx context.Context, req *scmintegrationv1.StartOAuthFlowRequest) (*scmintegrationv1.StartOAuthFlowResponse, error) {
+	result, err := s.startOAuthFlow.Execute(ctx, usecase.StartOAuthFlowInput{
+		TenantID:    req.GetTenantId(),
+		UserID:      req.GetUserId(),
+		Provider:    toDomainProvider(req.GetProvider()),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.StartOAuthFlowResponse{AuthorizationUrl: result.AuthorizationURL, State: result.State}, nil
+}
+
+func (s *Server) CompleteOAuthFlow(ctx context.Context, req *scmintegrationv1.CompleteOAuthFlowRequest) (*scmintegrationv1.CompleteOAuthFlowResponse, error) {
+	connected, err := s.completeOAuthFlow.Execute(ctx, usecase.CompleteOAuthFlowInput{
+		TenantID:    req.GetTenantId(),
+		UserID:      req.GetUserId(),
+		Provider:    toDomainProvider(req.GetProvider()),
+		Code:        req.GetCode(),
+		State:       req.GetState(),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.CompleteOAuthFlowResponse{Connected: connected}, nil
+}
+
+func (s *Server) RevokeAuth(ctx context.Context, req *scmintegrationv1.RevokeAuthRequest) (*scmintegrationv1.RevokeAuthResponse, error) {
+	if err := s.revokeAuth.Execute(ctx, usecase.RevokeAuthInput{
+		TenantID: req.GetTenantId(),
+		Provider: toDomainProvider(req.GetProvider()),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.RevokeAuthResponse{}, nil
 }
 
 func toDomainProvider(p scmintegrationv1.ScmProvider) domain.ScmProvider {

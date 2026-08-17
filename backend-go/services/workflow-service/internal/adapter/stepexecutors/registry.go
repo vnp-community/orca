@@ -1,9 +1,11 @@
-// Package stepexecutors implements the five concrete domain.StepExecutor
-// strategies — Condition and Webhook run in-process for real; Agent, Shell,
-// and Notification are stubs pending infra-fleet-service's relay client
-// (see workflow-service.md §2/§4 and this service's README). Also implements
-// usecase.StepExecutorRegistry's concrete Registry, wired in
-// cmd/server/main.go.
+// Package stepexecutors implements two of the five concrete
+// domain.StepExecutor strategies — Condition and Webhook, which run
+// in-process with no execution-plane dependency (see workflow-service.md
+// §2/§4). Agent, Shell, and Notification live in
+// internal/adapter/infrafleetclient instead, since they relay to
+// infra-fleet-service's Relay RPC rather than running locally. This package
+// also implements usecase.StepExecutorRegistry's concrete Registry, wired
+// in cmd/server/main.go alongside infrafleetclient's three executors.
 package stepexecutors
 
 import (

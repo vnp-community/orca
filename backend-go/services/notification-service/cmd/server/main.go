@@ -18,13 +18,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
-	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/notification-service/internal/config"
@@ -80,20 +80,26 @@ func run() error {
 	repo := notificationpostgres.New(pool)
 	broadcast := notificationbroadcaster.New()
 
-	// Vault client construction never fails at startup (no network call
-	// happens until a Transit operation is attempted) — SignVapidPayload
-	// surfaces a clear error at call time if Vault is actually unreachable.
-	// See vaultsigner's doc comment and this service's README.
-	vaultClient, err := secrets.NewClient()
+	// Real credential-broker-service connection — Epic B
+	// (docs/execution-plan.md §8), replacing this service's previous direct
+	// Vault client. Insecure transport credentials here are a
+	// local-dev/scaffold convenience only; production deploys terminate
+	// mTLS via the service mesh sidecar, per
+	// architecture/07-security-architecture.md. grpc.NewClient doesn't
+	// block or error on an unreachable target — SignVapidPayload surfaces a
+	// clear error at call time if credential-broker-service is actually
+	// unreachable, same graceful-degradation shape the previous direct-Vault
+	// version had.
+	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		logger.WarnContext(ctx, "vault client unavailable, VAPID payload signing will error until Vault is reachable", slog.Any("error", err))
-		vaultClient = nil
+		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}
-	signer := notificationvaultsigner.New(vaultClient)
+	defer func() { _ = brokerConn.Close() }()
+	signer := notificationvaultsigner.New(brokerConn)
 
 	subscribeUC := usecase.NewSubscribe(repo)
 	getVapidPublicKeyUC := usecase.NewGetVapidPublicKey(repo)
-	handleIncomingEventUC := usecase.NewHandleIncomingEvent(broadcast, logger)
+	handleIncomingEventUC := usecase.NewHandleIncomingEvent(broadcast, repo, logger)
 
 	var consumerWG sync.WaitGroup
 	_, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
@@ -123,13 +129,6 @@ func run() error {
 		defer cancel()
 		return pool.Ping(ctx)
 	})
-	healthSrv.Register("vault", func() error {
-		if vaultClient == nil {
-			return errors.New("vault client not configured — VAPID payload signing unavailable")
-		}
-		return nil
-	})
-
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler: healthSrv.Handler(),

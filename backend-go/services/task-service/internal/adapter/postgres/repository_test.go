@@ -50,15 +50,15 @@ func TestRepository_GetAncestors_WalksParentChainToRoot(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.NewString()
 
-	root, _ := domain.NewTask(uuid.NewString(), tenantID, "root", domain.StatusOpen, "")
+	root, _ := domain.NewTask(uuid.NewString(), tenantID, "root", domain.StatusOpen, "", "")
 	if _, err := repo.Create(ctx, root); err != nil {
 		t.Fatalf("creating root: %v", err)
 	}
-	child, _ := domain.NewTask(uuid.NewString(), tenantID, "child", domain.StatusOpen, root.ID)
+	child, _ := domain.NewTask(uuid.NewString(), tenantID, "child", domain.StatusOpen, root.ID, "")
 	if _, err := repo.Create(ctx, child); err != nil {
 		t.Fatalf("creating child: %v", err)
 	}
-	grandchild, _ := domain.NewTask(uuid.NewString(), tenantID, "grandchild", domain.StatusOpen, child.ID)
+	grandchild, _ := domain.NewTask(uuid.NewString(), tenantID, "grandchild", domain.StatusOpen, child.ID, "")
 	if _, err := repo.Create(ctx, grandchild); err != nil {
 		t.Fatalf("creating grandchild: %v", err)
 	}
@@ -80,8 +80,8 @@ func TestRepository_ListByKind_FiltersByTenantAndKind(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.NewString()
 
-	a, _ := domain.NewTask(uuid.NewString(), tenantID, "a", domain.StatusOpen, "")
-	b, _ := domain.NewTask(uuid.NewString(), tenantID, "b", domain.StatusOpen, "")
+	a, _ := domain.NewTask(uuid.NewString(), tenantID, "a", domain.StatusOpen, "", "")
+	b, _ := domain.NewTask(uuid.NewString(), tenantID, "b", domain.StatusOpen, "", "")
 	_, _ = repo.Create(ctx, a)
 	_, _ = repo.Create(ctx, b)
 
@@ -115,7 +115,7 @@ func TestRepository_Grant_And_ListGrantsForAncestors(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.NewString()
 
-	task, _ := domain.NewTask(uuid.NewString(), tenantID, "task", domain.StatusOpen, "")
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "task", domain.StatusOpen, "", "")
 	_, _ = repo.Create(ctx, task)
 
 	grant := domain.Grant{TaskID: task.ID, SubjectID: uuid.NewString(), Level: domain.GrantLevelOwner, ApplyTree: true}

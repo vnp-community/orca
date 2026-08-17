@@ -59,16 +59,44 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
   `DATABASE_DSN` is read directly from the environment for local dev; wire
   `secrets.DatabaseCredentialsFromFile` before this service is deployed
   anywhere Vault is actually running.
-- **`common/tracing` has no OTLP exporter configured** — spans are created
-  but not shipped anywhere until a collector endpoint is wired in.
-- **Author-only edit/delete via OPA is not enforced here** — per the design
-  doc §9, `UpdateAnnotation`/`DeleteAnnotation` ownership checks are an OPA
-  policy decision at the gateway, not an inline usecase check; this
-  scaffold enforces tenant isolation only.
+- ~~`common/tracing` has no OTLP exporter configured~~ — **closed**
+  (`docs/execution-plan.md` §3 Phase 1, fixed in shared `common/tracing`):
+  `Init` now batches spans to a real `otlptracegrpc` exporter whenever
+  `OTLP_ENDPOINT` is set.
+- **Author-only edit/delete via OPA is now enforced** —
+  `UpdateAnnotation`/`DeleteAnnotation` fetch the target annotation
+  (`Repository.GetAnnotation`) after the tenant/ID/content checks, then
+  call `internal/adapter/opaclient` (wrapping `common/policy.Evaluator`
+  against `data.orca.authz.annotation.allow` in
+  `backend-go/policy/orca-authz/annotation.rego`) with the caller's actor
+  id and the annotation's author id, fail-closed and before the mutation
+  runs. A denial maps to `apperrors.KindPermissionDenied`
+  (`ANNOTATION_NOT_AUTHOR`). **Known gap:** the policy input's
+  `actor_role` is always sent as `""` — this service's request context
+  (`common/tenant`, populated by `grpcmw.TenantExtractionInterceptor`)
+  only ever carries `tenant_id`/`user_id` today; no role claim is
+  propagated from `api-gateway` (see `api-gateway`'s
+  `AttachIdentity`/`grpcmw.MetadataTenantID`/`MetadataUserID` — there is
+  no `MetadataUserRole` counterpart anywhere in this codebase yet). The
+  Rego rule's admin-override branch (`actor_role == "admin"`) is
+  therefore unreachable from this service until role propagation is
+  added upstream; it's exercised only at the Rego/evaluator level
+  (`policy/orca-authz/annotation_test.rego`'s `test_admin_override`,
+  `common/policy/evaluator_test.go`'s `TestEvaluator_AnnotationDecision`),
+  not from an annotation-service usecase test, since faking that path
+  here would mean fabricating a role the service can't actually observe.
+  `OPABundlePath` is configurable via `OPA_BUNDLE_PATH`, defaulting to
+  `../../policy/orca-authz`.
 - **`project_id` validation against `project-service` is not called** — the
   design doc's §7 notes this service *may* call `GetProject` to validate a
   new annotation's `repo_id` before persisting; not wired in this scaffold.
-- The proto's `CreateAnnotationRequest.request_id` field is accepted but
-  not used for write idempotency — the `annotations` table has no
-  `request_id` column (unlike `usage-service`'s sessions table), matching
-  the design doc's minimal §5 schema for this service.
+- ~~The proto's `CreateAnnotationRequest.request_id` field is accepted but
+  not used for write idempotency~~ — **closed** (`docs/execution-plan.md`
+  §3 Phase 1): migration `0002_annotation_request_id` adds `request_id
+  TEXT NOT NULL` + `UNIQUE (tenant_id, request_id)`, matching
+  `usage-service`/`automation-service`'s identical convention.
+  `CreateAnnotation` now requires `request_id` (`ANNOTATION_NO_REQUEST_ID`
+  on empty) and checks `Repository.FindByRequestID` before inserting,
+  returning the existing row on a retry instead of a duplicate — including
+  a re-check on insert failure to absorb a genuine unique-constraint race,
+  the same pattern `automation-service.RunNow` uses.

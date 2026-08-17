@@ -27,14 +27,15 @@ type CreateUser struct {
 	audit  AuditRepository
 	hasher PasswordHasher
 	clock  Clock
+	opa    OPAClient
 }
 
-func NewCreateUser(users UserRepository, audit AuditRepository, hasher PasswordHasher, clock Clock) *CreateUser {
-	return &CreateUser{users: users, audit: audit, hasher: hasher, clock: clock}
+func NewCreateUser(users UserRepository, audit AuditRepository, hasher PasswordHasher, clock Clock, opa OPAClient) *CreateUser {
+	return &CreateUser{users: users, audit: audit, hasher: hasher, clock: clock, opa: opa}
 }
 
 func (uc *CreateUser) Execute(ctx context.Context, in CreateUserInput) (domain.User, error) {
-	actor, err := requireAdminActor(ctx, uc.users)
+	actor, err := requireAdminActor(ctx, uc.users, uc.opa)
 	if err != nil {
 		return domain.User{}, err
 	}

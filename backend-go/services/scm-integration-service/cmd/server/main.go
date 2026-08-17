@@ -15,12 +15,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/scm-integration-service/internal/config"
@@ -32,6 +35,9 @@ import (
 	scmgithub "github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/github"
 	scmgitlab "github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/gitlab"
 	scmgrpc "github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/oauth"
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/oauthstate"
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/providerregistry"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/usecase"
@@ -67,36 +73,90 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	// No database wired here: scm-integration-service owns no business data
-	// (§5 — every issue/PR/MR read hits the provider's live API on every
-	// call) and this scaffold doesn't implement the operational
-	// rate_limit_cache/webhook_delivery_log tables yet — see README's
-	// "Known gaps".
+	// scm.rate_limit_cache (migrations/0001_init.up.sql) as of Phase 3
+	// (docs/execution-plan.md §3) — this service's first real database
+	// connection. webhook_delivery_log lives in the same migration but has
+	// no writer yet (schema-only — see README "Known gaps"); no repository
+	// is wired for it here for that reason, not by oversight.
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
+	if err != nil {
+		return fmt.Errorf("resolving database credentials: %w", err)
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		return fmt.Errorf("connecting to postgres: %w", err)
+	}
+	defer pool.Close()
+	rateLimitCache := postgres.New(pool)
 
 	registry := providerregistry.New(map[domain.ScmProvider]usecase.ScmProvider{
 		domain.ScmProviderGitHub:      scmgithub.New(nil, cfg.GitHubBaseURL),
 		domain.ScmProviderGitLab:      scmgitlab.New(nil, cfg.GitLabBaseURL),
-		domain.ScmProviderBitbucket:   bitbucket.New(),
-		domain.ScmProviderAzureDevOps: azuredevops.New(),
-		domain.ScmProviderGitea:       gitea.New(),
+		domain.ScmProviderBitbucket:   bitbucket.New(nil, cfg.BitbucketBaseURL),
+		domain.ScmProviderAzureDevOps: azuredevops.New(nil, cfg.AzureDevOpsBaseURL),
+		domain.ScmProviderGitea:       gitea.New(nil, cfg.GiteaBaseURL),
 	})
 
-	// STUB — see internal/adapter/credentialbroker's package doc: this
-	// resolves a fake token, not a real per-tenant OAuth credential.
-	credentials := credentialbroker.NewStubResolver()
+	// One OAuthExchanger per provider (§9.1) — a provider whose OAuth app
+	// isn't configured (empty ClientID) is left out of this map entirely,
+	// so StartOAuthFlow reports SCM_PROVIDER_UNSUPPORTED for it instead of
+	// attempting a doomed exchange against an empty client_id.
+	oauthExchangers := map[domain.ScmProvider]usecase.OAuthExchanger{}
+	for provider, providerCfg := range map[domain.ScmProvider]svcconfig.OAuthProviderConfig{
+		domain.ScmProviderGitHub:      cfg.OAuth.GitHub,
+		domain.ScmProviderGitLab:      cfg.OAuth.GitLab,
+		domain.ScmProviderBitbucket:   cfg.OAuth.Bitbucket,
+		domain.ScmProviderAzureDevOps: cfg.OAuth.AzureDevOps,
+		domain.ScmProviderGitea:       cfg.OAuth.Gitea,
+	} {
+		if providerCfg.ClientID == "" {
+			continue
+		}
+		oauthExchangers[provider] = oauth.New(nil, oauth.Config{
+			AuthorizeURL: providerCfg.AuthorizeURL,
+			TokenURL:     providerCfg.TokenURL,
+			ClientID:     providerCfg.ClientID,
+			ClientSecret: providerCfg.ClientSecret,
+			Scope:        providerCfg.Scope,
+		})
+	}
+	oauthRegistry := providerregistry.NewOAuth(oauthExchangers)
+	stateCodec := oauthstate.New(cfg.OAuthStateSecret)
+
+	// Real credential-broker-service connection — Epic B
+	// (docs/execution-plan.md §8). Insecure transport credentials here are
+	// a local-dev/scaffold convenience only; production deploys terminate
+	// mTLS via the service mesh sidecar, per
+	// architecture/07-security-architecture.md.
+	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
+	}
+	defer func() { _ = brokerConn.Close() }()
+	credentials := credentialbroker.New(brokerConn)
 
 	listIssuesUC := usecase.NewListIssues(credentials, registry)
 	createPullRequestUC := usecase.NewCreatePullRequest(credentials, registry)
 	listPullRequestsUC := usecase.NewListPullRequests(credentials, registry)
-	getRateLimitStatusUC := usecase.NewGetRateLimitStatus(credentials, registry)
+	getRateLimitStatusUC := usecase.NewGetRateLimitStatus(credentials, registry, rateLimitCache)
+	getAuthStatusUC := usecase.NewGetAuthStatus(credentials)
+	startOAuthFlowUC := usecase.NewStartOAuthFlow(oauthRegistry, stateCodec, nil)
+	completeOAuthFlowUC := usecase.NewCompleteOAuthFlow(oauthRegistry, stateCodec, credentials)
+	revokeAuthUC := usecase.NewRevokeAuth(credentials)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
 		listIssuesUC, createPullRequestUC, listPullRequestsUC, getRateLimitStatusUC,
+		getAuthStatusUC, startOAuthFlowUC, completeOAuthFlowUC, revokeAuthUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	healthSrv := health.New()
+	healthSrv.Register("postgres", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return pool.Ping(ctx)
+	})
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),

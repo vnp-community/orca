@@ -79,26 +79,34 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
-- **Profile-resolution cache is in-process only, not shared across
-  replicas** — per tenant-service.md §6's explicit design choice (an
-  in-process LRU-with-TTL cache, not a shared Redis read-through cache: the
-  cached object is small, per-user, and cheap to recompute on a miss). Each
-  replica has its own cache, so an update on replica A doesn't invalidate
-  replica B within the 60s TTL window — an accepted staleness bound
-  carried forward from the TS system's process-local cache, not a bug. The
-  documented upgrade path if 60s staleness proves unacceptable is a
-  distributed invalidation broadcast (publish `Invalidate` on this
-  service's own outbox/NATS subject, consumed by every replica) — not built
-  by default. **This is a real scaling consideration**: at higher replica
-  counts or stricter staleness SLOs, revisit this trade-off before it
-  becomes a correctness issue rather than a documented staleness bound.
+- **Profile-resolution cache is in-process, per replica — Epic F resolved
+  the horizontal-scaling gap this used to carry** (docs/execution-plan.md
+  §2 Epic F, 2026-08-17). The cache itself is still an in-process
+  LRU-with-TTL, not a shared Redis read-through cache — deliberately kept
+  that way: the cached object is small, per-user, and its exact
+  invalidation set is always known at write time
+  (`internal/adapter/cache/lru_ttl_cache.go`'s doc comment), so Redis
+  wasn't justified. What changed: `SetUserDepartment`/`AddTeamMember` now
+  also publish `orca.tenant.profile.invalidated` (best-effort, not
+  outbox-backed) after invalidating their own replica's entry, and every
+  replica runs a background consumer (`internal/adapter/eventbus`) that
+  invalidates the same entry locally — closing the old "replica B stays
+  stale until its own 60s TTL elapses" gap down to event-delivery latency.
+  NATS unreachable at startup degrades gracefully (tenant-service is on the
+  critical path for every other service's tenant resolution, so it must
+  not crash-loop over this) — the cache then falls back to exactly today's
+  TTL-bounded-only behavior, not a regression from before this fix.
 - **`tenant.proto`'s current RPC surface is a reduced subset** of the design
   doc's full sketch (§3): no `UpdateCompany`/`UpdateDepartment`/`UpdateTeam`/
   `UpdateUserProfile`/`ListDepartments`/`RemoveTeamMember`/
   `InvalidateProfileCache` RPCs exist yet, so:
-  - `Team.settings_json` has a column and a `domain.Team.Settings` field
-    (needed for `ResolveProfile`'s team layer) but no RPC currently sets it
-    — every team's settings layer is `{}` until an `UpdateTeam` RPC exists.
+  - ~~`Team.settings_json` has a column and a `domain.Team.Settings` field
+    (needed for `ResolveProfile`'s team layer) but no RPC currently sets
+    it~~ ✅ fixed (execution-plan.md Phase 4): `CreateTeamRequest`/`Team`
+    now carry `settings_json`, threaded through `CreateTeamInput` →
+    `domain.NewTeam` → the existing `settings_json` column. There is still
+    no `UpdateTeam` RPC, so a team's settings layer can only be set at
+    creation time, not changed afterward.
   - There's no RPC to set a `UserProfile`'s own `Settings` override
     directly — only `SetUserDepartment` (department assignment). The user
     layer is populated implicitly whenever a `user_profiles` row exists.

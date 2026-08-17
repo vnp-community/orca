@@ -10,10 +10,13 @@ import (
 	"github.com/stablyai/orca-go/services/orchestration-service/internal/domain"
 )
 
-// CreateGateInput mirrors the CreateGateRequest RPC message. The generated
-// proto only carries DispatchContextID — Question/Options exist here for
-// forward-compatibility once the proto is extended (see README "Known
-// gaps"); the gRPC adapter currently always passes them empty.
+// CreateGateInput mirrors the CreateGateRequest RPC message. Question/Options
+// now flow through from the gRPC adapter — see docs/execution-plan.md Epic C
+// and README "Deviations from the design doc". CreateGateRequest also carries
+// orchestration_task_id, but it is deliberately NOT threaded onto this
+// struct: CreateGate derives the owning task from DispatchContextID itself
+// via a locked read (see Execute below and the postgres repository's
+// CreateGate), so there is no caller-supplied override to trust here.
 type CreateGateInput struct {
 	DispatchContextID string
 	Question          string

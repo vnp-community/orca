@@ -5,7 +5,6 @@
 package domain
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 )
@@ -58,21 +57,44 @@ var (
 // delegates to workflow-service.ExecuteAdHocStep (see
 // specs/backend-go/services/automation-service.md §2).
 type Automation struct {
-	ID             string
-	TenantID       string
-	Name           string
-	RRule          string
+	ID       string
+	TenantID string
+	Name     string
+	RRule    string
+	// StepType is now a first-class column (migration 0002) rather than a
+	// key inside StepConfigJSON — see the former ParseStepType note this
+	// replaces. Both internal/adapter/grpcclient (calling workflow-service)
+	// and internal/adapter/grpc (translating the wire Automation message,
+	// which reuses workflow-service's own StepType enum) map to/from this.
+	StepType       StepType
 	StepConfigJSON string
 	DTStart        time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// Timezone is the IANA tz name RRULE occurrences are computed in;
+	// always resolved to a concrete value ("UTC" if unset) by NewAutomation
+	// so every Automation is structurally ready for scheduling.
+	Timezone string
+	// Enabled gates the scheduler ticker's due-row query
+	// (WHERE enabled AND next_run_at <= now()) — a disabled automation is
+	// never claimed even if its next_run_at is in the past.
+	Enabled bool
+	// NextRunAt is the next time the scheduler should dispatch this
+	// automation; zero means "no further occurrences" (an exhausted
+	// COUNT/UNTIL-bounded rule) or "not yet computed". Advanced by
+	// internal/adapter/scheduler after each dispatch.
+	NextRunAt time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // NewAutomation constructs an Automation, enforcing the invariants a
 // definition must satisfy to be dispatchable — including that RRule parses,
 // so a malformed recurrence string is rejected at creation time rather than
-// discovered later by the scheduler loop.
-func NewAutomation(id, tenantID, name, rrule, stepConfigJSON string, dtstart, createdAt time.Time) (Automation, error) {
+// discovered later by the scheduler loop. stepType defaults to
+// StepTypeAgent and timezone to "UTC" when unspecified, so every Automation
+// this constructor returns is already structurally valid for dispatch —
+// callers never need a second defaulting pass. NextRunAt is left zero;
+// usecase.CreateAutomation computes it from the resulting RecurrenceRule.
+func NewAutomation(id, tenantID, name, rrule string, stepType StepType, stepConfigJSON string, dtstart time.Time, timezone string, enabled bool, createdAt time.Time) (Automation, error) {
 	if tenantID == "" {
 		return Automation{}, ErrEmptyTenant
 	}
@@ -88,13 +110,22 @@ func NewAutomation(id, tenantID, name, rrule, stepConfigJSON string, dtstart, cr
 	if _, err := NewRecurrenceRule(rrule, dtstart); err != nil {
 		return Automation{}, err
 	}
+	if !stepType.Valid() {
+		stepType = StepTypeAgent
+	}
+	if timezone == "" {
+		timezone = "UTC"
+	}
 	return Automation{
 		ID:             id,
 		TenantID:       tenantID,
 		Name:           name,
 		RRule:          rrule,
+		StepType:       stepType,
 		StepConfigJSON: stepConfigJSON,
 		DTStart:        dtstart,
+		Timezone:       timezone,
+		Enabled:        enabled,
 		CreatedAt:      createdAt,
 		UpdatedAt:      createdAt,
 	}, nil
@@ -104,24 +135,4 @@ func NewAutomation(id, tenantID, name, rrule, stepConfigJSON string, dtstart, cr
 // guaranteed to succeed since NewAutomation already validated RRule parses.
 func (a Automation) RecurrenceRule() (RecurrenceRule, error) {
 	return NewRecurrenceRule(a.RRule, a.DTStart)
-}
-
-// ParseStepType extracts the "step_type" key from a step_config_json body.
-// The generated automation.proto (proto/orca/automation/v1/automation.proto)
-// has no separate step_type field, so RunNow reads it out of the JSON
-// payload instead — see this service's README "deviations" note. Returns
-// StepTypeUnspecified if the JSON doesn't parse, has no step_type key, or
-// the value isn't one of the known StepType constants; callers decide the
-// fallback (RunNow defaults to StepTypeAgent).
-func ParseStepType(stepConfigJSON string) StepType {
-	var cfg struct {
-		StepType StepType `json:"step_type"`
-	}
-	if err := json.Unmarshal([]byte(stepConfigJSON), &cfg); err != nil {
-		return StepTypeUnspecified
-	}
-	if !cfg.StepType.Valid() {
-		return StepTypeUnspecified
-	}
-	return cfg.StepType
 }

@@ -30,6 +30,12 @@ var (
 	ErrEmptyUserID = errors.New("domain: user_id is required")
 	// ErrInvalidRole is returned by NewProjectMember when Role isn't a known enum value.
 	ErrInvalidRole = errors.New("domain: invalid project role")
+	// ErrMembershipNotFound is returned by ProjectRepository.GetMembership /
+	// MembershipRepository.GetMembership when the acting user has no
+	// membership row for the project in question — the OPA authorization
+	// check's normal "not a member of this project" case, not an
+	// infrastructure error.
+	ErrMembershipNotFound = errors.New("domain: project membership not found")
 )
 
 // ProjectMember links a user into a project with a role.

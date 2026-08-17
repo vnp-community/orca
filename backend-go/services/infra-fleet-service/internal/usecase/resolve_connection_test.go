@@ -14,17 +14,21 @@ import (
 // specs/backend-go/standards/testing-strategy.md's unit-test section.
 type fakeConnectionResolver struct {
 	byConnectionID map[string]domain.DevServer
+	connByID       map[string]domain.Connection // optional per-connection metadata (RepoPath/WorktreeID)
 	err            error
 	calls          []string // connectionIDs the port was called with, for assertions
 }
 
-func (f *fakeConnectionResolver) ResolveConnection(ctx context.Context, tenantID, connectionID string) (bool, domain.DevServer, error) {
+func (f *fakeConnectionResolver) ResolveConnection(ctx context.Context, tenantID, connectionID string) (bool, domain.DevServer, domain.Connection, error) {
 	f.calls = append(f.calls, connectionID)
 	if f.err != nil {
-		return false, domain.DevServer{}, f.err
+		return false, domain.DevServer{}, domain.Connection{}, f.err
 	}
 	ds, found := f.byConnectionID[connectionID]
-	return found, ds, nil
+	if !found {
+		return false, domain.DevServer{}, domain.Connection{}, nil
+	}
+	return true, ds, f.connByID[connectionID], nil
 }
 
 func withTenant(ctx context.Context, tenantID string) context.Context {
@@ -58,7 +62,7 @@ func TestResolveConnection_EmptyConnectionID_ShortCircuitsToLocal(t *testing.T) 
 
 // Branch 1: found — the connectionId resolves to a live dev server.
 func TestResolveConnection_Found_ReturnsConnectedAndDevServer(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH)
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

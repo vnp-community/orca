@@ -15,7 +15,7 @@ func TestWriteCredential_EncryptsPersistsAndAudits(t *testing.T) {
 	auditRepo := newFakeAuditRepo(rec)
 	store := newFakeSecretStore(rec)
 
-	uc := NewWriteCredential(metadataRepo, auditRepo, store)
+	uc := NewWriteCredential(store, newFakeTxRunner(rec, metadataRepo, auditRepo))
 	got, err := uc.Execute(context.Background(), WriteCredentialInput{
 		TenantID:          "tenant-1",
 		OwnerID:           "user-1",
@@ -60,7 +60,7 @@ func TestWriteCredential_EncryptsPersistsAndAudits(t *testing.T) {
 
 func TestWriteCredential_RejectsMissingScope(t *testing.T) {
 	rec := &callRecorder{}
-	uc := NewWriteCredential(newFakeMetadataRepo(rec), newFakeAuditRepo(rec), newFakeSecretStore(rec))
+	uc := NewWriteCredential(newFakeSecretStore(rec), newFakeTxRunner(rec, newFakeMetadataRepo(rec), newFakeAuditRepo(rec)))
 
 	_, err := uc.Execute(context.Background(), WriteCredentialInput{
 		Category: domain.CategoryScmOAuth,
@@ -77,7 +77,7 @@ func TestWriteCredential_VaultEncryptFailure_CreatesNoRowsAndNoAudit(t *testing.
 	store := newFakeSecretStore(rec)
 	store.encryptErr = errors.New("vault sealed")
 
-	uc := NewWriteCredential(metadataRepo, auditRepo, store)
+	uc := NewWriteCredential(store, newFakeTxRunner(rec, metadataRepo, auditRepo))
 	_, err := uc.Execute(context.Background(), WriteCredentialInput{
 		TenantID: "tenant-1", OwnerID: "user-1", Category: domain.CategoryScmOAuth,
 	})
@@ -99,13 +99,19 @@ func TestWriteCredential_AuditWriteFailure_FailsTheWholeOperation(t *testing.T) 
 	auditRepo.appendErr = errors.New("db unavailable")
 	store := newFakeSecretStore(rec)
 
-	uc := NewWriteCredential(metadataRepo, auditRepo, store)
+	uc := NewWriteCredential(store, newFakeTxRunner(rec, metadataRepo, auditRepo))
 	_, err := uc.Execute(context.Background(), WriteCredentialInput{
 		TenantID: "tenant-1", OwnerID: "user-1", Category: domain.CategoryScmOAuth,
 	})
 	// Per credential-broker-service.md §8: "if the audit write fails, the
-	// operation fails" — even though the metadata row above WAS created.
+	// operation fails" — even though the metadata Create above ran first.
 	if err == nil {
 		t.Fatal("expected WriteCredential to fail when the audit write fails")
+	}
+	// Atomicity assertion (§8: "same Postgres transaction"): the audit
+	// failure must roll back the metadata Create too, not leave an
+	// unaudited row behind. fakeTxRunner models this rollback in-memory.
+	if len(metadataRepo.rows) != 0 {
+		t.Errorf("expected the failed audit append to roll back the metadata Create, but %d row(s) remain", len(metadataRepo.rows))
 	}
 }

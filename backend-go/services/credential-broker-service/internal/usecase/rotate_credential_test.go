@@ -15,7 +15,7 @@ func TestRotateCredential_ReEncryptsAndAudits(t *testing.T) {
 
 	m := seedCredential(t, rec, metadataRepo, store, domain.CategoryAiProviderKey, domain.StatusActive, "old-key")
 
-	uc := NewRotateCredential(metadataRepo, auditRepo, store)
+	uc := NewRotateCredential(metadataRepo, store, newFakeTxRunner(rec, metadataRepo, auditRepo))
 	got, err := uc.Execute(context.Background(), RotateCredentialInput{
 		CredentialID: m.ID, NewEncryptedEnvelope: []byte("new-key"), RequestingService: "ai-provider-service",
 	})
@@ -52,7 +52,7 @@ func TestRotateCredential_RejectsRevoked(t *testing.T) {
 
 	m := seedCredential(t, rec, metadataRepo, store, domain.CategoryScmOAuth, domain.StatusRevoked, "token")
 
-	uc := NewRotateCredential(metadataRepo, auditRepo, store)
+	uc := NewRotateCredential(metadataRepo, store, newFakeTxRunner(rec, metadataRepo, auditRepo))
 	_, err := uc.Execute(context.Background(), RotateCredentialInput{CredentialID: m.ID, NewEncryptedEnvelope: []byte("x")})
 	if err == nil {
 		t.Fatal("expected rotating a revoked credential to fail")
@@ -61,7 +61,8 @@ func TestRotateCredential_RejectsRevoked(t *testing.T) {
 
 func TestRotateCredential_NotFound(t *testing.T) {
 	rec := &callRecorder{}
-	uc := NewRotateCredential(newFakeMetadataRepo(rec), newFakeAuditRepo(rec), newFakeSecretStore(rec))
+	metadataRepo := newFakeMetadataRepo(rec)
+	uc := NewRotateCredential(metadataRepo, newFakeSecretStore(rec), newFakeTxRunner(rec, metadataRepo, newFakeAuditRepo(rec)))
 	_, err := uc.Execute(context.Background(), RotateCredentialInput{CredentialID: "missing", NewEncryptedEnvelope: []byte("x")})
 	if err == nil {
 		t.Fatal("expected an error for a nonexistent credential")

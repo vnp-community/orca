@@ -14,7 +14,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
@@ -67,11 +66,21 @@ type GitExecutor interface {
 	Pull(ctx context.Context, repoPath string) (domain.PullResult, error)
 }
 
-// ErrGenerateCommitMessageNotImplemented is returned by GenerateCommitMessage's
-// Execute — per git-gateway-service.md §3.1, this RPC relays to the Dev
-// Server Agent's ai.complete rather than calling an LLM from this service,
-// and that relay path is not implemented in this scaffold.
-var ErrGenerateCommitMessageNotImplemented = errors.New("usecase: GenerateCommitMessage relays to AI inference on the Dev Server Agent; not implemented in this scaffold")
+// AICompleter calls the Dev Server Agent's ai.complete method for
+// GenerateCommitMessage (git-gateway-service.md §3.1: "this service never
+// calls an LLM API directly"). Unlike GitExecutor there is no host-local
+// implementation of this port — AI inference only ever runs on the Dev
+// Server Agent's execution plane, reached through the same infra-fleet
+// Relay RPC RelayExecutor already uses for git.* methods, so a worktree
+// with no relay connection has no completion path at all (see
+// GenerateCommitMessage's Execute for that decision).
+type AICompleter interface {
+	// Complete relays prompt to the Dev Server Agent's ai.complete method
+	// over the connection identified by connectionID (a ResolvedConnection.
+	// ConnectionID, not a repoPath — ai.complete has no filesystem path
+	// argument) and returns the generated text.
+	Complete(ctx context.Context, connectionID, prompt string) (string, error)
+}
 
 // dispatchExecutor is the resolve-and-dispatch logic every RPC-shaped
 // usecase in this package shares: ask ConnectionResolver which host owns

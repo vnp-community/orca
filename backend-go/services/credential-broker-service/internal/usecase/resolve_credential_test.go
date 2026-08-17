@@ -11,7 +11,7 @@ import (
 
 func seedCredential(t *testing.T, rec *callRecorder, metadataRepo *fakeMetadataRepo, store *fakeSecretStore, category domain.Category, status domain.Status, rawValue string) domain.CredentialMetadata {
 	t.Helper()
-	writeUC := NewWriteCredential(metadataRepo, newFakeAuditRepo(rec), store)
+	writeUC := NewWriteCredential(store, newFakeTxRunner(rec, metadataRepo, newFakeAuditRepo(rec)))
 	m, err := writeUC.Execute(context.Background(), WriteCredentialInput{
 		TenantID: "tenant-1", OwnerID: "user-1", Category: category,
 		EncryptedEnvelope: []byte(rawValue), RequestingService: "seed",

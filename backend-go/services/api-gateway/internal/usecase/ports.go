@@ -7,10 +7,9 @@ package usecase
 import "context"
 
 // JWKSClient fetches auth-service's public keys for real RS256 JWT
-// signature verification. NOT IMPLEMENTED in this scaffold — see the
-// PLACEHOLDER warning on AuthValidator in validate_identity.go. Defined
-// here as the port a real internal/adapter/authclient implementation would
-// satisfy, per api-gateway.md §6's package-layout sketch, once built.
+// signature verification (Epic D). Implemented by
+// internal/adapter/authclient.JWKSClient, which caches the JWKS with a
+// short TTL per api-gateway.md §5.
 type JWKSClient interface {
 	// PublicKey returns the public key for the given key ID (kid), fetched
 	// from auth-service's JWKS endpoint and cached with a short TTL

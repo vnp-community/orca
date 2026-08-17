@@ -35,11 +35,12 @@ func (r *callRecorder) snapshot() []string {
 
 // fakeMetadataRepo is an in-memory CredentialMetadataRepository.
 type fakeMetadataRepo struct {
-	recorder  *callRecorder
-	rows      map[string]domain.CredentialMetadata
-	createErr error
-	getErr    error
-	updateErr error
+	recorder    *callRecorder
+	rows        map[string]domain.CredentialMetadata
+	createErr   error
+	getErr      error
+	updateErr   error
+	getByOwnErr error
 }
 
 func newFakeMetadataRepo(r *callRecorder) *fakeMetadataRepo {
@@ -65,6 +66,22 @@ func (f *fakeMetadataRepo) Get(ctx context.Context, id string) (domain.Credentia
 		return domain.CredentialMetadata{}, domain.ErrCredentialNotFound
 	}
 	return m, nil
+}
+
+func (f *fakeMetadataRepo) GetByOwner(ctx context.Context, tenantID string, category domain.Category, ownerID string) (domain.CredentialMetadata, error) {
+	f.recorder.record("metadata.GetByOwner")
+	if f.getByOwnErr != nil {
+		return domain.CredentialMetadata{}, f.getByOwnErr
+	}
+	// Fake's "most recent" tie-break is irrelevant at this map-backed
+	// scale (tests never create two rows for the same owner) — first match
+	// found is sufficient here, unlike the real ORDER BY created_at DESC.
+	for _, m := range f.rows {
+		if m.TenantID == tenantID && m.Category == category && m.OwnerID == ownerID && m.Status != domain.StatusRevoked {
+			return m, nil
+		}
+	}
+	return domain.CredentialMetadata{}, domain.ErrCredentialNotFound
 }
 
 func (f *fakeMetadataRepo) UpdateStatus(ctx context.Context, id string, status domain.Status, now time.Time) error {
@@ -170,5 +187,42 @@ func (f *fakeSecretStore) RevokeSecret(ctx context.Context, mount, path string) 
 		return f.revokeErr
 	}
 	delete(f.kv, kvKey(mount, path))
+	return nil
+}
+
+// fakeTxRunner is an in-memory TxRunner — it runs fn against the same
+// fakeMetadataRepo/fakeAuditRepo instances the test already holds a handle
+// to, but snapshots their state first and restores it if fn returns an
+// error. This models real Postgres ROLLBACK semantics closely enough to
+// prove atomicity in tests without a real database — see
+// write_credential_test.go's rollback assertion, the reason this fake
+// exists rather than a bare pass-through.
+type fakeTxRunner struct {
+	recorder     *callRecorder
+	metadataRepo *fakeMetadataRepo
+	auditRepo    *fakeAuditRepo
+}
+
+func newFakeTxRunner(r *callRecorder, metadataRepo *fakeMetadataRepo, auditRepo *fakeAuditRepo) *fakeTxRunner {
+	return &fakeTxRunner{recorder: r, metadataRepo: metadataRepo, auditRepo: auditRepo}
+}
+
+func (f *fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context, metadataRepo CredentialMetadataRepository, auditRepo AuditRepository) error) error {
+	f.recorder.record("tx.Begin")
+	savedRows := make(map[string]domain.CredentialMetadata, len(f.metadataRepo.rows))
+	for k, v := range f.metadataRepo.rows {
+		savedRows[k] = v
+	}
+	savedEntries := append([]domain.AccessAuditEntry(nil), f.auditRepo.entries...)
+
+	if err := fn(ctx, f.metadataRepo, f.auditRepo); err != nil {
+		// Rollback: undo whatever fn did to either fake before returning
+		// its error, exactly like a real ROLLBACK undoes both statements.
+		f.metadataRepo.rows = savedRows
+		f.auditRepo.entries = savedEntries
+		f.recorder.record("tx.Rollback")
+		return err
+	}
+	f.recorder.record("tx.Commit")
 	return nil
 }

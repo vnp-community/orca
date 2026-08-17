@@ -3,8 +3,10 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
@@ -221,10 +223,95 @@ func TestPull_RoutesByConnectionState(t *testing.T) {
 	}
 }
 
-func TestGenerateCommitMessage_AlwaysReturnsNotImplemented(t *testing.T) {
-	uc := NewGenerateCommitMessage()
+// fakeAICompleter is an in-memory usecase.AICompleter — records the
+// connectionID/prompt it was called with so tests can assert
+// GenerateCommitMessage threads the resolved connection through correctly.
+type fakeAICompleter struct {
+	called          bool
+	gotConnectionID string
+	gotPrompt       string
+	message         string
+	err             error
+}
+
+func (f *fakeAICompleter) Complete(ctx context.Context, connectionID, prompt string) (string, error) {
+	f.called = true
+	f.gotConnectionID = connectionID
+	f.gotPrompt = prompt
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.message, nil
+}
+
+func TestGenerateCommitMessage_Connected_RelaysDiffAndReturnsMessage(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo/wt1"}}
+	local := &fakeGitExecutor{name: "local"}
+	relay := &fakeGitExecutor{name: "relay"}
+	getDiff := NewGetDiff(resolver, local, relay)
+	completer := &fakeAICompleter{message: "feat: add widget"}
+	uc := NewGenerateCommitMessage(resolver, getDiff, completer)
+
+	got, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "feat: add widget" {
+		t.Errorf("expected generated message to pass through, got %q", got)
+	}
+	if !relay.calledGetDiff || local.calledGetDiff {
+		t.Error("expected diff to be fetched via relay when Connected=true")
+	}
+	if !completer.called {
+		t.Fatal("expected AICompleter.Complete to be called")
+	}
+	if completer.gotConnectionID != "conn-1" {
+		t.Errorf("expected resolved ConnectionID to be passed through, got %q", completer.gotConnectionID)
+	}
+	if !strings.Contains(completer.gotPrompt, "diff") {
+		t.Errorf("expected prompt to include the fetched diff, got %q", completer.gotPrompt)
+	}
+}
+
+func TestGenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo/wt1"}}
+	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
+	completer := &fakeAICompleter{message: "should not be called"}
+	uc := NewGenerateCommitMessage(resolver, getDiff, completer)
+
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
-	if !errors.Is(err, ErrGenerateCommitMessageNotImplemented) {
-		t.Fatalf("expected ErrGenerateCommitMessageNotImplemented, got %v", err)
+	if err == nil {
+		t.Fatal("expected error when worktree has no relay connection")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Kind != apperrors.KindFailedPrecondition {
+		t.Fatalf("expected KindFailedPrecondition AppError, got %v", err)
+	}
+	if completer.called {
+		t.Error("expected AICompleter NOT to be called when there is no relay connection")
+	}
+}
+
+func TestGenerateCommitMessage_RelayFailure_Propagates(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo/wt1"}}
+	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
+	completer := &fakeAICompleter{err: errors.New("dev server agent unreachable")}
+	uc := NewGenerateCommitMessage(resolver, getDiff, completer)
+
+	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected relay failure to propagate as an error, not be swallowed")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Kind != apperrors.KindInternal {
+		t.Fatalf("expected KindInternal AppError, got %v", err)
+	}
+}
+
+func TestGenerateCommitMessage_MissingWorktreeID_ReturnsError(t *testing.T) {
+	uc := NewGenerateCommitMessage(&fakeConnectionResolver{}, NewGetDiff(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{}), &fakeAICompleter{})
+	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{})
+	if err == nil {
+		t.Fatal("expected error for missing worktree_id")
 	}
 }

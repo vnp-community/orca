@@ -244,28 +244,30 @@ func scanTask(row pgx.Row) (domain.OrchestrationTask, error) {
 // ---- DispatchContextRepository ------------------------------------------
 
 // Create inserts a dispatch_context row. See usecase.DispatchContextRepository's
-// doc comment: the generated CreateDispatchContextRequest proto message
-// carries no orchestration_task_id, so orchestration_task_id is left NULL
-// here — a single INSERT, trivially atomic on its own.
-func (r *Repository) CreateDispatchContext(ctx context.Context, tenantID, handle, coordinatorRunID string) (domain.DispatchContext, error) {
+// doc comment (Epic C, docs/execution-plan.md): orchestrationTaskID is
+// persisted when the caller supplies one (NULLIF collapses "" to NULL for
+// the nullable FK), and left NULL for an ad-hoc coordinator-only dispatch —
+// a single INSERT, trivially atomic on its own.
+func (r *Repository) CreateDispatchContext(ctx context.Context, tenantID, handle, coordinatorRunID, orchestrationTaskID string) (domain.DispatchContext, error) {
 	id := uuid.NewString()
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO orchestration.dispatch_contexts (id, tenant_id, handle, coordinator_run_id, status)
-		VALUES ($1,$2,$3,$4,'pending')
+		INSERT INTO orchestration.dispatch_contexts (id, tenant_id, handle, coordinator_run_id, orchestration_task_id, status)
+		VALUES ($1,$2,$3,$4,NULLIF($5,''),'pending')
 		RETURNING created_at
-	`, id, tenantID, handle, coordinatorRunID)
+	`, id, tenantID, handle, coordinatorRunID, orchestrationTaskID)
 
 	var createdAt time.Time
 	if err := row.Scan(&createdAt); err != nil {
 		return domain.DispatchContext{}, fmt.Errorf("postgres: insert dispatch context: %w", err)
 	}
 	return domain.DispatchContext{
-		ID:               id,
-		TenantID:         tenantID,
-		Handle:           handle,
-		CoordinatorRunID: coordinatorRunID,
-		Status:           domain.DispatchStatusPending,
-		CreatedAt:        createdAt,
+		ID:                  id,
+		TenantID:            tenantID,
+		Handle:              handle,
+		CoordinatorRunID:    coordinatorRunID,
+		OrchestrationTaskID: orchestrationTaskID,
+		Status:              domain.DispatchStatusPending,
+		CreatedAt:           createdAt,
 	}, nil
 }
 

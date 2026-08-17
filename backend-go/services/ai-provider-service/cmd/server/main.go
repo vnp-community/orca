@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
@@ -75,10 +76,19 @@ func run() error {
 
 	repo := aiproviderpostgres.New(pool)
 
-	// STUB: credential-broker-service isn't deployed yet — see
-	// internal/adapter/grpcclient's package doc for the full explanation and
-	// the security constraint that must hold once it's wired for real.
-	broker := aiprovidergrpcclient.New(cfg.CredentialBrokerAddr)
+	// Real credential-broker-service connection — Epic B
+	// (docs/execution-plan.md §8). Insecure transport credentials here are
+	// a local-dev/scaffold convenience only; production deploys terminate
+	// mTLS via the service mesh sidecar, per
+	// architecture/07-security-architecture.md. See
+	// internal/adapter/grpcclient's package doc comment for the
+	// SECURITY-CRITICAL constraint this client must uphold.
+	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
+	}
+	defer func() { _ = brokerConn.Close() }()
+	broker := aiprovidergrpcclient.New(brokerConn)
 
 	createAccountUC := usecase.NewCreateAccount(repo, broker, uuid.NewString, nil)
 	resolveProviderUC := usecase.NewResolveProvider(repo)

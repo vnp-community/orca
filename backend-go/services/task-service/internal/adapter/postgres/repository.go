@@ -37,9 +37,9 @@ func New(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO task.tasks (id, tenant_id, title, status, parent_id)
-		VALUES ($1, $2, $3, $4, $5)
-	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID))
+		INSERT INTO task.tasks (id, tenant_id, title, status, parent_id, project_id)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID))
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("postgres: insert task: %w", err)
 	}
@@ -48,13 +48,13 @@ func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task,
 
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Task, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, '')
+		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, '')
 		FROM task.tasks
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
 	var t domain.Task
-	if err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID); err != nil {
+	if err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Task{}, fmt.Errorf("postgres: task %s not found: %w", id, err)
 		}
@@ -74,18 +74,18 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 
 	rows, err := r.pool.Query(ctx, `
 		WITH RECURSIVE ancestors AS (
-			SELECT id, tenant_id, title, status, parent_id, 0 AS depth
+			SELECT id, tenant_id, title, status, parent_id, project_id, 0 AS depth
 			FROM task.tasks
 			WHERE tenant_id = $1 AND id = $2
 
 			UNION ALL
 
-			SELECT t.id, t.tenant_id, t.title, t.status, t.parent_id, a.depth + 1
+			SELECT t.id, t.tenant_id, t.title, t.status, t.parent_id, t.project_id, a.depth + 1
 			FROM task.tasks t
 			JOIN ancestors a ON t.id = a.parent_id
 			WHERE a.depth + 1 < $3
 		)
-		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, '')
+		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, '')
 		FROM ancestors
 		ORDER BY depth
 	`, tenantID, id, maxDepth)
@@ -97,7 +97,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 	var out []domain.Task
 	for rows.Next() {
 		var t domain.Task
-		if err := rows.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID); err != nil {
+		if err := rows.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID); err != nil {
 			return nil, fmt.Errorf("postgres: scan ancestor row: %w", err)
 		}
 		out = append(out, t)
@@ -109,6 +109,33 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 		return nil, fmt.Errorf("postgres: task %s not found while resolving ancestors", id)
 	}
 	return out, nil
+}
+
+// UpdateStatus persists a task's status transition — see
+// usecase.TaskRepository's doc comment for the one-way-transition caveat
+// this method is currently subject to (only ever called with
+// StatusInProgress today).
+func (r *Repository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE task.tasks SET status = $1, updated_at = now() WHERE tenant_id = $2 AND id = $3`, status, tenantID, id)
+	if err != nil {
+		return fmt.Errorf("postgres: update task status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: task %s not found", id)
+	}
+	return nil
+}
+
+// HasActiveExecutions reports whether tenantID/projectID has any task
+// currently in_progress — see usecase.HasActiveExecutions's doc comment for
+// the one-way-transition caveat this answer is subject to today.
+func (r *Repository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
+	row := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM task.tasks WHERE tenant_id = $1 AND project_id = $2 AND status = 'in_progress')`, tenantID, projectID)
+	var exists bool
+	if err := row.Scan(&exists); err != nil {
+		return false, fmt.Errorf("postgres: query has-active-executions: %w", err)
+	}
+	return exists, nil
 }
 
 func nullableUUID(id string) any {

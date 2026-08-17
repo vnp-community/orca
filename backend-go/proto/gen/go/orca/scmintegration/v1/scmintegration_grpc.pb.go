@@ -23,6 +23,10 @@ const (
 	ScmIntegrationService_CreatePullRequest_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
 	ScmIntegrationService_ListPullRequests_FullMethodName   = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
 	ScmIntegrationService_GetRateLimitStatus_FullMethodName = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
+	ScmIntegrationService_GetAuthStatus_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
+	ScmIntegrationService_StartOAuthFlow_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/StartOAuthFlow"
+	ScmIntegrationService_CompleteOAuthFlow_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/CompleteOAuthFlow"
+	ScmIntegrationService_RevokeAuth_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/RevokeAuth"
 )
 
 // ScmIntegrationServiceClient is the client API for ScmIntegrationService service.
@@ -37,6 +41,17 @@ type ScmIntegrationServiceClient interface {
 	CreatePullRequest(ctx context.Context, in *CreatePullRequestRequest, opts ...grpc.CallOption) (*CreatePullRequestResponse, error)
 	ListPullRequests(ctx context.Context, in *ListPullRequestsRequest, opts ...grpc.CallOption) (*ListPullRequestsResponse, error)
 	GetRateLimitStatus(ctx context.Context, in *GetRateLimitStatusRequest, opts ...grpc.CallOption) (*GetRateLimitStatusResponse, error)
+	// Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
+	// flow terminating at an api-gateway-hosted /auth/{provider}/callback, NOT
+	// the TS PTY/CLI-login mechanism (gh auth login/glab auth login) it
+	// replaces. See specs/backend-go/services/scm-integration-service.md
+	// §9.1's sequence diagram for the exact 3-call shape below (StartOAuthFlow
+	// returns the authorization URL + state; CompleteOAuthFlow is called by
+	// api-gateway from the provider's redirect callback with the code+state).
+	GetAuthStatus(ctx context.Context, in *GetAuthStatusRequest, opts ...grpc.CallOption) (*GetAuthStatusResponse, error)
+	StartOAuthFlow(ctx context.Context, in *StartOAuthFlowRequest, opts ...grpc.CallOption) (*StartOAuthFlowResponse, error)
+	CompleteOAuthFlow(ctx context.Context, in *CompleteOAuthFlowRequest, opts ...grpc.CallOption) (*CompleteOAuthFlowResponse, error)
+	RevokeAuth(ctx context.Context, in *RevokeAuthRequest, opts ...grpc.CallOption) (*RevokeAuthResponse, error)
 }
 
 type scmIntegrationServiceClient struct {
@@ -87,6 +102,46 @@ func (c *scmIntegrationServiceClient) GetRateLimitStatus(ctx context.Context, in
 	return out, nil
 }
 
+func (c *scmIntegrationServiceClient) GetAuthStatus(ctx context.Context, in *GetAuthStatusRequest, opts ...grpc.CallOption) (*GetAuthStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAuthStatusResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_GetAuthStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) StartOAuthFlow(ctx context.Context, in *StartOAuthFlowRequest, opts ...grpc.CallOption) (*StartOAuthFlowResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartOAuthFlowResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_StartOAuthFlow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) CompleteOAuthFlow(ctx context.Context, in *CompleteOAuthFlowRequest, opts ...grpc.CallOption) (*CompleteOAuthFlowResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteOAuthFlowResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_CompleteOAuthFlow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) RevokeAuth(ctx context.Context, in *RevokeAuthRequest, opts ...grpc.CallOption) (*RevokeAuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeAuthResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_RevokeAuth_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScmIntegrationServiceServer is the server API for ScmIntegrationService service.
 // All implementations must embed UnimplementedScmIntegrationServiceServer
 // for forward compatibility.
@@ -99,6 +154,17 @@ type ScmIntegrationServiceServer interface {
 	CreatePullRequest(context.Context, *CreatePullRequestRequest) (*CreatePullRequestResponse, error)
 	ListPullRequests(context.Context, *ListPullRequestsRequest) (*ListPullRequestsResponse, error)
 	GetRateLimitStatus(context.Context, *GetRateLimitStatusRequest) (*GetRateLimitStatusResponse, error)
+	// Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
+	// flow terminating at an api-gateway-hosted /auth/{provider}/callback, NOT
+	// the TS PTY/CLI-login mechanism (gh auth login/glab auth login) it
+	// replaces. See specs/backend-go/services/scm-integration-service.md
+	// §9.1's sequence diagram for the exact 3-call shape below (StartOAuthFlow
+	// returns the authorization URL + state; CompleteOAuthFlow is called by
+	// api-gateway from the provider's redirect callback with the code+state).
+	GetAuthStatus(context.Context, *GetAuthStatusRequest) (*GetAuthStatusResponse, error)
+	StartOAuthFlow(context.Context, *StartOAuthFlowRequest) (*StartOAuthFlowResponse, error)
+	CompleteOAuthFlow(context.Context, *CompleteOAuthFlowRequest) (*CompleteOAuthFlowResponse, error)
+	RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error)
 	mustEmbedUnimplementedScmIntegrationServiceServer()
 }
 
@@ -120,6 +186,18 @@ func (UnimplementedScmIntegrationServiceServer) ListPullRequests(context.Context
 }
 func (UnimplementedScmIntegrationServiceServer) GetRateLimitStatus(context.Context, *GetRateLimitStatusRequest) (*GetRateLimitStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRateLimitStatus not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) GetAuthStatus(context.Context, *GetAuthStatusRequest) (*GetAuthStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAuthStatus not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) StartOAuthFlow(context.Context, *StartOAuthFlowRequest) (*StartOAuthFlowResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartOAuthFlow not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) CompleteOAuthFlow(context.Context, *CompleteOAuthFlowRequest) (*CompleteOAuthFlowResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteOAuthFlow not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeAuth not implemented")
 }
 func (UnimplementedScmIntegrationServiceServer) mustEmbedUnimplementedScmIntegrationServiceServer() {}
 func (UnimplementedScmIntegrationServiceServer) testEmbeddedByValue()                               {}
@@ -214,6 +292,78 @@ func _ScmIntegrationService_GetRateLimitStatus_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScmIntegrationService_GetAuthStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAuthStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).GetAuthStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_GetAuthStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).GetAuthStatus(ctx, req.(*GetAuthStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_StartOAuthFlow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartOAuthFlowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).StartOAuthFlow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_StartOAuthFlow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).StartOAuthFlow(ctx, req.(*StartOAuthFlowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_CompleteOAuthFlow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteOAuthFlowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).CompleteOAuthFlow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_CompleteOAuthFlow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).CompleteOAuthFlow(ctx, req.(*CompleteOAuthFlowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_RevokeAuth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeAuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).RevokeAuth(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_RevokeAuth_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).RevokeAuth(ctx, req.(*RevokeAuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScmIntegrationService_ServiceDesc is the grpc.ServiceDesc for ScmIntegrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -236,6 +386,22 @@ var ScmIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRateLimitStatus",
 			Handler:    _ScmIntegrationService_GetRateLimitStatus_Handler,
+		},
+		{
+			MethodName: "GetAuthStatus",
+			Handler:    _ScmIntegrationService_GetAuthStatus_Handler,
+		},
+		{
+			MethodName: "StartOAuthFlow",
+			Handler:    _ScmIntegrationService_StartOAuthFlow_Handler,
+		},
+		{
+			MethodName: "CompleteOAuthFlow",
+			Handler:    _ScmIntegrationService_CompleteOAuthFlow_Handler,
+		},
+		{
+			MethodName: "RevokeAuth",
+			Handler:    _ScmIntegrationService_RevokeAuth_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

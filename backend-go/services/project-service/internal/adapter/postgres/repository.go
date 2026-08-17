@@ -1,6 +1,7 @@
-// Package postgres implements project-service's ProjectRepository port
-// (defined in internal/usecase) against this service's own PostgreSQL
-// database — see specs/backend-go/architecture/05-data-architecture.md's
+// Package postgres implements project-service's ProjectRepository/
+// RepoRepository/WorktreeRepository/ProjectGroupRepository ports (defined in
+// internal/usecase) against this service's own PostgreSQL database — see
+// specs/backend-go/architecture/05-data-architecture.md's
 // database-per-service rule: this is the ONLY package in project-service
 // that knows SQL exists.
 package postgres
@@ -15,6 +16,15 @@ import (
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
+
+// projectColumns is the column list shared by every SELECT/RETURNING
+// against project.projects — kept as one constant so Create/Get/List/
+// UpdateDevServerID/UpdateProject/scanProject can't drift out of sync with
+// each other. Both nullable UUID columns are cast to ::text before
+// COALESCE — COALESCE(uuid_col, ”) fails at parse time (Postgres unifies
+// the branch types to uuid and tries to parse ” as one), a latent bug this
+// change also fixes on dev_server_id, not just the new created_by column.
+const projectColumns = `id, tenant_id, name, COALESCE(dev_server_id::text, ''), description, default_branch, visibility, COALESCE(created_by::text, ''), created_at, updated_at`
 
 // Repository implements usecase.ProjectRepository against Postgres via pgx
 // — hand-written SQL (see architecture/04-tech-stack.md: sqlc codegen is the
@@ -31,13 +41,14 @@ func New(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) Create(ctx context.Context, p domain.Project) (domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO project.projects (id, tenant_id, name, dev_server_id)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, tenant_id, name, COALESCE(dev_server_id, '')
-	`, p.ID, p.TenantID, p.Name, nullableString(p.DevServerID))
+		INSERT INTO project.projects (id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING `+projectColumns,
+		p.ID, p.TenantID, p.Name, nullableString(p.DevServerID), p.Description, p.DefaultBranch, p.Visibility, nullableString(p.CreatedBy),
+	)
 
-	var out domain.Project
-	if err := row.Scan(&out.ID, &out.TenantID, &out.Name, &out.DevServerID); err != nil {
+	out, err := scanProject(row)
+	if err != nil {
 		return domain.Project{}, fmt.Errorf("postgres: insert project: %w", err)
 	}
 	return out, nil
@@ -45,13 +56,12 @@ func (r *Repository) Create(ctx context.Context, p domain.Project) (domain.Proje
 
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, name, COALESCE(dev_server_id, '')
+		SELECT `+projectColumns+`
 		FROM project.projects
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
-	var out domain.Project
-	err := row.Scan(&out.ID, &out.TenantID, &out.Name, &out.DevServerID)
+	out, err := scanProject(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Project{}, domain.ErrProjectNotFound
 	}
@@ -63,7 +73,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Proje
 
 func (r *Repository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, name, COALESCE(dev_server_id, '')
+		SELECT `+projectColumns+`
 		FROM project.projects
 		WHERE tenant_id = $1 AND id > $2
 		ORDER BY id
@@ -76,8 +86,8 @@ func (r *Repository) List(ctx context.Context, tenantID, pageToken string, pageS
 
 	var out []domain.Project
 	for rows.Next() {
-		var p domain.Project
-		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.DevServerID); err != nil {
+		p, err := scanProject(rows)
+		if err != nil {
 			return nil, "", fmt.Errorf("postgres: scan project row: %w", err)
 		}
 		out = append(out, p)
@@ -112,13 +122,13 @@ func (r *Repository) AddMember(ctx context.Context, m domain.ProjectMember) erro
 func (r *Repository) UpdateDevServerID(ctx context.Context, tenantID, projectID, devServerID string) (domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE project.projects
-		SET dev_server_id = $3
+		SET dev_server_id = $3, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
-		RETURNING id, tenant_id, name, COALESCE(dev_server_id, '')
-	`, tenantID, projectID, nullableString(devServerID))
+		RETURNING `+projectColumns,
+		tenantID, projectID, nullableString(devServerID),
+	)
 
-	var out domain.Project
-	err := row.Scan(&out.ID, &out.TenantID, &out.Name, &out.DevServerID)
+	out, err := scanProject(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Project{}, domain.ErrProjectNotFound
 	}
@@ -126,6 +136,89 @@ func (r *Repository) UpdateDevServerID(ctx context.Context, tenantID, projectID,
 		return domain.Project{}, fmt.Errorf("postgres: update dev_server_id: %w", err)
 	}
 	return out, nil
+}
+
+// UpdateProject applies patch's non-empty fields via COALESCE(NULLIF($n,
+// ”), column) — an empty string argument leaves the column unchanged, per
+// domain.ProjectUpdatePatch's "" = no-change semantics. Never references
+// dev_server_id.
+func (r *Repository) UpdateProject(ctx context.Context, tenantID, projectID string, patch domain.ProjectUpdatePatch) (domain.Project, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE project.projects
+		SET name           = COALESCE(NULLIF($3, ''), name),
+		    description    = COALESCE(NULLIF($4, ''), description),
+		    default_branch = COALESCE(NULLIF($5, ''), default_branch),
+		    visibility     = COALESCE(NULLIF($6, ''), visibility),
+		    updated_at     = now()
+		WHERE tenant_id = $1 AND id = $2
+		RETURNING `+projectColumns,
+		tenantID, projectID, patch.Name, patch.Description, patch.DefaultBranch, patch.Visibility,
+	)
+
+	out, err := scanProject(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Project{}, domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return domain.Project{}, fmt.Errorf("postgres: update project: %w", err)
+	}
+	return out, nil
+}
+
+// DeleteProject hard-deletes a project row. project_members/repos/worktrees
+// cascade via ON DELETE CASCADE FKs (migrations/0001/0003/0004) — see
+// usecase.DeleteProject's doc comment for why a single DELETE here is
+// sufficient.
+func (r *Repository) DeleteProject(ctx context.Context, tenantID, projectID string) error {
+	tag, err := r.pool.Exec(ctx, `
+		DELETE FROM project.projects WHERE tenant_id = $1 AND id = $2
+	`, tenantID, projectID)
+	if err != nil {
+		return fmt.Errorf("postgres: delete project: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrProjectNotFound
+	}
+	return nil
+}
+
+// GetMembership implements usecase.ProjectRepository.GetMembership (and,
+// structurally, usecase.MembershipRepository — see that interface's doc
+// comment) against project.project_members.
+func (r *Repository) GetMembership(ctx context.Context, projectID, userID string) (domain.ProjectMember, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT project_id, user_id, role
+		FROM project.project_members
+		WHERE project_id = $1 AND user_id = $2
+	`, projectID, userID)
+
+	var m domain.ProjectMember
+	var role string
+	if err := row.Scan(&m.ProjectID, &m.UserID, &role); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProjectMember{}, domain.ErrMembershipNotFound
+		}
+		return domain.ProjectMember{}, fmt.Errorf("postgres: query project membership: %w", err)
+	}
+	m.Role = domain.ProjectRole(role)
+	return m, nil
+}
+
+// rowScanner is satisfied by both pgx.Rows and pgx.Row, letting one scan
+// helper serve both a single-row QueryRow and a multi-row Query loop.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanProject(row rowScanner) (domain.Project, error) {
+	var p domain.Project
+	if err := row.Scan(
+		&p.ID, &p.TenantID, &p.Name, &p.DevServerID, &p.Description, &p.DefaultBranch, &p.Visibility, &p.CreatedBy,
+		&p.CreatedAt, &p.UpdatedAt,
+	); err != nil {
+		return domain.Project{}, err
+	}
+	return p, nil
 }
 
 func nullableString(s string) *string {

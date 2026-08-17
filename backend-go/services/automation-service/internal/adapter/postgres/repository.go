@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
+	"github.com/stablyai/orca-go/services/automation-service/internal/usecase"
 )
 
 // AutomationRepository implements usecase.AutomationRepository against
@@ -34,9 +35,9 @@ func NewAutomationRepository(pool *pgxpool.Pool) *AutomationRepository {
 func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO automation.automations (
-			id, tenant_id, name, rrule, dtstart, step_config_json, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-	`, a.ID, a.TenantID, a.Name, a.RRule, a.DTStart, a.StepConfigJSON, a.CreatedAt, a.UpdatedAt)
+			id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+	`, a.ID, a.TenantID, a.Name, a.RRule, a.DTStart, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, nullableTime(a.NextRunAt), a.CreatedAt, a.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("postgres: insert automation: %w", err)
 	}
@@ -45,17 +46,116 @@ func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) 
 
 func (r *AutomationRepository) Get(ctx context.Context, tenantID, id string) (domain.Automation, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, name, rrule, dtstart, step_config_json, created_at, updated_at
+		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at
 		FROM automation.automations
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
-	var a domain.Automation
-	if err := row.Scan(&a.ID, &a.TenantID, &a.Name, &a.RRule, &a.DTStart, &a.StepConfigJSON, &a.CreatedAt, &a.UpdatedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.Automation{}, fmt.Errorf("postgres: automation %s not found: %w", id, err)
-		}
+	a, err := scanAutomation(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Automation{}, fmt.Errorf("postgres: automation %s not found: %w", id, err)
+	}
+	if err != nil {
 		return domain.Automation{}, fmt.Errorf("postgres: query automation: %w", err)
+	}
+	return a, nil
+}
+
+// ClaimDue implements usecase.DueAutomationClaimer — see that port's doc
+// comment for why the returned batch's transaction stays open across
+// dispatch. The query intentionally has no tenant filter: the scheduler
+// scans across every tenant on a timer, it is not a per-request caller with
+// a single tenant to scope to (see automation-service.md §7's "every
+// replica runs a ticker" model) — every row it returns still carries its
+// own tenant_id, which RunNow scopes its own work to via context.
+func (r *AutomationRepository) ClaimDue(ctx context.Context, now time.Time, limit int32) (usecase.ClaimedBatch, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: begin claim tx: %w", err)
+	}
+
+	rows, err := tx.Query(ctx, `
+		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at
+		FROM automation.automations
+		WHERE enabled = true AND next_run_at IS NOT NULL AND next_run_at <= $1
+		ORDER BY next_run_at
+		LIMIT $2
+		FOR UPDATE SKIP LOCKED
+	`, now, limit)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return nil, fmt.Errorf("postgres: query due automations: %w", err)
+	}
+
+	var claimed []domain.Automation
+	for rows.Next() {
+		a, err := scanAutomation(rows)
+		if err != nil {
+			rows.Close()
+			_ = tx.Rollback(ctx)
+			return nil, fmt.Errorf("postgres: scan due automation row: %w", err)
+		}
+		claimed = append(claimed, a)
+	}
+	rowsErr := rows.Err()
+	rows.Close()
+	if rowsErr != nil {
+		_ = tx.Rollback(ctx)
+		return nil, fmt.Errorf("postgres: iterate due automation rows: %w", rowsErr)
+	}
+
+	return &claimedBatch{tx: tx, automations: claimed}, nil
+}
+
+// claimedBatch implements usecase.ClaimedBatch by wrapping the still-open
+// pgx.Tx ClaimDue began.
+type claimedBatch struct {
+	tx          pgx.Tx
+	automations []domain.Automation
+}
+
+func (b *claimedBatch) Automations() []domain.Automation { return b.automations }
+
+func (b *claimedBatch) Advance(ctx context.Context, automationID string, nextRunAt time.Time, hasNext bool) error {
+	var next *time.Time
+	if hasNext {
+		next = &nextRunAt
+	}
+	if _, err := b.tx.Exec(ctx, `
+		UPDATE automation.automations SET next_run_at = $1, updated_at = now() WHERE id = $2
+	`, next, automationID); err != nil {
+		return fmt.Errorf("postgres: advance next_run_at for automation %s: %w", automationID, err)
+	}
+	return nil
+}
+
+func (b *claimedBatch) Commit(ctx context.Context) error {
+	if err := b.tx.Commit(ctx); err != nil {
+		return fmt.Errorf("postgres: commit claim batch: %w", err)
+	}
+	return nil
+}
+
+func (b *claimedBatch) Rollback(ctx context.Context) error {
+	if err := b.tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+		return fmt.Errorf("postgres: rollback claim batch: %w", err)
+	}
+	return nil
+}
+
+func scanAutomation(row rowScanner) (domain.Automation, error) {
+	var a domain.Automation
+	var stepType string
+	var nextRunAt *time.Time
+	if err := row.Scan(
+		&a.ID, &a.TenantID, &a.Name, &a.RRule, &a.DTStart, &stepType, &a.StepConfigJSON,
+		&a.Enabled, &a.Timezone, &nextRunAt, &a.CreatedAt, &a.UpdatedAt,
+	); err != nil {
+		return domain.Automation{}, err
+	}
+	a.StepType = domain.StepType(stepType)
+	if nextRunAt != nil {
+		a.NextRunAt = *nextRunAt
 	}
 	return a, nil
 }
@@ -72,11 +172,11 @@ func NewAutomationRunRepository(pool *pgxpool.Pool) *AutomationRunRepository {
 func (r *AutomationRunRepository) Create(ctx context.Context, run domain.AutomationRun) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO automation.automation_runs (
-			id, automation_id, tenant_id, request_id, status, step_type, step_config_json,
+			id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
 			output_json, error_message, created_at, started_at, completed_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 	`,
-		run.ID, run.AutomationID, run.TenantID, run.RequestID, string(run.Status), string(run.StepType), run.StepConfigJSON,
+		run.ID, run.AutomationID, run.TenantID, run.RequestID, string(run.Status), string(run.StepType), string(run.Trigger), run.StepConfigJSON,
 		nullableString(run.OutputJSON), nullableString(run.ErrorMessage), run.CreatedAt, nullableTime(run.StartedAt), nullableTime(run.CompletedAt),
 	)
 	if err != nil {
@@ -87,7 +187,7 @@ func (r *AutomationRunRepository) Create(ctx context.Context, run domain.Automat
 
 func (r *AutomationRunRepository) FindByRequestID(ctx context.Context, tenantID, automationID, requestID string) (domain.AutomationRun, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, automation_id, tenant_id, request_id, status, step_type, step_config_json,
+		SELECT id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
 		       output_json, error_message, created_at, started_at, completed_at
 		FROM automation.automation_runs
 		WHERE tenant_id = $1 AND automation_id = $2 AND request_id = $3
@@ -121,7 +221,7 @@ func (r *AutomationRunRepository) UpdateStatus(ctx context.Context, run domain.A
 
 func (r *AutomationRunRepository) ListByAutomation(ctx context.Context, tenantID, automationID, pageToken string, pageSize int32) ([]domain.AutomationRun, string, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, automation_id, tenant_id, request_id, status, step_type, step_config_json,
+		SELECT id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
 		       output_json, error_message, created_at, started_at, completed_at
 		FROM automation.automation_runs
 		WHERE tenant_id = $1 AND automation_id = $2 AND id > $3
@@ -161,17 +261,18 @@ type rowScanner interface {
 
 func scanRun(row rowScanner) (domain.AutomationRun, error) {
 	var run domain.AutomationRun
-	var status, stepType string
+	var status, stepType, trigger string
 	var outputJSON, errorMessage *string
 	var startedAt, completedAt *time.Time
 	if err := row.Scan(
-		&run.ID, &run.AutomationID, &run.TenantID, &run.RequestID, &status, &stepType, &run.StepConfigJSON,
+		&run.ID, &run.AutomationID, &run.TenantID, &run.RequestID, &status, &stepType, &trigger, &run.StepConfigJSON,
 		&outputJSON, &errorMessage, &run.CreatedAt, &startedAt, &completedAt,
 	); err != nil {
 		return domain.AutomationRun{}, err
 	}
 	run.Status = domain.RunStatus(status)
 	run.StepType = domain.StepType(stepType)
+	run.Trigger = domain.RunTrigger(trigger)
 	if outputJSON != nil {
 		run.OutputJSON = *outputJSON
 	}

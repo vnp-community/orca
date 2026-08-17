@@ -4,8 +4,17 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wscompat"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
+
+// CookieSessionValidator resolves identity from the orca_session cookie via
+// a REAL auth-service.ValidateSession call — internal/adapter/authclient's
+// implementation. Same interface shape as wscompat.SessionValidator
+// (deliberately — both consume the same real validator, see main.go).
+type CookieSessionValidator interface {
+	ValidateCookie(ctx context.Context, r *http.Request) (wscompat.Identity, error)
+}
 
 type contextKey struct{ name string }
 
@@ -23,13 +32,30 @@ func identityFromContext(ctx context.Context) (usecase.Identity, bool) {
 	return id, ok
 }
 
-// authMiddleware runs AuthValidator ahead of every route this router
-// serves, per api-gateway.md §9: "session/JWT validation... before a
-// request reaches any internal service". See usecase.AuthValidator's doc
-// comment for the PLACEHOLDER warning this currently depends on.
-func authMiddleware(v *usecase.AuthValidator) func(http.Handler) http.Handler {
+// authMiddleware runs ahead of every route this router serves, per
+// api-gateway.md §9: "session/JWT validation... before a request reaches
+// any internal service".
+//
+// Real cookie sessions are validated for real (cookieValidator, against
+// auth-service.ValidateSession) — the orca_session cookie is a raw session
+// token, never a JWT, so usecase.AuthValidator's unverified-JWT parse
+// always failed against it (found live 2026-08-17, alongside the same bug
+// in wscompat — see docs/execution-plan.md §0). Falls back to
+// usecase.AuthValidator's placeholder path ONLY for a bearer JWT
+// (mobile/CLI) — that half is still not production-safe, see
+// usecase.AuthValidator's doc comment; cookieValidator being nil is also
+// tolerated (falls straight back to the placeholder for everything) so
+// this middleware doesn't hard-require auth-service to be reachable at
+// router-construction time.
+func authMiddleware(v *usecase.AuthValidator, cookieValidator CookieSessionValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if cookieValidator != nil {
+				if id, err := cookieValidator.ValidateCookie(r.Context(), r); err == nil {
+					next.ServeHTTP(w, r.WithContext(withIdentity(r.Context(), usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})))
+					return
+				}
+			}
 			identity, err := v.Validate(r)
 			if err != nil {
 				writeJSONError(w, http.StatusUnauthorized, "UNAUTHENTICATED", err.Error())

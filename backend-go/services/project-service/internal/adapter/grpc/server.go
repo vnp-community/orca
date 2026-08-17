@@ -8,6 +8,8 @@ package grpc
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 	"github.com/stablyai/orca-go/services/project-service/internal/usecase"
@@ -24,21 +26,80 @@ type Server struct {
 	listProjects    *usecase.ListProjects
 	addMember       *usecase.AddMember
 	rebindDevServer *usecase.RebindDevServer
+	updateProject   *usecase.UpdateProject
+	deleteProject   *usecase.DeleteProject
+
+	addRepo      *usecase.AddRepo
+	listRepos    *usecase.ListRepos
+	reorderRepos *usecase.ReorderRepos
+	removeRepo   *usecase.RemoveRepo
+
+	recordWorktreeCreated *usecase.RecordWorktreeCreated
+	recordWorktreeRemoved *usecase.RecordWorktreeRemoved
+	listWorktrees         *usecase.ListWorktrees
+	setWorktreeActivation *usecase.SetWorktreeActivation
+	renameWorktree        *usecase.RenameWorktree
+
+	createProjectGroup *usecase.CreateProjectGroup
+	updateProjectGroup *usecase.UpdateProjectGroup
+	deleteProjectGroup *usecase.DeleteProjectGroup
+	listProjectGroups  *usecase.ListProjectGroups
 }
 
-func New(
-	create *usecase.CreateProject,
-	get *usecase.GetProject,
-	list *usecase.ListProjects,
-	addMember *usecase.AddMember,
-	rebind *usecase.RebindDevServer,
-) *Server {
+// Deps groups every usecase Server needs — a plain constructor with 20
+// positional *usecase.X params would be unreadable and error-prone to call
+// correctly at the composition root, so New takes this struct instead.
+type Deps struct {
+	CreateProject   *usecase.CreateProject
+	GetProject      *usecase.GetProject
+	ListProjects    *usecase.ListProjects
+	AddMember       *usecase.AddMember
+	RebindDevServer *usecase.RebindDevServer
+	UpdateProject   *usecase.UpdateProject
+	DeleteProject   *usecase.DeleteProject
+
+	AddRepo      *usecase.AddRepo
+	ListRepos    *usecase.ListRepos
+	ReorderRepos *usecase.ReorderRepos
+	RemoveRepo   *usecase.RemoveRepo
+
+	RecordWorktreeCreated *usecase.RecordWorktreeCreated
+	RecordWorktreeRemoved *usecase.RecordWorktreeRemoved
+	ListWorktrees         *usecase.ListWorktrees
+	SetWorktreeActivation *usecase.SetWorktreeActivation
+	RenameWorktree        *usecase.RenameWorktree
+
+	CreateProjectGroup *usecase.CreateProjectGroup
+	UpdateProjectGroup *usecase.UpdateProjectGroup
+	DeleteProjectGroup *usecase.DeleteProjectGroup
+	ListProjectGroups  *usecase.ListProjectGroups
+}
+
+func New(deps Deps) *Server {
 	return &Server{
-		createProject:   create,
-		getProject:      get,
-		listProjects:    list,
-		addMember:       addMember,
-		rebindDevServer: rebind,
+		createProject:   deps.CreateProject,
+		getProject:      deps.GetProject,
+		listProjects:    deps.ListProjects,
+		addMember:       deps.AddMember,
+		rebindDevServer: deps.RebindDevServer,
+		updateProject:   deps.UpdateProject,
+		deleteProject:   deps.DeleteProject,
+
+		addRepo:      deps.AddRepo,
+		listRepos:    deps.ListRepos,
+		reorderRepos: deps.ReorderRepos,
+		removeRepo:   deps.RemoveRepo,
+
+		recordWorktreeCreated: deps.RecordWorktreeCreated,
+		recordWorktreeRemoved: deps.RecordWorktreeRemoved,
+		listWorktrees:         deps.ListWorktrees,
+		setWorktreeActivation: deps.SetWorktreeActivation,
+		renameWorktree:        deps.RenameWorktree,
+
+		createProjectGroup: deps.CreateProjectGroup,
+		updateProjectGroup: deps.UpdateProjectGroup,
+		deleteProjectGroup: deps.DeleteProjectGroup,
+		listProjectGroups:  deps.ListProjectGroups,
 	}
 }
 
@@ -48,7 +109,12 @@ func New(
 // rule. The wire field exists for forward compatibility with a future
 // admin/cross-tenant path, not used here.
 func (s *Server) CreateProject(ctx context.Context, req *projectv1.CreateProjectRequest) (*projectv1.CreateProjectResponse, error) {
-	project, err := s.createProject.Execute(ctx, usecase.CreateProjectInput{Name: req.GetName()})
+	project, err := s.createProject.Execute(ctx, usecase.CreateProjectInput{
+		Name:          req.GetName(),
+		Description:   req.GetDescription(),
+		DefaultBranch: req.GetDefaultBranch(),
+		Visibility:    req.GetVisibility(),
+	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -104,6 +170,163 @@ func (s *Server) RebindDevServer(ctx context.Context, req *projectv1.RebindDevSe
 	return &projectv1.RebindDevServerResponse{Project: toProtoProject(project)}, nil
 }
 
+func (s *Server) UpdateProject(ctx context.Context, req *projectv1.UpdateProjectRequest) (*projectv1.UpdateProjectResponse, error) {
+	project, err := s.updateProject.Execute(ctx, usecase.UpdateProjectInput{
+		ProjectID:     req.GetProjectId(),
+		Name:          req.GetName(),
+		Description:   req.GetDescription(),
+		DefaultBranch: req.GetDefaultBranch(),
+		Visibility:    req.GetVisibility(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateProjectResponse{Project: toProtoProject(project)}, nil
+}
+
+func (s *Server) DeleteProject(ctx context.Context, req *projectv1.DeleteProjectRequest) (*projectv1.DeleteProjectResponse, error) {
+	if err := s.deleteProject.Execute(ctx, usecase.DeleteProjectInput{ProjectID: req.GetProjectId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.DeleteProjectResponse{}, nil
+}
+
+func (s *Server) AddRepo(ctx context.Context, req *projectv1.AddRepoRequest) (*projectv1.AddRepoResponse, error) {
+	repo, err := s.addRepo.Execute(ctx, usecase.AddRepoInput{
+		ProjectID:   req.GetProjectId(),
+		URL:         req.GetUrl(),
+		DisplayName: req.GetDisplayName(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.AddRepoResponse{Repo: toProtoRepo(repo)}, nil
+}
+
+func (s *Server) ListRepos(ctx context.Context, req *projectv1.ListReposRequest) (*projectv1.ListReposResponse, error) {
+	repos, err := s.listRepos.Execute(ctx, usecase.ListReposInput{ProjectID: req.GetProjectId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.Repo, 0, len(repos))
+	for _, r := range repos {
+		out = append(out, toProtoRepo(r))
+	}
+	return &projectv1.ListReposResponse{Repos: out}, nil
+}
+
+func (s *Server) ReorderRepos(ctx context.Context, req *projectv1.ReorderReposRequest) (*projectv1.ReorderReposResponse, error) {
+	if err := s.reorderRepos.Execute(ctx, usecase.ReorderReposInput{
+		ProjectID:      req.GetProjectId(),
+		RepoIDsInOrder: req.GetRepoIdsInOrder(),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.ReorderReposResponse{}, nil
+}
+
+func (s *Server) RemoveRepo(ctx context.Context, req *projectv1.RemoveRepoRequest) (*projectv1.RemoveRepoResponse, error) {
+	if err := s.removeRepo.Execute(ctx, usecase.RemoveRepoInput{RepoID: req.GetRepoId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RemoveRepoResponse{}, nil
+}
+
+func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.RecordWorktreeCreatedRequest) (*projectv1.RecordWorktreeCreatedResponse, error) {
+	wt, err := s.recordWorktreeCreated.Execute(ctx, usecase.RecordWorktreeCreatedInput{
+		ProjectID: req.GetProjectId(),
+		RepoID:    req.GetRepoId(),
+		Path:      req.GetPath(),
+		Branch:    req.GetBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RecordWorktreeCreatedResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) RecordWorktreeRemoved(ctx context.Context, req *projectv1.RecordWorktreeRemovedRequest) (*projectv1.RecordWorktreeRemovedResponse, error) {
+	if err := s.recordWorktreeRemoved.Execute(ctx, usecase.RecordWorktreeRemovedInput{WorktreeID: req.GetWorktreeId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RecordWorktreeRemovedResponse{}, nil
+}
+
+func (s *Server) ListWorktrees(ctx context.Context, req *projectv1.ListWorktreesRequest) (*projectv1.ListWorktreesResponse, error) {
+	worktrees, err := s.listWorktrees.Execute(ctx, usecase.ListWorktreesInput{ProjectID: req.GetProjectId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.Worktree, 0, len(worktrees))
+	for _, wt := range worktrees {
+		out = append(out, toProtoWorktree(wt))
+	}
+	return &projectv1.ListWorktreesResponse{Worktrees: out}, nil
+}
+
+func (s *Server) SetWorktreeActivation(ctx context.Context, req *projectv1.SetWorktreeActivationRequest) (*projectv1.SetWorktreeActivationResponse, error) {
+	wt, err := s.setWorktreeActivation.Execute(ctx, usecase.SetWorktreeActivationInput{
+		WorktreeID: req.GetWorktreeId(),
+		Active:     req.GetActive(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.SetWorktreeActivationResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) RenameWorktree(ctx context.Context, req *projectv1.RenameWorktreeRequest) (*projectv1.RenameWorktreeResponse, error) {
+	wt, err := s.renameWorktree.Execute(ctx, usecase.RenameWorktreeInput{
+		WorktreeID: req.GetWorktreeId(),
+		Branch:     req.GetBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RenameWorktreeResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) CreateProjectGroup(ctx context.Context, req *projectv1.CreateProjectGroupRequest) (*projectv1.CreateProjectGroupResponse, error) {
+	group, err := s.createProjectGroup.Execute(ctx, usecase.CreateProjectGroupInput{
+		Name:          req.GetName(),
+		ParentGroupID: req.GetParentGroupId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.CreateProjectGroupResponse{Group: toProtoProjectGroup(group)}, nil
+}
+
+func (s *Server) UpdateProjectGroup(ctx context.Context, req *projectv1.UpdateProjectGroupRequest) (*projectv1.UpdateProjectGroupResponse, error) {
+	group, err := s.updateProjectGroup.Execute(ctx, usecase.UpdateProjectGroupInput{
+		GroupID: req.GetGroupId(),
+		Name:    req.GetName(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateProjectGroupResponse{Group: toProtoProjectGroup(group)}, nil
+}
+
+func (s *Server) DeleteProjectGroup(ctx context.Context, req *projectv1.DeleteProjectGroupRequest) (*projectv1.DeleteProjectGroupResponse, error) {
+	if err := s.deleteProjectGroup.Execute(ctx, usecase.DeleteProjectGroupInput{GroupID: req.GetGroupId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.DeleteProjectGroupResponse{}, nil
+}
+
+func (s *Server) ListProjectGroups(ctx context.Context, _ *projectv1.ListProjectGroupsRequest) (*projectv1.ListProjectGroupsResponse, error) {
+	groups, err := s.listProjectGroups.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.ProjectGroup, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, toProtoProjectGroup(g))
+	}
+	return &projectv1.ListProjectGroupsResponse{Groups: out}, nil
+}
+
 func toDomainRole(r projectv1.ProjectRole) domain.ProjectRole {
 	switch r {
 	case projectv1.ProjectRole_PROJECT_ROLE_OWNER:
@@ -116,10 +339,51 @@ func toDomainRole(r projectv1.ProjectRole) domain.ProjectRole {
 }
 
 func toProtoProject(p domain.Project) *projectv1.Project {
-	return &projectv1.Project{
-		Id:          p.ID,
-		TenantId:    p.TenantID,
-		Name:        p.Name,
-		DevServerId: p.DevServerID,
+	out := &projectv1.Project{
+		Id:            p.ID,
+		TenantId:      p.TenantID,
+		Name:          p.Name,
+		DevServerId:   p.DevServerID,
+		Description:   p.Description,
+		DefaultBranch: p.DefaultBranch,
+		Visibility:    p.Visibility,
+		CreatedBy:     p.CreatedBy,
+	}
+	if !p.CreatedAt.IsZero() {
+		out.CreatedAt = timestamppb.New(p.CreatedAt)
+	}
+	if !p.UpdatedAt.IsZero() {
+		out.UpdatedAt = timestamppb.New(p.UpdatedAt)
+	}
+	return out
+}
+
+func toProtoRepo(r domain.Repo) *projectv1.Repo {
+	return &projectv1.Repo{
+		Id:          r.ID,
+		ProjectId:   r.ProjectID,
+		Url:         r.URL,
+		DisplayName: r.DisplayName,
+		Position:    r.Position,
+	}
+}
+
+func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
+	return &projectv1.Worktree{
+		Id:        wt.ID,
+		ProjectId: wt.ProjectID,
+		RepoId:    wt.RepoID,
+		Path:      wt.Path,
+		Branch:    wt.Branch,
+		Active:    wt.Active,
+	}
+}
+
+func toProtoProjectGroup(g domain.ProjectGroup) *projectv1.ProjectGroup {
+	return &projectv1.ProjectGroup{
+		Id:            g.ID,
+		TenantId:      g.TenantID,
+		Name:          g.Name,
+		ParentGroupId: g.ParentGroupID,
 	}
 }

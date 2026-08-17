@@ -35,10 +35,14 @@ const requestingServiceMetadataKey = "x-orca-service-id"
 type Server struct {
 	credentialbrokerv1.UnimplementedCredentialBrokerServiceServer
 
-	writeCredential   *usecase.WriteCredential
-	resolveCredential *usecase.ResolveCredential
-	rotateCredential  *usecase.RotateCredential
-	revokeCredential  *usecase.RevokeCredential
+	writeCredential          *usecase.WriteCredential
+	resolveCredential        *usecase.ResolveCredential
+	rotateCredential         *usecase.RotateCredential
+	revokeCredential         *usecase.RevokeCredential
+	getCredentialMetadata    *usecase.GetCredentialMetadata
+	resolveCredentialByOwner *usecase.ResolveCredentialByOwner
+	revokeCredentialByOwner  *usecase.RevokeCredentialByOwner
+	signVapidPayload         *usecase.SignVapidPayload
 }
 
 func New(
@@ -46,12 +50,20 @@ func New(
 	resolve *usecase.ResolveCredential,
 	rotate *usecase.RotateCredential,
 	revoke *usecase.RevokeCredential,
+	getMetadata *usecase.GetCredentialMetadata,
+	resolveByOwner *usecase.ResolveCredentialByOwner,
+	revokeByOwner *usecase.RevokeCredentialByOwner,
+	signVapid *usecase.SignVapidPayload,
 ) *Server {
 	return &Server{
-		writeCredential:   write,
-		resolveCredential: resolve,
-		rotateCredential:  rotate,
-		revokeCredential:  revoke,
+		writeCredential:          write,
+		resolveCredential:        resolve,
+		rotateCredential:         rotate,
+		revokeCredential:         revoke,
+		getCredentialMetadata:    getMetadata,
+		resolveCredentialByOwner: resolveByOwner,
+		revokeCredentialByOwner:  revokeByOwner,
+		signVapidPayload:         signVapid,
 	}
 }
 
@@ -101,6 +113,53 @@ func (s *Server) RevokeCredential(ctx context.Context, req *credentialbrokerv1.R
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &credentialbrokerv1.RevokeCredentialResponse{}, nil
+}
+
+func (s *Server) GetCredentialMetadata(ctx context.Context, req *credentialbrokerv1.GetCredentialMetadataRequest) (*credentialbrokerv1.GetCredentialMetadataResponse, error) {
+	metadata, err := s.getCredentialMetadata.Execute(ctx, usecase.GetCredentialMetadataInput{
+		CredentialID: req.GetCredentialId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &credentialbrokerv1.GetCredentialMetadataResponse{Metadata: toProtoMetadata(metadata)}, nil
+}
+
+func (s *Server) ResolveCredentialByOwner(ctx context.Context, req *credentialbrokerv1.ResolveCredentialByOwnerRequest) (*credentialbrokerv1.ResolveCredentialByOwnerResponse, error) {
+	value, err := s.resolveCredentialByOwner.Execute(ctx, usecase.ResolveCredentialByOwnerInput{
+		TenantID:          req.GetTenantId(),
+		Category:          toDomainCategory(req.GetCategory()),
+		OwnerID:           req.GetOwnerId(),
+		RequestingService: requestingService(ctx),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &credentialbrokerv1.ResolveCredentialByOwnerResponse{Value: value}, nil
+}
+
+func (s *Server) RevokeCredentialByOwner(ctx context.Context, req *credentialbrokerv1.RevokeCredentialByOwnerRequest) (*credentialbrokerv1.RevokeCredentialByOwnerResponse, error) {
+	_, err := s.revokeCredentialByOwner.Execute(ctx, usecase.RevokeCredentialByOwnerInput{
+		TenantID:          req.GetTenantId(),
+		Category:          toDomainCategory(req.GetCategory()),
+		OwnerID:           req.GetOwnerId(),
+		RequestingService: requestingService(ctx),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &credentialbrokerv1.RevokeCredentialByOwnerResponse{}, nil
+}
+
+func (s *Server) SignVapidPayload(ctx context.Context, req *credentialbrokerv1.SignVapidPayloadRequest) (*credentialbrokerv1.SignVapidPayloadResponse, error) {
+	signature, err := s.signVapidPayload.Execute(ctx, usecase.SignVapidPayloadInput{
+		TenantID: req.GetTenantId(),
+		Payload:  req.GetPayload(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &credentialbrokerv1.SignVapidPayloadResponse{Signature: signature}, nil
 }
 
 func requestingService(ctx context.Context) string {

@@ -15,14 +15,16 @@ import (
 // specs/backend-go/standards/testing-strategy.md's unit-test section.
 type fakeRepository struct {
 	saved   []domain.UsageSession
+	events  []domain.OutboxEvent
 	saveErr error
 }
 
-func (f *fakeRepository) SaveSession(ctx context.Context, s domain.UsageSession) error {
+func (f *fakeRepository) SaveSession(ctx context.Context, s domain.UsageSession, event domain.OutboxEvent) error {
 	if f.saveErr != nil {
 		return f.saveErr
 	}
 	f.saved = append(f.saved, s)
+	f.events = append(f.events, event)
 	return nil
 }
 
@@ -50,26 +52,13 @@ func (f *fakeRepository) RecomputeDailyRollup(ctx context.Context, tenantID, use
 	return nil
 }
 
-type fakePublisher struct {
-	published []domain.UsageSession
-	err       error
-}
-
-func (f *fakePublisher) PublishSessionRecorded(ctx context.Context, tenantID string, s domain.UsageSession) error {
-	if f.err != nil {
-		return f.err
-	}
-	f.published = append(f.published, s)
-	return nil
-}
-
 func withIdentity(ctx context.Context, tenantID, userID string) context.Context {
 	ctx = tenant.WithTenantID(ctx, tenantID)
 	return tenant.WithUserID(ctx, userID)
 }
 
 func TestRecordUsageSession_RequiresTenantContext(t *testing.T) {
-	uc := NewRecordUsageSession(&fakeRepository{}, &fakePublisher{})
+	uc := NewRecordUsageSession(&fakeRepository{})
 	_, err := uc.Execute(context.Background(), RecordUsageSessionInput{
 		ID: "s1", Provider: domain.ProviderClaude, RequestID: "req-1",
 	})
@@ -78,10 +67,9 @@ func TestRecordUsageSession_RequiresTenantContext(t *testing.T) {
 	}
 }
 
-func TestRecordUsageSession_SavesAndPublishes(t *testing.T) {
+func TestRecordUsageSession_SavesAndEnqueuesOutboxEvent(t *testing.T) {
 	repo := &fakeRepository{}
-	pub := &fakePublisher{}
-	uc := NewRecordUsageSession(repo, pub)
+	uc := NewRecordUsageSession(repo)
 
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 	got, err := uc.Execute(ctx, RecordUsageSessionInput{
@@ -103,14 +91,17 @@ func TestRecordUsageSession_SavesAndPublishes(t *testing.T) {
 	if len(repo.saved) != 1 {
 		t.Fatalf("expected 1 saved session, got %d", len(repo.saved))
 	}
-	if len(pub.published) != 1 {
-		t.Fatalf("expected 1 published event, got %d", len(pub.published))
+	if len(repo.events) != 1 {
+		t.Fatalf("expected 1 outbox event enqueued in the same call as the session write, got %d", len(repo.events))
+	}
+	if repo.events[0].Subject != SessionRecordedSubject || repo.events[0].ID == "" {
+		t.Errorf("unexpected outbox event: %+v", repo.events[0])
 	}
 }
 
 func TestRecordUsageSession_RepositoryFailurePropagates(t *testing.T) {
 	repo := &fakeRepository{saveErr: errors.New("db unavailable")}
-	uc := NewRecordUsageSession(repo, &fakePublisher{})
+	uc := NewRecordUsageSession(repo)
 
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 	_, err := uc.Execute(ctx, RecordUsageSessionInput{

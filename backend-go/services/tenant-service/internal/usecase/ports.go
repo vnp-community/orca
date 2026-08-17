@@ -70,3 +70,18 @@ type ProfileCache interface {
 	Set(ctx context.Context, userID string, profile domain.ResolvedProfile, ttl time.Duration)
 	Invalidate(ctx context.Context, userID string)
 }
+
+// CacheInvalidationPublisher broadcasts a profile-cache invalidation to
+// every tenant-service replica over NATS — closes the horizontal-scaling
+// gap ProfileCache's own doc comment used to flag as an accepted, TTL-bound
+// staleness window (docs/execution-plan.md Epic F). Every mutating usecase
+// that calls ProfileCache.Invalidate locally also calls this, best-effort,
+// right after; internal/adapter/eventbus.Consumer is what makes every OTHER
+// replica invalidate the same entry. A nil CacheInvalidationPublisher
+// (wired in cmd/server/main.go when NATS is unreachable at startup) is
+// valid — callers must nil-check before use, same convention as an absent
+// optional dependency elsewhere in this codebase; the cache simply falls
+// back to today's TTL-bounded staleness.
+type CacheInvalidationPublisher interface {
+	PublishProfileInvalidated(ctx context.Context, tenantID, userID string) error
+}

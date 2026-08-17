@@ -36,6 +36,7 @@ import (
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -66,20 +67,28 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	// Outbound adapters. Both are stubs in this scaffold — see their doc
-	// comments in internal/adapter/grpcclient for what real wiring against
-	// infra-fleet-service needs. internal/adapter/localgit is real: it
-	// shells out to the host's `git` binary for the host-local dispatch path.
-	resolver := grpcclient.NewConnectionResolver()
+	// Outbound adapters. resolver/relay share one connection to
+	// infra-fleet-service — see internal/adapter/grpcclient's doc comments
+	// for the Relay param/result shape caveat. internal/adapter/localgit is
+	// real too: it shells out to the host's `git` binary for the host-local
+	// dispatch path.
+	infraFleetConn, err := grpcclient.Dial(cfg.InfraFleetServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing infra-fleet-service: %w", err)
+	}
+	defer func() { _ = infraFleetConn.Close() }()
+
+	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
+	resolver := grpcclient.NewConnectionResolver(infraFleetClient)
+	relay := grpcclient.NewRelayExecutor(infraFleetClient)
 	local := localgit.New()
-	relay := grpcclient.NewRelayExecutor()
 
 	getStatusUC := usecase.NewGetStatus(resolver, local, relay)
 	getDiffUC := usecase.NewGetDiff(resolver, local, relay)
 	commitUC := usecase.NewCommit(resolver, local, relay)
 	pushUC := usecase.NewPush(resolver, local, relay)
 	pullUC := usecase.NewPull(resolver, local, relay)
-	generateCommitMessageUC := usecase.NewGenerateCommitMessage()
+	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getDiffUC, relay)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(

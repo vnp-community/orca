@@ -21,14 +21,15 @@ type ListUsersOutput struct {
 // ListUsers is an admin-console operation.
 type ListUsers struct {
 	users UserRepository
+	opa   OPAClient
 }
 
-func NewListUsers(users UserRepository) *ListUsers {
-	return &ListUsers{users: users}
+func NewListUsers(users UserRepository, opa OPAClient) *ListUsers {
+	return &ListUsers{users: users, opa: opa}
 }
 
 func (uc *ListUsers) Execute(ctx context.Context, in ListUsersInput) (ListUsersOutput, error) {
-	if _, err := requireAdminActor(ctx, uc.users); err != nil {
+	if _, err := requireAdminActor(ctx, uc.users, uc.opa); err != nil {
 		return ListUsersOutput{}, err
 	}
 

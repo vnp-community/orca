@@ -9,11 +9,9 @@ import (
 
 type Config struct {
 	commonconfig.Base
-	// CredentialBrokerAddr is credential-broker-service's gRPC target.
-	// Unused by internal/adapter/grpcclient's current stub (see that
-	// package's doc comment) — read here so main.go's composition root
-	// already threads it through, ready for the real dial once that
-	// service exists.
+	// CredentialBrokerAddr is credential-broker-service's gRPC target —
+	// dialed for real by internal/adapter/grpcclient as of Epic B
+	// (docs/execution-plan.md §8).
 	CredentialBrokerAddr string
 }
 

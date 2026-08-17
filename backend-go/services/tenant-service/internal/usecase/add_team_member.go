@@ -21,12 +21,16 @@ type AddTeamMemberInput struct {
 // field, so the scoping company comes from the request context, same as
 // SetUserDepartment.
 type AddTeamMember struct {
-	teams TeamRepository
-	cache ProfileCache
+	teams        TeamRepository
+	cache        ProfileCache
+	invalidation CacheInvalidationPublisher
 }
 
-func NewAddTeamMember(teams TeamRepository, cache ProfileCache) *AddTeamMember {
-	return &AddTeamMember{teams: teams, cache: cache}
+// NewAddTeamMember wires cache invalidation. invalidation may be nil (NATS
+// unreachable at startup, see cmd/server/main.go) — this usecase then only
+// ever invalidates its own replica's cache entry, same as before Epic F.
+func NewAddTeamMember(teams TeamRepository, cache ProfileCache, invalidation CacheInvalidationPublisher) *AddTeamMember {
+	return &AddTeamMember{teams: teams, cache: cache, invalidation: invalidation}
 }
 
 func (uc *AddTeamMember) Execute(ctx context.Context, in AddTeamMemberInput) (domain.TeamMember, error) {
@@ -55,6 +59,12 @@ func (uc *AddTeamMember) Execute(ctx context.Context, in AddTeamMemberInput) (do
 	// change affects exactly the added member's team layer.
 	if uc.cache != nil {
 		uc.cache.Invalidate(ctx, in.UserID)
+	}
+	// Best-effort cross-replica broadcast (Epic F) — see
+	// SetUserDepartment.Execute's matching comment for why a publish error
+	// here doesn't fail the whole write.
+	if uc.invalidation != nil {
+		_ = uc.invalidation.PublishProfileInvalidated(ctx, companyID, in.UserID)
 	}
 	return member, nil
 }

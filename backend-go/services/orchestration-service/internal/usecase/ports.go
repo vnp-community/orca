@@ -59,14 +59,19 @@ type OrchestrationTaskRepository interface {
 // collide even though each interface is conceptually scoped to one entity.
 type DispatchContextRepository interface {
 	// CreateDispatchContext inserts a dispatch_context row for
-	// handle/coordinatorRunID.
+	// handle/coordinatorRunID, optionally owned by orchestrationTaskID.
 	//
-	// NOTE: the generated CreateDispatchContextRequest proto message does
-	// not carry an orchestration_task_id (see README "Known gaps"), so this
-	// single INSERT is trivially atomic on its own — the §8 "dispatch row
-	// and the task's dispatched transition must commit together" chain
-	// only becomes reachable once the proto is extended with a task id.
-	CreateDispatchContext(ctx context.Context, tenantID, handle, coordinatorRunID string) (domain.DispatchContext, error)
+	// orchestrationTaskID may be empty — an ad-hoc coordinator-only dispatch
+	// (no task yet) legitimately has none, and dispatch_contexts.
+	// orchestration_task_id is a nullable FK for exactly that reason. Per
+	// docs/execution-plan.md Epic C, the generated CreateDispatchContextRequest
+	// proto message now carries orchestration_task_id, so a caller that does
+	// supply one gets it persisted here — the precondition CreateGate needs
+	// to resolve dispatch_context_id -> orchestration_task_id instead of
+	// failing closed with ORCH_DISPATCH_CONTEXT_NO_TASK. This single INSERT
+	// remains trivially atomic on its own (no separate task-status
+	// transition happens here).
+	CreateDispatchContext(ctx context.Context, tenantID, handle, coordinatorRunID, orchestrationTaskID string) (domain.DispatchContext, error)
 }
 
 // GateRepository is the persistence port for decision gates.

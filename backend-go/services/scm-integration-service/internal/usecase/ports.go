@@ -14,6 +14,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 )
@@ -74,4 +75,112 @@ type ProviderRegistry interface {
 // tenant credentials matter — see scm-integration-service.md §7.
 type CredentialResolver interface {
 	Resolve(ctx context.Context, tenantID string, provider domain.ScmProvider) (Credential, error)
+}
+
+// OAuthToken is what a provider's token endpoint hands back after a
+// successful authorization-code exchange (§9.1) — deliberately narrower
+// than Credential (no notion of "resolved for this call"): this is the
+// value about to be written to credential-broker-service, not one already
+// resolved from it.
+type OAuthToken struct {
+	AccessToken string
+	Scope       string
+}
+
+// OAuthExchanger performs the provider-side half of the OAuth
+// authorization-code flow (§9.1): building the authorization URL the
+// browser is redirected to, and exchanging a callback code for an access
+// token. Kept as its own interface — separate from ScmProvider — because
+// "authenticate with this provider" and "call this provider's data API"
+// are different capabilities; folding both onto ScmProvider would force
+// every fake/adapter in ListIssues-style tests to also grow OAuth methods
+// they don't exercise.
+type OAuthExchanger interface {
+	// AuthorizationURL builds the URL to redirect the browser to. No
+	// network call — pure string construction from state/redirectURI.
+	AuthorizationURL(state, redirectURI string) string
+	// ExchangeCode calls the provider's token endpoint for real.
+	ExchangeCode(ctx context.Context, code, redirectURI string) (OAuthToken, error)
+}
+
+// OAuthExchangerRegistry resolves which OAuthExchanger to use for a given
+// provider — mirrors ProviderRegistry's shape/rationale (see its doc
+// comment) for the same reason: usecase/ code never imports a provider's
+// OAuth adapter directly.
+type OAuthExchangerRegistry interface {
+	Resolve(provider domain.ScmProvider) (OAuthExchanger, error)
+}
+
+// OAuthState is the payload carried by StartOAuthFlow's opaque state token
+// and recovered by CompleteOAuthFlow — see OAuthStateCodec's doc comment
+// for why this is a signed token rather than a persisted row.
+type OAuthState struct {
+	TenantID    string
+	UserID      string
+	Provider    domain.ScmProvider
+	RedirectURI string
+	ExpiresAt   time.Time
+}
+
+// OAuthStateCodec creates and verifies the state token exchanged during the
+// OAuth flow. Stateless (signed, not looked up) by design: this service's
+// own data model (scm-integration-service.md §5) deliberately holds only
+// rate_limit_cache/webhook_delivery_log — no oauth_state table — so the
+// state token itself carries everything CompleteOAuthFlow needs, integrity-
+// protected against tampering by whatever signing scheme the implementation
+// uses (see internal/adapter/oauthstate).
+type OAuthStateCodec interface {
+	Encode(state OAuthState) (string, error)
+	// Decode verifies the token's signature and expiry, returning an error
+	// for a tampered, expired, or malformed token — CompleteOAuthFlow must
+	// treat any Decode error as a rejected callback, never a best-effort
+	// partial decode.
+	Decode(token string) (OAuthState, error)
+}
+
+// CredentialWriter is this service's one write path into
+// credential-broker-service — used only by CompleteOAuthFlow, once the
+// authorization-code exchange succeeds, to persist the resulting token
+// (WriteCredential, category CREDENTIAL_CATEGORY_SCM_OAUTH, owner_id =
+// provider name — same convention CredentialResolver's doc comment already
+// establishes for reads). Kept as a separate interface from
+// CredentialResolver (read-only) so no other usecase in this service can
+// acquire write access by accident.
+type CredentialWriter interface {
+	Write(ctx context.Context, tenantID string, provider domain.ScmProvider, token OAuthToken) error
+}
+
+// CredentialRevoker is this service's disconnect path into
+// credential-broker-service — used only by RevokeAuth, via
+// RevokeCredentialByOwner (category CREDENTIAL_CATEGORY_SCM_OAUTH,
+// owner_id = provider name — same convention CredentialResolver/
+// CredentialWriter already establish). This service is only ever handed
+// (tenantID, provider), never an opaque credential_id (see
+// CredentialResolver's doc comment), so RevokeCredential's by-id RPC was
+// never reachable from here — RevokeCredentialByOwner closes that gap. Kept
+// as its own interface, not folded into CredentialWriter, for the same
+// "no usecase acquires an unrelated capability by accident" reasoning
+// CredentialWriter's doc comment gives.
+type CredentialRevoker interface {
+	RevokeByOwner(ctx context.Context, tenantID string, provider domain.ScmProvider) error
+}
+
+// RateLimitCache backs GetRateLimitStatus with a local read-through/
+// write-through cache — scm-integration-service.md §8: "populated from
+// response headers on every call; read before dispatching a burst of new
+// calls to decide whether to back off... not a source of truth." Backed by
+// the scm.rate_limit_cache table (migrations/0001_init.up.sql) as of Phase
+// 3 (docs/execution-plan.md §3). Scoped to GetRateLimitStatus only for
+// now — wiring every OTHER usecase (ListIssues/CreatePullRequest/
+// ListPullRequests) to also populate this cache from their own responses'
+// rate-limit headers, and to check it proactively before a burst of calls,
+// is a larger, not-yet-scoped change — see this service's README "Known
+// gaps".
+type RateLimitCache interface {
+	// Get returns the cached snapshot for (tenantID, provider) if one was
+	// recorded within freshWithin of now. ok=false covers both a cache miss
+	// and a snapshot older than that window — either way the caller must
+	// fall back to a live provider call.
+	Get(ctx context.Context, tenantID string, provider domain.ScmProvider, freshWithin time.Duration) (status domain.RateLimitStatus, ok bool, err error)
+	Set(ctx context.Context, tenantID string, provider domain.ScmProvider, status domain.RateLimitStatus) error
 }

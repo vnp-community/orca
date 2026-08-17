@@ -58,7 +58,7 @@ func TestScanWorkspacePorts_NoConnectionID_ReturnsEmptyWithoutRelaying(t *testin
 // This is the regression test for TS Gap 7: a bound connectionId must
 // always relay, never silently short-circuit to an empty result.
 func TestScanWorkspacePorts_ConnectionIDBound_AlwaysRelays(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH)
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestScanWorkspacePorts_ConnectionIDBound_AlwaysRelays(t *testing.T) {
 // A bound connectionId whose agent call fails must propagate the error, not
 // swallow it into an empty result — the exact bug class TS Gap 7 describes.
 func TestScanWorkspacePorts_ConnectionIDBound_AgentFailurePropagates(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH)
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

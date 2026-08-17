@@ -15,16 +15,23 @@ type GetProjectInput struct {
 
 type GetProject struct {
 	repo ProjectRepository
+	opa  OPAClient
 }
 
-func NewGetProject(repo ProjectRepository) *GetProject {
-	return &GetProject{repo: repo}
+func NewGetProject(repo ProjectRepository, opa OPAClient) *GetProject {
+	return &GetProject{repo: repo, opa: opa}
 }
 
+// Execute requires any membership (owner/member/viewer) in the project, or
+// global admin — project-service.md §9's "any membership" tier.
 func (uc *GetProject) Execute(ctx context.Context, in GetProjectInput) (domain.Project, error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return domain.Project{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
+	}
+
+	if err := requireProjectAccess(ctx, uc.repo, uc.opa, in.ID, projectActionAnyMember); err != nil {
+		return domain.Project{}, err
 	}
 
 	project, err := uc.repo.Get(ctx, tenantID, in.ID)

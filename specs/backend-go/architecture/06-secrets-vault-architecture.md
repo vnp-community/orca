@@ -24,16 +24,25 @@ the fragmentation forward.
 | Integration OAuth tokens (GitHub/GitLab/Bitbucket/Azure DevOps/Gitea/Jira/Linear) | Vault KV v2, one path per `(tenant, service, user)` | Direct replacement for `WebCredentialStore`'s per-user encrypted files — same access granularity, centrally managed instead of scattered files |
 | AI provider API keys (Anthropic/OpenAI/etc.) | Vault Transit engine for encrypt/decrypt-as-a-service, ciphertext reference stored in `ai-provider-service`'s Postgres, plaintext never touches application memory longer than the single call that needs it | Closes TS Gap 2 (`backend-agent-target-architecture.md`) by construction — no service ever holds a plaintext key at rest, and unlike the TS relay-based scheme, decrypt is always mediated by Vault policy, not implicit trust in whichever process holds a local `.enc` file |
 | SSH credentials for dev servers | Vault SSH secrets engine (signed short-lived SSH certificates) where the target supports certificate auth; static per-target key material otherwise, stored in KV v2 | Removes long-lived SSH private keys from `infra-fleet-service`'s filesystem/database entirely |
-| VAPID private key (Web Push signing) | Vault Transit engine | Same reasoning as JWT signing above — `notification-service` asks Vault to sign push payloads, the private key material never leaves Vault at all, not even into that service's memory |
+| VAPID private key (Web Push signing) | Vault Transit engine, mediated by `credential-broker-service`'s `SignVapidPayload` RPC | Same reasoning as JWT signing above — the private key material never leaves Vault at all, not even into `notification-service`'s memory. **Updated 2026-08-17 (Epic B, `backend-go/docs/execution-plan.md` §8)**: this row previously read "`notification-service` asks Vault to sign push payloads" directly, which contradicted the "`credential-broker-service`'s role" section below and was in fact how the scaffold's first pass implemented it — a real, documented inconsistency, not a hypothetical one. `notification-service` now calls `credential-broker-service.SignVapidPayload` instead of touching Vault itself, closing the gap; see that RPC's doc comment in `credentialbroker.proto` for why it's a narrow, dedicated RPC rather than folded into `WriteCredential`/`ResolveCredential` |
 | Webhook signing secrets, service-to-service shared secrets | Vault KV v2 | Consistent with everything else — no more "3 field-level `safeStorage` calls scattered across modules" |
 | Non-secret metadata (rotation timestamp, credential status, scope, which Vault path a credential lives at) | `credential-broker-service`'s Postgres | Never the secret value itself — a pointer + bookkeeping, matching ADR-021 §4's "metadata only" principle for the `credential` schema |
 
 ## `credential-broker-service`'s role
 
 No other service talks to Vault directly for **tenant/user secret
-material** (integration tokens, AI provider keys) — they all go through
-`credential-broker-service`'s gRPC API (`WriteCredential`, `ResolveCredential`,
-`RotateCredential`, `RevokeCredential`). Reasons:
+material** (integration tokens, AI provider keys, VAPID signing keys) — they
+all go through `credential-broker-service`'s gRPC API (`WriteCredential`,
+`ResolveCredential`, `RotateCredential`, `RevokeCredential`,
+`GetCredentialMetadata`, `ResolveCredentialByOwner`, `SignVapidPayload` —
+the last four added by Epic B to give every consumer a real, non-stub way
+to call this service without either leaking plaintext to a service that
+must never see it (`GetCredentialMetadata`, for `ai-provider-service`),
+requiring a caller to already hold an opaque `credential_id` it was never
+issued (`ResolveCredentialByOwner`, for `scm-integration-service`/
+`issue-tracking-service`), or needing a "sign with a service-managed key"
+operation `WriteCredential`/`ResolveCredential` don't fit
+(`SignVapidPayload`, for `notification-service`)). Reasons:
 
 1. **Single audit point.** Every secret access in the system goes through
    one service's logs, not 6 services each independently calling Vault.

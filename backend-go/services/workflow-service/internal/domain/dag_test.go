@@ -71,3 +71,132 @@ func TestDAGDefinition_Validate(t *testing.T) {
 		})
 	}
 }
+
+func stepIDs(steps []Step) []string {
+	ids := make([]string, len(steps))
+	for i, s := range steps {
+		ids[i] = s.ID
+	}
+	return ids
+}
+
+func TestDAGDefinition_BuildWaves_EmptyDefinition(t *testing.T) {
+	d := DAGDefinition{}
+	waves, err := d.BuildWaves()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(waves) != 0 {
+		t.Fatalf("expected no waves for an empty definition, got %v", waves)
+	}
+}
+
+func TestDAGDefinition_BuildWaves_AllIndependentStepsLandInWaveZero(t *testing.T) {
+	d, err := ParseDAG(`{"steps":[{"id":"a","type":"shell"},{"id":"b","type":"shell"},{"id":"c","type":"shell"}]}`)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	waves, err := d.BuildWaves()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(waves) != 1 {
+		t.Fatalf("expected exactly 1 wave, got %d: %v", len(waves), waves)
+	}
+	if got := stepIDs(waves[0]); len(got) != 3 {
+		t.Fatalf("expected all 3 independent steps in wave 0, got %v", got)
+	}
+}
+
+func TestDAGDefinition_BuildWaves_LinearChain(t *testing.T) {
+	d, err := ParseDAG(`{"steps":[
+		{"id":"a","type":"shell"},
+		{"id":"b","type":"shell","dependsOn":["a"]},
+		{"id":"c","type":"shell","dependsOn":["b"]}
+	]}`)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	waves, err := d.BuildWaves()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(waves) != 3 {
+		t.Fatalf("expected 3 waves for a linear chain, got %d: %v", len(waves), waves)
+	}
+	for i, want := range []string{"a", "b", "c"} {
+		if got := stepIDs(waves[i]); len(got) != 1 || got[0] != want {
+			t.Fatalf("wave %d: expected [%s], got %v", i, want, got)
+		}
+	}
+}
+
+func TestDAGDefinition_BuildWaves_DiamondDependency(t *testing.T) {
+	// a -> {b, c} -> d: b and c both depend only on a, and nothing depends
+	// on either of them until d — they must land in the same wave.
+	d, err := ParseDAG(`{"steps":[
+		{"id":"a","type":"shell"},
+		{"id":"b","type":"shell","dependsOn":["a"]},
+		{"id":"c","type":"shell","dependsOn":["a"]},
+		{"id":"d","type":"shell","dependsOn":["b","c"]}
+	]}`)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	waves, err := d.BuildWaves()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(waves) != 3 {
+		t.Fatalf("expected 3 waves for a diamond dependency, got %d: %v", len(waves), waves)
+	}
+	if got := stepIDs(waves[0]); len(got) != 1 || got[0] != "a" {
+		t.Fatalf("wave 0: expected [a], got %v", got)
+	}
+	wave1 := stepIDs(waves[1])
+	if len(wave1) != 2 || !((wave1[0] == "b" && wave1[1] == "c") || (wave1[0] == "c" && wave1[1] == "b")) {
+		t.Fatalf("wave 1: expected [b c] (order-preserving), got %v", wave1)
+	}
+	if got := stepIDs(waves[2]); len(got) != 1 || got[0] != "d" {
+		t.Fatalf("wave 2: expected [d], got %v", got)
+	}
+}
+
+func TestDAGDefinition_BuildWaves_ThreeNodeCycleDetected(t *testing.T) {
+	// a -> b -> c -> a: every edge resolves to a real, distinct step, so
+	// Validate (pairwise self-reference/unknown-dependency checks only)
+	// does not catch this — only BuildWaves' full pass does.
+	d, err := ParseDAG(`{"steps":[
+		{"id":"a","type":"shell","dependsOn":["c"]},
+		{"id":"b","type":"shell","dependsOn":["a"]},
+		{"id":"c","type":"shell","dependsOn":["b"]}
+	]}`)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if err := d.Validate(); err != nil {
+		t.Fatalf("expected Validate to pass (pairwise checks can't see this cycle), got %v", err)
+	}
+
+	_, err = d.BuildWaves()
+	if err == nil {
+		t.Fatal("expected BuildWaves to detect the 3-node cycle")
+	}
+	if !errors.Is(err, ErrCyclicDependency) {
+		t.Fatalf("expected error wrapping ErrCyclicDependency, got %v", err)
+	}
+}
+
+func TestDAGDefinition_BuildWaves_PreservesOriginalOrderWithinAWave(t *testing.T) {
+	d, err := ParseDAG(`{"steps":[{"id":"z","type":"shell"},{"id":"a","type":"shell"},{"id":"m","type":"shell"}]}`)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	waves, err := d.BuildWaves()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := stepIDs(waves[0]); len(got) != 3 || got[0] != "z" || got[1] != "a" || got[2] != "m" {
+		t.Fatalf("expected wave 0 to preserve definition order [z a m], got %v", got)
+	}
+}

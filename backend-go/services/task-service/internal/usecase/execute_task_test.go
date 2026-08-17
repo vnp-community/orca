@@ -9,7 +9,7 @@ import (
 )
 
 func TestExecuteTask_RequiresTenantContext(t *testing.T) {
-	uc := NewExecuteTask(&fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{})
+	uc := NewExecuteTask(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{})
 	_, err := uc.Execute(context.Background(), ExecuteTaskInput{TaskID: "t1"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -23,7 +23,7 @@ func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
 	edges := &fakeEdgeRepository{}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
-	uc := NewExecuteTask(edges, simple, complex)
+	uc := NewExecuteTask(newFakeTaskRepository(), edges, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	ref, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -47,7 +47,7 @@ func TestExecuteTask_ComplexPath_HasSubtasks(t *testing.T) {
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
-	uc := NewExecuteTask(edges, simple, complex)
+	uc := NewExecuteTask(newFakeTaskRepository(), edges, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	ref, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -71,7 +71,7 @@ func TestExecuteTask_ComplexPath_HasDependencies(t *testing.T) {
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
-	uc := NewExecuteTask(edges, simple, complex)
+	uc := NewExecuteTask(newFakeTaskRepository(), edges, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	ref, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -94,7 +94,7 @@ func TestExecuteTask_IgnoresEdgesToTheTaskWhenDecidingComplexity(t *testing.T) {
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
-	uc := NewExecuteTask(edges, simple, complex)
+	uc := NewExecuteTask(newFakeTaskRepository(), edges, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
@@ -108,7 +108,7 @@ func TestExecuteTask_IgnoresEdgesToTheTaskWhenDecidingComplexity(t *testing.T) {
 func TestExecuteTask_ExecutorFailurePropagates(t *testing.T) {
 	edges := &fakeEdgeRepository{}
 	simple := &fakeExecutor{err: errors.New("infra-fleet-service unavailable")}
-	uc := NewExecuteTask(edges, simple, &fakeExecutor{})
+	uc := NewExecuteTask(newFakeTaskRepository(), edges, simple, &fakeExecutor{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
@@ -117,10 +117,55 @@ func TestExecuteTask_ExecutorFailurePropagates(t *testing.T) {
 }
 
 func TestExecuteTask_RequiresTaskID(t *testing.T) {
-	uc := NewExecuteTask(&fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{})
+	uc := NewExecuteTask(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{RequestID: "req-1"}); err == nil {
 		t.Fatal("expected an error for an empty task_id")
+	}
+}
+
+// TestExecuteTask_MarksTaskInProgressBeforeDispatching is the regression for
+// this usecase's real state transition (see execute_task.go's doc comment):
+// Execute must call TaskRepository.UpdateStatus(StatusInProgress) before
+// handing off to either executor.
+func TestExecuteTask_MarksTaskInProgressBeforeDispatching(t *testing.T) {
+	repo := newFakeTaskRepository()
+	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	uc := NewExecuteTask(repo, &fakeEdgeRepository{}, simple, &fakeExecutor{})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.updateStatusCalls) != 1 {
+		t.Fatalf("expected exactly one UpdateStatus call, got %d: %+v", len(repo.updateStatusCalls), repo.updateStatusCalls)
+	}
+	got := repo.updateStatusCalls[0]
+	if got.tenantID != "tenant-1" || got.id != "task-1" || got.status != domain.StatusInProgress {
+		t.Errorf("unexpected UpdateStatus call: %+v", got)
+	}
+	if !simple.called {
+		t.Error("expected SimpleExecutor to be called after the status update")
+	}
+}
+
+// TestExecuteTask_StatusUpdateFailurePropagatesAndSkipsDispatch: since the
+// status transition is the entire point of this usecase's Epic C addition,
+// a failure to persist it must fail Execute outright rather than silently
+// dispatching with no recorded state.
+func TestExecuteTask_StatusUpdateFailurePropagatesAndSkipsDispatch(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.updateStatusErr = errors.New("db unavailable")
+	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	uc := NewExecuteTask(repo, &fakeEdgeRepository{}, simple, complex)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
+		t.Fatal("expected an error when the status update fails")
+	}
+	if simple.called || complex.called {
+		t.Errorf("expected neither executor to be called, simple=%v complex=%v", simple.called, complex.called)
 	}
 }

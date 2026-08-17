@@ -52,3 +52,22 @@ func TestCreateGate_DispatchContextNotFoundPropagates(t *testing.T) {
 		t.Fatalf("expected wrapped ErrDispatchContextNotFound, got %v", err)
 	}
 }
+
+// TestCreateGate_DispatchContextHasNoTaskPropagates keeps proving the
+// original failure mode (Epic C, docs/execution-plan.md) still correctly
+// surfaces as ErrDispatchContextHasNoTask (-> ORCH_DISPATCH_CONTEXT_NO_TASK /
+// FailedPrecondition at the gRPC boundary) for a dispatch context that
+// genuinely has no owning task — that's the real invariant, not a bug, and
+// must keep working once CreateDispatchContextRequest can supply a task id
+// for the cases that do have one.
+func TestCreateGate_DispatchContextHasNoTaskPropagates(t *testing.T) {
+	repo := newFakeGateRepository()
+	repo.err = ErrDispatchContextHasNoTask
+	uc := NewCreateGate(repo, &synchronousSerializer{})
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	_, err := uc.Execute(ctx, CreateGateInput{DispatchContextID: "dc-adhoc"})
+	if !errors.Is(err, ErrDispatchContextHasNoTask) {
+		t.Fatalf("expected wrapped ErrDispatchContextHasNoTask, got %v", err)
+	}
+}

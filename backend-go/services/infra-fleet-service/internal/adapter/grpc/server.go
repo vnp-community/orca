@@ -7,6 +7,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
@@ -24,6 +25,9 @@ type Server struct {
 	createSshTarget    *usecase.CreateSshTarget
 	getFleetHealth     *usecase.GetFleetHealth
 	scanWorkspacePorts *usecase.ScanWorkspacePorts
+	listDevServers     *usecase.ListDevServers
+	createConnection   *usecase.CreateConnection
+	relay              *usecase.Relay
 }
 
 func New(
@@ -32,6 +36,9 @@ func New(
 	createSshTarget *usecase.CreateSshTarget,
 	getFleetHealth *usecase.GetFleetHealth,
 	scanWorkspacePorts *usecase.ScanWorkspacePorts,
+	listDevServers *usecase.ListDevServers,
+	createConnection *usecase.CreateConnection,
+	relay *usecase.Relay,
 ) *Server {
 	return &Server{
 		registerDevServer:  registerDevServer,
@@ -39,13 +46,17 @@ func New(
 		createSshTarget:    createSshTarget,
 		getFleetHealth:     getFleetHealth,
 		scanWorkspacePorts: scanWorkspacePorts,
+		listDevServers:     listDevServers,
+		createConnection:   createConnection,
+		relay:              relay,
 	}
 }
 
 func (s *Server) RegisterDevServer(ctx context.Context, req *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error) {
 	devServer, err := s.registerDevServer.Execute(ctx, usecase.RegisterDevServerInput{
-		Host: req.GetHost(),
-		Mode: toDomainConnectionMode(req.GetMode()),
+		Host:        req.GetHost(),
+		Mode:        toDomainConnectionMode(req.GetMode()),
+		SSHTargetID: req.GetSshTargetId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -63,8 +74,65 @@ func (s *Server) ResolveConnection(ctx context.Context, req *infrafleetv1.Resolv
 	resp := &infrafleetv1.ResolveConnectionResponse{Connected: out.Connected}
 	if out.Connected {
 		resp.DevServer = toProtoDevServer(out.DevServer)
+		resp.RepoPath = out.RepoPath
+		resp.WorktreeId = out.WorktreeID
 	}
 	return resp, nil
+}
+
+// ListDevServers backs the frontend's devServer.list channel (wired through
+// api-gateway's wscompat) — see usecase.ListDevServers's doc comment.
+func (s *Server) ListDevServers(ctx context.Context, req *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error) {
+	devServers, err := s.listDevServers.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.DevServer, 0, len(devServers))
+	for _, ds := range devServers {
+		out = append(out, toProtoDevServer(ds))
+	}
+	return &infrafleetv1.ListDevServersResponse{DevServers: out}, nil
+}
+
+// CreateConnection is the write path for infra.connections — see
+// usecase.CreateConnection's doc comment.
+func (s *Server) CreateConnection(ctx context.Context, req *infrafleetv1.CreateConnectionRequest) (*infrafleetv1.CreateConnectionResponse, error) {
+	conn, err := s.createConnection.Execute(ctx, usecase.CreateConnectionInput{
+		DevServerID: req.GetDevServerId(),
+		RepoPath:    req.GetRepoPath(),
+		WorktreeID:  req.GetWorktreeId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CreateConnectionResponse{ConnectionId: conn.ID}, nil
+}
+
+// Relay is the generic connectionId+method+params passthrough — see
+// usecase.Relay's doc comment for why this is one RPC rather than one per
+// caller/method.
+func (s *Server) Relay(ctx context.Context, req *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+	var params map[string]any
+	if raw := req.GetParamsJson(); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &params); err != nil {
+			return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "INFRA_RELAY_BAD_PARAMS", "params_json must be a JSON object", err))
+		}
+	}
+
+	result, err := s.relay.Execute(ctx, usecase.RelayInput{
+		ConnectionID: req.GetConnectionId(),
+		Method:       req.GetMethod(),
+		Params:       params,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInternal, "INFRA_RELAY_ENCODE_FAILED", "failed to encode relay result", err))
+	}
+	return &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}, nil
 }
 
 func (s *Server) CreateSshTarget(ctx context.Context, req *infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error) {
@@ -130,10 +198,11 @@ func toProtoConnectionMode(m domain.ConnectionMode) infrafleetv1.ConnectionMode 
 
 func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 	return &infrafleetv1.DevServer{
-		Id:       ds.ID,
-		TenantId: ds.TenantID,
-		Host:     ds.Host,
-		Mode:     toProtoConnectionMode(ds.Mode),
+		Id:          ds.ID,
+		TenantId:    ds.TenantID,
+		Host:        ds.Host,
+		Mode:        toProtoConnectionMode(ds.Mode),
+		SshTargetId: ds.SSHTargetID,
 	}
 }
 

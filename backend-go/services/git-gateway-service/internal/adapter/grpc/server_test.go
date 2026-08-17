@@ -47,16 +47,25 @@ func (fakeExecutor) Pull(context.Context, string) (domain.PullResult, error) {
 	return domain.PullResult{Success: true, HadConflicts: false}, nil
 }
 
+// fakeAICompleter is a usecase.AICompleter stub for exercising
+// GenerateCommitMessage's wire<->usecase translation.
+type fakeAICompleter struct{ message string }
+
+func (f fakeAICompleter) Complete(context.Context, string, string) (string, error) {
+	return f.message, nil
+}
+
 func newTestServer() *Server {
 	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: false, RepoPath: "/repo"}}
 	exec := fakeExecutor{}
+	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	return New(
 		usecase.NewGetStatus(resolver, exec, exec),
-		usecase.NewGetDiff(resolver, exec, exec),
+		getDiffUC,
 		usecase.NewCommit(resolver, exec, exec),
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
-		usecase.NewGenerateCommitMessage(),
+		usecase.NewGenerateCommitMessage(resolver, getDiffUC, fakeAICompleter{message: "generated message"}),
 	)
 }
 
@@ -104,10 +113,35 @@ func TestServer_Pull_TranslatesResult(t *testing.T) {
 	}
 }
 
-func TestServer_GenerateCommitMessage_ReturnsUnimplemented(t *testing.T) {
+func TestServer_GenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *testing.T) {
+	// newTestServer's resolver reports Connected=false, i.e. no dev server
+	// for this worktree — GenerateCommitMessage has no AI-relay path in
+	// that case (see usecase.GenerateCommitMessage's doc comment).
 	s := newTestServer()
 	_, err := s.GenerateCommitMessage(context.Background(), &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: "wt-1"})
-	if status.Code(err) != codes.Unimplemented {
-		t.Fatalf("expected Unimplemented, got %v", err)
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestServer_GenerateCommitMessage_Connected_TranslatesResult(t *testing.T) {
+	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo"}}
+	exec := fakeExecutor{}
+	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
+	s := New(
+		usecase.NewGetStatus(resolver, exec, exec),
+		getDiffUC,
+		usecase.NewCommit(resolver, exec, exec),
+		usecase.NewPush(resolver, exec, exec),
+		usecase.NewPull(resolver, exec, exec),
+		usecase.NewGenerateCommitMessage(resolver, getDiffUC, fakeAICompleter{message: "generated message"}),
+	)
+
+	resp, err := s.GenerateCommitMessage(context.Background(), &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetMessage() != "generated message" {
+		t.Errorf("expected message=%q, got %q", "generated message", resp.GetMessage())
 	}
 }

@@ -215,4 +215,18 @@ func (f *fakeProfileCache) Invalidate(ctx context.Context, userID string) {
 	delete(f.byUserID, userID)
 }
 
+type fakeCacheInvalidationPublisher struct {
+	calls []string // userIDs, in call order
+	err   error
+}
+
+func newFakeCacheInvalidationPublisher() *fakeCacheInvalidationPublisher {
+	return &fakeCacheInvalidationPublisher{}
+}
+
+func (f *fakeCacheInvalidationPublisher) PublishProfileInvalidated(ctx context.Context, tenantID, userID string) error {
+	f.calls = append(f.calls, userID)
+	return f.err
+}
+
 var errFakeRepository = errors.New("fake repository error")

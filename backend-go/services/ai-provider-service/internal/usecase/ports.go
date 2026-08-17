@@ -79,7 +79,15 @@ type CredentialRef struct {
 // bytes from the caller's perspective; nothing in this package or its
 // callers inspects or decrypts it.
 type WriteCredentialInput struct {
-	TenantID      string
+	TenantID string
+	// OwnerID mirrors credentialbroker.proto's WriteCredentialRequest.owner_id
+	// ("user id or service name") — CreateAccount.Execute populates it from
+	// the account's UserID/ProjectID scope, falling back to this service's
+	// own name for server-scoped accounts with no specific owning user (see
+	// create_account.go). credential-broker-service rejects an empty
+	// OwnerID (WriteCredentialInput's own validation, "tenant_id and
+	// owner_id are required"), so this must never be left blank.
+	OwnerID       string
 	EncryptedBlob []byte
 }
 

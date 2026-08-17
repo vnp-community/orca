@@ -22,7 +22,7 @@ func TestNewTask_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewTask(tt.id, tt.tenantID, tt.title, tt.status, tt.parentID)
+			got, err := NewTask(tt.id, tt.tenantID, tt.title, tt.status, tt.parentID, "")
 			if tt.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected no error, got %v", err)
@@ -40,7 +40,7 @@ func TestNewTask_ValidatesInvariants(t *testing.T) {
 }
 
 func TestTask_SetStatus_RejectsTransitionOutOfTerminalState(t *testing.T) {
-	done, err := NewTask("t1", "tenant-1", "Title", StatusDone, "")
+	done, err := NewTask("t1", "tenant-1", "Title", StatusDone, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error building task: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestTask_SetStatus_RejectsTransitionOutOfTerminalState(t *testing.T) {
 }
 
 func TestTask_SetStatus_AllowsNonTerminalTransition(t *testing.T) {
-	open, err := NewTask("t1", "tenant-1", "Title", StatusOpen, "")
+	open, err := NewTask("t1", "tenant-1", "Title", StatusOpen, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error building task: %v", err)
 	}

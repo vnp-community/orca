@@ -19,9 +19,10 @@ import (
 // service owns ID assignment), but tests may supply one directly for
 // determinism.
 type CreateTaskInput struct {
-	ID       string
-	Title    string
-	ParentID string
+	ID        string
+	Title     string
+	ParentID  string
+	ProjectID string
 }
 
 type CreateTask struct {
@@ -42,7 +43,7 @@ func (uc *CreateTask) Execute(ctx context.Context, in CreateTaskInput) (domain.T
 	if id == "" {
 		id = uuid.NewString()
 	}
-	task, err := domain.NewTask(id, tenantID, in.Title, domain.StatusOpen, in.ParentID)
+	task, err := domain.NewTask(id, tenantID, in.Title, domain.StatusOpen, in.ParentID, in.ProjectID)
 	if err != nil {
 		return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID", err.Error(), err)
 	}

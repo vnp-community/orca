@@ -17,14 +17,15 @@ type RevokeSession struct {
 	sessions SessionRepository
 	audit    AuditRepository
 	clock    Clock
+	opa      OPAClient
 }
 
-func NewRevokeSession(users UserRepository, sessions SessionRepository, audit AuditRepository, clock Clock) *RevokeSession {
-	return &RevokeSession{users: users, sessions: sessions, audit: audit, clock: clock}
+func NewRevokeSession(users UserRepository, sessions SessionRepository, audit AuditRepository, clock Clock, opa OPAClient) *RevokeSession {
+	return &RevokeSession{users: users, sessions: sessions, audit: audit, clock: clock, opa: opa}
 }
 
 func (uc *RevokeSession) Execute(ctx context.Context, sessionToken string) error {
-	actor, err := requireAdminActor(ctx, uc.users)
+	actor, err := requireAdminActor(ctx, uc.users, uc.opa)
 	if err != nil {
 		return err
 	}

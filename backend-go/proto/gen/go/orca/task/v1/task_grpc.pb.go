@@ -19,12 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TaskService_CreateTask_FullMethodName        = "/orca.task.v1.TaskService/CreateTask"
-	TaskService_GetTask_FullMethodName           = "/orca.task.v1.TaskService/GetTask"
-	TaskService_AddEdge_FullMethodName           = "/orca.task.v1.TaskService/AddEdge"
-	TaskService_Grant_FullMethodName             = "/orca.task.v1.TaskService/Grant"
-	TaskService_ResolvePermission_FullMethodName = "/orca.task.v1.TaskService/ResolvePermission"
-	TaskService_Execute_FullMethodName           = "/orca.task.v1.TaskService/Execute"
+	TaskService_CreateTask_FullMethodName          = "/orca.task.v1.TaskService/CreateTask"
+	TaskService_GetTask_FullMethodName             = "/orca.task.v1.TaskService/GetTask"
+	TaskService_AddEdge_FullMethodName             = "/orca.task.v1.TaskService/AddEdge"
+	TaskService_Grant_FullMethodName               = "/orca.task.v1.TaskService/Grant"
+	TaskService_ResolvePermission_FullMethodName   = "/orca.task.v1.TaskService/ResolvePermission"
+	TaskService_Execute_FullMethodName             = "/orca.task.v1.TaskService/Execute"
+	TaskService_HasActiveExecutions_FullMethodName = "/orca.task.v1.TaskService/HasActiveExecutions"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -41,6 +42,15 @@ type TaskServiceClient interface {
 	Grant(ctx context.Context, in *GrantRequest, opts ...grpc.CallOption) (*GrantResponse, error)
 	ResolvePermission(ctx context.Context, in *ResolvePermissionRequest, opts ...grpc.CallOption) (*ResolvePermissionResponse, error)
 	Execute(ctx context.Context, in *TaskServiceExecuteRequest, opts ...grpc.CallOption) (*TaskServiceExecuteResponse, error)
+	// HasActiveExecutions answers "does this project have a task currently
+	// dispatched for execution (status=in_progress)" — added for Epic C
+	// (backend-go/docs/execution-plan.md §10) to close
+	// project-service.RebindDevServer's guard, previously a client-side
+	// no-op because this RPC didn't exist. See that RPC's Go doc comment
+	// (internal/usecase/has_active_executions.go) for the honest limit on
+	// what this can currently answer — task-service has no completion
+	// callback yet, so "in_progress" is one-way until that's built.
+	HasActiveExecutions(ctx context.Context, in *HasActiveExecutionsRequest, opts ...grpc.CallOption) (*HasActiveExecutionsResponse, error)
 }
 
 type taskServiceClient struct {
@@ -111,6 +121,16 @@ func (c *taskServiceClient) Execute(ctx context.Context, in *TaskServiceExecuteR
 	return out, nil
 }
 
+func (c *taskServiceClient) HasActiveExecutions(ctx context.Context, in *HasActiveExecutionsRequest, opts ...grpc.CallOption) (*HasActiveExecutionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HasActiveExecutionsResponse)
+	err := c.cc.Invoke(ctx, TaskService_HasActiveExecutions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -125,6 +145,15 @@ type TaskServiceServer interface {
 	Grant(context.Context, *GrantRequest) (*GrantResponse, error)
 	ResolvePermission(context.Context, *ResolvePermissionRequest) (*ResolvePermissionResponse, error)
 	Execute(context.Context, *TaskServiceExecuteRequest) (*TaskServiceExecuteResponse, error)
+	// HasActiveExecutions answers "does this project have a task currently
+	// dispatched for execution (status=in_progress)" — added for Epic C
+	// (backend-go/docs/execution-plan.md §10) to close
+	// project-service.RebindDevServer's guard, previously a client-side
+	// no-op because this RPC didn't exist. See that RPC's Go doc comment
+	// (internal/usecase/has_active_executions.go) for the honest limit on
+	// what this can currently answer — task-service has no completion
+	// callback yet, so "in_progress" is one-way until that's built.
+	HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -152,6 +181,9 @@ func (UnimplementedTaskServiceServer) ResolvePermission(context.Context, *Resolv
 }
 func (UnimplementedTaskServiceServer) Execute(context.Context, *TaskServiceExecuteRequest) (*TaskServiceExecuteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Execute not implemented")
+}
+func (UnimplementedTaskServiceServer) HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method HasActiveExecutions not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -282,6 +314,24 @@ func _TaskService_Execute_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_HasActiveExecutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HasActiveExecutionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).HasActiveExecutions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_HasActiveExecutions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).HasActiveExecutions(ctx, req.(*HasActiveExecutionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -312,6 +362,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Execute",
 			Handler:    _TaskService_Execute_Handler,
+		},
+		{
+			MethodName: "HasActiveExecutions",
+			Handler:    _TaskService_HasActiveExecutions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

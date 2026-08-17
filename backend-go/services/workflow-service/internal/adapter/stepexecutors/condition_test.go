@@ -46,18 +46,3 @@ func TestConditionExecutor_RejectsInvalidConfigJSON(t *testing.T) {
 		t.Fatal("expected an error for invalid config JSON")
 	}
 }
-
-func TestStubExecutors_ReturnNotImplemented(t *testing.T) {
-	for name, exec := range map[string]domain.StepExecutor{
-		"agent":        NewAgentStub(),
-		"shell":        NewShellStub(),
-		"notification": NewNotificationStub(),
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := exec.Execute(context.Background(), "{}")
-			if err == nil {
-				t.Fatalf("expected %s stub to return an error", name)
-			}
-		})
-	}
-}

@@ -61,7 +61,20 @@ func (uc *CreateAccount) Execute(ctx context.Context, in CreateAccountInput) (do
 		scope = domain.ScopeServer
 	}
 
-	ref, err := uc.broker.WriteCredential(ctx, WriteCredentialInput{TenantID: tenantID, EncryptedBlob: in.EncryptedBlob})
+	// ownerID: prefer the specific user/project this account is scoped to;
+	// server-scoped accounts (the common case today — see this method's
+	// doc comment) have neither, so fall back to this service's own name.
+	// credential-broker-service's owner_id is documented as "user id or
+	// service name" precisely to accommodate this fallback.
+	ownerID := in.UserID
+	if ownerID == "" {
+		ownerID = in.ProjectID
+	}
+	if ownerID == "" {
+		ownerID = "ai-provider-service"
+	}
+
+	ref, err := uc.broker.WriteCredential(ctx, WriteCredentialInput{TenantID: tenantID, OwnerID: ownerID, EncryptedBlob: in.EncryptedBlob})
 	if err != nil {
 		return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_CREDENTIAL_WRITE_FAILED", "failed to write credential via credential-broker-service", err)
 	}

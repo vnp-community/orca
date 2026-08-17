@@ -22,13 +22,16 @@ import (
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/infra-fleet-service/internal/config"
 
+	infraagentwsserver "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/agentwsserver"
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
+	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -72,22 +75,47 @@ func run() error {
 	}
 	defer pool.Close()
 
-	// One Repository backs DevServerRepository, SshTargetRepository,
-	// ConnectionResolver, and FleetHealthPort — see
-	// internal/adapter/postgres's package doc comment.
+	// One Repository backs DevServerRepository, ConnectionRepository,
+	// ConnectionResolver, and FleetHealthPort; SshTargetStore is a separate
+	// value over the same pool for SshTargetRepository/SshTargetResolver —
+	// see internal/adapter/postgres's package doc comment for why they can't
+	// be the same Go value.
 	repo := infrapostgres.New(pool)
+	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
 
-	// STUB — see internal/adapter/devserveragent's package doc comment and
-	// this service's README "Known gaps". Wired in cleanly so the shape of
-	// the dependency graph is correct; every call it makes returns an error
-	// today.
-	agentClient := infradevserveragent.New()
+	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
+	// wired below via agentwsserver) are both real. relay-ssh's connection
+	// layer (Health probe + shell.exec, via devserveragent.WithRelaySSH) is
+	// also real — see client.go's package doc comment — and now wired in via
+	// a Vault client used only for SSH cert issuance (sshconn.SSHCertIssuer).
+	// vault.NewClient() only builds the API client object (no network call,
+	// see common/secrets's doc comment) — construction failing means
+	// VAULT_ADDR is malformed, not that Vault is unreachable, so this stays
+	// a startup log warning + relay-ssh left unavailable, not a fatal error:
+	// this service's core (dev-server registry, relay-websocket,
+	// direct-websocket) has nothing to do with Vault and must not
+	// crash-loop over one optional mode's dependency.
+	var agentOpts []infradevserveragent.Option
+	vaultClient, err := secrets.NewClient()
+	if err != nil {
+		logger.Warn("failed to construct Vault client — relay-ssh mode will report ErrConnectionModeNotImplemented", slog.Any("error", err))
+	} else {
+		sshConnector := infrasshconn.NewConnector(vaultClient, infrasshconn.LoadConfigFromEnv())
+		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(sshConnector, sshTargetStore))
+	}
+
+	agentCfg := infradevserveragent.LoadConfigFromEnv()
+	agentClient := infradevserveragent.New(agentCfg, logger, agentOpts...)
+	defer agentClient.Close()
 
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
-	createSshTargetUC := usecase.NewCreateSshTarget(repo)
+	createSshTargetUC := usecase.NewCreateSshTarget(sshTargetStore)
 	getFleetHealthUC := usecase.NewGetFleetHealth(repo)
 	scanWorkspacePortsUC := usecase.NewScanWorkspacePorts(repo, agentClient)
+	listDevServersUC := usecase.NewListDevServers(repo)
+	createConnectionUC := usecase.NewCreateConnection(repo)
+	relayUC := usecase.NewRelay(repo, agentClient)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
@@ -96,6 +124,9 @@ func run() error {
 		createSshTargetUC,
 		getFleetHealthUC,
 		scanWorkspacePortsUC,
+		listDevServersUC,
+		createConnectionUC,
+		relayUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -106,9 +137,29 @@ func run() error {
 		return pool.Ping(ctx)
 	})
 
+	// direct-websocket's inbound WS handler ("/agent") and token-issuance
+	// endpoint ("/api/agent-token") share this service's existing HTTP
+	// server/port rather than opening a new one — see
+	// internal/adapter/agentwsserver's package doc comment. slotRegistry is
+	// shared between the two so a POST /api/agent-token-issued slot is what
+	// the WS handshake later validates against.
+	agentWSCfg := infraagentwsserver.LoadConfigFromEnv(cfg.HTTPPort, agentCfg.OrcaVersion)
+	if agentWSCfg.APISecret == "" {
+		logger.Warn("ORCA_AGENT_API_SECRET is not set — POST/GET /api/agent-token will reject every request (fail-secure); direct-websocket dev servers cannot be registered until it is configured")
+	}
+	slotRegistry := infraagentwsserver.NewRegistry(infraagentwsserver.DefaultConnectTimeout)
+	defer slotRegistry.Stop()
+	agentWSServer := infraagentwsserver.New(slotRegistry, agentClient, agentWSCfg, logger)
+	agentTokenIssuer := infraagentwsserver.NewTokenIssuer(slotRegistry, agentWSCfg, logger)
+
+	mux := http.NewServeMux()
+	mux.Handle("/", healthSrv.Handler())
+	mux.Handle("/agent", agentWSServer)
+	mux.Handle("/api/agent-token", agentTokenIssuer)
+
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler: healthSrv.Handler(),
+		Handler: mux,
 	}
 
 	errCh := make(chan error, 2)

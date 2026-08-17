@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package orca.automation.v1;
 
+import "orca/workflow/v1/workflow.proto";
+
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1;automationv1";
 
 // AutomationService owns schedule/trigger definitions + run history. Execution
@@ -12,6 +14,13 @@ service AutomationService {
   rpc CreateAutomation(CreateAutomationRequest) returns (CreateAutomationResponse);
   rpc RunNow(RunNowRequest) returns (RunNowResponse);
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+
+  // HandleExternalTrigger maps an external trigger source's payload onto the
+  // same run interactor RunNow uses (trigger=external instead of manual) —
+  // see design doc's TS external-automations-handler.ts note. request_id is
+  // the external source's own idempotency key, reused as-is for
+  // automation_runs' (tenant_id, request_id) unique index.
+  rpc HandleExternalTrigger(HandleExternalTriggerRequest) returns (HandleExternalTriggerResponse);
 }
 
 message Automation {
@@ -20,6 +29,16 @@ message Automation {
   string name = 3;
   string rrule = 4;
   string step_config_json = 5;
+  // step_type promotes what used to live only inside a "step_type" JSON key
+  // in step_config_json (domain.ParseStepType) to a first-class field —
+  // closes the Phase 2 execution-plan item. Reuses workflow-service's own
+  // StepType enum rather than defining a duplicate one, since automation's
+  // step_type must already match what ExecuteAdHocStepRequest.step_type
+  // expects on dispatch.
+  orca.workflow.v1.StepType step_type = 6;
+  bool enabled = 7;
+  string dtstart = 8; // RFC3339; empty = defaults to created_at at creation time
+  string timezone = 9; // IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
 }
 
 message CreateAutomationRequest {
@@ -27,6 +46,9 @@ message CreateAutomationRequest {
   string name = 2;
   string rrule = 3;
   string step_config_json = 4;
+  orca.workflow.v1.StepType step_type = 5;
+  string dtstart = 6; // optional; empty = defaults to now at creation time
+  string timezone = 7; // optional; empty = UTC
 }
 
 message CreateAutomationResponse {
@@ -57,4 +79,14 @@ message ListRunsRequest {
 message ListRunsResponse {
   repeated AutomationRun runs = 1;
   string next_page_token = 2;
+}
+
+message HandleExternalTriggerRequest {
+  string automation_id = 1;
+  string request_id = 2; // external source's idempotency key
+  string payload_json = 3; // opaque external payload; passed through as-is, not interpreted here
+}
+
+message HandleExternalTriggerResponse {
+  AutomationRun run = 1;
 }

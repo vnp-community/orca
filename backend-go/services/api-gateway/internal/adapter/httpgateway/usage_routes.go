@@ -210,6 +210,8 @@ func grpcCodeToHTTPStatus(c codes.Code) int {
 		return http.StatusServiceUnavailable
 	case codes.DeadlineExceeded:
 		return http.StatusGatewayTimeout
+	case codes.Unimplemented:
+		return http.StatusNotImplemented
 	default:
 		return http.StatusInternalServerError
 	}

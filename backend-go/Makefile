@@ -10,7 +10,7 @@ SERVICES := ai-provider-service annotation-service api-gateway auth-service \
             task-service tenant-service usage-service workflow-service
 
 .PHONY: dev-up dev-down build vet test test-integration lint fmt fmt-check \
-        proto-gen proto-lint migrate-all tidy-all help
+        proto-gen proto-lint migrate-all tidy-all opa-test help
 
 help:
 	@echo "make dev-up            - start postgres/vault/nats via docker compose"
@@ -26,6 +26,7 @@ help:
 	@echo "make proto-lint        - buf lint + breaking-change check"
 	@echo "make migrate-all       - run golang-migrate up for every service against DATABASE_DSN_<SERVICE>"
 	@echo "make tidy-all          - go mod tidy every module"
+	@echo "make opa-test          - opa test the orca-authz Rego bundle (needs the opa CLI)"
 
 dev-up:
 	docker compose up -d
@@ -88,3 +89,10 @@ migrate-all:
 	@echo "Run per-service, e.g.:"
 	@echo "  migrate -path services/usage-service/migrations -database \$$DATABASE_DSN up"
 	@echo "See each service's README for its own migrations path and expected DSN."
+
+# Epic E (docs/execution-plan.md §2): makes the orca-authz bundle CI-ready.
+# Not actually wired into a CI pipeline here — none exists yet for
+# backend-go at all (§5, unstarted), so there is no workflow file to add
+# this to; this target is what such a pipeline would call once it exists.
+opa-test:
+	opa test policy/orca-authz/ -v

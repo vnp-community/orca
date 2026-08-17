@@ -19,6 +19,30 @@ type Config struct {
 	BcryptCost int
 	// SessionTTL is how long a session created by Login stays valid.
 	SessionTTL time.Duration
+
+	// ServiceTokenTTL is how long a JWT minted by IssueServiceToken stays
+	// valid before "exp" — see internal/usecase/issue_service_token.go.
+	ServiceTokenTTL time.Duration
+
+	// OPABundlePath points requireAdminActor's OPA client
+	// (internal/adapter/opaclient, via common/policy.Evaluator) at the
+	// orca-authz Rego bundle on disk. Defaults to the bundle's location
+	// relative to this service's module root when run the way this
+	// service's README's "Running locally" section runs it (`cd
+	// services/auth-service && go run ./cmd/server`); override for
+	// container images that lay the bundle out elsewhere. Same env var
+	// name as task-service/annotation-service's own OPABundlePath, for
+	// consistency across Epic E's consuming services.
+	OPABundlePath string
+
+	// Bootstrap* configure the one-time first-admin creation
+	// (internal/usecase/bootstrap.go) — no-op unless BootstrapTenantID and
+	// BootstrapAdminEmail are both set. BootstrapAdminPassword empty =>
+	// auto-generate and log once at startup, mirroring the old TS
+	// backend's ORCA_ADMIN_EMAIL/ORCA_ADMIN_PASSWORD behavior.
+	BootstrapTenantID      string
+	BootstrapAdminEmail    string
+	BootstrapAdminPassword string
 }
 
 func Load() (Config, error) {
@@ -37,10 +61,20 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	serviceTokenTTL, err := durationEnv("SERVICE_TOKEN_TTL", 15*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
-		Base:       base,
-		BcryptCost: bcryptCost,
-		SessionTTL: sessionTTL,
+		Base:                   base,
+		BcryptCost:             bcryptCost,
+		SessionTTL:             sessionTTL,
+		ServiceTokenTTL:        serviceTokenTTL,
+		OPABundlePath:          commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		BootstrapTenantID:      os.Getenv("BOOTSTRAP_TENANT_ID"),
+		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
+		BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
 	}, nil
 }
 

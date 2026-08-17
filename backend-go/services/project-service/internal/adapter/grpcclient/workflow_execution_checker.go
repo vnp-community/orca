@@ -9,21 +9,18 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 )
 
 // WorkflowExecutionChecker implements usecase.WorkflowExecutionChecker by
-// dialing workflow-service.
-//
-// STUB — workflow-service doesn't yet expose a HasActiveExecutions RPC; this
-// must be replaced with a real gRPC client call once that RPC exists. Do not
-// deploy this stub to production — see project-service.md's RebindDevServer
-// section (§3) for the saga this port participates in. The ClientConn is
-// dialed for real (so config/wiring doesn't have to change later) but
-// HasActiveExecutions doesn't use it yet — it always reports "no active
-// executions", which means RebindDevServer's guard is currently a no-op for
-// the workflow-service half of the check.
+// dialing workflow-service's real HasActiveExecutions RPC — Epic C
+// (docs/execution-plan.md §10, 2026-08-17) closed the gap this was
+// previously a stub for. See project-service.md §3 for the saga
+// RebindDevServer runs this port as part of.
 type WorkflowExecutionChecker struct {
-	conn *grpc.ClientConn
+	conn   *grpc.ClientConn
+	client workflowv1.WorkflowServiceClient
 }
 
 // NewWorkflowExecutionChecker dials workflow-service at addr. The connection
@@ -34,17 +31,20 @@ func NewWorkflowExecutionChecker(addr string) (*WorkflowExecutionChecker, error)
 	if err != nil {
 		return nil, fmt.Errorf("grpcclient: dial workflow-service at %q: %w", addr, err)
 	}
-	return &WorkflowExecutionChecker{conn: conn}, nil
+	return &WorkflowExecutionChecker{conn: conn, client: workflowv1.NewWorkflowServiceClient(conn)}, nil
 }
 
 func (c *WorkflowExecutionChecker) Close() error {
 	return c.conn.Close()
 }
 
-// HasActiveExecutions always returns (false, nil) — see the STUB warning on
-// WorkflowExecutionChecker. Replace this body with the real unary RPC call
-// once workflow-service defines HasActiveExecutions(projectId) returns (bool).
+// HasActiveExecutions calls workflow-service's real HasActiveExecutions RPC
+// — see that RPC's proto doc comment: true iff projectID has a workflow
+// execution in a non-terminal (pending/running/paused) status.
 func (c *WorkflowExecutionChecker) HasActiveExecutions(ctx context.Context, projectID string) (bool, error) {
-	_ = c.conn // reserved for the real RPC call once workflow-service exposes it
-	return false, nil
+	resp, err := c.client.HasActiveExecutions(ctx, &workflowv1.HasActiveExecutionsRequest{ProjectId: projectID})
+	if err != nil {
+		return false, fmt.Errorf("grpcclient: workflow-service HasActiveExecutions: %w", err)
+	}
+	return resp.GetHasActive(), nil
 }

@@ -9,10 +9,14 @@ import (
 )
 
 // ResolveConnectionOutput is the resolved dispatch record: whether a dev
-// server owns the given connectionId (Connected) and, if so, which one.
+// server owns the given connectionId (Connected) and, if so, which one, plus
+// the per-connection metadata (RepoPath, WorktreeID) callers like
+// git-gateway-service's RelayExecutor need alongside DevServer.
 type ResolveConnectionOutput struct {
-	Connected bool
-	DevServer domain.DevServer
+	Connected  bool
+	DevServer  domain.DevServer
+	RepoPath   string
+	WorktreeID string
 }
 
 // ResolveConnection is THE core coordination/execution dispatch primitive of
@@ -41,9 +45,9 @@ func (uc *ResolveConnection) Execute(ctx context.Context, connectionID string) (
 		return ResolveConnectionOutput{Connected: false}, nil
 	}
 
-	connected, devServer, err := uc.resolver.ResolveConnection(ctx, tenantID, connectionID)
+	connected, devServer, conn, err := uc.resolver.ResolveConnection(ctx, tenantID, connectionID)
 	if err != nil {
 		return ResolveConnectionOutput{}, apperrors.New(apperrors.KindInternal, "INFRA_RESOLVE_FAILED", "failed to resolve connection", err)
 	}
-	return ResolveConnectionOutput{Connected: connected, DevServer: devServer}, nil
+	return ResolveConnectionOutput{Connected: connected, DevServer: devServer, RepoPath: conn.RepoPath, WorktreeID: conn.WorktreeID}, nil
 }

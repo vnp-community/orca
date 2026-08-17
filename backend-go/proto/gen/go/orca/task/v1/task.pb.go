@@ -135,6 +135,7 @@ type Task struct {
 	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
 	ParentId      string                 `protobuf:"bytes,5,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	ProjectId     string                 `protobuf:"bytes,6,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"` // added for Epic C's HasActiveExecutions — see that RPC's doc comment
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -204,11 +205,19 @@ func (x *Task) GetParentId() string {
 	return ""
 }
 
+func (x *Task) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
 type CreateTaskRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	ParentId      string                 `protobuf:"bytes,3,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	ProjectId     string                 `protobuf:"bytes,4,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -260,6 +269,13 @@ func (x *CreateTaskRequest) GetTitle() string {
 func (x *CreateTaskRequest) GetParentId() string {
 	if x != nil {
 		return x.ParentId
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
 	}
 	return ""
 }
@@ -794,21 +810,113 @@ func (x *TaskServiceExecuteResponse) GetExecutionRef() string {
 	return ""
 }
 
+type HasActiveExecutionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HasActiveExecutionsRequest) Reset() {
+	*x = HasActiveExecutionsRequest{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HasActiveExecutionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HasActiveExecutionsRequest) ProtoMessage() {}
+
+func (x *HasActiveExecutionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HasActiveExecutionsRequest.ProtoReflect.Descriptor instead.
+func (*HasActiveExecutionsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *HasActiveExecutionsRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+type HasActiveExecutionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HasActive     bool                   `protobuf:"varint,1,opt,name=has_active,json=hasActive,proto3" json:"has_active,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HasActiveExecutionsResponse) Reset() {
+	*x = HasActiveExecutionsResponse{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HasActiveExecutionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HasActiveExecutionsResponse) ProtoMessage() {}
+
+func (x *HasActiveExecutionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HasActiveExecutionsResponse.ProtoReflect.Descriptor instead.
+func (*HasActiveExecutionsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *HasActiveExecutionsResponse) GetHasActive() bool {
+	if x != nil {
+		return x.HasActive
+	}
+	return false
+}
+
 var File_orca_task_v1_task_proto protoreflect.FileDescriptor
 
 const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\n" +
-	"\x17orca/task/v1/task.proto\x12\forca.task.v1\"~\n" +
+	"\x17orca/task/v1/task.proto\x12\forca.task.v1\"\x9d\x01\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x16\n" +
 	"\x06status\x18\x04 \x01(\tR\x06status\x12\x1b\n" +
-	"\tparent_id\x18\x05 \x01(\tR\bparentId\"c\n" +
+	"\tparent_id\x18\x05 \x01(\tR\bparentId\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x06 \x01(\tR\tprojectId\"\x82\x01\n" +
 	"\x11CreateTaskRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1b\n" +
-	"\tparent_id\x18\x03 \x01(\tR\bparentId\"<\n" +
+	"\tparent_id\x18\x03 \x01(\tR\bparentId\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x04 \x01(\tR\tprojectId\"<\n" +
 	"\x12CreateTaskResponse\x12&\n" +
 	"\x04task\x18\x01 \x01(\v2\x12.orca.task.v1.TaskR\x04task\" \n" +
 	"\x0eGetTaskRequest\x12\x0e\n" +
@@ -840,7 +948,13 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x02 \x01(\tR\trequestId\"A\n" +
 	"\x1aTaskServiceExecuteResponse\x12#\n" +
-	"\rexecution_ref\x18\x01 \x01(\tR\fexecutionRef*[\n" +
+	"\rexecution_ref\x18\x01 \x01(\tR\fexecutionRef\";\n" +
+	"\x1aHasActiveExecutionsRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\"<\n" +
+	"\x1bHasActiveExecutionsResponse\x12\x1d\n" +
+	"\n" +
+	"has_active\x18\x01 \x01(\bR\thasActive*[\n" +
 	"\bEdgeType\x12\x19\n" +
 	"\x15EDGE_TYPE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16EDGE_TYPE_PARENT_CHILD\x10\x01\x12\x18\n" +
@@ -852,7 +966,7 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\x11GRANT_LEVEL_ADMIN\x10\x02\x12\x14\n" +
 	"\x10GRANT_LEVEL_USER\x10\x03\x12\x14\n" +
 	"\x10GRANT_LEVEL_TEAM\x10\x04\x12\x17\n" +
-	"\x13GRANT_LEVEL_COMPANY\x10\x052\xf4\x03\n" +
+	"\x13GRANT_LEVEL_COMPANY\x10\x052\xe0\x04\n" +
 	"\vTaskService\x12O\n" +
 	"\n" +
 	"CreateTask\x12\x1f.orca.task.v1.CreateTaskRequest\x1a .orca.task.v1.CreateTaskResponse\x12F\n" +
@@ -860,7 +974,8 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\aAddEdge\x12\x1c.orca.task.v1.AddEdgeRequest\x1a\x1d.orca.task.v1.AddEdgeResponse\x12@\n" +
 	"\x05Grant\x12\x1a.orca.task.v1.GrantRequest\x1a\x1b.orca.task.v1.GrantResponse\x12d\n" +
 	"\x11ResolvePermission\x12&.orca.task.v1.ResolvePermissionRequest\x1a'.orca.task.v1.ResolvePermissionResponse\x12\\\n" +
-	"\aExecute\x12'.orca.task.v1.TaskServiceExecuteRequest\x1a(.orca.task.v1.TaskServiceExecuteResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv1b\x06proto3"
+	"\aExecute\x12'.orca.task.v1.TaskServiceExecuteRequest\x1a(.orca.task.v1.TaskServiceExecuteResponse\x12j\n" +
+	"\x13HasActiveExecutions\x12(.orca.task.v1.HasActiveExecutionsRequest\x1a).orca.task.v1.HasActiveExecutionsResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv1b\x06proto3"
 
 var (
 	file_orca_task_v1_task_proto_rawDescOnce sync.Once
@@ -875,23 +990,25 @@ func file_orca_task_v1_task_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_task_v1_task_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_orca_task_v1_task_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_orca_task_v1_task_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_orca_task_v1_task_proto_goTypes = []any{
-	(EdgeType)(0),                      // 0: orca.task.v1.EdgeType
-	(GrantLevel)(0),                    // 1: orca.task.v1.GrantLevel
-	(*Task)(nil),                       // 2: orca.task.v1.Task
-	(*CreateTaskRequest)(nil),          // 3: orca.task.v1.CreateTaskRequest
-	(*CreateTaskResponse)(nil),         // 4: orca.task.v1.CreateTaskResponse
-	(*GetTaskRequest)(nil),             // 5: orca.task.v1.GetTaskRequest
-	(*GetTaskResponse)(nil),            // 6: orca.task.v1.GetTaskResponse
-	(*AddEdgeRequest)(nil),             // 7: orca.task.v1.AddEdgeRequest
-	(*AddEdgeResponse)(nil),            // 8: orca.task.v1.AddEdgeResponse
-	(*GrantRequest)(nil),               // 9: orca.task.v1.GrantRequest
-	(*GrantResponse)(nil),              // 10: orca.task.v1.GrantResponse
-	(*ResolvePermissionRequest)(nil),   // 11: orca.task.v1.ResolvePermissionRequest
-	(*ResolvePermissionResponse)(nil),  // 12: orca.task.v1.ResolvePermissionResponse
-	(*TaskServiceExecuteRequest)(nil),  // 13: orca.task.v1.TaskServiceExecuteRequest
-	(*TaskServiceExecuteResponse)(nil), // 14: orca.task.v1.TaskServiceExecuteResponse
+	(EdgeType)(0),                       // 0: orca.task.v1.EdgeType
+	(GrantLevel)(0),                     // 1: orca.task.v1.GrantLevel
+	(*Task)(nil),                        // 2: orca.task.v1.Task
+	(*CreateTaskRequest)(nil),           // 3: orca.task.v1.CreateTaskRequest
+	(*CreateTaskResponse)(nil),          // 4: orca.task.v1.CreateTaskResponse
+	(*GetTaskRequest)(nil),              // 5: orca.task.v1.GetTaskRequest
+	(*GetTaskResponse)(nil),             // 6: orca.task.v1.GetTaskResponse
+	(*AddEdgeRequest)(nil),              // 7: orca.task.v1.AddEdgeRequest
+	(*AddEdgeResponse)(nil),             // 8: orca.task.v1.AddEdgeResponse
+	(*GrantRequest)(nil),                // 9: orca.task.v1.GrantRequest
+	(*GrantResponse)(nil),               // 10: orca.task.v1.GrantResponse
+	(*ResolvePermissionRequest)(nil),    // 11: orca.task.v1.ResolvePermissionRequest
+	(*ResolvePermissionResponse)(nil),   // 12: orca.task.v1.ResolvePermissionResponse
+	(*TaskServiceExecuteRequest)(nil),   // 13: orca.task.v1.TaskServiceExecuteRequest
+	(*TaskServiceExecuteResponse)(nil),  // 14: orca.task.v1.TaskServiceExecuteResponse
+	(*HasActiveExecutionsRequest)(nil),  // 15: orca.task.v1.HasActiveExecutionsRequest
+	(*HasActiveExecutionsResponse)(nil), // 16: orca.task.v1.HasActiveExecutionsResponse
 }
 var file_orca_task_v1_task_proto_depIdxs = []int32{
 	2,  // 0: orca.task.v1.CreateTaskResponse.task:type_name -> orca.task.v1.Task
@@ -905,14 +1022,16 @@ var file_orca_task_v1_task_proto_depIdxs = []int32{
 	9,  // 8: orca.task.v1.TaskService.Grant:input_type -> orca.task.v1.GrantRequest
 	11, // 9: orca.task.v1.TaskService.ResolvePermission:input_type -> orca.task.v1.ResolvePermissionRequest
 	13, // 10: orca.task.v1.TaskService.Execute:input_type -> orca.task.v1.TaskServiceExecuteRequest
-	4,  // 11: orca.task.v1.TaskService.CreateTask:output_type -> orca.task.v1.CreateTaskResponse
-	6,  // 12: orca.task.v1.TaskService.GetTask:output_type -> orca.task.v1.GetTaskResponse
-	8,  // 13: orca.task.v1.TaskService.AddEdge:output_type -> orca.task.v1.AddEdgeResponse
-	10, // 14: orca.task.v1.TaskService.Grant:output_type -> orca.task.v1.GrantResponse
-	12, // 15: orca.task.v1.TaskService.ResolvePermission:output_type -> orca.task.v1.ResolvePermissionResponse
-	14, // 16: orca.task.v1.TaskService.Execute:output_type -> orca.task.v1.TaskServiceExecuteResponse
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
+	15, // 11: orca.task.v1.TaskService.HasActiveExecutions:input_type -> orca.task.v1.HasActiveExecutionsRequest
+	4,  // 12: orca.task.v1.TaskService.CreateTask:output_type -> orca.task.v1.CreateTaskResponse
+	6,  // 13: orca.task.v1.TaskService.GetTask:output_type -> orca.task.v1.GetTaskResponse
+	8,  // 14: orca.task.v1.TaskService.AddEdge:output_type -> orca.task.v1.AddEdgeResponse
+	10, // 15: orca.task.v1.TaskService.Grant:output_type -> orca.task.v1.GrantResponse
+	12, // 16: orca.task.v1.TaskService.ResolvePermission:output_type -> orca.task.v1.ResolvePermissionResponse
+	14, // 17: orca.task.v1.TaskService.Execute:output_type -> orca.task.v1.TaskServiceExecuteResponse
+	16, // 18: orca.task.v1.TaskService.HasActiveExecutions:output_type -> orca.task.v1.HasActiveExecutionsResponse
+	12, // [12:19] is the sub-list for method output_type
+	5,  // [5:12] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -929,7 +1048,7 @@ func file_orca_task_v1_task_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_task_v1_task_proto_rawDesc), len(file_orca_task_v1_task_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -27,33 +27,79 @@ an append-only audit trail, and nothing else.**
   engine (`transit`/`kv2`) a category's material belongs to, never
   independently settable.
 - `internal/usecase/` — `WriteCredential`, `ResolveCredential`,
-  `RotateCredential`, `RevokeCredential`, each tested against in-memory fake
+  `RotateCredential`, `RevokeCredential`, plus three RPCs added for Epic B
+  (`docs/execution-plan.md` §9, 2026-08-17) so every consumer that needed
+  a real client had a real RPC shaped for its actual call pattern:
+  `GetCredentialMetadata` (metadata-only, no Vault call, no audit row —
+  for `ai-provider-service`, which must never see plaintext),
+  `ResolveCredentialByOwner` (fail-closed/audited like `ResolveCredential`,
+  but keyed by `(tenant_id, category, owner_id)` instead of an opaque id —
+  for `scm-integration-service`/`issue-tracking-service`, which are never
+  handed a `credential_id`), and `SignVapidPayload` (a narrow Transit-sign
+  passthrough — for `notification-service`, which used to call Vault
+  directly for this). Each tested against in-memory fake
   `CredentialMetadataRepository`/`AuditRepository`/`SecretStore`, no real
   Postgres/Vault needed. Notably tested:
-  - `ResolveCredential` writes its access-audit row **before** returning the
-    resolved value, on every path that reaches Vault (success, revoked,
-    Vault error) — see `resolve_credential_test.go`'s call-order assertion.
+  - `ResolveCredential`/`ResolveCredentialByOwner` write their access-audit
+    row **before** returning the resolved value, on every path that
+    reaches Vault (success, revoked, Vault error) — see
+    `resolve_credential_test.go`'s call-order assertion. Both share this
+    ordering guarantee via one `resolveMetadata` helper
+    (`resolve_credential.go`) so they can't drift.
+  - `ResolveCredentialByOwner`'s owner-keyed lookup filters out revoked
+    rows at the SQL level (`GetByOwner`), so a revoked credential looks
+    identical to "never existed" for this RPC — a real, intentional
+    behavior difference from the by-id `ResolveCredential`, which can
+    still find and report a revoked row. See
+    `TestResolveCredentialByOwner_RevokedIsNotFound`.
+  - `GetCredentialMetadata` never calls `SecretStore` or `AuditRepository`
+    — asserted directly in `get_credential_metadata_test.go`, since "this
+    RPC exposes no secret material" is the whole point of it existing.
   - `RevokeCredential` genuinely calls `SecretStore.RevokeSecret` (not just
     the Postgres status flip) — see `revoke_credential_test.go`.
+  - `RevokeCredentialByOwner` (added alongside a follow-up pass closing
+    `scm-integration-service`'s `RevokeAuth` gap, 2026-08-18) mirrors
+    `RevokeCredential`'s Vault-revoke-then-audited-status-transition logic,
+    keyed by `(tenant_id, category, owner_id)` via the same `GetByOwner`
+    `ResolveCredentialByOwner` uses. Because `GetByOwner` filters revoked
+    rows out at the SQL level, this RPC has **no** "already revoked" success
+    branch the way `RevokeCredential` does by id — revoking an
+    already-revoked or never-existent owner-keyed credential both surface
+    as plain `CREDENTIAL_NOT_FOUND`. See
+    `revoke_credential_by_owner_test.go` and that file's doc comment.
   - A failed audit write fails the whole operation, per the design doc's
     "audit log write must never be best-effort" rule — see
-    `write_credential_test.go`/`resolve_credential_test.go`.
+    `write_credential_test.go`/`resolve_credential_test.go`. For
+    `WriteCredential`/`RotateCredential`/`RevokeCredential` specifically,
+    this is now a real atomicity guarantee, not just error propagation: the
+    metadata mutation and audit append run inside one `TxRunner.RunInTx`
+    call, so a failed audit append rolls the metadata mutation back too —
+    see `TestWriteCredential_AuditWriteFailure_FailsTheWholeOperation`'s
+    rollback assertion and "Known gaps" below.
 - `internal/adapter/postgres/` — real `pgx`-backed repository implementing
   both `CredentialMetadataRepository` and `AuditRepository` against the
   `credential` schema. **Not one column in this schema can hold a secret
   value** — see `migrations/0001_init.up.sql`'s prominent comment.
 - `internal/adapter/vault/` — **this service's real, working Vault
   integration**, wrapping `common/secrets.Client` as a thin pass-through:
-  `TransitEncrypt`/`TransitDecrypt`/`KVWrite`/`KVRead` all delegate directly
-  to the matching `common/secrets` method, no reinterpretation. This is the
-  one service in the whole backend-go scaffold where that package is wired
-  for real, non-stub, tenant-secret use — every other service's Vault
-  identity is scoped only to its own dynamic DB credential lease.
+  `TransitEncrypt`/`TransitDecrypt`/`KVWrite`/`KVRead`/`RevokeSecret`/`Ping`
+  all delegate directly to the matching `common/secrets` method, no
+  reinterpretation. This is the one service in the whole backend-go
+  scaffold where that package is wired for real, non-stub, tenant-secret
+  use — every other service's Vault identity is scoped only to its own
+  dynamic DB credential lease. `RevokeSecret` now calls
+  `common/secrets.Client.KVDestroyMetadata` (Vault's native
+  `DELETE <mount>/metadata/<path>`, a genuine permanent delete) and `Ping`
+  now calls `common/secrets.Client.Ping` (a real `Sys().Health()` call) —
+  see "Known gaps" below for what changed and `secret_store_test.go` for
+  the httptest-backed regression coverage proving both.
 - `internal/adapter/grpc/` — implements the generated
-  `credentialbrokerv1.CredentialBrokerServiceServer`
-  (`WriteCredential`/`ResolveCredential`/`RotateCredential`/`RevokeCredential`
-  — the actual generated proto's RPC surface, a subset of the design doc's
-  fuller sketch; see "Deviations" below).
+  `credentialbrokerv1.CredentialBrokerServiceServer`: the original
+  `WriteCredential`/`ResolveCredential`/`RotateCredential`/`RevokeCredential`
+  four (a subset of the design doc's fuller sketch; see "Deviations" below)
+  plus `GetCredentialMetadata`/`ResolveCredentialByOwner`/`SignVapidPayload`/
+  `RevokeCredentialByOwner`, added by Epic B and not in the original design
+  doc sketch at all — see the usecase bullet above for why each exists.
 - `migrations/0001_init.{up,down}.sql` — real DDL: `credential.credential_metadata`
   (no secret columns, by construction and by a schema-level SQL comment
   saying so), `credential.access_audit_log` (append-only, FK to
@@ -90,13 +136,21 @@ names are currently hardcoded rather than driven by real policy.
 ## Testing
 
 ```sh
-go test ./...                 # unit tests (domain/, usecase/) — no external deps
+go test ./...                 # unit tests (domain/, usecase/, adapter/vault/) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
 ```
 
-There is no equivalent integration-tagged test against a real Vault dev
-server today — `internal/adapter/vault` is exercised only indirectly, via
-the `usecase` layer's fakes. See "Known gaps".
+`internal/adapter/vault/secret_store_test.go` now exercises `Ping` and
+`RevokeSecret` against an `httptest`-backed fake Vault server (same pattern
+as `common/secrets`' own tests) — proving `Ping` calls `GET /v1/sys/health`
+and `RevokeSecret` calls `DELETE <mount>/metadata/<path>`, not the KV paths
+either used before. There is still no integration-tagged test against a
+*real* Vault dev server — see "Known gaps".
+`internal/adapter/postgres/repository_test.go`'s
+`TestRepository_RunInTx_CommitsBothOnSuccess`/
+`TestRepository_RunInTx_RollsBackBothOnFailure` (integration-tagged, real
+Postgres via testcontainers) prove `RunInTx`'s metadata mutation and audit
+append commit or roll back together.
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
@@ -149,29 +203,23 @@ production-ready deployment. What's left, explicitly:
   exactly as documented — nothing service-specific needs to change here;
   the Kubernetes-auth wiring is infrastructure this scaffold doesn't stand
   up, not application code this service is missing.
-- **`RevokeCredential`'s Vault-side revocation is an overwrite, not a native
-  delete.** `common/secrets.Client` has no KV-delete-version or
-  Transit-key-delete method today, and this service must not modify
-  `common/` to add one. `internal/adapter/vault.SecretStore.RevokeSecret`
-  therefore calls the real `KVWrite` with an empty payload — a genuine Vault
-  call, not a stub — which leaves no readable `ciphertext` field for a
-  subsequent `KVRead` to find. This is **not** equivalent to Vault's native
-  "destroy version" API (the prior version's bytes may still be recoverable
-  via KV v2's version history to a caller with broader-than-"current
-  version" read access) and does not touch the Transit key at all (Transit
-  keys are shared per category, so deleting one would revoke every
-  credential in that category). The primary revocation enforcement is the
-  fail-closed status check in `ResolveCredential` — Vault-side overwrite is
-  defense in depth, not the only mechanism. See
-  `internal/adapter/vault/secret_store.go`'s doc comment.
-- **Vault health check is a heuristic, not a native ping.**
-  `common/secrets.Client` has no `Ping`/`Sys().Health()`-style method.
-  `internal/adapter/vault.SecretStore.Ping` reads a well-known,
-  expected-to-be-absent KV v2 path and treats a "not found" error as
-  "Vault answered, so it's reachable" — any other error is treated as
-  unreachable/misconfigured. This is documented, not hidden; a production
-  hardening pass should switch to a real `Sys().Health()` call once
-  `common/secrets` exposes one.
+- ~~**`RevokeCredential`'s Vault-side revocation is an overwrite, not a
+  native delete.**~~ **Done.** `common/secrets.Client` now exposes
+  `KVDestroyMetadata` (Vault's native `DELETE <mount>/metadata/<path>`), and
+  `internal/adapter/vault.SecretStore.RevokeSecret` calls it directly —
+  genuinely permanent, scrubbing every KV v2 version, not just the current
+  one. Still does not touch the Transit key (Transit keys are shared per
+  category, so deleting one would revoke every credential in that category)
+  — the fail-closed status check in `ResolveCredential` remains defense in
+  depth alongside this Vault-side delete, not a substitute for it. See
+  `internal/adapter/vault/secret_store.go`'s doc comment and
+  `secret_store_test.go`'s `TestRevokeSecret_CallsDestroyMetadata`.
+- ~~**Vault health check is a heuristic, not a native ping.**~~ **Done.**
+  `common/secrets.Client` now exposes `Ping` (a real `Sys().Health()` call),
+  and `internal/adapter/vault.SecretStore.Ping` calls it directly, replacing
+  the prior well-known-absent-KV-path heuristic. See
+  `secret_store_test.go`'s `TestPing_CallsRealHealthEndpoint`/
+  `TestPing_UnreachableVaultErrors`.
 - **`RequestingService` identity is a plain gRPC metadata header, not real
   mTLS/JWT identity.** The design doc requires `RequestingIdentity` to be
   "resolved JWT/mTLS subject, not client-asserted" (§4). `common/grpcmw`'s
@@ -181,7 +229,18 @@ production-ready deployment. What's left, explicitly:
   reads a plain `x-orca-service-id` gRPC metadata header instead — trusted
   only as far as this scaffold's local-dev/internal-mesh boundary goes, and
   explicitly **not** a substitute for real mTLS SPIFFE identity extraction
-  before production use.
+  before production use. **Still true after Epic B wired all 4 consumers
+  (2026-08-17): none of their new gRPC clients set this header either** —
+  every access-audit-log row Epic B's new call paths generate will show an
+  empty/`"unknown"` `accessor_service` until a client actually sets it.
+- **`common/secrets.TransitEncrypt` stands in for a dedicated Transit
+  "sign" operation in `SignVapidPayload` too.** `common/secrets` exposes
+  `TransitEncrypt`/`TransitDecrypt` today, not Vault's asymmetric-key
+  `sign` endpoint — `usecase.SignVapidPayload` uses `TransitEncrypt` as the
+  available equivalent, the exact same choice `notification-service`'s
+  pre-Epic-B `vaultsigner.Signer` made when it called Vault directly (see
+  that service's README). Swap it for a real `transit/sign/<key>` call
+  once `common/secrets` grows one.
 - **Category/engine branching isn't fully wired into the usecase layer.**
   `domain.Category.Engine()` enforces the category→engine invariant the
   design doc requires (§4), but `WriteCredential`/`ResolveCredential`
@@ -197,19 +256,35 @@ production-ready deployment. What's left, explicitly:
 - **No integration test against a real Vault dev server.**
   `internal/adapter/postgres` has a `-tags=integration` test against a real
   Postgres via `testcontainers-go` (same pattern as `usage-service`);
-  `internal/adapter/vault` has no equivalent — it's exercised only
-  indirectly through `internal/usecase`'s fakes. Add one once a
+  `internal/adapter/vault` has no equivalent — `secret_store_test.go` now
+  covers `Ping`/`RevokeSecret` against an `httptest`-backed fake Vault
+  server (same pattern as `common/secrets`' own tests), which is real
+  regression coverage for this adapter's request shapes, but still not a
+  real Vault binary. Add a real-dev-server test once a
   Vault-dev-server-via-testcontainers helper exists in `common/testutil`.
-- **Metadata write + audit append are not wrapped in one explicit SQL
-  transaction.** The design doc (§8) asks for the metadata mutation and its
-  audit row to land in "the same Postgres transaction." This scaffold's
-  `internal/adapter/postgres.Repository` implements both
-  `CredentialMetadataRepository` and `AuditRepository` against the same
-  pool but issues them as separate statements; `internal/usecase`'s
-  `appendAudit` still fails the whole operation if the audit write fails
-  (preserving the *never-best-effort* guarantee), but the two writes are
-  not atomic against each other today. Wrapping both in one `pgx.Tx` is the
-  recommended next step.
+- ~~**Metadata write + audit append are not wrapped in one explicit SQL
+  transaction.**~~ **Done for the three usecases that mutate metadata**
+  (`WriteCredential`, `RotateCredential`, `RevokeCredential` —
+  `ResolveCredential`/`ResolveCredentialByOwner`/`GetCredentialMetadata`/
+  `SignVapidPayload` never mutate metadata, so this doesn't apply to them).
+  `internal/usecase/ports.go` adds a `TxRunner` port —
+  `RunInTx(ctx, fn)` opens one Postgres transaction and hands `fn` a
+  `CredentialMetadataRepository`/`AuditRepository` pair scoped to it,
+  reusing the existing port shapes rather than introducing
+  transaction-specific interfaces. `internal/adapter/postgres.Repository`
+  implements it via `pgx.BeginFunc`: its query methods now run against a
+  `db dbtx` field (satisfied by either `*pgxpool.Pool` or a `pgx.Tx`) so no
+  SQL is duplicated between the pooled and transactional paths. Each of the
+  three usecases now wraps its metadata mutation + `appendAudit` call in one
+  `RunInTx` call — a failed audit append rolls back the metadata mutation
+  too, turning the pre-existing "audit failure fails the whole operation"
+  *convention* into a real atomicity *guarantee*. See
+  `internal/usecase/write_credential_test.go`'s
+  `TestWriteCredential_AuditWriteFailure_FailsTheWholeOperation` (in-memory
+  `fakeTxRunner` rollback) and
+  `internal/adapter/postgres/repository_test.go`'s
+  `TestRepository_RunInTx_RollsBackBothOnFailure` (real Postgres, requires
+  `-tags=integration`).
 - **No `sqlc` codegen wired**, same as `usage-service` — hand-written SQL
   via `pgx` is a valid destination per the tech stack doc, not the
   codegen-checked default.

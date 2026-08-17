@@ -45,8 +45,8 @@ defines, still never yields a usable credential.
   (same `sqlc`-is-the-eventual-target choice usage-service made).
 - `internal/adapter/grpc/` — implements the generated
   `aiproviderv1.AiProviderServiceServer`, pure wire↔usecase translation.
-- `internal/adapter/grpcclient/` — **stub** `CredentialBrokerClient` (see
-  "The stub" below).
+- `internal/adapter/grpcclient/` — real `CredentialBrokerClient` (Epic B,
+  see "credential-broker-service is wired" below).
 - `migrations/0001_init.{up,down}.sql` — `ai_provider.accounts` (scope,
   `user_id`/`project_id` nullable per the `scope_ref_matches_scope` CHECK,
   `rotation_grace_until`, `credential_ref` — no other credential-shaped
@@ -57,52 +57,42 @@ defines, still never yields a usable credential.
   gRPC server with the shared interceptor chain, health/readiness HTTP
   server, graceful shutdown on SIGTERM.
 
-## The stub: `credential-broker-service` is not wired
+## `credential-broker-service` is wired (Epic B, 2026-08-17)
 
-This is the most important gap in this scaffold, called out explicitly per
-the task brief, because **this is where TS Gap 2's fix ultimately lives.**
-TS Gap 2 (`backend-agent-target-architecture.md` §"Gap 2") was that the old
-system's spawn path forwarded a plaintext `resolvedApiKey` from backend to
-the execution agent — a real violation of "backend never sees plaintext."
-The Go design closes this by having `ai-provider-service` and
-`credential-broker-service` push ciphertext to the execution plane ahead of
-time, so `Resolve` only ever hands back a `credential_ref` (see the design
-doc §9's sequence diagram). **That fix depends on `credential-broker-service`
-existing**, and it doesn't yet in this workspace — the two services are
-explicitly Phase 2, "built and cut over together... neither is
-independently useful" (§10).
+This closes the most important gap in this scaffold, and is where TS Gap 2's
+fix ultimately lands. TS Gap 2 (`backend-agent-target-architecture.md`
+§"Gap 2") was that the old system's spawn path forwarded a plaintext
+`resolvedApiKey` from backend to the execution agent — a real violation of
+"backend never sees plaintext." The Go design closes this by having
+`ai-provider-service` and `credential-broker-service` push ciphertext to the
+execution plane ahead of time, so `Resolve` only ever hands back a
+`credential_ref` (see the design doc §9's sequence diagram).
 
-`internal/adapter/grpcclient/credential_broker_client.go` is therefore a
-stub: it doesn't dial anything. `WriteCredential`/`RotateCredential` return
-locally-synthesized, opaque `CredentialRef{ID, Status}` values (a
-`uuid`-suffixed string and a status like `"pending_push"`) so the rest of
-this service's create/rotate paths — and their unit tests — can be
-exercised end-to-end today.
+`internal/adapter/grpcclient/credential_broker_client.go` dials
+`credential-broker-service` for real (`cfg.CredentialBrokerAddr`) and calls
+`WriteCredential`/`RotateCredential` for real.
 
-**No fake plaintext leaked into the stub, even for realism's sake.** This
-matters concretely, not just as a principle: `credential-broker-service`'s
-real proto **already exists** at
-[`proto/orca/credentialbroker/v1/credentialbroker.proto`](../../proto/orca/credentialbroker/v1/credentialbroker.proto),
-and its `ResolveCredentialResponse` carries `bytes value = 1` —
-plaintext, by that proto's own doc comment ("caller must not persist or
-log"). It would be easy for a "more realistic" stub to wire
-`usecase.CredentialBrokerClient.ResolveCredential` straight through to that
-real RPC once a `credentialbrokerv1` client exists — that would be wrong.
-The stub's `ResolveCredential` deliberately does **not** call that RPC and
-never will; it returns synthesized status metadata only
-(`CredentialRef{ID, Status: "active"}`), matching what
-`usecase.CredentialRef` can even express — there is no plaintext field on
-that type to populate by mistake. The package doc comment on
-`credential_broker_client.go` spells this out as a
-"SECURITY-CRITICAL — read before wiring the real client" note so it isn't
-lost when the real dial is finally wired in.
+**Plaintext never reaches this service, by construction, not just by
+convention.** `credential-broker-service`'s `ResolveCredential` RPC returns
+`ResolveCredentialResponse{bytes value}` — plaintext, by that proto's own
+doc comment ("caller must not persist or log"). It would be easy for this
+adapter to wire `usecase.CredentialBrokerClient.ResolveCredential` straight
+through to that RPC — that would be wrong. `ResolveCredential` here
+deliberately calls a different RPC, `GetCredentialMetadata` (added by Epic B
+specifically for this reason — see `credentialbroker.proto`'s doc comment on
+it), which returns status metadata only, matching what `usecase.CredentialRef`
+can even express — there is no plaintext field on that type to populate by
+mistake. The package doc comment on `credential_broker_client.go` carries
+this as a "SECURITY-CRITICAL" note.
+
+**Known, accepted gap carried over from before Epic B:** `RotateCredential`
+sends an empty `NewEncryptedEnvelope` — this scaffold has no client-side
+crypto / `PushCiphertext` integration yet to produce a real one (see "Known
+gaps" below), so only the ref/status-transition plumbing is real, not "new
+material actually differs from the old."
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
-- **`credential-broker-service` client is a stub** — see above. Replace
-  `grpcclient.New`'s body with a real dial once that service ships;
-  `internal/config` already threads `CREDENTIAL_BROKER_ADDR` through for
-  that purpose.
 - **`CreateAccountRequest`/`ResolveProviderRequest` proto messages are
   minimal** — the generated proto only carries `tenant_id`+`type` for
   create (no `scope`, `user_id`/`project_id`, or encrypted-blob field yet)

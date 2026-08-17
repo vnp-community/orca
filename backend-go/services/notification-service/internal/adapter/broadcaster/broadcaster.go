@@ -5,14 +5,16 @@
 // service never dials api-gateway; it only serves the stream api-gateway
 // opened").
 //
-// Known scaling limitation: this registry lives entirely in one process's
-// memory. It fans out correctly to every StreamNotifications subscriber
-// connected to THIS replica, but a subscriber connected to a different
-// replica of a horizontally-scaled notification-service never sees the
-// event. Solving that needs either sticky routing at api-gateway (same
-// user's stream always lands on the same replica) or a distributed
-// fan-out mechanism (e.g. republishing to a NATS subject this registry
-// also subscribes to) — tracked in this service's README, not solved here.
+// This registry still lives entirely in one process's memory — Broadcast
+// only ever reaches THIS replica's connected subscribers. That is no longer
+// a cross-replica gap in practice: internal/adapter/eventbus's Consumer now
+// gives every replica its own independent, non-shared subscription to each
+// domain-event subject (SubscribeEphemeral, not Subscribe — see that
+// package's doc comment), so every replica independently calls Broadcast
+// for every event and reaches its own locally-connected subscribers.
+// Cluster-wide fan-out is achieved by fan-out at the NATS layer, not by
+// this registry knowing about other replicas (docs/execution-plan.md
+// Epic F) — see this service's README for the decision writeup.
 package broadcaster
 
 import (

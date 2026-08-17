@@ -44,12 +44,31 @@ type VaultSigner interface {
 	SignVapidPayload(ctx context.Context, tenantID string, payload []byte) (string, error)
 }
 
+// ProcessedEventRepository is the persistence port for JetStream
+// consumer-side dedup — notification-service.md §5/§8's
+// notification.processed_events table, guarding HandleIncomingEvent against
+// at-least-once redelivery of the same event ID.
+type ProcessedEventRepository interface {
+	// MarkProcessed atomically reserves eventID: the first caller for a
+	// given eventID gets alreadyProcessed=false and should proceed with
+	// translation/broadcast; every later caller (a JetStream redelivery, or
+	// another replica racing the same redelivered message — SubscribeEphemeral
+	// gives every notification-service replica its own independent
+	// consumer, so this is a real concurrent scenario, not just
+	// single-process retry) gets alreadyProcessed=true and must skip
+	// re-processing. Implemented as a single atomic
+	// INSERT ... ON CONFLICT DO NOTHING, not a racy check-then-insert.
+	MarkProcessed(ctx context.Context, eventID, subject string) (alreadyProcessed bool, err error)
+}
+
 // NotificationBroadcaster fans a translated NotificationEvent out to
 // active StreamNotifications subscribers, keyed by tenant+user. A real,
-// working in-process implementation lives in internal/adapter/broadcaster
-// — it stands in for a distributed fan-out mechanism until api-gateway
-// exists as a running, horizontally-scaled service; see this service's
-// README for that known scaling limitation.
+// working in-process implementation lives in internal/adapter/broadcaster.
+// It is still replica-local (Broadcast only reaches subscribers connected
+// to the same process) — cross-replica delivery is handled one layer up,
+// by internal/adapter/eventbus's Consumer giving every replica its own
+// independent subscription to each domain event, so every replica calls
+// Broadcast for every event (docs/execution-plan.md Epic F).
 type NotificationBroadcaster interface {
 	// Subscribe registers a channel for tenantID+userID and returns it
 	// plus an unsubscribe func the caller MUST invoke exactly once when

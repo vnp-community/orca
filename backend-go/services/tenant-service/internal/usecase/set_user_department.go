@@ -21,13 +21,17 @@ type SetUserDepartmentInput struct {
 // tenant-extraction interceptor from validated metadata (common/grpcmw) —
 // see tenant-service.md §9's cross-tenant isolation rule.
 type SetUserDepartment struct {
-	departments DepartmentRepository
-	profiles    UserProfileRepository
-	cache       ProfileCache
+	departments  DepartmentRepository
+	profiles     UserProfileRepository
+	cache        ProfileCache
+	invalidation CacheInvalidationPublisher
 }
 
-func NewSetUserDepartment(departments DepartmentRepository, profiles UserProfileRepository, cache ProfileCache) *SetUserDepartment {
-	return &SetUserDepartment{departments: departments, profiles: profiles, cache: cache}
+// NewSetUserDepartment wires cache invalidation. invalidation may be nil
+// (NATS unreachable at startup, see cmd/server/main.go) — this usecase then
+// only ever invalidates its own replica's cache entry, same as before Epic F.
+func NewSetUserDepartment(departments DepartmentRepository, profiles UserProfileRepository, cache ProfileCache, invalidation CacheInvalidationPublisher) *SetUserDepartment {
+	return &SetUserDepartment{departments: departments, profiles: profiles, cache: cache, invalidation: invalidation}
 }
 
 func (uc *SetUserDepartment) Execute(ctx context.Context, in SetUserDepartmentInput) error {
@@ -64,6 +68,13 @@ func (uc *SetUserDepartment) Execute(ctx context.Context, in SetUserDepartmentIn
 	// user's cached ResolvedProfile before returning success.
 	if uc.cache != nil {
 		uc.cache.Invalidate(ctx, in.UserID)
+	}
+	// Best-effort cross-replica broadcast (Epic F): a missed publish just
+	// means a peer replica falls back to today's TTL-bounded staleness,
+	// never wrong data, so a publish error here isn't worth failing the
+	// whole write over.
+	if uc.invalidation != nil {
+		_ = uc.invalidation.PublishProfileInvalidated(ctx, companyID, in.UserID)
 	}
 	return nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/services/usage-service/internal/domain"
 )
 
@@ -29,11 +30,14 @@ func New(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-// SaveSession inserts a session and updates its day's rollup atomically —
-// the on-write aggregation pattern from usage-service.md §6. Idempotent on
+// SaveSession inserts a session, updates its day's rollup, and enqueues
+// event as an outbox row — all in ONE transaction (Epic G's
+// transactional-outbox pattern, docs/execution-plan.md; see
+// specs/backend-go/architecture/05-data-architecture.md). Idempotent on
 // (tenant_id, request_id) via ON CONFLICT DO NOTHING: a retried write with
-// the same RequestID is a no-op, not a double-count.
-func (r *Repository) SaveSession(ctx context.Context, s domain.UsageSession) error {
+// the same RequestID is a no-op — no double-counted rollup AND no
+// duplicate outbox row, since both happen after the same early-return.
+func (r *Repository) SaveSession(ctx context.Context, s domain.UsageSession, event domain.OutboxEvent) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("postgres: begin tx: %w", err)
@@ -57,7 +61,8 @@ func (r *Repository) SaveSession(ctx context.Context, s domain.UsageSession) err
 	}
 	if tag.RowsAffected() == 0 {
 		// Idempotent replay of an already-recorded request_id — nothing
-		// more to do, the rollup was already updated on the first attempt.
+		// more to do, the rollup and outbox row were already written on
+		// the first attempt.
 		return tx.Commit(ctx)
 	}
 
@@ -80,7 +85,58 @@ func (r *Repository) SaveSession(ctx context.Context, s domain.UsageSession) err
 		return fmt.Errorf("postgres: upsert daily rollup: %w", err)
 	}
 
+	_, err = tx.Exec(ctx, `
+		INSERT INTO usage.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+		VALUES ($1, $2, $3, $4, 1, $5)
+	`, event.ID, s.TenantID, event.Subject, event.OccurredAt, event.PayloadJSON)
+	if err != nil {
+		return fmt.Errorf("postgres: insert outbox event: %w", err)
+	}
+
 	return tx.Commit(ctx)
+}
+
+// FetchUnpublished and MarkPublished implement common/outbox.Store — see
+// cmd/server/main.go for where the relay is wired. Kept on the same
+// Repository as SaveSession since both operate on this service's own
+// database; no domain reason to split them into a separate type.
+func (r *Repository) FetchUnpublished(ctx context.Context, limit int) ([]outbox.Record, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, subject, occurred_at, version, payload
+		FROM usage.outbox_events
+		WHERE published_at IS NULL
+		ORDER BY created_at
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query unpublished outbox events: %w", err)
+	}
+	defer rows.Close()
+
+	var out []outbox.Record
+	for rows.Next() {
+		var rec outbox.Record
+		if err := rows.Scan(&rec.ID, &rec.Event.TenantID, &rec.Subject, &rec.Event.OccurredAt, &rec.Event.Version, &rec.Event.Payload); err != nil {
+			return nil, fmt.Errorf("postgres: scan outbox event row: %w", err)
+		}
+		rec.Event.ID = rec.ID
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate outbox event rows: %w", err)
+	}
+	return out, nil
+}
+
+func (r *Repository) MarkPublished(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `UPDATE usage.outbox_events SET published_at = now() WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return fmt.Errorf("postgres: mark outbox events published: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) GetDailyRollup(ctx context.Context, tenantID, userID string, provider domain.Provider, day time.Time) (domain.DailyUsageRollup, error) {

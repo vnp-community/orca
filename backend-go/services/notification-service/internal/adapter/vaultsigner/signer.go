@@ -1,52 +1,55 @@
-// Package vaultsigner implements usecase.VaultSigner against Vault's
-// Transit engine via common/secrets — notification-service.md §9's
-// headline property: the VAPID private key is generated inside Vault
-// Transit and never leaves it; signing a push payload's VAPID JWT is a
-// "Vault: sign" call, not "read secret, then sign locally."
+// Package vaultsigner implements usecase.VaultSigner against
+// credential-broker-service's SignVapidPayload RPC — Epic B
+// (docs/execution-plan.md §8).
 //
-// common/secrets exposes TransitEncrypt/TransitDecrypt today, not a
-// dedicated Transit "sign" operation — this adapter uses TransitEncrypt as
-// the available Transit-engine equivalent for producing signed-payload
-// material without the plaintext key ever leaving Vault. Swap this for a
-// real Transit `sign` call (Vault's asymmetric-key signing endpoint) once
-// common/secrets grows one; see this service's README "Known gaps".
+// Before Epic B, this package called common/secrets.TransitEncrypt
+// directly against Vault — the one documented exception to
+// architecture/06-secrets-vault-architecture.md's "no other service talks
+// to Vault directly for tenant secret material" rule (VAPID keys are
+// tenant-scoped, one per tenant_id). Epic B closes that exception for
+// real, not by amending the rule: credential-broker-service now owns the
+// "vapid-signing-<tenant_id>" Transit key and this adapter is a thin gRPC
+// client, exactly like every other Vault-touching operation in this
+// system. See credentialbroker.proto's SignVapidPayload doc comment for
+// why it's a narrow, dedicated RPC rather than a generic "Transit-sign
+// anything" surface.
 package vaultsigner
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/stablyai/orca-go/common/secrets"
+	"google.golang.org/grpc"
+
+	credentialbrokerv1 "github.com/stablyai/orca-go/proto/gen/go/orca/credentialbroker/v1"
 )
 
-// Signer implements usecase.VaultSigner. A nil *secrets.Client is
-// accepted (e.g. when Vault isn't configured for local dev) so
-// construction never fails at startup — SignVapidPayload returns a clear,
-// wrapped error at call time instead, per this service's README note on
-// graceful degradation when Vault is unreachable.
+// Signer implements usecase.VaultSigner against a real
+// credential-broker-service connection.
 type Signer struct {
-	client *secrets.Client
+	client credentialbrokerv1.CredentialBrokerServiceClient
 }
 
-// New wraps client. client may be nil.
-func New(client *secrets.Client) *Signer {
-	return &Signer{client: client}
+// New wraps an already-dialed connection to credential-broker-service (see
+// cmd/server/main.go's composition root for the dial + insecure-transport-
+// credentials rationale shared by every peer-service client in this
+// workspace).
+func New(conn grpc.ClientConnInterface) *Signer {
+	return &Signer{client: credentialbrokerv1.NewCredentialBrokerServiceClient(conn)}
 }
 
-// SignVapidPayload signs payload under the tenant's VAPID Transit key.
-// The key name convention ("vapid-signing-<tenant_id>") matches
-// vapid_key_metadata.vault_key_ref (notification-service.md §5) — this
-// adapter recomputes rather than reads that column: reading the column
-// isn't itself a capability (§9), so recomputing the well-known name here
-// avoids a needless repository round trip.
+// SignVapidPayload signs payload under tenantID's VAPID Transit key,
+// provisioned and owned by credential-broker-service (key name convention:
+// "vapid-signing-<tenant_id>", unchanged from this adapter's pre-Epic-B
+// direct-Vault version — see credential-broker-service's
+// usecase.vapidKeyName doc comment).
 func (s *Signer) SignVapidPayload(ctx context.Context, tenantID string, payload []byte) (string, error) {
-	if s.client == nil {
-		return "", fmt.Errorf("vaultsigner: no vault client configured (VAULT_ADDR unset, or vault unreachable at startup) — VAPID payload signing is unavailable until Vault is reachable")
-	}
-	keyName := "vapid-signing-" + tenantID
-	signed, err := s.client.TransitEncrypt(ctx, keyName, payload)
+	resp, err := s.client.SignVapidPayload(ctx, &credentialbrokerv1.SignVapidPayloadRequest{
+		TenantId: tenantID,
+		Payload:  payload,
+	})
 	if err != nil {
-		return "", fmt.Errorf("vaultsigner: transit sign via key %s: %w", keyName, err)
+		return "", fmt.Errorf("vaultsigner: credential-broker-service SignVapidPayload: %w", err)
 	}
-	return signed, nil
+	return resp.GetSignature(), nil
 }

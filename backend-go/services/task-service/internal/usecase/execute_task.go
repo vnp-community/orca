@@ -21,14 +21,28 @@ type ExecuteTaskInput struct {
 // SimpleExecutor (infra-fleet-service). Both executors are STUBS in this
 // scaffold (internal/adapter/grpcclient) — only the branch decision itself
 // is real.
+//
+// Execute also marks the task StatusInProgress (via TaskRepository) before
+// dispatching — a real, persisted state transition added for Epic C
+// (backend-go/docs/execution-plan.md) so usecase.HasActiveExecutions has
+// something true to query. This is honestly one-way in this scaffold:
+// task-service has no execution-completion callback at all, so nothing ever
+// transitions a task back out of in_progress today (there is no
+// UpdateTask/SetStatus RPC in the generated proto). HasActiveExecutions will
+// therefore over-report "active" for any task ever dispatched here, until a
+// real completion/update-status path is built — see this service's README
+// "Known gaps" for that follow-up. Because the status update is the entire
+// point of this addition, a failure to persist it fails the whole Execute
+// call rather than silently proceeding with dispatch but no recorded state.
 type ExecuteTask struct {
+	repo    TaskRepository
 	edges   EdgeRepository
 	simple  SimpleExecutor
 	complex ComplexExecutor
 }
 
-func NewExecuteTask(edges EdgeRepository, simple SimpleExecutor, complex ComplexExecutor) *ExecuteTask {
-	return &ExecuteTask{edges: edges, simple: simple, complex: complex}
+func NewExecuteTask(repo TaskRepository, edges EdgeRepository, simple SimpleExecutor, complex ComplexExecutor) *ExecuteTask {
+	return &ExecuteTask{repo: repo, edges: edges, simple: simple, complex: complex}
 }
 
 func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (string, error) {
@@ -38,6 +52,10 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (string
 	}
 	if in.TaskID == "" {
 		return "", apperrors.New(apperrors.KindInvalidArgument, "TASK_EXECUTE_INVALID", "task_id is required", nil)
+	}
+
+	if err := uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, domain.StatusInProgress); err != nil {
+		return "", apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_STATUS_UPDATE_FAILED", "failed to mark task in_progress", err)
 	}
 
 	complex, err := uc.isComplex(ctx, tenantID, in.TaskID)

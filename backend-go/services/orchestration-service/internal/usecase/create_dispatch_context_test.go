@@ -50,6 +50,30 @@ func TestCreateDispatchContext_CreatesAndKeysSerializerByHandle(t *testing.T) {
 	}
 }
 
+// TestCreateDispatchContext_ThreadsOrchestrationTaskID proves the Epic C
+// wiring (docs/execution-plan.md): a caller-supplied OrchestrationTaskID
+// reaches the repository call, not just Handle/CoordinatorRunID.
+func TestCreateDispatchContext_ThreadsOrchestrationTaskID(t *testing.T) {
+	repo := &fakeDispatchContextRepository{}
+	uc := NewCreateDispatchContext(repo, &synchronousSerializer{})
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	got, err := uc.Execute(ctx, CreateDispatchContextInput{
+		Handle:              "handle-1",
+		CoordinatorRunID:    "run-1",
+		OrchestrationTaskID: "task-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.OrchestrationTaskID != "task-1" {
+		t.Errorf("expected result OrchestrationTaskID %q, got %q", "task-1", got.OrchestrationTaskID)
+	}
+	if len(repo.created) != 1 || repo.created[0].OrchestrationTaskID != "task-1" {
+		t.Fatalf("expected repository to receive OrchestrationTaskID, got %+v", repo.created)
+	}
+}
+
 func TestCreateDispatchContext_RepositoryFailurePropagates(t *testing.T) {
 	repo := &fakeDispatchContextRepository{err: errors.New("db unavailable")}
 	uc := NewCreateDispatchContext(repo, &synchronousSerializer{})

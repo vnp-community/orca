@@ -14,6 +14,15 @@ type Config struct {
 	// call is wired in.
 	WorkflowServiceAddr string
 	TaskServiceAddr     string
+	// OPABundlePath points requireProjectAccess's OPA client
+	// (internal/adapter/opaclient, via common/policy.Evaluator) at the
+	// orca-authz Rego bundle directory. Defaults to the bundle's location
+	// relative to this service's cmd/server working directory in local dev
+	// (`go run ./cmd/server` from services/project-service) — same relative
+	// path/env var name as auth-service/annotation-service/task-service's
+	// own OPABundlePath, for identical override behavior in every
+	// deployment environment.
+	OPABundlePath string
 }
 
 func Load() (Config, error) {
@@ -25,5 +34,6 @@ func Load() (Config, error) {
 		Base:                base,
 		WorkflowServiceAddr: commonconfig.StringEnv("WORKFLOW_SERVICE_ADDR", "workflow-service:9090"),
 		TaskServiceAddr:     commonconfig.StringEnv("TASK_SERVICE_ADDR", "task-service:9090"),
+		OPABundlePath:       commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 	}, nil
 }

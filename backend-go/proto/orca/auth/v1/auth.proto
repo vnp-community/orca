@@ -13,6 +13,11 @@ service AuthService {
   rpc Logout(LogoutRequest) returns (LogoutResponse);
   rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
   rpc IssueServiceToken(IssueServiceTokenRequest) returns (IssueServiceTokenResponse);
+  // GetJWKS is public/unauthenticated by convention (Epic D): every service
+  // needs to fetch auth-service's signing keys to verify JWTs without a
+  // per-request call back, so this RPC deliberately requires no caller
+  // identity.
+  rpc GetJWKS(GetJWKSRequest) returns (GetJWKSResponse);
 
   // Admin console
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
@@ -71,6 +76,16 @@ message IssueServiceTokenRequest {
 message IssueServiceTokenResponse {
   string jwt = 1;
   google.protobuf.Timestamp expires_at = 2;
+}
+
+message GetJWKSRequest {}
+
+message GetJWKSResponse {
+  // JSON-serialized RFC 7517 JWK Set (`{"keys":[...]}`) — kept as an
+  // opaque string rather than a hand-modeled proto message, matching this
+  // codebase's existing convention for opaque external-format payloads
+  // (e.g. the Relay RPC's params_json/result_json).
+  string jwks_json = 1;
 }
 
 message CreateUserRequest {

@@ -29,10 +29,12 @@ import (
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 
 	workflowgrpc "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/infrafleetclient"
 	workflowpostgres "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/stepexecutors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 )
 
@@ -76,27 +78,54 @@ func run() error {
 
 	repo := workflowpostgres.New(pool)
 
+	infraFleetConn, err := infrafleetclient.Dial(cfg.InfraFleetServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing infra-fleet-service: %w", err)
+	}
+	defer func() { _ = infraFleetConn.Close() }()
+	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
+
 	// StepExecutorRegistry wiring — all five step types, per
 	// workflow-service.md §4: Condition and Webhook are real, in-process
-	// implementations; Agent/Shell/Notification are stubs pending
-	// infra-fleet-service's relay client (see this service's README).
+	// implementations; Agent/Shell/Notification relay to infra-fleet-
+	// service's generic Relay RPC (internal/adapter/infrafleetclient) —
+	// see that package's doc comments for the best-effort method-name/
+	// param-shape caveats (no live Dev Server Agent to verify against).
 	registry := stepexecutors.NewRegistry()
 	registry.Register(domain.StepTypeCondition, stepexecutors.NewConditionExecutor())
 	registry.Register(domain.StepTypeWebhook, stepexecutors.NewWebhookExecutor(cfg.WebhookAllowlistHosts, &http.Client{Timeout: 30 * time.Second}))
-	registry.Register(domain.StepTypeAgent, stepexecutors.NewAgentStub())
-	registry.Register(domain.StepTypeShell, stepexecutors.NewShellStub())
-	registry.Register(domain.StepTypeNotification, stepexecutors.NewNotificationStub())
+	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient))
+	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient))
+	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient))
 
 	createTemplateUC := usecase.NewCreateTemplate(repo)
-	executeUC := usecase.NewExecute(repo, repo)
+	executeUC := usecase.NewExecute(repo, repo, repo, registry)
 	getExecutionUC := usecase.NewGetExecution(repo)
 	pauseExecutionUC := usecase.NewPauseExecution(repo)
 	resumeExecutionUC := usecase.NewResumeExecution(repo)
-	executeAdHocStepUC := usecase.NewExecuteAdHocStep(registry)
+	executeAdHocStepUC := usecase.NewExecuteAdHocStep(repo, repo, registry)
+	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
+	cancelExecutionUC := usecase.NewCancelExecution(repo)
+	listTemplatesUC := usecase.NewListTemplates(repo)
+	resolveTemplateUC := usecase.NewResolveTemplate(repo)
+	recoverExecutionsUC := usecase.NewRecoverExecutions(repo, repo, repo, registry)
+
+	// Boot-time recovery scan (workflow-service.md §8: "before accepting
+	// new Execute calls"), run every time this process boots, not gated
+	// behind any flag. Runs synchronously here — but Execute itself only
+	// blocks on the (fast, indexed) listing + DAG-reconstruction work; each
+	// recovered execution's actual wave dispatch is handed to its own
+	// detached background goroutine (see RecoverExecutions.Execute's doc
+	// comment), so a slow recovered step cannot delay the gRPC/HTTP
+	// listeners below from coming up.
+	if err := recoverExecutionsUC.Execute(ctx); err != nil {
+		return fmt.Errorf("recovering in-flight workflow executions: %w", err)
+	}
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowgrpc.New(
-		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC,
+		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
+		cancelExecutionUC, listTemplatesUC, resolveTemplateUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

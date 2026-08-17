@@ -23,6 +23,7 @@ const (
 	AuthService_Logout_FullMethodName            = "/orca.auth.v1.AuthService/Logout"
 	AuthService_ValidateSession_FullMethodName   = "/orca.auth.v1.AuthService/ValidateSession"
 	AuthService_IssueServiceToken_FullMethodName = "/orca.auth.v1.AuthService/IssueServiceToken"
+	AuthService_GetJWKS_FullMethodName           = "/orca.auth.v1.AuthService/GetJWKS"
 	AuthService_CreateUser_FullMethodName        = "/orca.auth.v1.AuthService/CreateUser"
 	AuthService_ListUsers_FullMethodName         = "/orca.auth.v1.AuthService/ListUsers"
 	AuthService_UpdateUserRole_FullMethodName    = "/orca.auth.v1.AuthService/UpdateUserRole"
@@ -41,6 +42,11 @@ type AuthServiceClient interface {
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LogoutResponse, error)
 	ValidateSession(ctx context.Context, in *ValidateSessionRequest, opts ...grpc.CallOption) (*ValidateSessionResponse, error)
 	IssueServiceToken(ctx context.Context, in *IssueServiceTokenRequest, opts ...grpc.CallOption) (*IssueServiceTokenResponse, error)
+	// GetJWKS is public/unauthenticated by convention (Epic D): every service
+	// needs to fetch auth-service's signing keys to verify JWTs without a
+	// per-request call back, so this RPC deliberately requires no caller
+	// identity.
+	GetJWKS(ctx context.Context, in *GetJWKSRequest, opts ...grpc.CallOption) (*GetJWKSResponse, error)
 	// Admin console
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
@@ -91,6 +97,16 @@ func (c *authServiceClient) IssueServiceToken(ctx context.Context, in *IssueServ
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IssueServiceTokenResponse)
 	err := c.cc.Invoke(ctx, AuthService_IssueServiceToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GetJWKS(ctx context.Context, in *GetJWKSRequest, opts ...grpc.CallOption) (*GetJWKSResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetJWKSResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetJWKS_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +174,11 @@ type AuthServiceServer interface {
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
 	ValidateSession(context.Context, *ValidateSessionRequest) (*ValidateSessionResponse, error)
 	IssueServiceToken(context.Context, *IssueServiceTokenRequest) (*IssueServiceTokenResponse, error)
+	// GetJWKS is public/unauthenticated by convention (Epic D): every service
+	// needs to fetch auth-service's signing keys to verify JWTs without a
+	// per-request call back, so this RPC deliberately requires no caller
+	// identity.
+	GetJWKS(context.Context, *GetJWKSRequest) (*GetJWKSResponse, error)
 	// Admin console
 	CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
@@ -185,6 +206,9 @@ func (UnimplementedAuthServiceServer) ValidateSession(context.Context, *Validate
 }
 func (UnimplementedAuthServiceServer) IssueServiceToken(context.Context, *IssueServiceTokenRequest) (*IssueServiceTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IssueServiceToken not implemented")
+}
+func (UnimplementedAuthServiceServer) GetJWKS(context.Context, *GetJWKSRequest) (*GetJWKSResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetJWKS not implemented")
 }
 func (UnimplementedAuthServiceServer) CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateUser not implemented")
@@ -290,6 +314,24 @@ func _AuthService_IssueServiceToken_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AuthServiceServer).IssueServiceToken(ctx, req.(*IssueServiceTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GetJWKS_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetJWKSRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetJWKS(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetJWKS_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetJWKS(ctx, req.(*GetJWKSRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -406,6 +448,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "IssueServiceToken",
 			Handler:    _AuthService_IssueServiceToken_Handler,
+		},
+		{
+			MethodName: "GetJWKS",
+			Handler:    _AuthService_GetJWKS_Handler,
 		},
 		{
 			MethodName: "CreateUser",

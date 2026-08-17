@@ -5,6 +5,9 @@ import (
 	"errors"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
+
+	"github.com/stablyai/orca-go/common/jwtauth"
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 )
 
@@ -31,6 +34,10 @@ func (f *fakeUserRepository) seed(u domain.User, passwordHash string) {
 	f.byID[u.ID] = u
 	f.byEmail[u.Email] = u
 	f.hashes[u.ID] = passwordHash
+}
+
+func (f *fakeUserRepository) HasAnyUsers(ctx context.Context) (bool, error) {
+	return len(f.byID) > 0, nil
 }
 
 func (f *fakeUserRepository) CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error) {
@@ -154,3 +161,53 @@ type fakeClock struct {
 }
 
 func (f *fakeClock) Now() time.Time { return f.now }
+
+// fakeTokenSigner is an in-memory TokenSigner — records the last Sign call
+// so tests can assert on the claims IssueServiceToken built, without a real
+// Vault Transit round trip.
+type fakeTokenSigner struct {
+	signErr  error
+	jwksErr  error
+	lastCall jwtauth.Claims
+	token    string
+	jwks     jose.JSONWebKeySet
+}
+
+func (f *fakeTokenSigner) Sign(ctx context.Context, claims jwtauth.Claims) (string, error) {
+	if f.signErr != nil {
+		return "", f.signErr
+	}
+	f.lastCall = claims
+	if f.token != "" {
+		return f.token, nil
+	}
+	return "fake-signed-token", nil
+}
+
+func (f *fakeTokenSigner) PublicJWKS(ctx context.Context) (jose.JSONWebKeySet, error) {
+	if f.jwksErr != nil {
+		return jose.JSONWebKeySet{}, f.jwksErr
+	}
+	return f.jwks, nil
+}
+
+// fakeOPAClient backs requireAdminActor's tests without loading the real
+// Rego bundle — allow/decisionErr let a test force either branch of
+// Execute's fail-closed check; lastActor records the actor Decision was
+// last called with, so a test can assert the OPA input requireAdminActor
+// built. Mirrors task-service's own fakeOPAClient shape.
+type fakeOPAClient struct {
+	allow       bool
+	decisionErr error
+	lastActor   domain.User
+	called      bool
+}
+
+func (f *fakeOPAClient) Decision(ctx context.Context, actor domain.User) (bool, error) {
+	f.called = true
+	f.lastActor = actor
+	if f.decisionErr != nil {
+		return false, f.decisionErr
+	}
+	return f.allow, nil
+}

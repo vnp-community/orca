@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
@@ -27,6 +29,7 @@ import (
 	svcconfig "github.com/stablyai/orca-go/services/tenant-service/internal/config"
 
 	tenantcache "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/cache"
+	tenanteventbus "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/eventbus"
 	tenantgrpc "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/grpc"
 	tenantpostgres "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/tenant-service/internal/usecase"
@@ -82,14 +85,49 @@ func run() error {
 	// isn't a shared Redis read-through cache.
 	profileCache := tenantcache.NewLRUTTLCache(tenantcache.DefaultCapacity)
 
+	healthSrv := health.New()
+	healthSrv.Register("postgres", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return pool.Ping(ctx)
+	})
+
+	// Best-effort cross-replica profile-cache invalidation broadcast (Epic F,
+	// docs/execution-plan.md). Unlike every other NATS-consuming service in
+	// this scaffold, an unreachable NATS here must not be fatal: tenant-service
+	// sits on the critical path for every other service's tenant resolution
+	// (§3 Phase 4 — "do this last, everything depends on it"), so it degrades
+	// to today's TTL-bounded-only staleness instead of crash-looping.
+	var invalidationPublisher usecase.CacheInvalidationPublisher
+	var consumerWG sync.WaitGroup
+	pub, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, profile-cache invalidation stays TTL-bounded only", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, tenanteventbus.StreamName, []string{"orca.tenant.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			invalidationPublisher = tenanteventbus.New(pub)
+			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
+
+			invalidationConsumer := tenanteventbus.NewConsumer(cons, profileCache)
+			consumerWG.Add(1)
+			go func() {
+				defer consumerWG.Done()
+				invalidationConsumer.Run(ctx, logger)
+			}()
+		}
+	}
+
 	createCompanyUC := usecase.NewCreateCompany(companies)
 	validateTenantUC := usecase.NewValidateTenant(companies)
 	createDepartmentUC := usecase.NewCreateDepartment(companies, departments)
-	setUserDepartmentUC := usecase.NewSetUserDepartment(departments, profiles, profileCache)
+	setUserDepartmentUC := usecase.NewSetUserDepartment(departments, profiles, profileCache, invalidationPublisher)
 	baseGetResolvedProfileUC := usecase.NewGetResolvedProfile(companies, departments, profiles, teams)
 	getResolvedProfileUC := usecase.NewCachedGetResolvedProfile(baseGetResolvedProfileUC, profileCache, usecase.DefaultProfileCacheTTL)
 	createTeamUC := usecase.NewCreateTeam(companies, teams)
-	addTeamMemberUC := usecase.NewAddTeamMember(teams, profileCache)
+	addTeamMemberUC := usecase.NewAddTeamMember(teams, profileCache, invalidationPublisher)
 	listTeamMembersUC := usecase.NewListTeamMembers(teams)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
@@ -104,13 +142,6 @@ func run() error {
 		listTeamMembersUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
-
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
@@ -152,6 +183,12 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	// Wait for the profile-invalidation consumer goroutine (if started) to
+	// observe ctx cancellation and return, so it doesn't outlive the rest of
+	// the server on shutdown — same pattern notification-service's main.go
+	// uses for its own background consumer.
+	consumerWG.Wait()
 
 	return nil
 }

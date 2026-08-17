@@ -97,8 +97,13 @@ func withTenant(ctx context.Context, tenantID string) context.Context {
 
 func seedAutomation(t *testing.T, repo *fakeAutomationRepository, tenantID, id, stepConfigJSON string) domain.Automation {
 	t.Helper()
+	return seedAutomationWithStepType(t, repo, tenantID, id, domain.StepTypeAgent, stepConfigJSON)
+}
+
+func seedAutomationWithStepType(t *testing.T, repo *fakeAutomationRepository, tenantID, id string, stepType domain.StepType, stepConfigJSON string) domain.Automation {
+	t.Helper()
 	now := time.Now().UTC()
-	a, err := domain.NewAutomation(id, tenantID, "nightly-report", "FREQ=DAILY;INTERVAL=1", stepConfigJSON, now, now)
+	a, err := domain.NewAutomation(id, tenantID, "nightly-report", "FREQ=DAILY;INTERVAL=1", stepType, stepConfigJSON, now, "UTC", true, now)
 	if err != nil {
 		t.Fatalf("building automation: %v", err)
 	}
@@ -139,6 +144,70 @@ func TestRunNow_CallsWorkflowStepExecutorWithStepConfig(t *testing.T) {
 	}
 	if call.RequestID != "req-1" {
 		t.Errorf("expected request_id=req-1, got %v", call.RequestID)
+	}
+}
+
+func TestRunNow_DispatchesStructuralStepTypeWithoutTouchingStepConfigJSON(t *testing.T) {
+	automations := newFakeAutomationRepository()
+	runs := newFakeAutomationRunRepository()
+	executor := &fakeWorkflowStepExecutor{result: ExecuteAdHocStepOutput{Status: "completed", OutputJSON: `{}`}}
+	uc := NewRunNow(automations, runs, executor)
+
+	// step_config_json deliberately carries no "step_type" key — step_type
+	// is now a first-class stored column (migration 0002), not something
+	// RunNow parses out of the JSON body.
+	stepConfig := `{"command":"echo hi"}`
+	seedAutomationWithStepType(t, automations, "tenant-1", "auto-1", domain.StepTypeShell, stepConfig)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	if _, err := uc.Execute(ctx, RunNowInput{AutomationID: "auto-1", RequestID: "req-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(executor.calls) != 1 {
+		t.Fatalf("expected exactly 1 call, got %d", len(executor.calls))
+	}
+	if executor.calls[0].StepType != domain.StepTypeShell {
+		t.Errorf("expected the stored step_type=shell to be dispatched, got %v", executor.calls[0].StepType)
+	}
+	if executor.calls[0].StepConfigJSON != stepConfig {
+		t.Errorf("expected step_config_json to be passed through unchanged, got %q", executor.calls[0].StepConfigJSON)
+	}
+}
+
+func TestRunNow_DefaultsTriggerToManualWhenUnset(t *testing.T) {
+	automations := newFakeAutomationRepository()
+	runs := newFakeAutomationRunRepository()
+	executor := &fakeWorkflowStepExecutor{result: ExecuteAdHocStepOutput{Status: "completed", OutputJSON: `{}`}}
+	uc := NewRunNow(automations, runs, executor)
+
+	seedAutomation(t, automations, "tenant-1", "auto-1", `{"step_type":"agent"}`)
+	ctx := withTenant(context.Background(), "tenant-1")
+
+	run, err := uc.Execute(ctx, RunNowInput{AutomationID: "auto-1", RequestID: "req-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if run.Trigger != domain.RunTriggerManual {
+		t.Errorf("expected Trigger to default to manual, got %v", run.Trigger)
+	}
+}
+
+func TestRunNow_RecordsProvidedTrigger(t *testing.T) {
+	automations := newFakeAutomationRepository()
+	runs := newFakeAutomationRunRepository()
+	executor := &fakeWorkflowStepExecutor{result: ExecuteAdHocStepOutput{Status: "completed", OutputJSON: `{}`}}
+	uc := NewRunNow(automations, runs, executor)
+
+	seedAutomation(t, automations, "tenant-1", "auto-1", `{"step_type":"agent"}`)
+	ctx := withTenant(context.Background(), "tenant-1")
+
+	run, err := uc.Execute(ctx, RunNowInput{AutomationID: "auto-1", RequestID: "req-1", Trigger: domain.RunTriggerScheduled})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if run.Trigger != domain.RunTriggerScheduled {
+		t.Errorf("expected Trigger to be recorded as scheduled, got %v", run.Trigger)
 	}
 }
 

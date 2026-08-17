@@ -19,16 +19,18 @@ type RevokeCredentialInput struct {
 // own metadata — per credential-broker-service.md §9 ("Immediate revocation
 // without a deploy"), this is what makes any subsequent ResolveCredential
 // call for this credential fail from this point forward, with no code or
-// data deploy needed.
+// data deploy needed. The status update and its audit row are written
+// together inside one TxRunner.RunInTx call, per credential-broker-service.md
+// §8 — see TxRunner's doc comment.
 type RevokeCredential struct {
 	metadataRepo CredentialMetadataRepository
-	auditRepo    AuditRepository
 	store        SecretStore
+	txRunner     TxRunner
 	now          func() time.Time
 }
 
-func NewRevokeCredential(metadataRepo CredentialMetadataRepository, auditRepo AuditRepository, store SecretStore) *RevokeCredential {
-	return &RevokeCredential{metadataRepo: metadataRepo, auditRepo: auditRepo, store: store, now: time.Now}
+func NewRevokeCredential(metadataRepo CredentialMetadataRepository, store SecretStore, txRunner TxRunner) *RevokeCredential {
+	return &RevokeCredential{metadataRepo: metadataRepo, store: store, txRunner: txRunner, now: time.Now}
 }
 
 func (uc *RevokeCredential) Execute(ctx context.Context, in RevokeCredentialInput) (domain.CredentialMetadata, error) {
@@ -60,14 +62,15 @@ func (uc *RevokeCredential) Execute(ctx context.Context, in RevokeCredentialInpu
 	}
 
 	now := uc.now()
-	if err := uc.metadataRepo.UpdateStatus(ctx, metadata.ID, domain.StatusRevoked, now); err != nil {
-		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInternal, "CREDENTIAL_UPDATE_FAILED", "failed to mark credential revoked", err)
-	}
-	metadata = metadata.Revoke(now)
-
-	if err := appendAudit(ctx, uc.auditRepo, metadata.ID, in.RequestingService, domain.ActionRevoke, now); err != nil {
+	if err := uc.txRunner.RunInTx(ctx, func(ctx context.Context, metadataRepo CredentialMetadataRepository, auditRepo AuditRepository) error {
+		if err := metadataRepo.UpdateStatus(ctx, metadata.ID, domain.StatusRevoked, now); err != nil {
+			return apperrors.New(apperrors.KindInternal, "CREDENTIAL_UPDATE_FAILED", "failed to mark credential revoked", err)
+		}
+		return appendAudit(ctx, auditRepo, metadata.ID, in.RequestingService, domain.ActionRevoke, now)
+	}); err != nil {
 		return domain.CredentialMetadata{}, err
 	}
+	metadata = metadata.Revoke(now)
 
 	return metadata, nil
 }

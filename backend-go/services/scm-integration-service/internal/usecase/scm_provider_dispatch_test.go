@@ -228,13 +228,40 @@ func TestListPullRequests_DispatchesToResolvedProviderWithCredential(t *testing.
 	}
 }
 
+// fakeRateLimitCache is an in-memory RateLimitCache — stands in for the
+// real postgres-backed one in internal/adapter/postgres.
+type fakeRateLimitCache struct {
+	stored     map[string]domain.RateLimitStatus
+	getCalls   int
+	setCalls   int
+	forceStale bool // when true, Get always reports a miss regardless of stored
+}
+
+func (f *fakeRateLimitCache) Get(_ context.Context, tenantID string, provider domain.ScmProvider, _ time.Duration) (domain.RateLimitStatus, bool, error) {
+	f.getCalls++
+	if f.forceStale {
+		return domain.RateLimitStatus{}, false, nil
+	}
+	status, ok := f.stored[tenantID+"/"+string(provider)]
+	return status, ok, nil
+}
+
+func (f *fakeRateLimitCache) Set(_ context.Context, tenantID string, provider domain.ScmProvider, status domain.RateLimitStatus) error {
+	f.setCalls++
+	if f.stored == nil {
+		f.stored = map[string]domain.RateLimitStatus{}
+	}
+	f.stored[tenantID+"/"+string(provider)] = status
+	return nil
+}
+
 func TestGetRateLimitStatus_DispatchesToResolvedProviderWithCredential(t *testing.T) {
 	want := domain.RateLimitStatus{Provider: domain.ScmProviderGitHub, Remaining: 340, Limit: 5000, ResetAt: time.Now().Add(12 * time.Minute)}
 	github := &fakeProvider{rateLimit: want}
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: github}}
 	creds := &fakeCredentialResolver{token: "tok-abc"}
 
-	uc := NewGetRateLimitStatus(creds, registry)
+	uc := NewGetRateLimitStatus(creds, registry, nil)
 	got, err := uc.Execute(context.Background(), GetRateLimitStatusInput{TenantID: "tenant-1", Provider: domain.ScmProviderGitHub})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -250,10 +277,45 @@ func TestGetRateLimitStatus_DispatchesToResolvedProviderWithCredential(t *testin
 func TestGetRateLimitStatus_PropagatesAdapterFailure(t *testing.T) {
 	github := &fakeProvider{rateLimitErr: errors.New("github: unexpected status 503")}
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: github}}
-	uc := NewGetRateLimitStatus(&fakeCredentialResolver{token: "tok"}, registry)
+	uc := NewGetRateLimitStatus(&fakeCredentialResolver{token: "tok"}, registry, nil)
 
 	_, err := uc.Execute(context.Background(), GetRateLimitStatusInput{TenantID: "tenant-1", Provider: domain.ScmProviderGitHub})
 	if err == nil {
 		t.Fatal("expected adapter failure to propagate")
+	}
+}
+
+func TestGetRateLimitStatus_ReturnsCachedValueWithoutCallingProvider(t *testing.T) {
+	github := &fakeProvider{rateLimit: domain.RateLimitStatus{Remaining: 1, Limit: 1}} // would be wrong if hit — proves the cache short-circuits
+	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: github}}
+	cached := domain.RateLimitStatus{Provider: domain.ScmProviderGitHub, Remaining: 340, Limit: 5000, ResetAt: time.Now().Add(12 * time.Minute)}
+	cache := &fakeRateLimitCache{stored: map[string]domain.RateLimitStatus{"tenant-1/github": cached}}
+
+	uc := NewGetRateLimitStatus(&fakeCredentialResolver{token: "tok"}, registry, cache)
+	got, err := uc.Execute(context.Background(), GetRateLimitStatusInput{TenantID: "tenant-1", Provider: domain.ScmProviderGitHub})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Remaining != 340 || github.calls != 0 {
+		t.Fatalf("expected a cache hit to skip the provider call entirely, got %+v (provider calls=%d)", got, github.calls)
+	}
+}
+
+func TestGetRateLimitStatus_CacheMissCallsProviderAndPopulatesCache(t *testing.T) {
+	live := domain.RateLimitStatus{Provider: domain.ScmProviderGitHub, Remaining: 100, Limit: 5000, ResetAt: time.Now().Add(time.Hour)}
+	github := &fakeProvider{rateLimit: live}
+	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: github}}
+	cache := &fakeRateLimitCache{forceStale: true}
+
+	uc := NewGetRateLimitStatus(&fakeCredentialResolver{token: "tok"}, registry, cache)
+	got, err := uc.Execute(context.Background(), GetRateLimitStatusInput{TenantID: "tenant-1", Provider: domain.ScmProviderGitHub})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Remaining != 100 || github.calls != 1 {
+		t.Fatalf("expected a live provider call on a cache miss, got %+v (provider calls=%d)", got, github.calls)
+	}
+	if cache.setCalls != 1 {
+		t.Errorf("expected the live result to be written back to the cache, setCalls=%d", cache.setCalls)
 	}
 }

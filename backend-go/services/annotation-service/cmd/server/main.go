@@ -22,11 +22,13 @@ import (
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/annotation-service/internal/config"
 
 	annotationgrpc "github.com/stablyai/orca-go/services/annotation-service/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/annotation-service/internal/adapter/opaclient"
 	annotationpostgres "github.com/stablyai/orca-go/services/annotation-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/annotation-service/internal/usecase"
 
@@ -72,11 +74,12 @@ func run() error {
 	defer pool.Close()
 
 	repo := annotationpostgres.New(pool)
+	opa := opaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
 
 	createUC := usecase.NewCreateAnnotation(repo)
 	listUC := usecase.NewListAnnotations(repo)
-	updateUC := usecase.NewUpdateAnnotation(repo)
-	deleteUC := usecase.NewDeleteAnnotation(repo)
+	updateUC := usecase.NewUpdateAnnotation(repo, opa)
+	deleteUC := usecase.NewDeleteAnnotation(repo, opa)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	annotationv1.RegisterAnnotationServiceServer(grpcServer, annotationgrpc.New(createUC, listUC, updateUC, deleteUC))

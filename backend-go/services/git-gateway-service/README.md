@@ -80,35 +80,60 @@ This scaffold implements 6 of the ~26 RPCs sketched in the design doc's §3
 branch/history/conflict-resolution RPCs from the doc's fuller sketch aren't
 in `gitgateway.proto` yet). Within that surface:
 
-- **`internal/adapter/grpcclient.ConnectionResolver` is a stub.** It always
-  answers `Connected=false`, so every request routes to the local git
-  executor. A real implementation needs a gRPC client dialing
-  infra-fleet-service's `ResolveConnection` RPC (design doc §7). It also
-  currently uses the client-supplied `worktree_id` verbatim as the local
-  filesystem path — safe only for local/dev use of this scaffold; the
-  design doc's §3 explicitly requires resolving `worktree_id` via
-  `project-service` instead of trusting a client-supplied path. Neither
-  `project-service` nor `infra-fleet-service` exist yet in this workspace
-  (both are empty scaffold directories), so there was nothing real to wire
-  against — this mirrors the cross-service-stub pattern used elsewhere in
-  this repo for dependencies that don't exist yet.
-- **`internal/adapter/grpcclient.RelayExecutor` is a stub.** Every method
-  returns `ErrRelayNotImplemented` rather than silently no-op'ing or
-  falling back to local execution — per §8's explicit requirement that a
-  relay failure return a typed error, not a silent fallback to the wrong
-  worktree. Because `ConnectionResolver` always reports `Connected=false`
-  today, `RelayExecutor` is currently unreachable via the gRPC surface, but
-  the routing logic that would dispatch to it is implemented and tested
-  (`dispatch_test.go`'s `*_Connected_RoutesToRelayExecutor` /
-  `*_RoutesByConnectionState` tests construct `ConnectionResolver` fakes
-  directly to exercise that branch).
-- **`GenerateCommitMessage` always returns `codes.Unimplemented`.** Per
-  design doc §3.1, this RPC is meant to relay diff/status context to the
-  Dev Server Agent's `ai.complete` — this service must never call an LLM
-  API directly. That relay isn't implemented in this scaffold; the usecase
-  returns a clear sentinel error (`usecase.ErrGenerateCommitMessageNotImplemented`)
-  that the gRPC adapter maps to `Unimplemented`, rather than returning an
-  empty message that looks like a successful (but useless) response.
+- **`internal/adapter/grpcclient.ConnectionResolver` and `.RelayExecutor` are
+  now real** (Epic A's second pass, see
+  [`docs/execution-plan.md`](../../docs/execution-plan.md) §2 Epic A).
+  `ConnectionResolver` dials infra-fleet-service's `ResolveConnection` RPC
+  (`INFRA_FLEET_SERVICE_ADDR`) and passes `worktree_id` through verbatim as
+  infra-fleet-service's `connectionId`. `RelayExecutor` calls
+  infra-fleet-service's generic `Relay` RPC with methods `git.status`/
+  `git.diff`/`git.commit`/`git.push`/`git.pull`. Both attach tenant identity
+  onto the outbound gRPC context explicitly (`withTenantMetadata` in
+  `tenant_forwarding.go`) — no prior backend-to-backend call in this service
+  did this, so without it every infra-fleet-service call would fail with
+  `INFRA_NO_TENANT`. **Known gaps, not silently papered over:**
+  - `RelayExecutor`'s `git.*` method param/result JSON field names are
+    best-effort — matched 1:1 to this service's own `domain.GitStatus`/
+    `DiffResult`/etc. field names, not verified against a real Dev Server
+    Agent. `specs/agent/api/agent-rpc-catalog-git-fs.md` documents a
+    *different* contract (`worktreePath`, `filePath`, `pushTarget`, etc.) for
+    the SSH Relay Daemon's `git.*` handlers — reconcile before production use
+    (see `relay_executor.go`'s doc comment).
+  - `usecase.GitExecutor`'s methods only receive `repoPath`, not the
+    `connectionId` `ConnectionResolver` actually resolved — `RelayExecutor`
+    passes `repoPath` through as the relay's `connectionId` too, which is
+    only correct because those two values happen to coincide today (see
+    `relay_executor.go`'s `relay` doc comment for the exact reasoning).
+    Threading `ConnectionID` through `GitExecutor`'s signature is the real
+    fix; not done here since `ports.go`/`dispatchExecutor` were out of scope
+    for this pass.
+  - It also still uses the client-supplied `worktree_id` verbatim (now as
+    infra-fleet-service's `connectionId` lookup key, not a raw filesystem
+    path) rather than resolving it via `project-service` per the design
+    doc's §3 — `project-service` doesn't expose that RPC yet.
+  - **No live Dev Server Agent or infra-fleet-service deployment was
+    available to verify this against** — unit- and fake-client-tested only
+    (`grpcclient_test.go`), same honest caveat as infra-fleet-service's own
+    relay-websocket pass.
+- **`GenerateCommitMessage` is now real.** It resolves the worktree's
+  connection (same `ConnectionResolver` as every other RPC), fetches the
+  staged diff via the existing `GetDiff` usecase (no duplicated
+  diff-fetching logic), and relays a prompt built from that diff to the Dev
+  Server Agent's `ai.complete` through `RelayExecutor.Complete` — the same
+  infra-fleet-service `Relay` RPC/tenant-forwarding path `git.*` uses, just
+  with method `"ai.complete"`. That method name and its
+  `prompt(required), format?, taskId?, model?, accountId?, resolvedApiKey?`
+  → `{content, model?}` shape come from
+  `specs/agent/api/agent-rpc-catalog-runtime.md`'s confirmed real handler
+  (`ai-complete-handler.ts:47`), not a guess — this call only ever sends
+  `prompt`; model/account resolution is deliberately out of scope here
+  (`git-gateway-service.md` §3.1's "context assembler and relay point"
+  framing), so the agent falls back to its own configured default model.
+  If the worktree has no relay connection (`Connected=false`, i.e. no dev
+  server), there is no host-local AI-inference fallback to degrade to —
+  `GenerateCommitMessage` returns a `FailedPrecondition` error rather than
+  a silently empty message. See `usecase/generate_commit_message.go` and
+  `adapter/grpcclient/relay_executor.go`'s `Complete` method.
 - **No connection-resolution caching.** §8 recommends caching the resolved
   `(worktree_id) -> (repo_path, connectionId)` tuple with a short in-process
   TTL to keep `GetStatus`/`GetDiff` inside their latency budget. Not added

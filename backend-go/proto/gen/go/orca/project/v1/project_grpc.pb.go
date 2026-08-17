@@ -19,11 +19,26 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProjectService_CreateProject_FullMethodName   = "/orca.project.v1.ProjectService/CreateProject"
-	ProjectService_GetProject_FullMethodName      = "/orca.project.v1.ProjectService/GetProject"
-	ProjectService_ListProjects_FullMethodName    = "/orca.project.v1.ProjectService/ListProjects"
-	ProjectService_AddMember_FullMethodName       = "/orca.project.v1.ProjectService/AddMember"
-	ProjectService_RebindDevServer_FullMethodName = "/orca.project.v1.ProjectService/RebindDevServer"
+	ProjectService_CreateProject_FullMethodName         = "/orca.project.v1.ProjectService/CreateProject"
+	ProjectService_GetProject_FullMethodName            = "/orca.project.v1.ProjectService/GetProject"
+	ProjectService_ListProjects_FullMethodName          = "/orca.project.v1.ProjectService/ListProjects"
+	ProjectService_AddMember_FullMethodName             = "/orca.project.v1.ProjectService/AddMember"
+	ProjectService_RebindDevServer_FullMethodName       = "/orca.project.v1.ProjectService/RebindDevServer"
+	ProjectService_UpdateProject_FullMethodName         = "/orca.project.v1.ProjectService/UpdateProject"
+	ProjectService_DeleteProject_FullMethodName         = "/orca.project.v1.ProjectService/DeleteProject"
+	ProjectService_AddRepo_FullMethodName               = "/orca.project.v1.ProjectService/AddRepo"
+	ProjectService_ListRepos_FullMethodName             = "/orca.project.v1.ProjectService/ListRepos"
+	ProjectService_ReorderRepos_FullMethodName          = "/orca.project.v1.ProjectService/ReorderRepos"
+	ProjectService_RemoveRepo_FullMethodName            = "/orca.project.v1.ProjectService/RemoveRepo"
+	ProjectService_RecordWorktreeCreated_FullMethodName = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
+	ProjectService_RecordWorktreeRemoved_FullMethodName = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
+	ProjectService_ListWorktrees_FullMethodName         = "/orca.project.v1.ProjectService/ListWorktrees"
+	ProjectService_SetWorktreeActivation_FullMethodName = "/orca.project.v1.ProjectService/SetWorktreeActivation"
+	ProjectService_RenameWorktree_FullMethodName        = "/orca.project.v1.ProjectService/RenameWorktree"
+	ProjectService_CreateProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/CreateProjectGroup"
+	ProjectService_UpdateProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/UpdateProjectGroup"
+	ProjectService_DeleteProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/DeleteProjectGroup"
+	ProjectService_ListProjectGroups_FullMethodName     = "/orca.project.v1.ProjectService/ListProjectGroups"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -38,6 +53,31 @@ type ProjectServiceClient interface {
 	ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error)
 	AddMember(ctx context.Context, in *AddMemberRequest, opts ...grpc.CallOption) (*AddMemberResponse, error)
 	RebindDevServer(ctx context.Context, in *RebindDevServerRequest, opts ...grpc.CallOption) (*RebindDevServerResponse, error)
+	// UpdateProject's field list deliberately excludes dev_server_id —
+	// RebindDevServer (with its active-execution guard) stays the sole path
+	// that may change it, per project-service.md §3's explicit note. An empty
+	// string on any field below means "no change", not "clear the field".
+	UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*UpdateProjectResponse, error)
+	DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*DeleteProjectResponse, error)
+	// Repo surface — project-service.md §4's Repo entity, ordered per project.
+	AddRepo(ctx context.Context, in *AddRepoRequest, opts ...grpc.CallOption) (*AddRepoResponse, error)
+	ListRepos(ctx context.Context, in *ListReposRequest, opts ...grpc.CallOption) (*ListReposResponse, error)
+	ReorderRepos(ctx context.Context, in *ReorderReposRequest, opts ...grpc.CallOption) (*ReorderReposResponse, error)
+	RemoveRepo(ctx context.Context, in *RemoveRepoRequest, opts ...grpc.CallOption) (*RemoveRepoResponse, error)
+	// Worktree surface — metadata only, never authoritative for on-disk
+	// existence (git-gateway-service reconciles on demand, per
+	// project-service.md §4's Worktree note).
+	RecordWorktreeCreated(ctx context.Context, in *RecordWorktreeCreatedRequest, opts ...grpc.CallOption) (*RecordWorktreeCreatedResponse, error)
+	RecordWorktreeRemoved(ctx context.Context, in *RecordWorktreeRemovedRequest, opts ...grpc.CallOption) (*RecordWorktreeRemovedResponse, error)
+	ListWorktrees(ctx context.Context, in *ListWorktreesRequest, opts ...grpc.CallOption) (*ListWorktreesResponse, error)
+	SetWorktreeActivation(ctx context.Context, in *SetWorktreeActivationRequest, opts ...grpc.CallOption) (*SetWorktreeActivationResponse, error)
+	RenameWorktree(ctx context.Context, in *RenameWorktreeRequest, opts ...grpc.CallOption) (*RenameWorktreeResponse, error)
+	// ProjectGroup surface — self-referential tree via parent_group_id, per
+	// project-service.md §4.
+	CreateProjectGroup(ctx context.Context, in *CreateProjectGroupRequest, opts ...grpc.CallOption) (*CreateProjectGroupResponse, error)
+	UpdateProjectGroup(ctx context.Context, in *UpdateProjectGroupRequest, opts ...grpc.CallOption) (*UpdateProjectGroupResponse, error)
+	DeleteProjectGroup(ctx context.Context, in *DeleteProjectGroupRequest, opts ...grpc.CallOption) (*DeleteProjectGroupResponse, error)
+	ListProjectGroups(ctx context.Context, in *ListProjectGroupsRequest, opts ...grpc.CallOption) (*ListProjectGroupsResponse, error)
 }
 
 type projectServiceClient struct {
@@ -98,6 +138,156 @@ func (c *projectServiceClient) RebindDevServer(ctx context.Context, in *RebindDe
 	return out, nil
 }
 
+func (c *projectServiceClient) UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*UpdateProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*DeleteProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_DeleteProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) AddRepo(ctx context.Context, in *AddRepoRequest, opts ...grpc.CallOption) (*AddRepoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddRepoResponse)
+	err := c.cc.Invoke(ctx, ProjectService_AddRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListRepos(ctx context.Context, in *ListReposRequest, opts ...grpc.CallOption) (*ListReposResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListReposResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListRepos_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ReorderRepos(ctx context.Context, in *ReorderReposRequest, opts ...grpc.CallOption) (*ReorderReposResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReorderReposResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ReorderRepos_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RemoveRepo(ctx context.Context, in *RemoveRepoRequest, opts ...grpc.CallOption) (*RemoveRepoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveRepoResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RemoveRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RecordWorktreeCreated(ctx context.Context, in *RecordWorktreeCreatedRequest, opts ...grpc.CallOption) (*RecordWorktreeCreatedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordWorktreeCreatedResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RecordWorktreeCreated_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RecordWorktreeRemoved(ctx context.Context, in *RecordWorktreeRemovedRequest, opts ...grpc.CallOption) (*RecordWorktreeRemovedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordWorktreeRemovedResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RecordWorktreeRemoved_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListWorktrees(ctx context.Context, in *ListWorktreesRequest, opts ...grpc.CallOption) (*ListWorktreesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorktreesResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListWorktrees_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) SetWorktreeActivation(ctx context.Context, in *SetWorktreeActivationRequest, opts ...grpc.CallOption) (*SetWorktreeActivationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetWorktreeActivationResponse)
+	err := c.cc.Invoke(ctx, ProjectService_SetWorktreeActivation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RenameWorktree(ctx context.Context, in *RenameWorktreeRequest, opts ...grpc.CallOption) (*RenameWorktreeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RenameWorktreeResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RenameWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) CreateProjectGroup(ctx context.Context, in *CreateProjectGroupRequest, opts ...grpc.CallOption) (*CreateProjectGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateProjectGroupResponse)
+	err := c.cc.Invoke(ctx, ProjectService_CreateProjectGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateProjectGroup(ctx context.Context, in *UpdateProjectGroupRequest, opts ...grpc.CallOption) (*UpdateProjectGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateProjectGroupResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateProjectGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) DeleteProjectGroup(ctx context.Context, in *DeleteProjectGroupRequest, opts ...grpc.CallOption) (*DeleteProjectGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteProjectGroupResponse)
+	err := c.cc.Invoke(ctx, ProjectService_DeleteProjectGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListProjectGroups(ctx context.Context, in *ListProjectGroupsRequest, opts ...grpc.CallOption) (*ListProjectGroupsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProjectGroupsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListProjectGroups_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -110,6 +300,31 @@ type ProjectServiceServer interface {
 	ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error)
 	AddMember(context.Context, *AddMemberRequest) (*AddMemberResponse, error)
 	RebindDevServer(context.Context, *RebindDevServerRequest) (*RebindDevServerResponse, error)
+	// UpdateProject's field list deliberately excludes dev_server_id —
+	// RebindDevServer (with its active-execution guard) stays the sole path
+	// that may change it, per project-service.md §3's explicit note. An empty
+	// string on any field below means "no change", not "clear the field".
+	UpdateProject(context.Context, *UpdateProjectRequest) (*UpdateProjectResponse, error)
+	DeleteProject(context.Context, *DeleteProjectRequest) (*DeleteProjectResponse, error)
+	// Repo surface — project-service.md §4's Repo entity, ordered per project.
+	AddRepo(context.Context, *AddRepoRequest) (*AddRepoResponse, error)
+	ListRepos(context.Context, *ListReposRequest) (*ListReposResponse, error)
+	ReorderRepos(context.Context, *ReorderReposRequest) (*ReorderReposResponse, error)
+	RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error)
+	// Worktree surface — metadata only, never authoritative for on-disk
+	// existence (git-gateway-service reconciles on demand, per
+	// project-service.md §4's Worktree note).
+	RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error)
+	RecordWorktreeRemoved(context.Context, *RecordWorktreeRemovedRequest) (*RecordWorktreeRemovedResponse, error)
+	ListWorktrees(context.Context, *ListWorktreesRequest) (*ListWorktreesResponse, error)
+	SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error)
+	RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error)
+	// ProjectGroup surface — self-referential tree via parent_group_id, per
+	// project-service.md §4.
+	CreateProjectGroup(context.Context, *CreateProjectGroupRequest) (*CreateProjectGroupResponse, error)
+	UpdateProjectGroup(context.Context, *UpdateProjectGroupRequest) (*UpdateProjectGroupResponse, error)
+	DeleteProjectGroup(context.Context, *DeleteProjectGroupRequest) (*DeleteProjectGroupResponse, error)
+	ListProjectGroups(context.Context, *ListProjectGroupsRequest) (*ListProjectGroupsResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -134,6 +349,51 @@ func (UnimplementedProjectServiceServer) AddMember(context.Context, *AddMemberRe
 }
 func (UnimplementedProjectServiceServer) RebindDevServer(context.Context, *RebindDevServerRequest) (*RebindDevServerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RebindDevServer not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateProject(context.Context, *UpdateProjectRequest) (*UpdateProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateProject not implemented")
+}
+func (UnimplementedProjectServiceServer) DeleteProject(context.Context, *DeleteProjectRequest) (*DeleteProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteProject not implemented")
+}
+func (UnimplementedProjectServiceServer) AddRepo(context.Context, *AddRepoRequest) (*AddRepoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddRepo not implemented")
+}
+func (UnimplementedProjectServiceServer) ListRepos(context.Context, *ListReposRequest) (*ListReposResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRepos not implemented")
+}
+func (UnimplementedProjectServiceServer) ReorderRepos(context.Context, *ReorderReposRequest) (*ReorderReposResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReorderRepos not implemented")
+}
+func (UnimplementedProjectServiceServer) RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveRepo not implemented")
+}
+func (UnimplementedProjectServiceServer) RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordWorktreeCreated not implemented")
+}
+func (UnimplementedProjectServiceServer) RecordWorktreeRemoved(context.Context, *RecordWorktreeRemovedRequest) (*RecordWorktreeRemovedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordWorktreeRemoved not implemented")
+}
+func (UnimplementedProjectServiceServer) ListWorktrees(context.Context, *ListWorktreesRequest) (*ListWorktreesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListWorktrees not implemented")
+}
+func (UnimplementedProjectServiceServer) SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetWorktreeActivation not implemented")
+}
+func (UnimplementedProjectServiceServer) RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RenameWorktree not implemented")
+}
+func (UnimplementedProjectServiceServer) CreateProjectGroup(context.Context, *CreateProjectGroupRequest) (*CreateProjectGroupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateProjectGroup not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateProjectGroup(context.Context, *UpdateProjectGroupRequest) (*UpdateProjectGroupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateProjectGroup not implemented")
+}
+func (UnimplementedProjectServiceServer) DeleteProjectGroup(context.Context, *DeleteProjectGroupRequest) (*DeleteProjectGroupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteProjectGroup not implemented")
+}
+func (UnimplementedProjectServiceServer) ListProjectGroups(context.Context, *ListProjectGroupsRequest) (*ListProjectGroupsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListProjectGroups not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -246,6 +506,276 @@ func _ProjectService_RebindDevServer_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_UpdateProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateProject(ctx, req.(*UpdateProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_DeleteProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).DeleteProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_DeleteProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).DeleteProject(ctx, req.(*DeleteProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_AddRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).AddRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_AddRepo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).AddRepo(ctx, req.(*AddRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListReposRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListRepos(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListRepos_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListRepos(ctx, req.(*ListReposRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ReorderRepos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReorderReposRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ReorderRepos(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ReorderRepos_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ReorderRepos(ctx, req.(*ReorderReposRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RemoveRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RemoveRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RemoveRepo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RemoveRepo(ctx, req.(*RemoveRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RecordWorktreeCreated_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordWorktreeCreatedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RecordWorktreeCreated(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RecordWorktreeCreated_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RecordWorktreeCreated(ctx, req.(*RecordWorktreeCreatedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RecordWorktreeRemoved_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordWorktreeRemovedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RecordWorktreeRemoved(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RecordWorktreeRemoved_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RecordWorktreeRemoved(ctx, req.(*RecordWorktreeRemovedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListWorktrees_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorktreesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListWorktrees(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListWorktrees_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListWorktrees(ctx, req.(*ListWorktreesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_SetWorktreeActivation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetWorktreeActivationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).SetWorktreeActivation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_SetWorktreeActivation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).SetWorktreeActivation(ctx, req.(*SetWorktreeActivationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RenameWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenameWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RenameWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RenameWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RenameWorktree(ctx, req.(*RenameWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_CreateProjectGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateProjectGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).CreateProjectGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_CreateProjectGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).CreateProjectGroup(ctx, req.(*CreateProjectGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateProjectGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateProjectGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateProjectGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateProjectGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateProjectGroup(ctx, req.(*UpdateProjectGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_DeleteProjectGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteProjectGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).DeleteProjectGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_DeleteProjectGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).DeleteProjectGroup(ctx, req.(*DeleteProjectGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListProjectGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProjectGroupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListProjectGroups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListProjectGroups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListProjectGroups(ctx, req.(*ListProjectGroupsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -272,6 +802,66 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RebindDevServer",
 			Handler:    _ProjectService_RebindDevServer_Handler,
+		},
+		{
+			MethodName: "UpdateProject",
+			Handler:    _ProjectService_UpdateProject_Handler,
+		},
+		{
+			MethodName: "DeleteProject",
+			Handler:    _ProjectService_DeleteProject_Handler,
+		},
+		{
+			MethodName: "AddRepo",
+			Handler:    _ProjectService_AddRepo_Handler,
+		},
+		{
+			MethodName: "ListRepos",
+			Handler:    _ProjectService_ListRepos_Handler,
+		},
+		{
+			MethodName: "ReorderRepos",
+			Handler:    _ProjectService_ReorderRepos_Handler,
+		},
+		{
+			MethodName: "RemoveRepo",
+			Handler:    _ProjectService_RemoveRepo_Handler,
+		},
+		{
+			MethodName: "RecordWorktreeCreated",
+			Handler:    _ProjectService_RecordWorktreeCreated_Handler,
+		},
+		{
+			MethodName: "RecordWorktreeRemoved",
+			Handler:    _ProjectService_RecordWorktreeRemoved_Handler,
+		},
+		{
+			MethodName: "ListWorktrees",
+			Handler:    _ProjectService_ListWorktrees_Handler,
+		},
+		{
+			MethodName: "SetWorktreeActivation",
+			Handler:    _ProjectService_SetWorktreeActivation_Handler,
+		},
+		{
+			MethodName: "RenameWorktree",
+			Handler:    _ProjectService_RenameWorktree_Handler,
+		},
+		{
+			MethodName: "CreateProjectGroup",
+			Handler:    _ProjectService_CreateProjectGroup_Handler,
+		},
+		{
+			MethodName: "UpdateProjectGroup",
+			Handler:    _ProjectService_UpdateProjectGroup_Handler,
+		},
+		{
+			MethodName: "DeleteProjectGroup",
+			Handler:    _ProjectService_DeleteProjectGroup_Handler,
+		},
+		{
+			MethodName: "ListProjectGroups",
+			Handler:    _ProjectService_ListProjectGroups_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

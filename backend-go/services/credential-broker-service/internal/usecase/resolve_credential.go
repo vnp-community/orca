@@ -60,40 +60,53 @@ func (uc *ResolveCredential) Execute(ctx context.Context, in ResolveCredentialIn
 		return nil, apperrors.New(apperrors.KindInternal, "CREDENTIAL_FETCH_FAILED", "failed to fetch credential metadata", err)
 	}
 
-	now := uc.now()
+	return resolveMetadata(ctx, resolveDeps{auditRepo: uc.auditRepo, store: uc.store, now: uc.now}, metadata, in.RequestingService)
+}
+
+// resolveDeps bundles what resolveMetadata needs from either
+// ResolveCredential or ResolveCredentialByOwner — a plain struct rather
+// than an interface since both callers already hold the same
+// AuditRepository/SecretStore/now types.
+type resolveDeps struct {
+	auditRepo AuditRepository
+	store     SecretStore
+	now       func() time.Time
+}
+
+// resolveMetadata is ResolveCredential.Execute's fail-closed/audit-then-
+// return logic, factored out so ResolveCredentialByOwner.Execute (which
+// looks the row up by (tenant_id, category, owner_id) instead of by id) can
+// share it exactly rather than re-implement the ordering guarantee this
+// file's doc comment describes. See that doc comment for the ordering
+// requirement this function preserves.
+func resolveMetadata(ctx context.Context, deps resolveDeps, metadata domain.CredentialMetadata, requestingService string) ([]byte, error) {
+	now := deps.now()
 
 	if metadata.IsRevoked() {
-		// Fail closed on a revoked credential (§9's "immediate revocation"
-		// guarantee) — audited as a denied resolve attempt before returning
-		// the error; the metadata row exists here, so the audit FK is
-		// satisfiable.
-		if auditErr := appendAudit(ctx, uc.auditRepo, metadata.ID, in.RequestingService, domain.ActionResolve, now); auditErr != nil {
+		if auditErr := appendAudit(ctx, deps.auditRepo, metadata.ID, requestingService, domain.ActionResolve, now); auditErr != nil {
 			return nil, auditErr
 		}
 		return nil, apperrors.New(apperrors.KindFailedPrecondition, "CREDENTIAL_REVOKED", "credential has been revoked", domain.ErrCredentialRevoked)
 	}
 
-	value, resolveErr := uc.resolveFromVault(ctx, metadata)
+	value, resolveErr := resolveFromVault(ctx, deps.store, metadata)
 	if resolveErr != nil {
-		// Vault is unreachable, or the ciphertext is missing/corrupt — fail
-		// closed, no plaintext caching to fall back to by design (§8). The
-		// failed attempt is still audited.
-		if auditErr := appendAudit(ctx, uc.auditRepo, metadata.ID, in.RequestingService, domain.ActionResolve, now); auditErr != nil {
+		if auditErr := appendAudit(ctx, deps.auditRepo, metadata.ID, requestingService, domain.ActionResolve, now); auditErr != nil {
 			return nil, auditErr
 		}
 		return nil, apperrors.New(apperrors.KindInternal, "CREDENTIAL_VAULT_RESOLVE_FAILED", "failed to resolve credential from vault", resolveErr)
 	}
 
 	// Audit BEFORE returning the value — see this method's doc comment.
-	if err := appendAudit(ctx, uc.auditRepo, metadata.ID, in.RequestingService, domain.ActionResolve, now); err != nil {
+	if err := appendAudit(ctx, deps.auditRepo, metadata.ID, requestingService, domain.ActionResolve, now); err != nil {
 		return nil, err
 	}
 
 	return value, nil
 }
 
-func (uc *ResolveCredential) resolveFromVault(ctx context.Context, metadata domain.CredentialMetadata) ([]byte, error) {
-	data, err := uc.store.KVRead(ctx, kvMount, metadata.VaultPath)
+func resolveFromVault(ctx context.Context, store SecretStore, metadata domain.CredentialMetadata) ([]byte, error) {
+	data, err := store.KVRead(ctx, kvMount, metadata.VaultPath)
 	if err != nil {
 		return nil, err
 	}
@@ -101,5 +114,5 @@ func (uc *ResolveCredential) resolveFromVault(ctx context.Context, metadata doma
 	if ciphertext == "" {
 		return nil, errors.New("usecase: no ciphertext stored at vault_path")
 	}
-	return uc.store.TransitDecrypt(ctx, transitKeyName(string(metadata.Category)), ciphertext)
+	return store.TransitDecrypt(ctx, transitKeyName(string(metadata.Category)), ciphertext)
 }

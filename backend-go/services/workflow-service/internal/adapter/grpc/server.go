@@ -19,12 +19,16 @@ import (
 type Server struct {
 	workflowv1.UnimplementedWorkflowServiceServer
 
-	createTemplate   *usecase.CreateTemplate
-	execute          *usecase.Execute
-	getExecution     *usecase.GetExecution
-	pauseExecution   *usecase.PauseExecution
-	resumeExecution  *usecase.ResumeExecution
-	executeAdHocStep *usecase.ExecuteAdHocStep
+	createTemplate      *usecase.CreateTemplate
+	execute             *usecase.Execute
+	getExecution        *usecase.GetExecution
+	pauseExecution      *usecase.PauseExecution
+	resumeExecution     *usecase.ResumeExecution
+	executeAdHocStep    *usecase.ExecuteAdHocStep
+	hasActiveExecutions *usecase.HasActiveExecutions
+	cancelExecution     *usecase.CancelExecution
+	listTemplates       *usecase.ListTemplates
+	resolveTemplate     *usecase.ResolveTemplate
 }
 
 func New(
@@ -34,22 +38,31 @@ func New(
 	pauseExecution *usecase.PauseExecution,
 	resumeExecution *usecase.ResumeExecution,
 	executeAdHocStep *usecase.ExecuteAdHocStep,
+	hasActiveExecutions *usecase.HasActiveExecutions,
+	cancelExecution *usecase.CancelExecution,
+	listTemplates *usecase.ListTemplates,
+	resolveTemplate *usecase.ResolveTemplate,
 ) *Server {
 	return &Server{
-		createTemplate:   createTemplate,
-		execute:          execute,
-		getExecution:     getExecution,
-		pauseExecution:   pauseExecution,
-		resumeExecution:  resumeExecution,
-		executeAdHocStep: executeAdHocStep,
+		createTemplate:      createTemplate,
+		execute:             execute,
+		getExecution:        getExecution,
+		pauseExecution:      pauseExecution,
+		resumeExecution:     resumeExecution,
+		executeAdHocStep:    executeAdHocStep,
+		hasActiveExecutions: hasActiveExecutions,
+		cancelExecution:     cancelExecution,
+		listTemplates:       listTemplates,
+		resolveTemplate:     resolveTemplate,
 	}
 }
 
 func (s *Server) CreateTemplate(ctx context.Context, req *workflowv1.CreateTemplateRequest) (*workflowv1.CreateTemplateResponse, error) {
 	tmpl, err := s.createTemplate.Execute(ctx, usecase.CreateTemplateInput{
-		Name:    req.GetName(),
-		DAGJSON: req.GetDagJson(),
-		Scope:   req.GetScope(),
+		Name:             req.GetName(),
+		DAGJSON:          req.GetDagJson(),
+		Scope:            req.GetScope(),
+		ParentTemplateID: req.GetParentTemplateId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -106,6 +119,50 @@ func (s *Server) ExecuteAdHocStep(ctx context.Context, req *workflowv1.ExecuteAd
 	return &workflowv1.ExecuteAdHocStepResponse{Result: toProtoStepResult(result)}, nil
 }
 
+func (s *Server) HasActiveExecutions(ctx context.Context, req *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error) {
+	hasActive, err := s.hasActiveExecutions.Execute(ctx, usecase.HasActiveExecutionsInput{ProjectID: req.GetProjectId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.HasActiveExecutionsResponse{HasActive: hasActive}, nil
+}
+
+func (s *Server) CancelExecution(ctx context.Context, req *workflowv1.CancelExecutionRequest) (*workflowv1.CancelExecutionResponse, error) {
+	exec, err := s.cancelExecution.Execute(ctx, usecase.CancelExecutionInput{ID: req.GetId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.CancelExecutionResponse{Execution: toProtoExecution(exec)}, nil
+}
+
+func (s *Server) ListTemplates(ctx context.Context, req *workflowv1.ListTemplatesRequest) (*workflowv1.ListTemplatesResponse, error) {
+	out, err := s.listTemplates.Execute(ctx, usecase.ListTemplatesInput{
+		Scope:     req.GetScope(),
+		PageToken: req.GetPageToken(),
+		PageSize:  req.GetPageSize(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	templates := make([]*workflowv1.WorkflowTemplate, 0, len(out.Templates))
+	for _, tmpl := range out.Templates {
+		templates = append(templates, toProtoTemplate(tmpl))
+	}
+	return &workflowv1.ListTemplatesResponse{Templates: templates, NextPageToken: out.NextPageToken}, nil
+}
+
+func (s *Server) ResolveTemplate(ctx context.Context, req *workflowv1.ResolveTemplateRequest) (*workflowv1.ResolveTemplateResponse, error) {
+	out, err := s.resolveTemplate.Execute(ctx, usecase.ResolveTemplateInput{TemplateID: req.GetTemplateId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	chain := make([]*workflowv1.WorkflowTemplate, 0, len(out.Chain))
+	for _, tmpl := range out.Chain {
+		chain = append(chain, toProtoTemplate(tmpl))
+	}
+	return &workflowv1.ResolveTemplateResponse{Template: toProtoTemplate(out.Template), Chain: chain}, nil
+}
+
 func toDomainStepType(t workflowv1.StepType) domain.StepType {
 	switch t {
 	case workflowv1.StepType_STEP_TYPE_AGENT:
@@ -125,11 +182,12 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 
 func toProtoTemplate(t domain.WorkflowTemplate) *workflowv1.WorkflowTemplate {
 	return &workflowv1.WorkflowTemplate{
-		Id:       t.ID,
-		TenantId: t.TenantID,
-		Name:     t.Name,
-		DagJson:  t.DAGJSON,
-		Scope:    string(t.Scope),
+		Id:               t.ID,
+		TenantId:         t.TenantID,
+		Name:             t.Name,
+		DagJson:          t.DAGJSON,
+		Scope:            string(t.Scope),
+		ParentTemplateId: t.ParentTemplateID,
 	}
 }
 
@@ -139,6 +197,7 @@ func toProtoExecution(e domain.WorkflowExecution) *workflowv1.WorkflowExecution 
 		TemplateId:  e.TemplateID,
 		Status:      string(e.Status),
 		RootTraceId: e.RootTraceID,
+		ProjectId:   e.ProjectID,
 	}
 }
 

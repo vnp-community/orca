@@ -33,9 +33,9 @@ func New(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) CreateTemplate(ctx context.Context, tmpl domain.WorkflowTemplate) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO workflow.templates (id, tenant_id, name, dag_json, scope)
-		VALUES ($1, $2, $3, $4::jsonb, $5)
-	`, tmpl.ID, tmpl.TenantID, tmpl.Name, tmpl.DAGJSON, string(tmpl.Scope))
+		INSERT INTO workflow.templates (id, tenant_id, name, dag_json, scope, parent_template_id)
+		VALUES ($1, $2, $3, $4::jsonb, $5, $6)
+	`, tmpl.ID, tmpl.TenantID, tmpl.Name, tmpl.DAGJSON, string(tmpl.Scope), nullableString(tmpl.ParentTemplateID))
 	if err != nil {
 		return fmt.Errorf("postgres: insert template: %w", err)
 	}
@@ -44,14 +44,14 @@ func (r *Repository) CreateTemplate(ctx context.Context, tmpl domain.WorkflowTem
 
 func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (domain.WorkflowTemplate, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, name, dag_json::text, scope
+		SELECT id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, '')
 		FROM workflow.templates
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
 	var tmpl domain.WorkflowTemplate
 	var scope string
-	err := row.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &scope)
+	err := row.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &scope, &tmpl.ParentTemplateID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
 	}
@@ -62,11 +62,101 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (doma
 	return tmpl, nil
 }
 
+// ListTemplates backs usecase.ListTemplates — keyset pagination, same
+// shape as annotation-service's ListAnnotations (id::text > pageToken
+// cursor, ORDER BY id, next = last row's id iff the page came back full).
+func (r *Repository) ListTemplates(ctx context.Context, tenantID, scope, pageToken string, pageSize int32) ([]domain.WorkflowTemplate, string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, '')
+		FROM workflow.templates
+		WHERE tenant_id = $1 AND ($2 = '' OR scope = $2) AND id::text > $3
+		ORDER BY id
+		LIMIT $4
+	`, tenantID, scope, pageToken, pageSize)
+	if err != nil {
+		return nil, "", fmt.Errorf("postgres: query templates: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.WorkflowTemplate
+	for rows.Next() {
+		var tmpl domain.WorkflowTemplate
+		var s string
+		if err := rows.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &s, &tmpl.ParentTemplateID); err != nil {
+			return nil, "", fmt.Errorf("postgres: scan template row: %w", err)
+		}
+		tmpl.Scope = domain.Scope(s)
+		out = append(out, tmpl)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("postgres: iterate template rows: %w", err)
+	}
+
+	next := ""
+	if int32(len(out)) == pageSize && len(out) > 0 {
+		next = out[len(out)-1].ID
+	}
+	return out, next, nil
+}
+
+// ResolveChain backs usecase.ResolveTemplate — the one genuine
+// recursive-SQL query in this service (workflow-service.md §6), depth
+// capped inline in the WHERE clause. ORDER BY depth DESC returns
+// root-first (furthest ancestor first, the requested template itself
+// last), matching usecase.ResolveTemplateOutput.Chain's documented order.
+func (r *Repository) ResolveChain(ctx context.Context, tenantID, templateID string, maxDepth int) ([]domain.WorkflowTemplate, error) {
+	rows, err := r.pool.Query(ctx, `
+		WITH RECURSIVE chain AS (
+			SELECT id, tenant_id, name, dag_json, scope, parent_template_id, 0 AS depth
+			FROM workflow.templates
+			WHERE tenant_id = $1 AND id = $2
+
+			UNION ALL
+
+			SELECT t.id, t.tenant_id, t.name, t.dag_json, t.scope, t.parent_template_id, c.depth + 1
+			FROM workflow.templates t
+			JOIN chain c ON t.id = c.parent_template_id
+			WHERE c.depth + 1 < $3
+		)
+		SELECT id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, '')
+		FROM chain
+		ORDER BY depth DESC
+	`, tenantID, templateID, maxDepth)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query template chain: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.WorkflowTemplate
+	for rows.Next() {
+		var tmpl domain.WorkflowTemplate
+		var s string
+		if err := rows.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &s, &tmpl.ParentTemplateID); err != nil {
+			return nil, fmt.Errorf("postgres: scan template chain row: %w", err)
+		}
+		tmpl.Scope = domain.Scope(s)
+		out = append(out, tmpl)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate template chain rows: %w", err)
+	}
+	if len(out) == 0 {
+		return nil, domain.ErrTemplateNotFound
+	}
+	return out, nil
+}
+
+// CreateExecution persists exec. TemplateID is nullable
+// (migration 0005_execution_ad_hoc_template): a template-driven Execute
+// always sets it, but ExecuteAdHocStep's synthetic execution
+// (domain.NewAdHocWorkflowExecution) deliberately leaves it empty, since
+// an ad hoc run has no backing WorkflowTemplate — see that constructor's
+// doc comment.
 func (r *Repository) CreateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO workflow.executions (id, template_id, tenant_id, status, root_trace_id, paused_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, exec.ID, exec.TemplateID, exec.TenantID, string(exec.Status), nullableString(exec.RootTraceID), exec.PausedAt)
+		INSERT INTO workflow.executions (id, template_id, tenant_id, status, root_trace_id, paused_at, project_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, exec.ID, nullableString(exec.TemplateID), exec.TenantID, string(exec.Status), nullableString(exec.RootTraceID), exec.PausedAt, nullableString(exec.ProjectID))
 	if err != nil {
 		return fmt.Errorf("postgres: insert execution: %w", err)
 	}
@@ -75,7 +165,7 @@ func (r *Repository) CreateExecution(ctx context.Context, exec domain.WorkflowEx
 
 func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (domain.WorkflowExecution, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, template_id, tenant_id, status, COALESCE(root_trace_id, ''), paused_at
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, '')
 		FROM workflow.executions
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
@@ -83,7 +173,7 @@ func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (dom
 	var exec domain.WorkflowExecution
 	var status string
 	var pausedAt *time.Time
-	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt)
+	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.WorkflowExecution{}, domain.ErrExecutionNotFound
 	}
@@ -93,6 +183,23 @@ func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (dom
 	exec.Status = domain.Status(status)
 	exec.PausedAt = pausedAt
 	return exec, nil
+}
+
+// HasActiveExecutions backs usecase.HasActiveExecutions — see that
+// usecase's doc comment for why this exists (Epic C,
+// backend-go/docs/execution-plan.md).
+func (r *Repository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM workflow.executions
+			WHERE tenant_id = $1 AND project_id = $2 AND status IN ('pending','running','paused')
+		)
+	`, tenantID, projectID)
+	var exists bool
+	if err := row.Scan(&exists); err != nil {
+		return false, fmt.Errorf("postgres: query has-active-executions: %w", err)
+	}
+	return exists, nil
 }
 
 // UpdateExecution persists an execution's mutable fields — status and
@@ -113,6 +220,117 @@ func (r *Repository) UpdateExecution(ctx context.Context, exec domain.WorkflowEx
 	return nil
 }
 
+// ListRunning backs usecase.RecoverExecutions' boot-time scan — every
+// workflow.executions row, across every tenant, currently in
+// status='running'. Deliberately unscoped by tenant_id — see
+// usecase.ExecutionRepository.ListRunning's doc comment for why this is
+// the one query in this port that must see every tenant. Uses
+// idx_workflow_executions_resumable (migrations/0001_init), a partial
+// index on status IN ('running', 'paused') that also serves this narrower
+// status='running' predicate.
+func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecution, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, '')
+		FROM workflow.executions
+		WHERE status = 'running'
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query running executions: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.WorkflowExecution
+	for rows.Next() {
+		var exec domain.WorkflowExecution
+		var status string
+		var pausedAt *time.Time
+		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID); err != nil {
+			return nil, fmt.Errorf("postgres: scan running execution row: %w", err)
+		}
+		exec.Status = domain.Status(status)
+		exec.PausedAt = pausedAt
+		out = append(out, exec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate running execution rows: %w", err)
+	}
+	return out, nil
+}
+
+// CreateStepExecution backs usecase.StepExecutionRepository. Tenant scoping
+// isn't a parameter here (unlike Create/GetTemplate/Execution) because a
+// step_executions row's tenant is implied entirely by its execution_id —
+// the FK to workflow.executions plus that table's own tenant check (the
+// usecase layer always fetches/creates the owning execution through a
+// tenant-scoped call first) is the enforcement; RLS
+// (migration 0004_step_executions) is the defense-in-depth backstop.
+func (r *Repository) CreateStepExecution(ctx context.Context, se domain.StepExecution) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO workflow.step_executions (id, execution_id, step_id, wave, status, dispatch_token, output, error_message)
+		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+	`, se.ID, se.ExecutionID, se.StepID, se.Wave, string(se.Status), se.DispatchToken, nullableString(se.OutputJSON), nullableString(se.Error))
+	if err != nil {
+		return fmt.Errorf("postgres: insert step execution: %w", err)
+	}
+	return nil
+}
+
+// UpdateStepExecution persists a step execution's mutable fields — status,
+// output, error — set as a step transitions pending->running->completed/failed.
+func (r *Repository) UpdateStepExecution(ctx context.Context, se domain.StepExecution) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE workflow.step_executions
+		SET status = $1, output = $2::jsonb, error_message = $3, updated_at = now()
+		WHERE id = $4
+	`, string(se.Status), nullableString(se.OutputJSON), nullableString(se.Error), se.ID)
+	if err != nil {
+		return fmt.Errorf("postgres: update step execution: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: update step execution: no row for id %s", se.ID)
+	}
+	return nil
+}
+
+// ListStepExecutions returns every step_executions row for
+// tenantID/executionID, ordered by wave then step_id — joins to
+// workflow.executions for the tenant check, matching the RLS policy's own
+// EXISTS join (migration 0004_step_executions).
+func (r *Repository) ListStepExecutions(ctx context.Context, tenantID, executionID string) ([]domain.StepExecution, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT se.id, se.execution_id, se.step_id, se.wave, se.status, se.dispatch_token,
+		       COALESCE(se.output::text, ''), COALESCE(se.error_message, '')
+		FROM workflow.step_executions se
+		JOIN workflow.executions e ON e.id = se.execution_id
+		WHERE e.tenant_id = $1 AND se.execution_id = $2
+		ORDER BY se.wave, se.step_id
+	`, tenantID, executionID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query step executions: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.StepExecution
+	for rows.Next() {
+		var se domain.StepExecution
+		var status string
+		if err := rows.Scan(&se.ID, &se.ExecutionID, &se.StepID, &se.Wave, &status, &se.DispatchToken, &se.OutputJSON, &se.Error); err != nil {
+			return nil, fmt.Errorf("postgres: scan step execution row: %w", err)
+		}
+		se.Status = domain.StepExecutionStatus(status)
+		out = append(out, se)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate step execution rows: %w", err)
+	}
+	return out, nil
+}
+
+// nullableString maps an empty Go string to SQL NULL — used for both plain
+// text columns and, with a $N::jsonb cast at the call site, JSONB columns
+// like step_executions.output (an empty OutputJSON means "no output yet",
+// e.g. a pending/running step, which must insert/update as NULL, not the
+// literal string "").
 func nullableString(s string) *string {
 	if s == "" {
 		return nil

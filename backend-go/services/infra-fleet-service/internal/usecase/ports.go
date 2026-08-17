@@ -30,6 +30,31 @@ type DevServerRepository interface {
 // SshTargetRepository is the persistence port for SSH target registration.
 type SshTargetRepository interface {
 	Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error)
+	// Get fetches an SSH target scoped to tenantID — same tenant-join
+	// requirement as DevServerRepository.Get, see
+	// specs/backend-go/services/infra-fleet-service.md §9.
+	Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error)
+}
+
+// SshTargetResolver is the narrow read port adapter/devserveragent.Client
+// needs to resolve a DevServer.SSHTargetID into a full domain.SshTarget
+// before dialing via sshconn.Connector for relay-ssh mode. Same method as
+// SshTargetRepository.Get, declared as its own interface rather than reused
+// directly — this codebase's convention is that a port is defined where it
+// is consumed (see this file's own doc comment), and devserveragent is a
+// different consumer than the usecases that hold SshTargetRepository.
+// Implemented by postgres.SshTargetStore, same as SshTargetRepository.
+type SshTargetResolver interface {
+	Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error)
+}
+
+// ConnectionRepository is the persistence port for the write side of
+// infra.connections (migrations/0002_connections) — the real routing model
+// that replaced the connectionId==dev_server.id equation. Kept separate from
+// ConnectionResolver (the read side) the same way DevServerRepository and
+// ConnectionResolver already are two narrow ports over one Repository.
+type ConnectionRepository interface {
+	CreateConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error)
 }
 
 // ConnectionResolver is THE core coordination/execution dispatch primitive
@@ -51,8 +76,10 @@ type ConnectionResolver interface {
 	// ResolveConnection looks up connectionID within tenantID's scope.
 	// connected=false with a nil error means "no dev server owns this
 	// connectionId" — the caller's cue to execute locally, not an error
-	// condition.
-	ResolveConnection(ctx context.Context, tenantID, connectionID string) (connected bool, devServer domain.DevServer, err error)
+	// condition. conn carries the per-connection metadata (RepoPath,
+	// WorktreeID) callers like git-gateway-service's RelayExecutor need
+	// alongside devServer — zero-value when connected is false.
+	ResolveConnection(ctx context.Context, tenantID, connectionID string) (connected bool, devServer domain.DevServer, conn domain.Connection, err error)
 }
 
 // FleetHealthPort is the read port over fleet health samples. The
@@ -67,10 +94,10 @@ type FleetHealthPort interface {
 // implemented by adapter/devserveragent against the EXISTING TS wire
 // protocol (Option A, see
 // specs/backend-go/architecture/08-inter-service-communication.md), NOT a
-// new gRPC contract. THE IMPLEMENTATION IN THIS SCAFFOLD IS A STUB — every
-// call returns an error. See adapter/devserveragent's package doc comment
-// and this service's README "Known gaps" for what a real implementation
-// requires.
+// new gRPC contract. Real for relay-websocket mode (Epic A, 2026-08-17);
+// direct-websocket/relay-ssh still return ErrConnectionModeNotImplemented.
+// See adapter/devserveragent's package doc comment and this service's
+// README "Known gaps" for exactly what's still missing.
 type DevServerAgentClient interface {
 	// Exec dispatches one JSON-RPC method call (e.g. "ports.scan",
 	// "pty.spawn", "preflight.check") to the agent over devServer's resolved

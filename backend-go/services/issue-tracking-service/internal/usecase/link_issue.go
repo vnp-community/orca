@@ -2,10 +2,27 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/domain"
 )
+
+// LinkCreatedSubject is the event subject a link's outbox row publishes
+// under — task-service/project-service consume it to update their own
+// records of which task/worktree references which external issue (design
+// doc §7).
+const LinkCreatedSubject = "orca.issuetracking.link.created"
+
+// linkCreatedPayload is LinkCreatedSubject's JSON payload shape.
+type linkCreatedPayload struct {
+	IssueID string `json:"issue_id"`
+	TaskID  string `json:"task_id"`
+}
 
 // LinkIssueInput mirrors the LinkIssue gRPC request 1:1 by design.
 type LinkIssueInput struct {
@@ -13,23 +30,26 @@ type LinkIssueInput struct {
 	TaskID  string
 }
 
-// LinkIssue publishes orca.issuetracking.link.created instead of writing
-// directly into task-service/project-service's data (design doc §7) — this
-// replaces the TS behavior of writing a field onto the worktree's Postgres
-// blob row directly, which is no longer legal once task-service and
-// project-service own separate databases.
+// LinkIssue durably enqueues orca.issuetracking.link.created instead of
+// writing directly into task-service/project-service's data (design doc
+// §7) — this replaces the TS behavior of writing a field onto the
+// worktree's Postgres blob row directly, which is no longer legal once
+// task-service and project-service own separate databases.
 //
-// The publish IS this use case's persisted side effect: issue-tracking-service
-// owns no database of its own (design doc §2/§5), so unlike
-// usage-service's RecordUsageSession (where the event is a best-effort
-// bonus alongside a real DB write), a failed publish here must fail the RPC
-// rather than silently succeed with nothing durable to show for it.
+// The enqueue IS this usecase's persisted side effect: issue-tracking-service
+// gained its own (minimal, outbox-only) database in Epic G
+// (docs/execution-plan.md) specifically because Enqueue's own doc comment
+// on OutboxEnqueuer explains why — there's no other domain state to be
+// atomic with. A failed enqueue still fails the RPC, same as before Epic G;
+// what changed is that a transient NATS outage no longer needs to surface
+// as a failed enqueue at all (see common/outbox.Relay), only a database
+// outage does.
 type LinkIssue struct {
-	publisher EventPublisher
+	enqueuer OutboxEnqueuer
 }
 
-func NewLinkIssue(publisher EventPublisher) *LinkIssue {
-	return &LinkIssue{publisher: publisher}
+func NewLinkIssue(enqueuer OutboxEnqueuer) *LinkIssue {
+	return &LinkIssue{enqueuer: enqueuer}
 }
 
 func (uc *LinkIssue) Execute(ctx context.Context, in LinkIssueInput) error {
@@ -43,12 +63,23 @@ func (uc *LinkIssue) Execute(ctx context.Context, in LinkIssueInput) error {
 	if in.TaskID == "" {
 		return apperrors.New(apperrors.KindInvalidArgument, "ISSUETRACKING_EMPTY_TASK_ID", "task_id is required", nil)
 	}
-	if uc.publisher == nil {
-		return apperrors.New(apperrors.KindInternal, "ISSUETRACKING_EVENTBUS_UNAVAILABLE", "event bus is not configured", nil)
+	if uc.enqueuer == nil {
+		return apperrors.New(apperrors.KindInternal, "ISSUETRACKING_OUTBOX_UNAVAILABLE", "outbox store is not configured", nil)
 	}
 
-	if err := uc.publisher.PublishLinkCreated(ctx, tenantID, in.IssueID, in.TaskID); err != nil {
-		return apperrors.New(apperrors.KindInternal, "ISSUETRACKING_LINK_PUBLISH_FAILED", "failed to publish link.created event", err)
+	payload, err := json.Marshal(linkCreatedPayload{IssueID: in.IssueID, TaskID: in.TaskID})
+	if err != nil {
+		return apperrors.New(apperrors.KindInternal, "ISSUETRACKING_MARSHAL_EVENT_FAILED", "failed to marshal link-created event payload", err)
+	}
+	event := domain.OutboxEvent{
+		ID:          uuid.NewString(),
+		Subject:     LinkCreatedSubject,
+		OccurredAt:  time.Now().UTC(),
+		PayloadJSON: payload,
+	}
+
+	if err := uc.enqueuer.Enqueue(ctx, tenantID, event); err != nil {
+		return apperrors.New(apperrors.KindInternal, "ISSUETRACKING_LINK_ENQUEUE_FAILED", "failed to durably enqueue link.created event", err)
 	}
 	return nil
 }

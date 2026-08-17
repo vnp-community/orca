@@ -26,8 +26,12 @@ type DispatchContext struct {
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Handle           string                 `protobuf:"bytes,2,opt,name=handle,proto3" json:"handle,omitempty"` // KeyedAsyncQueue serialization key
 	CoordinatorRunId string                 `protobuf:"bytes,3,opt,name=coordinator_run_id,json=coordinatorRunId,proto3" json:"coordinator_run_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// orchestration_task_id round-trips the owning task id set on creation.
+	// See docs/execution-plan.md Epic C: added so callers can observe the FK
+	// they supplied on CreateDispatchContextRequest.
+	OrchestrationTaskId string `protobuf:"bytes,4,opt,name=orchestration_task_id,json=orchestrationTaskId,proto3" json:"orchestration_task_id,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *DispatchContext) Reset() {
@@ -81,12 +85,26 @@ func (x *DispatchContext) GetCoordinatorRunId() string {
 	return ""
 }
 
+func (x *DispatchContext) GetOrchestrationTaskId() string {
+	if x != nil {
+		return x.OrchestrationTaskId
+	}
+	return ""
+}
+
 type CreateDispatchContextRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Handle           string                 `protobuf:"bytes,1,opt,name=handle,proto3" json:"handle,omitempty"`
 	CoordinatorRunId string                 `protobuf:"bytes,2,opt,name=coordinator_run_id,json=coordinatorRunId,proto3" json:"coordinator_run_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// orchestration_task_id is the owning OrchestrationTask this dispatch
+	// attempt belongs to. Optional: an ad-hoc coordinator-only dispatch (no
+	// task yet) legitimately omits it. See docs/execution-plan.md Epic C —
+	// without this, dispatch_contexts.orchestration_task_id was always NULL
+	// and CreateGate could never resolve a task to block, failing closed with
+	// ORCH_DISPATCH_CONTEXT_NO_TASK for every dispatch context.
+	OrchestrationTaskId string `protobuf:"bytes,3,opt,name=orchestration_task_id,json=orchestrationTaskId,proto3" json:"orchestration_task_id,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *CreateDispatchContextRequest) Reset() {
@@ -129,6 +147,13 @@ func (x *CreateDispatchContextRequest) GetHandle() string {
 func (x *CreateDispatchContextRequest) GetCoordinatorRunId() string {
 	if x != nil {
 		return x.CoordinatorRunId
+	}
+	return ""
+}
+
+func (x *CreateDispatchContextRequest) GetOrchestrationTaskId() string {
+	if x != nil {
+		return x.OrchestrationTaskId
 	}
 	return ""
 }
@@ -182,8 +207,14 @@ type DecisionGate struct {
 	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	DispatchContextId string                 `protobuf:"bytes,2,opt,name=dispatch_context_id,json=dispatchContextId,proto3" json:"dispatch_context_id,omitempty"`
 	Status            string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"` // pending|resolved|failed
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// question/options round-trip what the gate asked. See
+	// docs/execution-plan.md Epic C — the usecase/repository layer already
+	// accepted and persisted these; only the proto lacked the fields to carry
+	// them over the wire.
+	Question      string   `protobuf:"bytes,4,opt,name=question,proto3" json:"question,omitempty"`
+	Options       []string `protobuf:"bytes,5,rep,name=options,proto3" json:"options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DecisionGate) Reset() {
@@ -237,11 +268,37 @@ func (x *DecisionGate) GetStatus() string {
 	return ""
 }
 
+func (x *DecisionGate) GetQuestion() string {
+	if x != nil {
+		return x.Question
+	}
+	return ""
+}
+
+func (x *DecisionGate) GetOptions() []string {
+	if x != nil {
+		return x.Options
+	}
+	return nil
+}
+
 type CreateGateRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	DispatchContextId string                 `protobuf:"bytes,1,opt,name=dispatch_context_id,json=dispatchContextId,proto3" json:"dispatch_context_id,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// orchestration_task_id is intentionally NOT threaded into the CreateGate
+	// usecase: it derives the owning task from dispatch_context_id itself via
+	// a locked read (see orchestration-service's create_gate.go), a
+	// deliberate derive-not-trust boundary. This field exists for API
+	// symmetry / future callers but the server does not read it — see
+	// docs/execution-plan.md Epic C.
+	OrchestrationTaskId string `protobuf:"bytes,2,opt,name=orchestration_task_id,json=orchestrationTaskId,proto3" json:"orchestration_task_id,omitempty"`
+	// question/options: see docs/execution-plan.md Epic C — the
+	// usecase/repository layer already accepted these but the proto never
+	// carried them from the gRPC caller, so they always arrived empty.
+	Question      string   `protobuf:"bytes,3,opt,name=question,proto3" json:"question,omitempty"`
+	Options       []string `protobuf:"bytes,4,rep,name=options,proto3" json:"options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateGateRequest) Reset() {
@@ -279,6 +336,27 @@ func (x *CreateGateRequest) GetDispatchContextId() string {
 		return x.DispatchContextId
 	}
 	return ""
+}
+
+func (x *CreateGateRequest) GetOrchestrationTaskId() string {
+	if x != nil {
+		return x.OrchestrationTaskId
+	}
+	return ""
+}
+
+func (x *CreateGateRequest) GetQuestion() string {
+	if x != nil {
+		return x.Question
+	}
+	return ""
+}
+
+func (x *CreateGateRequest) GetOptions() []string {
+	if x != nil {
+		return x.Options
+	}
+	return nil
 }
 
 type CreateGateResponse struct {
@@ -521,22 +599,29 @@ var File_orca_orchestration_v1_orchestration_proto protoreflect.FileDescriptor
 
 const file_orca_orchestration_v1_orchestration_proto_rawDesc = "" +
 	"\n" +
-	")orca/orchestration/v1/orchestration.proto\x12\x15orca.orchestration.v1\"g\n" +
+	")orca/orchestration/v1/orchestration.proto\x12\x15orca.orchestration.v1\"\x9b\x01\n" +
 	"\x0fDispatchContext\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06handle\x18\x02 \x01(\tR\x06handle\x12,\n" +
-	"\x12coordinator_run_id\x18\x03 \x01(\tR\x10coordinatorRunId\"d\n" +
+	"\x12coordinator_run_id\x18\x03 \x01(\tR\x10coordinatorRunId\x122\n" +
+	"\x15orchestration_task_id\x18\x04 \x01(\tR\x13orchestrationTaskId\"\x98\x01\n" +
 	"\x1cCreateDispatchContextRequest\x12\x16\n" +
 	"\x06handle\x18\x01 \x01(\tR\x06handle\x12,\n" +
-	"\x12coordinator_run_id\x18\x02 \x01(\tR\x10coordinatorRunId\"a\n" +
+	"\x12coordinator_run_id\x18\x02 \x01(\tR\x10coordinatorRunId\x122\n" +
+	"\x15orchestration_task_id\x18\x03 \x01(\tR\x13orchestrationTaskId\"a\n" +
 	"\x1dCreateDispatchContextResponse\x12@\n" +
-	"\acontext\x18\x01 \x01(\v2&.orca.orchestration.v1.DispatchContextR\acontext\"f\n" +
+	"\acontext\x18\x01 \x01(\v2&.orca.orchestration.v1.DispatchContextR\acontext\"\x9c\x01\n" +
 	"\fDecisionGate\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12.\n" +
 	"\x13dispatch_context_id\x18\x02 \x01(\tR\x11dispatchContextId\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\tR\x06status\"C\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x1a\n" +
+	"\bquestion\x18\x04 \x01(\tR\bquestion\x12\x18\n" +
+	"\aoptions\x18\x05 \x03(\tR\aoptions\"\xad\x01\n" +
 	"\x11CreateGateRequest\x12.\n" +
-	"\x13dispatch_context_id\x18\x01 \x01(\tR\x11dispatchContextId\"M\n" +
+	"\x13dispatch_context_id\x18\x01 \x01(\tR\x11dispatchContextId\x122\n" +
+	"\x15orchestration_task_id\x18\x02 \x01(\tR\x13orchestrationTaskId\x12\x1a\n" +
+	"\bquestion\x18\x03 \x01(\tR\bquestion\x12\x18\n" +
+	"\aoptions\x18\x04 \x03(\tR\aoptions\"M\n" +
 	"\x12CreateGateResponse\x127\n" +
 	"\x04gate\x18\x01 \x01(\v2#.orca.orchestration.v1.DecisionGateR\x04gate\"P\n" +
 	"\x12ResolveGateRequest\x12\x17\n" +

@@ -32,6 +32,27 @@ func (s RunStatus) Terminal() bool {
 	return s == RunStatusSucceeded || s == RunStatusFailed
 }
 
+// RunTrigger records what caused a run to be dispatched — the same RunNow
+// interactor is reached from a direct gRPC call (manual), the scheduler
+// ticker (scheduled), and HandleExternalTrigger (external); see
+// specs/backend-go/services/automation-service.md §3/§7.
+type RunTrigger string
+
+const (
+	RunTriggerManual    RunTrigger = "manual"
+	RunTriggerScheduled RunTrigger = "scheduled"
+	RunTriggerExternal  RunTrigger = "external"
+)
+
+func (t RunTrigger) Valid() bool {
+	switch t {
+	case RunTriggerManual, RunTriggerScheduled, RunTriggerExternal:
+		return true
+	default:
+		return false
+	}
+}
+
 var (
 	// ErrEmptyAutomationID guards against an orphaned run with no owning
 	// automation.
@@ -55,6 +76,7 @@ type AutomationRun struct {
 	RequestID      string // idempotency key, see automation-service.md §8
 	Status         RunStatus
 	StepType       StepType
+	Trigger        RunTrigger
 	StepConfigJSON string
 	OutputJSON     string
 	ErrorMessage   string
@@ -64,8 +86,10 @@ type AutomationRun struct {
 }
 
 // NewPendingRun constructs a freshly-created AutomationRun in the Pending
-// state, before workflow-service has been called.
-func NewPendingRun(id, automationID, tenantID, requestID string, stepType StepType, stepConfigJSON string, createdAt time.Time) (AutomationRun, error) {
+// state, before workflow-service has been called. trigger defaults to
+// RunTriggerManual when invalid/unset, mirroring NewAutomation's
+// self-defaulting StepType so every AutomationRun is structurally valid.
+func NewPendingRun(id, automationID, tenantID, requestID string, stepType StepType, trigger RunTrigger, stepConfigJSON string, createdAt time.Time) (AutomationRun, error) {
 	if automationID == "" {
 		return AutomationRun{}, ErrEmptyAutomationID
 	}
@@ -78,6 +102,9 @@ func NewPendingRun(id, automationID, tenantID, requestID string, stepType StepTy
 	if stepConfigJSON == "" {
 		return AutomationRun{}, ErrEmptyStepConfig
 	}
+	if !trigger.Valid() {
+		trigger = RunTriggerManual
+	}
 	return AutomationRun{
 		ID:             id,
 		AutomationID:   automationID,
@@ -85,6 +112,7 @@ func NewPendingRun(id, automationID, tenantID, requestID string, stepType StepTy
 		RequestID:      requestID,
 		Status:         RunStatusPending,
 		StepType:       stepType,
+		Trigger:        trigger,
 		StepConfigJSON: stepConfigJSON,
 		CreatedAt:      createdAt,
 	}, nil

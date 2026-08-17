@@ -8,19 +8,15 @@ import (
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 )
 
-// requireAdminActor resolves the acting user from context and checks its
-// role is admin.
-//
-// This is a placeholder, not the intended long-term mechanism: per
-// auth-service.md §9, every admin-console usecase method should call the
-// embedded OPA SDK with the caller's resolved role/claims as input, the
-// same mechanism every other service uses for its own fine-grained checks
-// — a simple "if role == admin" check here is exactly the bug class
-// (TS system's requireAdmin/requireOwnerOrAdmin) that design is meant to
-// close structurally. Replace this with the OPA integration described in
-// auth-service.md §6/§9 before production use; see this service's README
-// "Known gaps".
-func requireAdminActor(ctx context.Context, users UserRepository) (domain.User, error) {
+// requireAdminActor resolves the acting user from context and checks it's
+// authorized as admin via the embedded OPA policy decision
+// (data.orca.authz.admin.allow, internal/adapter/opaclient) — per
+// auth-service.md §6/§9, this replaces the earlier inline "role == admin"
+// check (exactly the bug class the TS system's requireAdmin/
+// requireOwnerOrAdmin were: a login-only check baked into usecase code
+// instead of a policy decision). See this service's README "Known gaps"
+// for what OPA does/doesn't cover yet.
+func requireAdminActor(ctx context.Context, users UserRepository, opa OPAClient) (domain.User, error) {
 	actorID, ok := tenant.UserID(ctx)
 	if !ok {
 		return domain.User{}, apperrors.New(apperrors.KindUnauthenticated, "AUTH_NO_ACTOR", "no authenticated user in request context", nil)
@@ -29,7 +25,14 @@ func requireAdminActor(ctx context.Context, users UserRepository) (domain.User, 
 	if err != nil {
 		return domain.User{}, apperrors.New(apperrors.KindUnauthenticated, "AUTH_ACTOR_NOT_FOUND", "acting user not found", err)
 	}
-	if actor.Role != domain.RoleAdmin {
+	allowed, err := opa.Decision(ctx, actor)
+	if err != nil {
+		// Fail closed: a policy-evaluation error is never treated as an
+		// allow, matching every other Epic E call site's fail-closed
+		// contract (common/policy.Evaluator's doc comment).
+		return domain.User{}, apperrors.New(apperrors.KindInternal, "AUTH_OPA_EVAL_FAILED", "policy evaluation failed", err)
+	}
+	if !allowed {
 		return domain.User{}, apperrors.New(apperrors.KindPermissionDenied, "AUTH_NOT_ADMIN", "admin role required", nil)
 	}
 	return actor, nil

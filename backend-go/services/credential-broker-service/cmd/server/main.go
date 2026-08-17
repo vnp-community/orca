@@ -92,13 +92,22 @@ func run() error {
 	}
 	store := credentialvault.New(vaultClient)
 
-	writeUC := usecase.NewWriteCredential(repo, repo, store)
+	// repo also implements usecase.TxRunner (RunInTx) — write/rotate/revoke
+	// use it so their metadata mutation and audit append commit together;
+	// see internal/usecase/ports.go's TxRunner doc comment.
+	writeUC := usecase.NewWriteCredential(store, repo)
 	resolveUC := usecase.NewResolveCredential(repo, repo, store)
-	rotateUC := usecase.NewRotateCredential(repo, repo, store)
-	revokeUC := usecase.NewRevokeCredential(repo, repo, store)
+	rotateUC := usecase.NewRotateCredential(repo, store, repo)
+	revokeUC := usecase.NewRevokeCredential(repo, store, repo)
+	getMetadataUC := usecase.NewGetCredentialMetadata(repo)
+	resolveByOwnerUC := usecase.NewResolveCredentialByOwner(repo, repo, store)
+	revokeByOwnerUC := usecase.NewRevokeCredentialByOwner(repo, store, repo)
+	signVapidUC := usecase.NewSignVapidPayload(store)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	credentialbrokerv1.RegisterCredentialBrokerServiceServer(grpcServer, credentialgrpc.New(writeUC, resolveUC, rotateUC, revokeUC))
+	credentialbrokerv1.RegisterCredentialBrokerServiceServer(grpcServer, credentialgrpc.New(
+		writeUC, resolveUC, rotateUC, revokeUC, getMetadataUC, resolveByOwnerUC, revokeByOwnerUC, signVapidUC,
+	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	healthSrv := health.New()

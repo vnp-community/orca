@@ -32,15 +32,16 @@ type HandleIncomingEventInput struct {
 // or claims authority over the source fact (§2) — it only derives an
 // ephemeral, user-facing artifact from it.
 type HandleIncomingEvent struct {
-	broadcaster NotificationBroadcaster
-	logger      *slog.Logger
+	broadcaster     NotificationBroadcaster
+	processedEvents ProcessedEventRepository
+	logger          *slog.Logger
 }
 
-func NewHandleIncomingEvent(broadcaster NotificationBroadcaster, logger *slog.Logger) *HandleIncomingEvent {
+func NewHandleIncomingEvent(broadcaster NotificationBroadcaster, processedEvents ProcessedEventRepository, logger *slog.Logger) *HandleIncomingEvent {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &HandleIncomingEvent{broadcaster: broadcaster, logger: logger}
+	return &HandleIncomingEvent{broadcaster: broadcaster, processedEvents: processedEvents, logger: logger}
 }
 
 // Execute translates in into a NotificationEvent and broadcasts it. A
@@ -50,7 +51,25 @@ func NewHandleIncomingEvent(broadcaster NotificationBroadcaster, logger *slog.Lo
 // JetStream redelivery of a message that will never translate
 // differently. Any other error is returned so the eventbus adapter NAKs
 // for redelivery.
+//
+// Dedup runs first, per notification-service.md §5/§8: JetStream's
+// at-least-once delivery (plus SubscribeEphemeral giving every replica its
+// own independent consumer, docs/execution-plan.md Epic F) means the same
+// event ID can arrive here more than once, concurrently, across replicas.
+// ProcessedEventRepository.MarkProcessed atomically reserves the event ID —
+// a redelivery/race loser is a successful no-op, not an error, so it isn't
+// NAK'd back into another redelivery loop.
 func (uc *HandleIncomingEvent) Execute(ctx context.Context, in HandleIncomingEventInput) error {
+	alreadyProcessed, err := uc.processedEvents.MarkProcessed(ctx, in.EventID, in.Subject)
+	if err != nil {
+		return apperrors.New(apperrors.KindInternal, "NOTIFICATION_DEDUP_CHECK_FAILED", "failed to record event dedup state", err)
+	}
+	if alreadyProcessed {
+		uc.logger.DebugContext(ctx, "skipping already-processed event (JetStream redelivery)",
+			slog.String("subject", in.Subject), slog.String("event_id", in.EventID))
+		return nil
+	}
+
 	payload, err := domain.DecodePayload(in.Payload)
 	if err != nil {
 		return apperrors.New(apperrors.KindInvalidArgument, "NOTIFICATION_MALFORMED_PAYLOAD", "failed to decode event payload", err)

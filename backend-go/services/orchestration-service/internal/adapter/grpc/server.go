@@ -40,24 +40,33 @@ func New(
 
 func (s *Server) CreateDispatchContext(ctx context.Context, req *orchestrationv1.CreateDispatchContextRequest) (*orchestrationv1.CreateDispatchContextResponse, error) {
 	dc, err := s.createDispatchContext.Execute(ctx, usecase.CreateDispatchContextInput{
-		Handle:           req.GetHandle(),
-		CoordinatorRunID: req.GetCoordinatorRunId(),
+		Handle:              req.GetHandle(),
+		CoordinatorRunID:    req.GetCoordinatorRunId(),
+		OrchestrationTaskID: req.GetOrchestrationTaskId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &orchestrationv1.CreateDispatchContextResponse{
 		Context: &orchestrationv1.DispatchContext{
-			Id:               dc.ID,
-			Handle:           dc.Handle,
-			CoordinatorRunId: dc.CoordinatorRunID,
+			Id:                  dc.ID,
+			Handle:              dc.Handle,
+			CoordinatorRunId:    dc.CoordinatorRunID,
+			OrchestrationTaskId: dc.OrchestrationTaskID,
 		},
 	}, nil
 }
 
 func (s *Server) CreateGate(ctx context.Context, req *orchestrationv1.CreateGateRequest) (*orchestrationv1.CreateGateResponse, error) {
+	// req.GetOrchestrationTaskId() is intentionally not read: CreateGate
+	// derives the owning task from DispatchContextID itself via a locked
+	// read inside its transaction (see usecase/create_gate.go), a
+	// deliberate derive-not-trust boundary — see docs/execution-plan.md
+	// Epic C and CreateGateRequest's doc comment in the proto.
 	gate, err := s.createGate.Execute(ctx, usecase.CreateGateInput{
 		DispatchContextID: req.GetDispatchContextId(),
+		Question:          req.GetQuestion(),
+		Options:           req.GetOptions(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -67,6 +76,8 @@ func (s *Server) CreateGate(ctx context.Context, req *orchestrationv1.CreateGate
 			Id:                gate.ID,
 			DispatchContextId: gate.DispatchContextID,
 			Status:            string(gate.Status),
+			Question:          gate.Question,
+			Options:           gate.Options,
 		},
 	}, nil
 }
@@ -84,6 +95,8 @@ func (s *Server) ResolveGate(ctx context.Context, req *orchestrationv1.ResolveGa
 			Id:                out.Gate.ID,
 			DispatchContextId: out.Gate.DispatchContextID,
 			Status:            string(out.Gate.Status),
+			Question:          out.Gate.Question,
+			Options:           out.Gate.Options,
 		},
 	}, nil
 }

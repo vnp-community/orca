@@ -63,16 +63,18 @@ func (r *ServiceRegistry) Rules() []RoutingRule {
 // rule per downstream service's REST prefix, per specs/backend-go/services/api-gateway.md
 // §7's list of all 16 services this gateway has an edge to.
 //
-// usage-service is RouteWired — the one real end-to-end REST->gRPC
-// reverse-proxy path in this scaffold (internal/adapter/httpgateway). Every
-// other service is RouteStubbed and returns 501 until its gRPC contract
-// stabilizes, per this doc's own instructions not to fake proxying ahead of
-// that.
+// RouteWired means a real mountXRoutes function
+// (internal/adapter/httpgateway) proxies that prefix to the owning
+// service's gRPC API. Everything else stays RouteStubbed and returns 501,
+// per this doc's own instructions not to fake proxying ahead of a
+// service's contract being ready — see execution-plan.md Phase 5 for which
+// backends were confirmed mature enough to wire, and why the remainder
+// (scm-integration-service, workflow-service) are still stubbed.
 //
-// notification-service's REST prefix is also RouteStubbed — its only real
-// wiring in this scaffold is the WS<->gRPC-stream bridge at
-// /v1/notifications/stream (internal/adapter/wsbridge), a distinct route
-// mounted directly, not derived from this table.
+// notification-service's REST prefix covers Subscribe/GetVapidPublicKey
+// only — its StreamNotifications RPC is the separate WS<->gRPC-stream
+// bridge at /v1/notifications/stream (internal/adapter/wsbridge), a
+// distinct route mounted directly, not derived from this table.
 //
 // credential-broker-service has no direct rule: per §7, it's "reached only
 // indirectly via infra-fleet-service's credential path" — no client calls
@@ -81,19 +83,19 @@ func NewDefaultServiceRegistry() *ServiceRegistry {
 	return NewServiceRegistry([]RoutingRule{
 		{PathPrefix: "/v1/usage", ServiceName: "usage-service", ProtoPackage: "orca.usage.v1", Status: RouteWired},
 
-		{PathPrefix: "/v1/auth", ServiceName: "auth-service", ProtoPackage: "orca.auth.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/tenants", ServiceName: "tenant-service", ProtoPackage: "orca.tenant.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/projects", ServiceName: "project-service", ProtoPackage: "orca.project.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/infra", ServiceName: "infra-fleet-service", ProtoPackage: "orca.infrafleet.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/git", ServiceName: "git-gateway-service", ProtoPackage: "orca.gitgateway.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/scm", ServiceName: "scm-integration-service", ProtoPackage: "orca.scmintegration.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/issues", ServiceName: "issue-tracking-service", ProtoPackage: "orca.issuetracking.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/ai-providers", ServiceName: "ai-provider-service", ProtoPackage: "orca.aiprovider.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/workflows", ServiceName: "workflow-service", ProtoPackage: "orca.workflow.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/tasks", ServiceName: "task-service", ProtoPackage: "orca.task.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/orchestration", ServiceName: "orchestration-service", ProtoPackage: "orca.orchestration.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/automations", ServiceName: "automation-service", ProtoPackage: "orca.automation.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/annotations", ServiceName: "annotation-service", ProtoPackage: "orca.annotation.v1", Status: RouteStubbed},
-		{PathPrefix: "/v1/notifications", ServiceName: "notification-service", ProtoPackage: "orca.notification.v1", Status: RouteStubbed},
+		{PathPrefix: "/v1/auth", ServiceName: "auth-service", ProtoPackage: "orca.auth.v1", Status: RouteWired},
+		{PathPrefix: "/v1/tenants", ServiceName: "tenant-service", ProtoPackage: "orca.tenant.v1", Status: RouteWired},
+		{PathPrefix: "/v1/projects", ServiceName: "project-service", ProtoPackage: "orca.project.v1", Status: RouteWired},
+		{PathPrefix: "/v1/infra", ServiceName: "infra-fleet-service", ProtoPackage: "orca.infrafleet.v1", Status: RouteWired},
+		{PathPrefix: "/v1/git", ServiceName: "git-gateway-service", ProtoPackage: "orca.gitgateway.v1", Status: RouteWired},
+		{PathPrefix: "/v1/scm", ServiceName: "scm-integration-service", ProtoPackage: "orca.scmintegration.v1", Status: RouteWired},
+		{PathPrefix: "/v1/issues", ServiceName: "issue-tracking-service", ProtoPackage: "orca.issuetracking.v1", Status: RouteWired},
+		{PathPrefix: "/v1/ai-providers", ServiceName: "ai-provider-service", ProtoPackage: "orca.aiprovider.v1", Status: RouteWired},
+		{PathPrefix: "/v1/workflows", ServiceName: "workflow-service", ProtoPackage: "orca.workflow.v1", Status: RouteWired},
+		{PathPrefix: "/v1/tasks", ServiceName: "task-service", ProtoPackage: "orca.task.v1", Status: RouteWired},
+		{PathPrefix: "/v1/orchestration", ServiceName: "orchestration-service", ProtoPackage: "orca.orchestration.v1", Status: RouteWired},
+		{PathPrefix: "/v1/automations", ServiceName: "automation-service", ProtoPackage: "orca.automation.v1", Status: RouteWired},
+		{PathPrefix: "/v1/annotations", ServiceName: "annotation-service", ProtoPackage: "orca.annotation.v1", Status: RouteWired},
+		{PathPrefix: "/v1/notifications", ServiceName: "notification-service", ProtoPackage: "orca.notification.v1", Status: RouteWired},
 	})
 }

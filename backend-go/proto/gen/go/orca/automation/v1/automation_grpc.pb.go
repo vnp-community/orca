@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AutomationService_CreateAutomation_FullMethodName = "/orca.automation.v1.AutomationService/CreateAutomation"
-	AutomationService_RunNow_FullMethodName           = "/orca.automation.v1.AutomationService/RunNow"
-	AutomationService_ListRuns_FullMethodName         = "/orca.automation.v1.AutomationService/ListRuns"
+	AutomationService_CreateAutomation_FullMethodName      = "/orca.automation.v1.AutomationService/CreateAutomation"
+	AutomationService_RunNow_FullMethodName                = "/orca.automation.v1.AutomationService/RunNow"
+	AutomationService_ListRuns_FullMethodName              = "/orca.automation.v1.AutomationService/ListRuns"
+	AutomationService_HandleExternalTrigger_FullMethodName = "/orca.automation.v1.AutomationService/HandleExternalTrigger"
 )
 
 // AutomationServiceClient is the client API for AutomationService service.
@@ -36,6 +37,12 @@ type AutomationServiceClient interface {
 	CreateAutomation(ctx context.Context, in *CreateAutomationRequest, opts ...grpc.CallOption) (*CreateAutomationResponse, error)
 	RunNow(ctx context.Context, in *RunNowRequest, opts ...grpc.CallOption) (*RunNowResponse, error)
 	ListRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*ListRunsResponse, error)
+	// HandleExternalTrigger maps an external trigger source's payload onto the
+	// same run interactor RunNow uses (trigger=external instead of manual) —
+	// see design doc's TS external-automations-handler.ts note. request_id is
+	// the external source's own idempotency key, reused as-is for
+	// automation_runs' (tenant_id, request_id) unique index.
+	HandleExternalTrigger(ctx context.Context, in *HandleExternalTriggerRequest, opts ...grpc.CallOption) (*HandleExternalTriggerResponse, error)
 }
 
 type automationServiceClient struct {
@@ -76,6 +83,16 @@ func (c *automationServiceClient) ListRuns(ctx context.Context, in *ListRunsRequ
 	return out, nil
 }
 
+func (c *automationServiceClient) HandleExternalTrigger(ctx context.Context, in *HandleExternalTriggerRequest, opts ...grpc.CallOption) (*HandleExternalTriggerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HandleExternalTriggerResponse)
+	err := c.cc.Invoke(ctx, AutomationService_HandleExternalTrigger_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AutomationServiceServer is the server API for AutomationService service.
 // All implementations must embed UnimplementedAutomationServiceServer
 // for forward compatibility.
@@ -88,6 +105,12 @@ type AutomationServiceServer interface {
 	CreateAutomation(context.Context, *CreateAutomationRequest) (*CreateAutomationResponse, error)
 	RunNow(context.Context, *RunNowRequest) (*RunNowResponse, error)
 	ListRuns(context.Context, *ListRunsRequest) (*ListRunsResponse, error)
+	// HandleExternalTrigger maps an external trigger source's payload onto the
+	// same run interactor RunNow uses (trigger=external instead of manual) —
+	// see design doc's TS external-automations-handler.ts note. request_id is
+	// the external source's own idempotency key, reused as-is for
+	// automation_runs' (tenant_id, request_id) unique index.
+	HandleExternalTrigger(context.Context, *HandleExternalTriggerRequest) (*HandleExternalTriggerResponse, error)
 	mustEmbedUnimplementedAutomationServiceServer()
 }
 
@@ -106,6 +129,9 @@ func (UnimplementedAutomationServiceServer) RunNow(context.Context, *RunNowReque
 }
 func (UnimplementedAutomationServiceServer) ListRuns(context.Context, *ListRunsRequest) (*ListRunsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListRuns not implemented")
+}
+func (UnimplementedAutomationServiceServer) HandleExternalTrigger(context.Context, *HandleExternalTriggerRequest) (*HandleExternalTriggerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method HandleExternalTrigger not implemented")
 }
 func (UnimplementedAutomationServiceServer) mustEmbedUnimplementedAutomationServiceServer() {}
 func (UnimplementedAutomationServiceServer) testEmbeddedByValue()                           {}
@@ -182,6 +208,24 @@ func _AutomationService_ListRuns_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AutomationService_HandleExternalTrigger_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HandleExternalTriggerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AutomationServiceServer).HandleExternalTrigger(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AutomationService_HandleExternalTrigger_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AutomationServiceServer).HandleExternalTrigger(ctx, req.(*HandleExternalTriggerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AutomationService_ServiceDesc is the grpc.ServiceDesc for AutomationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -200,6 +244,10 @@ var AutomationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListRuns",
 			Handler:    _AutomationService_ListRuns_Handler,
+		},
+		{
+			MethodName: "HandleExternalTrigger",
+			Handler:    _AutomationService_HandleExternalTrigger_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

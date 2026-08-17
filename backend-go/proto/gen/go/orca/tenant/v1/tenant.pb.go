@@ -602,6 +602,7 @@ type Team struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	CompanyId     string                 `protobuf:"bytes,2,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	SettingsJson  string                 `protobuf:"bytes,4,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"` // team-layer profile override, see ResolveProfile
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -657,10 +658,18 @@ func (x *Team) GetName() string {
 	return ""
 }
 
+func (x *Team) GetSettingsJson() string {
+	if x != nil {
+		return x.SettingsJson
+	}
+	return ""
+}
+
 type CreateTeamRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CompanyId     string                 `protobuf:"bytes,1,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	SettingsJson  string                 `protobuf:"bytes,3,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"` // optional; empty/unset means no team-layer override
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -705,6 +714,13 @@ func (x *CreateTeamRequest) GetCompanyId() string {
 func (x *CreateTeamRequest) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateTeamRequest) GetSettingsJson() string {
+	if x != nil {
+		return x.SettingsJson
 	}
 	return ""
 }
@@ -1028,16 +1044,18 @@ const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\x19GetResolvedProfileRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"R\n" +
 	"\x1aGetResolvedProfileResponse\x124\n" +
-	"\x16resolved_settings_json\x18\x01 \x01(\tR\x14resolvedSettingsJson\"I\n" +
+	"\x16resolved_settings_json\x18\x01 \x01(\tR\x14resolvedSettingsJson\"n\n" +
 	"\x04Team\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
 	"company_id\x18\x02 \x01(\tR\tcompanyId\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"F\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12#\n" +
+	"\rsettings_json\x18\x04 \x01(\tR\fsettingsJson\"k\n" +
 	"\x11CreateTeamRequest\x12\x1d\n" +
 	"\n" +
 	"company_id\x18\x01 \x01(\tR\tcompanyId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\">\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12#\n" +
+	"\rsettings_json\x18\x03 \x01(\tR\fsettingsJson\">\n" +
 	"\x12CreateTeamResponse\x12(\n" +
 	"\x04team\x18\x01 \x01(\v2\x14.orca.tenant.v1.TeamR\x04team\"d\n" +
 	"\x14AddTeamMemberRequest\x12\x17\n" +

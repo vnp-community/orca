@@ -16,24 +16,18 @@ import (
 // database — see specs/backend-go/architecture/05-data-architecture.md's
 // database-per-service rule.
 type Repository interface {
-	// SaveSession persists a session and atomically updates its day's
-	// rollup in the same transaction (on-write aggregation, see
-	// usage-service.md §6). Idempotent on RequestID: calling twice with the
-	// same RequestID must not double-count.
-	SaveSession(ctx context.Context, session domain.UsageSession) error
+	// SaveSession persists a session, atomically updates its day's rollup,
+	// and durably enqueues event in the SAME transaction (Epic G's
+	// transactional-outbox pattern, docs/execution-plan.md — this replaced
+	// the previous best-effort direct-publish-after-commit call, which
+	// could silently drop the event on a crash between commit and publish).
+	// Idempotent on RequestID: calling twice with the same RequestID must
+	// not double-count and must not enqueue a duplicate event either.
+	SaveSession(ctx context.Context, session domain.UsageSession, event domain.OutboxEvent) error
 	GetDailyRollup(ctx context.Context, tenantID, userID string, provider domain.Provider, day time.Time) (domain.DailyUsageRollup, error)
 	ListSessions(ctx context.Context, tenantID, userID string, pageToken string, pageSize int32) ([]domain.UsageSession, string, error)
 	// RecomputeDailyRollup rebuilds a day's rollup from its sessions —
 	// the periodic reconciliation safety net mentioned in usage-service.md,
 	// not called on the hot write path.
 	RecomputeDailyRollup(ctx context.Context, tenantID, userID string, provider domain.Provider, day time.Time) error
-}
-
-// EventPublisher is the outbound event port — usage-service publishes
-// usage.session.recorded events for anything that wants to react (e.g. a
-// future billing/alerting consumer); not required by any other service in
-// this system today, included to keep the pattern consistent across
-// services per architecture/08-inter-service-communication.md.
-type EventPublisher interface {
-	PublishSessionRecorded(ctx context.Context, tenantID string, session domain.UsageSession) error
 }

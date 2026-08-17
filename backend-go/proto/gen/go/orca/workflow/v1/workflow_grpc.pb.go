@@ -19,12 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WorkflowService_CreateTemplate_FullMethodName   = "/orca.workflow.v1.WorkflowService/CreateTemplate"
-	WorkflowService_Execute_FullMethodName          = "/orca.workflow.v1.WorkflowService/Execute"
-	WorkflowService_GetExecution_FullMethodName     = "/orca.workflow.v1.WorkflowService/GetExecution"
-	WorkflowService_PauseExecution_FullMethodName   = "/orca.workflow.v1.WorkflowService/PauseExecution"
-	WorkflowService_ResumeExecution_FullMethodName  = "/orca.workflow.v1.WorkflowService/ResumeExecution"
-	WorkflowService_ExecuteAdHocStep_FullMethodName = "/orca.workflow.v1.WorkflowService/ExecuteAdHocStep"
+	WorkflowService_CreateTemplate_FullMethodName      = "/orca.workflow.v1.WorkflowService/CreateTemplate"
+	WorkflowService_Execute_FullMethodName             = "/orca.workflow.v1.WorkflowService/Execute"
+	WorkflowService_GetExecution_FullMethodName        = "/orca.workflow.v1.WorkflowService/GetExecution"
+	WorkflowService_PauseExecution_FullMethodName      = "/orca.workflow.v1.WorkflowService/PauseExecution"
+	WorkflowService_ResumeExecution_FullMethodName     = "/orca.workflow.v1.WorkflowService/ResumeExecution"
+	WorkflowService_ExecuteAdHocStep_FullMethodName    = "/orca.workflow.v1.WorkflowService/ExecuteAdHocStep"
+	WorkflowService_CancelExecution_FullMethodName     = "/orca.workflow.v1.WorkflowService/CancelExecution"
+	WorkflowService_ListTemplates_FullMethodName       = "/orca.workflow.v1.WorkflowService/ListTemplates"
+	WorkflowService_ResolveTemplate_FullMethodName     = "/orca.workflow.v1.WorkflowService/ResolveTemplate"
+	WorkflowService_HasActiveExecutions_FullMethodName = "/orca.workflow.v1.WorkflowService/HasActiveExecutions"
 )
 
 // WorkflowServiceClient is the client API for WorkflowService service.
@@ -42,6 +46,27 @@ type WorkflowServiceClient interface {
 	PauseExecution(ctx context.Context, in *PauseExecutionRequest, opts ...grpc.CallOption) (*PauseExecutionResponse, error)
 	ResumeExecution(ctx context.Context, in *ResumeExecutionRequest, opts ...grpc.CallOption) (*ResumeExecutionResponse, error)
 	ExecuteAdHocStep(ctx context.Context, in *ExecuteAdHocStepRequest, opts ...grpc.CallOption) (*ExecuteAdHocStepResponse, error)
+	// CancelExecution transitions a pending/running/paused execution to
+	// cancelled — a terminal state, distinct from Pause (which is resumable).
+	// Added 2026-08-17, closing the last item of Epic C
+	// (backend-go/docs/execution-plan.md §2/§10) that was left deferred.
+	CancelExecution(ctx context.Context, in *CancelExecutionRequest, opts ...grpc.CallOption) (*CancelExecutionResponse, error)
+	// ListTemplates lists this tenant's templates, optionally filtered by
+	// scope, keyset-paginated (matches annotation-service's ListAnnotations
+	// convention: opaque page_token = last-seen id).
+	ListTemplates(ctx context.Context, in *ListTemplatesRequest, opts ...grpc.CallOption) (*ListTemplatesResponse, error)
+	// ResolveTemplate walks a template's parent_template_id chain
+	// (company -> team -> personal, depth<=5, workflow-service.md §6) and
+	// returns the effective, inheritance-resolved template. See
+	// ResolveTemplateResponse's doc comment for this scaffold's inheritance
+	// policy.
+	ResolveTemplate(ctx context.Context, in *ResolveTemplateRequest, opts ...grpc.CallOption) (*ResolveTemplateResponse, error)
+	// HasActiveExecutions answers "does this project have a non-terminal
+	// (pending/running/paused) workflow execution" — added for Epic C
+	// (backend-go/docs/execution-plan.md §10) to close
+	// project-service.RebindDevServer's guard, previously a client-side
+	// no-op because this RPC didn't exist.
+	HasActiveExecutions(ctx context.Context, in *HasActiveExecutionsRequest, opts ...grpc.CallOption) (*HasActiveExecutionsResponse, error)
 }
 
 type workflowServiceClient struct {
@@ -112,6 +137,46 @@ func (c *workflowServiceClient) ExecuteAdHocStep(ctx context.Context, in *Execut
 	return out, nil
 }
 
+func (c *workflowServiceClient) CancelExecution(ctx context.Context, in *CancelExecutionRequest, opts ...grpc.CallOption) (*CancelExecutionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelExecutionResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_CancelExecution_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) ListTemplates(ctx context.Context, in *ListTemplatesRequest, opts ...grpc.CallOption) (*ListTemplatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTemplatesResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ListTemplates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) ResolveTemplate(ctx context.Context, in *ResolveTemplateRequest, opts ...grpc.CallOption) (*ResolveTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveTemplateResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ResolveTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) HasActiveExecutions(ctx context.Context, in *HasActiveExecutionsRequest, opts ...grpc.CallOption) (*HasActiveExecutionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HasActiveExecutionsResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_HasActiveExecutions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkflowServiceServer is the server API for WorkflowService service.
 // All implementations must embed UnimplementedWorkflowServiceServer
 // for forward compatibility.
@@ -127,6 +192,27 @@ type WorkflowServiceServer interface {
 	PauseExecution(context.Context, *PauseExecutionRequest) (*PauseExecutionResponse, error)
 	ResumeExecution(context.Context, *ResumeExecutionRequest) (*ResumeExecutionResponse, error)
 	ExecuteAdHocStep(context.Context, *ExecuteAdHocStepRequest) (*ExecuteAdHocStepResponse, error)
+	// CancelExecution transitions a pending/running/paused execution to
+	// cancelled — a terminal state, distinct from Pause (which is resumable).
+	// Added 2026-08-17, closing the last item of Epic C
+	// (backend-go/docs/execution-plan.md §2/§10) that was left deferred.
+	CancelExecution(context.Context, *CancelExecutionRequest) (*CancelExecutionResponse, error)
+	// ListTemplates lists this tenant's templates, optionally filtered by
+	// scope, keyset-paginated (matches annotation-service's ListAnnotations
+	// convention: opaque page_token = last-seen id).
+	ListTemplates(context.Context, *ListTemplatesRequest) (*ListTemplatesResponse, error)
+	// ResolveTemplate walks a template's parent_template_id chain
+	// (company -> team -> personal, depth<=5, workflow-service.md §6) and
+	// returns the effective, inheritance-resolved template. See
+	// ResolveTemplateResponse's doc comment for this scaffold's inheritance
+	// policy.
+	ResolveTemplate(context.Context, *ResolveTemplateRequest) (*ResolveTemplateResponse, error)
+	// HasActiveExecutions answers "does this project have a non-terminal
+	// (pending/running/paused) workflow execution" — added for Epic C
+	// (backend-go/docs/execution-plan.md §10) to close
+	// project-service.RebindDevServer's guard, previously a client-side
+	// no-op because this RPC didn't exist.
+	HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error)
 	mustEmbedUnimplementedWorkflowServiceServer()
 }
 
@@ -154,6 +240,18 @@ func (UnimplementedWorkflowServiceServer) ResumeExecution(context.Context, *Resu
 }
 func (UnimplementedWorkflowServiceServer) ExecuteAdHocStep(context.Context, *ExecuteAdHocStepRequest) (*ExecuteAdHocStepResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExecuteAdHocStep not implemented")
+}
+func (UnimplementedWorkflowServiceServer) CancelExecution(context.Context, *CancelExecutionRequest) (*CancelExecutionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelExecution not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ListTemplates(context.Context, *ListTemplatesRequest) (*ListTemplatesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTemplates not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ResolveTemplate(context.Context, *ResolveTemplateRequest) (*ResolveTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveTemplate not implemented")
+}
+func (UnimplementedWorkflowServiceServer) HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method HasActiveExecutions not implemented")
 }
 func (UnimplementedWorkflowServiceServer) mustEmbedUnimplementedWorkflowServiceServer() {}
 func (UnimplementedWorkflowServiceServer) testEmbeddedByValue()                         {}
@@ -284,6 +382,78 @@ func _WorkflowService_ExecuteAdHocStep_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkflowService_CancelExecution_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelExecutionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).CancelExecution(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_CancelExecution_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).CancelExecution(ctx, req.(*CancelExecutionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_ListTemplates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTemplatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ListTemplates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ListTemplates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ListTemplates(ctx, req.(*ListTemplatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_ResolveTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ResolveTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ResolveTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ResolveTemplate(ctx, req.(*ResolveTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_HasActiveExecutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HasActiveExecutionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).HasActiveExecutions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_HasActiveExecutions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).HasActiveExecutions(ctx, req.(*HasActiveExecutionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkflowService_ServiceDesc is the grpc.ServiceDesc for WorkflowService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -314,6 +484,22 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExecuteAdHocStep",
 			Handler:    _WorkflowService_ExecuteAdHocStep_Handler,
+		},
+		{
+			MethodName: "CancelExecution",
+			Handler:    _WorkflowService_CancelExecution_Handler,
+		},
+		{
+			MethodName: "ListTemplates",
+			Handler:    _WorkflowService_ListTemplates_Handler,
+		},
+		{
+			MethodName: "ResolveTemplate",
+			Handler:    _WorkflowService_ResolveTemplate_Handler,
+		},
+		{
+			MethodName: "HasActiveExecutions",
+			Handler:    _WorkflowService_HasActiveExecutions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

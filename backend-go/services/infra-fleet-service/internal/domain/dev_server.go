@@ -37,26 +37,34 @@ var (
 	// ErrInvalidConnectionMode is returned when mode isn't one of the known
 	// transport modes.
 	ErrInvalidConnectionMode = errors.New("domain: invalid connection mode")
+	// ErrMissingSSHTargetForRelaySSH is returned when mode is
+	// ConnectionModeRelaySSH but SSHTargetID is empty — relay-ssh's
+	// cert-based SSH auth (sshconn.Connector) has no target to dial without
+	// it, see specs/backend-go/services/infra-fleet-service.md §9.
+	ErrMissingSSHTargetForRelaySSH = errors.New("domain: ssh_target_id is required when mode is relay-ssh")
 )
 
 // DevServer is a registered dev host: which tenant owns it, how to reach it
-// (host), and which transport mode this service uses to talk to it. See
+// (host), and which transport mode this service uses to talk to it.
+// SSHTargetID links to the SshTarget sshconn.Connector dials for cert-based
+// SSH auth — required for relay-ssh mode, empty for the other two modes. See
 // specs/backend-go/services/infra-fleet-service.md §4 — this scaffold's
 // DevServer is the proto-sized subset of the design doc's fuller entity
-// (display name, bootstrap status, agent version, associated SshTarget are
-// not modeled here; see this service's README "Known gaps").
+// (display name, bootstrap status, agent version are not modeled here; see
+// this service's README "Known gaps").
 type DevServer struct {
-	ID       string
-	TenantID string
-	Host     string
-	Mode     ConnectionMode
+	ID          string
+	TenantID    string
+	Host        string
+	Mode        ConnectionMode
+	SSHTargetID string
 }
 
 // NewDevServer constructs a DevServer, enforcing the invariants a record
 // must satisfy to be meaningful — this is where "infra-fleet-service owns
 // this data's correctness" actually lives, not scattered validation in the
 // gRPC handler.
-func NewDevServer(id, tenantID, host string, mode ConnectionMode) (DevServer, error) {
+func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID string) (DevServer, error) {
 	if tenantID == "" {
 		return DevServer{}, ErrEmptyDevServerTenant
 	}
@@ -66,7 +74,10 @@ func NewDevServer(id, tenantID, host string, mode ConnectionMode) (DevServer, er
 	if !mode.Valid() {
 		return DevServer{}, ErrInvalidConnectionMode
 	}
-	return DevServer{ID: id, TenantID: tenantID, Host: host, Mode: mode}, nil
+	if mode == ConnectionModeRelaySSH && sshTargetID == "" {
+		return DevServer{}, ErrMissingSSHTargetForRelaySSH
+	}
+	return DevServer{ID: id, TenantID: tenantID, Host: host, Mode: mode, SSHTargetID: sshTargetID}, nil
 }
 
 // IsZero reports whether ds is the zero-value DevServer — used by

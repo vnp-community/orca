@@ -1,11 +1,11 @@
 package usecase
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
+
+	"github.com/stablyai/orca-go/common/jwtauth"
 )
 
 // Identity is the tenant/user identity resolved from a validated
@@ -22,11 +22,19 @@ var (
 	// session cookie was present.
 	ErrNoCredential = errors.New("authvalidator: no bearer token or session cookie present")
 	// ErrMalformedToken means a credential was present but isn't
-	// structurally a JWT (three dot-separated, base64url segments).
+	// structurally a JWT (three dot-separated, base64url segments) or its
+	// "kid" header couldn't be read.
 	ErrMalformedToken = errors.New("authvalidator: malformed JWT")
-	// ErrMissingIdentityClaims means the JWT parsed but lacked the claims
+	// ErrMissingIdentityClaims means the JWT verified but lacked the claims
 	// needed to resolve an Identity.
 	ErrMissingIdentityClaims = errors.New("authvalidator: token missing tenant_id/sub claims")
+	// ErrKeyLookupFailed means the token's "kid" didn't resolve to a known
+	// auth-service signing key (unknown kid, or the JWKS fetch itself
+	// failed with nothing usable cached — see authclient.JWKSClient).
+	ErrKeyLookupFailed = errors.New("authvalidator: could not resolve signing key for token")
+	// ErrSignatureVerificationFailed means a signing key was found but the
+	// token's signature (or its exp/iat/iss) didn't validate against it.
+	ErrSignatureVerificationFailed = errors.New("authvalidator: signature verification failed")
 )
 
 // SessionCookieName is the HTTP-only browser session cookie, SameSite=strict
@@ -35,34 +43,30 @@ var (
 const SessionCookieName = "orca_session"
 
 // AuthValidator resolves the caller's tenant/user Identity from an inbound
-// HTTP request.
-//
-// # PLACEHOLDER — NOT PRODUCTION SAFE
-//
-// This extracts claims from a JWT's payload segment WITHOUT verifying its
-// signature, and treats the session cookie's value as if it were a JWT too.
-// Per api-gateway.md §9, production must instead:
-//  1. Validate short-lived RS256 JWTs (mobile/CLI) against auth-service's
-//     JWKS — fetch the key for the token's "kid" via a real JWKSClient
-//     (ports.go, currently unimplemented) and verify the signature before
-//     trusting any claim.
-//  2. Resolve the browser session cookie against auth-service's session
-//     store (an opaque session ID, not a bearer JWT, in the real design) —
-//     not parsed as a JWT the way this placeholder does for simplicity.
-//
-// Today, any caller can forge a tenant_id/sub claim and be trusted. This is
-// acceptable only because this is a scaffold with nothing production-real
-// reachable through it; wire real JWKS/session-store verification before
-// this service ever sees real traffic. See README.md "Known gaps".
-type AuthValidator struct{}
+// HTTP request by verifying a short-lived RS256 JWT (mobile/CLI bearer
+// token, or a JWT-shaped session-cookie value) against auth-service's JWKS
+// — real RS256 signature verification via common/jwtauth, not the
+// unverified claim extraction this replaced (Epic D). The browser's real
+// orca_session cookie is a raw opaque token, never a JWT — resolving that
+// is authclient.SessionValidator's job (a real ValidateSession RPC), which
+// authMiddleware/wsbridge.Handler both try FIRST; this validator is the
+// fallback for callers that actually present a bearer JWT.
+type AuthValidator struct {
+	jwks JWKSClient
+}
 
-// NewAuthValidator returns a placeholder AuthValidator. See the type doc
-// for what real verification still needs to be wired.
-func NewAuthValidator() *AuthValidator { return &AuthValidator{} }
+// NewAuthValidator returns an AuthValidator that verifies bearer/cookie
+// JWTs against jwks (see internal/adapter/authclient.JWKSClient for the
+// real implementation).
+func NewAuthValidator(jwks JWKSClient) *AuthValidator {
+	return &AuthValidator{jwks: jwks}
+}
 
 // Validate extracts a bearer token from the Authorization header, falling
-// back to the session cookie, and parses it as an unverified JWT to recover
-// tenant_id/sub claims.
+// back to the session cookie, then verifies it as a real RS256 JWT against
+// auth-service's JWKS: resolve "kid" -> fetch the matching public key ->
+// verify signature + exp/iat/iss -> require tenant_id/sub. Fails closed at
+// every step — no partial-trust path.
 func (v *AuthValidator) Validate(r *http.Request) (Identity, error) {
 	token := bearerToken(r)
 	if token == "" {
@@ -72,20 +76,25 @@ func (v *AuthValidator) Validate(r *http.Request) (Identity, error) {
 		return Identity{}, ErrNoCredential
 	}
 
-	claims, err := unverifiedJWTClaims(token)
+	kid, err := jwtauth.KeyID(token)
 	if err != nil {
-		return Identity{}, err
+		return Identity{}, ErrMalformedToken
 	}
 
-	tenantID, _ := claims["tenant_id"].(string)
-	userID, _ := claims["sub"].(string)
-	if userID == "" {
-		userID, _ = claims["user_id"].(string)
+	key, err := v.jwks.PublicKey(r.Context(), kid)
+	if err != nil {
+		return Identity{}, ErrKeyLookupFailed
 	}
-	if tenantID == "" || userID == "" {
+
+	claims, err := jwtauth.VerifyWithKey(key, token)
+	if err != nil {
+		return Identity{}, ErrSignatureVerificationFailed
+	}
+
+	if claims.TenantID == "" || claims.Subject == "" {
 		return Identity{}, ErrMissingIdentityClaims
 	}
-	return Identity{TenantID: tenantID, UserID: userID}, nil
+	return Identity{TenantID: claims.TenantID, UserID: claims.Subject}, nil
 }
 
 func bearerToken(r *http.Request) string {
@@ -103,26 +112,4 @@ func cookieToken(r *http.Request) string {
 		return ""
 	}
 	return c.Value
-}
-
-// unverifiedJWTClaims splits a JWT into its three dot-separated segments
-// and base64url-decodes + JSON-decodes the payload (second) segment — no
-// signature check performed. A real implementation must verify the
-// header's "alg" against an allow-list and the signature against
-// auth-service's JWKS before trusting any claim (see the AuthValidator doc
-// comment above).
-func unverifiedJWTClaims(token string) (map[string]any, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return nil, ErrMalformedToken
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return nil, ErrMalformedToken
-	}
-	var claims map[string]any
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return nil, ErrMalformedToken
-	}
-	return claims, nil
 }

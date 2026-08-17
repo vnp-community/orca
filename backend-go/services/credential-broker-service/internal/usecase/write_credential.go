@@ -41,16 +41,18 @@ type WriteCredentialInput struct {
 // WriteCredential is credential-broker-service's create path: Transit-
 // encrypt the incoming envelope, persist the resulting ciphertext under a
 // new Vault KV v2 path, and only THEN create the metadata + audit rows —
-// see the doc comment above and credential-broker-service.md §10.
+// see the doc comment above and credential-broker-service.md §10. The
+// metadata row and its audit row are created together inside one
+// TxRunner.RunInTx call, per credential-broker-service.md §8 — see
+// TxRunner's doc comment.
 type WriteCredential struct {
-	metadataRepo CredentialMetadataRepository
-	auditRepo    AuditRepository
-	store        SecretStore
-	now          func() time.Time
+	store    SecretStore
+	txRunner TxRunner
+	now      func() time.Time
 }
 
-func NewWriteCredential(metadataRepo CredentialMetadataRepository, auditRepo AuditRepository, store SecretStore) *WriteCredential {
-	return &WriteCredential{metadataRepo: metadataRepo, auditRepo: auditRepo, store: store, now: time.Now}
+func NewWriteCredential(store SecretStore, txRunner TxRunner) *WriteCredential {
+	return &WriteCredential{store: store, txRunner: txRunner, now: time.Now}
 }
 
 func (uc *WriteCredential) Execute(ctx context.Context, in WriteCredentialInput) (domain.CredentialMetadata, error) {
@@ -82,11 +84,14 @@ func (uc *WriteCredential) Execute(ctx context.Context, in WriteCredentialInput)
 	if err != nil {
 		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInvalidArgument, "CREDENTIAL_INVALID_METADATA", err.Error(), err)
 	}
-	if err := uc.metadataRepo.Create(ctx, metadata); err != nil {
-		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInternal, "CREDENTIAL_SAVE_FAILED", "failed to persist credential metadata", err)
-	}
-
-	if err := appendAudit(ctx, uc.auditRepo, metadata.ID, in.RequestingService, domain.ActionWrite, now); err != nil {
+	// Metadata create + audit append happen in one Postgres transaction —
+	// either both land or neither does, per credential-broker-service.md §8.
+	if err := uc.txRunner.RunInTx(ctx, func(ctx context.Context, metadataRepo CredentialMetadataRepository, auditRepo AuditRepository) error {
+		if err := metadataRepo.Create(ctx, metadata); err != nil {
+			return apperrors.New(apperrors.KindInternal, "CREDENTIAL_SAVE_FAILED", "failed to persist credential metadata", err)
+		}
+		return appendAudit(ctx, auditRepo, metadata.ID, in.RequestingService, domain.ActionWrite, now)
+	}); err != nil {
 		return domain.CredentialMetadata{}, err
 	}
 

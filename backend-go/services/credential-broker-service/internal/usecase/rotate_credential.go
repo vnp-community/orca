@@ -21,16 +21,20 @@ type RotateCredentialInput struct {
 
 // RotateCredential re-encrypts new material under the SAME Vault path an
 // existing credential already points at, then flips its status back to
-// active.
+// active. The status update and its audit row are written together inside
+// one TxRunner.RunInTx call, per credential-broker-service.md §8 — see
+// TxRunner's doc comment. The initial metadataRepo.Get lookup runs outside
+// that transaction: it's a read used only to validate the request, not part
+// of the mutation that needs atomicity with the audit row.
 type RotateCredential struct {
 	metadataRepo CredentialMetadataRepository
-	auditRepo    AuditRepository
 	store        SecretStore
+	txRunner     TxRunner
 	now          func() time.Time
 }
 
-func NewRotateCredential(metadataRepo CredentialMetadataRepository, auditRepo AuditRepository, store SecretStore) *RotateCredential {
-	return &RotateCredential{metadataRepo: metadataRepo, auditRepo: auditRepo, store: store, now: time.Now}
+func NewRotateCredential(metadataRepo CredentialMetadataRepository, store SecretStore, txRunner TxRunner) *RotateCredential {
+	return &RotateCredential{metadataRepo: metadataRepo, store: store, txRunner: txRunner, now: time.Now}
 }
 
 func (uc *RotateCredential) Execute(ctx context.Context, in RotateCredentialInput) (domain.CredentialMetadata, error) {
@@ -58,14 +62,15 @@ func (uc *RotateCredential) Execute(ctx context.Context, in RotateCredentialInpu
 	}
 
 	now := uc.now()
-	if err := uc.metadataRepo.UpdateStatus(ctx, metadata.ID, domain.StatusActive, now); err != nil {
-		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInternal, "CREDENTIAL_UPDATE_FAILED", "failed to update credential status after rotation", err)
-	}
-	metadata = metadata.WithStatus(domain.StatusActive, now)
-
-	if err := appendAudit(ctx, uc.auditRepo, metadata.ID, in.RequestingService, domain.ActionRotate, now); err != nil {
+	if err := uc.txRunner.RunInTx(ctx, func(ctx context.Context, metadataRepo CredentialMetadataRepository, auditRepo AuditRepository) error {
+		if err := metadataRepo.UpdateStatus(ctx, metadata.ID, domain.StatusActive, now); err != nil {
+			return apperrors.New(apperrors.KindInternal, "CREDENTIAL_UPDATE_FAILED", "failed to update credential status after rotation", err)
+		}
+		return appendAudit(ctx, auditRepo, metadata.ID, in.RequestingService, domain.ActionRotate, now)
+	}); err != nil {
 		return domain.CredentialMetadata{}, err
 	}
+	metadata = metadata.WithStatus(domain.StatusActive, now)
 
 	return metadata, nil
 }

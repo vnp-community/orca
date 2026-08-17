@@ -20,3 +20,17 @@ func marshalSettings(s domain.Settings) (string, error) {
 	}
 	return string(b), nil
 }
+
+// unmarshalSettings is this boundary's inbound counterpart to
+// marshalSettings — used where a request carries a caller-supplied
+// settings_json (currently only CreateTeamRequest).
+func unmarshalSettings(raw string) (domain.Settings, error) {
+	if raw == "" {
+		return domain.Settings{}, nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nil, err
+	}
+	return domain.Settings(m), nil
+}

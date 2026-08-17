@@ -124,3 +124,22 @@ func (r *Repository) GetPublicKey(ctx context.Context, tenantID string) (domain.
 	}
 	return key, nil
 }
+
+// MarkProcessed atomically reserves eventID for JetStream consumer-side
+// dedup (notification-service.md §5/§8) via a single
+// INSERT ... ON CONFLICT DO NOTHING — not a racy check-then-insert, so
+// concurrent replicas racing the same redelivered message (each with its
+// own independent SubscribeEphemeral consumer) agree on exactly one
+// winner. RowsAffected() == 0 means a row for eventID already existed, i.e.
+// this call lost the race / saw a redelivery.
+func (r *Repository) MarkProcessed(ctx context.Context, eventID, subject string) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		INSERT INTO notification.processed_events (event_id, subject)
+		VALUES ($1, $2)
+		ON CONFLICT (event_id) DO NOTHING
+	`, eventID, subject)
+	if err != nil {
+		return false, fmt.Errorf("postgres: mark event processed: %w", err)
+	}
+	return tag.RowsAffected() == 0, nil
+}

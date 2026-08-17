@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,11 +24,12 @@ import (
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/usage-service/internal/config"
 
-	usageeventbus "github.com/stablyai/orca-go/services/usage-service/internal/adapter/eventbus"
 	usagegrpc "github.com/stablyai/orca-go/services/usage-service/internal/adapter/grpc"
 	usagepostgres "github.com/stablyai/orca-go/services/usage-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/usage-service/internal/usecase"
@@ -63,9 +65,13 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this scaffold's testcontainers path still uses.
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
+	if err != nil {
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -75,33 +81,52 @@ func run() error {
 
 	repo := usagepostgres.New(pool)
 
-	var publisher usecase.EventPublisher
-	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
-	if err != nil {
-		logger.WarnContext(ctx, "eventbus unavailable, continuing without event publishing", slog.Any("error", err))
-	} else {
-		defer func() { _ = closeBus() }()
-		if err := pub.EnsureStream(ctx, "USAGE", []string{"orca.usage.>"}); err != nil {
-			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
-		} else {
-			publisher = usageeventbus.New(pub)
-		}
-	}
-
-	recordUC := usecase.NewRecordUsageSession(repo, publisher)
-	dailyUC := usecase.NewGetDailyUsage(repo)
-	listUC := usecase.NewListSessions(repo)
-
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	usagev1.RegisterUsageServiceServer(grpcServer, usagegrpc.New(recordUC, dailyUC, listUC))
-	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
-
 	healthSrv := health.New()
 	healthSrv.Register("postgres", func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		return pool.Ping(ctx)
 	})
+
+	// Transactional-outbox relay (Epic G, docs/execution-plan.md): RecordUsageSession
+	// durably enqueues an outbox row in the SAME Postgres transaction as the
+	// session write (internal/adapter/postgres.Repository.SaveSession) —
+	// this relay is what actually gets those rows to NATS. If NATS is
+	// unreachable at startup, rows still get written durably (the request
+	// path never touches NATS directly), they just queue up unpublished
+	// until an operator restarts this process once NATS recovers — this
+	// scaffold's Connect calls don't retry mid-run, same limitation every
+	// other NATS-consuming service here already carries.
+	var relay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "USAGE", []string{"orca.usage.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
+		}
+	}
+
+	var relayWG sync.WaitGroup
+	if relay != nil {
+		relayWG.Add(1)
+		go func() {
+			defer relayWG.Done()
+			relay.Run(ctx)
+		}()
+	}
+
+	recordUC := usecase.NewRecordUsageSession(repo)
+	dailyUC := usecase.NewGetDailyUsage(repo)
+	listUC := usecase.NewListSessions(repo)
+
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	usagev1.RegisterUsageServiceServer(grpcServer, usagegrpc.New(recordUC, dailyUC, listUC))
+	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
@@ -143,6 +168,12 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	// Wait for the outbox relay goroutine (if started) to observe ctx
+	// cancellation and return, so it doesn't outlive the rest of the
+	// server on shutdown — same pattern notification-service's main.go
+	// uses for its own background consumer.
+	relayWG.Wait()
 
 	return nil
 }

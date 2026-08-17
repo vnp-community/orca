@@ -36,12 +36,15 @@ layout and conventions this service follows exactly.
   `depends_on` edges only — `parent_child`'s single-parent invariant is a
   different, DB-enforced constraint), `Grant`, `ResolvePermission` (wires
   `TaskRepository.GetAncestors` + `GrantRepository.ListGrantsForAncestors`
-  + `TeamScopeResolver` into `domain.ResolveGrant`), and `ExecuteTask` —
+  + `TeamScopeResolver` into `domain.ResolveGrant`), `ExecuteTask` —
   §3.1's complexity branch: a task with any `parent_child` or `depends_on`
   edge *from* it dispatches to `ComplexExecutor`, otherwise
   `SimpleExecutor`. The branch decision itself is real and tested
-  (`execute_task_test.go`); both executors are stubs (see below).
-  Every usecase is tested against in-memory fakes, no real Postgres
+  (`execute_task_test.go`); both executors are stubs (see below). `Execute`
+  also now marks the task `StatusInProgress` via `TaskRepository.UpdateStatus`
+  before dispatching, and `HasActiveExecutions` queries that same state —
+  see "Epic C: `HasActiveExecutions`" below for what this does and does not
+  close. Every usecase is tested against in-memory fakes, no real Postgres
   needed (`fakes_test.go`).
 - `internal/adapter/postgres/` — real `pgx`-backed repository implementing
   all three ports (`TaskRepository`, `EdgeRepository`, `GrantRepository`)
@@ -59,6 +62,10 @@ layout and conventions this service follows exactly.
 - `migrations/0001_init.{up,down}.sql` — `task.tasks`, `task.task_edges`,
   `task.task_grants`, `task.task_comments`, RLS policies matching
   usage-service's pattern.
+- `migrations/0002_task_project_execution_tracking.{up,down}.sql` — adds
+  `task.tasks.project_id` and a partial index on
+  `(tenant_id, project_id, status) WHERE status = 'in_progress'` for Epic C
+  (see "Epic C: `HasActiveExecutions`" below).
 - `cmd/server/main.go` — a real, working composition root: config load,
   Postgres pool, gRPC server with the shared interceptor chain,
   health/readiness HTTP server, graceful shutdown on SIGTERM.
@@ -130,8 +137,9 @@ themselves are stubbed.
   membership, company grants match by tenant ID — see
   `internal/domain/grant.go`'s doc comment.
 - **The `tasks` table's field set matches the generated proto exactly**
-  (`id, tenant_id, title, status, parent_id`), not the design doc §5's
-  broader sketch (`description, complexity, assignee_id,
+  (`id, tenant_id, title, status, parent_id, project_id` — `project_id`
+  added by migration `0002` for Epic C, see below). This still isn't the
+  design doc §5's broader sketch (`description, complexity, assignee_id,
   active_execution_id`). `ExecuteTask`'s complexity branch is computed
   dynamically from edges rather than read from a stored `complexity`
   column, which is both simpler and matches the "branching logic must be
@@ -148,9 +156,46 @@ themselves are stubbed.
   layers together, as more of the surface is needed — same posture as
   usage-service's README on its own partial RPC surface.
 
+## Epic C: `HasActiveExecutions`
+
+`backend-go/docs/execution-plan.md`'s Epic C asked for `HasActiveExecutions`
+so `project-service.RebindDevServer`'s active-execution guard (the fix for
+the TS `PROJECT_HAS_ACTIVE_WORKFLOWS` gap) could stop being a client-side
+no-op — neither task-service's nor workflow-service's proto exposed a way to
+ask "does this project/task have an active execution" before now. This
+service's half is now real plumbing, not a stub:
+
+- `Task.ProjectID` / `CreateTaskRequest.project_id` (proto field 6/4) let a
+  task be associated with a project-service project.
+- `ExecuteTask.Execute` now calls `TaskRepository.UpdateStatus(...,
+  domain.StatusInProgress)` before dispatching to either executor — a real,
+  persisted state transition (migration `0002` adds the `project_id` column
+  and a partial index over `(tenant_id, project_id, status)` for it).
+- `HasActiveExecutions` (usecase + RPC) runs a real query:
+  `EXISTS(... WHERE project_id = $1 AND status = 'in_progress')`.
+
+**What this does NOT close**: task-service has no execution-completion
+callback anywhere in this scaffold, and the generated proto has no
+`UpdateTask`/`SetStatus` RPC to drive one manually. That means
+`status = 'in_progress'` is one-way — set on dispatch, never cleared. Once a
+task has ever been executed, `HasActiveExecutions` will keep reporting
+"active" for it indefinitely, even long after the underlying work actually
+finished (workflow-service has the identical documented limitation for its
+own executions — see that service's `internal/usecase/execute.go`). This
+closes the plumbing gap (the RPC now exists and answers a real question
+about real persisted state), not the semantics gap (the state it reads isn't
+kept accurate over time). A real completion/update-status path is separate,
+later work — see "Known gaps" below.
+
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
 - **The 3 stubbed cross-service ports above.**
+- **`HasActiveExecutions`'s `in_progress` status is one-way** — see "Epic C:
+  `HasActiveExecutions`" above. Closing this needs a real
+  execution-completion callback (from infra-fleet-service /
+  orchestration-service back into task-service) plus an
+  `UpdateTask`/`SetStatus`-shaped RPC to drive it, neither of which exist in
+  the generated proto yet.
 - **`AddEdge`'s cycle check and write are not atomic** — the usecase does
   `ListByKind` (read) then, if no cycle, `Add` (write) as two separate
   calls, not one transaction. Design doc §8 calls this out explicitly:
@@ -162,14 +207,33 @@ themselves are stubbed.
   `adapter/postgres/` is hand-written SQL via `pgx`. Design doc §6 names
   `sqlc` with hand-written recursive CTEs as this service's chosen
   approach; add a `sqlc.yaml` + regenerate once the query set stabilizes.
-- **No OPA integration** (`adapter/opaclient/`) — per design doc §9,
-  `ResolvePermission` should hand its resolved level to an in-process OPA
-  evaluation as the input document for the actual allow/deny decision.
-  This scaffold's `ResolvePermission` usecase returns the resolved level
-  (or a `PermissionDenied` apperror on no-match) directly; wiring OPA is
-  the next step, and per §10 should be tested "with the same rigor as the
-  BFS unit tests, since a bug in either half can silently produce a wrong
-  access decision."
+- **OPA integration is wired** (`internal/adapter/opaclient/`) — per design
+  doc §9, `ResolvePermission` now hands its resolved level, the caller's
+  requested action, and tenant context to an in-process OPA evaluation
+  (`common/policy.Evaluator` against
+  `policy/orca-authz/task_grant.rego`'s `data.orca.authz.task.allow` rule)
+  for the actual allow/deny decision, not just the resolved level. A `false`
+  decision or an evaluation error both fail closed into the same
+  `PermissionDenied`/`TASK_NO_GRANT` error the BFS walk's own not-found case
+  already returned — see `internal/usecase/resolve_permission.go`'s doc
+  comment and `internal/usecase/resolve_permission_test.go`'s allow/deny/
+  eval-error/not-found-skips-OPA cases.
+  - **First-cut permission matrix, not a final taxonomy**: `task_grant.rego`
+    itself says so — the `level -> allowed actions` mapping
+    (owner/admin: everything; user: read/write/execute; team: read/write;
+    company: read) is Epic E's starting point, may need product
+    refinement, and isn't re-derived from `GrantLevel`'s priority order so
+    much as it mirrors it as a widening/narrowing action set.
+  - **`ResolvePermissionRequest` has no `action` field on the wire** — the
+    generated proto only carries `task_id`/`user_id`. Until it grows one,
+    `internal/adapter/grpc.Server.ResolvePermission` hardcodes
+    `Action: "read"`, the one action every named `GrantLevel` authorizes —
+    so today the OPA check only ever actually denies the already-denied
+    not-found case over gRPC; the deny-on-a-real-action path is exercised
+    by the usecase's unit tests (which call `Execute` directly with an
+    explicit `Action`) but not reachable through the RPC surface yet. Add
+    an `action` field to the proto message, thread it through this
+    handler, and this gap closes.
 - **No event publishing** — design doc §9 says `Grant`/`RevokeGrant`
   should emit structured audit events. No `EventPublisher` port or
   `adapter/eventbus/` package exists in this scaffold; add it following

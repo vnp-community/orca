@@ -98,6 +98,17 @@ type Handler func(ctx context.Context, event Event) error
 // is cancelled. The consumer name must be stable across restarts so
 // JetStream resumes from the last acked position rather than replaying
 // everything.
+//
+// IMPORTANT semantics: a durable consumer name is a single shared cursor —
+// if multiple processes (e.g. every replica of a horizontally-scaled
+// service) call Subscribe with the SAME consumerName against the same
+// subject, JetStream treats them as one competing-consumer group and
+// round-robins each message to exactly one of them, not all of them. That
+// is the correct choice for at-least-once, effectively-once side-effect
+// processing (each event handled once, cluster-wide). It is the WRONG
+// choice when every replica must independently react to every event (e.g.
+// fan-out to replica-local in-process state) — use SubscribeEphemeral for
+// that case instead.
 func (c *Consumer) Subscribe(ctx context.Context, streamName, consumerName, subject string, fn Handler) error {
 	stream, err := c.js.Stream(ctx, streamName)
 	if err != nil {
@@ -111,8 +122,53 @@ func (c *Consumer) Subscribe(ctx context.Context, streamName, consumerName, subj
 	if err != nil {
 		return fmt.Errorf("eventbus: creating consumer %s: %w", consumerName, err)
 	}
+	return consumeUntilDone(ctx, cons, fn)
+}
 
-	_, err = cons.Consume(func(msg jetstream.Msg) {
+// ephemeralInactiveThreshold bounds how long an ephemeral consumer with no
+// active puller lingers server-side (e.g. between this process exiting and
+// JetStream noticing) before being auto-deleted — keeps replica
+// restarts/scale-down from accumulating dead consumers on the stream.
+const ephemeralInactiveThreshold = 5 * time.Minute
+
+// SubscribeEphemeral creates a genuinely ephemeral (unnamed) JetStream
+// consumer scoped to this call's lifetime and runs fn for every message on
+// subject until ctx is cancelled. Unlike Subscribe's named durable consumer
+// — a single shared cursor that JetStream load-balances across every
+// process attached to it — an ephemeral consumer has no shared identity:
+// each call gets its own private cursor, so N processes each calling
+// SubscribeEphemeral against the same subject each receive their OWN full
+// copy of every message. This is the correct primitive for "every replica
+// must react to every event" fan-out (e.g. notification-service's
+// cross-replica broadcast delivery, tenant-service's cross-replica cache
+// invalidation — see docs/execution-plan.md Epic F), as opposed to
+// Subscribe's "exactly one replica processes each event" semantics.
+//
+// Because there is no durable cursor, a replica that was down when an event
+// was published never catches up on it after restarting — acceptable only
+// for signals that are naturally self-healing or non-critical if missed
+// (never for a domain-of-record event, which must use Subscribe).
+func (c *Consumer) SubscribeEphemeral(ctx context.Context, streamName, subject string, fn Handler) error {
+	stream, err := c.js.Stream(ctx, streamName)
+	if err != nil {
+		return fmt.Errorf("eventbus: looking up stream %s: %w", streamName, err)
+	}
+	cons, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
+		FilterSubject:     subject,
+		AckPolicy:         jetstream.AckExplicitPolicy,
+		InactiveThreshold: ephemeralInactiveThreshold,
+	})
+	if err != nil {
+		return fmt.Errorf("eventbus: creating ephemeral consumer for %s: %w", subject, err)
+	}
+	return consumeUntilDone(ctx, cons, fn)
+}
+
+// consumeUntilDone runs the shared consume loop both Subscribe and
+// SubscribeEphemeral use: decode, hand off to fn, Ack/Nak accordingly, until
+// ctx is cancelled.
+func consumeUntilDone(ctx context.Context, cons jetstream.Consumer, fn Handler) error {
+	_, err := cons.Consume(func(msg jetstream.Msg) {
 		var event Event
 		if err := json.Unmarshal(msg.Data(), &event); err != nil {
 			_ = msg.Nak() // malformed payload; NAK for visibility rather than silently dropping

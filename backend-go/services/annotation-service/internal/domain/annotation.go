@@ -23,6 +23,10 @@ var (
 	ErrEmptyTenant = errors.New("domain: tenant_id and author_id are required")
 	// ErrEmptyContent guards against a caller persisting a blank comment.
 	ErrEmptyContent = errors.New("domain: content is required")
+	// ErrEmptyRequestID guards against a create with no idempotency key —
+	// see usage-service/automation-service's identical (tenant_id,
+	// request_id) convention this mirrors.
+	ErrEmptyRequestID = errors.New("domain: request_id is required")
 	// ErrAnnotationNotFound is returned by internal/adapter/postgres when a
 	// lookup/update/delete targets an annotation that doesn't exist (or
 	// isn't visible to the calling tenant) — usecase/ maps this to
@@ -66,6 +70,7 @@ type Annotation struct {
 	Anchor    Anchor
 	Content   string
 	Resolved  bool
+	RequestID string // idempotency key, see standards/api-design-guidelines.md
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -79,6 +84,7 @@ func NewAnnotation(
 	anchor Anchor,
 	content string,
 	resolved bool,
+	requestID string,
 	createdAt, updatedAt time.Time,
 ) (Annotation, error) {
 	if tenantID == "" || authorID == "" {
@@ -86,6 +92,9 @@ func NewAnnotation(
 	}
 	if content == "" {
 		return Annotation{}, ErrEmptyContent
+	}
+	if requestID == "" {
+		return Annotation{}, ErrEmptyRequestID
 	}
 	if _, err := NewAnchor(anchor.RepoID, anchor.FilePath, anchor.Line, anchor.Ref); err != nil {
 		return Annotation{}, err
@@ -97,6 +106,7 @@ func NewAnnotation(
 		Anchor:    anchor,
 		Content:   content,
 		Resolved:  resolved,
+		RequestID: requestID,
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 	}, nil

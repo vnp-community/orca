@@ -28,10 +28,10 @@ func TestListAnnotations_FiltersByTenantAndRepo(t *testing.T) {
 	ctx1 := withIdentity(context.Background(), "tenant-1", "user-1")
 	ctx2 := withIdentity(context.Background(), "tenant-2", "user-1")
 
-	if _, err := createUC.Execute(ctx1, CreateAnnotationInput{RepoID: "repo-1", FilePath: "main.go", Line: 1, Content: "a"}); err != nil {
+	if _, err := createUC.Execute(ctx1, CreateAnnotationInput{RepoID: "repo-1", FilePath: "main.go", Line: 1, Content: "a", RequestID: "req-1"}); err != nil {
 		t.Fatalf("seed create (tenant-1): %v", err)
 	}
-	if _, err := createUC.Execute(ctx2, CreateAnnotationInput{RepoID: "repo-1", FilePath: "main.go", Line: 1, Content: "b"}); err != nil {
+	if _, err := createUC.Execute(ctx2, CreateAnnotationInput{RepoID: "repo-1", FilePath: "main.go", Line: 1, Content: "b", RequestID: "req-2"}); err != nil {
 		t.Fatalf("seed create (tenant-2): %v", err)
 	}
 

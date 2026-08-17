@@ -14,11 +14,16 @@ import (
 // CreateAutomationInput mirrors the gRPC request 1:1 by design — see
 // architecture/03's note that usecase granularity mirrors today's RPC
 // methods so the TS->Go mapping stays traceable. TenantID is NOT trusted
-// from the request body — see Execute below.
+// from the request body — see Execute below. DTStart/Timezone are the raw
+// wire strings (RFC3339 / IANA tz name); empty means "default" — see
+// Execute for the resolution rules.
 type CreateAutomationInput struct {
 	Name           string
 	RRule          string
+	StepType       domain.StepType
 	StepConfigJSON string
+	DTStart        string // RFC3339; empty = defaults to now
+	Timezone       string // IANA tz name; empty = UTC
 }
 
 // CreateAutomation is automation-service's definition-creation path.
@@ -42,9 +47,47 @@ func (uc *CreateAutomation) Execute(ctx context.Context, in CreateAutomationInpu
 	}
 
 	now := time.Now().UTC()
-	automation, err := domain.NewAutomation(uuid.NewString(), tenantID, in.Name, in.RRule, in.StepConfigJSON, now, now)
+
+	dtstart := now
+	if in.DTStart != "" {
+		parsed, err := time.Parse(time.RFC3339, in.DTStart)
+		if err != nil {
+			return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID_DTSTART", "dtstart must be RFC3339", err)
+		}
+		dtstart = parsed
+	}
+
+	timezone := in.Timezone
+	if timezone != "" {
+		loc, err := time.LoadLocation(timezone)
+		if err != nil {
+			return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID_TIMEZONE", "timezone must be a valid IANA tz name", err)
+		}
+		dtstart = dtstart.In(loc)
+	}
+
+	// New automations default enabled=true — the generated
+	// CreateAutomationRequest has no enabled field (Automation does; see
+	// automation.proto), so there is nothing on the wire to read here.
+	automation, err := domain.NewAutomation(uuid.NewString(), tenantID, in.Name, in.RRule, in.StepType, in.StepConfigJSON, dtstart, timezone, true, now)
 	if err != nil {
 		return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID", err.Error(), err)
+	}
+
+	// Compute the FIRST next_run_at from rrule+dtstart so the scheduler has
+	// something to claim without waiting for a first manual RunNow. Anchored
+	// at dtstart itself (via a just-before-dtstart probe) rather than "now",
+	// so a future dtstart's first occurrence is dtstart, and a past
+	// dtstart's first occurrence is the earliest one — catch-up happens
+	// naturally the next time the ticker runs, per §8's "a missed tick must
+	// not silently drop a run".
+	rule, err := automation.RecurrenceRule()
+	if err != nil {
+		// Unreachable: NewAutomation already validated rrule parses.
+		return domain.Automation{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RRULE_BUILD_FAILED", "failed to build recurrence rule", err)
+	}
+	if next, ok := rule.NextOccurrenceAfter(dtstart.Add(-time.Second)); ok {
+		automation.NextRunAt = next
 	}
 
 	if err := uc.repo.Create(ctx, automation); err != nil {

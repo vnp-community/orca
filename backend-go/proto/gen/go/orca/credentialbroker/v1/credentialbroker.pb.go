@@ -547,6 +547,390 @@ func (*RevokeCredentialResponse) Descriptor() ([]byte, []int) {
 	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{8}
 }
 
+type GetCredentialMetadataRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CredentialId  string                 `protobuf:"bytes,1,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCredentialMetadataRequest) Reset() {
+	*x = GetCredentialMetadataRequest{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCredentialMetadataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCredentialMetadataRequest) ProtoMessage() {}
+
+func (x *GetCredentialMetadataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCredentialMetadataRequest.ProtoReflect.Descriptor instead.
+func (*GetCredentialMetadataRequest) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetCredentialMetadataRequest) GetCredentialId() string {
+	if x != nil {
+		return x.CredentialId
+	}
+	return ""
+}
+
+type GetCredentialMetadataResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *CredentialMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCredentialMetadataResponse) Reset() {
+	*x = GetCredentialMetadataResponse{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCredentialMetadataResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCredentialMetadataResponse) ProtoMessage() {}
+
+func (x *GetCredentialMetadataResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCredentialMetadataResponse.ProtoReflect.Descriptor instead.
+func (*GetCredentialMetadataResponse) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetCredentialMetadataResponse) GetMetadata() *CredentialMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type ResolveCredentialByOwnerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Category      CredentialCategory     `protobuf:"varint,2,opt,name=category,proto3,enum=orca.credentialbroker.v1.CredentialCategory" json:"category,omitempty"`
+	OwnerId       string                 `protobuf:"bytes,3,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveCredentialByOwnerRequest) Reset() {
+	*x = ResolveCredentialByOwnerRequest{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveCredentialByOwnerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveCredentialByOwnerRequest) ProtoMessage() {}
+
+func (x *ResolveCredentialByOwnerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveCredentialByOwnerRequest.ProtoReflect.Descriptor instead.
+func (*ResolveCredentialByOwnerRequest) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ResolveCredentialByOwnerRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ResolveCredentialByOwnerRequest) GetCategory() CredentialCategory {
+	if x != nil {
+		return x.Category
+	}
+	return CredentialCategory_CREDENTIAL_CATEGORY_UNSPECIFIED
+}
+
+func (x *ResolveCredentialByOwnerRequest) GetOwnerId() string {
+	if x != nil {
+		return x.OwnerId
+	}
+	return ""
+}
+
+type ResolveCredentialByOwnerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         []byte                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"` // plaintext, caller must not persist or log — same contract as ResolveCredentialResponse.value
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveCredentialByOwnerResponse) Reset() {
+	*x = ResolveCredentialByOwnerResponse{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveCredentialByOwnerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveCredentialByOwnerResponse) ProtoMessage() {}
+
+func (x *ResolveCredentialByOwnerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveCredentialByOwnerResponse.ProtoReflect.Descriptor instead.
+func (*ResolveCredentialByOwnerResponse) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ResolveCredentialByOwnerResponse) GetValue() []byte {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+type RevokeCredentialByOwnerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Category      CredentialCategory     `protobuf:"varint,2,opt,name=category,proto3,enum=orca.credentialbroker.v1.CredentialCategory" json:"category,omitempty"`
+	OwnerId       string                 `protobuf:"bytes,3,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeCredentialByOwnerRequest) Reset() {
+	*x = RevokeCredentialByOwnerRequest{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeCredentialByOwnerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeCredentialByOwnerRequest) ProtoMessage() {}
+
+func (x *RevokeCredentialByOwnerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeCredentialByOwnerRequest.ProtoReflect.Descriptor instead.
+func (*RevokeCredentialByOwnerRequest) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RevokeCredentialByOwnerRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RevokeCredentialByOwnerRequest) GetCategory() CredentialCategory {
+	if x != nil {
+		return x.Category
+	}
+	return CredentialCategory_CREDENTIAL_CATEGORY_UNSPECIFIED
+}
+
+func (x *RevokeCredentialByOwnerRequest) GetOwnerId() string {
+	if x != nil {
+		return x.OwnerId
+	}
+	return ""
+}
+
+type RevokeCredentialByOwnerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeCredentialByOwnerResponse) Reset() {
+	*x = RevokeCredentialByOwnerResponse{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeCredentialByOwnerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeCredentialByOwnerResponse) ProtoMessage() {}
+
+func (x *RevokeCredentialByOwnerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeCredentialByOwnerResponse.ProtoReflect.Descriptor instead.
+func (*RevokeCredentialByOwnerResponse) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{14}
+}
+
+type SignVapidPayloadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Payload       []byte                 `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignVapidPayloadRequest) Reset() {
+	*x = SignVapidPayloadRequest{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignVapidPayloadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignVapidPayloadRequest) ProtoMessage() {}
+
+func (x *SignVapidPayloadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignVapidPayloadRequest.ProtoReflect.Descriptor instead.
+func (*SignVapidPayloadRequest) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *SignVapidPayloadRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *SignVapidPayloadRequest) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+type SignVapidPayloadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Signature     string                 `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"` // Vault Transit's ciphertext/signature string form, opaque to the caller
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignVapidPayloadResponse) Reset() {
+	*x = SignVapidPayloadResponse{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignVapidPayloadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignVapidPayloadResponse) ProtoMessage() {}
+
+func (x *SignVapidPayloadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignVapidPayloadResponse.ProtoReflect.Descriptor instead.
+func (*SignVapidPayloadResponse) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *SignVapidPayloadResponse) GetSignature() string {
+	if x != nil {
+		return x.Signature
+	}
+	return ""
+}
+
 var File_orca_credentialbroker_v1_credentialbroker_proto protoreflect.FileDescriptor
 
 const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
@@ -578,19 +962,43 @@ const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
 	"\bmetadata\x18\x01 \x01(\v2,.orca.credentialbroker.v1.CredentialMetadataR\bmetadata\">\n" +
 	"\x17RevokeCredentialRequest\x12#\n" +
 	"\rcredential_id\x18\x01 \x01(\tR\fcredentialId\"\x1a\n" +
-	"\x18RevokeCredentialResponse*\xf7\x01\n" +
+	"\x18RevokeCredentialResponse\"C\n" +
+	"\x1cGetCredentialMetadataRequest\x12#\n" +
+	"\rcredential_id\x18\x01 \x01(\tR\fcredentialId\"i\n" +
+	"\x1dGetCredentialMetadataResponse\x12H\n" +
+	"\bmetadata\x18\x01 \x01(\v2,.orca.credentialbroker.v1.CredentialMetadataR\bmetadata\"\xa3\x01\n" +
+	"\x1fResolveCredentialByOwnerRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12H\n" +
+	"\bcategory\x18\x02 \x01(\x0e2,.orca.credentialbroker.v1.CredentialCategoryR\bcategory\x12\x19\n" +
+	"\bowner_id\x18\x03 \x01(\tR\aownerId\"8\n" +
+	" ResolveCredentialByOwnerResponse\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\fR\x05value\"\xa2\x01\n" +
+	"\x1eRevokeCredentialByOwnerRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12H\n" +
+	"\bcategory\x18\x02 \x01(\x0e2,.orca.credentialbroker.v1.CredentialCategoryR\bcategory\x12\x19\n" +
+	"\bowner_id\x18\x03 \x01(\tR\aownerId\"!\n" +
+	"\x1fRevokeCredentialByOwnerResponse\"P\n" +
+	"\x17SignVapidPayloadRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x18\n" +
+	"\apayload\x18\x02 \x01(\fR\apayload\"8\n" +
+	"\x18SignVapidPayloadResponse\x12\x1c\n" +
+	"\tsignature\x18\x01 \x01(\tR\tsignature*\xf7\x01\n" +
 	"\x12CredentialCategory\x12#\n" +
 	"\x1fCREDENTIAL_CATEGORY_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dCREDENTIAL_CATEGORY_SCM_OAUTH\x10\x01\x12+\n" +
 	"'CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH\x10\x02\x12'\n" +
 	"#CREDENTIAL_CATEGORY_AI_PROVIDER_KEY\x10\x03\x12\x1b\n" +
 	"\x17CREDENTIAL_CATEGORY_SSH\x10\x04\x12&\n" +
-	"\"CREDENTIAL_CATEGORY_SERVICE_SECRET\x10\x052\x85\x04\n" +
+	"\"CREDENTIAL_CATEGORY_SERVICE_SECRET\x10\x052\xb0\b\n" +
 	"\x17CredentialBrokerService\x12v\n" +
 	"\x0fWriteCredential\x120.orca.credentialbroker.v1.WriteCredentialRequest\x1a1.orca.credentialbroker.v1.WriteCredentialResponse\x12|\n" +
 	"\x11ResolveCredential\x122.orca.credentialbroker.v1.ResolveCredentialRequest\x1a3.orca.credentialbroker.v1.ResolveCredentialResponse\x12y\n" +
 	"\x10RotateCredential\x121.orca.credentialbroker.v1.RotateCredentialRequest\x1a2.orca.credentialbroker.v1.RotateCredentialResponse\x12y\n" +
-	"\x10RevokeCredential\x121.orca.credentialbroker.v1.RevokeCredentialRequest\x1a2.orca.credentialbroker.v1.RevokeCredentialResponseBVZTgithub.com/stablyai/orca-go/proto/gen/go/orca/credentialbroker/v1;credentialbrokerv1b\x06proto3"
+	"\x10RevokeCredential\x121.orca.credentialbroker.v1.RevokeCredentialRequest\x1a2.orca.credentialbroker.v1.RevokeCredentialResponse\x12\x88\x01\n" +
+	"\x15GetCredentialMetadata\x126.orca.credentialbroker.v1.GetCredentialMetadataRequest\x1a7.orca.credentialbroker.v1.GetCredentialMetadataResponse\x12\x91\x01\n" +
+	"\x18ResolveCredentialByOwner\x129.orca.credentialbroker.v1.ResolveCredentialByOwnerRequest\x1a:.orca.credentialbroker.v1.ResolveCredentialByOwnerResponse\x12\x8e\x01\n" +
+	"\x17RevokeCredentialByOwner\x128.orca.credentialbroker.v1.RevokeCredentialByOwnerRequest\x1a9.orca.credentialbroker.v1.RevokeCredentialByOwnerResponse\x12y\n" +
+	"\x10SignVapidPayload\x121.orca.credentialbroker.v1.SignVapidPayloadRequest\x1a2.orca.credentialbroker.v1.SignVapidPayloadResponseBVZTgithub.com/stablyai/orca-go/proto/gen/go/orca/credentialbroker/v1;credentialbrokerv1b\x06proto3"
 
 var (
 	file_orca_credentialbroker_v1_credentialbroker_proto_rawDescOnce sync.Once
@@ -605,37 +1013,56 @@ func file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_credentialbroker_v1_credentialbroker_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_orca_credentialbroker_v1_credentialbroker_proto_goTypes = []any{
-	(CredentialCategory)(0),           // 0: orca.credentialbroker.v1.CredentialCategory
-	(*CredentialMetadata)(nil),        // 1: orca.credentialbroker.v1.CredentialMetadata
-	(*WriteCredentialRequest)(nil),    // 2: orca.credentialbroker.v1.WriteCredentialRequest
-	(*WriteCredentialResponse)(nil),   // 3: orca.credentialbroker.v1.WriteCredentialResponse
-	(*ResolveCredentialRequest)(nil),  // 4: orca.credentialbroker.v1.ResolveCredentialRequest
-	(*ResolveCredentialResponse)(nil), // 5: orca.credentialbroker.v1.ResolveCredentialResponse
-	(*RotateCredentialRequest)(nil),   // 6: orca.credentialbroker.v1.RotateCredentialRequest
-	(*RotateCredentialResponse)(nil),  // 7: orca.credentialbroker.v1.RotateCredentialResponse
-	(*RevokeCredentialRequest)(nil),   // 8: orca.credentialbroker.v1.RevokeCredentialRequest
-	(*RevokeCredentialResponse)(nil),  // 9: orca.credentialbroker.v1.RevokeCredentialResponse
+	(CredentialCategory)(0),                  // 0: orca.credentialbroker.v1.CredentialCategory
+	(*CredentialMetadata)(nil),               // 1: orca.credentialbroker.v1.CredentialMetadata
+	(*WriteCredentialRequest)(nil),           // 2: orca.credentialbroker.v1.WriteCredentialRequest
+	(*WriteCredentialResponse)(nil),          // 3: orca.credentialbroker.v1.WriteCredentialResponse
+	(*ResolveCredentialRequest)(nil),         // 4: orca.credentialbroker.v1.ResolveCredentialRequest
+	(*ResolveCredentialResponse)(nil),        // 5: orca.credentialbroker.v1.ResolveCredentialResponse
+	(*RotateCredentialRequest)(nil),          // 6: orca.credentialbroker.v1.RotateCredentialRequest
+	(*RotateCredentialResponse)(nil),         // 7: orca.credentialbroker.v1.RotateCredentialResponse
+	(*RevokeCredentialRequest)(nil),          // 8: orca.credentialbroker.v1.RevokeCredentialRequest
+	(*RevokeCredentialResponse)(nil),         // 9: orca.credentialbroker.v1.RevokeCredentialResponse
+	(*GetCredentialMetadataRequest)(nil),     // 10: orca.credentialbroker.v1.GetCredentialMetadataRequest
+	(*GetCredentialMetadataResponse)(nil),    // 11: orca.credentialbroker.v1.GetCredentialMetadataResponse
+	(*ResolveCredentialByOwnerRequest)(nil),  // 12: orca.credentialbroker.v1.ResolveCredentialByOwnerRequest
+	(*ResolveCredentialByOwnerResponse)(nil), // 13: orca.credentialbroker.v1.ResolveCredentialByOwnerResponse
+	(*RevokeCredentialByOwnerRequest)(nil),   // 14: orca.credentialbroker.v1.RevokeCredentialByOwnerRequest
+	(*RevokeCredentialByOwnerResponse)(nil),  // 15: orca.credentialbroker.v1.RevokeCredentialByOwnerResponse
+	(*SignVapidPayloadRequest)(nil),          // 16: orca.credentialbroker.v1.SignVapidPayloadRequest
+	(*SignVapidPayloadResponse)(nil),         // 17: orca.credentialbroker.v1.SignVapidPayloadResponse
 }
 var file_orca_credentialbroker_v1_credentialbroker_proto_depIdxs = []int32{
-	0, // 0: orca.credentialbroker.v1.CredentialMetadata.category:type_name -> orca.credentialbroker.v1.CredentialCategory
-	0, // 1: orca.credentialbroker.v1.WriteCredentialRequest.category:type_name -> orca.credentialbroker.v1.CredentialCategory
-	1, // 2: orca.credentialbroker.v1.WriteCredentialResponse.metadata:type_name -> orca.credentialbroker.v1.CredentialMetadata
-	1, // 3: orca.credentialbroker.v1.RotateCredentialResponse.metadata:type_name -> orca.credentialbroker.v1.CredentialMetadata
-	2, // 4: orca.credentialbroker.v1.CredentialBrokerService.WriteCredential:input_type -> orca.credentialbroker.v1.WriteCredentialRequest
-	4, // 5: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredential:input_type -> orca.credentialbroker.v1.ResolveCredentialRequest
-	6, // 6: orca.credentialbroker.v1.CredentialBrokerService.RotateCredential:input_type -> orca.credentialbroker.v1.RotateCredentialRequest
-	8, // 7: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredential:input_type -> orca.credentialbroker.v1.RevokeCredentialRequest
-	3, // 8: orca.credentialbroker.v1.CredentialBrokerService.WriteCredential:output_type -> orca.credentialbroker.v1.WriteCredentialResponse
-	5, // 9: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredential:output_type -> orca.credentialbroker.v1.ResolveCredentialResponse
-	7, // 10: orca.credentialbroker.v1.CredentialBrokerService.RotateCredential:output_type -> orca.credentialbroker.v1.RotateCredentialResponse
-	9, // 11: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredential:output_type -> orca.credentialbroker.v1.RevokeCredentialResponse
-	8, // [8:12] is the sub-list for method output_type
-	4, // [4:8] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0,  // 0: orca.credentialbroker.v1.CredentialMetadata.category:type_name -> orca.credentialbroker.v1.CredentialCategory
+	0,  // 1: orca.credentialbroker.v1.WriteCredentialRequest.category:type_name -> orca.credentialbroker.v1.CredentialCategory
+	1,  // 2: orca.credentialbroker.v1.WriteCredentialResponse.metadata:type_name -> orca.credentialbroker.v1.CredentialMetadata
+	1,  // 3: orca.credentialbroker.v1.RotateCredentialResponse.metadata:type_name -> orca.credentialbroker.v1.CredentialMetadata
+	1,  // 4: orca.credentialbroker.v1.GetCredentialMetadataResponse.metadata:type_name -> orca.credentialbroker.v1.CredentialMetadata
+	0,  // 5: orca.credentialbroker.v1.ResolveCredentialByOwnerRequest.category:type_name -> orca.credentialbroker.v1.CredentialCategory
+	0,  // 6: orca.credentialbroker.v1.RevokeCredentialByOwnerRequest.category:type_name -> orca.credentialbroker.v1.CredentialCategory
+	2,  // 7: orca.credentialbroker.v1.CredentialBrokerService.WriteCredential:input_type -> orca.credentialbroker.v1.WriteCredentialRequest
+	4,  // 8: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredential:input_type -> orca.credentialbroker.v1.ResolveCredentialRequest
+	6,  // 9: orca.credentialbroker.v1.CredentialBrokerService.RotateCredential:input_type -> orca.credentialbroker.v1.RotateCredentialRequest
+	8,  // 10: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredential:input_type -> orca.credentialbroker.v1.RevokeCredentialRequest
+	10, // 11: orca.credentialbroker.v1.CredentialBrokerService.GetCredentialMetadata:input_type -> orca.credentialbroker.v1.GetCredentialMetadataRequest
+	12, // 12: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredentialByOwner:input_type -> orca.credentialbroker.v1.ResolveCredentialByOwnerRequest
+	14, // 13: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredentialByOwner:input_type -> orca.credentialbroker.v1.RevokeCredentialByOwnerRequest
+	16, // 14: orca.credentialbroker.v1.CredentialBrokerService.SignVapidPayload:input_type -> orca.credentialbroker.v1.SignVapidPayloadRequest
+	3,  // 15: orca.credentialbroker.v1.CredentialBrokerService.WriteCredential:output_type -> orca.credentialbroker.v1.WriteCredentialResponse
+	5,  // 16: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredential:output_type -> orca.credentialbroker.v1.ResolveCredentialResponse
+	7,  // 17: orca.credentialbroker.v1.CredentialBrokerService.RotateCredential:output_type -> orca.credentialbroker.v1.RotateCredentialResponse
+	9,  // 18: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredential:output_type -> orca.credentialbroker.v1.RevokeCredentialResponse
+	11, // 19: orca.credentialbroker.v1.CredentialBrokerService.GetCredentialMetadata:output_type -> orca.credentialbroker.v1.GetCredentialMetadataResponse
+	13, // 20: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredentialByOwner:output_type -> orca.credentialbroker.v1.ResolveCredentialByOwnerResponse
+	15, // 21: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredentialByOwner:output_type -> orca.credentialbroker.v1.RevokeCredentialByOwnerResponse
+	17, // 22: orca.credentialbroker.v1.CredentialBrokerService.SignVapidPayload:output_type -> orca.credentialbroker.v1.SignVapidPayloadResponse
+	15, // [15:23] is the sub-list for method output_type
+	7,  // [7:15] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_orca_credentialbroker_v1_credentialbroker_proto_init() }
@@ -649,7 +1076,7 @@ func file_orca_credentialbroker_v1_credentialbroker_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc), len(file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

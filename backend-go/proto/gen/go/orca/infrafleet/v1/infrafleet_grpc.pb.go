@@ -24,6 +24,9 @@ const (
 	InfraFleetService_CreateSshTarget_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
 	InfraFleetService_GetFleetHealth_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
 	InfraFleetService_ScanWorkspacePorts_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
+	InfraFleetService_ListDevServers_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
+	InfraFleetService_CreateConnection_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
+	InfraFleetService_Relay_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/Relay"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -39,6 +42,22 @@ type InfraFleetServiceClient interface {
 	CreateSshTarget(ctx context.Context, in *CreateSshTargetRequest, opts ...grpc.CallOption) (*CreateSshTargetResponse, error)
 	GetFleetHealth(ctx context.Context, in *GetFleetHealthRequest, opts ...grpc.CallOption) (*GetFleetHealthResponse, error)
 	ScanWorkspacePorts(ctx context.Context, in *ScanWorkspacePortsRequest, opts ...grpc.CallOption) (*ScanWorkspacePortsResponse, error)
+	// ListDevServers backs the frontend's devServer.list channel — the
+	// DevServerRepository.List method already existed but was never exposed
+	// over gRPC before Epic A's second pass.
+	ListDevServers(ctx context.Context, in *ListDevServersRequest, opts ...grpc.CallOption) (*ListDevServersResponse, error)
+	// CreateConnection is the write path for infra.connections
+	// (migrations/0002_connections) — binds a dev server to a worktree/repo
+	// path, producing the connectionId ResolveConnection/Relay resolve
+	// against. Without this RPC, connections would be schema nobody writes to.
+	CreateConnection(ctx context.Context, in *CreateConnectionRequest, opts ...grpc.CallOption) (*CreateConnectionResponse, error)
+	// Relay is the generic connectionId+method+params passthrough onto the Dev
+	// Server Agent execution plane — see usecase.Relay's doc comment for why
+	// this is a single generic RPC rather than one purpose-built RPC per
+	// caller (git-gateway-service's git.*, workflow-service's agent.exec/
+	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
+	// all go through this one).
+	Relay(ctx context.Context, in *RelayRequest, opts ...grpc.CallOption) (*RelayResponse, error)
 }
 
 type infraFleetServiceClient struct {
@@ -99,6 +118,36 @@ func (c *infraFleetServiceClient) ScanWorkspacePorts(ctx context.Context, in *Sc
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) ListDevServers(ctx context.Context, in *ListDevServersRequest, opts ...grpc.CallOption) (*ListDevServersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDevServersResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListDevServers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) CreateConnection(ctx context.Context, in *CreateConnectionRequest, opts ...grpc.CallOption) (*CreateConnectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateConnectionResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_CreateConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) Relay(ctx context.Context, in *RelayRequest, opts ...grpc.CallOption) (*RelayResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RelayResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_Relay_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -112,6 +161,22 @@ type InfraFleetServiceServer interface {
 	CreateSshTarget(context.Context, *CreateSshTargetRequest) (*CreateSshTargetResponse, error)
 	GetFleetHealth(context.Context, *GetFleetHealthRequest) (*GetFleetHealthResponse, error)
 	ScanWorkspacePorts(context.Context, *ScanWorkspacePortsRequest) (*ScanWorkspacePortsResponse, error)
+	// ListDevServers backs the frontend's devServer.list channel — the
+	// DevServerRepository.List method already existed but was never exposed
+	// over gRPC before Epic A's second pass.
+	ListDevServers(context.Context, *ListDevServersRequest) (*ListDevServersResponse, error)
+	// CreateConnection is the write path for infra.connections
+	// (migrations/0002_connections) — binds a dev server to a worktree/repo
+	// path, producing the connectionId ResolveConnection/Relay resolve
+	// against. Without this RPC, connections would be schema nobody writes to.
+	CreateConnection(context.Context, *CreateConnectionRequest) (*CreateConnectionResponse, error)
+	// Relay is the generic connectionId+method+params passthrough onto the Dev
+	// Server Agent execution plane — see usecase.Relay's doc comment for why
+	// this is a single generic RPC rather than one purpose-built RPC per
+	// caller (git-gateway-service's git.*, workflow-service's agent.exec/
+	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
+	// all go through this one).
+	Relay(context.Context, *RelayRequest) (*RelayResponse, error)
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -136,6 +201,15 @@ func (UnimplementedInfraFleetServiceServer) GetFleetHealth(context.Context, *Get
 }
 func (UnimplementedInfraFleetServiceServer) ScanWorkspacePorts(context.Context, *ScanWorkspacePortsRequest) (*ScanWorkspacePortsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ScanWorkspacePorts not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListDevServers(context.Context, *ListDevServersRequest) (*ListDevServersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDevServers not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CreateConnection(context.Context, *CreateConnectionRequest) (*CreateConnectionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateConnection not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) Relay(context.Context, *RelayRequest) (*RelayResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Relay not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -248,6 +322,60 @@ func _InfraFleetService_ScanWorkspacePorts_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_ListDevServers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDevServersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListDevServers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListDevServers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListDevServers(ctx, req.(*ListDevServersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_CreateConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CreateConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CreateConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CreateConnection(ctx, req.(*CreateConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_Relay_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RelayRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).Relay(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_Relay_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).Relay(ctx, req.(*RelayRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -274,6 +402,18 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ScanWorkspacePorts",
 			Handler:    _InfraFleetService_ScanWorkspacePorts_Handler,
+		},
+		{
+			MethodName: "ListDevServers",
+			Handler:    _InfraFleetService_ListDevServers_Handler,
+		},
+		{
+			MethodName: "CreateConnection",
+			Handler:    _InfraFleetService_CreateConnection_Handler,
+		},
+		{
+			MethodName: "Relay",
+			Handler:    _InfraFleetService_Relay_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

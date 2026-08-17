@@ -57,17 +57,37 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
-- **JWT signing via Vault Transit is not wired.** `IssueServiceToken`
-  exists and compiles (`internal/adapter/grpc/server.go`) but returns
-  `codes.Unimplemented` with a clear message rather than a token that looks
-  real but validates against nothing. Per `auth-service.md` §6-7, the real
-  implementation needs a Vault Transit client (`internal/adapter/vault/`,
-  not present in this scaffold) that requests a signature without the RSA
-  private key ever leaving Vault, plus the JWKS-publication sequencing in
-  §9 (publish the new public key *before* it's used to sign anything). Wire
-  this before any consumer relies on mobile/CLI/service-to-service JWTs.
-  `GetJWKS` itself isn't in this scaffold's proto surface either — add it
-  alongside real signing.
+- **JWT signing via Vault Transit is now real, for `IssueServiceToken` +
+  `GetJWKS` only (Epic D).** `internal/adapter/vault/token_signer.go` wraps
+  `common/jwtauth.TransitSigner` over a `*secrets.Client`, backed by a
+  single global (not per-tenant — auth-service issues JWTs across every
+  tenant from one service identity) Vault Transit RSA key, `"jwt-signing"`
+  / `"rsa-2048"`. `cmd/server/main.go` calls `TokenSigner.Ensure(ctx)` at
+  startup — the server refuses to start if the key can't be
+  created/verified — and registers a `vault` health check
+  (`TokenSigner.Ping`, mirroring credential-broker-service's Vault
+  reachability pattern) so a pod that loses Vault access is pulled out of
+  rotation. `IssueServiceToken` (`internal/usecase/issue_service_token.go`)
+  looks the target user up via the existing `UserRepository.GetUserByID`,
+  sets `sub` = that user's ID, `tenant_id` = that user's tenant, `aud` =
+  the request's `audience`, `iss` = `jwtauth.Issuer`, `exp` = now +
+  `ServiceTokenTTL` (config, default 15m, `SERVICE_TOKEN_TTL` env), `jti` =
+  `generateRandomToken`, then signs through Vault Transit — the RSA private
+  key never enters this process's memory. `GetJWKS`
+  (`internal/usecase/get_jwks.go`) publishes the signing key's
+  current+previous version (rotation overlap) as an RFC 7517 JWK Set;
+  it is deliberately unauthenticated, per the RPC's proto doc comment.
+  **Known gap, not fixed here:** `IssueServiceTokenRequest` carries no
+  caller-identity field, so there is no check that the *requester* of a
+  token is itself authorized to mint one for the given `user_id` — this
+  usecase only verifies the target user exists. Closing that needs a proto
+  change (a caller-identity field on the request) outside this task's
+  scope. **Also still not done:** the fuller
+  `IssueToken`/`RefreshToken`/`RevokeToken` RPC surface and
+  refresh-token-family design from `auth-service.md` §6-7 — only the
+  pre-existing `IssueServiceToken` RPC was made real; see the
+  "Refresh-token flow" entry below, still deferred to a later pass now that
+  Epic D's signing primitive exists for it to build on.
 - **SSO is not implemented — a real product gap, not a mechanical stub.**
   Per `auth-service.md` §9, the TS system's `GET /auth/sso/:provider`
   always returned `501`; this redesign is supposed to implement OIDC
@@ -76,17 +96,25 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
   decision *before* auth-service's initial build — not something this
   scaffold should invent. `InitiateSSO`/`HandleSSOCallback` aren't in the
   generated proto and aren't implemented here.
-- **OPA authorization checks are not wired — every admin-console usecase
-  does a simple role check instead.** `internal/usecase/authorization.go`'s
-  `requireAdminActor` looks up the acting user and checks
-  `role == RoleAdmin` directly. Per `auth-service.md` §9, this is exactly
-  the bug class (`requireAdmin`/`requireOwnerOrAdmin` being login-only
-  checks) the OPA-based design is meant to close structurally: the correct
-  implementation calls the embedded OPA SDK (`internal/adapter/opa/`, not
-  present in this scaffold) with the caller's resolved role/claims as
-  input, replacing this placeholder in `CreateUser`, `ListUsers`,
-  `UpdateUserRole`, `RevokeSession`, and `QueryAuditLog`. Do not treat the
-  placeholder as sufficient for production.
+- **OPA authorization checks are now real (Epic E).**
+  `internal/usecase/authorization.go`'s `requireAdminActor` resolves the
+  acting user, then calls the embedded OPA policy decision
+  (`data.orca.authz.admin.allow`, `backend-go/policy/orca-authz/admin.rego`)
+  through `internal/adapter/opaclient` (a thin wrapper over the shared
+  `common/policy.Evaluator`, mirroring task-service/annotation-service's own
+  `internal/adapter/opaclient`), instead of the earlier inline
+  `role == RoleAdmin` check — closing the bug class (`requireAdmin`/
+  `requireOwnerOrAdmin` being login-only checks) `auth-service.md` §9
+  describes. `CreateUser`, `ListUsers`, `UpdateUserRole`, `RevokeSession`,
+  and `QueryAuditLog` all thread an `OPAClient` port through their
+  constructors. A policy-evaluation error fails closed (denies), matching
+  every other Epic E consumer's contract. `cmd/server/main.go` constructs
+  one `policy.NewEvaluator(cfg.OPABundlePath)`, shared across every call —
+  `OPABundlePath` config (`OPA_BUNDLE_PATH` env, default
+  `../../policy/orca-authz`) matches task-service/annotation-service's own
+  convention. **Known gap, not fixed here:** the bundle has no hot-reload —
+  a policy edit needs a service restart to take effect (see
+  `common/policy.Evaluator`'s doc comment).
 - **`CreateUser`'s password handling is a placeholder.** The generated
   `CreateUserRequest` (see `proto/orca/auth/v1/auth.proto`) has no password
   field — there is no invite/reset-link flow in this scaffold to hand a
@@ -103,20 +131,55 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
   ambiguous. Flagged here rather than inventing an out-of-scope
   tenant-selection step; revisit if/when the proto's `LoginRequest` grows a
   tenant hint.
-- **No refresh-token / `IssueToken` / `RefreshToken` / `RevokeToken` model.**
-  `auth-service.md` §3/§5 describes a `refresh_tokens` table and
-  reuse-detection flow for mobile/CLI JWTs; none of that RPC surface is in
-  the generated proto or implemented here — only session-cookie login
-  (`Login`/`Logout`/`ValidateSession`) and the admin-console RPCs are.
-- **No access-policy CRUD, first-run setup, or session/refresh-token
-  reaper job.** `auth-service.md` §3/§5/§8 describes `AccessPolicy` CRUD,
-  `GetFirstRunStatus`/`CompleteFirstRunSetup`, and a background reaper for
-  expired sessions — none of these are in the generated proto's RPC set,
-  so none are implemented in this scaffold. `CreateUser`'s "first admin
-  user" case has no special-cased single-use guard here.
-- **`common/secrets` (Vault) is not wired into this service's `main.go`** —
-  `DATABASE_DSN` is read directly from the environment for local dev, same
-  caveat as usage-service's README.
+- **Refresh-token / `IssueToken` / `RefreshToken` / `RevokeToken`, access-policy
+  CRUD, and first-run setup — investigated for Epic C
+  (`docs/execution-plan.md` §10, 2026-08-17), each resolved differently, not
+  left as one undifferentiated "not implemented" bucket:**
+  - **First-run setup: not needed as an RPC — a different mechanism already
+    closes the gap it exists for.** `auth-service.md` §3's
+    `GetFirstRunStatus`/`CompleteFirstRunSetup` solve "how does a fresh
+    deployment with zero users get its first admin account" via an
+    interactive first-boot wizard. This scaffold already solves the same
+    underlying problem via `internal/usecase/bootstrap.go`'s `Bootstrap`
+    (env-var-driven: `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`,
+    runs once at `cmd/server/main.go` startup, never via RPC — see that
+    file's doc comment) — found live and shipped 2026-08-17, before this
+    Epic C pass. Different UX (operator-configured env vars vs. an
+    interactive setup screen), same goal, already closed. Building the
+    RPC pair too would be two mechanisms doing the same job; not done.
+  - **Access-policy CRUD: genuinely missing, but correctly deferred, not
+    forgotten.** `AccessPolicy` rows are OPA's *input data* (`auth-service.md`
+    §3/§5) — CRUD for documents nothing consumes is speculative scaffolding.
+    Epic E (OPA policy bundle, `docs/execution-plan.md` §2) is explicit that
+    "no service calls OPA yet." Build this once Epic E stands up an actual
+    OPA instance for it to feed — tracked there, not duplicated here.
+  - **Refresh-token flow: genuinely missing, but correctly deferred, not
+    forgotten.** Mobile/CLI `RefreshToken`/`RevokeToken` need real JWT
+    issuance behind them to mean anything. Epic D has now landed real
+    Vault-Transit-backed signing + JWKS publication for `IssueServiceToken`/
+    `GetJWKS` (see "JWT signing via Vault Transit" above) — but the
+    dedicated `IssueToken`/`RefreshToken`/`RevokeToken` RPCs and
+    refresh-token-family rotation state are still not in the generated
+    proto surface or implemented here. That's a distinct piece of work
+    (new proto messages/RPCs, a `refresh_tokens` table, rotation-family
+    bookkeeping) layered on top of the signing primitive Epic D built, not
+    included in this pass.
+  - **No session/refresh-token reaper job** — the `sessions` table itself
+    is real (see `ValidateSession`), but nothing expires old rows yet;
+    `refresh_tokens` doesn't exist until the point above lands. A cheap,
+    separable follow-up once there's a real table to reap.
+  - `CreateUser`'s "first admin user" case has no special-cased single-use
+    guard — not needed either, since `Bootstrap` (not `CreateUser`) is what
+    actually creates that first user; `CreateUser` itself always requires
+    an existing admin caller (`requireAdminActor`), which is already the
+    right invariant for every call after the first.
+- **`common/secrets` (Vault) is wired into this service's `main.go` for
+  Transit-based JWT signing only (Epic D, see above) — not for database
+  credentials.** `DATABASE_DSN` is still read directly from the environment
+  for local dev, same caveat as usage-service's README; a Vault-Agent-
+  rendered dynamic DB credential (the bootstrap exception every other
+  service also defers, per `common/secrets`' doc comment) isn't wired here
+  either.
 - **`common/tracing` has no OTLP exporter configured** — spans are created
   but not shipped anywhere until a collector endpoint is wired in
   (see that package's doc comment).

@@ -9,6 +9,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/stablyai/orca-go/common/testutil"
 	"github.com/stablyai/orca-go/services/orchestration-service/internal/domain"
+	"github.com/stablyai/orca-go/services/orchestration-service/internal/usecase"
 )
 
 func setupRepository(t *testing.T) *Repository {
@@ -122,15 +124,9 @@ func TestRepository_ResolveGate_CannotBeResolvedTwice(t *testing.T) {
 		t.Fatalf("creating task: %v", err)
 	}
 
-	dc, err := repo.CreateDispatchContext(ctx, tenantID, "handle-1", runID)
+	dc, err := repo.CreateDispatchContext(ctx, tenantID, "handle-1", runID, task.ID)
 	if err != nil {
 		t.Fatalf("creating dispatch context: %v", err)
-	}
-	// This scaffold's CreateDispatchContext leaves orchestration_task_id
-	// NULL (see README "Known gaps") — patch it directly so CreateGate has
-	// a task to attach to, exercising the rest of the atomic chain.
-	if _, err := repo.pool.Exec(ctx, `UPDATE orchestration.dispatch_contexts SET orchestration_task_id=$1 WHERE id=$2`, task.ID, dc.ID); err != nil {
-		t.Fatalf("patching dispatch context: %v", err)
 	}
 
 	gate, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"})
@@ -144,5 +140,83 @@ func TestRepository_ResolveGate_CannotBeResolvedTwice(t *testing.T) {
 
 	if _, _, err := repo.ResolveGate(ctx, tenantID, gate.ID, "no"); err == nil {
 		t.Fatal("expected an error resolving an already-resolved gate")
+	}
+}
+
+// TestRepository_CreateGate_SucceedsWhenDispatchContextHasTask is the
+// concrete proof that Epic C's proto extension (docs/execution-plan.md)
+// closes the ORCH_DISPATCH_CONTEXT_NO_TASK gap: a dispatch context created
+// with a real orchestration_task_id (now possible via the extended
+// CreateDispatchContextRequest) lets CreateGate succeed and round-trip
+// question/options, instead of failing closed.
+func TestRepository_CreateGate_SucceedsWhenDispatchContextHasTask(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "55555555-5555-5555-5555-555555555555"
+	runID := "66666666-6666-6666-6666-666666666666"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-3")
+
+	task, err := domain.NewOrchestrationTask("", tenantID, runID, "", "", "gated task", nil, nil)
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	task, err = repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	dc, err := repo.CreateDispatchContext(ctx, tenantID, "handle-1", runID, task.ID)
+	if err != nil {
+		t.Fatalf("creating dispatch context: %v", err)
+	}
+	if dc.OrchestrationTaskID != task.ID {
+		t.Fatalf("expected dispatch context orchestration_task_id %q, got %q", task.ID, dc.OrchestrationTaskID)
+	}
+
+	gate, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"})
+	if err != nil {
+		t.Fatalf("expected CreateGate to succeed for a dispatch context with a task, got: %v", err)
+	}
+	if gate.OrchestrationTaskID != task.ID {
+		t.Errorf("expected gate.OrchestrationTaskID %q, got %q", task.ID, gate.OrchestrationTaskID)
+	}
+	if gate.Question != "proceed?" {
+		t.Errorf("expected question to round-trip, got %q", gate.Question)
+	}
+	if len(gate.Options) != 2 || gate.Options[0] != "yes" || gate.Options[1] != "no" {
+		t.Errorf("expected options to round-trip, got %v", gate.Options)
+	}
+
+	got, err := repo.Get(ctx, tenantID, task.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.Status != domain.TaskStatusBlocked {
+		t.Errorf("expected task blocked by the gate, got %s", got.Status)
+	}
+}
+
+// TestRepository_CreateGate_FailsWhenDispatchContextHasNoTask keeps proving
+// the original failure mode is a real invariant, not a bug: an ad-hoc
+// coordinator-only dispatch context (legitimately created with no
+// orchestration_task_id) must still make CreateGate fail closed with
+// usecase.ErrDispatchContextHasNoTask (mapped to ORCH_DISPATCH_CONTEXT_NO_TASK
+// / FailedPrecondition at the usecase layer).
+func TestRepository_CreateGate_FailsWhenDispatchContextHasNoTask(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "77777777-7777-7777-7777-777777777777"
+	runID := "88888888-8888-8888-8888-888888888888"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-4")
+
+	dc, err := repo.CreateDispatchContext(ctx, tenantID, "handle-1", runID, "")
+	if err != nil {
+		t.Fatalf("creating dispatch context: %v", err)
+	}
+
+	if _, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"}); !errors.Is(err, usecase.ErrDispatchContextHasNoTask) {
+		t.Fatalf("expected usecase.ErrDispatchContextHasNoTask, got: %v", err)
 	}
 }

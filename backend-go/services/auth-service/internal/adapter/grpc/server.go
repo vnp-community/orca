@@ -8,8 +8,6 @@ import (
 	"context"
 	"time"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -23,14 +21,16 @@ import (
 type Server struct {
 	authv1.UnimplementedAuthServiceServer
 
-	login           *usecase.Login
-	logout          *usecase.Logout
-	validateSession *usecase.ValidateSession
-	createUser      *usecase.CreateUser
-	listUsers       *usecase.ListUsers
-	updateUserRole  *usecase.UpdateUserRole
-	revokeSession   *usecase.RevokeSession
-	queryAuditLog   *usecase.QueryAuditLog
+	login             *usecase.Login
+	logout            *usecase.Logout
+	validateSession   *usecase.ValidateSession
+	createUser        *usecase.CreateUser
+	listUsers         *usecase.ListUsers
+	updateUserRole    *usecase.UpdateUserRole
+	revokeSession     *usecase.RevokeSession
+	queryAuditLog     *usecase.QueryAuditLog
+	issueServiceToken *usecase.IssueServiceToken
+	getJWKS           *usecase.GetJWKS
 }
 
 func New(
@@ -42,16 +42,20 @@ func New(
 	updateUserRole *usecase.UpdateUserRole,
 	revokeSession *usecase.RevokeSession,
 	queryAuditLog *usecase.QueryAuditLog,
+	issueServiceToken *usecase.IssueServiceToken,
+	getJWKS *usecase.GetJWKS,
 ) *Server {
 	return &Server{
-		login:           login,
-		logout:          logout,
-		validateSession: validateSession,
-		createUser:      createUser,
-		listUsers:       listUsers,
-		updateUserRole:  updateUserRole,
-		revokeSession:   revokeSession,
-		queryAuditLog:   queryAuditLog,
+		login:             login,
+		logout:            logout,
+		validateSession:   validateSession,
+		createUser:        createUser,
+		listUsers:         listUsers,
+		updateUserRole:    updateUserRole,
+		revokeSession:     revokeSession,
+		queryAuditLog:     queryAuditLog,
+		issueServiceToken: issueServiceToken,
+		getJWKS:           getJWKS,
 	}
 }
 
@@ -82,16 +86,34 @@ func (s *Server) ValidateSession(ctx context.Context, req *authv1.ValidateSessio
 	return resp, nil
 }
 
-// IssueServiceToken is a stub. Per auth-service.md §6-7, minting a real RS256
-// JWT here requires signing through Vault Transit (the private key never
-// materializes in this service's process memory) plus the JWKS-publication
-// sequencing described in §9 ("publish the new public key before it's used
-// to sign anything"). None of that is wired in this scaffold — see this
-// service's README "Known gaps". The handler exists and compiles, as
-// required, but deliberately refuses rather than returning a token that
-// looks real but validates against nothing.
+// IssueServiceToken mints a real RS256 JWT, signed through Vault Transit
+// (internal/adapter/vault.TokenSigner) — the private key never materializes
+// in this service's process memory. See this service's README "Known gaps"
+// for what's still not covered (caller-authorization, the fuller
+// IssueToken/RefreshToken/RevokeToken surface).
 func (s *Server) IssueServiceToken(ctx context.Context, req *authv1.IssueServiceTokenRequest) (*authv1.IssueServiceTokenResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "IssueServiceToken: JWT signing via Vault Transit is not wired in this scaffold; see auth-service.md §6-7 and this service's README")
+	out, err := s.issueServiceToken.Execute(ctx, usecase.IssueServiceTokenInput{
+		UserID:   req.GetUserId(),
+		Audience: req.GetAudience(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.IssueServiceTokenResponse{
+		Jwt:       out.JWT,
+		ExpiresAt: timestamppb.New(out.ExpiresAt),
+	}, nil
+}
+
+// GetJWKS is public/unauthenticated by convention (see
+// proto/orca/auth/v1/auth.proto's doc comment on the RPC) — no actor
+// resolution here, unlike every admin-console handler above.
+func (s *Server) GetJWKS(ctx context.Context, req *authv1.GetJWKSRequest) (*authv1.GetJWKSResponse, error) {
+	out, err := s.getJWKS.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.GetJWKSResponse{JwksJson: out.JWKSJSON}, nil
 }
 
 func (s *Server) CreateUser(ctx context.Context, req *authv1.CreateUserRequest) (*authv1.CreateUserResponse, error) {

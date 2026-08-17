@@ -15,7 +15,7 @@ func TestRevokeCredential_CallsVaultRevokeAndMarksRevoked(t *testing.T) {
 
 	m := seedCredential(t, rec, metadataRepo, store, domain.CategoryScmOAuth, domain.StatusActive, "token")
 
-	uc := NewRevokeCredential(metadataRepo, auditRepo, store)
+	uc := NewRevokeCredential(metadataRepo, store, newFakeTxRunner(rec, metadataRepo, auditRepo))
 	got, err := uc.Execute(context.Background(), RevokeCredentialInput{CredentialID: m.ID, RequestingService: "scm-integration-service"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -60,7 +60,7 @@ func TestRevokeCredential_IsIdempotent(t *testing.T) {
 
 	m := seedCredential(t, rec, metadataRepo, store, domain.CategoryScmOAuth, domain.StatusRevoked, "token")
 
-	uc := NewRevokeCredential(metadataRepo, auditRepo, store)
+	uc := NewRevokeCredential(metadataRepo, store, newFakeTxRunner(rec, metadataRepo, auditRepo))
 	got, err := uc.Execute(context.Background(), RevokeCredentialInput{CredentialID: m.ID})
 	if err != nil {
 		t.Fatalf("unexpected error revoking an already-revoked credential: %v", err)
@@ -78,7 +78,8 @@ func TestRevokeCredential_IsIdempotent(t *testing.T) {
 
 func TestRevokeCredential_NotFound(t *testing.T) {
 	rec := &callRecorder{}
-	uc := NewRevokeCredential(newFakeMetadataRepo(rec), newFakeAuditRepo(rec), newFakeSecretStore(rec))
+	metadataRepo := newFakeMetadataRepo(rec)
+	uc := NewRevokeCredential(metadataRepo, newFakeSecretStore(rec), newFakeTxRunner(rec, metadataRepo, newFakeAuditRepo(rec)))
 	_, err := uc.Execute(context.Background(), RevokeCredentialInput{CredentialID: "missing"})
 	if err == nil {
 		t.Fatal("expected an error for a nonexistent credential")

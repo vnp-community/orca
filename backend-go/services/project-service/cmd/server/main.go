@@ -22,12 +22,14 @@ import (
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/project-service/internal/config"
 
 	projectgrpc "github.com/stablyai/orca-go/services/project-service/internal/adapter/grpc"
 	projectgrpcclient "github.com/stablyai/orca-go/services/project-service/internal/adapter/grpcclient"
+	projectopaclient "github.com/stablyai/orca-go/services/project-service/internal/adapter/opaclient"
 	projectpostgres "github.com/stablyai/orca-go/services/project-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/project-service/internal/usecase"
 
@@ -73,11 +75,13 @@ func run() error {
 	defer pool.Close()
 
 	repo := projectpostgres.New(pool)
+	repoRepo := projectpostgres.NewRepoRepository(pool)
+	worktreeRepo := projectpostgres.NewWorktreeRepository(pool)
+	projectGroupRepo := projectpostgres.NewProjectGroupRepository(pool)
 
-	// STUB clients — see internal/adapter/grpcclient's doc comments. Dialed
-	// for real (lazy connect, doesn't block startup) so config/wiring is
-	// already correct once workflow-service/task-service expose
-	// HasActiveExecutions.
+	// Real clients — Epic C (docs/execution-plan.md §10, 2026-08-17) closed
+	// the gap these were previously stubs for. Dialed lazily (doesn't block
+	// startup) — see internal/adapter/grpcclient's doc comments.
 	workflowChecker, err := projectgrpcclient.NewWorkflowExecutionChecker(cfg.WorkflowServiceAddr)
 	if err != nil {
 		return fmt.Errorf("dialing workflow-service: %w", err)
@@ -90,14 +94,66 @@ func run() error {
 	}
 	defer func() { _ = taskChecker.Close() }()
 
+	// Shared embedded-OPA evaluator (common/policy) for project-role/
+	// global-admin authorization — mirrors auth-service/annotation-service/
+	// task-service's own composition-root wiring. One Evaluator, pointed at
+	// the same orca-authz bundle, shared by every OPA-gated usecase below.
+	opa := projectopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
+
 	createProjectUC := usecase.NewCreateProject(repo)
-	getProjectUC := usecase.NewGetProject(repo)
+	getProjectUC := usecase.NewGetProject(repo, opa)
 	listProjectsUC := usecase.NewListProjects(repo)
-	addMemberUC := usecase.NewAddMember(repo)
-	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker)
+	addMemberUC := usecase.NewAddMember(repo, opa)
+	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker, opa)
+	updateProjectUC := usecase.NewUpdateProject(repo, opa)
+	deleteProjectUC := usecase.NewDeleteProject(repo, workflowChecker, taskChecker, opa)
+
+	// repo (usecase.ProjectRepository) satisfies usecase.MembershipRepository
+	// structurally — passed as the membership-lookup port to usecases whose
+	// primary repository dependency is RepoRepository/WorktreeRepository
+	// instead. See usecase.MembershipRepository's doc comment.
+	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa)
+	listReposUC := usecase.NewListRepos(repoRepo, repo, opa)
+	reorderReposUC := usecase.NewReorderRepos(repoRepo, repo, opa)
+	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
+
+	recordWorktreeCreatedUC := usecase.NewRecordWorktreeCreated(worktreeRepo)
+	recordWorktreeRemovedUC := usecase.NewRecordWorktreeRemoved(worktreeRepo)
+	listWorktreesUC := usecase.NewListWorktrees(worktreeRepo, repo, opa)
+	setWorktreeActivationUC := usecase.NewSetWorktreeActivation(worktreeRepo)
+	renameWorktreeUC := usecase.NewRenameWorktree(worktreeRepo)
+
+	createProjectGroupUC := usecase.NewCreateProjectGroup(projectGroupRepo)
+	updateProjectGroupUC := usecase.NewUpdateProjectGroup(projectGroupRepo)
+	deleteProjectGroupUC := usecase.NewDeleteProjectGroup(projectGroupRepo)
+	listProjectGroupsUC := usecase.NewListProjectGroups(projectGroupRepo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(createProjectUC, getProjectUC, listProjectsUC, addMemberUC, rebindDevServerUC))
+	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
+		CreateProject:   createProjectUC,
+		GetProject:      getProjectUC,
+		ListProjects:    listProjectsUC,
+		AddMember:       addMemberUC,
+		RebindDevServer: rebindDevServerUC,
+		UpdateProject:   updateProjectUC,
+		DeleteProject:   deleteProjectUC,
+
+		AddRepo:      addRepoUC,
+		ListRepos:    listReposUC,
+		ReorderRepos: reorderReposUC,
+		RemoveRepo:   removeRepoUC,
+
+		RecordWorktreeCreated: recordWorktreeCreatedUC,
+		RecordWorktreeRemoved: recordWorktreeRemovedUC,
+		ListWorktrees:         listWorktreesUC,
+		SetWorktreeActivation: setWorktreeActivationUC,
+		RenameWorktree:        renameWorktreeUC,
+
+		CreateProjectGroup: createProjectGroupUC,
+		UpdateProjectGroup: updateProjectGroupUC,
+		DeleteProjectGroup: deleteProjectGroupUC,
+		ListProjectGroups:  listProjectGroupsUC,
+	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	healthSrv := health.New()

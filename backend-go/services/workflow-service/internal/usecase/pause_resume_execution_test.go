@@ -2,17 +2,28 @@ package usecase
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 )
 
-// fakeExecutionRepository is an in-memory ExecutionRepository.
+// fakeExecutionRepository is an in-memory ExecutionRepository. Safe for
+// concurrent use: usecase.Execute's wave dispatch updates it from a
+// background goroutine, which execute_test.go's tests exercise directly.
 type fakeExecutionRepository struct {
-	executions map[string]domain.WorkflowExecution
-	getErr     error
-	updateErr  error
+	mu               sync.Mutex
+	executions       map[string]domain.WorkflowExecution
+	getErr           error
+	updateErr        error
+	hasActiveExecErr error
+	listRunningErr   error
+	// onUpdate, if set, is invoked synchronously inside UpdateExecution
+	// after the row is stored — a deterministic hook execute_test.go uses
+	// to observe "the background dispatch goroutine reached its final
+	// status update" without polling or sleeping.
+	onUpdate func(domain.WorkflowExecution)
 }
 
 func newFakeExecutionRepository() *fakeExecutionRepository {
@@ -20,11 +31,15 @@ func newFakeExecutionRepository() *fakeExecutionRepository {
 }
 
 func (f *fakeExecutionRepository) CreateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.executions[exec.ID] = exec
 	return nil
 }
 
 func (f *fakeExecutionRepository) GetExecution(ctx context.Context, tenantID, id string) (domain.WorkflowExecution, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.getErr != nil {
 		return domain.WorkflowExecution{}, f.getErr
 	}
@@ -36,16 +51,77 @@ func (f *fakeExecutionRepository) GetExecution(ctx context.Context, tenantID, id
 }
 
 func (f *fakeExecutionRepository) UpdateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
+	f.mu.Lock()
 	if f.updateErr != nil {
+		f.mu.Unlock()
 		return f.updateErr
 	}
 	f.executions[exec.ID] = exec
+	hook := f.onUpdate
+	f.mu.Unlock()
+	if hook != nil {
+		hook(exec)
+	}
 	return nil
+}
+
+func (f *fakeExecutionRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.hasActiveExecErr != nil {
+		return false, f.hasActiveExecErr
+	}
+	for _, e := range f.executions {
+		if e.TenantID != tenantID || e.ProjectID != projectID {
+			continue
+		}
+		switch e.Status {
+		case domain.StatusPending, domain.StatusRunning, domain.StatusPaused:
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// ListRunning implements usecase.ExecutionRepository.ListRunning for
+// recover_executions_test.go — deliberately ignores tenant, matching the
+// real port method's process-wide contract (see that method's doc
+// comment).
+func (f *fakeExecutionRepository) ListRunning(ctx context.Context) ([]domain.WorkflowExecution, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.listRunningErr != nil {
+		return nil, f.listRunningErr
+	}
+	var out []domain.WorkflowExecution
+	for _, e := range f.executions {
+		if e.Status == domain.StatusRunning {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+// snapshot returns a copy of id's current stored execution, for tests to
+// inspect after synchronizing via onUpdate.
+func (f *fakeExecutionRepository) snapshot(id string) (domain.WorkflowExecution, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	e, ok := f.executions[id]
+	return e, ok
+}
+
+// count returns how many executions are currently stored — used to assert
+// a synchronous validation failure never persisted anything.
+func (f *fakeExecutionRepository) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.executions)
 }
 
 func TestPauseExecution_RunningTransitionsToPaused(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, err := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1")
+	exec, err := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
 	if err != nil {
 		t.Fatalf("building execution: %v", err)
 	}
@@ -71,7 +147,7 @@ func TestPauseExecution_RunningTransitionsToPaused(t *testing.T) {
 
 func TestPauseExecution_RejectsNonRunningExecution(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
 	// Force it into a terminal state a real running execution would reach
 	// on its own — pausing from here must be rejected.
 	exec.Status = domain.StatusCompleted
@@ -88,7 +164,7 @@ func TestPauseExecution_RejectsNonRunningExecution(t *testing.T) {
 
 func TestResumeExecution_PausedTransitionsToRunning(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
 	_ = exec.Pause(time.Now().UTC())
 	_ = repo.CreateExecution(context.Background(), exec)
 
@@ -110,7 +186,7 @@ func TestResumeExecution_PausedTransitionsToRunning(t *testing.T) {
 func TestResumeExecution_RejectsNonPausedExecution(t *testing.T) {
 	repo := newFakeExecutionRepository()
 	// Still running — never paused.
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
 	_ = repo.CreateExecution(context.Background(), exec)
 
 	uc := NewResumeExecution(repo)

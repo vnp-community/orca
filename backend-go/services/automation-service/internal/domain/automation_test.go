@@ -24,7 +24,7 @@ func TestNewAutomation_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewAutomation("a1", tt.tenantID, tt.automationName, tt.rrule, tt.stepConfig, now, now)
+			_, err := NewAutomation("a1", tt.tenantID, tt.automationName, tt.rrule, StepTypeAgent, tt.stepConfig, now, "UTC", true, now)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -37,15 +37,37 @@ func TestNewAutomation_ValidatesInvariants(t *testing.T) {
 
 func TestNewAutomation_RejectsInvalidRRule(t *testing.T) {
 	now := time.Now()
-	_, err := NewAutomation("a1", "t1", "bad-rule", "NOT_A_RULE", `{}`, now, now)
+	_, err := NewAutomation("a1", "t1", "bad-rule", "NOT_A_RULE", StepTypeAgent, `{}`, now, "UTC", true, now)
 	if err == nil {
 		t.Fatal("expected an error for an invalid rrule")
 	}
 }
 
+func TestNewAutomation_DefaultsStepTypeWhenInvalid(t *testing.T) {
+	now := time.Now()
+	a, err := NewAutomation("a1", "t1", "nightly-report", "FREQ=DAILY;INTERVAL=1", StepTypeUnspecified, `{}`, now, "UTC", true, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.StepType != StepTypeAgent {
+		t.Errorf("expected StepType to default to agent, got %v", a.StepType)
+	}
+}
+
+func TestNewAutomation_DefaultsTimezoneWhenEmpty(t *testing.T) {
+	now := time.Now()
+	a, err := NewAutomation("a1", "t1", "nightly-report", "FREQ=DAILY;INTERVAL=1", StepTypeAgent, `{}`, now, "", true, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.Timezone != "UTC" {
+		t.Errorf("expected Timezone to default to UTC, got %q", a.Timezone)
+	}
+}
+
 func TestAutomationRun_StatusTransitions(t *testing.T) {
 	now := time.Now()
-	run, err := NewPendingRun("r1", "a1", "t1", "req-1", StepTypeAgent, `{"step_type":"agent"}`, now)
+	run, err := NewPendingRun("r1", "a1", "t1", "req-1", StepTypeAgent, RunTriggerManual, `{"step_type":"agent"}`, now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +104,7 @@ func TestAutomationRun_StatusTransitions(t *testing.T) {
 
 func TestAutomationRun_MarkFailed_ValidFromPendingOrRunning(t *testing.T) {
 	now := time.Now()
-	run, err := NewPendingRun("r1", "a1", "t1", "req-1", StepTypeAgent, `{}`, now)
+	run, err := NewPendingRun("r1", "a1", "t1", "req-1", StepTypeAgent, RunTriggerManual, `{}`, now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -101,10 +123,21 @@ func TestAutomationRun_MarkFailed_ValidFromPendingOrRunning(t *testing.T) {
 
 func TestNewPendingRun_ValidatesInvariants(t *testing.T) {
 	now := time.Now()
-	if _, err := NewPendingRun("r1", "", "t1", "req-1", StepTypeAgent, `{}`, now); err != ErrEmptyAutomationID {
+	if _, err := NewPendingRun("r1", "", "t1", "req-1", StepTypeAgent, RunTriggerManual, `{}`, now); err != ErrEmptyAutomationID {
 		t.Errorf("expected ErrEmptyAutomationID, got %v", err)
 	}
-	if _, err := NewPendingRun("r1", "a1", "t1", "", StepTypeAgent, `{}`, now); err != ErrEmptyRequestID {
+	if _, err := NewPendingRun("r1", "a1", "t1", "", StepTypeAgent, RunTriggerManual, `{}`, now); err != ErrEmptyRequestID {
 		t.Errorf("expected ErrEmptyRequestID, got %v", err)
+	}
+}
+
+func TestNewPendingRun_DefaultsTriggerWhenInvalid(t *testing.T) {
+	now := time.Now()
+	run, err := NewPendingRun("r1", "a1", "t1", "req-1", StepTypeAgent, RunTrigger("bogus"), `{}`, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if run.Trigger != RunTriggerManual {
+		t.Errorf("expected Trigger to default to manual, got %v", run.Trigger)
 	}
 }

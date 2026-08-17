@@ -68,29 +68,37 @@ layout/conventions this service follows.
 ## Known gaps / follow-ups (flagged honestly, not silently dropped)
 
 The generated proto
-(`proto/orca/orchestration/v1/orchestration.proto`, **not regenerated for
-this service**) is narrower than the design doc §3's RPC sketch. This
-service's domain/DB layer is still built per the design doc's fuller model
-(the system-of-record contract), and the gaps below are all at the
-proto/adapter seam, not in the coordination logic itself:
+(`proto/orca/orchestration/v1/orchestration.proto`) is narrower than the
+design doc §3's RPC sketch. This service's domain/DB layer is still built
+per the design doc's fuller model (the system-of-record contract), and the
+gaps below are all at the proto/adapter seam, not in the coordination logic
+itself:
 
-- **`CreateDispatchContextRequest` carries no `orchestration_task_id`.**
-  The design doc's §8 NFR table requires "dispatch row and `dispatched`
-  transition must commit together"; without a task id in the request, a
-  `dispatch_contexts` row is created with `orchestration_task_id = NULL`
-  and no task transition happens. `orchestration_task_id` is a nullable FK
-  in the migration specifically so the schema is ready the moment the
-  proto is extended — see `internal/usecase/ports.go`'s
-  `DispatchContextRepository` doc comment.
-- **`CreateGateRequest` carries only `dispatch_context_id`** — no
-  `orchestration_task_id`, `question`, or `options`. `CreateGate` resolves
-  `dispatch_context_id -> orchestration_task_id` via a locked read inside
-  its transaction, but because every dispatch context created through this
-  proto surface has `orchestration_task_id = NULL` (previous point),
-  `CreateGate` will return `ORCH_DISPATCH_CONTEXT_NO_TASK`
-  (`FailedPrecondition`) until `CreateDispatchContextRequest` is extended.
-  `question`/`options` are accepted by the usecase/repository but always
-  empty from the current gRPC adapter.
+- **FIXED (Epic C, docs/execution-plan.md): `CreateDispatchContextRequest`
+  now carries `orchestration_task_id`.** The proto, the
+  `DispatchContextRepository.CreateDispatchContext` port, and the Postgres
+  INSERT were all extended to accept and persist it (nullable — an
+  ad-hoc coordinator-only dispatch context legitimately still has none).
+  `DispatchContext`'s response message round-trips it back too. See
+  `internal/usecase/ports.go`'s `DispatchContextRepository` doc comment.
+- **FIXED (Epic C, docs/execution-plan.md): `CreateGateRequest` now carries
+  `question`/`options`,** which flow through the gRPC adapter into
+  `CreateGateInput` and round-trip onto `DecisionGate.question`/`options` in
+  `CreateGateResponse`/`ResolveGateResponse`. `CreateGate` still resolves
+  `dispatch_context_id -> orchestration_task_id` itself via a locked read
+  inside its transaction rather than trusting a caller-supplied
+  `orchestration_task_id` (a deliberate derive-not-trust boundary —
+  `CreateGateRequest.orchestration_task_id` exists on the wire but is
+  intentionally left unread in the gRPC handler, see its comment in
+  `internal/adapter/grpc/server.go`). Now that
+  `CreateDispatchContextRequest` can supply a real task id, a dispatch
+  context created with one lets `CreateGate` succeed; a dispatch context
+  genuinely created with no task (an ad-hoc coordinator-only dispatch)
+  still correctly fails closed with `ORCH_DISPATCH_CONTEXT_NO_TASK`
+  (`FailedPrecondition`) — that's the real invariant, not a bug. See
+  `internal/adapter/postgres/repository_test.go`'s
+  `TestRepository_CreateGate_SucceedsWhenDispatchContextHasTask` /
+  `TestRepository_CreateGate_FailsWhenDispatchContextHasNoTask`.
 - **No handle in `ResolveGateRequest` / `UpdateTaskStatusAndPromoteRequest`.**
   The design doc keys `HandleSerializer.Do` by `assignee_handle`/
   `coordinator_handle`; those RPCs don't carry one, so `ResolveGate` keys

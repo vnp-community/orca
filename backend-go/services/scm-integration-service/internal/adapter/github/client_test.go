@@ -83,18 +83,115 @@ func TestListIssues_NonOKStatusIsAnError(t *testing.T) {
 	}
 }
 
-func TestUnimplementedMethods_ReturnErrNotImplemented(t *testing.T) {
-	client := New(nil, "")
-	ctx := context.Background()
-	cred := usecase.Credential{Token: "tok"}
+func TestCreatePullRequest_RealHTTPCall(t *testing.T) {
+	var gotMethod, gotPath, gotAuth string
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
 
-	if _, err := client.CreatePullRequest(ctx, cred, "a/b", usecase.CreatePullRequestInput{}); err != ErrNotImplemented {
-		t.Errorf("expected ErrNotImplemented, got %v", err)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"number":   9,
+			"title":    "add feature",
+			"state":    "open",
+			"html_url": "https://github.com/octocat/hello-world/pull/9",
+			"head":     map[string]any{"ref": "feature"},
+			"base":     map[string]any{"ref": "main"},
+		})
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	pr, err := client.CreatePullRequest(context.Background(), usecase.Credential{Token: "gho_faketoken"}, "octocat/hello-world", usecase.CreatePullRequestInput{
+		Title: "add feature", Body: "desc", HeadBranch: "feature", BaseBranch: "main",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := client.ListPullRequests(ctx, cred, "a/b"); err != ErrNotImplemented {
-		t.Errorf("expected ErrNotImplemented, got %v", err)
+	if gotMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", gotMethod)
 	}
-	if _, err := client.GetRateLimitStatus(ctx, cred); err != ErrNotImplemented {
-		t.Errorf("expected ErrNotImplemented, got %v", err)
+	if gotPath != "/repos/octocat/hello-world/pulls" {
+		t.Errorf("unexpected request path: %s", gotPath)
+	}
+	if gotAuth != "Bearer gho_faketoken" {
+		t.Errorf("expected Authorization header to carry the resolved credential, got %q", gotAuth)
+	}
+	if gotBody["head"] != "feature" || gotBody["base"] != "main" {
+		t.Errorf("unexpected request body: %+v", gotBody)
+	}
+	if pr.ID != "9" || pr.State != "open" || pr.HeadBranch != "feature" || pr.BaseBranch != "main" {
+		t.Errorf("unexpected pull request: %+v", pr)
+	}
+}
+
+func TestListPullRequests_RealHTTPCall(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{
+				"number":   3,
+				"title":    "fix bug",
+				"state":    "open",
+				"html_url": "https://github.com/octocat/hello-world/pull/3",
+				"head":     map[string]any{"ref": "fix"},
+				"base":     map[string]any{"ref": "main"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	prs, err := client.ListPullRequests(context.Background(), usecase.Credential{Token: "gho_faketoken"}, "octocat/hello-world")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotPath != "/repos/octocat/hello-world/pulls" {
+		t.Errorf("unexpected request path: %s", gotPath)
+	}
+	if len(prs) != 1 || prs[0].ID != "3" || prs[0].HeadBranch != "fix" {
+		t.Errorf("unexpected pull requests: %+v", prs)
+	}
+}
+
+func TestGetRateLimitStatus_RealHTTPCall(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"resources": map[string]any{
+				"core": map[string]any{"limit": 5000, "remaining": 340, "reset": 1700000000},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	status, err := client.GetRateLimitStatus(context.Background(), usecase.Credential{Token: "gho_faketoken"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotPath != "/rate_limit" {
+		t.Errorf("unexpected request path: %s", gotPath)
+	}
+	if status.Remaining != 340 || status.Limit != 5000 {
+		t.Errorf("unexpected rate limit status: %+v", status)
+	}
+}
+
+func TestCreatePullRequest_NonCreatedStatusIsAnError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, err := client.CreatePullRequest(context.Background(), usecase.Credential{Token: "tok"}, "a/b", usecase.CreatePullRequestInput{Title: "t", HeadBranch: "h", BaseBranch: "b"})
+	if err == nil {
+		t.Fatal("expected an error for a non-201 response")
 	}
 }

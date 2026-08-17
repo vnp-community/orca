@@ -9,6 +9,9 @@ import (
 	"errors"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v4"
+
+	"github.com/stablyai/orca-go/common/jwtauth"
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 )
 
@@ -46,6 +49,12 @@ type UserRepository interface {
 	GetUserByID(ctx context.Context, userID string) (domain.User, error)
 	ListUsers(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.User, string, error)
 	UpdateUserRole(ctx context.Context, userID string, role domain.Role) (domain.User, error)
+	// HasAnyUsers reports whether ANY row exists in the users table,
+	// across every tenant — deliberately not tenant-scoped, since it
+	// exists only for Bootstrap's "is this a completely fresh deployment"
+	// check (internal/usecase/bootstrap.go), which by definition runs
+	// before any tenant context exists to scope by.
+	HasAnyUsers(ctx context.Context) (bool, error)
 }
 
 // SessionRepository is the persistence port for sessions. Only the SHA-256
@@ -88,3 +97,28 @@ type Clock interface {
 type SystemClock struct{}
 
 func (SystemClock) Now() time.Time { return time.Now().UTC() }
+
+// OPAClient is the authorization port requireAdminActor uses for the "is
+// this actor an admin" decision — implemented by internal/adapter/opaclient
+// against the shared embedded OPA evaluator (common/policy), consuming
+// backend-go/policy/orca-authz/admin.rego's data.orca.authz.admin.allow
+// rule. Mirrors task-service/annotation-service's own OPAClient port shape.
+type OPAClient interface {
+	// Decision reports whether actor is authorized as admin, per
+	// admin.rego's {"actor": {"id", "role"}} input contract.
+	Decision(ctx context.Context, actor domain.User) (bool, error)
+}
+
+// TokenSigner is the port IssueServiceToken/GetJWKS sign and publish JWTs
+// through — implemented by internal/adapter/vault against a Vault Transit
+// key, kept behind this interface so this usecase package never imports
+// common/secrets or Vault SDK types directly, per auth-service's other
+// ports (PasswordHasher, etc.) following the same Dependency Inversion
+// convention.
+type TokenSigner interface {
+	// Sign mints a compact-serialized RS256 JWT for claims.
+	Sign(ctx context.Context, claims jwtauth.Claims) (string, error)
+	// PublicJWKS returns the current+previous signing key version as an
+	// RFC 7517 JWK Set, for GetJWKS to publish.
+	PublicJWKS(ctx context.Context) (jose.JSONWebKeySet, error)
+}

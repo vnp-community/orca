@@ -7,6 +7,7 @@
 package automationv1
 
 import (
+	v1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -28,8 +29,18 @@ type Automation struct {
 	Name           string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Rrule          string                 `protobuf:"bytes,4,opt,name=rrule,proto3" json:"rrule,omitempty"`
 	StepConfigJson string                 `protobuf:"bytes,5,opt,name=step_config_json,json=stepConfigJson,proto3" json:"step_config_json,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// step_type promotes what used to live only inside a "step_type" JSON key
+	// in step_config_json (domain.ParseStepType) to a first-class field —
+	// closes the Phase 2 execution-plan item. Reuses workflow-service's own
+	// StepType enum rather than defining a duplicate one, since automation's
+	// step_type must already match what ExecuteAdHocStepRequest.step_type
+	// expects on dispatch.
+	StepType      v1.StepType `protobuf:"varint,6,opt,name=step_type,json=stepType,proto3,enum=orca.workflow.v1.StepType" json:"step_type,omitempty"`
+	Enabled       bool        `protobuf:"varint,7,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Dtstart       string      `protobuf:"bytes,8,opt,name=dtstart,proto3" json:"dtstart,omitempty"`   // RFC3339; empty = defaults to created_at at creation time
+	Timezone      string      `protobuf:"bytes,9,opt,name=timezone,proto3" json:"timezone,omitempty"` // IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Automation) Reset() {
@@ -97,12 +108,43 @@ func (x *Automation) GetStepConfigJson() string {
 	return ""
 }
 
+func (x *Automation) GetStepType() v1.StepType {
+	if x != nil {
+		return x.StepType
+	}
+	return v1.StepType(0)
+}
+
+func (x *Automation) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *Automation) GetDtstart() string {
+	if x != nil {
+		return x.Dtstart
+	}
+	return ""
+}
+
+func (x *Automation) GetTimezone() string {
+	if x != nil {
+		return x.Timezone
+	}
+	return ""
+}
+
 type CreateAutomationRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	TenantId       string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Rrule          string                 `protobuf:"bytes,3,opt,name=rrule,proto3" json:"rrule,omitempty"`
 	StepConfigJson string                 `protobuf:"bytes,4,opt,name=step_config_json,json=stepConfigJson,proto3" json:"step_config_json,omitempty"`
+	StepType       v1.StepType            `protobuf:"varint,5,opt,name=step_type,json=stepType,proto3,enum=orca.workflow.v1.StepType" json:"step_type,omitempty"`
+	Dtstart        string                 `protobuf:"bytes,6,opt,name=dtstart,proto3" json:"dtstart,omitempty"`   // optional; empty = defaults to now at creation time
+	Timezone       string                 `protobuf:"bytes,7,opt,name=timezone,proto3" json:"timezone,omitempty"` // optional; empty = UTC
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -161,6 +203,27 @@ func (x *CreateAutomationRequest) GetRrule() string {
 func (x *CreateAutomationRequest) GetStepConfigJson() string {
 	if x != nil {
 		return x.StepConfigJson
+	}
+	return ""
+}
+
+func (x *CreateAutomationRequest) GetStepType() v1.StepType {
+	if x != nil {
+		return x.StepType
+	}
+	return v1.StepType(0)
+}
+
+func (x *CreateAutomationRequest) GetDtstart() string {
+	if x != nil {
+		return x.Dtstart
+	}
+	return ""
+}
+
+func (x *CreateAutomationRequest) GetTimezone() string {
+	if x != nil {
+		return x.Timezone
 	}
 	return ""
 }
@@ -477,23 +540,134 @@ func (x *ListRunsResponse) GetNextPageToken() string {
 	return ""
 }
 
+type HandleExternalTriggerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AutomationId  string                 `protobuf:"bytes,1,opt,name=automation_id,json=automationId,proto3" json:"automation_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`       // external source's idempotency key
+	PayloadJson   string                 `protobuf:"bytes,3,opt,name=payload_json,json=payloadJson,proto3" json:"payload_json,omitempty"` // opaque external payload; passed through as-is, not interpreted here
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HandleExternalTriggerRequest) Reset() {
+	*x = HandleExternalTriggerRequest{}
+	mi := &file_orca_automation_v1_automation_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HandleExternalTriggerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HandleExternalTriggerRequest) ProtoMessage() {}
+
+func (x *HandleExternalTriggerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_automation_v1_automation_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HandleExternalTriggerRequest.ProtoReflect.Descriptor instead.
+func (*HandleExternalTriggerRequest) Descriptor() ([]byte, []int) {
+	return file_orca_automation_v1_automation_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *HandleExternalTriggerRequest) GetAutomationId() string {
+	if x != nil {
+		return x.AutomationId
+	}
+	return ""
+}
+
+func (x *HandleExternalTriggerRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *HandleExternalTriggerRequest) GetPayloadJson() string {
+	if x != nil {
+		return x.PayloadJson
+	}
+	return ""
+}
+
+type HandleExternalTriggerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Run           *AutomationRun         `protobuf:"bytes,1,opt,name=run,proto3" json:"run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HandleExternalTriggerResponse) Reset() {
+	*x = HandleExternalTriggerResponse{}
+	mi := &file_orca_automation_v1_automation_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HandleExternalTriggerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HandleExternalTriggerResponse) ProtoMessage() {}
+
+func (x *HandleExternalTriggerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_automation_v1_automation_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HandleExternalTriggerResponse.ProtoReflect.Descriptor instead.
+func (*HandleExternalTriggerResponse) Descriptor() ([]byte, []int) {
+	return file_orca_automation_v1_automation_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *HandleExternalTriggerResponse) GetRun() *AutomationRun {
+	if x != nil {
+		return x.Run
+	}
+	return nil
+}
+
 var File_orca_automation_v1_automation_proto protoreflect.FileDescriptor
 
 const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\n" +
-	"#orca/automation/v1/automation.proto\x12\x12orca.automation.v1\"\x8d\x01\n" +
+	"#orca/automation/v1/automation.proto\x12\x12orca.automation.v1\x1a\x1forca/workflow/v1/workflow.proto\"\x96\x02\n" +
 	"\n" +
 	"Automation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
 	"\x05rrule\x18\x04 \x01(\tR\x05rrule\x12(\n" +
-	"\x10step_config_json\x18\x05 \x01(\tR\x0estepConfigJson\"\x8a\x01\n" +
+	"\x10step_config_json\x18\x05 \x01(\tR\x0estepConfigJson\x127\n" +
+	"\tstep_type\x18\x06 \x01(\x0e2\x1a.orca.workflow.v1.StepTypeR\bstepType\x12\x18\n" +
+	"\aenabled\x18\a \x01(\bR\aenabled\x12\x18\n" +
+	"\adtstart\x18\b \x01(\tR\adtstart\x12\x1a\n" +
+	"\btimezone\x18\t \x01(\tR\btimezone\"\xf9\x01\n" +
 	"\x17CreateAutomationRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05rrule\x18\x03 \x01(\tR\x05rrule\x12(\n" +
-	"\x10step_config_json\x18\x04 \x01(\tR\x0estepConfigJson\"Z\n" +
+	"\x10step_config_json\x18\x04 \x01(\tR\x0estepConfigJson\x127\n" +
+	"\tstep_type\x18\x05 \x01(\x0e2\x1a.orca.workflow.v1.StepTypeR\bstepType\x12\x18\n" +
+	"\adtstart\x18\x06 \x01(\tR\adtstart\x12\x1a\n" +
+	"\btimezone\x18\a \x01(\tR\btimezone\"Z\n" +
 	"\x18CreateAutomationResponse\x12>\n" +
 	"\n" +
 	"automation\x18\x01 \x01(\v2\x1e.orca.automation.v1.AutomationR\n" +
@@ -515,11 +689,19 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"q\n" +
 	"\x10ListRunsResponse\x125\n" +
 	"\x04runs\x18\x01 \x03(\v2!.orca.automation.v1.AutomationRunR\x04runs\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\xaa\x02\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x85\x01\n" +
+	"\x1cHandleExternalTriggerRequest\x12#\n" +
+	"\rautomation_id\x18\x01 \x01(\tR\fautomationId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12!\n" +
+	"\fpayload_json\x18\x03 \x01(\tR\vpayloadJson\"T\n" +
+	"\x1dHandleExternalTriggerResponse\x123\n" +
+	"\x03run\x18\x01 \x01(\v2!.orca.automation.v1.AutomationRunR\x03run2\xa8\x03\n" +
 	"\x11AutomationService\x12m\n" +
 	"\x10CreateAutomation\x12+.orca.automation.v1.CreateAutomationRequest\x1a,.orca.automation.v1.CreateAutomationResponse\x12O\n" +
 	"\x06RunNow\x12!.orca.automation.v1.RunNowRequest\x1a\".orca.automation.v1.RunNowResponse\x12U\n" +
-	"\bListRuns\x12#.orca.automation.v1.ListRunsRequest\x1a$.orca.automation.v1.ListRunsResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/automation/v1;automationv1b\x06proto3"
+	"\bListRuns\x12#.orca.automation.v1.ListRunsRequest\x1a$.orca.automation.v1.ListRunsResponse\x12|\n" +
+	"\x15HandleExternalTrigger\x120.orca.automation.v1.HandleExternalTriggerRequest\x1a1.orca.automation.v1.HandleExternalTriggerResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/automation/v1;automationv1b\x06proto3"
 
 var (
 	file_orca_automation_v1_automation_proto_rawDescOnce sync.Once
@@ -533,32 +715,40 @@ func file_orca_automation_v1_automation_proto_rawDescGZIP() []byte {
 	return file_orca_automation_v1_automation_proto_rawDescData
 }
 
-var file_orca_automation_v1_automation_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_orca_automation_v1_automation_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_orca_automation_v1_automation_proto_goTypes = []any{
-	(*Automation)(nil),               // 0: orca.automation.v1.Automation
-	(*CreateAutomationRequest)(nil),  // 1: orca.automation.v1.CreateAutomationRequest
-	(*CreateAutomationResponse)(nil), // 2: orca.automation.v1.CreateAutomationResponse
-	(*RunNowRequest)(nil),            // 3: orca.automation.v1.RunNowRequest
-	(*AutomationRun)(nil),            // 4: orca.automation.v1.AutomationRun
-	(*RunNowResponse)(nil),           // 5: orca.automation.v1.RunNowResponse
-	(*ListRunsRequest)(nil),          // 6: orca.automation.v1.ListRunsRequest
-	(*ListRunsResponse)(nil),         // 7: orca.automation.v1.ListRunsResponse
+	(*Automation)(nil),                    // 0: orca.automation.v1.Automation
+	(*CreateAutomationRequest)(nil),       // 1: orca.automation.v1.CreateAutomationRequest
+	(*CreateAutomationResponse)(nil),      // 2: orca.automation.v1.CreateAutomationResponse
+	(*RunNowRequest)(nil),                 // 3: orca.automation.v1.RunNowRequest
+	(*AutomationRun)(nil),                 // 4: orca.automation.v1.AutomationRun
+	(*RunNowResponse)(nil),                // 5: orca.automation.v1.RunNowResponse
+	(*ListRunsRequest)(nil),               // 6: orca.automation.v1.ListRunsRequest
+	(*ListRunsResponse)(nil),              // 7: orca.automation.v1.ListRunsResponse
+	(*HandleExternalTriggerRequest)(nil),  // 8: orca.automation.v1.HandleExternalTriggerRequest
+	(*HandleExternalTriggerResponse)(nil), // 9: orca.automation.v1.HandleExternalTriggerResponse
+	(v1.StepType)(0),                      // 10: orca.workflow.v1.StepType
 }
 var file_orca_automation_v1_automation_proto_depIdxs = []int32{
-	0, // 0: orca.automation.v1.CreateAutomationResponse.automation:type_name -> orca.automation.v1.Automation
-	4, // 1: orca.automation.v1.RunNowResponse.run:type_name -> orca.automation.v1.AutomationRun
-	4, // 2: orca.automation.v1.ListRunsResponse.runs:type_name -> orca.automation.v1.AutomationRun
-	1, // 3: orca.automation.v1.AutomationService.CreateAutomation:input_type -> orca.automation.v1.CreateAutomationRequest
-	3, // 4: orca.automation.v1.AutomationService.RunNow:input_type -> orca.automation.v1.RunNowRequest
-	6, // 5: orca.automation.v1.AutomationService.ListRuns:input_type -> orca.automation.v1.ListRunsRequest
-	2, // 6: orca.automation.v1.AutomationService.CreateAutomation:output_type -> orca.automation.v1.CreateAutomationResponse
-	5, // 7: orca.automation.v1.AutomationService.RunNow:output_type -> orca.automation.v1.RunNowResponse
-	7, // 8: orca.automation.v1.AutomationService.ListRuns:output_type -> orca.automation.v1.ListRunsResponse
-	6, // [6:9] is the sub-list for method output_type
-	3, // [3:6] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	10, // 0: orca.automation.v1.Automation.step_type:type_name -> orca.workflow.v1.StepType
+	10, // 1: orca.automation.v1.CreateAutomationRequest.step_type:type_name -> orca.workflow.v1.StepType
+	0,  // 2: orca.automation.v1.CreateAutomationResponse.automation:type_name -> orca.automation.v1.Automation
+	4,  // 3: orca.automation.v1.RunNowResponse.run:type_name -> orca.automation.v1.AutomationRun
+	4,  // 4: orca.automation.v1.ListRunsResponse.runs:type_name -> orca.automation.v1.AutomationRun
+	4,  // 5: orca.automation.v1.HandleExternalTriggerResponse.run:type_name -> orca.automation.v1.AutomationRun
+	1,  // 6: orca.automation.v1.AutomationService.CreateAutomation:input_type -> orca.automation.v1.CreateAutomationRequest
+	3,  // 7: orca.automation.v1.AutomationService.RunNow:input_type -> orca.automation.v1.RunNowRequest
+	6,  // 8: orca.automation.v1.AutomationService.ListRuns:input_type -> orca.automation.v1.ListRunsRequest
+	8,  // 9: orca.automation.v1.AutomationService.HandleExternalTrigger:input_type -> orca.automation.v1.HandleExternalTriggerRequest
+	2,  // 10: orca.automation.v1.AutomationService.CreateAutomation:output_type -> orca.automation.v1.CreateAutomationResponse
+	5,  // 11: orca.automation.v1.AutomationService.RunNow:output_type -> orca.automation.v1.RunNowResponse
+	7,  // 12: orca.automation.v1.AutomationService.ListRuns:output_type -> orca.automation.v1.ListRunsResponse
+	9,  // 13: orca.automation.v1.AutomationService.HandleExternalTrigger:output_type -> orca.automation.v1.HandleExternalTriggerResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_orca_automation_v1_automation_proto_init() }
@@ -572,7 +762,7 @@ func file_orca_automation_v1_automation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_automation_v1_automation_proto_rawDesc), len(file_orca_automation_v1_automation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

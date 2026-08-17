@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wscompat"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
@@ -32,25 +33,41 @@ import (
 // unit-testable without a real gRPC connection.
 type StreamOpener func(ctx context.Context, userID string) (notificationv1.NotificationService_StreamNotificationsClient, error)
 
-// Handler serves /v1/notifications/stream: resolves the caller's identity
-// (placeholder-verified, see usecase.AuthValidator), upgrades to WS, opens
-// notification-service's real StreamNotifications gRPC call for that user,
-// and pumps received messages to the WS connection as JSON frames until
-// either side closes — the concrete implementation of api-gateway.md §8's
-// sequence diagram for this one endpoint.
+// CookieValidator resolves identity from the orca_session cookie via a REAL
+// auth-service.ValidateSession call — same interface shape as
+// httpgateway.CookieSessionValidator (deliberately: both consume the same
+// authclient.SessionValidator implementation, wired once in main.go).
+type CookieValidator interface {
+	ValidateCookie(ctx context.Context, r *http.Request) (wscompat.Identity, error)
+}
+
+// Handler serves /v1/notifications/stream: resolves the caller's identity,
+// upgrades to WS, opens notification-service's real StreamNotifications
+// gRPC call for that user, and pumps received messages to the WS
+// connection as JSON frames until either side closes — the concrete
+// implementation of api-gateway.md §8's sequence diagram for this one
+// endpoint.
 type Handler struct {
 	Logger *slog.Logger
 	Auth   *usecase.AuthValidator
+	// Cookie resolves the real browser orca_session cookie, tried FIRST —
+	// same cookie-then-JWT fallback order as httpgateway.authMiddleware.
+	// Without this, a cookie-authenticated browser session (which has no
+	// bearer JWT to present) could never reach this endpoint once Auth
+	// stopped accepting unverified claims (found live 2026-08-17 while
+	// mapping Epic D's blast radius — see docs/execution-plan.md).
+	// Nil is tolerated (falls straight back to Auth for everything).
+	Cookie CookieValidator
 	Open   StreamOpener
 }
 
 // New returns a Handler ready to mount at /v1/notifications/stream.
-func New(logger *slog.Logger, auth *usecase.AuthValidator, open StreamOpener) *Handler {
-	return &Handler{Logger: logger, Auth: auth, Open: open}
+func New(logger *slog.Logger, auth *usecase.AuthValidator, cookie CookieValidator, open StreamOpener) *Handler {
+	return &Handler{Logger: logger, Auth: auth, Cookie: cookie, Open: open}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	identity, err := h.Auth.Validate(r)
+	identity, err := h.resolveIdentity(r)
 	if err != nil {
 		http.Error(w, "unauthenticated: "+err.Error(), http.StatusUnauthorized)
 		return
@@ -101,6 +118,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			slog.String("connection_id", connectionID), slog.Any("error", bridgeErr))
 		_ = conn.Close(websocket.StatusInternalError, "bridge error")
 	}
+}
+
+// resolveIdentity tries the real cookie-session validator first (same
+// cookie-then-JWT fallback order as httpgateway.authMiddleware), falling
+// back to h.Auth's bearer/cookie JWT verification only if Cookie is nil or
+// the cookie doesn't validate.
+func (h *Handler) resolveIdentity(r *http.Request) (usecase.Identity, error) {
+	if h.Cookie != nil {
+		if id, err := h.Cookie.ValidateCookie(r.Context(), r); err == nil {
+			return usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}, nil
+		}
+	}
+	return h.Auth.Validate(r)
 }
 
 // wsFrameWriter adapts a *websocket.Conn to usecase.WSWriter.

@@ -54,7 +54,9 @@ func TestExecuteAdHocStep_ResolvesAndCallsExecutor(t *testing.T) {
 	fake := &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted, OutputJSON: `{"ok":true}`}}
 	registry.executors[domain.StepTypeCondition] = fake
 
-	uc := NewExecuteAdHocStep(registry)
+	executions := newFakeExecutionRepository()
+	stepExecutions := newFakeStepExecutionRepository()
+	uc := NewExecuteAdHocStep(executions, stepExecutions, registry)
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	result, err := uc.Execute(ctx, ExecuteAdHocStepInput{
@@ -74,12 +76,43 @@ func TestExecuteAdHocStep_ResolvesAndCallsExecutor(t *testing.T) {
 	if fake.lastConfig != `{"expression":"a == b"}` {
 		t.Errorf("expected step config to be passed through verbatim, got %q", fake.lastConfig)
 	}
+
+	// §3.1's persistence gap: a synthetic one-step execution (no backing
+	// template) plus one wave-0 step_executions row should now exist,
+	// both reaching a completed terminal status.
+	if len(executions.executions) != 1 {
+		t.Fatalf("expected exactly 1 synthetic execution to be persisted, got %d", len(executions.executions))
+	}
+	var exec domain.WorkflowExecution
+	for _, e := range executions.executions {
+		exec = e
+	}
+	if exec.TemplateID != "" {
+		t.Errorf("expected the synthetic execution to have no backing template, got %q", exec.TemplateID)
+	}
+	if exec.Status != domain.StatusCompleted {
+		t.Errorf("expected the synthetic execution to be completed, got %v", exec.Status)
+	}
+
+	rows := stepExecutions.byExecution(exec.ID)
+	if len(rows) != 1 {
+		t.Fatalf("expected exactly 1 step_executions row, got %d", len(rows))
+	}
+	if rows[0].Wave != 0 {
+		t.Errorf("expected the ad hoc step to be recorded as wave 0, got %d", rows[0].Wave)
+	}
+	if rows[0].Status != domain.StepExecutionStatusCompleted {
+		t.Errorf("expected the step execution row to be completed, got %v", rows[0].Status)
+	}
+	if rows[0].OutputJSON != `{"ok":true}` {
+		t.Errorf("expected the step execution's output to be recorded, got %q", rows[0].OutputJSON)
+	}
 }
 
 func TestExecuteAdHocStep_RequiresTenantContext(t *testing.T) {
 	registry := newFakeRegistry()
 	registry.executors[domain.StepTypeCondition] = &fakeStepExecutor{}
-	uc := NewExecuteAdHocStep(registry)
+	uc := NewExecuteAdHocStep(newFakeExecutionRepository(), newFakeStepExecutionRepository(), registry)
 
 	_, err := uc.Execute(context.Background(), ExecuteAdHocStepInput{StepType: domain.StepTypeCondition})
 	if err == nil {
@@ -89,7 +122,7 @@ func TestExecuteAdHocStep_RequiresTenantContext(t *testing.T) {
 
 func TestExecuteAdHocStep_RejectsInvalidStepType(t *testing.T) {
 	registry := newFakeRegistry()
-	uc := NewExecuteAdHocStep(registry)
+	uc := NewExecuteAdHocStep(newFakeExecutionRepository(), newFakeStepExecutionRepository(), registry)
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	_, err := uc.Execute(ctx, ExecuteAdHocStepInput{StepType: domain.StepType("bogus")})
@@ -100,23 +133,66 @@ func TestExecuteAdHocStep_RejectsInvalidStepType(t *testing.T) {
 
 func TestExecuteAdHocStep_UnregisteredStepTypePropagatesFailedPrecondition(t *testing.T) {
 	registry := newFakeRegistry() // nothing registered
-	uc := NewExecuteAdHocStep(registry)
+	executions := newFakeExecutionRepository()
+	stepExecutions := newFakeStepExecutionRepository()
+	uc := NewExecuteAdHocStep(executions, stepExecutions, registry)
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	_, err := uc.Execute(ctx, ExecuteAdHocStepInput{StepType: domain.StepTypeShell})
 	if err == nil {
 		t.Fatal("expected an error when no executor is registered for the step type")
 	}
+
+	// The synthetic execution/step_execution rows should still have been
+	// persisted (and marked failed) even though the run itself failed —
+	// observability of a failed ad hoc run matters as much as a successful
+	// one.
+	var exec domain.WorkflowExecution
+	for _, e := range executions.executions {
+		exec = e
+	}
+	if exec.Status != domain.StatusFailed {
+		t.Errorf("expected the synthetic execution to be marked failed, got %v", exec.Status)
+	}
+	rows := stepExecutions.byExecution(exec.ID)
+	if len(rows) != 1 || rows[0].Status != domain.StepExecutionStatusFailed {
+		t.Fatalf("expected the step execution row to be marked failed, got %+v", rows)
+	}
 }
 
 func TestExecuteAdHocStep_ExecutorErrorPropagates(t *testing.T) {
 	registry := newFakeRegistry()
 	registry.executors[domain.StepTypeAgent] = &fakeStepExecutor{err: errors.New("not implemented")}
-	uc := NewExecuteAdHocStep(registry)
+	uc := NewExecuteAdHocStep(newFakeExecutionRepository(), newFakeStepExecutionRepository(), registry)
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	_, err := uc.Execute(ctx, ExecuteAdHocStepInput{StepType: domain.StepTypeAgent})
 	if err == nil {
 		t.Fatal("expected the executor's error to propagate")
+	}
+}
+
+func TestExecuteAdHocStep_BusinessFailedResultMarksExecutionFailed(t *testing.T) {
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeCondition] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusFailed, OutputJSON: `{"error":"bad expression"}`}}
+	executions := newFakeExecutionRepository()
+	stepExecutions := newFakeStepExecutionRepository()
+	uc := NewExecuteAdHocStep(executions, stepExecutions, registry)
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	result, err := uc.Execute(ctx, ExecuteAdHocStepInput{StepType: domain.StepTypeCondition, StepConfigJSON: `{"expression":"bad"}`})
+	if err != nil {
+		t.Fatalf("a business-level failed StepResult should not be a Go error: %v", err)
+	}
+	if result.Status != domain.ResultStatusFailed {
+		t.Errorf("expected a failed result, got %v", result.Status)
+	}
+
+	var exec domain.WorkflowExecution
+	for _, e := range executions.executions {
+		exec = e
+	}
+	if exec.Status != domain.StatusFailed {
+		t.Errorf("expected the synthetic execution to be marked failed for a business-level failed step, got %v", exec.Status)
 	}
 }

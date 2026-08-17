@@ -2,13 +2,30 @@ package usecase
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/usage-service/internal/domain"
 )
+
+// SessionRecordedSubject is the event subject a recorded session's outbox
+// row publishes under — task-service/project-service consumers, if any
+// exist in the future, would subscribe here (see usecase.Repository's doc
+// comment: this used to be internal/adapter/eventbus's Subject constant,
+// moved here now that this usecase is what builds the outbox row instead
+// of calling a publisher directly).
+const SessionRecordedSubject = "orca.usage.session.recorded"
+
+// sessionRecordedPayload is SessionRecordedSubject's JSON payload shape.
+type sessionRecordedPayload struct {
+	SessionID string  `json:"session_id"`
+	Provider  string  `json:"provider"`
+	CostUSD   float64 `json:"cost_usd"`
+}
 
 // RecordUsageSessionInput mirrors the gRPC request 1:1 by design — see
 // architecture/03's note that usecase granularity mirrors today's RPC
@@ -32,12 +49,11 @@ type RecordUsageSessionInput struct {
 // common/tenant), never trusted from the request body, per
 // architecture/05-data-architecture.md's tenant-isolation rule.
 type RecordUsageSession struct {
-	repo      Repository
-	publisher EventPublisher
+	repo Repository
 }
 
-func NewRecordUsageSession(repo Repository, publisher EventPublisher) *RecordUsageSession {
-	return &RecordUsageSession{repo: repo, publisher: publisher}
+func NewRecordUsageSession(repo Repository) *RecordUsageSession {
+	return &RecordUsageSession{repo: repo}
 }
 
 func (uc *RecordUsageSession) Execute(ctx context.Context, in RecordUsageSessionInput) (domain.UsageSession, error) {
@@ -59,20 +75,25 @@ func (uc *RecordUsageSession) Execute(ctx context.Context, in RecordUsageSession
 		return domain.UsageSession{}, apperrors.New(apperrors.KindInvalidArgument, "USAGE_INVALID_SESSION", err.Error(), err)
 	}
 
-	if err := uc.repo.SaveSession(ctx, session); err != nil {
-		return domain.UsageSession{}, apperrors.New(apperrors.KindInternal, "USAGE_SAVE_FAILED", "failed to persist usage session", err)
+	payload, err := json.Marshal(sessionRecordedPayload{SessionID: session.ID, Provider: string(session.Provider), CostUSD: session.CostUSD})
+	if err != nil {
+		return domain.UsageSession{}, apperrors.New(apperrors.KindInternal, "USAGE_MARSHAL_EVENT_FAILED", "failed to marshal session-recorded event payload", err)
+	}
+	event := domain.OutboxEvent{
+		ID:          uuid.NewString(),
+		Subject:     SessionRecordedSubject,
+		OccurredAt:  time.Now().UTC(),
+		PayloadJSON: payload,
 	}
 
-	// Best-effort event publish — usage-service.md notes this can tolerate
-	// eventual consistency; a publish failure doesn't fail the write that
-	// already committed. In production this goes through the transactional
-	// outbox (architecture/05), not a direct call — this scaffold calls the
-	// publisher directly to keep the reference implementation simple; see
-	// this service's README for the outbox follow-up.
-	if uc.publisher != nil {
-		if err := uc.publisher.PublishSessionRecorded(ctx, tenantID, session); err != nil {
-			return session, fmt.Errorf("session saved but event publish failed: %w", err)
-		}
+	// Session write and outbox enqueue happen in ONE transaction (Epic G,
+	// docs/execution-plan.md) — unlike the previous best-effort
+	// direct-publish call, there is no longer a "session saved but event
+	// publish failed" partial-success state to report: either both commit,
+	// or neither does. common/outbox.Relay (started in cmd/server/main.go)
+	// publishes the enqueued row to NATS asynchronously.
+	if err := uc.repo.SaveSession(ctx, session, event); err != nil {
+		return domain.UsageSession{}, apperrors.New(apperrors.KindInternal, "USAGE_SAVE_FAILED", "failed to persist usage session", err)
 	}
 
 	return session, nil

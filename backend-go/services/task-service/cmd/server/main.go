@@ -22,12 +22,14 @@ import (
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/task-service/internal/config"
 
 	taskgrpc "github.com/stablyai/orca-go/services/task-service/internal/adapter/grpc"
 	taskgrpcclient "github.com/stablyai/orca-go/services/task-service/internal/adapter/grpcclient"
+	taskopaclient "github.com/stablyai/orca-go/services/task-service/internal/adapter/opaclient"
 	taskpostgres "github.com/stablyai/orca-go/services/task-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 
@@ -81,16 +83,23 @@ func run() error {
 	simpleExecutor := taskgrpcclient.NewStubSimpleExecutor()
 	complexExecutor := taskgrpcclient.NewStubComplexExecutor()
 
+	// opaEvaluator loads/compiles the orca-authz bundle once per distinct
+	// query string (common/policy.Evaluator's own cache) and is shared by
+	// every ResolvePermission call for this process's lifetime.
+	opaEvaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	opaClient := taskopaclient.New(opaEvaluator)
+
 	createTaskUC := usecase.NewCreateTask(repo)
 	getTaskUC := usecase.NewGetTask(repo)
 	addEdgeUC := usecase.NewAddEdge(repo)
 	grantUC := usecase.NewGrant(repo)
-	resolvePermissionUC := usecase.NewResolvePermission(repo, repo, teamScopeResolver)
-	executeTaskUC := usecase.NewExecuteTask(repo, simpleExecutor, complexExecutor)
+	resolvePermissionUC := usecase.NewResolvePermission(repo, repo, teamScopeResolver, opaClient)
+	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor)
+	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
-		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC,
+		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

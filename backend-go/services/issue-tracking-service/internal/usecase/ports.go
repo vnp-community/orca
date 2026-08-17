@@ -56,13 +56,21 @@ type CredentialResolver interface {
 	Resolve(ctx context.Context, tenantID string, provider domain.Provider) (Credential, error)
 }
 
-// EventPublisher is the outbound event port for issue linking —
-// issue-tracking-service publishes orca.issuetracking.link.created so
-// task-service/project-service can update their own records of which
-// task/worktree references which external issue (design doc §7). Unlike
-// usage-service's EventPublisher, this one is REAL (internal/adapter/eventbus),
-// wired to common/eventbus — the design doc calls this side effect out by
-// name as the reason this service exists as a separate service at all.
-type EventPublisher interface {
-	PublishLinkCreated(ctx context.Context, tenantID, issueID, taskID string) error
+// OutboxEnqueuer is the outbound event port for issue linking —
+// issue-tracking-service durably records orca.issuetracking.link.created
+// so task-service/project-service can update their own records of which
+// task/worktree references which external issue (design doc §7). Backed by
+// this service's own Postgres database (internal/adapter/postgres) as of
+// Epic G (docs/execution-plan.md) — this service previously owned no
+// database at all, so unlike a normal transactional-outbox write (a
+// domain-state INSERT plus an outbox-row INSERT in one transaction), the
+// enqueued row here IS the entire write: there is no other domain state in
+// this service to be atomic with. What changed from the pre-Epic-G direct
+// NATS publish: the event now has a durable Postgres row proving intent
+// the instant Enqueue returns, closing the old "publish IS the persisted
+// side effect, so publish failure must fail the RPC with nothing durable
+// to retry against" gap — a transient NATS outage no longer needs the
+// caller to retry LinkIssue itself, only the outbox relay retries.
+type OutboxEnqueuer interface {
+	Enqueue(ctx context.Context, tenantID string, event domain.OutboxEvent) error
 }

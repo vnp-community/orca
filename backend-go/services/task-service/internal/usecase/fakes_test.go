@@ -18,8 +18,20 @@ func withIdentity(ctx context.Context, tenantID, userID string) context.Context 
 }
 
 type fakeTaskRepository struct {
-	tasks     map[string]domain.Task
-	createErr error
+	tasks             map[string]domain.Task
+	createErr         error
+	updateStatusErr   error
+	hasActiveErr      error
+	updateStatusCalls []updateStatusCall
+}
+
+// updateStatusCall records one UpdateStatus invocation — used by
+// execute_task_test.go to assert ExecuteTask marks a task in_progress
+// before dispatching, without needing a full call-recorder abstraction.
+type updateStatusCall struct {
+	tenantID string
+	id       string
+	status   string
 }
 
 func newFakeTaskRepository() *fakeTaskRepository {
@@ -63,6 +75,38 @@ func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id stri
 		current = parent
 	}
 	return chain, nil
+}
+
+// UpdateStatus mirrors adapter/postgres's real semantics (mutates the
+// stored task's status) but, unlike the real repository, does not error
+// when the task is missing from the fake's map — several existing tests in
+// this package exercise ExecuteTask without first seeding a task via
+// Create, and this fake is a permissive test double, not a fidelity
+// replica of Postgres's not-found behavior.
+func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
+	f.updateStatusCalls = append(f.updateStatusCalls, updateStatusCall{tenantID: tenantID, id: id, status: status})
+	if f.updateStatusErr != nil {
+		return f.updateStatusErr
+	}
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.Status = status
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+// HasActiveExecutions scans the fake's tasks map — real enough to exercise
+// usecase.HasActiveExecutions's tenant/project filtering without a database.
+func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
+	if f.hasActiveErr != nil {
+		return false, f.hasActiveErr
+	}
+	for _, t := range f.tasks {
+		if t.TenantID == tenantID && t.ProjectID == projectID && t.Status == domain.StatusInProgress {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 var errNotFound = &notFoundError{}
@@ -152,6 +196,24 @@ func (f *fakeTeamScopeResolver) ResolveTeams(ctx context.Context, tenantID, user
 		return nil, f.err
 	}
 	return f.teams, nil
+}
+
+// fakeOPAClient backs ResolvePermission's tests without loading the real
+// Rego bundle — allow/decisionErr let a test force either branch of
+// Execute's fail-closed check; called records whether Decision was ever
+// invoked, so a not-found test can assert OPA was never even reached.
+type fakeOPAClient struct {
+	allow       bool
+	decisionErr error
+	called      bool
+}
+
+func (f *fakeOPAClient) Decision(ctx context.Context, level domain.GrantLevel, action, tenantID string) (bool, error) {
+	f.called = true
+	if f.decisionErr != nil {
+		return false, f.decisionErr
+	}
+	return f.allow, nil
 }
 
 type fakeExecutor struct {

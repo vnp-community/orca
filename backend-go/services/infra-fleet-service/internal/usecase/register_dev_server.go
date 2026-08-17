@@ -14,8 +14,9 @@ import (
 // architecture/03's note that usecase granularity mirrors today's RPC
 // methods so the TS->Go mapping stays traceable.
 type RegisterDevServerInput struct {
-	Host string
-	Mode domain.ConnectionMode
+	Host        string
+	Mode        domain.ConnectionMode
+	SSHTargetID string
 }
 
 // RegisterDevServer adds a new dev host to the registry. TenantID is NOT
@@ -36,7 +37,7 @@ func (uc *RegisterDevServer) Execute(ctx context.Context, in RegisterDevServerIn
 		return domain.DevServer{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	devServer, err := domain.NewDevServer(uuid.NewString(), tenantID, in.Host, in.Mode)
+	devServer, err := domain.NewDevServer(uuid.NewString(), tenantID, in.Host, in.Mode, in.SSHTargetID)
 	if err != nil {
 		return domain.DevServer{}, apperrors.New(apperrors.KindInvalidArgument, "INFRA_INVALID_DEV_SERVER", err.Error(), err)
 	}

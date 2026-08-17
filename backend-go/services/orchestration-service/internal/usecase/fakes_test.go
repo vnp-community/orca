@@ -101,16 +101,17 @@ type fakeDispatchContextRepository struct {
 	err     error
 }
 
-func (f *fakeDispatchContextRepository) CreateDispatchContext(_ context.Context, tenantID, handle, coordinatorRunID string) (domain.DispatchContext, error) {
+func (f *fakeDispatchContextRepository) CreateDispatchContext(_ context.Context, tenantID, handle, coordinatorRunID, orchestrationTaskID string) (domain.DispatchContext, error) {
 	if f.err != nil {
 		return domain.DispatchContext{}, f.err
 	}
 	dc := domain.DispatchContext{
-		ID:               "dc-" + handle,
-		TenantID:         tenantID,
-		Handle:           handle,
-		CoordinatorRunID: coordinatorRunID,
-		Status:           domain.DispatchStatusPending,
+		ID:                  "dc-" + handle,
+		TenantID:            tenantID,
+		Handle:              handle,
+		CoordinatorRunID:    coordinatorRunID,
+		OrchestrationTaskID: orchestrationTaskID,
+		Status:              domain.DispatchStatusPending,
 	}
 	f.created = append(f.created, dc)
 	return dc, nil

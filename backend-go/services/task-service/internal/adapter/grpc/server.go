@@ -18,12 +18,13 @@ import (
 type Server struct {
 	taskv1.UnimplementedTaskServiceServer
 
-	createTask        *usecase.CreateTask
-	getTask           *usecase.GetTask
-	addEdge           *usecase.AddEdge
-	grant             *usecase.Grant
-	resolvePermission *usecase.ResolvePermission
-	executeTask       *usecase.ExecuteTask
+	createTask          *usecase.CreateTask
+	getTask             *usecase.GetTask
+	addEdge             *usecase.AddEdge
+	grant               *usecase.Grant
+	resolvePermission   *usecase.ResolvePermission
+	executeTask         *usecase.ExecuteTask
+	hasActiveExecutions *usecase.HasActiveExecutions
 }
 
 func New(
@@ -33,14 +34,16 @@ func New(
 	grant *usecase.Grant,
 	resolvePermission *usecase.ResolvePermission,
 	executeTask *usecase.ExecuteTask,
+	hasActiveExecutions *usecase.HasActiveExecutions,
 ) *Server {
 	return &Server{
-		createTask:        createTask,
-		getTask:           getTask,
-		addEdge:           addEdge,
-		grant:             grant,
-		resolvePermission: resolvePermission,
-		executeTask:       executeTask,
+		createTask:          createTask,
+		getTask:             getTask,
+		addEdge:             addEdge,
+		grant:               grant,
+		resolvePermission:   resolvePermission,
+		executeTask:         executeTask,
+		hasActiveExecutions: hasActiveExecutions,
 	}
 }
 
@@ -48,8 +51,9 @@ func (s *Server) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) 
 	// No ID field on CreateTaskRequest — the usecase assigns one (uuid) when
 	// Input.ID is left empty.
 	task, err := s.createTask.Execute(ctx, usecase.CreateTaskInput{
-		Title:    req.GetTitle(),
-		ParentID: req.GetParentId(),
+		Title:     req.GetTitle(),
+		ParentID:  req.GetParentId(),
+		ProjectID: req.GetProjectId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -94,6 +98,12 @@ func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermi
 	level, err := s.resolvePermission.Execute(ctx, usecase.ResolvePermissionInput{
 		TaskID: req.GetTaskId(),
 		UserID: req.GetUserId(),
+		// ResolvePermissionRequest has no action-equivalent field yet (see
+		// this service's README "Known gaps") — default to "read", the one
+		// action task_grant.rego's level_actions table authorizes for
+		// every named GrantLevel, so a resolved grant of any kind still
+		// passes the OPA check until the wire contract grows a real field.
+		Action: "read",
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -110,6 +120,14 @@ func (s *Server) Execute(ctx context.Context, req *taskv1.TaskServiceExecuteRequ
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &taskv1.TaskServiceExecuteResponse{ExecutionRef: ref}, nil
+}
+
+func (s *Server) HasActiveExecutions(ctx context.Context, req *taskv1.HasActiveExecutionsRequest) (*taskv1.HasActiveExecutionsResponse, error) {
+	hasActive, err := s.hasActiveExecutions.Execute(ctx, usecase.HasActiveExecutionsInput{ProjectID: req.GetProjectId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.HasActiveExecutionsResponse{HasActive: hasActive}, nil
 }
 
 func toDomainEdgeKind(t taskv1.EdgeType) domain.EdgeKind {
@@ -159,10 +177,11 @@ func toProtoGrantLevel(l domain.GrantLevel) taskv1.GrantLevel {
 
 func toProtoTask(t domain.Task) *taskv1.Task {
 	return &taskv1.Task{
-		Id:       t.ID,
-		TenantId: t.TenantID,
-		Title:    t.Title,
-		Status:   t.Status,
-		ParentId: t.ParentID,
+		Id:        t.ID,
+		TenantId:  t.TenantID,
+		Title:     t.Title,
+		Status:    t.Status,
+		ParentId:  t.ParentID,
+		ProjectId: t.ProjectID,
 	}
 }

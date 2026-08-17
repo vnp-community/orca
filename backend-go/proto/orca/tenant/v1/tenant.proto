@@ -74,11 +74,13 @@ message Team {
   string id = 1;
   string company_id = 2;
   string name = 3;
+  string settings_json = 4; // team-layer profile override, see ResolveProfile
 }
 
 message CreateTeamRequest {
   string company_id = 1;
   string name = 2;
+  string settings_json = 3; // optional; empty/unset means no team-layer override
 }
 
 message CreateTeamResponse {

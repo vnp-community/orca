@@ -11,10 +11,16 @@ import (
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
 )
 
-// RunNowInput mirrors RunNowRequest (proto/orca/automation/v1/automation.proto).
+// RunNowInput mirrors RunNowRequest (proto/orca/automation/v1/automation.proto),
+// plus Trigger — not on the wire message itself, set by each caller: the
+// gRPC RunNow handler passes RunTriggerManual, internal/adapter/scheduler
+// passes RunTriggerScheduled, HandleExternalTrigger passes
+// RunTriggerExternal. Left empty, it defaults to RunTriggerManual (see
+// Execute) so existing manual-only callers don't need to change.
 type RunNowInput struct {
 	AutomationID string
 	RequestID    string // idempotency key — see automation-service.md §8
+	Trigger      domain.RunTrigger
 }
 
 // RunNow is THE core interactor of this service — see
@@ -58,17 +64,24 @@ func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.Automatio
 		return existing, nil
 	}
 
-	// step_type travels inside step_config_json's JSON body (the generated
-	// automation.proto has no separate step_type field) — see this
-	// service's README "deviations" note. Defaults to StepTypeAgent, since
-	// an automation's step is a prompt/agent invocation in the common case.
-	stepType := domain.ParseStepType(automation.StepConfigJSON)
-	if stepType == domain.StepTypeUnspecified {
+	// step_type is now a first-class stored column on Automation (migration
+	// 0002) rather than a key inside step_config_json — see
+	// domain.NewAutomation's doc comment. It's already guaranteed valid
+	// (NewAutomation defaults StepTypeUnspecified to StepTypeAgent at
+	// creation time), but default again defensively here in case a row
+	// predates that migration and still has an empty step_type.
+	stepType := automation.StepType
+	if !stepType.Valid() {
 		stepType = domain.StepTypeAgent
 	}
 
+	trigger := in.Trigger
+	if !trigger.Valid() {
+		trigger = domain.RunTriggerManual
+	}
+
 	now := time.Now().UTC()
-	pending, err := domain.NewPendingRun(uuid.NewString(), automation.ID, tenantID, in.RequestID, stepType, automation.StepConfigJSON, now)
+	pending, err := domain.NewPendingRun(uuid.NewString(), automation.ID, tenantID, in.RequestID, stepType, trigger, automation.StepConfigJSON, now)
 	if err != nil {
 		return domain.AutomationRun{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_RUN_INVALID", err.Error(), err)
 	}

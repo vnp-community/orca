@@ -104,6 +104,15 @@ func (r *Repository) UpdateUserRole(ctx context.Context, userID string, role dom
 	return u, nil
 }
 
+func (r *Repository) HasAnyUsers(ctx context.Context) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM auth.users LIMIT 1)`).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("postgres: checking for any users: %w", err)
+	}
+	return exists, nil
+}
+
 // rowScanner is satisfied by both pgx.Row and pgx.Rows, letting
 // scanUserWithHash serve both QueryRow and Query call sites.
 type rowScanner interface {

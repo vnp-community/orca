@@ -37,10 +37,10 @@ var (
 
 // Task is task-service's central entity — see
 // specs/backend-go/services/task-service.md §4 and §5. The proto's Task
-// message (id, tenant_id, title, status, parent_id) is this scaffold's
-// authoritative field set; the design doc's broader schema (description,
-// complexity, assignee, active_execution_id) is intentionally deferred, see
-// this service's README.
+// message (id, tenant_id, title, status, parent_id, project_id) is this
+// scaffold's authoritative field set; the design doc's broader schema
+// (description, complexity, assignee, active_execution_id) is intentionally
+// deferred, see this service's README.
 type Task struct {
 	ID       string
 	TenantID string
@@ -51,6 +51,13 @@ type Task struct {
 	// parent_child row to exist before GetAncestors can walk it — see
 	// adapter/postgres's GetAncestors doc comment.
 	ParentID string
+	// ProjectID is optional and denotes which project (owned by
+	// project-service, a foreign concept this service never validates)
+	// this task belongs to. Added for Epic C (backend-go/docs/execution-plan.md)
+	// so usecase.HasActiveExecutions can answer "does this project have a
+	// task currently in_progress" — see that usecase's doc comment for the
+	// honest limit on what "in_progress" currently means here.
+	ProjectID string
 }
 
 func validStatus(s string) bool {
@@ -65,8 +72,10 @@ func validStatus(s string) bool {
 // NewTask constructs a Task, enforcing the invariants a record must satisfy
 // to be meaningful — mirrors usage-service's NewUsageSession pattern
 // (invariant-enforcing constructor, not scattered validation in the gRPC
-// handler).
-func NewTask(id, tenantID, title, status, parentID string) (Task, error) {
+// handler). projectID is optional (may be empty) and carries no validation
+// of its own — task-service never validates that a project_id refers to a
+// real project-service project, per the bounded-context rule.
+func NewTask(id, tenantID, title, status, parentID, projectID string) (Task, error) {
 	if tenantID == "" {
 		return Task{}, ErrEmptyTenant
 	}
@@ -82,7 +91,7 @@ func NewTask(id, tenantID, title, status, parentID string) (Task, error) {
 	if parentID != "" && parentID == id {
 		return Task{}, ErrSelfParent
 	}
-	return Task{ID: id, TenantID: tenantID, Title: title, Status: status, ParentID: parentID}, nil
+	return Task{ID: id, TenantID: tenantID, Title: title, Status: status, ParentID: parentID, ProjectID: projectID}, nil
 }
 
 // SetStatus enforces the (small, currently permissive-by-design) set of

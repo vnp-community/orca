@@ -23,6 +23,15 @@ type TaskRepository interface {
 	// bounds the walk (task-service.md §8's max-depth guard) — 0 means the
 	// repository's own default cap.
 	GetAncestors(ctx context.Context, tenantID, id string, maxDepth int) ([]domain.Task, error)
+	// UpdateStatus persists a task's status transition. Currently only ever
+	// called to set StatusInProgress on dispatch (see ExecuteTask) — there is
+	// no RPC surface yet to transition a task back out of in_progress. See
+	// this service's README "Known gaps".
+	UpdateStatus(ctx context.Context, tenantID, id, status string) error
+	// HasActiveExecutions reports whether tenantID/projectID has any task
+	// currently in_progress — see usecase.HasActiveExecutions's doc comment
+	// for the one-way-transition caveat this answer is subject to today.
+	HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error)
 }
 
 // EdgeRepository is the persistence port for task_edges rows. Cycle
@@ -67,6 +76,22 @@ type GrantRepository interface {
 // is wired to a real tenant-service client — see this service's README.
 type TeamScopeResolver interface {
 	ResolveTeams(ctx context.Context, tenantID, userID string) ([]string, error)
+}
+
+// OPAClient is the authorization port ResolvePermission uses for the
+// "does this resolved level authorize this action" decision (§9's
+// domain-computes/OPA-decides split) — implemented by
+// internal/adapter/opaclient against the shared embedded OPA evaluator
+// (common/policy), consuming
+// backend-go/policy/orca-authz/task_grant.rego's
+// data.orca.authz.task.allow rule.
+type OPAClient interface {
+	// Decision reports whether level authorizes action for tenantID, per
+	// task_grant.rego's level_actions table. Never called with
+	// domain.GrantLevelUnspecified — ResolvePermission.Execute returns its
+	// own PermissionDenied before reaching this call when domain.ResolveGrant
+	// finds no match.
+	Decision(ctx context.Context, level domain.GrantLevel, action, tenantID string) (bool, error)
 }
 
 // SimpleExecutor relays Execute's simple-path dispatch to

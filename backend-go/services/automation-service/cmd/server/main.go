@@ -30,6 +30,7 @@ import (
 	automationgrpc "github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpcclient"
 	automationpostgres "github.com/stablyai/orca-go/services/automation-service/internal/adapter/postgres"
+	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/scheduler"
 	"github.com/stablyai/orca-go/services/automation-service/internal/usecase"
 
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
@@ -92,10 +93,20 @@ func run() error {
 	createAutomationUC := usecase.NewCreateAutomation(automationRepo)
 	runNowUC := usecase.NewRunNow(automationRepo, runRepo, workflowExecutor)
 	listRunsUC := usecase.NewListRuns(runRepo)
+	handleExternalTriggerUC := usecase.NewHandleExternalTrigger(runNowUC)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	automationv1.RegisterAutomationServiceServer(grpcServer, automationgrpc.New(createAutomationUC, runNowUC, listRunsUC))
+	automationv1.RegisterAutomationServiceServer(grpcServer, automationgrpc.New(createAutomationUC, runNowUC, listRunsUC, handleExternalTriggerUC))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
+
+	// In-process scheduler ticker — see automation-service.md §7. Every
+	// replica runs one; automationRepo (postgres.AutomationRepository) also
+	// implements usecase.DueAutomationClaimer's SKIP LOCKED claim query, so
+	// concurrent replicas' ticks never dispatch the same due occurrence
+	// twice. Started as a goroutine sharing the same top-level shutdown
+	// ctx every other goroutine here watches.
+	schedulerTicker := scheduler.New(automationRepo, runNowUC, cfg.SchedulerInterval, cfg.SchedulerBatchSize, logger)
+	go schedulerTicker.Run(ctx)
 
 	healthSrv := health.New()
 	healthSrv.Register("postgres", func() error {
@@ -149,8 +160,13 @@ func run() error {
 
 	// Graceful shutdown: GracefulStop drains in-flight gRPC calls before
 	// returning, matching the termination-grace-period expectation in
-	// standards/production-readiness-checklist.md.
+	// standards/production-readiness-checklist.md. schedulerTicker.Done()
+	// waits for any in-flight tick to finish committing its claim batch
+	// rather than abandoning it mid-dispatch — ctx is already cancelled at
+	// this point (it's the same ctx Run watches), so this only waits for
+	// work already underway, never starts new work.
 	grpcServer.GracefulStop()
+	<-schedulerTicker.Done()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
