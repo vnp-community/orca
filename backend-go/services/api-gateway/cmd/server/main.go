@@ -238,7 +238,7 @@ func run() error {
 	// call, not usecase.AuthValidator's JWT verification path — the
 	// browser's orca_session cookie holds a raw session token, never a JWT).
 	wsCompatRegistry := wscompat.NewRegistry()
-	wscompat.RegisterRealChannels(wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient)
+	wscompat.RegisterRealChannels(wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient, rateLimiter)
 	wsCompatHandler := wscompat.New(logger, sessionValidator, wsCompatRegistry)
 
 	router := httpgateway.NewRouter(httpgateway.Deps{

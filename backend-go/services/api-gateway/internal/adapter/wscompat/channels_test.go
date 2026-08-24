@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -285,5 +286,279 @@ func TestFleetHealthCheckAllChannel_PropagatesError(t *testing.T) {
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "fleet.health.checkAll", args)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("want error %v, got %v", wantErr, err)
+	}
+}
+
+// ── TASK-007: crashReports.* tests ──────────────────────────────────────────
+
+// TestCrashReportGetLatestPendingChannel_ReturnsNull verifies that the channel
+// returns nil (JSON null) — the honest answer for a backend that has no crash
+// reporting service. Frontend expects a nullable result.
+func TestCrashReportGetLatestPendingChannel_ReturnsNull(t *testing.T) {
+	r := NewRegistry()
+	registerCrashReportChannels(r)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "crashReports.getLatestPending", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Errorf("want nil (no crash report in backend-go), got %v", result)
+	}
+}
+
+// TestCrashReportGetLatestPendingChannel_AcceptsAnyArgs verifies that the
+// handler does not panic or error when called with no args or extra args.
+func TestCrashReportGetLatestPendingChannel_AcceptsAnyArgs(t *testing.T) {
+	r := NewRegistry()
+	registerCrashReportChannels(r)
+
+	// no args
+	if _, err := r.Dispatch(context.Background(), Identity{}, "crashReports.getLatestPending", nil); err != nil {
+		t.Errorf("with nil args: unexpected error: %v", err)
+	}
+	// extra args (frontend may pass session id etc.)
+	args := argsJSON(t, map[string]any{"sessionId": "abc-123"})
+	if _, err := r.Dispatch(context.Background(), Identity{}, "crashReports.getLatestPending", args); err != nil {
+		t.Errorf("with extra args: unexpected error: %v", err)
+	}
+}
+
+// ── TASK-007: rateLimits.* tests ─────────────────────────────────────────────
+
+// fakeRateLimitReader is a test double for the rateLimitReader interface.
+type fakeRateLimitReader struct {
+	rps   float64
+	burst int
+}
+
+func (f *fakeRateLimitReader) RPS() float64 { return f.rps }
+func (f *fakeRateLimitReader) Burst() int   { return f.burst }
+
+// TestRateLimitsGetChannel_ReturnsConfiguredValues verifies the channel exposes
+// the limiter's configured RPS and burst — not live per-tenant counters.
+func TestRateLimitsGetChannel_ReturnsConfiguredValues(t *testing.T) {
+	r := NewRegistry()
+	rl := &fakeRateLimitReader{rps: 100.0, burst: 200}
+	registerRateLimitChannels(r, rl)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "rateLimits.get", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	info, ok := result.(rateLimitInfo)
+	if !ok {
+		t.Fatalf("unexpected result type %T, want rateLimitInfo", result)
+	}
+	if info.RequestsPerSecond != 100.0 {
+		t.Errorf("want RequestsPerSecond=100.0, got %f", info.RequestsPerSecond)
+	}
+	if info.Burst != 200 {
+		t.Errorf("want Burst=200, got %d", info.Burst)
+	}
+}
+
+// TestRateLimitsGetChannel_JSONFieldNames verifies the JSON wire format has
+// the field names the frontend expects (camelCase).
+func TestRateLimitsGetChannel_JSONFieldNames(t *testing.T) {
+	r := NewRegistry()
+	rl := &fakeRateLimitReader{rps: 10.0, burst: 20}
+	registerRateLimitChannels(r, rl)
+
+	result, err := r.Dispatch(context.Background(), Identity{}, "rateLimits.get", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal result: %v", err)
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if _, ok := m["requestsPerSecond"]; !ok {
+		t.Errorf("JSON field 'requestsPerSecond' missing; got keys: %v", m)
+	}
+	if _, ok := m["burst"]; !ok {
+		t.Errorf("JSON field 'burst' missing; got keys: %v", m)
+	}
+}
+
+// ── TASK-009: rpcTimeout tests ───────────────────────────────────────────────
+
+// TestRPCTimeoutConstant_ShorterThanInvokeTimeout documents the required
+// relationship: rpcTimeout < invokeTimeout. Failing this test means the
+// per-RPC deadline no longer leaves margin for write-back (SOL-001 / TASK-001).
+func TestRPCTimeoutConstant_ShorterThanInvokeTimeout(t *testing.T) {
+	if rpcTimeout >= invokeTimeout {
+		t.Errorf("rpcTimeout (%s) must be < invokeTimeout (%s); "+
+			"rpcTimeout occupies the dispatch window, invokeTimeout must envelope it",
+			rpcTimeout, invokeTimeout)
+	}
+	// Write margin must be at least 5s (writeTimeout from SOL-001).
+	margin := invokeTimeout - rpcTimeout
+	if margin < 5*time.Second {
+		t.Errorf("write margin (invokeTimeout - rpcTimeout = %s) must be >= 5s "+
+			"to accommodate writeTimeout (SOL-001)", margin)
+	}
+}
+
+// TestDevServerListChannel_FailsFastWhenServiceSlow verifies that devServer.list
+// returns an error within rpcTimeout + small margin when infra-fleet-service
+// blocks, NOT after the full invokeTimeout (25s). Regression guard for BUG-003.
+func TestDevServerListChannel_FailsFastWhenServiceSlow(t *testing.T) {
+	fake := &fakeInfraFleetClient{
+		listDevServersFunc: func(ctx context.Context, in *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error) {
+			// Simulate a slow/hung service: block until the per-RPC context
+			// is cancelled (i.e. until rpcTimeout fires).
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+
+	r := NewRegistry()
+	registerDevServerChannels(r, fake)
+
+	start := time.Now()
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "devServer.list", nil)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("want error from slow service, got nil")
+	}
+	// Must fail within rpcTimeout (8s) + 2s margin, not after 25s.
+	maxAllowed := rpcTimeout + 2*time.Second
+	if elapsed > maxAllowed {
+		t.Errorf("devServer.list took %s, want < %s (rpcTimeout + margin); "+
+			"infra-fleet-service timeout not being enforced", elapsed, maxAllowed)
+	}
+}
+
+// TestDevServerAddChannel_FailsFastWhenServiceSlow verifies the same rpcTimeout
+// enforcement for devServer.add.
+func TestDevServerAddChannel_FailsFastWhenServiceSlow(t *testing.T) {
+	fake := &fakeInfraFleetClient{
+		registerDevServerFunc: func(ctx context.Context, in *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+
+	r := NewRegistry()
+	registerDevServerChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"name": "slow-server", "connectionType": "relay-ssh"})
+
+	start := time.Now()
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "devServer.add", args)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("want error from slow service, got nil")
+	}
+	if elapsed > rpcTimeout+2*time.Second {
+		t.Errorf("devServer.add took %s, want < %s", elapsed, rpcTimeout+2*time.Second)
+	}
+}
+
+// TestFleetHealthCheckAll_FailsFastWhenServiceSlow verifies rpcTimeout
+// enforcement for fleet.health.checkAll.
+func TestFleetHealthCheckAll_FailsFastWhenServiceSlow(t *testing.T) {
+	fake := &fakeInfraFleetClient{
+		getFleetHealthFunc: func(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+
+	r := NewRegistry()
+	registerFleetChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"serverIds": []string{"ds-1"}})
+
+	start := time.Now()
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "fleet.health.checkAll", args)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("want error from slow service, got nil")
+	}
+	if elapsed > rpcTimeout+2*time.Second {
+		t.Errorf("fleet.health.checkAll took %s, want < %s", elapsed, rpcTimeout+2*time.Second)
+	}
+}
+
+// ── TASK-010: preflight.check tests ─────────────────────────────────────────
+
+// TestPreflightCheckChannel_CompletesInstantly verifies that preflight.check
+// returns within 50ms — it makes no downstream calls and should be sub-millisecond
+// in practice. Regression guard for BUG-004.
+func TestPreflightCheckChannel_CompletesInstantly(t *testing.T) {
+	r := NewRegistry()
+	registerPreflightChannels(r)
+
+	start := time.Now()
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "preflight.check", nil)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if elapsed > 50*time.Millisecond {
+		t.Errorf("preflight.check took %s, want < 50ms (local handler, no gRPC call)", elapsed)
+	}
+
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T, want map[string]any", result)
+	}
+
+	// Verify git key exists and installed=true (git-gateway-service uses real git binary).
+	gitInfo, ok := m["git"].(map[string]any)
+	if !ok {
+		t.Fatalf("result['git'] is %T, want map[string]any", m["git"])
+	}
+	if gitInfo["installed"] != true {
+		t.Errorf("result['git']['installed'] = %v, want true", gitInfo["installed"])
+	}
+
+	// Verify gh and glab report installed=false (no CLI wrappers in backend-go).
+	for _, tool := range []string{"gh", "glab"} {
+		info, ok := m[tool].(map[string]any)
+		if !ok {
+			t.Fatalf("result[%q] is %T, want map[string]any", tool, m[tool])
+		}
+		if info["installed"] != false {
+			t.Errorf("result[%q]['installed'] = %v, want false (no CLI in backend-go)", tool, info["installed"])
+		}
+		if info["authenticated"] != false {
+			t.Errorf("result[%q]['authenticated'] = %v, want false", tool, info["authenticated"])
+		}
+	}
+}
+
+// TestPreflightCheckChannel_ReturnsExpectedKeys verifies the response has
+// exactly the keys the frontend expects (git, gh, glab).
+func TestPreflightCheckChannel_ReturnsExpectedKeys(t *testing.T) {
+	r := NewRegistry()
+	registerPreflightChannels(r)
+
+	result, err := r.Dispatch(context.Background(), Identity{}, "preflight.check", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+
+	for _, key := range []string{"git", "gh", "glab"} {
+		if _, exists := m[key]; !exists {
+			t.Errorf("preflight.check response missing expected key %q", key)
+		}
 	}
 }

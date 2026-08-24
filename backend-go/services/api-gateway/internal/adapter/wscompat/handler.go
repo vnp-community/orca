@@ -124,19 +124,44 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // future channel gets this for free, not just the ones wired so far.
 const invokeTimeout = 25 * time.Second
 
+// writeTimeout is the deadline for sending a single WS response frame back
+// to the client. Kept short: by the time we reach a write, the dispatch is
+// already done; a 5s window is generous for a single JSON frame over a
+// local/LAN WebSocket connection. Deliberately independent of invokeTimeout
+// so a timed-out or cancelled dispatch context does not silently drop the
+// response (the original bug — BUG-001).
+const writeTimeout = 5 * time.Second
+
 func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, identity Identity, msg InboundMessage) {
-	ctx, cancel := context.WithTimeout(ctx, invokeTimeout)
-	defer cancel()
+	dispatchCtx, dispatchCancel := context.WithTimeout(ctx, invokeTimeout)
+	defer dispatchCancel()
 
-	result, err := h.Registry.Dispatch(ctx, identity, msg.Channel, msg.Args)
+	result, err := h.Registry.Dispatch(dispatchCtx, identity, msg.Channel, msg.Args)
 
+	// Attempt to acquire writeMu; log if we have to wait significantly
+	// (indicates concurrent timeout contention — see BUG-004 Cause B).
+	lockStart := time.Now()
 	writeMu.Lock()
 	defer writeMu.Unlock()
+	if waited := time.Since(lockStart); waited > 100*time.Millisecond {
+		h.Logger.WarnContext(context.Background(), "wscompat: writeMu contention detected",
+			slog.String("channel", msg.Channel),
+			slog.Duration("lock_wait", waited))
+	}
+
+	// Use a fresh context for the write so a cancelled or timed-out
+	// dispatchCtx does not silently drop the error or result frame.
+	// context.Background() is intentional: the write must succeed even if
+	// the parent HTTP request context has been cancelled (e.g. proxy
+	// timeout, client navigation) — the WS connection itself is still open.
+	writeCtx, writeCancel := context.WithTimeout(context.Background(), writeTimeout)
+	defer writeCancel()
+
 	if err != nil {
-		_ = wsjson.Write(ctx, conn, ErrorMessage{Type: "error", ID: msg.ID, Message: err.Error()})
+		_ = wsjson.Write(writeCtx, conn, ErrorMessage{Type: "error", ID: msg.ID, Message: err.Error()})
 		return
 	}
-	_ = wsjson.Write(ctx, conn, ResultMessage{Type: "result", ID: msg.ID, Result: result})
+	_ = wsjson.Write(writeCtx, conn, ResultMessage{Type: "result", ID: msg.ID, Result: result})
 }
 
 // handleSend dispatches a fire-and-forget "send" message the same way as
@@ -144,14 +169,17 @@ func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeM
 // which doesn't wait for one. Errors are logged, not surfaced to the
 // client, since there's no request ID to correlate a response to.
 func (h *Handler) handleSend(ctx context.Context, identity Identity, msg InboundMessage) {
-	ctx, cancel := context.WithTimeout(ctx, invokeTimeout)
+	dispatchCtx, cancel := context.WithTimeout(ctx, invokeTimeout)
 	defer cancel()
 
 	var args []json.RawMessage
 	if len(msg.Data) > 0 {
 		args = []json.RawMessage{msg.Data}
 	}
-	if _, err := h.Registry.Dispatch(ctx, identity, msg.Channel, args); err != nil {
-		h.Logger.WarnContext(ctx, "wscompat: send channel failed", slog.String("channel", msg.Channel), slog.Any("error", err))
+	if _, err := h.Registry.Dispatch(dispatchCtx, identity, msg.Channel, args); err != nil {
+		// Log with background ctx so the log entry is not dropped if the
+		// HTTP request ctx was cancelled before the dispatch finished.
+		h.Logger.WarnContext(context.Background(), "wscompat: send channel failed",
+			slog.String("channel", msg.Channel), slog.Any("error", err))
 	}
 }

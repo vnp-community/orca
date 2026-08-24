@@ -1,41 +1,21 @@
-package usecase
+# TASK-004: Viết test cho `RateLimiter` accessors
 
-import "testing"
+**From Solution:** SOL-002 (TDD test 3)  
+**Priority:** P1  
+**Service:** `api-gateway`  
+**File:** `services/api-gateway/internal/usecase/rate_limit_test.go`  
+**Depends on:** TASK-003  
+**Status:** `[x]` DONE
 
-func TestRateLimiter_AllowsBurstThenBlocks(t *testing.T) {
-	// 1 request/sec sustained, burst of 3: the first 3 calls for a tenant
-	// should succeed immediately (consuming the full bucket), the 4th
-	// should be blocked because the bucket hasn't had time to refill.
-	rl := NewRateLimiter(1, 3)
+---
 
-	for i := 0; i < 3; i++ {
-		if !rl.Allow("tenant-a") {
-			t.Fatalf("call %d: expected Allow to succeed within burst, got false", i+1)
-		}
-	}
+## Thay đổi cần thực hiện
 
-	if rl.Allow("tenant-a") {
-		t.Fatal("expected 4th call to be blocked once the burst is exhausted")
-	}
-}
+**File:** `services/api-gateway/internal/usecase/rate_limit_test.go`
 
-func TestRateLimiter_TracksTenantsIndependently(t *testing.T) {
-	rl := NewRateLimiter(1, 1)
+Thêm test function vào cuối file (sau các tests hiện có):
 
-	if !rl.Allow("tenant-a") {
-		t.Fatal("expected tenant-a's first call to succeed")
-	}
-	if rl.Allow("tenant-a") {
-		t.Fatal("expected tenant-a's second call to be blocked (burst=1)")
-	}
-
-	// tenant-b has its own independent bucket, unaffected by tenant-a's
-	// consumption — this is the whole point of per-tenant limiting.
-	if !rl.Allow("tenant-b") {
-		t.Fatal("expected tenant-b's first call to succeed regardless of tenant-a's state")
-	}
-}
-
+```go
 // TestRateLimiterAccessors verifies the RPS() and Burst() read-only methods
 // added by SOL-002 / TASK-003 — confirming they return the configured values
 // without mutating any state.
@@ -76,3 +56,21 @@ func TestRateLimiterAccessors_DoNotMutateState(t *testing.T) {
 		}
 	}
 }
+```
+
+---
+
+## Verify sau khi thay đổi
+
+```bash
+cd /Users/binhnt/Work/blockchain/vnp-blc/orca/backend-go/services/api-gateway
+go test ./internal/usecase/... -run TestRateLimiterAccessors -v -count=1
+```
+
+Expected output:
+```
+--- PASS: TestRateLimiterAccessors (0.00s)
+--- PASS: TestRateLimiterAccessors_ZeroValues (0.00s)
+--- PASS: TestRateLimiterAccessors_DoNotMutateState (0.00s)
+PASS
+```

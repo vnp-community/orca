@@ -48,3 +48,17 @@ func (l *RateLimiter) limiterFor(tenantID string) *rate.Limiter {
 	}
 	return lim
 }
+
+// RPS returns the per-tenant request-per-second limit this limiter enforces.
+// Safe for concurrent use — reads immutable fields set at construction time,
+// no mutex needed.
+func (l *RateLimiter) RPS() float64 {
+	return float64(l.rps)
+}
+
+// Burst returns the per-tenant burst size this limiter allows.
+// Safe for concurrent use — reads immutable fields set at construction time,
+// no mutex needed.
+func (l *RateLimiter) Burst() int {
+	return l.burst
+}
