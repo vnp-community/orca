@@ -23,8 +23,10 @@ type handshakeParams struct {
 
 // HandshakeInfo mirrors WsHandshakeInfo — what the agent's handshake result
 // tells Orca about itself. Exported since adapter/agentwsserver (the
-// direct-websocket inbound server) constructs one after its own handshake
-// exchange and passes it to Client.AttachInboundSession.
+// direct-websocket inbound server) and adapter/sshrelay (relay-ssh's
+// deploy+launch provisioner) both construct one after their own handshake
+// exchange and pass it to Client.AttachInboundSession /
+// Client.SshProvisioner.Provision's return value respectively.
 type HandshakeInfo struct {
 	Platform     string   `json:"platform"`
 	Arch         string   `json:"arch"`
@@ -40,19 +42,22 @@ type pendingCall struct {
 }
 
 // session is one persistent connection to a single dev server's agent —
-// dial (or accept), handshake, read loop, keepalive, and reconnect live
-// here, mirroring DevServerRelayBridge.connectRelayWebSocket +
-// SshChannelMultiplexer's combined responsibilities. Used for both
-// relay-websocket (Orca dials out) and direct-websocket (the agent dials
-// in, Orca only accepts) — everything past attachConnection is identical
-// either way; only how conn/info was obtained differs, tracked by inbound.
+// dial (or accept, or provision), handshake, read loop, keepalive, and
+// reconnect live here, mirroring DevServerRelayBridge.connectRelayWebSocket
+// + SshChannelMultiplexer's combined responsibilities. Used for all three
+// connection modes via the Transport abstraction (transport.go):
+// relay-websocket dials out over a wsTransport, direct-websocket accepts an
+// inbound wsTransport, relay-ssh gets a Transport from adapter/sshrelay's
+// SSH-exec-channel deploy+launch pipeline — everything past
+// attachTransport is identical across all three; only how the Transport was
+// obtained differs, tracked by managedExternally.
 type session struct {
 	cfg    Config
 	host   string
 	logger *slog.Logger
 
 	mu             sync.Mutex
-	conn           *websocket.Conn
+	transport      Transport
 	handshaked     bool
 	handshakeInfo  HandshakeInfo
 	nextFrameID    uint32
@@ -61,11 +66,12 @@ type session struct {
 	pending        map[uint32]*pendingCall
 	closed         bool
 
-	// inbound marks a direct-websocket session (the agent dialed in via
-	// adapter/agentwsserver) — backgroundReconnect must not attempt an
-	// outbound connect() for these; there is nothing to dial, Orca can only
-	// wait for the agent to dial in again.
-	inbound bool
+	// managedExternally marks a session this package doesn't own
+	// re-establishing on its own — direct-websocket's inbound accept (the
+	// agent must dial in again) and relay-ssh's active provision (a fresh
+	// deploy+launch, not a reconnect). backgroundReconnect no-ops for both;
+	// there is nothing for it to dial.
+	managedExternally bool
 
 	reconnectAttempt int
 
@@ -91,7 +97,9 @@ func newSession(host string, cfg Config, logger *slog.Logger) *session {
 }
 
 // connect dials the agent and runs the initiator handshake. Safe to call
-// again after a disconnect (reconnect path) — each call replaces s.conn.
+// again after a disconnect (reconnect path) — each call replaces
+// s.transport. relay-websocket only — direct-websocket/relay-ssh sessions
+// never call this, see attachTransport's callers.
 func (s *session) connect(ctx context.Context) error {
 	if s.cfg.Token == "" {
 		return fmt.Errorf("devserveragent: ORCA_AGENT_TOKEN is not configured — relay-websocket mode requires it (see specs/agent/api/connection-modes.md §2)")
@@ -113,21 +121,19 @@ func (s *session) connect(ctx context.Context) error {
 		return err
 	}
 
-	s.attachConnection(conn, info)
+	s.attachTransport(newWSTransport(conn, s.logger), info)
 	return nil
 }
 
-// attachConnection installs conn as this session's live connection and
-// starts the read/keepalive loops — the shared tail of connect() (outbound
-// dial, Orca-initiated handshake) and Client.AttachInboundSession
-// (direct-websocket mode: conn arrived inbound and was already
-// handshake/token-validated by adapter/agentwsserver before this is
-// called). Everything past this point — readLoop, keepAliveLoop, call,
-// backgroundReconnect — is direction-agnostic; only how conn/info was
-// obtained differs.
-func (s *session) attachConnection(conn *websocket.Conn, info HandshakeInfo) {
+// attachTransport installs t as this session's live transport and starts
+// the read/keepalive loops — the shared tail every connection-establishment
+// path (outbound dial, inbound accept, SSH-exec provision) funnels through.
+// Everything past this point — readLoop, keepAliveLoop, call,
+// backgroundReconnect — is transport-agnostic; only how t/info was obtained
+// differs.
+func (s *session) attachTransport(t Transport, info HandshakeInfo) {
 	s.mu.Lock()
-	s.conn = conn
+	s.transport = t
 	s.handshaked = true
 	s.handshakeInfo = info
 	s.nextFrameID = 1
@@ -135,8 +141,8 @@ func (s *session) attachConnection(conn *websocket.Conn, info HandshakeInfo) {
 	s.highestPeerSeq = 0
 	s.mu.Unlock()
 
-	go s.readLoop(conn)
-	go s.keepAliveLoop(conn)
+	go s.readLoop(t)
+	go s.keepAliveLoop(t)
 }
 
 // runInitiatorHandshake sends agent.handshake (frame id=1, ack=0, exactly
@@ -144,7 +150,9 @@ func (s *session) attachConnection(conn *websocket.Conn, info HandshakeInfo) {
 // a one-shot exchange run before the persistent read loop starts, matching
 // the TS side's detach-after-settle discipline (see ws-handshake.ts's
 // BUG-FE-PTY-001 fix comment: this function owns its own single read here,
-// it never leaves a handshake-only listener attached once done).
+// it never leaves a handshake-only listener attached once done). Operates
+// on the raw *websocket.Conn directly (not yet wrapped as a Transport) —
+// relay-websocket only, the one mode where Orca is the handshake initiator.
 func (s *session) runInitiatorHandshake(ctx context.Context, conn *websocket.Conn) (HandshakeInfo, error) {
 	hctx, cancel := context.WithTimeout(ctx, s.cfg.HandshakeTimeout)
 	defer cancel()
@@ -195,19 +203,14 @@ func (s *session) runInitiatorHandshake(ctx context.Context, conn *websocket.Con
 }
 
 // readLoop decodes every subsequent frame and routes JSON-RPC responses to
-// their pending caller by ID. Runs until the connection closes.
-func (s *session) readLoop(conn *websocket.Conn) {
+// their pending caller by ID. Runs until the transport errors/closes.
+func (s *session) readLoop(t Transport) {
 	ctx := context.Background()
 	for {
-		_, data, err := conn.Read(ctx)
+		decoded, err := t.ReadFrame(ctx)
 		if err != nil {
-			s.handleDisconnect(conn, err)
+			s.handleDisconnect(t, err)
 			return
-		}
-		decoded, err := DecodeFrame(data)
-		if err != nil {
-			s.logger.Warn("devserveragent: dropping malformed frame", slog.Any("error", err))
-			continue
 		}
 
 		s.mu.Lock()
@@ -237,15 +240,15 @@ func (s *session) readLoop(conn *websocket.Conn) {
 
 // keepAliveLoop sends a KeepAlive frame every cfg.KeepAliveInterval —
 // mirrors SshChannelMultiplexer.startKeepalive(). Exits once the session is
-// marked closed.
-func (s *session) keepAliveLoop(conn *websocket.Conn) {
+// marked closed or superseded by a newer transport.
+func (s *session) keepAliveLoop(t Transport) {
 	ticker := time.NewTicker(s.cfg.KeepAliveInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			s.mu.Lock()
-			if s.conn != conn || s.closed {
+			if s.transport != t || s.closed {
 				s.mu.Unlock()
 				return
 			}
@@ -255,10 +258,10 @@ func (s *session) keepAliveLoop(conn *websocket.Conn) {
 			s.mu.Unlock()
 
 			writeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			err := conn.Write(writeCtx, websocket.MessageBinary, EncodeKeepAliveFrame(id, ack))
+			err := t.WriteFrame(writeCtx, EncodeKeepAliveFrame(id, ack))
 			cancel()
 			if err != nil {
-				return // readLoop's next Read() will observe the same failure and drive reconnect
+				return // readLoop's next ReadFrame() will observe the same failure and drive reconnect
 			}
 		case <-s.closeCh:
 			return
@@ -266,17 +269,18 @@ func (s *session) keepAliveLoop(conn *websocket.Conn) {
 	}
 }
 
-// handleDisconnect fails every pending call on this connection, clears
-// session state so the next Call()/Health() triggers a fresh connect(), and
-// spawns backgroundReconnect so a dropped session recovers on its own
-// instead of staying dead until a caller happens to retry it.
-func (s *session) handleDisconnect(conn *websocket.Conn, cause error) {
+// handleDisconnect fails every pending call on this transport, clears
+// session state so the next Call()/Health() triggers a fresh
+// connect()/provision, and spawns backgroundReconnect so a dropped session
+// recovers on its own instead of staying dead until a caller happens to
+// retry it.
+func (s *session) handleDisconnect(t Transport, cause error) {
 	s.mu.Lock()
-	if s.conn != conn {
+	if s.transport != t {
 		s.mu.Unlock()
-		return // already superseded by a newer connection
+		return // already superseded by a newer transport
 	}
-	s.conn = nil
+	s.transport = nil
 	s.handshaked = false
 	pending := s.pending
 	s.pending = make(map[uint32]*pendingCall)
@@ -294,19 +298,20 @@ func (s *session) handleDisconnect(conn *websocket.Conn, cause error) {
 // succeeds or the session is closed. getOrCreateSession's existing lazy
 // redial remains the fallback for a call that arrives mid-backoff — this
 // loop just means a dropped session doesn't sit dead until one does.
+// relay-websocket only — see managedExternally's doc comment.
 func (s *session) backgroundReconnect() {
-	if s.inbound {
-		// direct-websocket: there is nothing to dial. The agent owns
-		// reconnection on its side (see specs/agent/api/connection-modes.md
-		// §7's RECONNECT_DELAYS_MS) and will re-establish via a fresh
-		// POST /api/agent-token + inbound handshake, which calls
-		// Client.AttachInboundSession directly — bypassing this loop
-		// entirely, not resuming it.
+	if s.managedExternally {
+		// direct-websocket: there is nothing to dial, the agent owns
+		// reconnection on its side (specs/agent/api/connection-modes.md §7's
+		// RECONNECT_DELAYS_MS) and re-attaches via Client.AttachInboundSession.
+		// relay-ssh: reconnecting means redeploying+relaunching, not dialing
+		// this same transport again — the next Exec/Health call re-provisions
+		// via Client.getOrProvisionSession instead of this loop.
 		return
 	}
 	for {
 		s.mu.Lock()
-		alreadyLive := s.handshaked && s.conn != nil
+		alreadyLive := s.handshaked && s.transport != nil
 		closed := s.closed
 		attempt := s.reconnectAttempt
 		s.mu.Unlock()
@@ -322,7 +327,7 @@ func (s *session) backgroundReconnect() {
 		}
 
 		s.mu.Lock()
-		if s.closed || (s.handshaked && s.conn != nil) {
+		if s.closed || (s.handshaked && s.transport != nil) {
 			s.mu.Unlock()
 			return // superseded by a lazy reconnect (getOrCreateSession) while we waited
 		}
@@ -349,15 +354,15 @@ func (s *session) backgroundReconnect() {
 	}
 }
 
-// call sends a JSON-RPC request over the live connection and waits for its
+// call sends a JSON-RPC request over the live transport and waits for its
 // response, honoring ctx and cfg.RequestTimeout (whichever is shorter).
 func (s *session) call(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	s.mu.Lock()
-	if s.conn == nil || !s.handshaked {
+	if s.transport == nil || !s.handshaked {
 		s.mu.Unlock()
 		return nil, fmt.Errorf("devserveragent: not connected")
 	}
-	conn := s.conn
+	t := s.transport
 	reqID := s.nextRequestID
 	s.nextRequestID++
 	frameID := s.nextFrameID
@@ -386,7 +391,7 @@ func (s *session) call(ctx context.Context, method string, params any) (json.Raw
 	callCtx, cancel := context.WithTimeout(ctx, s.cfg.RequestTimeout)
 	defer cancel()
 
-	if err := conn.Write(callCtx, websocket.MessageBinary, frame); err != nil {
+	if err := t.WriteFrame(callCtx, frame); err != nil {
 		s.dropPending(reqID)
 		return nil, fmt.Errorf("devserveragent: sending %q: %w", method, err)
 	}
@@ -412,7 +417,7 @@ func (s *session) dropPending(id uint32) {
 func (s *session) isHandshaked() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.handshaked && s.conn != nil
+	return s.handshaked && s.transport != nil
 }
 
 // close tears down the session — used when a devServer is removed or the
@@ -426,11 +431,11 @@ func (s *session) close() {
 		return
 	}
 	s.closed = true
-	conn := s.conn
+	t := s.transport
 	s.mu.Unlock()
 	close(s.closeCh)
-	if conn != nil {
-		conn.Close(websocket.StatusNormalClosure, "session closed")
+	if t != nil {
+		_ = t.Close("session closed")
 	}
 }
 

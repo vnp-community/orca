@@ -4,21 +4,11 @@
 // domain.SshTarget, per the "Preferred: Vault's SSH secrets engine" model in
 // specs/backend-go/services/infra-fleet-service.md §9.
 //
-// What this deliberately does NOT do yet:
-//   - Deploy or launch a relay binary (SFTP a `relay.js` build artifact,
-//     start it, speak JSON-RPC over the exec channel). No such artifact is
-//     reachable from backend-go's build in this environment, so there is
-//     nothing to deploy or talk to — that half of relay-ssh mode stays
-//     unimplemented here, same honest gap already flagged for relay-ssh in
-//     this service's README "Known gaps".
-//   - Wire into anything. This package is NOT called from
-//     devserveragent.Client, usecase.GetFleetHealth, any gRPC RPC, or
-//     cmd/server/main.go in this pass — a deliberate staged increment, the
-//     same way internal/adapter/devserveragent shipped standalone-and-real
-//     (dial + handshake + JSON-RPC round trip, fake-agent-tested) before any
-//     usecase wired it in. A future pass decides if/how a caller (e.g. a
-//     "GetFleetHealth reachability check" or the eventual relay-ssh deploy
-//     step) uses Connector.
+// Connection.SFTPClient/NewSession are what adapter/sshrelay builds its
+// deploy (SFTP-upload agent/out/agent.js) and launch (SSH exec channel,
+// `node agent.js --stdio`) steps on, over this same already-authenticated
+// connection — see that package's doc comment for the rest of relay-ssh
+// mode, which this package only establishes the transport for.
 //
 // Known, deliberate gaps carried forward from this pass (not silently
 // matched — flagged here and at each call site below):
@@ -47,6 +37,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
@@ -243,4 +234,29 @@ func (conn *Connection) RunCommand(ctx context.Context, cmd string) (stdout, std
 // Close closes the underlying SSH connection.
 func (conn *Connection) Close() error {
 	return conn.client.Close()
+}
+
+// NewSession opens a fresh SSH session over this connection — the
+// lower-level primitive RunCommand itself uses, exposed so
+// adapter/sshrelay can drive an exec channel directly (wiring its own
+// Stdin/Stdout pipes for the agent.js --stdio process) instead of
+// RunCommand's own buffer-and-wait shape, which doesn't fit a long-lived
+// bidirectional process.
+func (conn *Connection) NewSession() (*ssh.Session, error) {
+	session, err := conn.client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("sshconn: opening session: %w", err)
+	}
+	return session, nil
+}
+
+// SFTPClient opens an SFTP subsystem client over this connection —
+// adapter/sshrelay's deploy step uses it to upload agent/out/agent.js.
+// Callers must Close() the returned client when done.
+func (conn *Connection) SFTPClient() (*sftp.Client, error) {
+	client, err := sftp.NewClient(conn.client)
+	if err != nil {
+		return nil, fmt.Errorf("sshconn: opening sftp client: %w", err)
+	}
+	return client, nil
 }

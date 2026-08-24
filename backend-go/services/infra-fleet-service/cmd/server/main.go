@@ -32,6 +32,7 @@ import (
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
+	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -84,27 +85,36 @@ func run() error {
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
-	// wired below via agentwsserver) are both real. relay-ssh's connection
-	// layer (Health probe + shell.exec, via devserveragent.WithRelaySSH) is
-	// also real — see client.go's package doc comment — and now wired in via
-	// a Vault client used only for SSH cert issuance (sshconn.SSHCertIssuer).
+	// wired below via agentwsserver) are both real, and so is relay-ssh now
+	// (deploy agent/out/agent.js over SSH, launch it --stdio, real JSON-RPC
+	// session — see adapter/sshrelay's package doc comment), wired in via a
+	// Vault client used only for SSH cert issuance (sshconn.SSHCertIssuer).
 	// vault.NewClient() only builds the API client object (no network call,
 	// see common/secrets's doc comment) — construction failing means
 	// VAULT_ADDR is malformed, not that Vault is unreachable, so this stays
 	// a startup log warning + relay-ssh left unavailable, not a fatal error:
 	// this service's core (dev-server registry, relay-websocket,
 	// direct-websocket) has nothing to do with Vault and must not
-	// crash-loop over one optional mode's dependency.
+	// crash-loop over one optional mode's dependency. ORCA_RELAY_BUNDLE_PATH
+	// unset is the same kind of "leave relay-ssh unavailable" case, checked
+	// lazily inside sshrelay.deploy rather than here, since it's still worth
+	// constructing the provisioner (so config wiring is visibly complete)
+	// even if deploy will fail until an operator sets the bundle path.
+	agentCfg := infradevserveragent.LoadConfigFromEnv()
 	var agentOpts []infradevserveragent.Option
 	vaultClient, err := secrets.NewClient()
 	if err != nil {
 		logger.Warn("failed to construct Vault client — relay-ssh mode will report ErrConnectionModeNotImplemented", slog.Any("error", err))
 	} else {
 		sshConnector := infrasshconn.NewConnector(vaultClient, infrasshconn.LoadConfigFromEnv())
-		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(sshConnector, sshTargetStore))
+		sshRelayCfg := infrasshrelay.LoadConfigFromEnv(agentCfg.OrcaVersion)
+		if sshRelayCfg.BundlePath == "" {
+			logger.Warn("ORCA_RELAY_BUNDLE_PATH is not set — relay-ssh dev servers will fail to provision until it points at a built agent/out/agent.js")
+		}
+		provisioner := infrasshrelay.NewProvisioner(sshConnector, sshTargetStore, sshRelayCfg)
+		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(provisioner))
 	}
 
-	agentCfg := infradevserveragent.LoadConfigFromEnv()
 	agentClient := infradevserveragent.New(agentCfg, logger, agentOpts...)
 	defer agentClient.Close()
 
