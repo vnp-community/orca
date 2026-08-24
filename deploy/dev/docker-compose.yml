@@ -132,6 +132,34 @@ services:
     networks:
       - orca-go-net
 
+  # Vault dev-mode auto-mounts secret/ (KV) only, never transit/ — nothing
+  # else in this deploy set enables it, so auth-service's TransitEnsureKey
+  # (common/secrets/vault.go) 404s on every boot without this. Idempotent
+  # (checks `vault secrets list` before enabling) so it's safe to re-run on
+  # every `docker compose up -d`, incl. against a live long-running vault.
+  vault-init:
+    image: hashicorp/vault:1.17
+    container_name: orca-go-vault-init
+    restart: "no"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        vault secrets list -address="$$VAULT_ADDR" | grep -q '^transit/' \
+          || vault secrets enable -address="$$VAULT_ADDR" -path=transit transit
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-dev-root-token}
+    depends_on:
+      vault: { condition: service_healthy }
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options: { max-size: "20m", max-file: "3" }
+    networks:
+      - orca-go-net
+
   nats:
     image: nats:2.10-alpine
     container_name: orca-go-nats
@@ -152,9 +180,9 @@ services:
       - orca-go-net
 
   # ------------------------------------------------------------
-  # backend-go services — 13 own a database (bind-mount ./bin/<svc>/orca +
-  # DATABASE_DSN), 4 don't (git-gateway, scm-integration, issue-tracking,
-  # api-gateway — see specs/backend-go/services/00-service-catalog.md).
+  # backend-go services — 15 own a database (bind-mount ./bin/<svc>/orca +
+  # DATABASE_DSN), 2 don't (git-gateway, api-gateway — see
+  # specs/backend-go/services/00-service-catalog.md).
   # Every container: same public distroless image, no build step, binary
   # bind-mounted read-only at /app/bin/orca.
   # ------------------------------------------------------------
@@ -176,6 +204,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
+      vault-init: { condition: service_completed_successfully }
 
   tenant-service:
     <<: *go-defaults
@@ -333,7 +362,7 @@ services:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
 
-  # 3 services with no database:
+  # 2 services with no database:
   git-gateway-service:
     <<: *go-defaults
     container_name: orca-go-git-gateway
@@ -349,8 +378,13 @@ services:
     container_name: orca-go-scm-integration
     volumes:
       - ./bin/scm-integration-service/orca:/app/bin/orca:ro
-    environment: *go-common-env
+    environment:
+      <<: *go-common-env
+      # Owns scm.rate_limit_cache/webhook_delivery_log as of Phase 3
+      # (docs/execution-plan.md §3) — see cmd/server/main.go's doc comment.
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/scm?sslmode=disable
     depends_on:
+      postgres: { condition: service_healthy }
       credential-broker-service: { condition: service_started }
 
   issue-tracking-service:
@@ -476,6 +510,10 @@ services:
     <<: *migrate-defaults
     volumes: ["./bin/issue-tracking-service/migrations:/migrations:ro"]
     command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuetracking?sslmode=disable", "up"]
+  migrate-scm:
+    <<: *migrate-defaults
+    volumes: ["./bin/scm-integration-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/scm?sslmode=disable", "up"]
 
 networks:
   orca-go-net:
