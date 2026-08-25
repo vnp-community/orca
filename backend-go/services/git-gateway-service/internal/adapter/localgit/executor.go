@@ -54,14 +54,15 @@ func (e *Executor) GetStatus(ctx context.Context, repoPath string) (domain.GitSt
 	return parsePorcelainStatus(out), nil
 }
 
-// GetDiff runs `git diff` (or `git diff --staged`) and passes its output
-// through unparsed — §2: this service does not parse diffs beyond what's
-// needed to pass them through.
-func (e *Executor) GetDiff(ctx context.Context, repoPath string, staged bool) (domain.DiffResult, error) {
+// GetDiff runs `git diff [--staged] -- <filePath>` — per-file, matching the
+// real Dev Server Agent contract this local path must stay consistent with
+// (see BUG-036/TASK-228).
+func (e *Executor) GetDiff(ctx context.Context, repoPath, filePath string, staged bool) (domain.DiffResult, error) {
 	args := []string{"diff"}
 	if staged {
 		args = append(args, "--staged")
 	}
+	args = append(args, "--", filePath)
 	out, err := e.run(ctx, repoPath, args...)
 	if err != nil {
 		return domain.DiffResult{}, err
@@ -123,6 +124,171 @@ func (e *Executor) Pull(ctx context.Context, repoPath string) (domain.PullResult
 		return domain.PullResult{}, err
 	}
 	return domain.PullResult{Success: true}, nil
+}
+
+// Stage runs `git add -- <paths...>`.
+func (e *Executor) Stage(ctx context.Context, repoPath string, paths []string) (domain.SimpleResult, error) {
+	args := append([]string{"add", "--"}, paths...)
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// Unstage runs `git restore --staged -- <paths...>` (Git 2.23+, well under
+// this service's Git 2.5 baseline for the rest of its command set — but
+// still above the project's Git 2.25 compatibility floor per
+// docs/reference/git-compatibility.md, so no `git reset HEAD --` fallback
+// branch is needed).
+func (e *Executor) Unstage(ctx context.Context, repoPath string, paths []string) (domain.SimpleResult, error) {
+	args := append([]string{"restore", "--staged", "--"}, paths...)
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// History runs `git log` with a stable, tab-delimited format. cursor
+// support removed — the real agent has no pagination concept, so this
+// local implementation matches it rather than offering a richer feature
+// the relay side can't provide (TASK-209's Contract correction section).
+func (e *Executor) History(ctx context.Context, repoPath, baseRef string, limit int) ([]domain.CommitRef, error) {
+	target := baseRef
+	if target == "" {
+		target = "HEAD"
+	}
+	args := []string{"log", target, `--format=%H%x09%an%x09%cn%x09%at%x09%P%x09%s`}
+	if limit > 0 {
+		args = append(args, fmt.Sprintf("-%d", limit))
+	}
+	out, err := e.run(ctx, repoPath, args...)
+	if err != nil {
+		return nil, err
+	}
+	var commits []domain.CommitRef
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line == "" {
+			continue
+		}
+		f := strings.Split(line, "\t")
+		if len(f) < 6 {
+			continue
+		}
+		var ts int64
+		fmt.Sscanf(f[3], "%d", &ts)
+		var parents []string
+		if f[4] != "" {
+			parents = strings.Split(f[4], " ")
+		}
+		commits = append(commits, domain.CommitRef{
+			SHA: f[0], Author: f[1], Committer: f[2], Timestamp: ts,
+			ParentSHAs: parents, Message: f[5],
+		})
+	}
+	return commits, nil
+}
+
+// CheckIgnored runs `git check-ignore` per path (its own exit code — 0 for
+// ignored, 1 for not — makes a single multi-path invocation ambiguous
+// about which paths matched, so this loops rather than parsing combined
+// output). Returns only the ignored subset, matching the real agent's
+// response shape (TASK-209's Contract correction section).
+func (e *Executor) CheckIgnored(ctx context.Context, repoPath string, paths []string) ([]string, error) {
+	var ignored []string
+	for _, p := range paths {
+		if _, err := e.run(ctx, repoPath, "check-ignore", "--quiet", p); err == nil {
+			ignored = append(ignored, p)
+		}
+	}
+	return ignored, nil
+}
+
+// ForkSync compares HEAD against expectedUpstream (a caller-supplied
+// remote-tracking ref, e.g. "origin/main") — expectedUpstream is a
+// required param, matching the real agent (TASK-209's Contract correction
+// section).
+func (e *Executor) ForkSync(ctx context.Context, repoPath, expectedUpstream string) (domain.ForkSyncStatus, error) {
+	ahead, behind, err := e.aheadBehind(ctx, repoPath, "HEAD", expectedUpstream)
+	if err != nil {
+		return domain.ForkSyncStatus{}, err
+	}
+	return domain.ForkSyncStatus{Ahead: ahead, Behind: behind, Diverged: ahead > 0 && behind > 0}, nil
+}
+
+// UpstreamStatus reads the current branch's configured @{upstream}.
+// pushTarget is accepted for signature parity with the relay path (real
+// git.upstreamStatus takes an optional pushTarget) but unused locally —
+// local execution reads the branch's actual git config directly rather
+// than resolving a push target.
+func (e *Executor) UpstreamStatus(ctx context.Context, repoPath, pushTarget string) (domain.UpstreamStatus, error) {
+	upstream, err := e.run(ctx, repoPath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	if err != nil {
+		// No upstream configured is a domain outcome, not a Go error.
+		return domain.UpstreamStatus{HasUpstream: false}, nil
+	}
+	ahead, behind, err := e.aheadBehind(ctx, repoPath, "HEAD", strings.TrimSpace(upstream))
+	if err != nil {
+		return domain.UpstreamStatus{}, err
+	}
+	return domain.UpstreamStatus{HasUpstream: true, Ahead: ahead, Behind: behind}, nil
+}
+
+// aheadBehind runs `git rev-list --left-right --count a...b` and parses its
+// two-column tab-separated output.
+func (e *Executor) aheadBehind(ctx context.Context, repoPath, a, b string) (ahead, behind int, err error) {
+	out, err := e.run(ctx, repoPath, "rev-list", "--left-right", "--count", a+"..."+b)
+	if err != nil {
+		return 0, 0, err
+	}
+	fields := strings.Fields(out)
+	if len(fields) != 2 {
+		return 0, 0, fmt.Errorf("localgit: unexpected rev-list output %q", out)
+	}
+	fmt.Sscanf(fields[0], "%d", &ahead)
+	fmt.Sscanf(fields[1], "%d", &behind)
+	return ahead, behind, nil
+}
+
+// RemoteCommitURL resolves origin's URL and pattern-matches the host
+// (github.com/gitlab.com/bitbucket.org) to build a commit permalink.
+func (e *Executor) RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error) {
+	base, err := e.remoteWebBaseURL(ctx, repoPath)
+	if err != nil {
+		return "", err
+	}
+	return base + "/commit/" + sha, nil
+}
+
+// RemoteFileURL resolves origin's URL and builds a file-at-ref permalink.
+// GitHub/GitLab both use "/blob/<ref>/<path>"; Bitbucket uses
+// "/src/<ref>/<path>" — branch on host.
+func (e *Executor) RemoteFileURL(ctx context.Context, repoPath, path, ref string) (string, error) {
+	base, err := e.remoteWebBaseURL(ctx, repoPath)
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(base, "bitbucket.org") {
+		return base + "/src/" + ref + "/" + path, nil
+	}
+	return base + "/blob/" + ref + "/" + path, nil
+}
+
+// remoteWebBaseURL converts `git remote get-url origin`'s SSH or HTTPS form
+// into a browsable https://<host>/<org>/<repo> base URL.
+func (e *Executor) remoteWebBaseURL(ctx context.Context, repoPath string) (string, error) {
+	raw, err := e.run(ctx, repoPath, "remote", "get-url", "origin")
+	if err != nil {
+		return "", err
+	}
+	url := strings.TrimSpace(raw)
+	url = strings.TrimSuffix(url, ".git")
+	if strings.HasPrefix(url, "git@") {
+		// git@host:org/repo -> https://host/org/repo
+		url = strings.TrimPrefix(url, "git@")
+		url = strings.Replace(url, ":", "/", 1)
+		url = "https://" + url
+	}
+	return url, nil
 }
 
 // parsePorcelainStatus parses `git status --porcelain=v1 -b` output. The

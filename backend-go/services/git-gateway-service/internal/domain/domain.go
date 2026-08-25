@@ -79,3 +79,37 @@ type PullResult struct {
 	Success      bool
 	HadConflicts bool
 }
+
+// SimpleResult is the bare-success-flag shape shared by Stage/Unstage
+// (TASK-208) and Fetch — any operation with no richer result than
+// "did it work".
+type SimpleResult struct {
+	Success bool
+}
+
+// CommitRef is one commit's metadata, returned by History. Mirrors
+// gitgateway.proto's CommitRef message 1:1.
+type CommitRef struct {
+	SHA        string
+	Author     string
+	Committer  string
+	Message    string
+	Timestamp  int64
+	ParentSHAs []string
+}
+
+// ForkSyncStatus reflects a worktree's ahead/behind/diverged state relative
+// to its upstream fork's default branch.
+type ForkSyncStatus struct {
+	Ahead    int
+	Behind   int
+	Diverged bool
+}
+
+// UpstreamStatus reflects whether the current branch has a configured
+// upstream and its ahead/behind counts if so.
+type UpstreamStatus struct {
+	HasUpstream bool
+	Ahead       int
+	Behind      int
+}

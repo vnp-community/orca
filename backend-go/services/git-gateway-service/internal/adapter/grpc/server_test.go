@@ -15,7 +15,10 @@ import (
 
 // fakeResolver/fakeExecutor let this test exercise wire<->usecase
 // translation without touching a real ConnectionResolver/GitExecutor
-// implementation.
+// implementation. fakeExecutor implements usecase.GitExecutor,
+// usecase.FilesystemExecutor, and usecase.LocalOnlyFilesystemExecutor —
+// this service's fake-adapter test convention uses one type across all
+// three ports since they're all selected by the same dispatch shape.
 type fakeResolver struct{ conn usecase.ResolvedConnection }
 
 func (f *fakeResolver) ResolveConnection(context.Context, string) (usecase.ResolvedConnection, error) {
@@ -31,7 +34,7 @@ func (fakeExecutor) GetStatus(context.Context, string) (domain.GitStatus, error)
 	}, nil
 }
 
-func (fakeExecutor) GetDiff(context.Context, string, bool) (domain.DiffResult, error) {
+func (fakeExecutor) GetDiff(context.Context, string, string, bool) (domain.DiffResult, error) {
 	return domain.DiffResult{UnifiedDiff: "diff --git a/a.txt b/a.txt"}, nil
 }
 
@@ -47,6 +50,76 @@ func (fakeExecutor) Pull(context.Context, string) (domain.PullResult, error) {
 	return domain.PullResult{Success: true, HadConflicts: false}, nil
 }
 
+func (fakeExecutor) Stage(context.Context, string, []string) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) Unstage(context.Context, string, []string) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) History(context.Context, string, string, int) ([]domain.CommitRef, error) {
+	return []domain.CommitRef{{SHA: "deadbeef", Message: "fix"}}, nil
+}
+
+func (fakeExecutor) CheckIgnored(context.Context, string, []string) ([]string, error) {
+	return []string{"node_modules"}, nil
+}
+
+func (fakeExecutor) ForkSync(context.Context, string, string) (domain.ForkSyncStatus, error) {
+	return domain.ForkSyncStatus{Ahead: 1, Behind: 2}, nil
+}
+
+func (fakeExecutor) UpstreamStatus(context.Context, string, string) (domain.UpstreamStatus, error) {
+	return domain.UpstreamStatus{HasUpstream: true, Ahead: 1}, nil
+}
+
+func (fakeExecutor) RemoteCommitURL(context.Context, string, string) (string, error) {
+	return "https://example.com/commit/deadbeef", nil
+}
+
+func (fakeExecutor) RemoteFileURL(context.Context, string, string, string) (string, error) {
+	return "https://example.com/blob/main/a.txt", nil
+}
+
+func (fakeExecutor) ReadFile(context.Context, string, string) ([]byte, error) {
+	return []byte("content"), nil
+}
+
+func (fakeExecutor) ReadFilePreview(context.Context, string, string, int64) ([]byte, bool, error) {
+	return []byte("preview"), false, nil
+}
+
+func (fakeExecutor) ReadDir(context.Context, string, string) ([]domain.DirEntry, error) {
+	return []domain.DirEntry{{Name: "a.txt"}}, nil
+}
+
+func (fakeExecutor) WriteFile(context.Context, string, string, []byte, bool) (int64, error) {
+	return 7, nil
+}
+
+func (fakeExecutor) WriteFileChunk(context.Context, string, string, int64, []byte, bool) (int64, error) {
+	return 4, nil
+}
+
+func (fakeExecutor) CreateDir(context.Context, string, string, bool, bool) error { return nil }
+func (fakeExecutor) Delete(context.Context, string, string, bool) error         { return nil }
+
+func (fakeExecutor) Stat(context.Context, string, string) (domain.FileStat, error) {
+	return domain.FileStat{Exists: true, SizeBytes: 7}, nil
+}
+
+func (fakeExecutor) Search(context.Context, string, domain.SearchOptions) ([]domain.SearchMatch, error) {
+	return []domain.SearchMatch{{Path: "a.txt", Line: 1, LineText: "match"}}, nil
+}
+
+func (fakeExecutor) Glob(context.Context, string, string, int) ([]string, error) {
+	return []string{"a.txt", "b.md"}, nil
+}
+
+func (fakeExecutor) Rename(context.Context, string, string, string) error { return nil }
+func (fakeExecutor) Copy(context.Context, string, string, string) error   { return nil }
+
 // fakeAICompleter is a usecase.AICompleter stub for exercising
 // GenerateCommitMessage's wire<->usecase translation.
 type fakeAICompleter struct{ message string }
@@ -55,18 +128,55 @@ func (f fakeAICompleter) Complete(context.Context, string, string) (string, erro
 	return f.message, nil
 }
 
-func newTestServer() *Server {
-	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+// fakeAIProviderResolver is a usecase.AIProviderResolver stub for
+// exercising DiscoverCommitMessageModels' wire<->usecase translation.
+type fakeAIProviderResolver struct{}
+
+func (fakeAIProviderResolver) ResolveProvider(context.Context, string, string) (string, string, string, error) {
+	return "PROVIDER_TYPE_ANTHROPIC", "acct-1", "active", nil
+}
+
+func newTestServerWithResolver(resolver *fakeResolver) *Server {
 	exec := fakeExecutor{}
+	getStatusUC := usecase.NewGetStatus(resolver, exec, exec)
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
+	completer := fakeAICompleter{message: "generated message"}
 	return New(
-		usecase.NewGetStatus(resolver, exec, exec),
+		getStatusUC,
 		getDiffUC,
 		usecase.NewCommit(resolver, exec, exec),
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
-		usecase.NewGenerateCommitMessage(resolver, getDiffUC, fakeAICompleter{message: "generated message"}),
+		usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, completer),
+		usecase.NewStage(resolver, exec, exec),
+		usecase.NewUnstage(resolver, exec, exec),
+		usecase.NewHistory(resolver, exec, exec),
+		usecase.NewCheckIgnored(resolver, exec, exec),
+		usecase.NewForkSync(resolver, exec, exec),
+		usecase.NewUpstreamStatus(resolver, exec, exec),
+		usecase.NewRemoteCommitURL(resolver, exec, exec),
+		usecase.NewRemoteFileURL(resolver, exec, exec),
+		usecase.NewGeneratePullRequestFields(resolver, getStatusUC, getDiffUC, completer),
+		usecase.NewDiscoverCommitMessageModels(fakeAIProviderResolver{}),
+		usecase.NewReadFileUseCase(resolver, exec, exec),
+		usecase.NewReadFileChunkUseCase(resolver, exec),
+		usecase.NewReadFilePreviewUseCase(resolver, exec, exec),
+		usecase.NewReadDirUseCase(resolver, exec, exec),
+		usecase.NewWriteFileUseCase(resolver, exec, exec),
+		usecase.NewWriteFileChunkUseCase(resolver, exec, exec),
+		usecase.NewCreateDirUseCase(resolver, exec, exec),
+		usecase.NewDeleteFileUseCase(resolver, exec, exec),
+		usecase.NewStatFileUseCase(resolver, exec, exec),
+		usecase.NewSearchFilesUseCase(resolver, exec, exec),
+		usecase.NewListAllFilesUseCase(resolver, exec, exec),
+		usecase.NewListMarkdownDocumentsUseCase(resolver, exec, exec),
+		usecase.NewRenameFileUseCase(resolver, exec),
+		usecase.NewCopyFileUseCase(resolver, exec),
 	)
+}
+
+func newTestServer() *Server {
+	return newTestServerWithResolver(&fakeResolver{conn: usecase.ResolvedConnection{Connected: false, RepoPath: "/repo"}})
 }
 
 func TestServer_GetStatus_TranslatesResult(t *testing.T) {
@@ -88,6 +198,17 @@ func TestServer_GetStatus_MissingWorktreeID_ReturnsInvalidArgument(t *testing.T)
 	_, err := s.GetStatus(context.Background(), &gitgatewayv1.GetStatusRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestServer_GetDiff_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.GetDiff(context.Background(), &gitgatewayv1.GetDiffRequest{WorktreeId: "wt-1", FilePath: "a.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetUnifiedDiff() == "" {
+		t.Error("expected non-empty unified diff")
 	}
 }
 
@@ -125,17 +246,7 @@ func TestServer_GenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *
 }
 
 func TestServer_GenerateCommitMessage_Connected_TranslatesResult(t *testing.T) {
-	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo"}}
-	exec := fakeExecutor{}
-	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
-	s := New(
-		usecase.NewGetStatus(resolver, exec, exec),
-		getDiffUC,
-		usecase.NewCommit(resolver, exec, exec),
-		usecase.NewPush(resolver, exec, exec),
-		usecase.NewPull(resolver, exec, exec),
-		usecase.NewGenerateCommitMessage(resolver, getDiffUC, fakeAICompleter{message: "generated message"}),
-	)
+	s := newTestServerWithResolver(&fakeResolver{conn: usecase.ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo"}})
 
 	resp, err := s.GenerateCommitMessage(context.Background(), &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: "wt-1"})
 	if err != nil {
@@ -143,5 +254,221 @@ func TestServer_GenerateCommitMessage_Connected_TranslatesResult(t *testing.T) {
 	}
 	if resp.GetMessage() != "generated message" {
 		t.Errorf("expected message=%q, got %q", "generated message", resp.GetMessage())
+	}
+}
+
+func TestServer_Stage_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.Stage(context.Background(), &gitgatewayv1.StageRequest{WorktreeId: "wt-1", Paths: []string{"a.txt"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Error("expected success=true")
+	}
+}
+
+func TestServer_Unstage_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.Unstage(context.Background(), &gitgatewayv1.UnstageRequest{WorktreeId: "wt-1", Paths: []string{"a.txt"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Error("expected success=true")
+	}
+}
+
+func TestServer_History_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.History(context.Background(), &gitgatewayv1.HistoryRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetCommits()) != 1 || resp.GetCommits()[0].GetSha() != "deadbeef" {
+		t.Errorf("unexpected commits: %+v", resp.GetCommits())
+	}
+}
+
+func TestServer_CheckIgnored_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.CheckIgnored(context.Background(), &gitgatewayv1.CheckIgnoredRequest{WorktreeId: "wt-1", Paths: []string{"node_modules"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetIgnoredPaths()) != 1 || resp.GetIgnoredPaths()[0] != "node_modules" {
+		t.Errorf("unexpected ignored paths: %+v", resp.GetIgnoredPaths())
+	}
+}
+
+func TestServer_ForkSync_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ForkSync(context.Background(), &gitgatewayv1.ForkSyncRequest{WorktreeId: "wt-1", ExpectedUpstream: "origin/main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetAhead() != 1 || resp.GetBehind() != 2 {
+		t.Errorf("unexpected fork sync response: %+v", resp)
+	}
+}
+
+func TestServer_UpstreamStatus_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.UpstreamStatus(context.Background(), &gitgatewayv1.UpstreamStatusRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetHasUpstream() {
+		t.Error("expected has_upstream=true")
+	}
+}
+
+func TestServer_RemoteCommitUrl_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.RemoteCommitUrl(context.Background(), &gitgatewayv1.RemoteCommitUrlRequest{WorktreeId: "wt-1", Sha: "deadbeef"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetUrl() == "" {
+		t.Error("expected non-empty url")
+	}
+}
+
+func TestServer_RemoteFileUrl_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.RemoteFileUrl(context.Background(), &gitgatewayv1.RemoteFileUrlRequest{WorktreeId: "wt-1", Path: "a.txt", Ref: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetUrl() == "" {
+		t.Error("expected non-empty url")
+	}
+}
+
+func TestServer_GeneratePullRequestFields_NotConnected_ReturnsFailedPrecondition(t *testing.T) {
+	s := newTestServer()
+	_, err := s.GeneratePullRequestFields(context.Background(), &gitgatewayv1.GeneratePullRequestFieldsRequest{WorktreeId: "wt-1"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestServer_GeneratePullRequestFields_Connected_TranslatesResult(t *testing.T) {
+	s := newTestServerWithResolver(&fakeResolver{conn: usecase.ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo"}})
+	resp, err := s.GeneratePullRequestFields(context.Background(), &gitgatewayv1.GeneratePullRequestFieldsRequest{WorktreeId: "wt-1", BaseBranch: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetTitle() == "" {
+		t.Error("expected non-empty title")
+	}
+}
+
+func TestServer_DiscoverCommitMessageModels_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.DiscoverCommitMessageModels(context.Background(), &gitgatewayv1.DiscoverCommitMessageModelsRequest{TenantId: "t-1", UserId: "u-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetModels()) != 1 || resp.GetModels()[0].GetAccountId() != "acct-1" {
+		t.Errorf("unexpected models: %+v", resp.GetModels())
+	}
+}
+
+func TestServer_ReadFile_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ReadFile(context.Background(), &gitgatewayv1.ReadFileRequest{WorktreeId: "wt-1", Path: "a.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(resp.GetContent()) != "content" {
+		t.Errorf("unexpected content: %q", resp.GetContent())
+	}
+}
+
+func TestServer_WriteFile_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.WriteFile(context.Background(), &gitgatewayv1.WriteFileRequest{WorktreeId: "wt-1", Path: "a.txt", Content: []byte("x")})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetBytesWritten() != 7 {
+		t.Errorf("unexpected bytes written: %d", resp.GetBytesWritten())
+	}
+}
+
+func TestServer_StatFile_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.StatFile(context.Background(), &gitgatewayv1.StatFileRequest{WorktreeId: "wt-1", Path: "a.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetExists() || resp.GetSizeBytes() != 7 {
+		t.Errorf("unexpected stat response: %+v", resp)
+	}
+}
+
+func TestServer_SearchFiles_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.SearchFiles(context.Background(), &gitgatewayv1.SearchFilesRequest{WorktreeId: "wt-1", Pattern: "match"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetMatches()) != 1 {
+		t.Errorf("unexpected matches: %+v", resp.GetMatches())
+	}
+}
+
+func TestServer_ListAllFiles_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ListAllFiles(context.Background(), &gitgatewayv1.ListAllFilesRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetPaths()) != 2 {
+		t.Errorf("unexpected paths: %+v", resp.GetPaths())
+	}
+}
+
+func TestServer_ListMarkdownDocuments_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ListMarkdownDocuments(context.Background(), &gitgatewayv1.ListMarkdownDocumentsRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetPaths()) != 1 || resp.GetPaths()[0] != "b.md" {
+		t.Errorf("expected only b.md, got: %+v", resp.GetPaths())
+	}
+}
+
+func TestServer_RenameFile_LocalSucceeds(t *testing.T) {
+	s := newTestServer() // Connected=false -> local dispatch
+	_, err := s.RenameFile(context.Background(), &gitgatewayv1.RenameFileRequest{WorktreeId: "wt-1", FromPath: "a.txt", ToPath: "b.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestServer_RenameFile_Connected_ReturnsFailedPrecondition(t *testing.T) {
+	s := newTestServerWithResolver(&fakeResolver{conn: usecase.ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo"}})
+	_, err := s.RenameFile(context.Background(), &gitgatewayv1.RenameFileRequest{WorktreeId: "wt-1", FromPath: "a.txt", ToPath: "b.txt"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition (known gap, BUG-009), got %v", err)
+	}
+}
+
+func TestServer_CopyFile_LocalSucceeds(t *testing.T) {
+	s := newTestServer()
+	_, err := s.CopyFile(context.Background(), &gitgatewayv1.CopyFileRequest{WorktreeId: "wt-1", FromPath: "a.txt", ToPath: "b.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestServer_ReadFileChunk_Connected_ReturnsFailedPrecondition(t *testing.T) {
+	s := newTestServerWithResolver(&fakeResolver{conn: usecase.ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo"}})
+	_, err := s.ReadFileChunk(context.Background(), &gitgatewayv1.ReadFileChunkRequest{WorktreeId: "wt-1", Path: "a.txt"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition (known gap, BUG-009), got %v", err)
 	}
 }

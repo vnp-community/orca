@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -26,6 +27,12 @@ const (
 	TaskService_ResolvePermission_FullMethodName   = "/orca.task.v1.TaskService/ResolvePermission"
 	TaskService_Execute_FullMethodName             = "/orca.task.v1.TaskService/Execute"
 	TaskService_HasActiveExecutions_FullMethodName = "/orca.task.v1.TaskService/HasActiveExecutions"
+	TaskService_ListTasks_FullMethodName           = "/orca.task.v1.TaskService/ListTasks"
+	TaskService_UpdateTask_FullMethodName          = "/orca.task.v1.TaskService/UpdateTask"
+	TaskService_DeleteTask_FullMethodName          = "/orca.task.v1.TaskService/DeleteTask"
+	TaskService_GetDependencies_FullMethodName     = "/orca.task.v1.TaskService/GetDependencies"
+	TaskService_AIDecompose_FullMethodName         = "/orca.task.v1.TaskService/AIDecompose"
+	TaskService_AIApply_FullMethodName             = "/orca.task.v1.TaskService/AIApply"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -51,6 +58,21 @@ type TaskServiceClient interface {
 	// what this can currently answer — task-service has no completion
 	// callback yet, so "in_progress" is one-way until that's built.
 	HasActiveExecutions(ctx context.Context, in *HasActiveExecutionsRequest, opts ...grpc.CallOption) (*HasActiveExecutionsResponse, error)
+	ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
+	UpdateTask(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*UpdateTaskResponse, error)
+	DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetDependencies(ctx context.Context, in *GetDependenciesRequest, opts ...grpc.CallOption) (*GetDependenciesResponse, error)
+	// AIDecompose relays to the Dev Server Agent's ai.complete method (via
+	// infra-fleet-service's Relay RPC) to propose a subtask breakdown for
+	// task_id — review-before-commit: proposals are not written to
+	// task_edges until a subsequent AIApply call. See TASK-224's Context
+	// note for why task-service goes through infra-fleet-service rather
+	// than calling the Dev Server Agent directly.
+	AIDecompose(ctx context.Context, in *AIDecomposeRequest, opts ...grpc.CallOption) (*AIDecomposeResponse, error)
+	// AIApply commits a (possibly user-edited) proposal set from a prior
+	// AIDecompose call, creating one subtask + parent_child edge per
+	// proposal.
+	AIApply(ctx context.Context, in *AIApplyRequest, opts ...grpc.CallOption) (*AIApplyResponse, error)
 }
 
 type taskServiceClient struct {
@@ -131,6 +153,66 @@ func (c *taskServiceClient) HasActiveExecutions(ctx context.Context, in *HasActi
 	return out, nil
 }
 
+func (c *taskServiceClient) ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTasksResponse)
+	err := c.cc.Invoke(ctx, TaskService_ListTasks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) UpdateTask(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*UpdateTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateTaskResponse)
+	err := c.cc.Invoke(ctx, TaskService_UpdateTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_DeleteTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetDependencies(ctx context.Context, in *GetDependenciesRequest, opts ...grpc.CallOption) (*GetDependenciesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDependenciesResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetDependencies_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) AIDecompose(ctx context.Context, in *AIDecomposeRequest, opts ...grpc.CallOption) (*AIDecomposeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIDecomposeResponse)
+	err := c.cc.Invoke(ctx, TaskService_AIDecompose_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) AIApply(ctx context.Context, in *AIApplyRequest, opts ...grpc.CallOption) (*AIApplyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIApplyResponse)
+	err := c.cc.Invoke(ctx, TaskService_AIApply_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -154,6 +236,21 @@ type TaskServiceServer interface {
 	// what this can currently answer — task-service has no completion
 	// callback yet, so "in_progress" is one-way until that's built.
 	HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error)
+	ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
+	UpdateTask(context.Context, *UpdateTaskRequest) (*UpdateTaskResponse, error)
+	DeleteTask(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error)
+	GetDependencies(context.Context, *GetDependenciesRequest) (*GetDependenciesResponse, error)
+	// AIDecompose relays to the Dev Server Agent's ai.complete method (via
+	// infra-fleet-service's Relay RPC) to propose a subtask breakdown for
+	// task_id — review-before-commit: proposals are not written to
+	// task_edges until a subsequent AIApply call. See TASK-224's Context
+	// note for why task-service goes through infra-fleet-service rather
+	// than calling the Dev Server Agent directly.
+	AIDecompose(context.Context, *AIDecomposeRequest) (*AIDecomposeResponse, error)
+	// AIApply commits a (possibly user-edited) proposal set from a prior
+	// AIDecompose call, creating one subtask + parent_child edge per
+	// proposal.
+	AIApply(context.Context, *AIApplyRequest) (*AIApplyResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -184,6 +281,24 @@ func (UnimplementedTaskServiceServer) Execute(context.Context, *TaskServiceExecu
 }
 func (UnimplementedTaskServiceServer) HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HasActiveExecutions not implemented")
+}
+func (UnimplementedTaskServiceServer) ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTasks not implemented")
+}
+func (UnimplementedTaskServiceServer) UpdateTask(context.Context, *UpdateTaskRequest) (*UpdateTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateTask not implemented")
+}
+func (UnimplementedTaskServiceServer) DeleteTask(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteTask not implemented")
+}
+func (UnimplementedTaskServiceServer) GetDependencies(context.Context, *GetDependenciesRequest) (*GetDependenciesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDependencies not implemented")
+}
+func (UnimplementedTaskServiceServer) AIDecompose(context.Context, *AIDecomposeRequest) (*AIDecomposeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AIDecompose not implemented")
+}
+func (UnimplementedTaskServiceServer) AIApply(context.Context, *AIApplyRequest) (*AIApplyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AIApply not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -332,6 +447,114 @@ func _TaskService_HasActiveExecutions_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_ListTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ListTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ListTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ListTasks(ctx, req.(*ListTasksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_UpdateTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).UpdateTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_UpdateTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).UpdateTask(ctx, req.(*UpdateTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_DeleteTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).DeleteTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_DeleteTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).DeleteTask(ctx, req.(*DeleteTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetDependencies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDependenciesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetDependencies(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetDependencies_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetDependencies(ctx, req.(*GetDependenciesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_AIDecompose_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIDecomposeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).AIDecompose(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_AIDecompose_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).AIDecompose(ctx, req.(*AIDecomposeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_AIApply_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIApplyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).AIApply(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_AIApply_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).AIApply(ctx, req.(*AIApplyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -366,6 +589,30 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HasActiveExecutions",
 			Handler:    _TaskService_HasActiveExecutions_Handler,
+		},
+		{
+			MethodName: "ListTasks",
+			Handler:    _TaskService_ListTasks_Handler,
+		},
+		{
+			MethodName: "UpdateTask",
+			Handler:    _TaskService_UpdateTask_Handler,
+		},
+		{
+			MethodName: "DeleteTask",
+			Handler:    _TaskService_DeleteTask_Handler,
+		},
+		{
+			MethodName: "GetDependencies",
+			Handler:    _TaskService_GetDependencies_Handler,
+		},
+		{
+			MethodName: "AIDecompose",
+			Handler:    _TaskService_AIDecompose_Handler,
+		},
+		{
+			MethodName: "AIApply",
+			Handler:    _TaskService_AIApply_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

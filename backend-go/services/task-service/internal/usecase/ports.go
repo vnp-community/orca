@@ -32,6 +32,18 @@ type TaskRepository interface {
 	// currently in_progress — see usecase.HasActiveExecutions's doc comment
 	// for the one-way-transition caveat this answer is subject to today.
 	HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error)
+	// List returns tasks for tenantID, optionally filtered by projectID
+	// (empty = no filter), cursor-paginated by page_size/page_token.
+	List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error)
+	// Update persists a partial field update (title/status). Status
+	// transitions into StatusInProgress are rejected at the domain layer
+	// (domain.Task.SetStatus) before this is ever called — see TASK-223's
+	// Context note.
+	Update(ctx context.Context, tenantID string, task domain.Task) error
+	// Delete removes a task. task_edges/task_grants reference tasks(id)
+	// with ON DELETE CASCADE (migrations/0001_init.up.sql) — no explicit
+	// edge/grant cleanup needed.
+	Delete(ctx context.Context, tenantID, id string) error
 }
 
 // EdgeRepository is the persistence port for task_edges rows. Cycle
@@ -51,9 +63,9 @@ type EdgeRepository interface {
 	// contract simple; see this service's README for the scale follow-up.
 	ListByKind(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error)
 	// ListFrom returns the edges of the given kind originating at
-	// fromTaskID — used by the Execute usecase's complexity branch (§3.1):
-	// a task with any parent_child or depends_on edges from it is
-	// "complex".
+	// fromTaskID — used by the Execute usecase's complexity branch (§3.1)
+	// and reused as-is by GetDependencies (TASK-223) for the identical
+	// depends_on edge kind.
 	ListFrom(ctx context.Context, tenantID, fromTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error)
 }
 
@@ -98,9 +110,11 @@ type OPAClient interface {
 // infra-fleet-service (-> Dev Server Agent agent.exec), per
 // task-service.md §3.1.
 //
-// STUB in this scaffold: internal/adapter/grpcclient's implementation
-// returns a fixed placeholder execution ref without calling
-// infra-fleet-service — see this service's README.
+// internal/adapter/grpcclient's implementation is real (TASK-224):
+// resolves the task's project_id to a connectionId via
+// ProjectExecutionResolver and relays through infra-fleet-service's Relay
+// RPC — see that file's doc comment for the honest limits carried over
+// unchanged (still dispatch-only, no completion callback).
 type SimpleExecutor interface {
 	Execute(ctx context.Context, tenantID, taskID, requestID string) (executionRef string, err error)
 }
@@ -113,4 +127,30 @@ type SimpleExecutor interface {
 // orchestration-service — see this service's README.
 type ComplexExecutor interface {
 	Execute(ctx context.Context, tenantID, taskID, requestID string) (executionRef string, err error)
+}
+
+// ProjectExecutionResolver resolves a project's execution target
+// (connectionId, or none for host-local) via infra-fleet-service —
+// task-service never calls project-service or infra-fleet-service directly
+// from this port's consumers (SimpleExecutor, AIDecompose); the resolution
+// itself lives in internal/adapter/grpcclient, mirroring
+// git-gateway-service's ConnectionResolver split.
+type ProjectExecutionResolver interface {
+	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID string, connected bool, err error)
+}
+
+// AIProviderContextResolver resolves AI provider/account context for a
+// tenant+user by calling ai-provider-service — distinct from
+// ProjectExecutionResolver (execution target) and from AICompleter below
+// (the actual completion call).
+type AIProviderContextResolver interface {
+	ResolveContext(ctx context.Context, tenantID, userID string) (providerContext string, err error)
+}
+
+// AICompleter relays a prompt to the Dev Server Agent's ai.complete method
+// over a resolved connectionID — same port shape as
+// git-gateway-service.AICompleter, implemented here against
+// infra-fleet-service's Relay RPC rather than duplicated per-service.
+type AICompleter interface {
+	Complete(ctx context.Context, connectionID, prompt string) (string, error)
 }

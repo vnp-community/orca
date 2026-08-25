@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"sort"
 
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -22,6 +23,9 @@ type fakeTaskRepository struct {
 	createErr         error
 	updateStatusErr   error
 	hasActiveErr      error
+	listErr           error
+	updateErr         error
+	deleteErr         error
 	updateStatusCalls []updateStatusCall
 }
 
@@ -107,6 +111,58 @@ func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, 
 		}
 	}
 	return false, nil
+}
+
+// List returns tasks for tenantID (optionally filtered by projectID),
+// sorted by ID for deterministic test assertions — real enough to exercise
+// ListTasks's filtering without a database. Pagination (pageToken/pageSize)
+// is intentionally not simulated here (no test in this package needs it
+// yet); every match is returned with an empty next-page token.
+func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
+	if f.listErr != nil {
+		return nil, "", f.listErr
+	}
+	ids := make([]string, 0, len(f.tasks))
+	for id := range f.tasks {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var out []domain.Task
+	for _, id := range ids {
+		t := f.tasks[id]
+		if t.TenantID != tenantID {
+			continue
+		}
+		if projectID != "" && t.ProjectID != projectID {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out, "", nil
+}
+
+func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task) error {
+	if f.updateErr != nil {
+		return f.updateErr
+	}
+	existing, ok := f.tasks[task.ID]
+	if !ok || existing.TenantID != tenantID {
+		return errNotFound
+	}
+	f.tasks[task.ID] = task
+	return nil
+}
+
+func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	existing, ok := f.tasks[id]
+	if !ok || existing.TenantID != tenantID {
+		return errNotFound
+	}
+	delete(f.tasks, id)
+	return nil
 }
 
 var errNotFound = &notFoundError{}

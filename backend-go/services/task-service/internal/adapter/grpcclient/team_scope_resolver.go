@@ -1,8 +1,9 @@
-// Package grpcclient holds task-service's outbound gRPC-client adapters for
-// the three cross-service ports usecase/ports.go defines
-// (TeamScopeResolver, SimpleExecutor, ComplexExecutor). All three are STUBS
-// in this scaffold — see each file's doc comment for what real wiring
-// needs, and this service's README for the consolidated list.
+// Package grpcclient holds task-service's outbound gRPC-client adapters:
+// TeamScopeResolver and ComplexExecutor are still STUBS (see each file's
+// doc comment for what real wiring needs, and this service's README for
+// the consolidated list); SimpleExecutor, ProjectExecutionResolver,
+// AICompleter, and AIProviderContextResolver are real as of TASK-224,
+// dialed against infra-fleet-service and ai-provider-service.
 package grpcclient
 
 import "context"

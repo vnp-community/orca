@@ -32,9 +32,11 @@ import (
 
 	gitgatewaygrpc "github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/grpcclient"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/localfs"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/localgit"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
@@ -82,17 +84,75 @@ func run() error {
 	resolver := grpcclient.NewConnectionResolver(infraFleetClient)
 	relay := grpcclient.NewRelayExecutor(infraFleetClient)
 	local := localgit.New()
+	localFS := localfs.New()
+	relayFS := relay // *grpcclient.RelayExecutor also satisfies usecase.FilesystemExecutor (TASK-051)
+
+	// ai-provider-service — dialed separately from infra-fleet-service:
+	// DiscoverCommitMessageModels (TASK-211) resolves account metadata
+	// directly, it does not go through the execution-plane relay.
+	aiProviderConn, err := grpcclient.Dial(cfg.AIProviderServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing ai-provider-service: %w", err)
+	}
+	defer func() { _ = aiProviderConn.Close() }()
+	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
+	aiProviderResolver := grpcclient.NewAIProviderResolver(aiProviderClient)
 
 	getStatusUC := usecase.NewGetStatus(resolver, local, relay)
 	getDiffUC := usecase.NewGetDiff(resolver, local, relay)
 	commitUC := usecase.NewCommit(resolver, local, relay)
 	pushUC := usecase.NewPush(resolver, local, relay)
 	pullUC := usecase.NewPull(resolver, local, relay)
-	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getDiffUC, relay)
+	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, relay)
+
+	stageUC := usecase.NewStage(resolver, local, relay)
+	unstageUC := usecase.NewUnstage(resolver, local, relay)
+
+	historyUC := usecase.NewHistory(resolver, local, relay)
+	checkIgnoredUC := usecase.NewCheckIgnored(resolver, local, relay)
+	forkSyncUC := usecase.NewForkSync(resolver, local, relay)
+	upstreamStatusUC := usecase.NewUpstreamStatus(resolver, local, relay)
+	// ⚠️ BLOCKED — do not wire these 5 until TASK-209's Contract correction
+	// section shape redesigns land:
+	// commitCompareUC := usecase.NewCommitCompare(resolver, local, relay)
+	// branchCompareUC := usecase.NewBranchCompare(resolver, local, relay)
+	// commitDiffUC := usecase.NewCommitDiff(resolver, local, relay)
+	// branchDiffUC := usecase.NewBranchDiff(resolver, local, relay)
+	// submoduleStatusUC := usecase.NewSubmoduleStatus(resolver, local, relay)
+
+	remoteCommitURLUC := usecase.NewRemoteCommitURL(resolver, local, relay)
+	remoteFileURLUC := usecase.NewRemoteFileURL(resolver, local, relay)
+	// ⚠️ BLOCKED — fetch needs TASK-227 + the pushTarget design question
+	// (SOL-032 §0 open question #1) resolved first. Not wired.
+
+	generatePullRequestFieldsUC := usecase.NewGeneratePullRequestFields(resolver, getStatusUC, getDiffUC, relay)
+	discoverCommitMessageModelsUC := usecase.NewDiscoverCommitMessageModels(aiProviderResolver)
+
+	readFileUC := usecase.NewReadFileUseCase(resolver, localFS, relayFS)
+	readFileChunkUC := usecase.NewReadFileChunkUseCase(resolver, localFS)
+	readFilePreviewUC := usecase.NewReadFilePreviewUseCase(resolver, localFS, relayFS)
+	readDirUC := usecase.NewReadDirUseCase(resolver, localFS, relayFS)
+	writeFileUC := usecase.NewWriteFileUseCase(resolver, localFS, relayFS)
+	writeFileChunkUC := usecase.NewWriteFileChunkUseCase(resolver, localFS, relayFS)
+	createDirUC := usecase.NewCreateDirUseCase(resolver, localFS, relayFS)
+	deleteFileUC := usecase.NewDeleteFileUseCase(resolver, localFS, relayFS)
+	statFileUC := usecase.NewStatFileUseCase(resolver, localFS, relayFS)
+	searchFilesUC := usecase.NewSearchFilesUseCase(resolver, localFS, relayFS)
+	listAllFilesUC := usecase.NewListAllFilesUseCase(resolver, localFS, relayFS)
+	listMarkdownDocumentsUC := usecase.NewListMarkdownDocumentsUseCase(resolver, localFS, relayFS)
+	renameFileUC := usecase.NewRenameFileUseCase(resolver, localFS)
+	copyFileUC := usecase.NewCopyFileUseCase(resolver, localFS)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
 		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
+		stageUC, unstageUC,
+		historyUC, checkIgnoredUC, forkSyncUC, upstreamStatusUC,
+		remoteCommitURLUC, remoteFileURLUC,
+		generatePullRequestFieldsUC, discoverCommitMessageModelsUC,
+		readFileUC, readFileChunkUC, readFilePreviewUC, readDirUC, writeFileUC, writeFileChunkUC,
+		createDirUC, deleteFileUC, statFileUC, searchFilesUC, listAllFilesUC, listMarkdownDocumentsUC,
+		renameFileUC, copyFileUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

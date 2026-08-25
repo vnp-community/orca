@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package orca.gitgateway.v1;
 
+import "google/protobuf/empty.proto";
+
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1;gitgatewayv1";
 
 // GitGatewayService is a stateless dispatcher: resolve the worktree's owning
@@ -14,6 +16,49 @@ service GitGatewayService {
   rpc Push(PushRequest) returns (PushResponse);
   rpc Pull(PullRequest) returns (PullResponse);
   rpc GenerateCommitMessage(GenerateCommitMessageRequest) returns (GenerateCommitMessageResponse);
+
+  // ── Group B (TASK-208) — staging. Both always relay to the agent's bulk
+  // variant regardless of path count — see RelayExecutor.Stage/Unstage. ──
+  rpc Stage(StageRequest) returns (StageResponse);
+  rpc Unstage(UnstageRequest) returns (UnstageResponse);
+
+  // ── Group C (TASK-209) — history/compare. Only the 4 methods confirmed
+  // shippable-now per SOL-032 §0's contract correction are exposed here;
+  // commitCompare/branchCompare/commitDiff/branchDiff/submoduleStatus stay
+  // BLOCKED pending a real shape redesign — see TASK-209. ──────────────────
+  rpc History(HistoryRequest) returns (HistoryResponse);
+  rpc CheckIgnored(CheckIgnoredRequest) returns (CheckIgnoredResponse);
+  rpc ForkSync(ForkSyncRequest) returns (ForkSyncResponse);
+  rpc UpstreamStatus(UpstreamStatusRequest) returns (UpstreamStatusResponse);
+
+  // ── Group D (TASK-210) — remote. Only remoteCommitUrl/remoteFileUrl are
+  // exposed; fetch stays BLOCKED on the pushTarget design question. ───────
+  rpc RemoteCommitUrl(RemoteCommitUrlRequest) returns (RemoteUrlResponse);
+  rpc RemoteFileUrl(RemoteFileUrlRequest) returns (RemoteUrlResponse);
+
+  // ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
+  rpc GeneratePullRequestFields(GeneratePullRequestFieldsRequest) returns (GeneratePullRequestFieldsResponse);
+  rpc DiscoverCommitMessageModels(DiscoverCommitMessageModelsRequest) returns (DiscoverCommitMessageModelsResponse);
+
+  // ── File I/O (TASK-049) — resolve worktree_id -> host -> local exec or
+  // relay, identical dispatch shape to every git.* RPC above. ─────────────
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  rpc ReadFileChunk(ReadFileChunkRequest) returns (ReadFileChunkResponse);
+  rpc ReadFilePreview(ReadFilePreviewRequest) returns (ReadFilePreviewResponse);
+  rpc ReadDir(ReadDirRequest) returns (ReadDirResponse);
+  rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
+  rpc WriteFileChunk(WriteFileChunkRequest) returns (WriteFileChunkResponse);
+  rpc CreateDir(CreateDirRequest) returns (CreateDirResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (google.protobuf.Empty);
+  rpc StatFile(StatFileRequest) returns (StatFileResponse);
+  rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse);
+  rpc ListAllFiles(ListAllFilesRequest) returns (ListAllFilesResponse);
+  rpc ListMarkdownDocuments(ListMarkdownDocumentsRequest) returns (ListMarkdownDocumentsResponse);
+  // Known gaps carried forward from the old backend — both RPCs exist so
+  // the contract is honest, but return FAILED_PRECONDITION whenever
+  // dispatch resolves to a relay target, never a silent no-op.
+  rpc RenameFile(RenameFileRequest) returns (RenameFileResponse);
+  rpc CopyFile(CopyFileRequest) returns (CopyFileResponse);
 }
 
 message GetStatusRequest {
@@ -32,7 +77,8 @@ message GetStatusResponse {
 
 message GetDiffRequest {
   string worktree_id = 1;
-  bool staged = 2;
+  string file_path = 2; // required — real git.diff is a per-file operation, see TASK-228
+  bool staged = 3;
 }
 
 message GetDiffResponse {
@@ -77,3 +123,246 @@ message GenerateCommitMessageRequest {
 message GenerateCommitMessageResponse {
   string message = 1;
 }
+
+// ── Group B — staging (TASK-208) ──────────────────────────────────────────
+
+message StageRequest {
+  string worktree_id = 1;
+  repeated string paths = 2; // single-element for git.stage, full selection for git.bulkStage
+}
+message StageResponse {
+  bool success = 1;
+}
+
+message UnstageRequest {
+  string worktree_id = 1;
+  repeated string paths = 2; // single-element for git.unstage, full selection for git.bulkUnstage
+}
+message UnstageResponse {
+  bool success = 1;
+}
+
+// ── Group C — history/compare (TASK-209, shippable-now subset only) ──────
+
+message CommitRef {
+  string sha = 1;
+  string author = 2;
+  string committer = 3;
+  string message = 4;
+  int64 timestamp = 5; // unix seconds
+  repeated string parent_shas = 6;
+}
+
+// cursor/pagination dropped — the real agent has no pagination concept.
+// ref renamed to base_ref to match the field name the real agent reads.
+message HistoryRequest {
+  string worktree_id = 1;
+  string base_ref = 2; // empty = current branch
+  int32 limit = 3;
+}
+message HistoryResponse {
+  repeated CommitRef commits = 1;
+}
+
+// Response shape matches the real agent: only the ignored subset, not a
+// {path, ignored} pair for every input path.
+message CheckIgnoredRequest {
+  string worktree_id = 1;
+  repeated string paths = 2;
+}
+message CheckIgnoredResponse {
+  repeated string ignored_paths = 1;
+}
+
+// expected_upstream is required — the real git.forkSync rejects calls
+// without it.
+message ForkSyncRequest {
+  string worktree_id = 1;
+  string expected_upstream = 2;
+}
+message ForkSyncResponse {
+  int32 ahead = 1;
+  int32 behind = 2;
+  bool diverged = 3;
+}
+
+// push_target is a placeholder string field — the real PushTargetInput
+// shape is SOL-032 §0 open question #1, still unresolved. Replace with the
+// real structured type once that question closes.
+message UpstreamStatusRequest {
+  string worktree_id = 1;
+  string push_target = 2; // placeholder — see SOL-032 §0 open question #1
+}
+message UpstreamStatusResponse {
+  bool has_upstream = 1;
+  int32 ahead = 2;
+  int32 behind = 3;
+}
+
+// ── Group D — remote (TASK-210, shippable-now subset only; fetch BLOCKED) ─
+
+message RemoteCommitUrlRequest { string worktree_id = 1; string sha = 2; }
+message RemoteFileUrlRequest   { string worktree_id = 1; string path = 2; string ref = 3; }
+message RemoteUrlResponse      { string url = 1; }
+
+// ── Group E — AI-assist (TASK-211) ────────────────────────────────────────
+
+message GeneratePullRequestFieldsRequest {
+  string worktree_id = 1;
+  string base_branch = 2;
+}
+message GeneratePullRequestFieldsResponse {
+  string title = 1;
+  string description = 2;
+}
+
+message ModelInfo {
+  string provider_type = 1; // mirrors orca.aiprovider.v1.ProviderType's string name
+  string account_id = 2;
+  string status = 3; // active | rotating | revoked
+}
+message DiscoverCommitMessageModelsRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+}
+message DiscoverCommitMessageModelsResponse {
+  repeated ModelInfo models = 1; // 0 or 1 entries today — see DiscoverCommitMessageModels usecase doc comment
+}
+
+// ── File I/O (TASK-049) ───────────────────────────────────────────────────
+
+message ReadFileRequest {
+  string worktree_id = 1;
+  string path = 2;       // worktree-relative
+}
+message ReadFileResponse {
+  bytes content = 1;
+  string encoding = 2;   // "utf8" | "base64" — binary files come back base64
+}
+
+message ReadFileChunkRequest {
+  string worktree_id = 1;
+  string path = 2;
+  int64 offset_bytes = 3;
+  int64 length_bytes = 4;
+}
+message ReadFileChunkResponse {
+  bytes content = 1;
+  bool eof = 2;
+}
+
+message ReadFilePreviewRequest {
+  string worktree_id = 1;
+  string path = 2;
+  int64 max_bytes = 3;
+}
+message ReadFilePreviewResponse {
+  bytes content = 1;
+  bool truncated = 2;
+}
+
+message ReadDirRequest {
+  string worktree_id = 1;
+  string path = 2;
+}
+message DirEntry {
+  string name = 1;
+  bool is_directory = 2;
+}
+message ReadDirResponse {
+  repeated DirEntry entries = 1;
+}
+
+message WriteFileRequest {
+  string worktree_id = 1;
+  string path = 2;
+  bytes content = 3;
+  string encoding = 4;   // mirrors ReadFileResponse.encoding
+  bool create_parents = 5;
+}
+message WriteFileResponse {
+  int64 bytes_written = 1;
+}
+
+message WriteFileChunkRequest {
+  string worktree_id = 1;
+  string path = 2;
+  int64 offset_bytes = 3;
+  bytes content = 4;      // base64-decoded before this RPC is called
+  bool is_final = 5;
+}
+message WriteFileChunkResponse {
+  int64 bytes_written = 1;
+}
+
+message CreateDirRequest {
+  string worktree_id = 1;
+  string path = 2;
+  bool recursive = 3;
+  bool no_clobber = 4;   // files.createDirNoClobber collapses onto this field
+}
+message CreateDirResponse {}
+
+message DeleteFileRequest {
+  string worktree_id = 1;
+  string path = 2;
+  bool recursive = 3;
+}
+
+message StatFileRequest {
+  string worktree_id = 1;
+  string path = 2;
+}
+message StatFileResponse {
+  bool exists = 1;
+  bool is_directory = 2;
+  int64 size_bytes = 3;
+  int64 modified_at_unix_ms = 4;
+}
+
+message SearchFilesRequest {
+  string worktree_id = 1;
+  string pattern = 2;
+  bool is_regex = 3;
+  string path_glob = 4;
+  int32 max_results = 5;
+}
+message SearchMatch {
+  string path = 1;
+  int32 line = 2;
+  string line_text = 3;
+}
+message SearchFilesResponse {
+  repeated SearchMatch matches = 1;
+}
+
+message ListAllFilesRequest {
+  string worktree_id = 1;
+  string path_glob = 2;
+  int32 max_results = 3;
+}
+message ListAllFilesResponse {
+  repeated string paths = 1;
+}
+
+message ListMarkdownDocumentsRequest {
+  string worktree_id = 1;
+  int32 max_results = 2;
+}
+message ListMarkdownDocumentsResponse {
+  repeated string paths = 1;
+}
+
+message RenameFileRequest {
+  string worktree_id = 1;
+  string from_path = 2;
+  string to_path = 3;
+}
+message RenameFileResponse {}
+
+message CopyFileRequest {
+  string worktree_id = 1;
+  string from_path = 2;
+  string to_path = 3;
+}
+message CopyFileResponse {}

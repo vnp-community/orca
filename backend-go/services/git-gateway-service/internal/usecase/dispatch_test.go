@@ -28,13 +28,22 @@ func (f *fakeConnectionResolver) ResolveConnection(ctx context.Context, worktree
 type fakeGitExecutor struct {
 	name string // "local" or "relay", for assertion messages
 
-	calledGetStatus bool
-	calledGetDiff   bool
-	calledCommit    bool
-	calledPush      bool
-	calledPull      bool
+	calledGetStatus     bool
+	calledGetDiff       bool
+	calledCommit        bool
+	calledPush          bool
+	calledPull          bool
+	calledStage         bool
+	calledUnstage       bool
+	calledHistory       bool
+	calledCheckIgnored  bool
+	calledForkSync      bool
+	calledUpstreamState bool
+	calledRemoteCommit  bool
+	calledRemoteFile    bool
 
 	gotRepoPath string
+	gotFilePath string
 
 	statusErr error
 	diffErr   error
@@ -49,12 +58,15 @@ func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domai
 	if f.statusErr != nil {
 		return domain.GitStatus{}, f.statusErr
 	}
-	return domain.GitStatus{Branch: "main"}, nil
+	// One changed file so gatherFullDiff (used by GenerateCommitMessage /
+	// GeneratePullRequestFields) actually calls GetDiff below.
+	return domain.GitStatus{Branch: "main", Files: []domain.FileStatus{{Path: "file.txt", State: domain.FileStateModified}}}, nil
 }
 
-func (f *fakeGitExecutor) GetDiff(ctx context.Context, repoPath string, staged bool) (domain.DiffResult, error) {
+func (f *fakeGitExecutor) GetDiff(ctx context.Context, repoPath, filePath string, staged bool) (domain.DiffResult, error) {
 	f.calledGetDiff = true
 	f.gotRepoPath = repoPath
+	f.gotFilePath = filePath
 	if f.diffErr != nil {
 		return domain.DiffResult{}, f.diffErr
 	}
@@ -86,6 +98,54 @@ func (f *fakeGitExecutor) Pull(ctx context.Context, repoPath string) (domain.Pul
 		return domain.PullResult{}, f.pullErr
 	}
 	return domain.PullResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) Stage(ctx context.Context, repoPath string, paths []string) (domain.SimpleResult, error) {
+	f.calledStage = true
+	f.gotRepoPath = repoPath
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) Unstage(ctx context.Context, repoPath string, paths []string) (domain.SimpleResult, error) {
+	f.calledUnstage = true
+	f.gotRepoPath = repoPath
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) History(ctx context.Context, repoPath, baseRef string, limit int) ([]domain.CommitRef, error) {
+	f.calledHistory = true
+	f.gotRepoPath = repoPath
+	return []domain.CommitRef{{SHA: "abc123"}}, nil
+}
+
+func (f *fakeGitExecutor) CheckIgnored(ctx context.Context, repoPath string, paths []string) ([]string, error) {
+	f.calledCheckIgnored = true
+	f.gotRepoPath = repoPath
+	return []string{}, nil
+}
+
+func (f *fakeGitExecutor) ForkSync(ctx context.Context, repoPath, expectedUpstream string) (domain.ForkSyncStatus, error) {
+	f.calledForkSync = true
+	f.gotRepoPath = repoPath
+	return domain.ForkSyncStatus{}, nil
+}
+
+func (f *fakeGitExecutor) UpstreamStatus(ctx context.Context, repoPath, pushTarget string) (domain.UpstreamStatus, error) {
+	f.calledUpstreamState = true
+	f.gotRepoPath = repoPath
+	return domain.UpstreamStatus{}, nil
+}
+
+func (f *fakeGitExecutor) RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error) {
+	f.calledRemoteCommit = true
+	f.gotRepoPath = repoPath
+	return "https://example.com/commit/" + sha, nil
+}
+
+func (f *fakeGitExecutor) RemoteFileURL(ctx context.Context, repoPath, path, ref string) (string, error) {
+	f.calledRemoteFile = true
+	f.gotRepoPath = repoPath
+	return "https://example.com/blob/" + ref + "/" + path, nil
 }
 
 func TestGetStatus_NotConnected_RoutesToLocalExecutor(t *testing.T) {
@@ -152,7 +212,7 @@ func TestGetDiff_RoutesByConnectionState(t *testing.T) {
 	relay := &fakeGitExecutor{}
 	uc := NewGetDiff(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
 
-	got, err := uc.Execute(context.Background(), GetDiffInput{WorktreeID: "wt1", Staged: true})
+	got, err := uc.Execute(context.Background(), GetDiffInput{WorktreeID: "wt1", FilePath: "README.md", Staged: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,6 +221,14 @@ func TestGetDiff_RoutesByConnectionState(t *testing.T) {
 	}
 	if got.UnifiedDiff != "diff" {
 		t.Errorf("unexpected diff result: %+v", got)
+	}
+}
+
+func TestGetDiff_MissingFilePath_ReturnsError(t *testing.T) {
+	uc := NewGetDiff(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), GetDiffInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing file_path")
 	}
 }
 
@@ -248,9 +316,10 @@ func TestGenerateCommitMessage_Connected_RelaysDiffAndReturnsMessage(t *testing.
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo/wt1"}}
 	local := &fakeGitExecutor{name: "local"}
 	relay := &fakeGitExecutor{name: "relay"}
+	getStatus := NewGetStatus(resolver, local, relay)
 	getDiff := NewGetDiff(resolver, local, relay)
 	completer := &fakeAICompleter{message: "feat: add widget"}
-	uc := NewGenerateCommitMessage(resolver, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
 
 	got, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err != nil {
@@ -275,9 +344,10 @@ func TestGenerateCommitMessage_Connected_RelaysDiffAndReturnsMessage(t *testing.
 
 func TestGenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo/wt1"}}
+	getStatus := NewGetStatus(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	completer := &fakeAICompleter{message: "should not be called"}
-	uc := NewGenerateCommitMessage(resolver, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
 
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err == nil {
@@ -294,9 +364,10 @@ func TestGenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *testing
 
 func TestGenerateCommitMessage_RelayFailure_Propagates(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo/wt1"}}
+	getStatus := NewGetStatus(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	completer := &fakeAICompleter{err: errors.New("dev server agent unreachable")}
-	uc := NewGenerateCommitMessage(resolver, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
 
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err == nil {
@@ -309,9 +380,252 @@ func TestGenerateCommitMessage_RelayFailure_Propagates(t *testing.T) {
 }
 
 func TestGenerateCommitMessage_MissingWorktreeID_ReturnsError(t *testing.T) {
-	uc := NewGenerateCommitMessage(&fakeConnectionResolver{}, NewGetDiff(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{}), &fakeAICompleter{})
+	emptyResolver := &fakeConnectionResolver{}
+	uc := NewGenerateCommitMessage(emptyResolver, NewGetStatus(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), NewGetDiff(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), &fakeAICompleter{})
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{})
 	if err == nil {
 		t.Fatal("expected error for missing worktree_id")
+	}
+}
+
+// ── TASK-208: Stage/Unstage ───────────────────────────────────────────────
+
+func TestStage_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStage(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), StageInput{WorktreeID: "wt1", Paths: []string{"a.txt"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledStage || local.calledStage {
+		t.Error("expected Stage to route to relay when Connected=true")
+	}
+	if !got.Success {
+		t.Errorf("unexpected stage result: %+v", got)
+	}
+}
+
+func TestStage_MissingPaths_ReturnsError(t *testing.T) {
+	uc := NewStage(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), StageInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing paths")
+	}
+}
+
+func TestUnstage_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewUnstage(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), UnstageInput{WorktreeID: "wt1", Paths: []string{"a.txt"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledUnstage || relay.calledUnstage {
+		t.Error("expected Unstage to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected unstage result: %+v", got)
+	}
+}
+
+// ── TASK-209 (shippable-now subset): History/CheckIgnored/ForkSync/UpstreamStatus ──
+
+func TestHistory_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewHistory(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), HistoryInput{WorktreeID: "wt1", BaseRef: "main", Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledHistory || local.calledHistory {
+		t.Error("expected History to route to relay when Connected=true")
+	}
+	if len(got.Commits) != 1 {
+		t.Errorf("unexpected history result: %+v", got)
+	}
+}
+
+func TestCheckIgnored_MissingPaths_ReturnsError(t *testing.T) {
+	uc := NewCheckIgnored(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), CheckIgnoredInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing paths")
+	}
+}
+
+func TestCheckIgnored_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewCheckIgnored(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), CheckIgnoredInput{WorktreeID: "wt1", Paths: []string{"node_modules"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledCheckIgnored || relay.calledCheckIgnored {
+		t.Error("expected CheckIgnored to route to local when Connected=false")
+	}
+}
+
+func TestForkSync_MissingExpectedUpstream_ReturnsError(t *testing.T) {
+	uc := NewForkSync(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), ForkSyncInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing expected_upstream — real agent requires it (TASK-209)")
+	}
+}
+
+func TestForkSync_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewForkSync(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), ForkSyncInput{WorktreeID: "wt1", ExpectedUpstream: "origin/main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledForkSync || local.calledForkSync {
+		t.Error("expected ForkSync to route to relay when Connected=true")
+	}
+}
+
+func TestUpstreamStatus_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewUpstreamStatus(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), UpstreamStatusInput{WorktreeID: "wt1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledUpstreamState || relay.calledUpstreamState {
+		t.Error("expected UpstreamStatus to route to local when Connected=false")
+	}
+}
+
+// ── TASK-210 (shippable-now subset): RemoteCommitURL/RemoteFileURL ───────
+
+func TestRemoteCommitURL_MissingSHA_ReturnsError(t *testing.T) {
+	uc := NewRemoteCommitURL(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), RemoteCommitURLInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing sha")
+	}
+}
+
+func TestRemoteCommitURL_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewRemoteCommitURL(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), RemoteCommitURLInput{WorktreeID: "wt1", SHA: "deadbeef"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledRemoteCommit || relay.calledRemoteCommit {
+		t.Error("expected RemoteCommitURL to route to local when Connected=false")
+	}
+	if got == "" {
+		t.Error("expected non-empty url")
+	}
+}
+
+func TestRemoteFileURL_MissingPath_ReturnsError(t *testing.T) {
+	uc := NewRemoteFileURL(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), RemoteFileURLInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing path")
+	}
+}
+
+// ── TASK-211: GeneratePullRequestFields/DiscoverCommitMessageModels ──────
+
+func TestGeneratePullRequestFields_Connected_RelaysDiffAndReturnsFields(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo/wt1"}}
+	local := &fakeGitExecutor{name: "local"}
+	relay := &fakeGitExecutor{name: "relay"}
+	getStatus := NewGetStatus(resolver, local, relay)
+	getDiff := NewGetDiff(resolver, local, relay)
+	completer := &fakeAICompleter{message: "Add widget\n\nImplements the widget feature."}
+	uc := NewGeneratePullRequestFields(resolver, getStatus, getDiff, completer)
+
+	got, err := uc.Execute(context.Background(), GeneratePullRequestFieldsInput{WorktreeID: "wt1", BaseBranch: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Title != "Add widget" {
+		t.Errorf("expected title=%q, got %q", "Add widget", got.Title)
+	}
+	if got.Description != "\nImplements the widget feature." {
+		t.Errorf("unexpected description: %q", got.Description)
+	}
+}
+
+func TestGeneratePullRequestFields_NotConnected_ReturnsFailedPrecondition(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}
+	getStatus := NewGetStatus(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
+	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
+	uc := NewGeneratePullRequestFields(resolver, getStatus, getDiff, &fakeAICompleter{})
+
+	_, err := uc.Execute(context.Background(), GeneratePullRequestFieldsInput{WorktreeID: "wt1"})
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Kind != apperrors.KindFailedPrecondition {
+		t.Fatalf("expected KindFailedPrecondition AppError, got %v", err)
+	}
+}
+
+func TestParsePRFields_NoNewline_TitleOnly(t *testing.T) {
+	got := parsePRFields("just a title, no newline")
+	if got.Title != "just a title, no newline" || got.Description != "" {
+		t.Errorf("unexpected parse result: %+v", got)
+	}
+}
+
+// fakeAIProviderResolver is an in-memory usecase.AIProviderResolver.
+type fakeAIProviderResolver struct {
+	providerType, accountID, status string
+	err                             error
+}
+
+func (f *fakeAIProviderResolver) ResolveProvider(ctx context.Context, tenantID, userID string) (string, string, string, error) {
+	if f.err != nil {
+		return "", "", "", f.err
+	}
+	return f.providerType, f.accountID, f.status, nil
+}
+
+func TestDiscoverCommitMessageModels_ReturnsResolvedAccount(t *testing.T) {
+	uc := NewDiscoverCommitMessageModels(&fakeAIProviderResolver{providerType: "PROVIDER_TYPE_ANTHROPIC", accountID: "acct-1", status: "active"})
+	got, err := uc.Execute(context.Background(), DiscoverCommitMessageModelsInput{TenantID: "t-1", UserID: "u-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0].AccountID != "acct-1" {
+		t.Errorf("unexpected models: %+v", got)
+	}
+}
+
+func TestDiscoverCommitMessageModels_NoAccount_ReturnsEmpty(t *testing.T) {
+	uc := NewDiscoverCommitMessageModels(&fakeAIProviderResolver{})
+	got, err := uc.Execute(context.Background(), DiscoverCommitMessageModelsInput{TenantID: "t-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected 0 models when ResolveProvider finds no account, got %+v", got)
+	}
+}
+
+func TestDiscoverCommitMessageModels_MissingTenantID_ReturnsError(t *testing.T) {
+	uc := NewDiscoverCommitMessageModels(&fakeAIProviderResolver{})
+	_, err := uc.Execute(context.Background(), DiscoverCommitMessageModelsInput{})
+	if err == nil {
+		t.Fatal("expected error for missing tenant_id")
 	}
 }

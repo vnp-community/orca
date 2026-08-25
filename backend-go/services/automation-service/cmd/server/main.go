@@ -94,9 +94,15 @@ func run() error {
 	runNowUC := usecase.NewRunNow(automationRepo, runRepo, workflowExecutor)
 	listRunsUC := usecase.NewListRuns(runRepo)
 	handleExternalTriggerUC := usecase.NewHandleExternalTrigger(runNowUC)
+	listAutomationsUC := usecase.NewListAutomations(automationRepo)
+	updateAutomationUC := usecase.NewUpdateAutomation(automationRepo)
+	deleteAutomationUC := usecase.NewDeleteAutomation(automationRepo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	automationv1.RegisterAutomationServiceServer(grpcServer, automationgrpc.New(createAutomationUC, runNowUC, listRunsUC, handleExternalTriggerUC))
+	automationv1.RegisterAutomationServiceServer(grpcServer, automationgrpc.New(
+		createAutomationUC, runNowUC, listRunsUC, handleExternalTriggerUC,
+		listAutomationsUC, updateAutomationUC, deleteAutomationUC,
+	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// In-process scheduler ticker — see automation-service.md §7. Every

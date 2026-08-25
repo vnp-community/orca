@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -23,6 +24,9 @@ const (
 	AutomationService_RunNow_FullMethodName                = "/orca.automation.v1.AutomationService/RunNow"
 	AutomationService_ListRuns_FullMethodName              = "/orca.automation.v1.AutomationService/ListRuns"
 	AutomationService_HandleExternalTrigger_FullMethodName = "/orca.automation.v1.AutomationService/HandleExternalTrigger"
+	AutomationService_ListAutomations_FullMethodName       = "/orca.automation.v1.AutomationService/ListAutomations"
+	AutomationService_UpdateAutomation_FullMethodName      = "/orca.automation.v1.AutomationService/UpdateAutomation"
+	AutomationService_DeleteAutomation_FullMethodName      = "/orca.automation.v1.AutomationService/DeleteAutomation"
 )
 
 // AutomationServiceClient is the client API for AutomationService service.
@@ -43,6 +47,9 @@ type AutomationServiceClient interface {
 	// the external source's own idempotency key, reused as-is for
 	// automation_runs' (tenant_id, request_id) unique index.
 	HandleExternalTrigger(ctx context.Context, in *HandleExternalTriggerRequest, opts ...grpc.CallOption) (*HandleExternalTriggerResponse, error)
+	ListAutomations(ctx context.Context, in *ListAutomationsRequest, opts ...grpc.CallOption) (*ListAutomationsResponse, error)
+	UpdateAutomation(ctx context.Context, in *UpdateAutomationRequest, opts ...grpc.CallOption) (*UpdateAutomationResponse, error)
+	DeleteAutomation(ctx context.Context, in *DeleteAutomationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type automationServiceClient struct {
@@ -93,6 +100,36 @@ func (c *automationServiceClient) HandleExternalTrigger(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *automationServiceClient) ListAutomations(ctx context.Context, in *ListAutomationsRequest, opts ...grpc.CallOption) (*ListAutomationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAutomationsResponse)
+	err := c.cc.Invoke(ctx, AutomationService_ListAutomations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *automationServiceClient) UpdateAutomation(ctx context.Context, in *UpdateAutomationRequest, opts ...grpc.CallOption) (*UpdateAutomationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateAutomationResponse)
+	err := c.cc.Invoke(ctx, AutomationService_UpdateAutomation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *automationServiceClient) DeleteAutomation(ctx context.Context, in *DeleteAutomationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AutomationService_DeleteAutomation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AutomationServiceServer is the server API for AutomationService service.
 // All implementations must embed UnimplementedAutomationServiceServer
 // for forward compatibility.
@@ -111,6 +148,9 @@ type AutomationServiceServer interface {
 	// the external source's own idempotency key, reused as-is for
 	// automation_runs' (tenant_id, request_id) unique index.
 	HandleExternalTrigger(context.Context, *HandleExternalTriggerRequest) (*HandleExternalTriggerResponse, error)
+	ListAutomations(context.Context, *ListAutomationsRequest) (*ListAutomationsResponse, error)
+	UpdateAutomation(context.Context, *UpdateAutomationRequest) (*UpdateAutomationResponse, error)
+	DeleteAutomation(context.Context, *DeleteAutomationRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAutomationServiceServer()
 }
 
@@ -132,6 +172,15 @@ func (UnimplementedAutomationServiceServer) ListRuns(context.Context, *ListRunsR
 }
 func (UnimplementedAutomationServiceServer) HandleExternalTrigger(context.Context, *HandleExternalTriggerRequest) (*HandleExternalTriggerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HandleExternalTrigger not implemented")
+}
+func (UnimplementedAutomationServiceServer) ListAutomations(context.Context, *ListAutomationsRequest) (*ListAutomationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAutomations not implemented")
+}
+func (UnimplementedAutomationServiceServer) UpdateAutomation(context.Context, *UpdateAutomationRequest) (*UpdateAutomationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAutomation not implemented")
+}
+func (UnimplementedAutomationServiceServer) DeleteAutomation(context.Context, *DeleteAutomationRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAutomation not implemented")
 }
 func (UnimplementedAutomationServiceServer) mustEmbedUnimplementedAutomationServiceServer() {}
 func (UnimplementedAutomationServiceServer) testEmbeddedByValue()                           {}
@@ -226,6 +275,60 @@ func _AutomationService_HandleExternalTrigger_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AutomationService_ListAutomations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAutomationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AutomationServiceServer).ListAutomations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AutomationService_ListAutomations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AutomationServiceServer).ListAutomations(ctx, req.(*ListAutomationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AutomationService_UpdateAutomation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAutomationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AutomationServiceServer).UpdateAutomation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AutomationService_UpdateAutomation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AutomationServiceServer).UpdateAutomation(ctx, req.(*UpdateAutomationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AutomationService_DeleteAutomation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAutomationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AutomationServiceServer).DeleteAutomation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AutomationService_DeleteAutomation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AutomationServiceServer).DeleteAutomation(ctx, req.(*DeleteAutomationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AutomationService_ServiceDesc is the grpc.ServiceDesc for AutomationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -248,6 +351,18 @@ var AutomationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HandleExternalTrigger",
 			Handler:    _AutomationService_HandleExternalTrigger_Handler,
+		},
+		{
+			MethodName: "ListAutomations",
+			Handler:    _AutomationService_ListAutomations_Handler,
+		},
+		{
+			MethodName: "UpdateAutomation",
+			Handler:    _AutomationService_UpdateAutomation_Handler,
+		},
+		{
+			MethodName: "DeleteAutomation",
+			Handler:    _AutomationService_DeleteAutomation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
