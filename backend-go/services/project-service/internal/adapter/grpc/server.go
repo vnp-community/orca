@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 	"github.com/stablyai/orca-go/services/project-service/internal/usecase"
 
@@ -29,6 +30,10 @@ type Server struct {
 	updateProject   *usecase.UpdateProject
 	deleteProject   *usecase.DeleteProject
 
+	listMembers      *usecase.ListMembers
+	removeMember     *usecase.RemoveMember
+	updateMemberRole *usecase.UpdateMemberRole
+
 	addRepo      *usecase.AddRepo
 	listRepos    *usecase.ListRepos
 	reorderRepos *usecase.ReorderRepos
@@ -44,6 +49,15 @@ type Server struct {
 	updateProjectGroup *usecase.UpdateProjectGroup
 	deleteProjectGroup *usecase.DeleteProjectGroup
 	listProjectGroups  *usecase.ListProjectGroups
+	moveProject        *usecase.MoveProject
+	scanNested         *usecase.ScanNested
+	importNested       *usecase.ImportNested
+
+	createHostSetup     *usecase.CreateHostSetup
+	listHostSetups      *usecase.ListHostSetups
+	updateHostSetup     *usecase.UpdateHostSetup
+	deleteHostSetup     *usecase.DeleteHostSetup
+	setupExistingFolder *usecase.SetupExistingFolder
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
@@ -57,6 +71,10 @@ type Deps struct {
 	RebindDevServer *usecase.RebindDevServer
 	UpdateProject   *usecase.UpdateProject
 	DeleteProject   *usecase.DeleteProject
+
+	ListMembers      *usecase.ListMembers
+	RemoveMember     *usecase.RemoveMember
+	UpdateMemberRole *usecase.UpdateMemberRole
 
 	AddRepo      *usecase.AddRepo
 	ListRepos    *usecase.ListRepos
@@ -73,6 +91,15 @@ type Deps struct {
 	UpdateProjectGroup *usecase.UpdateProjectGroup
 	DeleteProjectGroup *usecase.DeleteProjectGroup
 	ListProjectGroups  *usecase.ListProjectGroups
+	MoveProject        *usecase.MoveProject
+	ScanNested         *usecase.ScanNested
+	ImportNested       *usecase.ImportNested
+
+	CreateHostSetup     *usecase.CreateHostSetup
+	ListHostSetups      *usecase.ListHostSetups
+	UpdateHostSetup     *usecase.UpdateHostSetup
+	DeleteHostSetup     *usecase.DeleteHostSetup
+	SetupExistingFolder *usecase.SetupExistingFolder
 }
 
 func New(deps Deps) *Server {
@@ -84,6 +111,10 @@ func New(deps Deps) *Server {
 		rebindDevServer: deps.RebindDevServer,
 		updateProject:   deps.UpdateProject,
 		deleteProject:   deps.DeleteProject,
+
+		listMembers:      deps.ListMembers,
+		removeMember:     deps.RemoveMember,
+		updateMemberRole: deps.UpdateMemberRole,
 
 		addRepo:      deps.AddRepo,
 		listRepos:    deps.ListRepos,
@@ -100,6 +131,15 @@ func New(deps Deps) *Server {
 		updateProjectGroup: deps.UpdateProjectGroup,
 		deleteProjectGroup: deps.DeleteProjectGroup,
 		listProjectGroups:  deps.ListProjectGroups,
+		moveProject:        deps.MoveProject,
+		scanNested:         deps.ScanNested,
+		importNested:       deps.ImportNested,
+
+		createHostSetup:     deps.CreateHostSetup,
+		listHostSetups:      deps.ListHostSetups,
+		updateHostSetup:     deps.UpdateHostSetup,
+		deleteHostSetup:     deps.DeleteHostSetup,
+		setupExistingFolder: deps.SetupExistingFolder,
 	}
 }
 
@@ -157,6 +197,38 @@ func (s *Server) AddMember(ctx context.Context, req *projectv1.AddMemberRequest)
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.AddMemberResponse{}, nil
+}
+
+func (s *Server) ListMembers(ctx context.Context, req *projectv1.ListMembersRequest) (*projectv1.ListMembersResponse, error) {
+	members, err := s.listMembers.Execute(ctx, usecase.ListMembersInput{ProjectID: req.GetProjectId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.Member, 0, len(members))
+	for _, m := range members {
+		out = append(out, &projectv1.Member{UserId: m.UserID, Role: toProtoRole(m.Role)})
+	}
+	return &projectv1.ListMembersResponse{Members: out}, nil
+}
+
+func (s *Server) RemoveMember(ctx context.Context, req *projectv1.RemoveMemberRequest) (*projectv1.RemoveMemberResponse, error) {
+	err := s.removeMember.Execute(ctx, usecase.RemoveMemberInput{
+		ProjectID: req.GetProjectId(), UserID: req.GetUserId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RemoveMemberResponse{}, nil
+}
+
+func (s *Server) UpdateMemberRole(ctx context.Context, req *projectv1.UpdateMemberRoleRequest) (*projectv1.UpdateMemberRoleResponse, error) {
+	member, err := s.updateMemberRole.Execute(ctx, usecase.UpdateMemberRoleInput{
+		ProjectID: req.GetProjectId(), UserID: req.GetUserId(), Role: toDomainRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateMemberRoleResponse{Member: &projectv1.Member{UserId: member.UserID, Role: toProtoRole(member.Role)}}, nil
 }
 
 func (s *Server) RebindDevServer(ctx context.Context, req *projectv1.RebindDevServerRequest) (*projectv1.RebindDevServerResponse, error) {
@@ -327,6 +399,108 @@ func (s *Server) ListProjectGroups(ctx context.Context, _ *projectv1.ListProject
 	return &projectv1.ListProjectGroupsResponse{Groups: out}, nil
 }
 
+func (s *Server) MoveProject(ctx context.Context, req *projectv1.MoveProjectRequest) (*projectv1.MoveProjectResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err))
+	}
+	group, err := s.moveProject.Execute(ctx, tenantID, usecase.MoveProjectInput{
+		ProjectID: req.GetProjectId(), TargetParentGroupID: req.GetTargetParentGroupId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.MoveProjectResponse{Group: toProtoProjectGroup(group)}, nil
+}
+
+func (s *Server) ScanNested(ctx context.Context, req *projectv1.ScanNestedRequest) (*projectv1.ScanNestedResponse, error) {
+	candidates, err := s.scanNested.Execute(ctx, usecase.ScanNestedInput{
+		DevServerID: req.GetDevServerId(), RootPath: req.GetRootPath(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.NestedRepoCandidate, 0, len(candidates))
+	for _, c := range candidates {
+		out = append(out, &projectv1.NestedRepoCandidate{Path: c.Path, SuggestedName: c.SuggestedName, IsGitRepo: c.IsGitRepo})
+	}
+	return &projectv1.ScanNestedResponse{Candidates: out}, nil
+}
+
+func (s *Server) ImportNested(ctx context.Context, req *projectv1.ImportNestedRequest) (*projectv1.ImportNestedResponse, error) {
+	selected := make([]domain.NestedRepoCandidate, 0, len(req.GetSelected()))
+	for _, c := range req.GetSelected() {
+		selected = append(selected, domain.NestedRepoCandidate{Path: c.GetPath(), SuggestedName: c.GetSuggestedName(), IsGitRepo: c.GetIsGitRepo()})
+	}
+	groups, projects, err := s.importNested.Execute(ctx, usecase.ImportNestedInput{
+		DevServerID: req.GetDevServerId(), ParentGroupID: req.GetParentGroupId(), Selected: selected,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	outGroups := make([]*projectv1.ProjectGroup, 0, len(groups))
+	for _, g := range groups {
+		outGroups = append(outGroups, toProtoProjectGroup(g))
+	}
+	outProjects := make([]*projectv1.Project, 0, len(projects))
+	for _, p := range projects {
+		outProjects = append(outProjects, toProtoProject(p))
+	}
+	return &projectv1.ImportNestedResponse{CreatedGroups: outGroups, CreatedProjects: outProjects}, nil
+}
+
+func (s *Server) CreateHostSetup(ctx context.Context, req *projectv1.CreateHostSetupRequest) (*projectv1.CreateHostSetupResponse, error) {
+	setup, err := s.createHostSetup.Execute(ctx, usecase.CreateHostSetupInput{
+		DevServerID: req.GetDevServerId(), FolderPath: req.GetFolderPath(), DisplayName: req.GetDisplayName(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.CreateHostSetupResponse{Setup: toProtoHostSetup(setup)}, nil
+}
+
+func (s *Server) ListHostSetups(ctx context.Context, _ *projectv1.ListHostSetupsRequest) (*projectv1.ListHostSetupsResponse, error) {
+	setups, err := s.listHostSetups.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.HostSetup, 0, len(setups))
+	for _, setup := range setups {
+		out = append(out, toProtoHostSetup(setup))
+	}
+	return &projectv1.ListHostSetupsResponse{Setups: out}, nil
+}
+
+func (s *Server) UpdateHostSetup(ctx context.Context, req *projectv1.UpdateHostSetupRequest) (*projectv1.UpdateHostSetupResponse, error) {
+	setup, err := s.updateHostSetup.Execute(ctx, usecase.UpdateHostSetupInput{
+		ID:    req.GetId(),
+		Patch: domain.HostSetupPatch{FolderPath: req.GetFolderPath(), DisplayName: req.GetDisplayName()},
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateHostSetupResponse{Setup: toProtoHostSetup(setup)}, nil
+}
+
+func (s *Server) DeleteHostSetup(ctx context.Context, req *projectv1.DeleteHostSetupRequest) (*projectv1.DeleteHostSetupResponse, error) {
+	if err := s.deleteHostSetup.Execute(ctx, usecase.DeleteHostSetupInput{ID: req.GetId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.DeleteHostSetupResponse{}, nil
+}
+
+func (s *Server) SetupExistingFolder(ctx context.Context, req *projectv1.SetupExistingFolderRequest) (*projectv1.SetupExistingFolderResponse, error) {
+	setup, project, err := s.setupExistingFolder.Execute(ctx, usecase.SetupExistingFolderInput{ID: req.GetId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &projectv1.SetupExistingFolderResponse{Setup: toProtoHostSetup(setup)}
+	if setup.Status == domain.HostSetupCompleted {
+		resp.Project = toProtoProject(project)
+	}
+	return resp, nil
+}
+
 func toDomainRole(r projectv1.ProjectRole) domain.ProjectRole {
 	switch r {
 	case projectv1.ProjectRole_PROJECT_ROLE_OWNER:
@@ -335,6 +509,19 @@ func toDomainRole(r projectv1.ProjectRole) domain.ProjectRole {
 		return domain.ProjectRoleMember
 	default:
 		return ""
+	}
+}
+
+// toProtoRole is toDomainRole's inverse, for ListMembers/UpdateMemberRole's
+// response mapping.
+func toProtoRole(r domain.ProjectRole) projectv1.ProjectRole {
+	switch r {
+	case domain.ProjectRoleOwner:
+		return projectv1.ProjectRole_PROJECT_ROLE_OWNER
+	case domain.ProjectRoleMember:
+		return projectv1.ProjectRole_PROJECT_ROLE_MEMBER
+	default:
+		return projectv1.ProjectRole_PROJECT_ROLE_UNSPECIFIED
 	}
 }
 
@@ -385,5 +572,13 @@ func toProtoProjectGroup(g domain.ProjectGroup) *projectv1.ProjectGroup {
 		TenantId:      g.TenantID,
 		Name:          g.Name,
 		ParentGroupId: g.ParentGroupID,
+		ProjectId:     g.ProjectID,
+	}
+}
+
+func toProtoHostSetup(s domain.HostSetup) *projectv1.HostSetup {
+	return &projectv1.HostSetup{
+		Id: s.ID, TenantId: s.TenantID, DevServerId: s.DevServerID, FolderPath: s.FolderPath,
+		DisplayName: s.DisplayName, Status: string(s.Status), ProjectId: s.ProjectID,
 	}
 }

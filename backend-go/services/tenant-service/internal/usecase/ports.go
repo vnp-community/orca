@@ -23,6 +23,9 @@ type CompanyRepository interface {
 	// service calls to confirm a tenant_id it received is real
 	// (tenant-service.md §3).
 	Exists(ctx context.Context, id string) (bool, error)
+	// Update applies patch's non-empty fields only. Returns found=false if
+	// no company matches id.
+	Update(ctx context.Context, id string, patch domain.CompanySettingsPatch) (domain.Company, bool, error)
 }
 
 // DepartmentRepository persists Department aggregates, always scoped by
@@ -32,17 +35,33 @@ type CompanyRepository interface {
 type DepartmentRepository interface {
 	Create(ctx context.Context, department domain.Department) (domain.Department, error)
 	Get(ctx context.Context, companyID, id string) (domain.Department, bool, error)
+	// List returns every department scoped to companyID — flat, no
+	// hierarchy (tenant-service.md's departments.parent_department_id
+	// column is not surfaced by any RPC yet, see domain.Department's doc
+	// comment).
+	List(ctx context.Context, companyID string) ([]domain.Department, error)
+	// Update applies patch's non-empty fields only, scoped by (companyID,
+	// id) — a department_id from another company resolves as not-found,
+	// same isolation rule as Get. Returns found=false if no match.
+	Update(ctx context.Context, companyID, id string, patch domain.DepartmentSettingsPatch) (domain.Department, bool, error)
 }
 
 // UserProfileRepository persists the per-user profile-override row
 // (tenant.user_profiles) — 1:1 with a user, logical FK to auth-service.
 type UserProfileRepository interface {
-	// Upsert creates or updates a user's profile row. Used by
-	// SetUserDepartment, the only mutating usecase in tenant.proto's
-	// current surface that touches this table — see README "Known gaps"
-	// (there's no UpdateUserProfile RPC yet to set Settings directly).
+	// Upsert creates or updates a user's profile row — used by
+	// SetUserDepartment and (after this task) UpdateUserProfile.
 	Upsert(ctx context.Context, profile domain.UserProfile) error
 	Get(ctx context.Context, companyID, userID string) (domain.UserProfile, bool, error)
+	// ListUserIDsByDepartment returns every user_id whose profile currently
+	// has department_id = departmentID — UpdateDepartment's cache-
+	// invalidation scope (tenant-service.md §8's per-mutation invalidation
+	// table). Cheap indexed read against idx_user_profiles_department.
+	ListUserIDsByDepartment(ctx context.Context, companyID, departmentID string) ([]string, error)
+	// ListUserIDsByCompany returns every user_id in companyID —
+	// UpdateCompany's (wider) cache-invalidation scope. Cheap indexed read
+	// against idx_user_profiles_company.
+	ListUserIDsByCompany(ctx context.Context, companyID string) ([]string, error)
 }
 
 // TeamRepository persists Team aggregates and TeamMember rows, always

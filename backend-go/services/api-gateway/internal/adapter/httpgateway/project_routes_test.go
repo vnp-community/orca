@@ -102,6 +102,50 @@ type fakeProjectServiceClient struct {
 	lastListProjectGroupsReq *projectv1.ListProjectGroupsRequest
 	listProjectGroupsResp    *projectv1.ListProjectGroupsResponse
 	listProjectGroupsErr     error
+
+	lastListMembersReq *projectv1.ListMembersRequest
+	listMembersResp    *projectv1.ListMembersResponse
+	listMembersErr     error
+
+	lastRemoveMemberReq *projectv1.RemoveMemberRequest
+	removeMemberResp    *projectv1.RemoveMemberResponse
+	removeMemberErr     error
+
+	lastUpdateMemberRoleReq *projectv1.UpdateMemberRoleRequest
+	updateMemberRoleResp    *projectv1.UpdateMemberRoleResponse
+	updateMemberRoleErr     error
+
+	lastMoveProjectReq *projectv1.MoveProjectRequest
+	moveProjectResp    *projectv1.MoveProjectResponse
+	moveProjectErr     error
+
+	lastScanNestedReq *projectv1.ScanNestedRequest
+	scanNestedResp    *projectv1.ScanNestedResponse
+	scanNestedErr     error
+
+	lastImportNestedReq *projectv1.ImportNestedRequest
+	importNestedResp    *projectv1.ImportNestedResponse
+	importNestedErr     error
+
+	lastCreateHostSetupReq *projectv1.CreateHostSetupRequest
+	createHostSetupResp    *projectv1.CreateHostSetupResponse
+	createHostSetupErr     error
+
+	lastListHostSetupsReq *projectv1.ListHostSetupsRequest
+	listHostSetupsResp    *projectv1.ListHostSetupsResponse
+	listHostSetupsErr     error
+
+	lastUpdateHostSetupReq *projectv1.UpdateHostSetupRequest
+	updateHostSetupResp    *projectv1.UpdateHostSetupResponse
+	updateHostSetupErr     error
+
+	lastDeleteHostSetupReq *projectv1.DeleteHostSetupRequest
+	deleteHostSetupResp    *projectv1.DeleteHostSetupResponse
+	deleteHostSetupErr     error
+
+	lastSetupExistingFolderReq *projectv1.SetupExistingFolderRequest
+	setupExistingFolderResp    *projectv1.SetupExistingFolderResponse
+	setupExistingFolderErr     error
 }
 
 func (f *fakeProjectServiceClient) CreateProject(_ context.Context, in *projectv1.CreateProjectRequest, _ ...grpc.CallOption) (*projectv1.CreateProjectResponse, error) {
@@ -262,6 +306,94 @@ func (f *fakeProjectServiceClient) ListProjectGroups(_ context.Context, in *proj
 		return nil, f.listProjectGroupsErr
 	}
 	return f.listProjectGroupsResp, nil
+}
+
+func (f *fakeProjectServiceClient) ListMembers(_ context.Context, in *projectv1.ListMembersRequest, _ ...grpc.CallOption) (*projectv1.ListMembersResponse, error) {
+	f.lastListMembersReq = in
+	if f.listMembersErr != nil {
+		return nil, f.listMembersErr
+	}
+	return f.listMembersResp, nil
+}
+
+func (f *fakeProjectServiceClient) RemoveMember(_ context.Context, in *projectv1.RemoveMemberRequest, _ ...grpc.CallOption) (*projectv1.RemoveMemberResponse, error) {
+	f.lastRemoveMemberReq = in
+	if f.removeMemberErr != nil {
+		return nil, f.removeMemberErr
+	}
+	return f.removeMemberResp, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateMemberRole(_ context.Context, in *projectv1.UpdateMemberRoleRequest, _ ...grpc.CallOption) (*projectv1.UpdateMemberRoleResponse, error) {
+	f.lastUpdateMemberRoleReq = in
+	if f.updateMemberRoleErr != nil {
+		return nil, f.updateMemberRoleErr
+	}
+	return f.updateMemberRoleResp, nil
+}
+
+func (f *fakeProjectServiceClient) MoveProject(_ context.Context, in *projectv1.MoveProjectRequest, _ ...grpc.CallOption) (*projectv1.MoveProjectResponse, error) {
+	f.lastMoveProjectReq = in
+	if f.moveProjectErr != nil {
+		return nil, f.moveProjectErr
+	}
+	return f.moveProjectResp, nil
+}
+
+func (f *fakeProjectServiceClient) ScanNested(_ context.Context, in *projectv1.ScanNestedRequest, _ ...grpc.CallOption) (*projectv1.ScanNestedResponse, error) {
+	f.lastScanNestedReq = in
+	if f.scanNestedErr != nil {
+		return nil, f.scanNestedErr
+	}
+	return f.scanNestedResp, nil
+}
+
+func (f *fakeProjectServiceClient) ImportNested(_ context.Context, in *projectv1.ImportNestedRequest, _ ...grpc.CallOption) (*projectv1.ImportNestedResponse, error) {
+	f.lastImportNestedReq = in
+	if f.importNestedErr != nil {
+		return nil, f.importNestedErr
+	}
+	return f.importNestedResp, nil
+}
+
+func (f *fakeProjectServiceClient) CreateHostSetup(_ context.Context, in *projectv1.CreateHostSetupRequest, _ ...grpc.CallOption) (*projectv1.CreateHostSetupResponse, error) {
+	f.lastCreateHostSetupReq = in
+	if f.createHostSetupErr != nil {
+		return nil, f.createHostSetupErr
+	}
+	return f.createHostSetupResp, nil
+}
+
+func (f *fakeProjectServiceClient) ListHostSetups(_ context.Context, in *projectv1.ListHostSetupsRequest, _ ...grpc.CallOption) (*projectv1.ListHostSetupsResponse, error) {
+	f.lastListHostSetupsReq = in
+	if f.listHostSetupsErr != nil {
+		return nil, f.listHostSetupsErr
+	}
+	return f.listHostSetupsResp, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateHostSetup(_ context.Context, in *projectv1.UpdateHostSetupRequest, _ ...grpc.CallOption) (*projectv1.UpdateHostSetupResponse, error) {
+	f.lastUpdateHostSetupReq = in
+	if f.updateHostSetupErr != nil {
+		return nil, f.updateHostSetupErr
+	}
+	return f.updateHostSetupResp, nil
+}
+
+func (f *fakeProjectServiceClient) DeleteHostSetup(_ context.Context, in *projectv1.DeleteHostSetupRequest, _ ...grpc.CallOption) (*projectv1.DeleteHostSetupResponse, error) {
+	f.lastDeleteHostSetupReq = in
+	if f.deleteHostSetupErr != nil {
+		return nil, f.deleteHostSetupErr
+	}
+	return f.deleteHostSetupResp, nil
+}
+
+func (f *fakeProjectServiceClient) SetupExistingFolder(_ context.Context, in *projectv1.SetupExistingFolderRequest, _ ...grpc.CallOption) (*projectv1.SetupExistingFolderResponse, error) {
+	f.lastSetupExistingFolderReq = in
+	if f.setupExistingFolderErr != nil {
+		return nil, f.setupExistingFolderErr
+	}
+	return f.setupExistingFolderResp, nil
 }
 
 var _ projectv1.ProjectServiceClient = (*fakeProjectServiceClient)(nil)

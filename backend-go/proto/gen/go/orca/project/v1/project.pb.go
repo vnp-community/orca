@@ -603,6 +603,338 @@ func (*AddMemberResponse) Descriptor() ([]byte, []int) {
 	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{8}
 }
 
+type Member struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Role          ProjectRole            `protobuf:"varint,2,opt,name=role,proto3,enum=orca.project.v1.ProjectRole" json:"role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Member) Reset() {
+	*x = Member{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Member) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Member) ProtoMessage() {}
+
+func (x *Member) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Member.ProtoReflect.Descriptor instead.
+func (*Member) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Member) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *Member) GetRole() ProjectRole {
+	if x != nil {
+		return x.Role
+	}
+	return ProjectRole_PROJECT_ROLE_UNSPECIFIED
+}
+
+type ListMembersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersRequest) Reset() {
+	*x = ListMembersRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersRequest) ProtoMessage() {}
+
+func (x *ListMembersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersRequest.ProtoReflect.Descriptor instead.
+func (*ListMembersRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListMembersRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+type ListMembersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Members       []*Member              `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersResponse) Reset() {
+	*x = ListMembersResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersResponse) ProtoMessage() {}
+
+func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersResponse.ProtoReflect.Descriptor instead.
+func (*ListMembersResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListMembersResponse) GetMembers() []*Member {
+	if x != nil {
+		return x.Members
+	}
+	return nil
+}
+
+type RemoveMemberRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveMemberRequest) Reset() {
+	*x = RemoveMemberRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveMemberRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveMemberRequest) ProtoMessage() {}
+
+func (x *RemoveMemberRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveMemberRequest.ProtoReflect.Descriptor instead.
+func (*RemoveMemberRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RemoveMemberRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *RemoveMemberRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type RemoveMemberResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveMemberResponse) Reset() {
+	*x = RemoveMemberResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveMemberResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveMemberResponse) ProtoMessage() {}
+
+func (x *RemoveMemberResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveMemberResponse.ProtoReflect.Descriptor instead.
+func (*RemoveMemberResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{13}
+}
+
+type UpdateMemberRoleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Role          ProjectRole            `protobuf:"varint,3,opt,name=role,proto3,enum=orca.project.v1.ProjectRole" json:"role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateMemberRoleRequest) Reset() {
+	*x = UpdateMemberRoleRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateMemberRoleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateMemberRoleRequest) ProtoMessage() {}
+
+func (x *UpdateMemberRoleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateMemberRoleRequest.ProtoReflect.Descriptor instead.
+func (*UpdateMemberRoleRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *UpdateMemberRoleRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *UpdateMemberRoleRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UpdateMemberRoleRequest) GetRole() ProjectRole {
+	if x != nil {
+		return x.Role
+	}
+	return ProjectRole_PROJECT_ROLE_UNSPECIFIED
+}
+
+type UpdateMemberRoleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Member        *Member                `protobuf:"bytes,1,opt,name=member,proto3" json:"member,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateMemberRoleResponse) Reset() {
+	*x = UpdateMemberRoleResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateMemberRoleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateMemberRoleResponse) ProtoMessage() {}
+
+func (x *UpdateMemberRoleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateMemberRoleResponse.ProtoReflect.Descriptor instead.
+func (*UpdateMemberRoleResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UpdateMemberRoleResponse) GetMember() *Member {
+	if x != nil {
+		return x.Member
+	}
+	return nil
+}
+
 // RebindDevServer closes TS's PROJECT_HAS_ACTIVE_WORKFLOWS gap: the usecase
 // layer checks workflow-service/task-service for active executions before
 // allowing this to succeed. See project-service.md section on the rebind guard.
@@ -616,7 +948,7 @@ type RebindDevServerRequest struct {
 
 func (x *RebindDevServerRequest) Reset() {
 	*x = RebindDevServerRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[9]
+	mi := &file_orca_project_v1_project_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -628,7 +960,7 @@ func (x *RebindDevServerRequest) String() string {
 func (*RebindDevServerRequest) ProtoMessage() {}
 
 func (x *RebindDevServerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[9]
+	mi := &file_orca_project_v1_project_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -641,7 +973,7 @@ func (x *RebindDevServerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RebindDevServerRequest.ProtoReflect.Descriptor instead.
 func (*RebindDevServerRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{9}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RebindDevServerRequest) GetProjectId() string {
@@ -667,7 +999,7 @@ type RebindDevServerResponse struct {
 
 func (x *RebindDevServerResponse) Reset() {
 	*x = RebindDevServerResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[10]
+	mi := &file_orca_project_v1_project_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -679,7 +1011,7 @@ func (x *RebindDevServerResponse) String() string {
 func (*RebindDevServerResponse) ProtoMessage() {}
 
 func (x *RebindDevServerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[10]
+	mi := &file_orca_project_v1_project_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -692,7 +1024,7 @@ func (x *RebindDevServerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RebindDevServerResponse.ProtoReflect.Descriptor instead.
 func (*RebindDevServerResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{10}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RebindDevServerResponse) GetProject() *Project {
@@ -715,7 +1047,7 @@ type UpdateProjectRequest struct {
 
 func (x *UpdateProjectRequest) Reset() {
 	*x = UpdateProjectRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[11]
+	mi := &file_orca_project_v1_project_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -727,7 +1059,7 @@ func (x *UpdateProjectRequest) String() string {
 func (*UpdateProjectRequest) ProtoMessage() {}
 
 func (x *UpdateProjectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[11]
+	mi := &file_orca_project_v1_project_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -740,7 +1072,7 @@ func (x *UpdateProjectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateProjectRequest.ProtoReflect.Descriptor instead.
 func (*UpdateProjectRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{11}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UpdateProjectRequest) GetProjectId() string {
@@ -787,7 +1119,7 @@ type UpdateProjectResponse struct {
 
 func (x *UpdateProjectResponse) Reset() {
 	*x = UpdateProjectResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[12]
+	mi := &file_orca_project_v1_project_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -799,7 +1131,7 @@ func (x *UpdateProjectResponse) String() string {
 func (*UpdateProjectResponse) ProtoMessage() {}
 
 func (x *UpdateProjectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[12]
+	mi := &file_orca_project_v1_project_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -812,7 +1144,7 @@ func (x *UpdateProjectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateProjectResponse.ProtoReflect.Descriptor instead.
 func (*UpdateProjectResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{12}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UpdateProjectResponse) GetProject() *Project {
@@ -831,7 +1163,7 @@ type DeleteProjectRequest struct {
 
 func (x *DeleteProjectRequest) Reset() {
 	*x = DeleteProjectRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[13]
+	mi := &file_orca_project_v1_project_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -843,7 +1175,7 @@ func (x *DeleteProjectRequest) String() string {
 func (*DeleteProjectRequest) ProtoMessage() {}
 
 func (x *DeleteProjectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[13]
+	mi := &file_orca_project_v1_project_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -856,7 +1188,7 @@ func (x *DeleteProjectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteProjectRequest.ProtoReflect.Descriptor instead.
 func (*DeleteProjectRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{13}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DeleteProjectRequest) GetProjectId() string {
@@ -874,7 +1206,7 @@ type DeleteProjectResponse struct {
 
 func (x *DeleteProjectResponse) Reset() {
 	*x = DeleteProjectResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[14]
+	mi := &file_orca_project_v1_project_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -886,7 +1218,7 @@ func (x *DeleteProjectResponse) String() string {
 func (*DeleteProjectResponse) ProtoMessage() {}
 
 func (x *DeleteProjectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[14]
+	mi := &file_orca_project_v1_project_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -899,7 +1231,7 @@ func (x *DeleteProjectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteProjectResponse.ProtoReflect.Descriptor instead.
 func (*DeleteProjectResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{14}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{21}
 }
 
 type Repo struct {
@@ -915,7 +1247,7 @@ type Repo struct {
 
 func (x *Repo) Reset() {
 	*x = Repo{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[15]
+	mi := &file_orca_project_v1_project_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -927,7 +1259,7 @@ func (x *Repo) String() string {
 func (*Repo) ProtoMessage() {}
 
 func (x *Repo) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[15]
+	mi := &file_orca_project_v1_project_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -940,7 +1272,7 @@ func (x *Repo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Repo.ProtoReflect.Descriptor instead.
 func (*Repo) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{15}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Repo) GetId() string {
@@ -989,7 +1321,7 @@ type AddRepoRequest struct {
 
 func (x *AddRepoRequest) Reset() {
 	*x = AddRepoRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[16]
+	mi := &file_orca_project_v1_project_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1001,7 +1333,7 @@ func (x *AddRepoRequest) String() string {
 func (*AddRepoRequest) ProtoMessage() {}
 
 func (x *AddRepoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[16]
+	mi := &file_orca_project_v1_project_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1014,7 +1346,7 @@ func (x *AddRepoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddRepoRequest.ProtoReflect.Descriptor instead.
 func (*AddRepoRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{16}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *AddRepoRequest) GetProjectId() string {
@@ -1047,7 +1379,7 @@ type AddRepoResponse struct {
 
 func (x *AddRepoResponse) Reset() {
 	*x = AddRepoResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[17]
+	mi := &file_orca_project_v1_project_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1059,7 +1391,7 @@ func (x *AddRepoResponse) String() string {
 func (*AddRepoResponse) ProtoMessage() {}
 
 func (x *AddRepoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[17]
+	mi := &file_orca_project_v1_project_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1072,7 +1404,7 @@ func (x *AddRepoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddRepoResponse.ProtoReflect.Descriptor instead.
 func (*AddRepoResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{17}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *AddRepoResponse) GetRepo() *Repo {
@@ -1091,7 +1423,7 @@ type ListReposRequest struct {
 
 func (x *ListReposRequest) Reset() {
 	*x = ListReposRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[18]
+	mi := &file_orca_project_v1_project_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1103,7 +1435,7 @@ func (x *ListReposRequest) String() string {
 func (*ListReposRequest) ProtoMessage() {}
 
 func (x *ListReposRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[18]
+	mi := &file_orca_project_v1_project_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1116,7 +1448,7 @@ func (x *ListReposRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReposRequest.ProtoReflect.Descriptor instead.
 func (*ListReposRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{18}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListReposRequest) GetProjectId() string {
@@ -1135,7 +1467,7 @@ type ListReposResponse struct {
 
 func (x *ListReposResponse) Reset() {
 	*x = ListReposResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[19]
+	mi := &file_orca_project_v1_project_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1147,7 +1479,7 @@ func (x *ListReposResponse) String() string {
 func (*ListReposResponse) ProtoMessage() {}
 
 func (x *ListReposResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[19]
+	mi := &file_orca_project_v1_project_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1160,7 +1492,7 @@ func (x *ListReposResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReposResponse.ProtoReflect.Descriptor instead.
 func (*ListReposResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{19}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListReposResponse) GetRepos() []*Repo {
@@ -1180,7 +1512,7 @@ type ReorderReposRequest struct {
 
 func (x *ReorderReposRequest) Reset() {
 	*x = ReorderReposRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[20]
+	mi := &file_orca_project_v1_project_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1192,7 +1524,7 @@ func (x *ReorderReposRequest) String() string {
 func (*ReorderReposRequest) ProtoMessage() {}
 
 func (x *ReorderReposRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[20]
+	mi := &file_orca_project_v1_project_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1205,7 +1537,7 @@ func (x *ReorderReposRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReorderReposRequest.ProtoReflect.Descriptor instead.
 func (*ReorderReposRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{20}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ReorderReposRequest) GetProjectId() string {
@@ -1230,7 +1562,7 @@ type ReorderReposResponse struct {
 
 func (x *ReorderReposResponse) Reset() {
 	*x = ReorderReposResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[21]
+	mi := &file_orca_project_v1_project_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1242,7 +1574,7 @@ func (x *ReorderReposResponse) String() string {
 func (*ReorderReposResponse) ProtoMessage() {}
 
 func (x *ReorderReposResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[21]
+	mi := &file_orca_project_v1_project_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1255,7 +1587,7 @@ func (x *ReorderReposResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReorderReposResponse.ProtoReflect.Descriptor instead.
 func (*ReorderReposResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{21}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{28}
 }
 
 type RemoveRepoRequest struct {
@@ -1267,7 +1599,7 @@ type RemoveRepoRequest struct {
 
 func (x *RemoveRepoRequest) Reset() {
 	*x = RemoveRepoRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[22]
+	mi := &file_orca_project_v1_project_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1279,7 +1611,7 @@ func (x *RemoveRepoRequest) String() string {
 func (*RemoveRepoRequest) ProtoMessage() {}
 
 func (x *RemoveRepoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[22]
+	mi := &file_orca_project_v1_project_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1292,7 +1624,7 @@ func (x *RemoveRepoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRepoRequest.ProtoReflect.Descriptor instead.
 func (*RemoveRepoRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{22}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RemoveRepoRequest) GetRepoId() string {
@@ -1310,7 +1642,7 @@ type RemoveRepoResponse struct {
 
 func (x *RemoveRepoResponse) Reset() {
 	*x = RemoveRepoResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[23]
+	mi := &file_orca_project_v1_project_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1322,7 +1654,7 @@ func (x *RemoveRepoResponse) String() string {
 func (*RemoveRepoResponse) ProtoMessage() {}
 
 func (x *RemoveRepoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[23]
+	mi := &file_orca_project_v1_project_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1335,7 +1667,7 @@ func (x *RemoveRepoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRepoResponse.ProtoReflect.Descriptor instead.
 func (*RemoveRepoResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{23}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{30}
 }
 
 type Worktree struct {
@@ -1352,7 +1684,7 @@ type Worktree struct {
 
 func (x *Worktree) Reset() {
 	*x = Worktree{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[24]
+	mi := &file_orca_project_v1_project_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1364,7 +1696,7 @@ func (x *Worktree) String() string {
 func (*Worktree) ProtoMessage() {}
 
 func (x *Worktree) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[24]
+	mi := &file_orca_project_v1_project_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1377,7 +1709,7 @@ func (x *Worktree) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Worktree.ProtoReflect.Descriptor instead.
 func (*Worktree) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{24}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Worktree) GetId() string {
@@ -1434,7 +1766,7 @@ type RecordWorktreeCreatedRequest struct {
 
 func (x *RecordWorktreeCreatedRequest) Reset() {
 	*x = RecordWorktreeCreatedRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[25]
+	mi := &file_orca_project_v1_project_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1446,7 +1778,7 @@ func (x *RecordWorktreeCreatedRequest) String() string {
 func (*RecordWorktreeCreatedRequest) ProtoMessage() {}
 
 func (x *RecordWorktreeCreatedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[25]
+	mi := &file_orca_project_v1_project_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1459,7 +1791,7 @@ func (x *RecordWorktreeCreatedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordWorktreeCreatedRequest.ProtoReflect.Descriptor instead.
 func (*RecordWorktreeCreatedRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{25}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *RecordWorktreeCreatedRequest) GetProjectId() string {
@@ -1499,7 +1831,7 @@ type RecordWorktreeCreatedResponse struct {
 
 func (x *RecordWorktreeCreatedResponse) Reset() {
 	*x = RecordWorktreeCreatedResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[26]
+	mi := &file_orca_project_v1_project_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1511,7 +1843,7 @@ func (x *RecordWorktreeCreatedResponse) String() string {
 func (*RecordWorktreeCreatedResponse) ProtoMessage() {}
 
 func (x *RecordWorktreeCreatedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[26]
+	mi := &file_orca_project_v1_project_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1524,7 +1856,7 @@ func (x *RecordWorktreeCreatedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordWorktreeCreatedResponse.ProtoReflect.Descriptor instead.
 func (*RecordWorktreeCreatedResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{26}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *RecordWorktreeCreatedResponse) GetWorktree() *Worktree {
@@ -1543,7 +1875,7 @@ type RecordWorktreeRemovedRequest struct {
 
 func (x *RecordWorktreeRemovedRequest) Reset() {
 	*x = RecordWorktreeRemovedRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[27]
+	mi := &file_orca_project_v1_project_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1555,7 +1887,7 @@ func (x *RecordWorktreeRemovedRequest) String() string {
 func (*RecordWorktreeRemovedRequest) ProtoMessage() {}
 
 func (x *RecordWorktreeRemovedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[27]
+	mi := &file_orca_project_v1_project_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1568,7 +1900,7 @@ func (x *RecordWorktreeRemovedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordWorktreeRemovedRequest.ProtoReflect.Descriptor instead.
 func (*RecordWorktreeRemovedRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{27}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *RecordWorktreeRemovedRequest) GetWorktreeId() string {
@@ -1586,7 +1918,7 @@ type RecordWorktreeRemovedResponse struct {
 
 func (x *RecordWorktreeRemovedResponse) Reset() {
 	*x = RecordWorktreeRemovedResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[28]
+	mi := &file_orca_project_v1_project_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1598,7 +1930,7 @@ func (x *RecordWorktreeRemovedResponse) String() string {
 func (*RecordWorktreeRemovedResponse) ProtoMessage() {}
 
 func (x *RecordWorktreeRemovedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[28]
+	mi := &file_orca_project_v1_project_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1611,7 +1943,7 @@ func (x *RecordWorktreeRemovedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordWorktreeRemovedResponse.ProtoReflect.Descriptor instead.
 func (*RecordWorktreeRemovedResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{28}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{35}
 }
 
 type ListWorktreesRequest struct {
@@ -1623,7 +1955,7 @@ type ListWorktreesRequest struct {
 
 func (x *ListWorktreesRequest) Reset() {
 	*x = ListWorktreesRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[29]
+	mi := &file_orca_project_v1_project_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1635,7 +1967,7 @@ func (x *ListWorktreesRequest) String() string {
 func (*ListWorktreesRequest) ProtoMessage() {}
 
 func (x *ListWorktreesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[29]
+	mi := &file_orca_project_v1_project_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1648,7 +1980,7 @@ func (x *ListWorktreesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorktreesRequest.ProtoReflect.Descriptor instead.
 func (*ListWorktreesRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{29}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListWorktreesRequest) GetProjectId() string {
@@ -1667,7 +1999,7 @@ type ListWorktreesResponse struct {
 
 func (x *ListWorktreesResponse) Reset() {
 	*x = ListWorktreesResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[30]
+	mi := &file_orca_project_v1_project_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1679,7 +2011,7 @@ func (x *ListWorktreesResponse) String() string {
 func (*ListWorktreesResponse) ProtoMessage() {}
 
 func (x *ListWorktreesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[30]
+	mi := &file_orca_project_v1_project_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1692,7 +2024,7 @@ func (x *ListWorktreesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWorktreesResponse.ProtoReflect.Descriptor instead.
 func (*ListWorktreesResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{30}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ListWorktreesResponse) GetWorktrees() []*Worktree {
@@ -1712,7 +2044,7 @@ type SetWorktreeActivationRequest struct {
 
 func (x *SetWorktreeActivationRequest) Reset() {
 	*x = SetWorktreeActivationRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[31]
+	mi := &file_orca_project_v1_project_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1724,7 +2056,7 @@ func (x *SetWorktreeActivationRequest) String() string {
 func (*SetWorktreeActivationRequest) ProtoMessage() {}
 
 func (x *SetWorktreeActivationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[31]
+	mi := &file_orca_project_v1_project_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1737,7 +2069,7 @@ func (x *SetWorktreeActivationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetWorktreeActivationRequest.ProtoReflect.Descriptor instead.
 func (*SetWorktreeActivationRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{31}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *SetWorktreeActivationRequest) GetWorktreeId() string {
@@ -1763,7 +2095,7 @@ type SetWorktreeActivationResponse struct {
 
 func (x *SetWorktreeActivationResponse) Reset() {
 	*x = SetWorktreeActivationResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[32]
+	mi := &file_orca_project_v1_project_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1775,7 +2107,7 @@ func (x *SetWorktreeActivationResponse) String() string {
 func (*SetWorktreeActivationResponse) ProtoMessage() {}
 
 func (x *SetWorktreeActivationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[32]
+	mi := &file_orca_project_v1_project_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1788,7 +2120,7 @@ func (x *SetWorktreeActivationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetWorktreeActivationResponse.ProtoReflect.Descriptor instead.
 func (*SetWorktreeActivationResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{32}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SetWorktreeActivationResponse) GetWorktree() *Worktree {
@@ -1808,7 +2140,7 @@ type RenameWorktreeRequest struct {
 
 func (x *RenameWorktreeRequest) Reset() {
 	*x = RenameWorktreeRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[33]
+	mi := &file_orca_project_v1_project_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1820,7 +2152,7 @@ func (x *RenameWorktreeRequest) String() string {
 func (*RenameWorktreeRequest) ProtoMessage() {}
 
 func (x *RenameWorktreeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[33]
+	mi := &file_orca_project_v1_project_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1833,7 +2165,7 @@ func (x *RenameWorktreeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameWorktreeRequest.ProtoReflect.Descriptor instead.
 func (*RenameWorktreeRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{33}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *RenameWorktreeRequest) GetWorktreeId() string {
@@ -1859,7 +2191,7 @@ type RenameWorktreeResponse struct {
 
 func (x *RenameWorktreeResponse) Reset() {
 	*x = RenameWorktreeResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[34]
+	mi := &file_orca_project_v1_project_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1871,7 +2203,7 @@ func (x *RenameWorktreeResponse) String() string {
 func (*RenameWorktreeResponse) ProtoMessage() {}
 
 func (x *RenameWorktreeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[34]
+	mi := &file_orca_project_v1_project_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1884,7 +2216,7 @@ func (x *RenameWorktreeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameWorktreeResponse.ProtoReflect.Descriptor instead.
 func (*RenameWorktreeResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{34}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *RenameWorktreeResponse) GetWorktree() *Worktree {
@@ -1900,13 +2232,14 @@ type ProjectGroup struct {
 	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	ParentGroupId string                 `protobuf:"bytes,4,opt,name=parent_group_id,json=parentGroupId,proto3" json:"parent_group_id,omitempty"` // empty = root of its tree
+	ProjectId     string                 `protobuf:"bytes,5,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`               // empty = pure folder node, not yet linked to a project
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProjectGroup) Reset() {
 	*x = ProjectGroup{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[35]
+	mi := &file_orca_project_v1_project_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1918,7 +2251,7 @@ func (x *ProjectGroup) String() string {
 func (*ProjectGroup) ProtoMessage() {}
 
 func (x *ProjectGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[35]
+	mi := &file_orca_project_v1_project_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1931,7 +2264,7 @@ func (x *ProjectGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectGroup.ProtoReflect.Descriptor instead.
 func (*ProjectGroup) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{35}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ProjectGroup) GetId() string {
@@ -1962,6 +2295,13 @@ func (x *ProjectGroup) GetParentGroupId() string {
 	return ""
 }
 
+func (x *ProjectGroup) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
 type CreateProjectGroupRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -1972,7 +2312,7 @@ type CreateProjectGroupRequest struct {
 
 func (x *CreateProjectGroupRequest) Reset() {
 	*x = CreateProjectGroupRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[36]
+	mi := &file_orca_project_v1_project_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1984,7 +2324,7 @@ func (x *CreateProjectGroupRequest) String() string {
 func (*CreateProjectGroupRequest) ProtoMessage() {}
 
 func (x *CreateProjectGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[36]
+	mi := &file_orca_project_v1_project_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1997,7 +2337,7 @@ func (x *CreateProjectGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateProjectGroupRequest.ProtoReflect.Descriptor instead.
 func (*CreateProjectGroupRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{36}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *CreateProjectGroupRequest) GetName() string {
@@ -2023,7 +2363,7 @@ type CreateProjectGroupResponse struct {
 
 func (x *CreateProjectGroupResponse) Reset() {
 	*x = CreateProjectGroupResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[37]
+	mi := &file_orca_project_v1_project_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2035,7 +2375,7 @@ func (x *CreateProjectGroupResponse) String() string {
 func (*CreateProjectGroupResponse) ProtoMessage() {}
 
 func (x *CreateProjectGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[37]
+	mi := &file_orca_project_v1_project_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2048,7 +2388,7 @@ func (x *CreateProjectGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateProjectGroupResponse.ProtoReflect.Descriptor instead.
 func (*CreateProjectGroupResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{37}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *CreateProjectGroupResponse) GetGroup() *ProjectGroup {
@@ -2068,7 +2408,7 @@ type UpdateProjectGroupRequest struct {
 
 func (x *UpdateProjectGroupRequest) Reset() {
 	*x = UpdateProjectGroupRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[38]
+	mi := &file_orca_project_v1_project_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2080,7 +2420,7 @@ func (x *UpdateProjectGroupRequest) String() string {
 func (*UpdateProjectGroupRequest) ProtoMessage() {}
 
 func (x *UpdateProjectGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[38]
+	mi := &file_orca_project_v1_project_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2093,7 +2433,7 @@ func (x *UpdateProjectGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateProjectGroupRequest.ProtoReflect.Descriptor instead.
 func (*UpdateProjectGroupRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{38}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *UpdateProjectGroupRequest) GetGroupId() string {
@@ -2119,7 +2459,7 @@ type UpdateProjectGroupResponse struct {
 
 func (x *UpdateProjectGroupResponse) Reset() {
 	*x = UpdateProjectGroupResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[39]
+	mi := &file_orca_project_v1_project_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2131,7 +2471,7 @@ func (x *UpdateProjectGroupResponse) String() string {
 func (*UpdateProjectGroupResponse) ProtoMessage() {}
 
 func (x *UpdateProjectGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[39]
+	mi := &file_orca_project_v1_project_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2144,7 +2484,7 @@ func (x *UpdateProjectGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateProjectGroupResponse.ProtoReflect.Descriptor instead.
 func (*UpdateProjectGroupResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{39}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *UpdateProjectGroupResponse) GetGroup() *ProjectGroup {
@@ -2163,7 +2503,7 @@ type DeleteProjectGroupRequest struct {
 
 func (x *DeleteProjectGroupRequest) Reset() {
 	*x = DeleteProjectGroupRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[40]
+	mi := &file_orca_project_v1_project_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2175,7 +2515,7 @@ func (x *DeleteProjectGroupRequest) String() string {
 func (*DeleteProjectGroupRequest) ProtoMessage() {}
 
 func (x *DeleteProjectGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[40]
+	mi := &file_orca_project_v1_project_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2188,7 +2528,7 @@ func (x *DeleteProjectGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteProjectGroupRequest.ProtoReflect.Descriptor instead.
 func (*DeleteProjectGroupRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{40}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *DeleteProjectGroupRequest) GetGroupId() string {
@@ -2206,7 +2546,7 @@ type DeleteProjectGroupResponse struct {
 
 func (x *DeleteProjectGroupResponse) Reset() {
 	*x = DeleteProjectGroupResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[41]
+	mi := &file_orca_project_v1_project_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2218,7 +2558,7 @@ func (x *DeleteProjectGroupResponse) String() string {
 func (*DeleteProjectGroupResponse) ProtoMessage() {}
 
 func (x *DeleteProjectGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[41]
+	mi := &file_orca_project_v1_project_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2231,7 +2571,7 @@ func (x *DeleteProjectGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteProjectGroupResponse.ProtoReflect.Descriptor instead.
 func (*DeleteProjectGroupResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{41}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{48}
 }
 
 type ListProjectGroupsRequest struct {
@@ -2242,7 +2582,7 @@ type ListProjectGroupsRequest struct {
 
 func (x *ListProjectGroupsRequest) Reset() {
 	*x = ListProjectGroupsRequest{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[42]
+	mi := &file_orca_project_v1_project_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2254,7 +2594,7 @@ func (x *ListProjectGroupsRequest) String() string {
 func (*ListProjectGroupsRequest) ProtoMessage() {}
 
 func (x *ListProjectGroupsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[42]
+	mi := &file_orca_project_v1_project_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2267,7 +2607,7 @@ func (x *ListProjectGroupsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectGroupsRequest.ProtoReflect.Descriptor instead.
 func (*ListProjectGroupsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{42}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{49}
 }
 
 type ListProjectGroupsResponse struct {
@@ -2279,7 +2619,7 @@ type ListProjectGroupsResponse struct {
 
 func (x *ListProjectGroupsResponse) Reset() {
 	*x = ListProjectGroupsResponse{}
-	mi := &file_orca_project_v1_project_proto_msgTypes[43]
+	mi := &file_orca_project_v1_project_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2291,7 +2631,7 @@ func (x *ListProjectGroupsResponse) String() string {
 func (*ListProjectGroupsResponse) ProtoMessage() {}
 
 func (x *ListProjectGroupsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_project_v1_project_proto_msgTypes[43]
+	mi := &file_orca_project_v1_project_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2304,12 +2644,936 @@ func (x *ListProjectGroupsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectGroupsResponse.ProtoReflect.Descriptor instead.
 func (*ListProjectGroupsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{43}
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *ListProjectGroupsResponse) GetGroups() []*ProjectGroup {
 	if x != nil {
 		return x.Groups
+	}
+	return nil
+}
+
+type MoveProjectRequest struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId           string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	TargetParentGroupId string                 `protobuf:"bytes,2,opt,name=target_parent_group_id,json=targetParentGroupId,proto3" json:"target_parent_group_id,omitempty"` // empty = move to tree root
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *MoveProjectRequest) Reset() {
+	*x = MoveProjectRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveProjectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveProjectRequest) ProtoMessage() {}
+
+func (x *MoveProjectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveProjectRequest.ProtoReflect.Descriptor instead.
+func (*MoveProjectRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *MoveProjectRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *MoveProjectRequest) GetTargetParentGroupId() string {
+	if x != nil {
+		return x.TargetParentGroupId
+	}
+	return ""
+}
+
+type MoveProjectResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Group         *ProjectGroup          `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"` // the project's (possibly newly-created) leaf group node, relocated
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveProjectResponse) Reset() {
+	*x = MoveProjectResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveProjectResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveProjectResponse) ProtoMessage() {}
+
+func (x *MoveProjectResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveProjectResponse.ProtoReflect.Descriptor instead.
+func (*MoveProjectResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *MoveProjectResponse) GetGroup() *ProjectGroup {
+	if x != nil {
+		return x.Group
+	}
+	return nil
+}
+
+type ScanNestedRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	RootPath      string                 `protobuf:"bytes,2,opt,name=root_path,json=rootPath,proto3" json:"root_path,omitempty"` // absolute path on that dev server to scan under
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScanNestedRequest) Reset() {
+	*x = ScanNestedRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScanNestedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScanNestedRequest) ProtoMessage() {}
+
+func (x *ScanNestedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScanNestedRequest.ProtoReflect.Descriptor instead.
+func (*ScanNestedRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *ScanNestedRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *ScanNestedRequest) GetRootPath() string {
+	if x != nil {
+		return x.RootPath
+	}
+	return ""
+}
+
+type NestedRepoCandidate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	SuggestedName string                 `protobuf:"bytes,2,opt,name=suggested_name,json=suggestedName,proto3" json:"suggested_name,omitempty"`
+	IsGitRepo     bool                   `protobuf:"varint,3,opt,name=is_git_repo,json=isGitRepo,proto3" json:"is_git_repo,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NestedRepoCandidate) Reset() {
+	*x = NestedRepoCandidate{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NestedRepoCandidate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NestedRepoCandidate) ProtoMessage() {}
+
+func (x *NestedRepoCandidate) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NestedRepoCandidate.ProtoReflect.Descriptor instead.
+func (*NestedRepoCandidate) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *NestedRepoCandidate) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *NestedRepoCandidate) GetSuggestedName() string {
+	if x != nil {
+		return x.SuggestedName
+	}
+	return ""
+}
+
+func (x *NestedRepoCandidate) GetIsGitRepo() bool {
+	if x != nil {
+		return x.IsGitRepo
+	}
+	return false
+}
+
+type ScanNestedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Candidates    []*NestedRepoCandidate `protobuf:"bytes,1,rep,name=candidates,proto3" json:"candidates,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScanNestedResponse) Reset() {
+	*x = ScanNestedResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScanNestedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScanNestedResponse) ProtoMessage() {}
+
+func (x *ScanNestedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScanNestedResponse.ProtoReflect.Descriptor instead.
+func (*ScanNestedResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *ScanNestedResponse) GetCandidates() []*NestedRepoCandidate {
+	if x != nil {
+		return x.Candidates
+	}
+	return nil
+}
+
+type ImportNestedRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	ParentGroupId string                 `protobuf:"bytes,2,opt,name=parent_group_id,json=parentGroupId,proto3" json:"parent_group_id,omitempty"` // where the imported tree attaches; empty = root
+	Selected      []*NestedRepoCandidate `protobuf:"bytes,3,rep,name=selected,proto3" json:"selected,omitempty"`                                  // subset of a prior ScanNested's candidates the caller chose
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportNestedRequest) Reset() {
+	*x = ImportNestedRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportNestedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportNestedRequest) ProtoMessage() {}
+
+func (x *ImportNestedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportNestedRequest.ProtoReflect.Descriptor instead.
+func (*ImportNestedRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *ImportNestedRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *ImportNestedRequest) GetParentGroupId() string {
+	if x != nil {
+		return x.ParentGroupId
+	}
+	return ""
+}
+
+func (x *ImportNestedRequest) GetSelected() []*NestedRepoCandidate {
+	if x != nil {
+		return x.Selected
+	}
+	return nil
+}
+
+type ImportNestedResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CreatedGroups   []*ProjectGroup        `protobuf:"bytes,1,rep,name=created_groups,json=createdGroups,proto3" json:"created_groups,omitempty"`
+	CreatedProjects []*Project             `protobuf:"bytes,2,rep,name=created_projects,json=createdProjects,proto3" json:"created_projects,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ImportNestedResponse) Reset() {
+	*x = ImportNestedResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportNestedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportNestedResponse) ProtoMessage() {}
+
+func (x *ImportNestedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportNestedResponse.ProtoReflect.Descriptor instead.
+func (*ImportNestedResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *ImportNestedResponse) GetCreatedGroups() []*ProjectGroup {
+	if x != nil {
+		return x.CreatedGroups
+	}
+	return nil
+}
+
+func (x *ImportNestedResponse) GetCreatedProjects() []*Project {
+	if x != nil {
+		return x.CreatedProjects
+	}
+	return nil
+}
+
+type HostSetup struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	DevServerId   string                 `protobuf:"bytes,3,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"` // logical FK -> infra-fleet-service.dev_servers
+	FolderPath    string                 `protobuf:"bytes,4,opt,name=folder_path,json=folderPath,proto3" json:"folder_path,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Status        string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`                        // pending | validated | completed | failed
+	ProjectId     string                 `protobuf:"bytes,7,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"` // empty until completed
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HostSetup) Reset() {
+	*x = HostSetup{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HostSetup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HostSetup) ProtoMessage() {}
+
+func (x *HostSetup) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HostSetup.ProtoReflect.Descriptor instead.
+func (*HostSetup) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *HostSetup) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *HostSetup) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *HostSetup) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *HostSetup) GetFolderPath() string {
+	if x != nil {
+		return x.FolderPath
+	}
+	return ""
+}
+
+func (x *HostSetup) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *HostSetup) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *HostSetup) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+type CreateHostSetupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	FolderPath    string                 `protobuf:"bytes,2,opt,name=folder_path,json=folderPath,proto3" json:"folder_path,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateHostSetupRequest) Reset() {
+	*x = CreateHostSetupRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateHostSetupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateHostSetupRequest) ProtoMessage() {}
+
+func (x *CreateHostSetupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateHostSetupRequest.ProtoReflect.Descriptor instead.
+func (*CreateHostSetupRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *CreateHostSetupRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *CreateHostSetupRequest) GetFolderPath() string {
+	if x != nil {
+		return x.FolderPath
+	}
+	return ""
+}
+
+func (x *CreateHostSetupRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+type CreateHostSetupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Setup         *HostSetup             `protobuf:"bytes,1,opt,name=setup,proto3" json:"setup,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateHostSetupResponse) Reset() {
+	*x = CreateHostSetupResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateHostSetupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateHostSetupResponse) ProtoMessage() {}
+
+func (x *CreateHostSetupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateHostSetupResponse.ProtoReflect.Descriptor instead.
+func (*CreateHostSetupResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *CreateHostSetupResponse) GetSetup() *HostSetup {
+	if x != nil {
+		return x.Setup
+	}
+	return nil
+}
+
+type ListHostSetupsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListHostSetupsRequest) Reset() {
+	*x = ListHostSetupsRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListHostSetupsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListHostSetupsRequest) ProtoMessage() {}
+
+func (x *ListHostSetupsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListHostSetupsRequest.ProtoReflect.Descriptor instead.
+func (*ListHostSetupsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{61}
+}
+
+type ListHostSetupsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Setups        []*HostSetup           `protobuf:"bytes,1,rep,name=setups,proto3" json:"setups,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListHostSetupsResponse) Reset() {
+	*x = ListHostSetupsResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListHostSetupsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListHostSetupsResponse) ProtoMessage() {}
+
+func (x *ListHostSetupsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListHostSetupsResponse.ProtoReflect.Descriptor instead.
+func (*ListHostSetupsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *ListHostSetupsResponse) GetSetups() []*HostSetup {
+	if x != nil {
+		return x.Setups
+	}
+	return nil
+}
+
+type UpdateHostSetupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FolderPath    string                 `protobuf:"bytes,2,opt,name=folder_path,json=folderPath,proto3" json:"folder_path,omitempty"`    // empty = no change
+	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"` // empty = no change
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateHostSetupRequest) Reset() {
+	*x = UpdateHostSetupRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateHostSetupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateHostSetupRequest) ProtoMessage() {}
+
+func (x *UpdateHostSetupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateHostSetupRequest.ProtoReflect.Descriptor instead.
+func (*UpdateHostSetupRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *UpdateHostSetupRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateHostSetupRequest) GetFolderPath() string {
+	if x != nil {
+		return x.FolderPath
+	}
+	return ""
+}
+
+func (x *UpdateHostSetupRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+type UpdateHostSetupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Setup         *HostSetup             `protobuf:"bytes,1,opt,name=setup,proto3" json:"setup,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateHostSetupResponse) Reset() {
+	*x = UpdateHostSetupResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateHostSetupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateHostSetupResponse) ProtoMessage() {}
+
+func (x *UpdateHostSetupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateHostSetupResponse.ProtoReflect.Descriptor instead.
+func (*UpdateHostSetupResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *UpdateHostSetupResponse) GetSetup() *HostSetup {
+	if x != nil {
+		return x.Setup
+	}
+	return nil
+}
+
+type DeleteHostSetupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteHostSetupRequest) Reset() {
+	*x = DeleteHostSetupRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteHostSetupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteHostSetupRequest) ProtoMessage() {}
+
+func (x *DeleteHostSetupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteHostSetupRequest.ProtoReflect.Descriptor instead.
+func (*DeleteHostSetupRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *DeleteHostSetupRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type DeleteHostSetupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteHostSetupResponse) Reset() {
+	*x = DeleteHostSetupResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteHostSetupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteHostSetupResponse) ProtoMessage() {}
+
+func (x *DeleteHostSetupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteHostSetupResponse.ProtoReflect.Descriptor instead.
+func (*DeleteHostSetupResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{66}
+}
+
+// SetupExistingFolder validates folder_path exists on dev_server_id
+// (relayed to the Dev Server Agent via infra-fleet-service, never checked
+// against project-service's own host), then creates a real Project + Repo
+// from it and marks the HostSetup completed (or failed).
+type SetupExistingFolderRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // the HostSetup being finalized
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupExistingFolderRequest) Reset() {
+	*x = SetupExistingFolderRequest{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupExistingFolderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupExistingFolderRequest) ProtoMessage() {}
+
+func (x *SetupExistingFolderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupExistingFolderRequest.ProtoReflect.Descriptor instead.
+func (*SetupExistingFolderRequest) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *SetupExistingFolderRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type SetupExistingFolderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Setup         *HostSetup             `protobuf:"bytes,1,opt,name=setup,proto3" json:"setup,omitempty"`     // status now "completed" or "failed"
+	Project       *Project               `protobuf:"bytes,2,opt,name=project,proto3" json:"project,omitempty"` // set only on success
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupExistingFolderResponse) Reset() {
+	*x = SetupExistingFolderResponse{}
+	mi := &file_orca_project_v1_project_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupExistingFolderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupExistingFolderResponse) ProtoMessage() {}
+
+func (x *SetupExistingFolderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_project_v1_project_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupExistingFolderResponse.ProtoReflect.Descriptor instead.
+func (*SetupExistingFolderResponse) Descriptor() ([]byte, []int) {
+	return file_orca_project_v1_project_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *SetupExistingFolderResponse) GetSetup() *HostSetup {
+	if x != nil {
+		return x.Setup
+	}
+	return nil
+}
+
+func (x *SetupExistingFolderResponse) GetProject() *Project {
+	if x != nil {
+		return x.Project
 	}
 	return nil
 }
@@ -2363,7 +3627,27 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x120\n" +
 	"\x04role\x18\x03 \x01(\x0e2\x1c.orca.project.v1.ProjectRoleR\x04role\"\x13\n" +
-	"\x11AddMemberResponse\"b\n" +
+	"\x11AddMemberResponse\"S\n" +
+	"\x06Member\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x120\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x1c.orca.project.v1.ProjectRoleR\x04role\"3\n" +
+	"\x12ListMembersRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\"H\n" +
+	"\x13ListMembersResponse\x121\n" +
+	"\amembers\x18\x01 \x03(\v2\x17.orca.project.v1.MemberR\amembers\"M\n" +
+	"\x13RemoveMemberRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\"\x16\n" +
+	"\x14RemoveMemberResponse\"\x83\x01\n" +
+	"\x17UpdateMemberRoleRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x120\n" +
+	"\x04role\x18\x03 \x01(\x0e2\x1c.orca.project.v1.ProjectRoleR\x04role\"K\n" +
+	"\x18UpdateMemberRoleResponse\x12/\n" +
+	"\x06member\x18\x01 \x01(\v2\x17.orca.project.v1.MemberR\x06member\"b\n" +
 	"\x16RebindDevServerRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12)\n" +
@@ -2448,12 +3732,14 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"worktreeId\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\"O\n" +
 	"\x16RenameWorktreeResponse\x125\n" +
-	"\bworktree\x18\x01 \x01(\v2\x19.orca.project.v1.WorktreeR\bworktree\"w\n" +
+	"\bworktree\x18\x01 \x01(\v2\x19.orca.project.v1.WorktreeR\bworktree\"\x96\x01\n" +
 	"\fProjectGroup\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12&\n" +
-	"\x0fparent_group_id\x18\x04 \x01(\tR\rparentGroupId\"W\n" +
+	"\x0fparent_group_id\x18\x04 \x01(\tR\rparentGroupId\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x05 \x01(\tR\tprojectId\"W\n" +
 	"\x19CreateProjectGroupRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12&\n" +
 	"\x0fparent_group_id\x18\x02 \x01(\tR\rparentGroupId\"Q\n" +
@@ -2469,17 +3755,79 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\x1aDeleteProjectGroupResponse\"\x1a\n" +
 	"\x18ListProjectGroupsRequest\"R\n" +
 	"\x19ListProjectGroupsResponse\x125\n" +
-	"\x06groups\x18\x01 \x03(\v2\x1d.orca.project.v1.ProjectGroupR\x06groups*\\\n" +
+	"\x06groups\x18\x01 \x03(\v2\x1d.orca.project.v1.ProjectGroupR\x06groups\"h\n" +
+	"\x12MoveProjectRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x123\n" +
+	"\x16target_parent_group_id\x18\x02 \x01(\tR\x13targetParentGroupId\"J\n" +
+	"\x13MoveProjectResponse\x123\n" +
+	"\x05group\x18\x01 \x01(\v2\x1d.orca.project.v1.ProjectGroupR\x05group\"T\n" +
+	"\x11ScanNestedRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x1b\n" +
+	"\troot_path\x18\x02 \x01(\tR\brootPath\"p\n" +
+	"\x13NestedRepoCandidate\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12%\n" +
+	"\x0esuggested_name\x18\x02 \x01(\tR\rsuggestedName\x12\x1e\n" +
+	"\vis_git_repo\x18\x03 \x01(\bR\tisGitRepo\"Z\n" +
+	"\x12ScanNestedResponse\x12D\n" +
+	"\n" +
+	"candidates\x18\x01 \x03(\v2$.orca.project.v1.NestedRepoCandidateR\n" +
+	"candidates\"\xa3\x01\n" +
+	"\x13ImportNestedRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12&\n" +
+	"\x0fparent_group_id\x18\x02 \x01(\tR\rparentGroupId\x12@\n" +
+	"\bselected\x18\x03 \x03(\v2$.orca.project.v1.NestedRepoCandidateR\bselected\"\xa1\x01\n" +
+	"\x14ImportNestedResponse\x12D\n" +
+	"\x0ecreated_groups\x18\x01 \x03(\v2\x1d.orca.project.v1.ProjectGroupR\rcreatedGroups\x12C\n" +
+	"\x10created_projects\x18\x02 \x03(\v2\x18.orca.project.v1.ProjectR\x0fcreatedProjects\"\xd7\x01\n" +
+	"\tHostSetup\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\"\n" +
+	"\rdev_server_id\x18\x03 \x01(\tR\vdevServerId\x12\x1f\n" +
+	"\vfolder_path\x18\x04 \x01(\tR\n" +
+	"folderPath\x12!\n" +
+	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\a \x01(\tR\tprojectId\"\x80\x01\n" +
+	"\x16CreateHostSetupRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x1f\n" +
+	"\vfolder_path\x18\x02 \x01(\tR\n" +
+	"folderPath\x12!\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"K\n" +
+	"\x17CreateHostSetupResponse\x120\n" +
+	"\x05setup\x18\x01 \x01(\v2\x1a.orca.project.v1.HostSetupR\x05setup\"\x17\n" +
+	"\x15ListHostSetupsRequest\"L\n" +
+	"\x16ListHostSetupsResponse\x122\n" +
+	"\x06setups\x18\x01 \x03(\v2\x1a.orca.project.v1.HostSetupR\x06setups\"l\n" +
+	"\x16UpdateHostSetupRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vfolder_path\x18\x02 \x01(\tR\n" +
+	"folderPath\x12!\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"K\n" +
+	"\x17UpdateHostSetupResponse\x120\n" +
+	"\x05setup\x18\x01 \x01(\v2\x1a.orca.project.v1.HostSetupR\x05setup\"(\n" +
+	"\x16DeleteHostSetupRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x19\n" +
+	"\x17DeleteHostSetupResponse\",\n" +
+	"\x1aSetupExistingFolderRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x83\x01\n" +
+	"\x1bSetupExistingFolderResponse\x120\n" +
+	"\x05setup\x18\x01 \x01(\v2\x1a.orca.project.v1.HostSetupR\x05setup\x122\n" +
+	"\aproject\x18\x02 \x01(\v2\x18.orca.project.v1.ProjectR\aproject*\\\n" +
 	"\vProjectRole\x12\x1c\n" +
 	"\x18PROJECT_ROLE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13PROJECT_ROLE_MEMBER\x10\x01\x12\x16\n" +
-	"\x12PROJECT_ROLE_OWNER\x10\x022\xd8\x0f\n" +
+	"\x12PROJECT_ROLE_OWNER\x10\x022\x8d\x18\n" +
 	"\x0eProjectService\x12^\n" +
 	"\rCreateProject\x12%.orca.project.v1.CreateProjectRequest\x1a&.orca.project.v1.CreateProjectResponse\x12U\n" +
 	"\n" +
 	"GetProject\x12\".orca.project.v1.GetProjectRequest\x1a#.orca.project.v1.GetProjectResponse\x12[\n" +
 	"\fListProjects\x12$.orca.project.v1.ListProjectsRequest\x1a%.orca.project.v1.ListProjectsResponse\x12R\n" +
-	"\tAddMember\x12!.orca.project.v1.AddMemberRequest\x1a\".orca.project.v1.AddMemberResponse\x12d\n" +
+	"\tAddMember\x12!.orca.project.v1.AddMemberRequest\x1a\".orca.project.v1.AddMemberResponse\x12X\n" +
+	"\vListMembers\x12#.orca.project.v1.ListMembersRequest\x1a$.orca.project.v1.ListMembersResponse\x12[\n" +
+	"\fRemoveMember\x12$.orca.project.v1.RemoveMemberRequest\x1a%.orca.project.v1.RemoveMemberResponse\x12g\n" +
+	"\x10UpdateMemberRole\x12(.orca.project.v1.UpdateMemberRoleRequest\x1a).orca.project.v1.UpdateMemberRoleResponse\x12d\n" +
 	"\x0fRebindDevServer\x12'.orca.project.v1.RebindDevServerRequest\x1a(.orca.project.v1.RebindDevServerResponse\x12^\n" +
 	"\rUpdateProject\x12%.orca.project.v1.UpdateProjectRequest\x1a&.orca.project.v1.UpdateProjectResponse\x12^\n" +
 	"\rDeleteProject\x12%.orca.project.v1.DeleteProjectRequest\x1a&.orca.project.v1.DeleteProjectResponse\x12L\n" +
@@ -2496,7 +3844,16 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\x12CreateProjectGroup\x12*.orca.project.v1.CreateProjectGroupRequest\x1a+.orca.project.v1.CreateProjectGroupResponse\x12m\n" +
 	"\x12UpdateProjectGroup\x12*.orca.project.v1.UpdateProjectGroupRequest\x1a+.orca.project.v1.UpdateProjectGroupResponse\x12m\n" +
 	"\x12DeleteProjectGroup\x12*.orca.project.v1.DeleteProjectGroupRequest\x1a+.orca.project.v1.DeleteProjectGroupResponse\x12j\n" +
-	"\x11ListProjectGroups\x12).orca.project.v1.ListProjectGroupsRequest\x1a*.orca.project.v1.ListProjectGroupsResponseBDZBgithub.com/stablyai/orca-go/proto/gen/go/orca/project/v1;projectv1b\x06proto3"
+	"\x11ListProjectGroups\x12).orca.project.v1.ListProjectGroupsRequest\x1a*.orca.project.v1.ListProjectGroupsResponse\x12X\n" +
+	"\vMoveProject\x12#.orca.project.v1.MoveProjectRequest\x1a$.orca.project.v1.MoveProjectResponse\x12U\n" +
+	"\n" +
+	"ScanNested\x12\".orca.project.v1.ScanNestedRequest\x1a#.orca.project.v1.ScanNestedResponse\x12[\n" +
+	"\fImportNested\x12$.orca.project.v1.ImportNestedRequest\x1a%.orca.project.v1.ImportNestedResponse\x12d\n" +
+	"\x0fCreateHostSetup\x12'.orca.project.v1.CreateHostSetupRequest\x1a(.orca.project.v1.CreateHostSetupResponse\x12a\n" +
+	"\x0eListHostSetups\x12&.orca.project.v1.ListHostSetupsRequest\x1a'.orca.project.v1.ListHostSetupsResponse\x12d\n" +
+	"\x0fUpdateHostSetup\x12'.orca.project.v1.UpdateHostSetupRequest\x1a(.orca.project.v1.UpdateHostSetupResponse\x12d\n" +
+	"\x0fDeleteHostSetup\x12'.orca.project.v1.DeleteHostSetupRequest\x1a(.orca.project.v1.DeleteHostSetupResponse\x12p\n" +
+	"\x13SetupExistingFolder\x12+.orca.project.v1.SetupExistingFolderRequest\x1a,.orca.project.v1.SetupExistingFolderResponseBDZBgithub.com/stablyai/orca-go/proto/gen/go/orca/project/v1;projectv1b\x06proto3"
 
 var (
 	file_orca_project_v1_project_proto_rawDescOnce sync.Once
@@ -2511,7 +3868,7 @@ func file_orca_project_v1_project_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_project_v1_project_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_project_v1_project_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_orca_project_v1_project_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
 var file_orca_project_v1_project_proto_goTypes = []any{
 	(ProjectRole)(0),                      // 0: orca.project.v1.ProjectRole
 	(*Project)(nil),                       // 1: orca.project.v1.Project
@@ -2523,106 +3880,167 @@ var file_orca_project_v1_project_proto_goTypes = []any{
 	(*ListProjectsResponse)(nil),          // 7: orca.project.v1.ListProjectsResponse
 	(*AddMemberRequest)(nil),              // 8: orca.project.v1.AddMemberRequest
 	(*AddMemberResponse)(nil),             // 9: orca.project.v1.AddMemberResponse
-	(*RebindDevServerRequest)(nil),        // 10: orca.project.v1.RebindDevServerRequest
-	(*RebindDevServerResponse)(nil),       // 11: orca.project.v1.RebindDevServerResponse
-	(*UpdateProjectRequest)(nil),          // 12: orca.project.v1.UpdateProjectRequest
-	(*UpdateProjectResponse)(nil),         // 13: orca.project.v1.UpdateProjectResponse
-	(*DeleteProjectRequest)(nil),          // 14: orca.project.v1.DeleteProjectRequest
-	(*DeleteProjectResponse)(nil),         // 15: orca.project.v1.DeleteProjectResponse
-	(*Repo)(nil),                          // 16: orca.project.v1.Repo
-	(*AddRepoRequest)(nil),                // 17: orca.project.v1.AddRepoRequest
-	(*AddRepoResponse)(nil),               // 18: orca.project.v1.AddRepoResponse
-	(*ListReposRequest)(nil),              // 19: orca.project.v1.ListReposRequest
-	(*ListReposResponse)(nil),             // 20: orca.project.v1.ListReposResponse
-	(*ReorderReposRequest)(nil),           // 21: orca.project.v1.ReorderReposRequest
-	(*ReorderReposResponse)(nil),          // 22: orca.project.v1.ReorderReposResponse
-	(*RemoveRepoRequest)(nil),             // 23: orca.project.v1.RemoveRepoRequest
-	(*RemoveRepoResponse)(nil),            // 24: orca.project.v1.RemoveRepoResponse
-	(*Worktree)(nil),                      // 25: orca.project.v1.Worktree
-	(*RecordWorktreeCreatedRequest)(nil),  // 26: orca.project.v1.RecordWorktreeCreatedRequest
-	(*RecordWorktreeCreatedResponse)(nil), // 27: orca.project.v1.RecordWorktreeCreatedResponse
-	(*RecordWorktreeRemovedRequest)(nil),  // 28: orca.project.v1.RecordWorktreeRemovedRequest
-	(*RecordWorktreeRemovedResponse)(nil), // 29: orca.project.v1.RecordWorktreeRemovedResponse
-	(*ListWorktreesRequest)(nil),          // 30: orca.project.v1.ListWorktreesRequest
-	(*ListWorktreesResponse)(nil),         // 31: orca.project.v1.ListWorktreesResponse
-	(*SetWorktreeActivationRequest)(nil),  // 32: orca.project.v1.SetWorktreeActivationRequest
-	(*SetWorktreeActivationResponse)(nil), // 33: orca.project.v1.SetWorktreeActivationResponse
-	(*RenameWorktreeRequest)(nil),         // 34: orca.project.v1.RenameWorktreeRequest
-	(*RenameWorktreeResponse)(nil),        // 35: orca.project.v1.RenameWorktreeResponse
-	(*ProjectGroup)(nil),                  // 36: orca.project.v1.ProjectGroup
-	(*CreateProjectGroupRequest)(nil),     // 37: orca.project.v1.CreateProjectGroupRequest
-	(*CreateProjectGroupResponse)(nil),    // 38: orca.project.v1.CreateProjectGroupResponse
-	(*UpdateProjectGroupRequest)(nil),     // 39: orca.project.v1.UpdateProjectGroupRequest
-	(*UpdateProjectGroupResponse)(nil),    // 40: orca.project.v1.UpdateProjectGroupResponse
-	(*DeleteProjectGroupRequest)(nil),     // 41: orca.project.v1.DeleteProjectGroupRequest
-	(*DeleteProjectGroupResponse)(nil),    // 42: orca.project.v1.DeleteProjectGroupResponse
-	(*ListProjectGroupsRequest)(nil),      // 43: orca.project.v1.ListProjectGroupsRequest
-	(*ListProjectGroupsResponse)(nil),     // 44: orca.project.v1.ListProjectGroupsResponse
-	(*timestamppb.Timestamp)(nil),         // 45: google.protobuf.Timestamp
+	(*Member)(nil),                        // 10: orca.project.v1.Member
+	(*ListMembersRequest)(nil),            // 11: orca.project.v1.ListMembersRequest
+	(*ListMembersResponse)(nil),           // 12: orca.project.v1.ListMembersResponse
+	(*RemoveMemberRequest)(nil),           // 13: orca.project.v1.RemoveMemberRequest
+	(*RemoveMemberResponse)(nil),          // 14: orca.project.v1.RemoveMemberResponse
+	(*UpdateMemberRoleRequest)(nil),       // 15: orca.project.v1.UpdateMemberRoleRequest
+	(*UpdateMemberRoleResponse)(nil),      // 16: orca.project.v1.UpdateMemberRoleResponse
+	(*RebindDevServerRequest)(nil),        // 17: orca.project.v1.RebindDevServerRequest
+	(*RebindDevServerResponse)(nil),       // 18: orca.project.v1.RebindDevServerResponse
+	(*UpdateProjectRequest)(nil),          // 19: orca.project.v1.UpdateProjectRequest
+	(*UpdateProjectResponse)(nil),         // 20: orca.project.v1.UpdateProjectResponse
+	(*DeleteProjectRequest)(nil),          // 21: orca.project.v1.DeleteProjectRequest
+	(*DeleteProjectResponse)(nil),         // 22: orca.project.v1.DeleteProjectResponse
+	(*Repo)(nil),                          // 23: orca.project.v1.Repo
+	(*AddRepoRequest)(nil),                // 24: orca.project.v1.AddRepoRequest
+	(*AddRepoResponse)(nil),               // 25: orca.project.v1.AddRepoResponse
+	(*ListReposRequest)(nil),              // 26: orca.project.v1.ListReposRequest
+	(*ListReposResponse)(nil),             // 27: orca.project.v1.ListReposResponse
+	(*ReorderReposRequest)(nil),           // 28: orca.project.v1.ReorderReposRequest
+	(*ReorderReposResponse)(nil),          // 29: orca.project.v1.ReorderReposResponse
+	(*RemoveRepoRequest)(nil),             // 30: orca.project.v1.RemoveRepoRequest
+	(*RemoveRepoResponse)(nil),            // 31: orca.project.v1.RemoveRepoResponse
+	(*Worktree)(nil),                      // 32: orca.project.v1.Worktree
+	(*RecordWorktreeCreatedRequest)(nil),  // 33: orca.project.v1.RecordWorktreeCreatedRequest
+	(*RecordWorktreeCreatedResponse)(nil), // 34: orca.project.v1.RecordWorktreeCreatedResponse
+	(*RecordWorktreeRemovedRequest)(nil),  // 35: orca.project.v1.RecordWorktreeRemovedRequest
+	(*RecordWorktreeRemovedResponse)(nil), // 36: orca.project.v1.RecordWorktreeRemovedResponse
+	(*ListWorktreesRequest)(nil),          // 37: orca.project.v1.ListWorktreesRequest
+	(*ListWorktreesResponse)(nil),         // 38: orca.project.v1.ListWorktreesResponse
+	(*SetWorktreeActivationRequest)(nil),  // 39: orca.project.v1.SetWorktreeActivationRequest
+	(*SetWorktreeActivationResponse)(nil), // 40: orca.project.v1.SetWorktreeActivationResponse
+	(*RenameWorktreeRequest)(nil),         // 41: orca.project.v1.RenameWorktreeRequest
+	(*RenameWorktreeResponse)(nil),        // 42: orca.project.v1.RenameWorktreeResponse
+	(*ProjectGroup)(nil),                  // 43: orca.project.v1.ProjectGroup
+	(*CreateProjectGroupRequest)(nil),     // 44: orca.project.v1.CreateProjectGroupRequest
+	(*CreateProjectGroupResponse)(nil),    // 45: orca.project.v1.CreateProjectGroupResponse
+	(*UpdateProjectGroupRequest)(nil),     // 46: orca.project.v1.UpdateProjectGroupRequest
+	(*UpdateProjectGroupResponse)(nil),    // 47: orca.project.v1.UpdateProjectGroupResponse
+	(*DeleteProjectGroupRequest)(nil),     // 48: orca.project.v1.DeleteProjectGroupRequest
+	(*DeleteProjectGroupResponse)(nil),    // 49: orca.project.v1.DeleteProjectGroupResponse
+	(*ListProjectGroupsRequest)(nil),      // 50: orca.project.v1.ListProjectGroupsRequest
+	(*ListProjectGroupsResponse)(nil),     // 51: orca.project.v1.ListProjectGroupsResponse
+	(*MoveProjectRequest)(nil),            // 52: orca.project.v1.MoveProjectRequest
+	(*MoveProjectResponse)(nil),           // 53: orca.project.v1.MoveProjectResponse
+	(*ScanNestedRequest)(nil),             // 54: orca.project.v1.ScanNestedRequest
+	(*NestedRepoCandidate)(nil),           // 55: orca.project.v1.NestedRepoCandidate
+	(*ScanNestedResponse)(nil),            // 56: orca.project.v1.ScanNestedResponse
+	(*ImportNestedRequest)(nil),           // 57: orca.project.v1.ImportNestedRequest
+	(*ImportNestedResponse)(nil),          // 58: orca.project.v1.ImportNestedResponse
+	(*HostSetup)(nil),                     // 59: orca.project.v1.HostSetup
+	(*CreateHostSetupRequest)(nil),        // 60: orca.project.v1.CreateHostSetupRequest
+	(*CreateHostSetupResponse)(nil),       // 61: orca.project.v1.CreateHostSetupResponse
+	(*ListHostSetupsRequest)(nil),         // 62: orca.project.v1.ListHostSetupsRequest
+	(*ListHostSetupsResponse)(nil),        // 63: orca.project.v1.ListHostSetupsResponse
+	(*UpdateHostSetupRequest)(nil),        // 64: orca.project.v1.UpdateHostSetupRequest
+	(*UpdateHostSetupResponse)(nil),       // 65: orca.project.v1.UpdateHostSetupResponse
+	(*DeleteHostSetupRequest)(nil),        // 66: orca.project.v1.DeleteHostSetupRequest
+	(*DeleteHostSetupResponse)(nil),       // 67: orca.project.v1.DeleteHostSetupResponse
+	(*SetupExistingFolderRequest)(nil),    // 68: orca.project.v1.SetupExistingFolderRequest
+	(*SetupExistingFolderResponse)(nil),   // 69: orca.project.v1.SetupExistingFolderResponse
+	(*timestamppb.Timestamp)(nil),         // 70: google.protobuf.Timestamp
 }
 var file_orca_project_v1_project_proto_depIdxs = []int32{
-	45, // 0: orca.project.v1.Project.created_at:type_name -> google.protobuf.Timestamp
-	45, // 1: orca.project.v1.Project.updated_at:type_name -> google.protobuf.Timestamp
+	70, // 0: orca.project.v1.Project.created_at:type_name -> google.protobuf.Timestamp
+	70, // 1: orca.project.v1.Project.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: orca.project.v1.CreateProjectResponse.project:type_name -> orca.project.v1.Project
 	1,  // 3: orca.project.v1.GetProjectResponse.project:type_name -> orca.project.v1.Project
 	1,  // 4: orca.project.v1.ListProjectsResponse.projects:type_name -> orca.project.v1.Project
 	0,  // 5: orca.project.v1.AddMemberRequest.role:type_name -> orca.project.v1.ProjectRole
-	1,  // 6: orca.project.v1.RebindDevServerResponse.project:type_name -> orca.project.v1.Project
-	1,  // 7: orca.project.v1.UpdateProjectResponse.project:type_name -> orca.project.v1.Project
-	16, // 8: orca.project.v1.AddRepoResponse.repo:type_name -> orca.project.v1.Repo
-	16, // 9: orca.project.v1.ListReposResponse.repos:type_name -> orca.project.v1.Repo
-	25, // 10: orca.project.v1.RecordWorktreeCreatedResponse.worktree:type_name -> orca.project.v1.Worktree
-	25, // 11: orca.project.v1.ListWorktreesResponse.worktrees:type_name -> orca.project.v1.Worktree
-	25, // 12: orca.project.v1.SetWorktreeActivationResponse.worktree:type_name -> orca.project.v1.Worktree
-	25, // 13: orca.project.v1.RenameWorktreeResponse.worktree:type_name -> orca.project.v1.Worktree
-	36, // 14: orca.project.v1.CreateProjectGroupResponse.group:type_name -> orca.project.v1.ProjectGroup
-	36, // 15: orca.project.v1.UpdateProjectGroupResponse.group:type_name -> orca.project.v1.ProjectGroup
-	36, // 16: orca.project.v1.ListProjectGroupsResponse.groups:type_name -> orca.project.v1.ProjectGroup
-	2,  // 17: orca.project.v1.ProjectService.CreateProject:input_type -> orca.project.v1.CreateProjectRequest
-	4,  // 18: orca.project.v1.ProjectService.GetProject:input_type -> orca.project.v1.GetProjectRequest
-	6,  // 19: orca.project.v1.ProjectService.ListProjects:input_type -> orca.project.v1.ListProjectsRequest
-	8,  // 20: orca.project.v1.ProjectService.AddMember:input_type -> orca.project.v1.AddMemberRequest
-	10, // 21: orca.project.v1.ProjectService.RebindDevServer:input_type -> orca.project.v1.RebindDevServerRequest
-	12, // 22: orca.project.v1.ProjectService.UpdateProject:input_type -> orca.project.v1.UpdateProjectRequest
-	14, // 23: orca.project.v1.ProjectService.DeleteProject:input_type -> orca.project.v1.DeleteProjectRequest
-	17, // 24: orca.project.v1.ProjectService.AddRepo:input_type -> orca.project.v1.AddRepoRequest
-	19, // 25: orca.project.v1.ProjectService.ListRepos:input_type -> orca.project.v1.ListReposRequest
-	21, // 26: orca.project.v1.ProjectService.ReorderRepos:input_type -> orca.project.v1.ReorderReposRequest
-	23, // 27: orca.project.v1.ProjectService.RemoveRepo:input_type -> orca.project.v1.RemoveRepoRequest
-	26, // 28: orca.project.v1.ProjectService.RecordWorktreeCreated:input_type -> orca.project.v1.RecordWorktreeCreatedRequest
-	28, // 29: orca.project.v1.ProjectService.RecordWorktreeRemoved:input_type -> orca.project.v1.RecordWorktreeRemovedRequest
-	30, // 30: orca.project.v1.ProjectService.ListWorktrees:input_type -> orca.project.v1.ListWorktreesRequest
-	32, // 31: orca.project.v1.ProjectService.SetWorktreeActivation:input_type -> orca.project.v1.SetWorktreeActivationRequest
-	34, // 32: orca.project.v1.ProjectService.RenameWorktree:input_type -> orca.project.v1.RenameWorktreeRequest
-	37, // 33: orca.project.v1.ProjectService.CreateProjectGroup:input_type -> orca.project.v1.CreateProjectGroupRequest
-	39, // 34: orca.project.v1.ProjectService.UpdateProjectGroup:input_type -> orca.project.v1.UpdateProjectGroupRequest
-	41, // 35: orca.project.v1.ProjectService.DeleteProjectGroup:input_type -> orca.project.v1.DeleteProjectGroupRequest
-	43, // 36: orca.project.v1.ProjectService.ListProjectGroups:input_type -> orca.project.v1.ListProjectGroupsRequest
-	3,  // 37: orca.project.v1.ProjectService.CreateProject:output_type -> orca.project.v1.CreateProjectResponse
-	5,  // 38: orca.project.v1.ProjectService.GetProject:output_type -> orca.project.v1.GetProjectResponse
-	7,  // 39: orca.project.v1.ProjectService.ListProjects:output_type -> orca.project.v1.ListProjectsResponse
-	9,  // 40: orca.project.v1.ProjectService.AddMember:output_type -> orca.project.v1.AddMemberResponse
-	11, // 41: orca.project.v1.ProjectService.RebindDevServer:output_type -> orca.project.v1.RebindDevServerResponse
-	13, // 42: orca.project.v1.ProjectService.UpdateProject:output_type -> orca.project.v1.UpdateProjectResponse
-	15, // 43: orca.project.v1.ProjectService.DeleteProject:output_type -> orca.project.v1.DeleteProjectResponse
-	18, // 44: orca.project.v1.ProjectService.AddRepo:output_type -> orca.project.v1.AddRepoResponse
-	20, // 45: orca.project.v1.ProjectService.ListRepos:output_type -> orca.project.v1.ListReposResponse
-	22, // 46: orca.project.v1.ProjectService.ReorderRepos:output_type -> orca.project.v1.ReorderReposResponse
-	24, // 47: orca.project.v1.ProjectService.RemoveRepo:output_type -> orca.project.v1.RemoveRepoResponse
-	27, // 48: orca.project.v1.ProjectService.RecordWorktreeCreated:output_type -> orca.project.v1.RecordWorktreeCreatedResponse
-	29, // 49: orca.project.v1.ProjectService.RecordWorktreeRemoved:output_type -> orca.project.v1.RecordWorktreeRemovedResponse
-	31, // 50: orca.project.v1.ProjectService.ListWorktrees:output_type -> orca.project.v1.ListWorktreesResponse
-	33, // 51: orca.project.v1.ProjectService.SetWorktreeActivation:output_type -> orca.project.v1.SetWorktreeActivationResponse
-	35, // 52: orca.project.v1.ProjectService.RenameWorktree:output_type -> orca.project.v1.RenameWorktreeResponse
-	38, // 53: orca.project.v1.ProjectService.CreateProjectGroup:output_type -> orca.project.v1.CreateProjectGroupResponse
-	40, // 54: orca.project.v1.ProjectService.UpdateProjectGroup:output_type -> orca.project.v1.UpdateProjectGroupResponse
-	42, // 55: orca.project.v1.ProjectService.DeleteProjectGroup:output_type -> orca.project.v1.DeleteProjectGroupResponse
-	44, // 56: orca.project.v1.ProjectService.ListProjectGroups:output_type -> orca.project.v1.ListProjectGroupsResponse
-	37, // [37:57] is the sub-list for method output_type
-	17, // [17:37] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	0,  // 6: orca.project.v1.Member.role:type_name -> orca.project.v1.ProjectRole
+	10, // 7: orca.project.v1.ListMembersResponse.members:type_name -> orca.project.v1.Member
+	0,  // 8: orca.project.v1.UpdateMemberRoleRequest.role:type_name -> orca.project.v1.ProjectRole
+	10, // 9: orca.project.v1.UpdateMemberRoleResponse.member:type_name -> orca.project.v1.Member
+	1,  // 10: orca.project.v1.RebindDevServerResponse.project:type_name -> orca.project.v1.Project
+	1,  // 11: orca.project.v1.UpdateProjectResponse.project:type_name -> orca.project.v1.Project
+	23, // 12: orca.project.v1.AddRepoResponse.repo:type_name -> orca.project.v1.Repo
+	23, // 13: orca.project.v1.ListReposResponse.repos:type_name -> orca.project.v1.Repo
+	32, // 14: orca.project.v1.RecordWorktreeCreatedResponse.worktree:type_name -> orca.project.v1.Worktree
+	32, // 15: orca.project.v1.ListWorktreesResponse.worktrees:type_name -> orca.project.v1.Worktree
+	32, // 16: orca.project.v1.SetWorktreeActivationResponse.worktree:type_name -> orca.project.v1.Worktree
+	32, // 17: orca.project.v1.RenameWorktreeResponse.worktree:type_name -> orca.project.v1.Worktree
+	43, // 18: orca.project.v1.CreateProjectGroupResponse.group:type_name -> orca.project.v1.ProjectGroup
+	43, // 19: orca.project.v1.UpdateProjectGroupResponse.group:type_name -> orca.project.v1.ProjectGroup
+	43, // 20: orca.project.v1.ListProjectGroupsResponse.groups:type_name -> orca.project.v1.ProjectGroup
+	43, // 21: orca.project.v1.MoveProjectResponse.group:type_name -> orca.project.v1.ProjectGroup
+	55, // 22: orca.project.v1.ScanNestedResponse.candidates:type_name -> orca.project.v1.NestedRepoCandidate
+	55, // 23: orca.project.v1.ImportNestedRequest.selected:type_name -> orca.project.v1.NestedRepoCandidate
+	43, // 24: orca.project.v1.ImportNestedResponse.created_groups:type_name -> orca.project.v1.ProjectGroup
+	1,  // 25: orca.project.v1.ImportNestedResponse.created_projects:type_name -> orca.project.v1.Project
+	59, // 26: orca.project.v1.CreateHostSetupResponse.setup:type_name -> orca.project.v1.HostSetup
+	59, // 27: orca.project.v1.ListHostSetupsResponse.setups:type_name -> orca.project.v1.HostSetup
+	59, // 28: orca.project.v1.UpdateHostSetupResponse.setup:type_name -> orca.project.v1.HostSetup
+	59, // 29: orca.project.v1.SetupExistingFolderResponse.setup:type_name -> orca.project.v1.HostSetup
+	1,  // 30: orca.project.v1.SetupExistingFolderResponse.project:type_name -> orca.project.v1.Project
+	2,  // 31: orca.project.v1.ProjectService.CreateProject:input_type -> orca.project.v1.CreateProjectRequest
+	4,  // 32: orca.project.v1.ProjectService.GetProject:input_type -> orca.project.v1.GetProjectRequest
+	6,  // 33: orca.project.v1.ProjectService.ListProjects:input_type -> orca.project.v1.ListProjectsRequest
+	8,  // 34: orca.project.v1.ProjectService.AddMember:input_type -> orca.project.v1.AddMemberRequest
+	11, // 35: orca.project.v1.ProjectService.ListMembers:input_type -> orca.project.v1.ListMembersRequest
+	13, // 36: orca.project.v1.ProjectService.RemoveMember:input_type -> orca.project.v1.RemoveMemberRequest
+	15, // 37: orca.project.v1.ProjectService.UpdateMemberRole:input_type -> orca.project.v1.UpdateMemberRoleRequest
+	17, // 38: orca.project.v1.ProjectService.RebindDevServer:input_type -> orca.project.v1.RebindDevServerRequest
+	19, // 39: orca.project.v1.ProjectService.UpdateProject:input_type -> orca.project.v1.UpdateProjectRequest
+	21, // 40: orca.project.v1.ProjectService.DeleteProject:input_type -> orca.project.v1.DeleteProjectRequest
+	24, // 41: orca.project.v1.ProjectService.AddRepo:input_type -> orca.project.v1.AddRepoRequest
+	26, // 42: orca.project.v1.ProjectService.ListRepos:input_type -> orca.project.v1.ListReposRequest
+	28, // 43: orca.project.v1.ProjectService.ReorderRepos:input_type -> orca.project.v1.ReorderReposRequest
+	30, // 44: orca.project.v1.ProjectService.RemoveRepo:input_type -> orca.project.v1.RemoveRepoRequest
+	33, // 45: orca.project.v1.ProjectService.RecordWorktreeCreated:input_type -> orca.project.v1.RecordWorktreeCreatedRequest
+	35, // 46: orca.project.v1.ProjectService.RecordWorktreeRemoved:input_type -> orca.project.v1.RecordWorktreeRemovedRequest
+	37, // 47: orca.project.v1.ProjectService.ListWorktrees:input_type -> orca.project.v1.ListWorktreesRequest
+	39, // 48: orca.project.v1.ProjectService.SetWorktreeActivation:input_type -> orca.project.v1.SetWorktreeActivationRequest
+	41, // 49: orca.project.v1.ProjectService.RenameWorktree:input_type -> orca.project.v1.RenameWorktreeRequest
+	44, // 50: orca.project.v1.ProjectService.CreateProjectGroup:input_type -> orca.project.v1.CreateProjectGroupRequest
+	46, // 51: orca.project.v1.ProjectService.UpdateProjectGroup:input_type -> orca.project.v1.UpdateProjectGroupRequest
+	48, // 52: orca.project.v1.ProjectService.DeleteProjectGroup:input_type -> orca.project.v1.DeleteProjectGroupRequest
+	50, // 53: orca.project.v1.ProjectService.ListProjectGroups:input_type -> orca.project.v1.ListProjectGroupsRequest
+	52, // 54: orca.project.v1.ProjectService.MoveProject:input_type -> orca.project.v1.MoveProjectRequest
+	54, // 55: orca.project.v1.ProjectService.ScanNested:input_type -> orca.project.v1.ScanNestedRequest
+	57, // 56: orca.project.v1.ProjectService.ImportNested:input_type -> orca.project.v1.ImportNestedRequest
+	60, // 57: orca.project.v1.ProjectService.CreateHostSetup:input_type -> orca.project.v1.CreateHostSetupRequest
+	62, // 58: orca.project.v1.ProjectService.ListHostSetups:input_type -> orca.project.v1.ListHostSetupsRequest
+	64, // 59: orca.project.v1.ProjectService.UpdateHostSetup:input_type -> orca.project.v1.UpdateHostSetupRequest
+	66, // 60: orca.project.v1.ProjectService.DeleteHostSetup:input_type -> orca.project.v1.DeleteHostSetupRequest
+	68, // 61: orca.project.v1.ProjectService.SetupExistingFolder:input_type -> orca.project.v1.SetupExistingFolderRequest
+	3,  // 62: orca.project.v1.ProjectService.CreateProject:output_type -> orca.project.v1.CreateProjectResponse
+	5,  // 63: orca.project.v1.ProjectService.GetProject:output_type -> orca.project.v1.GetProjectResponse
+	7,  // 64: orca.project.v1.ProjectService.ListProjects:output_type -> orca.project.v1.ListProjectsResponse
+	9,  // 65: orca.project.v1.ProjectService.AddMember:output_type -> orca.project.v1.AddMemberResponse
+	12, // 66: orca.project.v1.ProjectService.ListMembers:output_type -> orca.project.v1.ListMembersResponse
+	14, // 67: orca.project.v1.ProjectService.RemoveMember:output_type -> orca.project.v1.RemoveMemberResponse
+	16, // 68: orca.project.v1.ProjectService.UpdateMemberRole:output_type -> orca.project.v1.UpdateMemberRoleResponse
+	18, // 69: orca.project.v1.ProjectService.RebindDevServer:output_type -> orca.project.v1.RebindDevServerResponse
+	20, // 70: orca.project.v1.ProjectService.UpdateProject:output_type -> orca.project.v1.UpdateProjectResponse
+	22, // 71: orca.project.v1.ProjectService.DeleteProject:output_type -> orca.project.v1.DeleteProjectResponse
+	25, // 72: orca.project.v1.ProjectService.AddRepo:output_type -> orca.project.v1.AddRepoResponse
+	27, // 73: orca.project.v1.ProjectService.ListRepos:output_type -> orca.project.v1.ListReposResponse
+	29, // 74: orca.project.v1.ProjectService.ReorderRepos:output_type -> orca.project.v1.ReorderReposResponse
+	31, // 75: orca.project.v1.ProjectService.RemoveRepo:output_type -> orca.project.v1.RemoveRepoResponse
+	34, // 76: orca.project.v1.ProjectService.RecordWorktreeCreated:output_type -> orca.project.v1.RecordWorktreeCreatedResponse
+	36, // 77: orca.project.v1.ProjectService.RecordWorktreeRemoved:output_type -> orca.project.v1.RecordWorktreeRemovedResponse
+	38, // 78: orca.project.v1.ProjectService.ListWorktrees:output_type -> orca.project.v1.ListWorktreesResponse
+	40, // 79: orca.project.v1.ProjectService.SetWorktreeActivation:output_type -> orca.project.v1.SetWorktreeActivationResponse
+	42, // 80: orca.project.v1.ProjectService.RenameWorktree:output_type -> orca.project.v1.RenameWorktreeResponse
+	45, // 81: orca.project.v1.ProjectService.CreateProjectGroup:output_type -> orca.project.v1.CreateProjectGroupResponse
+	47, // 82: orca.project.v1.ProjectService.UpdateProjectGroup:output_type -> orca.project.v1.UpdateProjectGroupResponse
+	49, // 83: orca.project.v1.ProjectService.DeleteProjectGroup:output_type -> orca.project.v1.DeleteProjectGroupResponse
+	51, // 84: orca.project.v1.ProjectService.ListProjectGroups:output_type -> orca.project.v1.ListProjectGroupsResponse
+	53, // 85: orca.project.v1.ProjectService.MoveProject:output_type -> orca.project.v1.MoveProjectResponse
+	56, // 86: orca.project.v1.ProjectService.ScanNested:output_type -> orca.project.v1.ScanNestedResponse
+	58, // 87: orca.project.v1.ProjectService.ImportNested:output_type -> orca.project.v1.ImportNestedResponse
+	61, // 88: orca.project.v1.ProjectService.CreateHostSetup:output_type -> orca.project.v1.CreateHostSetupResponse
+	63, // 89: orca.project.v1.ProjectService.ListHostSetups:output_type -> orca.project.v1.ListHostSetupsResponse
+	65, // 90: orca.project.v1.ProjectService.UpdateHostSetup:output_type -> orca.project.v1.UpdateHostSetupResponse
+	67, // 91: orca.project.v1.ProjectService.DeleteHostSetup:output_type -> orca.project.v1.DeleteHostSetupResponse
+	69, // 92: orca.project.v1.ProjectService.SetupExistingFolder:output_type -> orca.project.v1.SetupExistingFolderResponse
+	62, // [62:93] is the sub-list for method output_type
+	31, // [31:62] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_orca_project_v1_project_proto_init() }
@@ -2636,7 +4054,7 @@ func file_orca_project_v1_project_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_project_v1_project_proto_rawDesc), len(file_orca_project_v1_project_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   44,
+			NumMessages:   69,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
