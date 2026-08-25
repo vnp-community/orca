@@ -44,6 +44,8 @@ type Server struct {
 	updateProjectGroup *usecase.UpdateProjectGroup
 	deleteProjectGroup *usecase.DeleteProjectGroup
 	listProjectGroups  *usecase.ListProjectGroups
+
+	folderWorkspaces *usecase.FolderWorkspaceUseCase
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
@@ -73,6 +75,8 @@ type Deps struct {
 	UpdateProjectGroup *usecase.UpdateProjectGroup
 	DeleteProjectGroup *usecase.DeleteProjectGroup
 	ListProjectGroups  *usecase.ListProjectGroups
+
+	FolderWorkspaces *usecase.FolderWorkspaceUseCase
 }
 
 func New(deps Deps) *Server {
@@ -100,6 +104,8 @@ func New(deps Deps) *Server {
 		updateProjectGroup: deps.UpdateProjectGroup,
 		deleteProjectGroup: deps.DeleteProjectGroup,
 		listProjectGroups:  deps.ListProjectGroups,
+
+		folderWorkspaces: deps.FolderWorkspaces,
 	}
 }
 
@@ -386,4 +392,68 @@ func toProtoProjectGroup(g domain.ProjectGroup) *projectv1.ProjectGroup {
 		Name:          g.Name,
 		ParentGroupId: g.ParentGroupID,
 	}
+}
+
+func (s *Server) CreateFolderWorkspace(ctx context.Context, req *projectv1.CreateFolderWorkspaceRequest) (*projectv1.CreateFolderWorkspaceResponse, error) {
+	fw, err := s.folderWorkspaces.Create(ctx, usecase.CreateFolderWorkspaceInput{
+		DevServerID: req.GetDevServerId(),
+		Path:        req.GetPath(),
+		Name:        req.GetName(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.CreateFolderWorkspaceResponse{FolderWorkspace: toProtoFolderWorkspace(fw)}, nil
+}
+
+func (s *Server) UpdateFolderWorkspace(ctx context.Context, req *projectv1.UpdateFolderWorkspaceRequest) (*projectv1.UpdateFolderWorkspaceResponse, error) {
+	fw, err := s.folderWorkspaces.Update(ctx, req.GetId(), req.GetName())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateFolderWorkspaceResponse{FolderWorkspace: toProtoFolderWorkspace(fw)}, nil
+}
+
+func (s *Server) DeleteFolderWorkspace(ctx context.Context, req *projectv1.DeleteFolderWorkspaceRequest) (*projectv1.DeleteFolderWorkspaceResponse, error) {
+	if err := s.folderWorkspaces.Delete(ctx, req.GetId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.DeleteFolderWorkspaceResponse{}, nil
+}
+
+func (s *Server) ListFolderWorkspaces(ctx context.Context, _ *projectv1.ListFolderWorkspacesRequest) (*projectv1.ListFolderWorkspacesResponse, error) {
+	list, err := s.folderWorkspaces.List(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.FolderWorkspace, 0, len(list))
+	for _, fw := range list {
+		out = append(out, toProtoFolderWorkspace(fw))
+	}
+	return &projectv1.ListFolderWorkspacesResponse{FolderWorkspaces: out}, nil
+}
+
+func (s *Server) GetFolderWorkspacePathStatus(ctx context.Context, req *projectv1.GetFolderWorkspacePathStatusRequest) (*projectv1.GetFolderWorkspacePathStatusResponse, error) {
+	result, err := s.folderWorkspaces.GetPathStatus(ctx, req.GetDevServerId(), req.GetPath())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.GetFolderWorkspacePathStatusResponse{
+		Status:                    result.Status,
+		ExistingFolderWorkspaceId: result.ExistingID,
+	}, nil
+}
+
+func toProtoFolderWorkspace(fw domain.FolderWorkspace) *projectv1.FolderWorkspace {
+	out := &projectv1.FolderWorkspace{
+		Id:          fw.ID,
+		DevServerId: fw.DevServerID,
+		Path:        fw.Path,
+		Name:        fw.Name,
+		AddedBy:     fw.AddedBy,
+	}
+	if !fw.CreatedAt.IsZero() {
+		out.CreatedAt = timestamppb.New(fw.CreatedAt)
+	}
+	return out
 }

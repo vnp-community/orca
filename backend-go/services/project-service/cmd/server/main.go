@@ -78,6 +78,7 @@ func run() error {
 	repoRepo := projectpostgres.NewRepoRepository(pool)
 	worktreeRepo := projectpostgres.NewWorktreeRepository(pool)
 	projectGroupRepo := projectpostgres.NewProjectGroupRepository(pool)
+	folderWorkspaceRepo := projectpostgres.NewFolderWorkspaceRepository(pool)
 
 	// Real clients — Epic C (docs/execution-plan.md §10, 2026-08-17) closed
 	// the gap these were previously stubs for. Dialed lazily (doesn't block
@@ -128,6 +129,8 @@ func run() error {
 	deleteProjectGroupUC := usecase.NewDeleteProjectGroup(projectGroupRepo)
 	listProjectGroupsUC := usecase.NewListProjectGroups(projectGroupRepo)
 
+	folderWorkspaceUC := usecase.NewFolderWorkspaceUseCase(folderWorkspaceRepo)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
 		CreateProject:   createProjectUC,
@@ -153,6 +156,8 @@ func run() error {
 		UpdateProjectGroup: updateProjectGroupUC,
 		DeleteProjectGroup: deleteProjectGroupUC,
 		ListProjectGroups:  listProjectGroupsUC,
+
+		FolderWorkspaces: folderWorkspaceUC,
 	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

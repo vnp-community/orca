@@ -147,3 +147,33 @@ type ProjectGroupRepository interface {
 	DeleteProjectGroup(ctx context.Context, tenantID, id string) error
 	ListProjectGroups(ctx context.Context, tenantID string) ([]domain.ProjectGroup, error)
 }
+
+// FolderWorkspaceRepository is the persistence port for FolderWorkspace —
+// see domain.FolderWorkspace's doc comment for why this is a standalone
+// entity, not a ProjectGroup extension. Implemented by internal/adapter/
+// postgres against project.folder_workspaces.
+type FolderWorkspaceRepository interface {
+	Create(ctx context.Context, fw domain.FolderWorkspace) (domain.FolderWorkspace, error)
+	// Update renames a folder workspace — the only mutable field, per
+	// project.proto's UpdateFolderWorkspaceRequest doc comment. Returns
+	// domain.ErrFolderWorkspaceNotFound (wrapped) if no row matches.
+	Update(ctx context.Context, id, name string) (domain.FolderWorkspace, error)
+	// Delete returns domain.ErrFolderWorkspaceNotFound (wrapped) if no row
+	// matches.
+	Delete(ctx context.Context, id string) error
+	ListByTenant(ctx context.Context, tenantID string) ([]domain.FolderWorkspace, error)
+	// FindByPath returns nil, nil (not an error) when no row matches — used
+	// by usecase.FolderWorkspaceUseCase.GetPathStatus to distinguish
+	// PathStatusAlreadyFolderWorkspace from the next check.
+	FindByPath(ctx context.Context, tenantID, devServerID, path string) (*domain.FolderWorkspace, error)
+	// RepoPathExists cross-checks against project.worktrees (joined through
+	// project.projects for its dev_server_id — project.repos itself has no
+	// filesystem-path column, see the postgres adapter's doc comment) so
+	// GetFolderWorkspacePathStatus can distinguish PathStatusAlreadyRepo from
+	// PathStatusAvailable.
+	RepoPathExists(ctx context.Context, tenantID, devServerID, path string) (bool, error)
+	// Get returns nil, nil (not an error) when no row matches — used by
+	// Update/Delete's ownership check (usecase.FolderWorkspaceUseCase) to
+	// load the caller's added_by before mutating.
+	Get(ctx context.Context, id string) (*domain.FolderWorkspace, error)
+}

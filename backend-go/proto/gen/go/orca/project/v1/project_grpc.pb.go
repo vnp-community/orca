@@ -19,26 +19,31 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProjectService_CreateProject_FullMethodName         = "/orca.project.v1.ProjectService/CreateProject"
-	ProjectService_GetProject_FullMethodName            = "/orca.project.v1.ProjectService/GetProject"
-	ProjectService_ListProjects_FullMethodName          = "/orca.project.v1.ProjectService/ListProjects"
-	ProjectService_AddMember_FullMethodName             = "/orca.project.v1.ProjectService/AddMember"
-	ProjectService_RebindDevServer_FullMethodName       = "/orca.project.v1.ProjectService/RebindDevServer"
-	ProjectService_UpdateProject_FullMethodName         = "/orca.project.v1.ProjectService/UpdateProject"
-	ProjectService_DeleteProject_FullMethodName         = "/orca.project.v1.ProjectService/DeleteProject"
-	ProjectService_AddRepo_FullMethodName               = "/orca.project.v1.ProjectService/AddRepo"
-	ProjectService_ListRepos_FullMethodName             = "/orca.project.v1.ProjectService/ListRepos"
-	ProjectService_ReorderRepos_FullMethodName          = "/orca.project.v1.ProjectService/ReorderRepos"
-	ProjectService_RemoveRepo_FullMethodName            = "/orca.project.v1.ProjectService/RemoveRepo"
-	ProjectService_RecordWorktreeCreated_FullMethodName = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
-	ProjectService_RecordWorktreeRemoved_FullMethodName = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
-	ProjectService_ListWorktrees_FullMethodName         = "/orca.project.v1.ProjectService/ListWorktrees"
-	ProjectService_SetWorktreeActivation_FullMethodName = "/orca.project.v1.ProjectService/SetWorktreeActivation"
-	ProjectService_RenameWorktree_FullMethodName        = "/orca.project.v1.ProjectService/RenameWorktree"
-	ProjectService_CreateProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/CreateProjectGroup"
-	ProjectService_UpdateProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/UpdateProjectGroup"
-	ProjectService_DeleteProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/DeleteProjectGroup"
-	ProjectService_ListProjectGroups_FullMethodName     = "/orca.project.v1.ProjectService/ListProjectGroups"
+	ProjectService_CreateProject_FullMethodName                = "/orca.project.v1.ProjectService/CreateProject"
+	ProjectService_GetProject_FullMethodName                   = "/orca.project.v1.ProjectService/GetProject"
+	ProjectService_ListProjects_FullMethodName                 = "/orca.project.v1.ProjectService/ListProjects"
+	ProjectService_AddMember_FullMethodName                    = "/orca.project.v1.ProjectService/AddMember"
+	ProjectService_RebindDevServer_FullMethodName              = "/orca.project.v1.ProjectService/RebindDevServer"
+	ProjectService_UpdateProject_FullMethodName                = "/orca.project.v1.ProjectService/UpdateProject"
+	ProjectService_DeleteProject_FullMethodName                = "/orca.project.v1.ProjectService/DeleteProject"
+	ProjectService_AddRepo_FullMethodName                      = "/orca.project.v1.ProjectService/AddRepo"
+	ProjectService_ListRepos_FullMethodName                    = "/orca.project.v1.ProjectService/ListRepos"
+	ProjectService_ReorderRepos_FullMethodName                 = "/orca.project.v1.ProjectService/ReorderRepos"
+	ProjectService_RemoveRepo_FullMethodName                   = "/orca.project.v1.ProjectService/RemoveRepo"
+	ProjectService_RecordWorktreeCreated_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
+	ProjectService_RecordWorktreeRemoved_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
+	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
+	ProjectService_SetWorktreeActivation_FullMethodName        = "/orca.project.v1.ProjectService/SetWorktreeActivation"
+	ProjectService_RenameWorktree_FullMethodName               = "/orca.project.v1.ProjectService/RenameWorktree"
+	ProjectService_CreateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/CreateProjectGroup"
+	ProjectService_UpdateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/UpdateProjectGroup"
+	ProjectService_DeleteProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/DeleteProjectGroup"
+	ProjectService_ListProjectGroups_FullMethodName            = "/orca.project.v1.ProjectService/ListProjectGroups"
+	ProjectService_CreateFolderWorkspace_FullMethodName        = "/orca.project.v1.ProjectService/CreateFolderWorkspace"
+	ProjectService_UpdateFolderWorkspace_FullMethodName        = "/orca.project.v1.ProjectService/UpdateFolderWorkspace"
+	ProjectService_DeleteFolderWorkspace_FullMethodName        = "/orca.project.v1.ProjectService/DeleteFolderWorkspace"
+	ProjectService_ListFolderWorkspaces_FullMethodName         = "/orca.project.v1.ProjectService/ListFolderWorkspaces"
+	ProjectService_GetFolderWorkspacePathStatus_FullMethodName = "/orca.project.v1.ProjectService/GetFolderWorkspacePathStatus"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -78,6 +83,17 @@ type ProjectServiceClient interface {
 	UpdateProjectGroup(ctx context.Context, in *UpdateProjectGroupRequest, opts ...grpc.CallOption) (*UpdateProjectGroupResponse, error)
 	DeleteProjectGroup(ctx context.Context, in *DeleteProjectGroupRequest, opts ...grpc.CallOption) (*DeleteProjectGroupResponse, error)
 	ListProjectGroups(ctx context.Context, in *ListProjectGroupsRequest, opts ...grpc.CallOption) (*ListProjectGroupsResponse, error)
+	// Folder workspaces — standalone, non-git filesystem paths added directly
+	// to the workspace. No project_id — see FolderWorkspace's doc comment
+	// below. See specs/backend-go/bugs/missing-v1/solutions/SOL-010-folderworkspace-channels.md.
+	CreateFolderWorkspace(ctx context.Context, in *CreateFolderWorkspaceRequest, opts ...grpc.CallOption) (*CreateFolderWorkspaceResponse, error)
+	UpdateFolderWorkspace(ctx context.Context, in *UpdateFolderWorkspaceRequest, opts ...grpc.CallOption) (*UpdateFolderWorkspaceResponse, error)
+	DeleteFolderWorkspace(ctx context.Context, in *DeleteFolderWorkspaceRequest, opts ...grpc.CallOption) (*DeleteFolderWorkspaceResponse, error)
+	ListFolderWorkspaces(ctx context.Context, in *ListFolderWorkspacesRequest, opts ...grpc.CallOption) (*ListFolderWorkspacesResponse, error)
+	// GetFolderWorkspacePathStatus is a DB-conflict check against this
+	// service's own tables, NOT a live filesystem probe — see the response
+	// message's doc comment.
+	GetFolderWorkspacePathStatus(ctx context.Context, in *GetFolderWorkspacePathStatusRequest, opts ...grpc.CallOption) (*GetFolderWorkspacePathStatusResponse, error)
 }
 
 type projectServiceClient struct {
@@ -288,6 +304,56 @@ func (c *projectServiceClient) ListProjectGroups(ctx context.Context, in *ListPr
 	return out, nil
 }
 
+func (c *projectServiceClient) CreateFolderWorkspace(ctx context.Context, in *CreateFolderWorkspaceRequest, opts ...grpc.CallOption) (*CreateFolderWorkspaceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateFolderWorkspaceResponse)
+	err := c.cc.Invoke(ctx, ProjectService_CreateFolderWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateFolderWorkspace(ctx context.Context, in *UpdateFolderWorkspaceRequest, opts ...grpc.CallOption) (*UpdateFolderWorkspaceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateFolderWorkspaceResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateFolderWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) DeleteFolderWorkspace(ctx context.Context, in *DeleteFolderWorkspaceRequest, opts ...grpc.CallOption) (*DeleteFolderWorkspaceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteFolderWorkspaceResponse)
+	err := c.cc.Invoke(ctx, ProjectService_DeleteFolderWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListFolderWorkspaces(ctx context.Context, in *ListFolderWorkspacesRequest, opts ...grpc.CallOption) (*ListFolderWorkspacesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListFolderWorkspacesResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListFolderWorkspaces_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetFolderWorkspacePathStatus(ctx context.Context, in *GetFolderWorkspacePathStatusRequest, opts ...grpc.CallOption) (*GetFolderWorkspacePathStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFolderWorkspacePathStatusResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetFolderWorkspacePathStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -325,6 +391,17 @@ type ProjectServiceServer interface {
 	UpdateProjectGroup(context.Context, *UpdateProjectGroupRequest) (*UpdateProjectGroupResponse, error)
 	DeleteProjectGroup(context.Context, *DeleteProjectGroupRequest) (*DeleteProjectGroupResponse, error)
 	ListProjectGroups(context.Context, *ListProjectGroupsRequest) (*ListProjectGroupsResponse, error)
+	// Folder workspaces — standalone, non-git filesystem paths added directly
+	// to the workspace. No project_id — see FolderWorkspace's doc comment
+	// below. See specs/backend-go/bugs/missing-v1/solutions/SOL-010-folderworkspace-channels.md.
+	CreateFolderWorkspace(context.Context, *CreateFolderWorkspaceRequest) (*CreateFolderWorkspaceResponse, error)
+	UpdateFolderWorkspace(context.Context, *UpdateFolderWorkspaceRequest) (*UpdateFolderWorkspaceResponse, error)
+	DeleteFolderWorkspace(context.Context, *DeleteFolderWorkspaceRequest) (*DeleteFolderWorkspaceResponse, error)
+	ListFolderWorkspaces(context.Context, *ListFolderWorkspacesRequest) (*ListFolderWorkspacesResponse, error)
+	// GetFolderWorkspacePathStatus is a DB-conflict check against this
+	// service's own tables, NOT a live filesystem probe — see the response
+	// message's doc comment.
+	GetFolderWorkspacePathStatus(context.Context, *GetFolderWorkspacePathStatusRequest) (*GetFolderWorkspacePathStatusResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -394,6 +471,21 @@ func (UnimplementedProjectServiceServer) DeleteProjectGroup(context.Context, *De
 }
 func (UnimplementedProjectServiceServer) ListProjectGroups(context.Context, *ListProjectGroupsRequest) (*ListProjectGroupsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListProjectGroups not implemented")
+}
+func (UnimplementedProjectServiceServer) CreateFolderWorkspace(context.Context, *CreateFolderWorkspaceRequest) (*CreateFolderWorkspaceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateFolderWorkspace not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateFolderWorkspace(context.Context, *UpdateFolderWorkspaceRequest) (*UpdateFolderWorkspaceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateFolderWorkspace not implemented")
+}
+func (UnimplementedProjectServiceServer) DeleteFolderWorkspace(context.Context, *DeleteFolderWorkspaceRequest) (*DeleteFolderWorkspaceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteFolderWorkspace not implemented")
+}
+func (UnimplementedProjectServiceServer) ListFolderWorkspaces(context.Context, *ListFolderWorkspacesRequest) (*ListFolderWorkspacesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListFolderWorkspaces not implemented")
+}
+func (UnimplementedProjectServiceServer) GetFolderWorkspacePathStatus(context.Context, *GetFolderWorkspacePathStatusRequest) (*GetFolderWorkspacePathStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFolderWorkspacePathStatus not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -776,6 +868,96 @@ func _ProjectService_ListProjectGroups_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_CreateFolderWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateFolderWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).CreateFolderWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_CreateFolderWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).CreateFolderWorkspace(ctx, req.(*CreateFolderWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateFolderWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateFolderWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateFolderWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateFolderWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateFolderWorkspace(ctx, req.(*UpdateFolderWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_DeleteFolderWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteFolderWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).DeleteFolderWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_DeleteFolderWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).DeleteFolderWorkspace(ctx, req.(*DeleteFolderWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListFolderWorkspaces_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFolderWorkspacesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListFolderWorkspaces(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListFolderWorkspaces_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListFolderWorkspaces(ctx, req.(*ListFolderWorkspacesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetFolderWorkspacePathStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFolderWorkspacePathStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetFolderWorkspacePathStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetFolderWorkspacePathStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetFolderWorkspacePathStatus(ctx, req.(*GetFolderWorkspacePathStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -862,6 +1044,26 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListProjectGroups",
 			Handler:    _ProjectService_ListProjectGroups_Handler,
+		},
+		{
+			MethodName: "CreateFolderWorkspace",
+			Handler:    _ProjectService_CreateFolderWorkspace_Handler,
+		},
+		{
+			MethodName: "UpdateFolderWorkspace",
+			Handler:    _ProjectService_UpdateFolderWorkspace_Handler,
+		},
+		{
+			MethodName: "DeleteFolderWorkspace",
+			Handler:    _ProjectService_DeleteFolderWorkspace_Handler,
+		},
+		{
+			MethodName: "ListFolderWorkspaces",
+			Handler:    _ProjectService_ListFolderWorkspaces_Handler,
+		},
+		{
+			MethodName: "GetFolderWorkspacePathStatus",
+			Handler:    _ProjectService_GetFolderWorkspacePathStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

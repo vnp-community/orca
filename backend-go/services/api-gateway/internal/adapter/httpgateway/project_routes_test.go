@@ -102,6 +102,31 @@ type fakeProjectServiceClient struct {
 	lastListProjectGroupsReq *projectv1.ListProjectGroupsRequest
 	listProjectGroupsResp    *projectv1.ListProjectGroupsResponse
 	listProjectGroupsErr     error
+
+	// FolderWorkspace methods below (TASK-061..065) — no REST route mounts
+	// any of these yet (project-service's folderWorkspace.* surface is
+	// wscompat-only, see wscompat/channels_emulator_folderworkspace_host.go),
+	// but the interface satisfaction assertion at the bottom of this file
+	// requires every ProjectServiceClient method to exist here regardless.
+	lastCreateFolderWorkspaceReq *projectv1.CreateFolderWorkspaceRequest
+	createFolderWorkspaceResp    *projectv1.CreateFolderWorkspaceResponse
+	createFolderWorkspaceErr     error
+
+	lastUpdateFolderWorkspaceReq *projectv1.UpdateFolderWorkspaceRequest
+	updateFolderWorkspaceResp    *projectv1.UpdateFolderWorkspaceResponse
+	updateFolderWorkspaceErr     error
+
+	lastDeleteFolderWorkspaceReq *projectv1.DeleteFolderWorkspaceRequest
+	deleteFolderWorkspaceResp    *projectv1.DeleteFolderWorkspaceResponse
+	deleteFolderWorkspaceErr     error
+
+	lastListFolderWorkspacesReq *projectv1.ListFolderWorkspacesRequest
+	listFolderWorkspacesResp    *projectv1.ListFolderWorkspacesResponse
+	listFolderWorkspacesErr     error
+
+	lastGetFolderWorkspacePathStatusReq *projectv1.GetFolderWorkspacePathStatusRequest
+	getFolderWorkspacePathStatusResp    *projectv1.GetFolderWorkspacePathStatusResponse
+	getFolderWorkspacePathStatusErr     error
 }
 
 func (f *fakeProjectServiceClient) CreateProject(_ context.Context, in *projectv1.CreateProjectRequest, _ ...grpc.CallOption) (*projectv1.CreateProjectResponse, error) {
@@ -262,6 +287,46 @@ func (f *fakeProjectServiceClient) ListProjectGroups(_ context.Context, in *proj
 		return nil, f.listProjectGroupsErr
 	}
 	return f.listProjectGroupsResp, nil
+}
+
+func (f *fakeProjectServiceClient) CreateFolderWorkspace(_ context.Context, in *projectv1.CreateFolderWorkspaceRequest, _ ...grpc.CallOption) (*projectv1.CreateFolderWorkspaceResponse, error) {
+	f.lastCreateFolderWorkspaceReq = in
+	if f.createFolderWorkspaceErr != nil {
+		return nil, f.createFolderWorkspaceErr
+	}
+	return f.createFolderWorkspaceResp, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateFolderWorkspace(_ context.Context, in *projectv1.UpdateFolderWorkspaceRequest, _ ...grpc.CallOption) (*projectv1.UpdateFolderWorkspaceResponse, error) {
+	f.lastUpdateFolderWorkspaceReq = in
+	if f.updateFolderWorkspaceErr != nil {
+		return nil, f.updateFolderWorkspaceErr
+	}
+	return f.updateFolderWorkspaceResp, nil
+}
+
+func (f *fakeProjectServiceClient) DeleteFolderWorkspace(_ context.Context, in *projectv1.DeleteFolderWorkspaceRequest, _ ...grpc.CallOption) (*projectv1.DeleteFolderWorkspaceResponse, error) {
+	f.lastDeleteFolderWorkspaceReq = in
+	if f.deleteFolderWorkspaceErr != nil {
+		return nil, f.deleteFolderWorkspaceErr
+	}
+	return f.deleteFolderWorkspaceResp, nil
+}
+
+func (f *fakeProjectServiceClient) ListFolderWorkspaces(_ context.Context, in *projectv1.ListFolderWorkspacesRequest, _ ...grpc.CallOption) (*projectv1.ListFolderWorkspacesResponse, error) {
+	f.lastListFolderWorkspacesReq = in
+	if f.listFolderWorkspacesErr != nil {
+		return nil, f.listFolderWorkspacesErr
+	}
+	return f.listFolderWorkspacesResp, nil
+}
+
+func (f *fakeProjectServiceClient) GetFolderWorkspacePathStatus(_ context.Context, in *projectv1.GetFolderWorkspacePathStatusRequest, _ ...grpc.CallOption) (*projectv1.GetFolderWorkspacePathStatusResponse, error) {
+	f.lastGetFolderWorkspacePathStatusReq = in
+	if f.getFolderWorkspacePathStatusErr != nil {
+		return nil, f.getFolderWorkspacePathStatusErr
+	}
+	return f.getFolderWorkspacePathStatusResp, nil
 }
 
 var _ projectv1.ProjectServiceClient = (*fakeProjectServiceClient)(nil)
