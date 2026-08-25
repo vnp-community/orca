@@ -1,290 +1,43 @@
-// Package github implements usecase.ScmProvider against GitHub's REST API
-// directly via net/http — no gh CLI, no shared keychain, no shell-out, per
-// scm-integration-service.md §10 (the direct fix for TS Gap 1). Every
-// ScmProvider method is a real REST call as of Phase 3
-// (docs/execution-plan.md §3) — this is the reference implementation the
-// other four provider adapters mirror.
-package github
+# TASK-075: Implement GitHub REST adapter methods for PR/issue mutations + repo/branch resolution
 
-import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
-	"time"
+**From Solution:** SOL-012 (Design — `adapter/external/github/` implementation notes)
+**Priority:** P1
+**Service:** `scm-integration-service`
+**File:** `services/scm-integration-service/internal/adapter/github/client.go`
+**Depends on:** TASK-073, TASK-074
+**Status:** `[x]` DONE (verified — `go build`/`go vet`/`go test ./internal/adapter/github/...` clean; `var _ usecase.ScmProvider = (*Client)(nil)` compiles)
 
-	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
-	"github.com/stablyai/orca-go/services/scm-integration-service/internal/usecase"
-)
+---
 
-// DefaultBaseURL is GitHub's public REST API root.
-const DefaultBaseURL = "https://api.github.com"
+## Context
 
-// DefaultGraphQLURL is GitHub's single GraphQL endpoint — distinct from
-// DefaultBaseURL's REST root. GitHub Enterprise Server deployments use
-// {baseURL}/api/graphql instead; not handled here since this adapter only
-// targets github.com today (same scope limitation client.go already has
-// for DefaultBaseURL).
-const DefaultGraphQLURL = "https://api.github.com/graphql"
+Implements the 7 new `ScmProvider` methods (TASK-073/074) for real against
+GitHub's REST API, following `client.go`'s existing header-setting and
+error-wrapping conventions exactly (`Authorization: Bearer`, `Accept:
+application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`).
+`SetPullRequestAutoMerge` is the one GraphQL-only operation in this batch
+(GitHub REST has no auto-merge endpoint) — it gets a small, self-contained
+`graphQLRequest` helper here; TASK-079's Projects v2 GraphQL adapter reuses
+this same helper rather than building a second one.
 
-// ErrNotImplemented is kept as a sentinel for any future method added to
-// usecase.ScmProvider before this adapter implements it — every method
-// currently in the interface is real.
-var ErrNotImplemented = errors.New("github: not implemented")
+---
 
-// Client implements usecase.ScmProvider against GitHub's REST API.
-type Client struct {
-	httpClient *http.Client
-	baseURL    string
-	graphQLURL string
-}
+## Changes to make
 
-// New returns a GitHub Client. A nil httpClient defaults to
-// http.DefaultClient; an empty baseURL defaults to DefaultBaseURL —
-// overridable for tests (httptest.Server) and GitHub Enterprise deployments.
-func New(httpClient *http.Client, baseURL string) *Client {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
-	if baseURL == "" {
-		baseURL = DefaultBaseURL
-	}
-	return &Client{httpClient: httpClient, baseURL: baseURL, graphQLURL: DefaultGraphQLURL}
-}
+**File:** `services/scm-integration-service/internal/adapter/github/client.go`
 
-var _ usecase.ScmProvider = (*Client)(nil)
+### Step 1: Add a shared "get PR by number" helper
 
-// githubIssue mirrors the fields this adapter needs from GitHub's
-// GET /repos/{owner}/{repo}/issues response
-// (https://docs.github.com/en/rest/issues/issues#list-repository-issues).
-// GitHub's issues endpoint also returns pull requests; PullRequest being
-// non-nil is how the API distinguishes them.
-type githubIssue struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	State       string `json:"state"`
-	HTMLURL     string `json:"html_url"`
-	PullRequest *struct {
-		URL string `json:"url"`
-	} `json:"pull_request"`
-}
+Append after `toDomainPullRequest`:
 
-// ListIssues calls GitHub's REST API for real: GET /repos/{repo}/issues,
-// with the resolved per-tenant token as a Bearer credential — per
-// scm-integration-service.md §9, this is the only place that token exists,
-// built directly into the auth header immediately before dispatch, never
-// stored on the Client or logged.
-func (c *Client) ListIssues(ctx context.Context, cred usecase.Credential, repo string, _ usecase.IssueFilter) ([]domain.Issue, error) {
-	url := fmt.Sprintf("%s/repos/%s/issues", c.baseURL, repo)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("github: build list issues request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+cred.Token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("github: list issues request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github: list issues: unexpected status %d", resp.StatusCode)
-	}
-
-	var raw []githubIssue
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("github: decode list issues response: %w", err)
-	}
-
-	issues := make([]domain.Issue, 0, len(raw))
-	for _, gi := range raw {
-		if gi.PullRequest != nil {
-			continue // GitHub's issues endpoint also returns PRs; not this method's concern.
-		}
-		issue, err := domain.NewIssue(strconv.Itoa(gi.Number), domain.ScmProviderGitHub, repo, gi.Title, gi.State, gi.HTMLURL)
-		if err != nil {
-			return nil, fmt.Errorf("github: invalid issue in response: %w", err)
-		}
-		issues = append(issues, issue)
-	}
-	return issues, nil
-}
-
-// githubPullRequest mirrors the fields this adapter needs from GitHub's
-// POST/GET /repos/{owner}/{repo}/pulls response shape
-// (https://docs.github.com/en/rest/pulls/pulls).
-type githubPullRequest struct {
-	Number  int    `json:"number"`
-	NodeID  string `json:"node_id"` // GraphQL node id — needed by SetPullRequestAutoMerge's mutation
-	Title   string `json:"title"`
-	State   string `json:"state"`
-	HTMLURL string `json:"html_url"`
-	Head    struct {
-		Ref string `json:"ref"`
-	} `json:"head"`
-	Base struct {
-		Ref string `json:"ref"`
-	} `json:"base"`
-}
-
-func toDomainPullRequest(repo string, gp githubPullRequest) (domain.PullRequest, error) {
-	pr, err := domain.NewPullRequest(
-		strconv.Itoa(gp.Number), domain.ScmProviderGitHub, repo, gp.Title, gp.State, gp.HTMLURL,
-		gp.Head.Ref, gp.Base.Ref,
-	)
-	if err != nil {
-		return domain.PullRequest{}, err
-	}
-	pr.Number = int32(gp.Number)
-	return pr, nil
-}
-
-// CreatePullRequest calls GitHub's REST API for real: POST
-// /repos/{repo}/pulls, with the resolved per-tenant token as a Bearer
-// credential — see ListIssues' doc comment for the token-handling
-// invariant this shares.
-func (c *Client) CreatePullRequest(ctx context.Context, cred usecase.Credential, repo string, input usecase.CreatePullRequestInput) (domain.PullRequest, error) {
-	body, err := json.Marshal(struct {
-		Title string `json:"title"`
-		Body  string `json:"body,omitempty"`
-		Head  string `json:"head"`
-		Base  string `json:"base"`
-	}{Title: input.Title, Body: input.Body, Head: input.HeadBranch, Base: input.BaseBranch})
-	if err != nil {
-		return domain.PullRequest{}, fmt.Errorf("github: encode create pull request body: %w", err)
-	}
-
-	url := fmt.Sprintf("%s/repos/%s/pulls", c.baseURL, repo)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return domain.PullRequest{}, fmt.Errorf("github: build create pull request request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+cred.Token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return domain.PullRequest{}, fmt.Errorf("github: create pull request request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated {
-		return domain.PullRequest{}, fmt.Errorf("github: create pull request: unexpected status %d", resp.StatusCode)
-	}
-
-	var raw githubPullRequest
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return domain.PullRequest{}, fmt.Errorf("github: decode create pull request response: %w", err)
-	}
-	pr, err := toDomainPullRequest(repo, raw)
-	if err != nil {
-		return domain.PullRequest{}, fmt.Errorf("github: invalid pull request in response: %w", err)
-	}
-	return pr, nil
-}
-
-// ListPullRequests calls GitHub's REST API for real: GET
-// /repos/{repo}/pulls.
-func (c *Client) ListPullRequests(ctx context.Context, cred usecase.Credential, repo string) ([]domain.PullRequest, error) {
-	url := fmt.Sprintf("%s/repos/%s/pulls", c.baseURL, repo)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("github: build list pull requests request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+cred.Token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("github: list pull requests request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github: list pull requests: unexpected status %d", resp.StatusCode)
-	}
-
-	var raw []githubPullRequest
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("github: decode list pull requests response: %w", err)
-	}
-	prs := make([]domain.PullRequest, 0, len(raw))
-	for _, gp := range raw {
-		pr, err := toDomainPullRequest(repo, gp)
-		if err != nil {
-			return nil, fmt.Errorf("github: invalid pull request in response: %w", err)
-		}
-		prs = append(prs, pr)
-	}
-	return prs, nil
-}
-
-// githubRateLimitResponse mirrors GET /rate_limit
-// (https://docs.github.com/en/rest/rate-limit) — this adapter reports the
-// "core" REST bucket, since that's the bucket every other method in this
-// client consumes against; GraphQL/search buckets are a separate future
-// RateLimitStatus.Bucket dimension per §8, not modeled yet.
-type githubRateLimitResponse struct {
-	Resources struct {
-		Core struct {
-			Limit     int   `json:"limit"`
-			Remaining int   `json:"remaining"`
-			Reset     int64 `json:"reset"`
-		} `json:"core"`
-	} `json:"resources"`
-}
-
-// GetRateLimitStatus calls GitHub's REST API for real: GET /rate_limit.
-func (c *Client) GetRateLimitStatus(ctx context.Context, cred usecase.Credential) (domain.RateLimitStatus, error) {
-	url := fmt.Sprintf("%s/rate_limit", c.baseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return domain.RateLimitStatus{}, fmt.Errorf("github: build rate limit request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+cred.Token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return domain.RateLimitStatus{}, fmt.Errorf("github: rate limit request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return domain.RateLimitStatus{}, fmt.Errorf("github: rate limit: unexpected status %d", resp.StatusCode)
-	}
-
-	var raw githubRateLimitResponse
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return domain.RateLimitStatus{}, fmt.Errorf("github: decode rate limit response: %w", err)
-	}
-	return domain.RateLimitStatus{
-		Provider:  domain.ScmProviderGitHub,
-		Remaining: raw.Resources.Core.Remaining,
-		Limit:     raw.Resources.Core.Limit,
-		ResetAt:   time.Unix(raw.Resources.Core.Reset, 0),
-	}, nil
-}
-
+```go
 // getPullRequestByNumber calls GET /repos/{repo}/pulls/{number} — used by
 // every mutation below to return the post-mutation PR state, since GitHub's
 // mutation endpoints (merge, requested_reviewers) don't always echo every
 // field this adapter's domain.PullRequest needs.
 func (c *Client) getPullRequestByNumber(ctx context.Context, cred usecase.Credential, repo string, number int32) (githubPullRequest, error) {
-	reqURL := fmt.Sprintf("%s/repos/%s/pulls/%d", c.baseURL, repo, number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	url := fmt.Sprintf("%s/repos/%s/pulls/%d", c.baseURL, repo, number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return githubPullRequest{}, fmt.Errorf("github: build get pull request request: %w", err)
 	}
@@ -306,7 +59,74 @@ func (c *Client) getPullRequestByNumber(ctx context.Context, cred usecase.Creden
 	}
 	return raw, nil
 }
+```
 
+`githubPullRequest` (existing struct) needs two more fields for this batch —
+find:
+
+```go
+type githubPullRequest struct {
+	Number  int    `json:"number"`
+	Title   string `json:"title"`
+	State   string `json:"state"`
+	HTMLURL string `json:"html_url"`
+	Head    struct {
+		Ref string `json:"ref"`
+	} `json:"head"`
+	Base struct {
+		Ref string `json:"ref"`
+	} `json:"base"`
+}
+```
+
+Replace with:
+
+```go
+type githubPullRequest struct {
+	Number  int    `json:"number"`
+	NodeID  string `json:"node_id"` // GraphQL node id — needed by SetPullRequestAutoMerge's mutation
+	Title   string `json:"title"`
+	State   string `json:"state"`
+	HTMLURL string `json:"html_url"`
+	Head    struct {
+		Ref string `json:"ref"`
+	} `json:"head"`
+	Base struct {
+		Ref string `json:"ref"`
+	} `json:"base"`
+}
+```
+
+And `toDomainPullRequest` gains the `Number` field — find:
+
+```go
+func toDomainPullRequest(repo string, gp githubPullRequest) (domain.PullRequest, error) {
+	return domain.NewPullRequest(
+		strconv.Itoa(gp.Number), domain.ScmProviderGitHub, repo, gp.Title, gp.State, gp.HTMLURL,
+		gp.Head.Ref, gp.Base.Ref,
+	)
+}
+```
+
+Replace with:
+
+```go
+func toDomainPullRequest(repo string, gp githubPullRequest) (domain.PullRequest, error) {
+	pr, err := domain.NewPullRequest(
+		strconv.Itoa(gp.Number), domain.ScmProviderGitHub, repo, gp.Title, gp.State, gp.HTMLURL,
+		gp.Head.Ref, gp.Base.Ref,
+	)
+	if err != nil {
+		return domain.PullRequest{}, err
+	}
+	pr.Number = int32(gp.Number)
+	return pr, nil
+}
+```
+
+### Step 2: `MergePullRequest`
+
+```go
 // MergePullRequest calls GitHub's REST API: PUT /repos/{repo}/pulls/{number}/merge.
 func (c *Client) MergePullRequest(ctx context.Context, cred usecase.Credential, repo string, number int32, input usecase.MergePullRequestInput) (domain.PullRequest, bool, string, error) {
 	body, err := json.Marshal(struct {
@@ -318,8 +138,8 @@ func (c *Client) MergePullRequest(ctx context.Context, cred usecase.Credential, 
 		return domain.PullRequest{}, false, "", fmt.Errorf("github: encode merge pull request body: %w", err)
 	}
 
-	reqURL := fmt.Sprintf("%s/repos/%s/pulls/%d/merge", c.baseURL, repo, number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, reqURL, bytes.NewReader(body))
+	url := fmt.Sprintf("%s/repos/%s/pulls/%d/merge", c.baseURL, repo, number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
 	if err != nil {
 		return domain.PullRequest{}, false, "", fmt.Errorf("github: build merge pull request request: %w", err)
 	}
@@ -356,7 +176,11 @@ func (c *Client) MergePullRequest(ctx context.Context, cred usecase.Credential, 
 	}
 	return pr, raw.Merged, raw.SHA, nil
 }
+```
 
+### Step 3: `RequestPullRequestReviewers` / `RemovePullRequestReviewers`
+
+```go
 // RequestPullRequestReviewers calls GitHub's REST API: POST
 // /repos/{repo}/pulls/{number}/requested_reviewers.
 func (c *Client) RequestPullRequestReviewers(ctx context.Context, cred usecase.Credential, repo string, number int32, reviewerLogins, teamSlugs []string) (domain.PullRequest, error) {
@@ -367,8 +191,8 @@ func (c *Client) RequestPullRequestReviewers(ctx context.Context, cred usecase.C
 	if err != nil {
 		return domain.PullRequest{}, fmt.Errorf("github: encode request reviewers body: %w", err)
 	}
-	reqURL := fmt.Sprintf("%s/repos/%s/pulls/%d/requested_reviewers", c.baseURL, repo, number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(body))
+	url := fmt.Sprintf("%s/repos/%s/pulls/%d/requested_reviewers", c.baseURL, repo, number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return domain.PullRequest{}, fmt.Errorf("github: build request reviewers request: %w", err)
 	}
@@ -402,8 +226,8 @@ func (c *Client) RemovePullRequestReviewers(ctx context.Context, cred usecase.Cr
 	if err != nil {
 		return domain.PullRequest{}, fmt.Errorf("github: encode remove reviewers body: %w", err)
 	}
-	reqURL := fmt.Sprintf("%s/repos/%s/pulls/%d/requested_reviewers", c.baseURL, repo, number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, reqURL, bytes.NewReader(body))
+	url := fmt.Sprintf("%s/repos/%s/pulls/%d/requested_reviewers", c.baseURL, repo, number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, bytes.NewReader(body))
 	if err != nil {
 		return domain.PullRequest{}, fmt.Errorf("github: build remove reviewers request: %w", err)
 	}
@@ -426,6 +250,17 @@ func (c *Client) RemovePullRequestReviewers(ctx context.Context, cred usecase.Cr
 	}
 	return toDomainPullRequest(repo, raw)
 }
+```
+
+### Step 4: `graphQLRequest` helper + `SetPullRequestAutoMerge`
+
+```go
+// DefaultGraphQLURL is GitHub's single GraphQL endpoint — distinct from
+// DefaultBaseURL's REST root. GitHub Enterprise Server deployments use
+// {baseURL}/api/graphql instead; not handled here since this adapter only
+// targets github.com today (same scope limitation client.go already has
+// for DefaultBaseURL).
+const DefaultGraphQLURL = "https://api.github.com/graphql"
 
 // graphQLRequest POSTs one GraphQL operation to GitHub's /graphql endpoint
 // and decodes the "data" field into out. GitHub reports GraphQL-level
@@ -439,7 +274,7 @@ func (c *Client) graphQLRequest(ctx context.Context, cred usecase.Credential, qu
 	if err != nil {
 		return fmt.Errorf("github: encode graphql request: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.graphQLURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, DefaultGraphQLURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("github: build graphql request: %w", err)
 	}
@@ -514,7 +349,13 @@ func (c *Client) SetPullRequestAutoMerge(ctx context.Context, cred usecase.Crede
 	}
 	return toDomainPullRequest(repo, gp2)
 }
+```
 
+Add `"strings"` to the existing `import` block.
+
+### Step 5: `UpdateIssue`
+
+```go
 // githubIssuePatch is UpdateIssue's REST PATCH body — only fields present in
 // usecase.IssuePatch are included (omitempty via pointer types matches
 // GitHub's own "omit = leave unchanged" PATCH semantics).
@@ -535,8 +376,8 @@ func (c *Client) UpdateIssue(ctx context.Context, cred usecase.Credential, repo 
 		if err != nil {
 			return domain.Issue{}, fmt.Errorf("github: encode update issue body: %w", err)
 		}
-		reqURL := fmt.Sprintf("%s/repos/%s/issues/%d", c.baseURL, repo, number)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPatch, reqURL, bytes.NewReader(body))
+		url := fmt.Sprintf("%s/repos/%s/issues/%d", c.baseURL, repo, number)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(body))
 		if err != nil {
 			return domain.Issue{}, fmt.Errorf("github: build update issue request: %w", err)
 		}
@@ -558,8 +399,8 @@ func (c *Client) UpdateIssue(ctx context.Context, cred usecase.Credential, repo 
 		body, _ := json.Marshal(struct {
 			Labels []string `json:"labels"`
 		}{Labels: patch.AddLabels})
-		reqURL := fmt.Sprintf("%s/repos/%s/issues/%d/labels", c.baseURL, repo, number)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(body))
+		url := fmt.Sprintf("%s/repos/%s/issues/%d/labels", c.baseURL, repo, number)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 		if err != nil {
 			return domain.Issue{}, fmt.Errorf("github: build add labels request: %w", err)
 		}
@@ -578,8 +419,8 @@ func (c *Client) UpdateIssue(ctx context.Context, cred usecase.Credential, repo 
 	}
 
 	for _, label := range patch.RemoveLabels {
-		reqURL := fmt.Sprintf("%s/repos/%s/issues/%d/labels/%s", c.baseURL, repo, number, url.PathEscape(label))
-		req, err := http.NewRequestWithContext(ctx, http.MethodDelete, reqURL, nil)
+		url := fmt.Sprintf("%s/repos/%s/issues/%d/labels/%s", c.baseURL, repo, number, url_PathEscape(label))
+		req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 		if err != nil {
 			return domain.Issue{}, fmt.Errorf("github: build remove label request: %w", err)
 		}
@@ -597,8 +438,8 @@ func (c *Client) UpdateIssue(ctx context.Context, cred usecase.Credential, repo 
 		}
 	}
 
-	reqURL := fmt.Sprintf("%s/repos/%s/issues/%d", c.baseURL, repo, number)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	url := fmt.Sprintf("%s/repos/%s/issues/%d", c.baseURL, repo, number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return domain.Issue{}, fmt.Errorf("github: build get issue request: %w", err)
 	}
@@ -624,7 +465,15 @@ func (c *Client) UpdateIssue(ctx context.Context, cred usecase.Credential, repo 
 	issue.Number = int32(raw.Number)
 	return issue, nil
 }
+```
 
+Replace the `url_PathEscape(label)` placeholder above with `url.PathEscape(label)`
+and add `"net/url"` to the import block (GitHub label names can contain
+spaces/slashes, which must be escaped in the path segment).
+
+### Step 6: `GetPullRequestForBranch` / `ResolveRepoSlug`
+
+```go
 // GetPullRequestForBranch calls GitHub's REST API: GET /repos/{repo}/pulls
 // ?head={owner}:{branch}&state=open — GitHub's head filter requires the
 // "owner:branch" form even though repo already encodes owner.
@@ -724,30 +573,20 @@ func parseGitHubRepoCandidate(candidate string) (owner, name string, err error) 
 	}
 	return parts[0], parts[1], nil
 }
+```
 
-// BranchExists calls GitHub's REST API: GET /repos/{repo}/branches/{branch}
-// — 200 means it exists, 404 means it doesn't (not an error in either case).
-func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo, branch string) (bool, error) {
-	reqURL := fmt.Sprintf("%s/repos/%s/branches/%s", c.baseURL, repo, url.PathEscape(branch))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-	if err != nil {
-		return false, fmt.Errorf("github: build branch exists request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+cred.Token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+Add `"net/url"` to the import block if not already added in Step 5.
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return false, fmt.Errorf("github: branch exists request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	switch resp.StatusCode {
-	case http.StatusOK:
-		return true, nil
-	case http.StatusNotFound:
-		return false, nil
-	default:
-		return false, fmt.Errorf("github: branch exists: unexpected status %d", resp.StatusCode)
-	}
-}
+---
+
+## Verify
+
+```bash
+cd /opt/repos/orca/backend-go/services/scm-integration-service
+go build ./internal/adapter/github/... && go vet ./internal/adapter/github/...
+go test ./internal/adapter/github/... -count=1
+```
+
+Expected: build succeeds, `*Client` satisfies `usecase.ScmProvider` in full
+(`var _ usecase.ScmProvider = (*Client)(nil)` at the top of `client.go`
+compiles clean). Existing `client_test.go` tests still pass.
