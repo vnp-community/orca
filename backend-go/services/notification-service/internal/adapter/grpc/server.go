@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -22,9 +23,10 @@ import (
 type Server struct {
 	notificationv1.UnimplementedNotificationServiceServer
 
-	subscribe         *usecase.Subscribe
-	getVapidPublicKey *usecase.GetVapidPublicKey
-	broadcaster       usecase.NotificationBroadcaster
+	subscribe                  *usecase.Subscribe
+	unregisterPushSubscription *usecase.UnregisterPushSubscription
+	getVapidPublicKey          *usecase.GetVapidPublicKey
+	broadcaster                usecase.NotificationBroadcaster
 	// signer is wired for the future DeliverPush usecase
 	// (mobile push delivery via APNs/FCM, notification-service.md §6's
 	// deliver_push.go) — not yet called from any RPC path in this
@@ -32,8 +34,14 @@ type Server struct {
 	signer usecase.VaultSigner
 }
 
-func New(subscribe *usecase.Subscribe, getVapidPublicKey *usecase.GetVapidPublicKey, broadcaster usecase.NotificationBroadcaster, signer usecase.VaultSigner) *Server {
-	return &Server{subscribe: subscribe, getVapidPublicKey: getVapidPublicKey, broadcaster: broadcaster, signer: signer}
+func New(subscribe *usecase.Subscribe, unregisterPushSubscription *usecase.UnregisterPushSubscription, getVapidPublicKey *usecase.GetVapidPublicKey, broadcaster usecase.NotificationBroadcaster, signer usecase.VaultSigner) *Server {
+	return &Server{
+		subscribe:                  subscribe,
+		unregisterPushSubscription: unregisterPushSubscription,
+		getVapidPublicKey:          getVapidPublicKey,
+		broadcaster:                broadcaster,
+		signer:                     signer,
+	}
 }
 
 func (s *Server) Subscribe(ctx context.Context, req *notificationv1.SubscribeRequest) (*notificationv1.SubscribeResponse, error) {
@@ -47,6 +55,13 @@ func (s *Server) Subscribe(ctx context.Context, req *notificationv1.SubscribeReq
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &notificationv1.SubscribeResponse{SubscriptionId: sub.ID}, nil
+}
+
+func (s *Server) UnregisterPushSubscription(ctx context.Context, req *notificationv1.UnregisterPushSubscriptionRequest) (*emptypb.Empty, error) {
+	if err := s.unregisterPushSubscription.Execute(ctx, req.GetEndpoint()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) GetVapidPublicKey(ctx context.Context, req *notificationv1.GetVapidPublicKeyRequest) (*notificationv1.GetVapidPublicKeyResponse, error) {

@@ -9,6 +9,7 @@ package authv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -1235,11 +1236,955 @@ func (x *QueryAuditLogResponse) GetNextPageToken() string {
 	return ""
 }
 
+type DeactivateUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeactivateUserRequest) Reset() {
+	*x = DeactivateUserRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeactivateUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeactivateUserRequest) ProtoMessage() {}
+
+func (x *DeactivateUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeactivateUserRequest.ProtoReflect.Descriptor instead.
+func (*DeactivateUserRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *DeactivateUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type DeactivateUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeactivateUserResponse) Reset() {
+	*x = DeactivateUserResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeactivateUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeactivateUserResponse) ProtoMessage() {}
+
+func (x *DeactivateUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeactivateUserResponse.ProtoReflect.Descriptor instead.
+func (*DeactivateUserResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *DeactivateUserResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+type ReactivateUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReactivateUserRequest) Reset() {
+	*x = ReactivateUserRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReactivateUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReactivateUserRequest) ProtoMessage() {}
+
+func (x *ReactivateUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReactivateUserRequest.ProtoReflect.Descriptor instead.
+func (*ReactivateUserRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ReactivateUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type ReactivateUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReactivateUserResponse) Reset() {
+	*x = ReactivateUserResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReactivateUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReactivateUserResponse) ProtoMessage() {}
+
+func (x *ReactivateUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReactivateUserResponse.ProtoReflect.Descriptor instead.
+func (*ReactivateUserResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ReactivateUserResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+type ListSessionsForUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsForUserRequest) Reset() {
+	*x = ListSessionsForUserRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsForUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsForUserRequest) ProtoMessage() {}
+
+func (x *ListSessionsForUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsForUserRequest.ProtoReflect.Descriptor instead.
+func (*ListSessionsForUserRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ListSessionsForUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type ListSessionsForUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sessions      []*Session             `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsForUserResponse) Reset() {
+	*x = ListSessionsForUserResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsForUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsForUserResponse) ProtoMessage() {}
+
+func (x *ListSessionsForUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsForUserResponse.ProtoReflect.Descriptor instead.
+func (*ListSessionsForUserResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ListSessionsForUserResponse) GetSessions() []*Session {
+	if x != nil {
+		return x.Sessions
+	}
+	return nil
+}
+
+type Session struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // opaque token hash, never the raw token
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	LastSeenAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	Ip            string                 `protobuf:"bytes,6,opt,name=ip,proto3" json:"ip,omitempty"`
+	UserAgent     string                 `protobuf:"bytes,7,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Session) Reset() {
+	*x = Session{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Session) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Session) ProtoMessage() {}
+
+func (x *Session) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Session.ProtoReflect.Descriptor instead.
+func (*Session) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *Session) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Session) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *Session) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Session) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *Session) GetLastSeenAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSeenAt
+	}
+	return nil
+}
+
+func (x *Session) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *Session) GetUserAgent() string {
+	if x != nil {
+		return x.UserAgent
+	}
+	return ""
+}
+
+type ForceRevokeAllSessionsForUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForceRevokeAllSessionsForUserRequest) Reset() {
+	*x = ForceRevokeAllSessionsForUserRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForceRevokeAllSessionsForUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForceRevokeAllSessionsForUserRequest) ProtoMessage() {}
+
+func (x *ForceRevokeAllSessionsForUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForceRevokeAllSessionsForUserRequest.ProtoReflect.Descriptor instead.
+func (*ForceRevokeAllSessionsForUserRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ForceRevokeAllSessionsForUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type ForceRevokeAllSessionsForUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RevokedCount  int32                  `protobuf:"varint,1,opt,name=revoked_count,json=revokedCount,proto3" json:"revoked_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForceRevokeAllSessionsForUserResponse) Reset() {
+	*x = ForceRevokeAllSessionsForUserResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForceRevokeAllSessionsForUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForceRevokeAllSessionsForUserResponse) ProtoMessage() {}
+
+func (x *ForceRevokeAllSessionsForUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForceRevokeAllSessionsForUserResponse.ProtoReflect.Descriptor instead.
+func (*ForceRevokeAllSessionsForUserResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ForceRevokeAllSessionsForUserResponse) GetRevokedCount() int32 {
+	if x != nil {
+		return x.RevokedCount
+	}
+	return 0
+}
+
+type AccessPolicy struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Kind          string                 `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`                                     // "role-definition" | "rate-tier" | ...
+	DocumentJson  string                 `protobuf:"bytes,4,opt,name=document_json,json=documentJson,proto3" json:"document_json,omitempty"` // JSONB document, serialized
+	Version       int32                  `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
+	UpdatedBy     string                 `protobuf:"bytes,6,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccessPolicy) Reset() {
+	*x = AccessPolicy{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccessPolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccessPolicy) ProtoMessage() {}
+
+func (x *AccessPolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccessPolicy.ProtoReflect.Descriptor instead.
+func (*AccessPolicy) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *AccessPolicy) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AccessPolicy) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AccessPolicy) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *AccessPolicy) GetDocumentJson() string {
+	if x != nil {
+		return x.DocumentJson
+	}
+	return ""
+}
+
+func (x *AccessPolicy) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *AccessPolicy) GetUpdatedBy() string {
+	if x != nil {
+		return x.UpdatedBy
+	}
+	return ""
+}
+
+func (x *AccessPolicy) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type CreateAccessPolicyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	DocumentJson  string                 `protobuf:"bytes,3,opt,name=document_json,json=documentJson,proto3" json:"document_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAccessPolicyRequest) Reset() {
+	*x = CreateAccessPolicyRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAccessPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAccessPolicyRequest) ProtoMessage() {}
+
+func (x *CreateAccessPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAccessPolicyRequest.ProtoReflect.Descriptor instead.
+func (*CreateAccessPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *CreateAccessPolicyRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateAccessPolicyRequest) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *CreateAccessPolicyRequest) GetDocumentJson() string {
+	if x != nil {
+		return x.DocumentJson
+	}
+	return ""
+}
+
+type GetAccessPolicyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAccessPolicyRequest) Reset() {
+	*x = GetAccessPolicyRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccessPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccessPolicyRequest) ProtoMessage() {}
+
+func (x *GetAccessPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccessPolicyRequest.ProtoReflect.Descriptor instead.
+func (*GetAccessPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetAccessPolicyRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type ListAccessPoliciesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PageToken     string                 `protobuf:"bytes,1,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccessPoliciesRequest) Reset() {
+	*x = ListAccessPoliciesRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccessPoliciesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccessPoliciesRequest) ProtoMessage() {}
+
+func (x *ListAccessPoliciesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccessPoliciesRequest.ProtoReflect.Descriptor instead.
+func (*ListAccessPoliciesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ListAccessPoliciesRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListAccessPoliciesRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type ListAccessPoliciesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Policies      []*AccessPolicy        `protobuf:"bytes,1,rep,name=policies,proto3" json:"policies,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccessPoliciesResponse) Reset() {
+	*x = ListAccessPoliciesResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccessPoliciesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccessPoliciesResponse) ProtoMessage() {}
+
+func (x *ListAccessPoliciesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccessPoliciesResponse.ProtoReflect.Descriptor instead.
+func (*ListAccessPoliciesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ListAccessPoliciesResponse) GetPolicies() []*AccessPolicy {
+	if x != nil {
+		return x.Policies
+	}
+	return nil
+}
+
+func (x *ListAccessPoliciesResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type UpdateAccessPolicyRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	DocumentJson    string                 `protobuf:"bytes,2,opt,name=document_json,json=documentJson,proto3" json:"document_json,omitempty"`
+	ExpectedVersion int32                  `protobuf:"varint,3,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UpdateAccessPolicyRequest) Reset() {
+	*x = UpdateAccessPolicyRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAccessPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAccessPolicyRequest) ProtoMessage() {}
+
+func (x *UpdateAccessPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAccessPolicyRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAccessPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *UpdateAccessPolicyRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateAccessPolicyRequest) GetDocumentJson() string {
+	if x != nil {
+		return x.DocumentJson
+	}
+	return ""
+}
+
+func (x *UpdateAccessPolicyRequest) GetExpectedVersion() int32 {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return 0
+}
+
+type DeleteAccessPolicyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAccessPolicyRequest) Reset() {
+	*x = DeleteAccessPolicyRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAccessPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAccessPolicyRequest) ProtoMessage() {}
+
+func (x *DeleteAccessPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAccessPolicyRequest.ProtoReflect.Descriptor instead.
+func (*DeleteAccessPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *DeleteAccessPolicyRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetAdminStatsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAdminStatsRequest) Reset() {
+	*x = GetAdminStatsRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAdminStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAdminStatsRequest) ProtoMessage() {}
+
+func (x *GetAdminStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAdminStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetAdminStatsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{38}
+}
+
+type GetAdminStatsResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	TotalUsers     int32                  `protobuf:"varint,1,opt,name=total_users,json=totalUsers,proto3" json:"total_users,omitempty"`
+	ActiveSessions int32                  `protobuf:"varint,2,opt,name=active_sessions,json=activeSessions,proto3" json:"active_sessions,omitempty"`
+	TotalPolicies  int32                  `protobuf:"varint,3,opt,name=total_policies,json=totalPolicies,proto3" json:"total_policies,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetAdminStatsResponse) Reset() {
+	*x = GetAdminStatsResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAdminStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAdminStatsResponse) ProtoMessage() {}
+
+func (x *GetAdminStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAdminStatsResponse.ProtoReflect.Descriptor instead.
+func (*GetAdminStatsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *GetAdminStatsResponse) GetTotalUsers() int32 {
+	if x != nil {
+		return x.TotalUsers
+	}
+	return 0
+}
+
+func (x *GetAdminStatsResponse) GetActiveSessions() int32 {
+	if x != nil {
+		return x.ActiveSessions
+	}
+	return 0
+}
+
+func (x *GetAdminStatsResponse) GetTotalPolicies() int32 {
+	if x != nil {
+		return x.TotalPolicies
+	}
+	return 0
+}
+
 var File_orca_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x17orca/auth/v1/auth.proto\x12\forca.auth.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdd\x01\n" +
+	"\x17orca/auth/v1/auth.proto\x12\forca.auth.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdd\x01\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x14\n" +
@@ -1313,12 +2258,75 @@ const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"s\n" +
 	"\x15QueryAuditLogResponse\x122\n" +
 	"\aentries\x18\x01 \x03(\v2\x18.orca.auth.v1.AuditEntryR\aentries\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*;\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"0\n" +
+	"\x15DeactivateUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"@\n" +
+	"\x16DeactivateUserResponse\x12&\n" +
+	"\x04user\x18\x01 \x01(\v2\x12.orca.auth.v1.UserR\x04user\"0\n" +
+	"\x15ReactivateUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"@\n" +
+	"\x16ReactivateUserResponse\x12&\n" +
+	"\x04user\x18\x01 \x01(\v2\x12.orca.auth.v1.UserR\x04user\"5\n" +
+	"\x1aListSessionsForUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"P\n" +
+	"\x1bListSessionsForUserResponse\x121\n" +
+	"\bsessions\x18\x01 \x03(\v2\x15.orca.auth.v1.SessionR\bsessions\"\x95\x02\n" +
+	"\aSession\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x129\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12<\n" +
+	"\flast_seen_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastSeenAt\x12\x0e\n" +
+	"\x02ip\x18\x06 \x01(\tR\x02ip\x12\x1d\n" +
+	"\n" +
+	"user_agent\x18\a \x01(\tR\tuserAgent\"?\n" +
+	"$ForceRevokeAllSessionsForUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"L\n" +
+	"%ForceRevokeAllSessionsForUserResponse\x12#\n" +
+	"\rrevoked_count\x18\x01 \x01(\x05R\frevokedCount\"\xdf\x01\n" +
+	"\fAccessPolicy\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04kind\x18\x03 \x01(\tR\x04kind\x12#\n" +
+	"\rdocument_json\x18\x04 \x01(\tR\fdocumentJson\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\x05R\aversion\x12\x1d\n" +
+	"\n" +
+	"updated_by\x18\x06 \x01(\tR\tupdatedBy\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"h\n" +
+	"\x19CreateAccessPolicyRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12#\n" +
+	"\rdocument_json\x18\x03 \x01(\tR\fdocumentJson\"(\n" +
+	"\x16GetAccessPolicyRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"W\n" +
+	"\x19ListAccessPoliciesRequest\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x01 \x01(\tR\tpageToken\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\"|\n" +
+	"\x1aListAccessPoliciesResponse\x126\n" +
+	"\bpolicies\x18\x01 \x03(\v2\x1a.orca.auth.v1.AccessPolicyR\bpolicies\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"{\n" +
+	"\x19UpdateAccessPolicyRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rdocument_json\x18\x02 \x01(\tR\fdocumentJson\x12)\n" +
+	"\x10expected_version\x18\x03 \x01(\x05R\x0fexpectedVersion\"+\n" +
+	"\x19DeleteAccessPolicyRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x16\n" +
+	"\x14GetAdminStatsRequest\"\x88\x01\n" +
+	"\x15GetAdminStatsResponse\x12\x1f\n" +
+	"\vtotal_users\x18\x01 \x01(\x05R\n" +
+	"totalUsers\x12'\n" +
+	"\x0factive_sessions\x18\x02 \x01(\x05R\x0eactiveSessions\x12%\n" +
+	"\x0etotal_policies\x18\x03 \x01(\x05R\rtotalPolicies*;\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tROLE_USER\x10\x01\x12\x0e\n" +
 	"\n" +
-	"ROLE_ADMIN\x10\x022\xd2\x06\n" +
+	"ROLE_ADMIN\x10\x022\xa8\x0e\n" +
 	"\vAuthService\x12@\n" +
 	"\x05Login\x12\x1a.orca.auth.v1.LoginRequest\x1a\x1b.orca.auth.v1.LoginResponse\x12C\n" +
 	"\x06Logout\x12\x1b.orca.auth.v1.LogoutRequest\x1a\x1c.orca.auth.v1.LogoutResponse\x12^\n" +
@@ -1330,7 +2338,17 @@ const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"\tListUsers\x12\x1e.orca.auth.v1.ListUsersRequest\x1a\x1f.orca.auth.v1.ListUsersResponse\x12[\n" +
 	"\x0eUpdateUserRole\x12#.orca.auth.v1.UpdateUserRoleRequest\x1a$.orca.auth.v1.UpdateUserRoleResponse\x12X\n" +
 	"\rRevokeSession\x12\".orca.auth.v1.RevokeSessionRequest\x1a#.orca.auth.v1.RevokeSessionResponse\x12X\n" +
-	"\rQueryAuditLog\x12\".orca.auth.v1.QueryAuditLogRequest\x1a#.orca.auth.v1.QueryAuditLogResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1;authv1b\x06proto3"
+	"\rQueryAuditLog\x12\".orca.auth.v1.QueryAuditLogRequest\x1a#.orca.auth.v1.QueryAuditLogResponse\x12[\n" +
+	"\x0eDeactivateUser\x12#.orca.auth.v1.DeactivateUserRequest\x1a$.orca.auth.v1.DeactivateUserResponse\x12[\n" +
+	"\x0eReactivateUser\x12#.orca.auth.v1.ReactivateUserRequest\x1a$.orca.auth.v1.ReactivateUserResponse\x12j\n" +
+	"\x13ListSessionsForUser\x12(.orca.auth.v1.ListSessionsForUserRequest\x1a).orca.auth.v1.ListSessionsForUserResponse\x12\x88\x01\n" +
+	"\x1dForceRevokeAllSessionsForUser\x122.orca.auth.v1.ForceRevokeAllSessionsForUserRequest\x1a3.orca.auth.v1.ForceRevokeAllSessionsForUserResponse\x12Y\n" +
+	"\x12CreateAccessPolicy\x12'.orca.auth.v1.CreateAccessPolicyRequest\x1a\x1a.orca.auth.v1.AccessPolicy\x12S\n" +
+	"\x0fGetAccessPolicy\x12$.orca.auth.v1.GetAccessPolicyRequest\x1a\x1a.orca.auth.v1.AccessPolicy\x12g\n" +
+	"\x12ListAccessPolicies\x12'.orca.auth.v1.ListAccessPoliciesRequest\x1a(.orca.auth.v1.ListAccessPoliciesResponse\x12Y\n" +
+	"\x12UpdateAccessPolicy\x12'.orca.auth.v1.UpdateAccessPolicyRequest\x1a\x1a.orca.auth.v1.AccessPolicy\x12U\n" +
+	"\x12DeleteAccessPolicy\x12'.orca.auth.v1.DeleteAccessPolicyRequest\x1a\x16.google.protobuf.Empty\x12X\n" +
+	"\rGetAdminStats\x12\".orca.auth.v1.GetAdminStatsRequest\x1a#.orca.auth.v1.GetAdminStatsResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1;authv1b\x06proto3"
 
 var (
 	file_orca_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -1345,72 +2363,119 @@ func file_orca_auth_v1_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_auth_v1_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_orca_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_orca_auth_v1_auth_proto_goTypes = []any{
-	(Role)(0),                         // 0: orca.auth.v1.Role
-	(*User)(nil),                      // 1: orca.auth.v1.User
-	(*LoginRequest)(nil),              // 2: orca.auth.v1.LoginRequest
-	(*LoginResponse)(nil),             // 3: orca.auth.v1.LoginResponse
-	(*LogoutRequest)(nil),             // 4: orca.auth.v1.LogoutRequest
-	(*LogoutResponse)(nil),            // 5: orca.auth.v1.LogoutResponse
-	(*ValidateSessionRequest)(nil),    // 6: orca.auth.v1.ValidateSessionRequest
-	(*ValidateSessionResponse)(nil),   // 7: orca.auth.v1.ValidateSessionResponse
-	(*IssueServiceTokenRequest)(nil),  // 8: orca.auth.v1.IssueServiceTokenRequest
-	(*IssueServiceTokenResponse)(nil), // 9: orca.auth.v1.IssueServiceTokenResponse
-	(*GetJWKSRequest)(nil),            // 10: orca.auth.v1.GetJWKSRequest
-	(*GetJWKSResponse)(nil),           // 11: orca.auth.v1.GetJWKSResponse
-	(*CreateUserRequest)(nil),         // 12: orca.auth.v1.CreateUserRequest
-	(*CreateUserResponse)(nil),        // 13: orca.auth.v1.CreateUserResponse
-	(*ListUsersRequest)(nil),          // 14: orca.auth.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),         // 15: orca.auth.v1.ListUsersResponse
-	(*UpdateUserRoleRequest)(nil),     // 16: orca.auth.v1.UpdateUserRoleRequest
-	(*UpdateUserRoleResponse)(nil),    // 17: orca.auth.v1.UpdateUserRoleResponse
-	(*RevokeSessionRequest)(nil),      // 18: orca.auth.v1.RevokeSessionRequest
-	(*RevokeSessionResponse)(nil),     // 19: orca.auth.v1.RevokeSessionResponse
-	(*AuditEntry)(nil),                // 20: orca.auth.v1.AuditEntry
-	(*QueryAuditLogRequest)(nil),      // 21: orca.auth.v1.QueryAuditLogRequest
-	(*QueryAuditLogResponse)(nil),     // 22: orca.auth.v1.QueryAuditLogResponse
-	(*timestamppb.Timestamp)(nil),     // 23: google.protobuf.Timestamp
+	(Role)(0),                                     // 0: orca.auth.v1.Role
+	(*User)(nil),                                  // 1: orca.auth.v1.User
+	(*LoginRequest)(nil),                          // 2: orca.auth.v1.LoginRequest
+	(*LoginResponse)(nil),                         // 3: orca.auth.v1.LoginResponse
+	(*LogoutRequest)(nil),                         // 4: orca.auth.v1.LogoutRequest
+	(*LogoutResponse)(nil),                        // 5: orca.auth.v1.LogoutResponse
+	(*ValidateSessionRequest)(nil),                // 6: orca.auth.v1.ValidateSessionRequest
+	(*ValidateSessionResponse)(nil),               // 7: orca.auth.v1.ValidateSessionResponse
+	(*IssueServiceTokenRequest)(nil),              // 8: orca.auth.v1.IssueServiceTokenRequest
+	(*IssueServiceTokenResponse)(nil),             // 9: orca.auth.v1.IssueServiceTokenResponse
+	(*GetJWKSRequest)(nil),                        // 10: orca.auth.v1.GetJWKSRequest
+	(*GetJWKSResponse)(nil),                       // 11: orca.auth.v1.GetJWKSResponse
+	(*CreateUserRequest)(nil),                     // 12: orca.auth.v1.CreateUserRequest
+	(*CreateUserResponse)(nil),                    // 13: orca.auth.v1.CreateUserResponse
+	(*ListUsersRequest)(nil),                      // 14: orca.auth.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),                     // 15: orca.auth.v1.ListUsersResponse
+	(*UpdateUserRoleRequest)(nil),                 // 16: orca.auth.v1.UpdateUserRoleRequest
+	(*UpdateUserRoleResponse)(nil),                // 17: orca.auth.v1.UpdateUserRoleResponse
+	(*RevokeSessionRequest)(nil),                  // 18: orca.auth.v1.RevokeSessionRequest
+	(*RevokeSessionResponse)(nil),                 // 19: orca.auth.v1.RevokeSessionResponse
+	(*AuditEntry)(nil),                            // 20: orca.auth.v1.AuditEntry
+	(*QueryAuditLogRequest)(nil),                  // 21: orca.auth.v1.QueryAuditLogRequest
+	(*QueryAuditLogResponse)(nil),                 // 22: orca.auth.v1.QueryAuditLogResponse
+	(*DeactivateUserRequest)(nil),                 // 23: orca.auth.v1.DeactivateUserRequest
+	(*DeactivateUserResponse)(nil),                // 24: orca.auth.v1.DeactivateUserResponse
+	(*ReactivateUserRequest)(nil),                 // 25: orca.auth.v1.ReactivateUserRequest
+	(*ReactivateUserResponse)(nil),                // 26: orca.auth.v1.ReactivateUserResponse
+	(*ListSessionsForUserRequest)(nil),            // 27: orca.auth.v1.ListSessionsForUserRequest
+	(*ListSessionsForUserResponse)(nil),           // 28: orca.auth.v1.ListSessionsForUserResponse
+	(*Session)(nil),                               // 29: orca.auth.v1.Session
+	(*ForceRevokeAllSessionsForUserRequest)(nil),  // 30: orca.auth.v1.ForceRevokeAllSessionsForUserRequest
+	(*ForceRevokeAllSessionsForUserResponse)(nil), // 31: orca.auth.v1.ForceRevokeAllSessionsForUserResponse
+	(*AccessPolicy)(nil),                          // 32: orca.auth.v1.AccessPolicy
+	(*CreateAccessPolicyRequest)(nil),             // 33: orca.auth.v1.CreateAccessPolicyRequest
+	(*GetAccessPolicyRequest)(nil),                // 34: orca.auth.v1.GetAccessPolicyRequest
+	(*ListAccessPoliciesRequest)(nil),             // 35: orca.auth.v1.ListAccessPoliciesRequest
+	(*ListAccessPoliciesResponse)(nil),            // 36: orca.auth.v1.ListAccessPoliciesResponse
+	(*UpdateAccessPolicyRequest)(nil),             // 37: orca.auth.v1.UpdateAccessPolicyRequest
+	(*DeleteAccessPolicyRequest)(nil),             // 38: orca.auth.v1.DeleteAccessPolicyRequest
+	(*GetAdminStatsRequest)(nil),                  // 39: orca.auth.v1.GetAdminStatsRequest
+	(*GetAdminStatsResponse)(nil),                 // 40: orca.auth.v1.GetAdminStatsResponse
+	(*timestamppb.Timestamp)(nil),                 // 41: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                         // 42: google.protobuf.Empty
 }
 var file_orca_auth_v1_auth_proto_depIdxs = []int32{
 	0,  // 0: orca.auth.v1.User.role:type_name -> orca.auth.v1.Role
-	23, // 1: orca.auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	41, // 1: orca.auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: orca.auth.v1.LoginResponse.user:type_name -> orca.auth.v1.User
 	1,  // 3: orca.auth.v1.ValidateSessionResponse.user:type_name -> orca.auth.v1.User
-	23, // 4: orca.auth.v1.IssueServiceTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
+	41, // 4: orca.auth.v1.IssueServiceTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 5: orca.auth.v1.CreateUserRequest.role:type_name -> orca.auth.v1.Role
 	1,  // 6: orca.auth.v1.CreateUserResponse.user:type_name -> orca.auth.v1.User
 	1,  // 7: orca.auth.v1.ListUsersResponse.users:type_name -> orca.auth.v1.User
 	0,  // 8: orca.auth.v1.UpdateUserRoleRequest.role:type_name -> orca.auth.v1.Role
 	1,  // 9: orca.auth.v1.UpdateUserRoleResponse.user:type_name -> orca.auth.v1.User
-	23, // 10: orca.auth.v1.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
-	23, // 11: orca.auth.v1.QueryAuditLogRequest.since:type_name -> google.protobuf.Timestamp
+	41, // 10: orca.auth.v1.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
+	41, // 11: orca.auth.v1.QueryAuditLogRequest.since:type_name -> google.protobuf.Timestamp
 	20, // 12: orca.auth.v1.QueryAuditLogResponse.entries:type_name -> orca.auth.v1.AuditEntry
-	2,  // 13: orca.auth.v1.AuthService.Login:input_type -> orca.auth.v1.LoginRequest
-	4,  // 14: orca.auth.v1.AuthService.Logout:input_type -> orca.auth.v1.LogoutRequest
-	6,  // 15: orca.auth.v1.AuthService.ValidateSession:input_type -> orca.auth.v1.ValidateSessionRequest
-	8,  // 16: orca.auth.v1.AuthService.IssueServiceToken:input_type -> orca.auth.v1.IssueServiceTokenRequest
-	10, // 17: orca.auth.v1.AuthService.GetJWKS:input_type -> orca.auth.v1.GetJWKSRequest
-	12, // 18: orca.auth.v1.AuthService.CreateUser:input_type -> orca.auth.v1.CreateUserRequest
-	14, // 19: orca.auth.v1.AuthService.ListUsers:input_type -> orca.auth.v1.ListUsersRequest
-	16, // 20: orca.auth.v1.AuthService.UpdateUserRole:input_type -> orca.auth.v1.UpdateUserRoleRequest
-	18, // 21: orca.auth.v1.AuthService.RevokeSession:input_type -> orca.auth.v1.RevokeSessionRequest
-	21, // 22: orca.auth.v1.AuthService.QueryAuditLog:input_type -> orca.auth.v1.QueryAuditLogRequest
-	3,  // 23: orca.auth.v1.AuthService.Login:output_type -> orca.auth.v1.LoginResponse
-	5,  // 24: orca.auth.v1.AuthService.Logout:output_type -> orca.auth.v1.LogoutResponse
-	7,  // 25: orca.auth.v1.AuthService.ValidateSession:output_type -> orca.auth.v1.ValidateSessionResponse
-	9,  // 26: orca.auth.v1.AuthService.IssueServiceToken:output_type -> orca.auth.v1.IssueServiceTokenResponse
-	11, // 27: orca.auth.v1.AuthService.GetJWKS:output_type -> orca.auth.v1.GetJWKSResponse
-	13, // 28: orca.auth.v1.AuthService.CreateUser:output_type -> orca.auth.v1.CreateUserResponse
-	15, // 29: orca.auth.v1.AuthService.ListUsers:output_type -> orca.auth.v1.ListUsersResponse
-	17, // 30: orca.auth.v1.AuthService.UpdateUserRole:output_type -> orca.auth.v1.UpdateUserRoleResponse
-	19, // 31: orca.auth.v1.AuthService.RevokeSession:output_type -> orca.auth.v1.RevokeSessionResponse
-	22, // 32: orca.auth.v1.AuthService.QueryAuditLog:output_type -> orca.auth.v1.QueryAuditLogResponse
-	23, // [23:33] is the sub-list for method output_type
-	13, // [13:23] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	1,  // 13: orca.auth.v1.DeactivateUserResponse.user:type_name -> orca.auth.v1.User
+	1,  // 14: orca.auth.v1.ReactivateUserResponse.user:type_name -> orca.auth.v1.User
+	29, // 15: orca.auth.v1.ListSessionsForUserResponse.sessions:type_name -> orca.auth.v1.Session
+	41, // 16: orca.auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	41, // 17: orca.auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	41, // 18: orca.auth.v1.Session.last_seen_at:type_name -> google.protobuf.Timestamp
+	41, // 19: orca.auth.v1.AccessPolicy.updated_at:type_name -> google.protobuf.Timestamp
+	32, // 20: orca.auth.v1.ListAccessPoliciesResponse.policies:type_name -> orca.auth.v1.AccessPolicy
+	2,  // 21: orca.auth.v1.AuthService.Login:input_type -> orca.auth.v1.LoginRequest
+	4,  // 22: orca.auth.v1.AuthService.Logout:input_type -> orca.auth.v1.LogoutRequest
+	6,  // 23: orca.auth.v1.AuthService.ValidateSession:input_type -> orca.auth.v1.ValidateSessionRequest
+	8,  // 24: orca.auth.v1.AuthService.IssueServiceToken:input_type -> orca.auth.v1.IssueServiceTokenRequest
+	10, // 25: orca.auth.v1.AuthService.GetJWKS:input_type -> orca.auth.v1.GetJWKSRequest
+	12, // 26: orca.auth.v1.AuthService.CreateUser:input_type -> orca.auth.v1.CreateUserRequest
+	14, // 27: orca.auth.v1.AuthService.ListUsers:input_type -> orca.auth.v1.ListUsersRequest
+	16, // 28: orca.auth.v1.AuthService.UpdateUserRole:input_type -> orca.auth.v1.UpdateUserRoleRequest
+	18, // 29: orca.auth.v1.AuthService.RevokeSession:input_type -> orca.auth.v1.RevokeSessionRequest
+	21, // 30: orca.auth.v1.AuthService.QueryAuditLog:input_type -> orca.auth.v1.QueryAuditLogRequest
+	23, // 31: orca.auth.v1.AuthService.DeactivateUser:input_type -> orca.auth.v1.DeactivateUserRequest
+	25, // 32: orca.auth.v1.AuthService.ReactivateUser:input_type -> orca.auth.v1.ReactivateUserRequest
+	27, // 33: orca.auth.v1.AuthService.ListSessionsForUser:input_type -> orca.auth.v1.ListSessionsForUserRequest
+	30, // 34: orca.auth.v1.AuthService.ForceRevokeAllSessionsForUser:input_type -> orca.auth.v1.ForceRevokeAllSessionsForUserRequest
+	33, // 35: orca.auth.v1.AuthService.CreateAccessPolicy:input_type -> orca.auth.v1.CreateAccessPolicyRequest
+	34, // 36: orca.auth.v1.AuthService.GetAccessPolicy:input_type -> orca.auth.v1.GetAccessPolicyRequest
+	35, // 37: orca.auth.v1.AuthService.ListAccessPolicies:input_type -> orca.auth.v1.ListAccessPoliciesRequest
+	37, // 38: orca.auth.v1.AuthService.UpdateAccessPolicy:input_type -> orca.auth.v1.UpdateAccessPolicyRequest
+	38, // 39: orca.auth.v1.AuthService.DeleteAccessPolicy:input_type -> orca.auth.v1.DeleteAccessPolicyRequest
+	39, // 40: orca.auth.v1.AuthService.GetAdminStats:input_type -> orca.auth.v1.GetAdminStatsRequest
+	3,  // 41: orca.auth.v1.AuthService.Login:output_type -> orca.auth.v1.LoginResponse
+	5,  // 42: orca.auth.v1.AuthService.Logout:output_type -> orca.auth.v1.LogoutResponse
+	7,  // 43: orca.auth.v1.AuthService.ValidateSession:output_type -> orca.auth.v1.ValidateSessionResponse
+	9,  // 44: orca.auth.v1.AuthService.IssueServiceToken:output_type -> orca.auth.v1.IssueServiceTokenResponse
+	11, // 45: orca.auth.v1.AuthService.GetJWKS:output_type -> orca.auth.v1.GetJWKSResponse
+	13, // 46: orca.auth.v1.AuthService.CreateUser:output_type -> orca.auth.v1.CreateUserResponse
+	15, // 47: orca.auth.v1.AuthService.ListUsers:output_type -> orca.auth.v1.ListUsersResponse
+	17, // 48: orca.auth.v1.AuthService.UpdateUserRole:output_type -> orca.auth.v1.UpdateUserRoleResponse
+	19, // 49: orca.auth.v1.AuthService.RevokeSession:output_type -> orca.auth.v1.RevokeSessionResponse
+	22, // 50: orca.auth.v1.AuthService.QueryAuditLog:output_type -> orca.auth.v1.QueryAuditLogResponse
+	24, // 51: orca.auth.v1.AuthService.DeactivateUser:output_type -> orca.auth.v1.DeactivateUserResponse
+	26, // 52: orca.auth.v1.AuthService.ReactivateUser:output_type -> orca.auth.v1.ReactivateUserResponse
+	28, // 53: orca.auth.v1.AuthService.ListSessionsForUser:output_type -> orca.auth.v1.ListSessionsForUserResponse
+	31, // 54: orca.auth.v1.AuthService.ForceRevokeAllSessionsForUser:output_type -> orca.auth.v1.ForceRevokeAllSessionsForUserResponse
+	32, // 55: orca.auth.v1.AuthService.CreateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	32, // 56: orca.auth.v1.AuthService.GetAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	36, // 57: orca.auth.v1.AuthService.ListAccessPolicies:output_type -> orca.auth.v1.ListAccessPoliciesResponse
+	32, // 58: orca.auth.v1.AuthService.UpdateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	42, // 59: orca.auth.v1.AuthService.DeleteAccessPolicy:output_type -> google.protobuf.Empty
+	40, // 60: orca.auth.v1.AuthService.GetAdminStats:output_type -> orca.auth.v1.GetAdminStatsResponse
+	41, // [41:61] is the sub-list for method output_type
+	21, // [21:41] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_orca_auth_v1_auth_proto_init() }
@@ -1424,7 +2489,7 @@ func file_orca_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_auth_v1_auth_proto_rawDesc), len(file_orca_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   22,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
