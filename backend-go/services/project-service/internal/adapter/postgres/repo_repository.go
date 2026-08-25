@@ -122,6 +122,27 @@ func (r *RepoRepository) GetRepo(ctx context.Context, repoID string) (domain.Rep
 	return out, nil
 }
 
+// Update persists repo's current url/display_name — used by
+// usecase.UpdateRepo after it applies the field-mask.
+func (r *RepoRepository) Update(ctx context.Context, repo domain.Repo) (domain.Repo, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE project.repos
+		SET url = $2, display_name = $3
+		WHERE id = $1
+		RETURNING `+repoColumns,
+		repo.ID, repo.URL, repo.DisplayName,
+	)
+
+	out, err := scanRepo(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	if err != nil {
+		return domain.Repo{}, fmt.Errorf("postgres: update repo: %w", err)
+	}
+	return out, nil
+}
+
 func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM project.repos WHERE id = $1`, repoID)
 	if err != nil {

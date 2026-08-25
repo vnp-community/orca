@@ -15,8 +15,11 @@ package localgit
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
@@ -123,6 +126,170 @@ func (e *Executor) Pull(ctx context.Context, repoPath string) (domain.PullResult
 		return domain.PullResult{}, err
 	}
 	return domain.PullResult{Success: true}, nil
+}
+
+// Clone runs `git clone <url> <destPath>` and reads back the resulting
+// default branch with `git symbolic-ref --short HEAD`.
+func (e *Executor) Clone(ctx context.Context, url, destPath string) (string, string, error) {
+	cmd := exec.CommandContext(ctx, "git", "clone", url, destPath)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", "", fmt.Errorf("git clone: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	branch, err := e.run(ctx, destPath, "symbolic-ref", "--short", "HEAD")
+	if err != nil {
+		return destPath, "", err
+	}
+	return destPath, strings.TrimSpace(branch), nil
+}
+
+// InitRepo runs `git init` (optionally with -b <defaultBranch>, Git 2.28+;
+// falls back to a plain `git init` + `git symbolic-ref` rename for older
+// Git per docs/reference/git-compatibility.md's 2.25 baseline) at destPath.
+func (e *Executor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+	if err := os.MkdirAll(destPath, 0o755); err != nil {
+		return "", "", fmt.Errorf("mkdir dest path: %w", err)
+	}
+	args := []string{"init"}
+	if defaultBranch != "" {
+		args = append(args, "-b", defaultBranch)
+	}
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = destPath
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", "", fmt.Errorf("git init: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	branch, err := e.run(ctx, destPath, "symbolic-ref", "--short", "HEAD")
+	if err != nil {
+		return destPath, defaultBranch, nil // best-effort: init succeeded even if branch read fails
+	}
+	return destPath, strings.TrimSpace(branch), nil
+}
+
+// BaseRefDefault resolves the remote's default branch via
+// `git symbolic-ref refs/remotes/origin/HEAD` (falls back to `git remote
+// show origin`'s "HEAD branch:" line pre-Git 2.8, if that boundary ever
+// matters for this baseline).
+func (e *Executor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
+	out, err := e.run(ctx, repoPath, "symbolic-ref", "refs/remotes/origin/HEAD")
+	if err != nil {
+		return "", err
+	}
+	// "refs/remotes/origin/main" -> "main"
+	ref := strings.TrimSpace(out)
+	if idx := strings.LastIndex(ref, "/"); idx >= 0 {
+		ref = ref[idx+1:]
+	}
+	return ref, nil
+}
+
+// SearchRefs runs `git for-each-ref` filtered by query as a substring match
+// over ref short names.
+func (e *Executor) SearchRefs(ctx context.Context, repoPath, query string) ([]string, error) {
+	out, err := e.run(ctx, repoPath, "for-each-ref", "--format=%(refname:short)")
+	if err != nil {
+		return nil, err
+	}
+	var matched []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line != "" && (query == "" || strings.Contains(line, query)) {
+			matched = append(matched, line)
+		}
+	}
+	return matched, nil
+}
+
+// CheckHooks lists installed hooks under .git/hooks and reports whether
+// orca's own hooks (pre-commit, post-checkout — the two orca installs, per
+// this scaffold's own install-hooks convention) are present and current.
+// "Current" here means present at all — this scaffold does not diff hook
+// content against a known-good version; see this service's README "Known
+// gaps" if that stronger check is ever needed.
+func (e *Executor) CheckHooks(ctx context.Context, repoPath string) ([]string, bool, error) {
+	entries, err := os.ReadDir(filepath.Join(repoPath, ".git", "hooks"))
+	if err != nil {
+		return nil, false, fmt.Errorf("read hooks dir: %w", err)
+	}
+	var installed []string
+	hasPreCommit, hasPostCheckout := false, false
+	for _, entry := range entries {
+		if entry.IsDir() || strings.HasSuffix(entry.Name(), ".sample") {
+			continue
+		}
+		installed = append(installed, entry.Name())
+		switch entry.Name() {
+		case "pre-commit":
+			hasPreCommit = true
+		case "post-checkout":
+			hasPostCheckout = true
+		}
+	}
+	return installed, hasPreCommit && hasPostCheckout, nil
+}
+
+// issueCommandPath is the well-known location orca writes/reads its
+// issue-command config from, relative to the repo root.
+const issueCommandPath = ".orca/issue-command.json"
+
+// ReadIssueCommand reads the issue-command config file, reporting
+// exists=false (not an error) when it hasn't been created yet.
+func (e *Executor) ReadIssueCommand(ctx context.Context, repoPath string) (string, bool, error) {
+	data, err := os.ReadFile(filepath.Join(repoPath, issueCommandPath))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("read issue command file: %w", err)
+	}
+	return string(data), true, nil
+}
+
+// WriteIssueCommand writes the issue-command config file, creating the
+// .orca/ directory if it doesn't exist yet.
+func (e *Executor) WriteIssueCommand(ctx context.Context, repoPath, content string) error {
+	dir := filepath.Join(repoPath, ".orca")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("mkdir .orca: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "issue-command.json"), []byte(content), 0o644); err != nil {
+		return fmt.Errorf("write issue command file: %w", err)
+	}
+	return nil
+}
+
+// ScanSetupScriptImports reads .orca/setup.sh (or setup.ts/setup.js, in
+// that preference order) and returns any relative paths its `source`/
+// `import`/`require` lines reference — a best-effort static scan, not a
+// real shell/JS parser.
+func (e *Executor) ScanSetupScriptImports(ctx context.Context, repoPath string) ([]string, error) {
+	candidates := []string{"setup.sh", "setup.ts", "setup.js"}
+	var script []byte
+	for _, name := range candidates {
+		data, err := os.ReadFile(filepath.Join(repoPath, ".orca", name))
+		if err == nil {
+			script = data
+			break
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("read setup script %s: %w", name, err)
+		}
+	}
+	if script == nil {
+		return []string{}, nil
+	}
+	var imports []string
+	for _, line := range strings.Split(string(script), "\n") {
+		line = strings.TrimSpace(line)
+		for _, prefix := range []string{"source ", "import ", "require("} {
+			if strings.HasPrefix(line, prefix) {
+				imports = append(imports, line)
+			}
+		}
+	}
+	return imports, nil
 }
 
 // parsePorcelainStatus parses `git status --porcelain=v1 -b` output. The

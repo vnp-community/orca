@@ -15,10 +15,22 @@ type fakeDevServerAgentClient struct {
 	execResult map[string]any
 	execErr    error
 	execCalls  []string // methods called with, for assertions
+
+	// execCalled/lastMethod are a simpler single-call view of execCalls,
+	// used by kill_workspace_port_test.go/establish_connection_test.go.
+	execCalled bool
+	lastMethod string
+
+	// healthy/healthErr drive Health's fake answer — used by
+	// establish_connection_test.go.
+	healthy   bool
+	healthErr error
 }
 
 func (f *fakeDevServerAgentClient) Exec(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (map[string]any, error) {
 	f.execCalls = append(f.execCalls, method)
+	f.execCalled = true
+	f.lastMethod = method
 	if f.execErr != nil {
 		return nil, f.execErr
 	}
@@ -26,7 +38,10 @@ func (f *fakeDevServerAgentClient) Exec(ctx context.Context, devServer domain.De
 }
 
 func (f *fakeDevServerAgentClient) Health(ctx context.Context, devServer domain.DevServer) (bool, error) {
-	return false, errors.New("not used by this test")
+	if f.healthErr != nil {
+		return false, f.healthErr
+	}
+	return f.healthy, nil
 }
 
 func TestScanWorkspacePorts_RequiresTenantContext(t *testing.T) {

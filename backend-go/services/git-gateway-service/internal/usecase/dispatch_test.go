@@ -28,19 +28,47 @@ func (f *fakeConnectionResolver) ResolveConnection(ctx context.Context, worktree
 type fakeGitExecutor struct {
 	name string // "local" or "relay", for assertion messages
 
-	calledGetStatus bool
-	calledGetDiff   bool
-	calledCommit    bool
-	calledPush      bool
-	calledPull      bool
+	calledGetStatus              bool
+	calledGetDiff                bool
+	calledCommit                 bool
+	calledPush                   bool
+	calledPull                   bool
+	calledClone                  bool
+	calledInitRepo               bool
+	calledBaseRefDefault         bool
+	calledSearchRefs             bool
+	calledCheckHooks             bool
+	calledReadIssueCommand       bool
+	calledWriteIssueCommand      bool
+	calledScanSetupScriptImports bool
 
 	gotRepoPath string
 
-	statusErr error
-	diffErr   error
-	commitErr error
-	pushErr   error
-	pullErr   error
+	statusErr                 error
+	diffErr                   error
+	commitErr                 error
+	pushErr                   error
+	pullErr                   error
+	cloneErr                  error
+	initRepoErr               error
+	baseRefDefaultErr         error
+	searchRefsErr             error
+	checkHooksErr             error
+	readIssueCommandErr       error
+	writeIssueCommandErr      error
+	scanSetupScriptImportsErr error
+
+	// return values for the new methods, settable per-test
+	worktreePath           string
+	defaultBranch          string
+	initPath               string
+	baseRef                string
+	refs                   []string
+	installedHooks         []string
+	orcaHooksCurrent       bool
+	issueCommandContent    string
+	issueCommandExists     bool
+	setupScriptImportPaths []string
 }
 
 func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
@@ -86,6 +114,85 @@ func (f *fakeGitExecutor) Pull(ctx context.Context, repoPath string) (domain.Pul
 		return domain.PullResult{}, f.pullErr
 	}
 	return domain.PullResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) Clone(ctx context.Context, url, destPath string) (string, string, error) {
+	f.calledClone = true
+	if f.cloneErr != nil {
+		return "", "", f.cloneErr
+	}
+	return f.worktreePath, f.defaultBranch, nil
+}
+
+func (f *fakeGitExecutor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+	f.calledInitRepo = true
+	if f.initRepoErr != nil {
+		return "", "", f.initRepoErr
+	}
+	return f.initPath, f.defaultBranch, nil
+}
+
+func (f *fakeGitExecutor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
+	f.calledBaseRefDefault = true
+	f.gotRepoPath = repoPath
+	if f.baseRefDefaultErr != nil {
+		return "", f.baseRefDefaultErr
+	}
+	return f.baseRef, nil
+}
+
+func (f *fakeGitExecutor) SearchRefs(ctx context.Context, repoPath, query string) ([]string, error) {
+	f.calledSearchRefs = true
+	f.gotRepoPath = repoPath
+	if f.searchRefsErr != nil {
+		return nil, f.searchRefsErr
+	}
+	return f.refs, nil
+}
+
+func (f *fakeGitExecutor) CheckHooks(ctx context.Context, repoPath string) ([]string, bool, error) {
+	f.calledCheckHooks = true
+	f.gotRepoPath = repoPath
+	if f.checkHooksErr != nil {
+		return nil, false, f.checkHooksErr
+	}
+	return f.installedHooks, f.orcaHooksCurrent, nil
+}
+
+func (f *fakeGitExecutor) ReadIssueCommand(ctx context.Context, repoPath string) (string, bool, error) {
+	f.calledReadIssueCommand = true
+	f.gotRepoPath = repoPath
+	if f.readIssueCommandErr != nil {
+		return "", false, f.readIssueCommandErr
+	}
+	return f.issueCommandContent, f.issueCommandExists, nil
+}
+
+func (f *fakeGitExecutor) WriteIssueCommand(ctx context.Context, repoPath, content string) error {
+	f.calledWriteIssueCommand = true
+	f.gotRepoPath = repoPath
+	return f.writeIssueCommandErr
+}
+
+func (f *fakeGitExecutor) ScanSetupScriptImports(ctx context.Context, repoPath string) ([]string, error) {
+	f.calledScanSetupScriptImports = true
+	f.gotRepoPath = repoPath
+	if f.scanSetupScriptImportsErr != nil {
+		return nil, f.scanSetupScriptImportsErr
+	}
+	return f.setupScriptImportPaths, nil
+}
+
+// fakeDevServerReachability is an in-memory DevServerReachability, for
+// Clone/InitRepo's tests — same fake-not-real-call convention as
+// fakeConnectionResolver.
+type fakeDevServerReachability struct {
+	reachable bool
+	err       error
+}
+
+func (f *fakeDevServerReachability) IsReachable(ctx context.Context, devServerID string) (bool, error) {
+	return f.reachable, f.err
 }
 
 func TestGetStatus_NotConnected_RoutesToLocalExecutor(t *testing.T) {

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package orca.gitgateway.v1;
 
+import "google/protobuf/empty.proto";
+
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1;gitgatewayv1";
 
 // GitGatewayService is a stateless dispatcher: resolve the worktree's owning
@@ -14,6 +16,18 @@ service GitGatewayService {
   rpc Push(PushRequest) returns (PushResponse);
   rpc Pull(PullRequest) returns (PullResponse);
   rpc GenerateCommitMessage(GenerateCommitMessageRequest) returns (GenerateCommitMessageResponse);
+
+  // repo.*-owned RPCs (TASK-156) — file/host operations against a repo's
+  // working tree, not the repos Postgres table (that's project-service's
+  // UpdateRepo). See SOL-023 Bucket 3.
+  rpc Clone(CloneRequest) returns (CloneResponse);
+  rpc BaseRefDefault(BaseRefDefaultRequest) returns (BaseRefDefaultResponse);
+  rpc SearchRefs(SearchRefsRequest) returns (SearchRefsResponse);
+  rpc InitRepo(InitRepoRequest) returns (InitRepoResponse);          // repo.create
+  rpc CheckHooks(CheckHooksRequest) returns (CheckHooksResponse);     // repo.hooksCheck
+  rpc ReadIssueCommand(ReadIssueCommandRequest) returns (ReadIssueCommandResponse);
+  rpc WriteIssueCommand(WriteIssueCommandRequest) returns (google.protobuf.Empty);
+  rpc ScanSetupScriptImports(ScanSetupScriptImportsRequest) returns (ScanSetupScriptImportsResponse);
 }
 
 message GetStatusRequest {
@@ -77,3 +91,45 @@ message GenerateCommitMessageRequest {
 message GenerateCommitMessageResponse {
   string message = 1;
 }
+
+message CloneRequest {
+  string dev_server_id = 1; // which host to clone onto — resolved via infra-fleet-service by the caller (project-service context) before this call
+  string url = 2;
+  string dest_path = 3;
+}
+message CloneResponse {
+  string worktree_path = 1;
+  string default_branch = 2;
+}
+
+message BaseRefDefaultRequest { string worktree_id = 1; }
+message BaseRefDefaultResponse { string ref = 1; }
+
+message SearchRefsRequest { string worktree_id = 1; string query = 2; }
+message SearchRefsResponse { repeated string refs = 1; }
+
+// InitRepo runs `git init` at dest_path on the resolved host and returns
+// enough for the caller to then call ProjectService.AddRepo — mirrors
+// project-service.md §2's "git-gateway-service does the git op, then
+// writes back metadata" saga already established for worktrees
+// (RecordWorktreeCreated), applied here to repo creation instead.
+message InitRepoRequest {
+  string dev_server_id = 1;
+  string dest_path = 2;
+  string default_branch = 3; // empty = git's own default
+}
+message InitRepoResponse {
+  string path = 1;
+  string default_branch = 2;
+}
+
+message CheckHooksRequest { string worktree_id = 1; }
+message CheckHooksResponse { repeated string installed_hooks = 1; bool orca_hooks_current = 2; }
+
+message ReadIssueCommandRequest { string worktree_id = 1; }
+message ReadIssueCommandResponse { string content = 1; bool exists = 2; }
+
+message WriteIssueCommandRequest { string worktree_id = 1; string content = 2; }
+
+message ScanSetupScriptImportsRequest { string worktree_id = 1; }
+message ScanSetupScriptImportsResponse { repeated string imported_paths = 1; }

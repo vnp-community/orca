@@ -8,6 +8,8 @@ package grpc
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
@@ -25,6 +27,15 @@ type Server struct {
 	push                  *usecase.Push
 	pull                  *usecase.Pull
 	generateCommitMessage *usecase.GenerateCommitMessage
+
+	clone                  *usecase.Clone
+	initRepo               *usecase.InitRepo
+	baseRefDefault         *usecase.BaseRefDefault
+	searchRefs             *usecase.SearchRefs
+	checkHooks             *usecase.CheckHooks
+	readIssueCommand       *usecase.ReadIssueCommand
+	writeIssueCommand      *usecase.WriteIssueCommand
+	scanSetupScriptImports *usecase.ScanSetupScriptImports
 }
 
 func New(
@@ -34,6 +45,14 @@ func New(
 	push *usecase.Push,
 	pull *usecase.Pull,
 	generateCommitMessage *usecase.GenerateCommitMessage,
+	clone *usecase.Clone,
+	initRepo *usecase.InitRepo,
+	baseRefDefault *usecase.BaseRefDefault,
+	searchRefs *usecase.SearchRefs,
+	checkHooks *usecase.CheckHooks,
+	readIssueCommand *usecase.ReadIssueCommand,
+	writeIssueCommand *usecase.WriteIssueCommand,
+	scanSetupScriptImports *usecase.ScanSetupScriptImports,
 ) *Server {
 	return &Server{
 		getStatus:             getStatus,
@@ -42,6 +61,15 @@ func New(
 		push:                  push,
 		pull:                  pull,
 		generateCommitMessage: generateCommitMessage,
+
+		clone:                  clone,
+		initRepo:               initRepo,
+		baseRefDefault:         baseRefDefault,
+		searchRefs:             searchRefs,
+		checkHooks:             checkHooks,
+		readIssueCommand:       readIssueCommand,
+		writeIssueCommand:      writeIssueCommand,
+		scanSetupScriptImports: scanSetupScriptImports,
 	}
 }
 
@@ -108,6 +136,74 @@ func (s *Server) GenerateCommitMessage(ctx context.Context, req *gitgatewayv1.Ge
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.GenerateCommitMessageResponse{Message: message}, nil
+}
+
+func (s *Server) Clone(ctx context.Context, req *gitgatewayv1.CloneRequest) (*gitgatewayv1.CloneResponse, error) {
+	result, err := s.clone.Execute(ctx, usecase.CloneInput{
+		DevServerID: req.GetDevServerId(), URL: req.GetUrl(), DestPath: req.GetDestPath(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CloneResponse{WorktreePath: result.WorktreePath, DefaultBranch: result.DefaultBranch}, nil
+}
+
+func (s *Server) InitRepo(ctx context.Context, req *gitgatewayv1.InitRepoRequest) (*gitgatewayv1.InitRepoResponse, error) {
+	result, err := s.initRepo.Execute(ctx, usecase.InitRepoInput{
+		DevServerID: req.GetDevServerId(), DestPath: req.GetDestPath(), DefaultBranch: req.GetDefaultBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.InitRepoResponse{Path: result.Path, DefaultBranch: result.DefaultBranch}, nil
+}
+
+func (s *Server) BaseRefDefault(ctx context.Context, req *gitgatewayv1.BaseRefDefaultRequest) (*gitgatewayv1.BaseRefDefaultResponse, error) {
+	ref, err := s.baseRefDefault.Execute(ctx, usecase.BaseRefDefaultInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.BaseRefDefaultResponse{Ref: ref}, nil
+}
+
+func (s *Server) SearchRefs(ctx context.Context, req *gitgatewayv1.SearchRefsRequest) (*gitgatewayv1.SearchRefsResponse, error) {
+	refs, err := s.searchRefs.Execute(ctx, usecase.SearchRefsInput{WorktreeID: req.GetWorktreeId(), Query: req.GetQuery()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.SearchRefsResponse{Refs: refs}, nil
+}
+
+func (s *Server) CheckHooks(ctx context.Context, req *gitgatewayv1.CheckHooksRequest) (*gitgatewayv1.CheckHooksResponse, error) {
+	result, err := s.checkHooks.Execute(ctx, usecase.CheckHooksInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CheckHooksResponse{InstalledHooks: result.InstalledHooks, OrcaHooksCurrent: result.OrcaHooksCurrent}, nil
+}
+
+func (s *Server) ReadIssueCommand(ctx context.Context, req *gitgatewayv1.ReadIssueCommandRequest) (*gitgatewayv1.ReadIssueCommandResponse, error) {
+	result, err := s.readIssueCommand.Execute(ctx, usecase.ReadIssueCommandInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ReadIssueCommandResponse{Content: result.Content, Exists: result.Exists}, nil
+}
+
+func (s *Server) WriteIssueCommand(ctx context.Context, req *gitgatewayv1.WriteIssueCommandRequest) (*emptypb.Empty, error) {
+	err := s.writeIssueCommand.Execute(ctx, usecase.WriteIssueCommandInput{WorktreeID: req.GetWorktreeId(), Content: req.GetContent()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.ScanSetupScriptImportsRequest) (*gitgatewayv1.ScanSetupScriptImportsResponse, error) {
+	paths, err := s.scanSetupScriptImports.Execute(ctx, usecase.ScanSetupScriptImportsInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ScanSetupScriptImportsResponse{ImportedPaths: paths}, nil
 }
 
 func toProtoFileStatuses(files []domain.FileStatus) []*gitgatewayv1.FileStatus {

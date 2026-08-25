@@ -134,6 +134,78 @@ func (r *RelayExecutor) Pull(ctx context.Context, repoPath string) (domain.PullR
 	return result, err
 }
 
+// Clone and InitRepo have no repoPath/connectionId yet (they create the
+// worktree) — destPath doubles as the relay's connectionID, consistent
+// with this file's existing "repoPath doubles as connectionId" convention
+// (see this file's doc comment's "Known gap").
+func (r *RelayExecutor) Clone(ctx context.Context, url, destPath string) (string, string, error) {
+	var result struct {
+		WorktreePath  string `json:"worktreePath"`
+		DefaultBranch string `json:"defaultBranch"`
+	}
+	err := r.relay(ctx, destPath, "git.clone", map[string]any{
+		"url": url, "destPath": destPath,
+	}, &result)
+	return result.WorktreePath, result.DefaultBranch, err
+}
+
+func (r *RelayExecutor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+	var result struct {
+		Path          string `json:"path"`
+		DefaultBranch string `json:"defaultBranch"`
+	}
+	err := r.relay(ctx, destPath, "git.init", map[string]any{
+		"destPath": destPath, "defaultBranch": defaultBranch,
+	}, &result)
+	return result.Path, result.DefaultBranch, err
+}
+
+func (r *RelayExecutor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
+	var result struct {
+		Ref string `json:"ref"`
+	}
+	err := r.relay(ctx, repoPath, "git.baseRefDefault", map[string]any{"repoPath": repoPath}, &result)
+	return result.Ref, err
+}
+
+func (r *RelayExecutor) SearchRefs(ctx context.Context, repoPath, query string) ([]string, error) {
+	var result struct {
+		Refs []string `json:"refs"`
+	}
+	err := r.relay(ctx, repoPath, "git.searchRefs", map[string]any{"repoPath": repoPath, "query": query}, &result)
+	return result.Refs, err
+}
+
+func (r *RelayExecutor) CheckHooks(ctx context.Context, repoPath string) ([]string, bool, error) {
+	var result struct {
+		InstalledHooks   []string `json:"installedHooks"`
+		OrcaHooksCurrent bool     `json:"orcaHooksCurrent"`
+	}
+	err := r.relay(ctx, repoPath, "git.checkHooks", map[string]any{"repoPath": repoPath}, &result)
+	return result.InstalledHooks, result.OrcaHooksCurrent, err
+}
+
+func (r *RelayExecutor) ReadIssueCommand(ctx context.Context, repoPath string) (string, bool, error) {
+	var result struct {
+		Content string `json:"content"`
+		Exists  bool   `json:"exists"`
+	}
+	err := r.relay(ctx, repoPath, "git.readIssueCommand", map[string]any{"repoPath": repoPath}, &result)
+	return result.Content, result.Exists, err
+}
+
+func (r *RelayExecutor) WriteIssueCommand(ctx context.Context, repoPath, content string) error {
+	return r.relay(ctx, repoPath, "git.writeIssueCommand", map[string]any{"repoPath": repoPath, "content": content}, nil)
+}
+
+func (r *RelayExecutor) ScanSetupScriptImports(ctx context.Context, repoPath string) ([]string, error) {
+	var result struct {
+		ImportedPaths []string `json:"importedPaths"`
+	}
+	err := r.relay(ctx, repoPath, "git.scanSetupScriptImports", map[string]any{"repoPath": repoPath}, &result)
+	return result.ImportedPaths, err
+}
+
 // Complete implements usecase.AICompleter by relaying to the Dev Server
 // Agent's ai.complete method, per specs/agent/api/agent-rpc-catalog-runtime.md's
 // confirmed real handler (`ai-complete-handler.ts:47`): params

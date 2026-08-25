@@ -116,6 +116,10 @@ func run() error {
 	listDevServersUC := usecase.NewListDevServers(repo)
 	createConnectionUC := usecase.NewCreateConnection(repo)
 	relayUC := usecase.NewRelay(repo, agentClient)
+	listSshTargetsUC := usecase.NewListSshTargets(sshTargetStore)
+	getSshStateUC := usecase.NewGetSshState(sshTargetStore, repo, repo)
+	establishConnectionUC := usecase.NewEstablishConnection(sshTargetStore, repo, repo, agentClient)
+	killWorkspacePortUC := usecase.NewKillWorkspacePort(repo, agentClient)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
@@ -127,6 +131,10 @@ func run() error {
 		listDevServersUC,
 		createConnectionUC,
 		relayUC,
+		listSshTargetsUC,
+		getSshStateUC,
+		establishConnectionUC,
+		killWorkspacePortUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

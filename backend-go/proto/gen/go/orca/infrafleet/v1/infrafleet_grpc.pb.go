@@ -19,14 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InfraFleetService_RegisterDevServer_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
-	InfraFleetService_ResolveConnection_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
-	InfraFleetService_CreateSshTarget_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
-	InfraFleetService_GetFleetHealth_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
-	InfraFleetService_ScanWorkspacePorts_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
-	InfraFleetService_ListDevServers_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
-	InfraFleetService_CreateConnection_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
-	InfraFleetService_Relay_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_RegisterDevServer_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
+	InfraFleetService_ResolveConnection_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
+	InfraFleetService_CreateSshTarget_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
+	InfraFleetService_GetFleetHealth_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
+	InfraFleetService_ScanWorkspacePorts_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
+	InfraFleetService_ListDevServers_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
+	InfraFleetService_CreateConnection_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
+	InfraFleetService_Relay_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_ListSshTargets_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
+	InfraFleetService_GetSshState_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
+	InfraFleetService_EstablishConnection_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
+	InfraFleetService_KillWorkspacePort_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -58,6 +62,17 @@ type InfraFleetServiceClient interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(ctx context.Context, in *RelayRequest, opts ...grpc.CallOption) (*RelayResponse, error)
+	// ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
+	// latter derives from this same read — see wscompat's registerSshChannels).
+	ListSshTargets(ctx context.Context, in *ListSshTargetsRequest, opts ...grpc.CallOption) (*ListSshTargetsResponse, error)
+	// GetSshState is a local read (no dial) of whichever connection (if any)
+	// currently binds this SSH target's dev server.
+	GetSshState(ctx context.Context, in *GetSshStateRequest, opts ...grpc.CallOption) (*GetSshStateResponse, error)
+	// EstablishConnection performs the actual SSH + Dev Server Agent
+	// handshake synchronously — it IS the connection-establishment act, not
+	// a record of one requested. See usecase.EstablishConnection's doc comment.
+	EstablishConnection(ctx context.Context, in *EstablishConnectionRequest, opts ...grpc.CallOption) (*Connection, error)
+	KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error)
 }
 
 type infraFleetServiceClient struct {
@@ -148,6 +163,46 @@ func (c *infraFleetServiceClient) Relay(ctx context.Context, in *RelayRequest, o
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) ListSshTargets(ctx context.Context, in *ListSshTargetsRequest, opts ...grpc.CallOption) (*ListSshTargetsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSshTargetsResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListSshTargets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetSshState(ctx context.Context, in *GetSshStateRequest, opts ...grpc.CallOption) (*GetSshStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSshStateResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetSshState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) EstablishConnection(ctx context.Context, in *EstablishConnectionRequest, opts ...grpc.CallOption) (*Connection, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Connection)
+	err := c.cc.Invoke(ctx, InfraFleetService_EstablishConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(KillWorkspacePortResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_KillWorkspacePort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -177,6 +232,17 @@ type InfraFleetServiceServer interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(context.Context, *RelayRequest) (*RelayResponse, error)
+	// ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
+	// latter derives from this same read — see wscompat's registerSshChannels).
+	ListSshTargets(context.Context, *ListSshTargetsRequest) (*ListSshTargetsResponse, error)
+	// GetSshState is a local read (no dial) of whichever connection (if any)
+	// currently binds this SSH target's dev server.
+	GetSshState(context.Context, *GetSshStateRequest) (*GetSshStateResponse, error)
+	// EstablishConnection performs the actual SSH + Dev Server Agent
+	// handshake synchronously — it IS the connection-establishment act, not
+	// a record of one requested. See usecase.EstablishConnection's doc comment.
+	EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error)
+	KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error)
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -210,6 +276,18 @@ func (UnimplementedInfraFleetServiceServer) CreateConnection(context.Context, *C
 }
 func (UnimplementedInfraFleetServiceServer) Relay(context.Context, *RelayRequest) (*RelayResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Relay not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListSshTargets(context.Context, *ListSshTargetsRequest) (*ListSshTargetsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSshTargets not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetSshState(context.Context, *GetSshStateRequest) (*GetSshStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSshState not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error) {
+	return nil, status.Error(codes.Unimplemented, "method EstablishConnection not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method KillWorkspacePort not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -376,6 +454,78 @@ func _InfraFleetService_Relay_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_ListSshTargets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSshTargetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListSshTargets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListSshTargets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListSshTargets(ctx, req.(*ListSshTargetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetSshState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSshStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetSshState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetSshState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetSshState(ctx, req.(*GetSshStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_EstablishConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EstablishConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).EstablishConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_EstablishConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).EstablishConnection(ctx, req.(*EstablishConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_KillWorkspacePort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KillWorkspacePortRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).KillWorkspacePort(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_KillWorkspacePort_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).KillWorkspacePort(ctx, req.(*KillWorkspacePortRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -414,6 +564,22 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Relay",
 			Handler:    _InfraFleetService_Relay_Handler,
+		},
+		{
+			MethodName: "ListSshTargets",
+			Handler:    _InfraFleetService_ListSshTargets_Handler,
+		},
+		{
+			MethodName: "GetSshState",
+			Handler:    _InfraFleetService_GetSshState_Handler,
+		},
+		{
+			MethodName: "EstablishConnection",
+			Handler:    _InfraFleetService_EstablishConnection_Handler,
+		},
+		{
+			MethodName: "KillWorkspacePort",
+			Handler:    _InfraFleetService_KillWorkspacePort_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

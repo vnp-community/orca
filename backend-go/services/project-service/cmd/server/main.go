@@ -116,6 +116,7 @@ func run() error {
 	listReposUC := usecase.NewListRepos(repoRepo, repo, opa)
 	reorderReposUC := usecase.NewReorderRepos(repoRepo, repo, opa)
 	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
+	updateRepoUC := usecase.NewUpdateRepo(repoRepo, repo, opa)
 
 	recordWorktreeCreatedUC := usecase.NewRecordWorktreeCreated(worktreeRepo)
 	recordWorktreeRemovedUC := usecase.NewRecordWorktreeRemoved(worktreeRepo)
@@ -142,6 +143,7 @@ func run() error {
 		ListRepos:    listReposUC,
 		ReorderRepos: reorderReposUC,
 		RemoveRepo:   removeRepoUC,
+		UpdateRepo:   updateRepoUC,
 
 		RecordWorktreeCreated: recordWorktreeCreatedUC,
 		RecordWorktreeRemoved: recordWorktreeRemovedUC,

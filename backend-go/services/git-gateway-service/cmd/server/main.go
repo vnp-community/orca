@@ -82,6 +82,7 @@ func run() error {
 	resolver := grpcclient.NewConnectionResolver(infraFleetClient)
 	relay := grpcclient.NewRelayExecutor(infraFleetClient)
 	local := localgit.New()
+	devServerReachability := grpcclient.NewDevServerReachability(infraFleetClient)
 
 	getStatusUC := usecase.NewGetStatus(resolver, local, relay)
 	getDiffUC := usecase.NewGetDiff(resolver, local, relay)
@@ -89,10 +90,20 @@ func run() error {
 	pushUC := usecase.NewPush(resolver, local, relay)
 	pullUC := usecase.NewPull(resolver, local, relay)
 	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getDiffUC, relay)
+	cloneUC := usecase.NewClone(devServerReachability, local, relay)
+	initRepoUC := usecase.NewInitRepo(devServerReachability, local, relay)
+	baseRefDefaultUC := usecase.NewBaseRefDefault(resolver, local, relay)
+	searchRefsUC := usecase.NewSearchRefs(resolver, local, relay)
+	checkHooksUC := usecase.NewCheckHooks(resolver, local, relay)
+	readIssueCommandUC := usecase.NewReadIssueCommand(resolver, local, relay)
+	writeIssueCommandUC := usecase.NewWriteIssueCommand(resolver, local, relay)
+	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(resolver, local, relay)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
 		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
+		cloneUC, initRepoUC, baseRefDefaultUC, searchRefsUC, checkHooksUC,
+		readIssueCommandUC, writeIssueCommandUC, scanSetupScriptImportsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

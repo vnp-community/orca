@@ -109,6 +109,10 @@ type RepoRepository interface {
 	// check, since RemoveRepoInput carries only a repo_id. Returns
 	// domain.ErrRepoNotFound (wrapped) if no repo matches.
 	GetRepo(ctx context.Context, repoID string) (domain.Repo, error)
+	// Update persists repo's current url/display_name — used by
+	// usecase.UpdateRepo after it applies the field-mask. Returns
+	// domain.ErrRepoNotFound (wrapped) if no repo matches.
+	Update(ctx context.Context, repo domain.Repo) (domain.Repo, error)
 }
 
 // WorktreeRepository is the persistence port for a project's worktree

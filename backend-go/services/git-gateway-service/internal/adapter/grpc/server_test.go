@@ -47,6 +47,46 @@ func (fakeExecutor) Pull(context.Context, string) (domain.PullResult, error) {
 	return domain.PullResult{Success: true, HadConflicts: false}, nil
 }
 
+func (fakeExecutor) Clone(context.Context, string, string) (string, string, error) {
+	return "/repo/cloned", "main", nil
+}
+
+func (fakeExecutor) InitRepo(context.Context, string, string) (string, string, error) {
+	return "/repo/init", "main", nil
+}
+
+func (fakeExecutor) BaseRefDefault(context.Context, string) (string, error) {
+	return "main", nil
+}
+
+func (fakeExecutor) SearchRefs(context.Context, string, string) ([]string, error) {
+	return []string{"main", "feature/x"}, nil
+}
+
+func (fakeExecutor) CheckHooks(context.Context, string) ([]string, bool, error) {
+	return []string{"pre-commit", "post-checkout"}, true, nil
+}
+
+func (fakeExecutor) ReadIssueCommand(context.Context, string) (string, bool, error) {
+	return `{"command":"gh issue view"}`, true, nil
+}
+
+func (fakeExecutor) WriteIssueCommand(context.Context, string, string) error {
+	return nil
+}
+
+func (fakeExecutor) ScanSetupScriptImports(context.Context, string) ([]string, error) {
+	return []string{"source ./lib.sh"}, nil
+}
+
+// fakeReachability is a usecase.DevServerReachability stub for exercising
+// Clone/InitRepo's wire<->usecase translation.
+type fakeReachability struct{ reachable bool }
+
+func (f fakeReachability) IsReachable(context.Context, string) (bool, error) {
+	return f.reachable, nil
+}
+
 // fakeAICompleter is a usecase.AICompleter stub for exercising
 // GenerateCommitMessage's wire<->usecase translation.
 type fakeAICompleter struct{ message string }
@@ -58,6 +98,7 @@ func (f fakeAICompleter) Complete(context.Context, string, string) (string, erro
 func newTestServer() *Server {
 	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: false, RepoPath: "/repo"}}
 	exec := fakeExecutor{}
+	reachability := fakeReachability{reachable: false}
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	return New(
 		usecase.NewGetStatus(resolver, exec, exec),
@@ -66,6 +107,14 @@ func newTestServer() *Server {
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
 		usecase.NewGenerateCommitMessage(resolver, getDiffUC, fakeAICompleter{message: "generated message"}),
+		usecase.NewClone(reachability, exec, exec),
+		usecase.NewInitRepo(reachability, exec, exec),
+		usecase.NewBaseRefDefault(resolver, exec, exec),
+		usecase.NewSearchRefs(resolver, exec, exec),
+		usecase.NewCheckHooks(resolver, exec, exec),
+		usecase.NewReadIssueCommand(resolver, exec, exec),
+		usecase.NewWriteIssueCommand(resolver, exec, exec),
+		usecase.NewScanSetupScriptImports(resolver, exec, exec),
 	)
 }
 
@@ -127,6 +176,7 @@ func TestServer_GenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *
 func TestServer_GenerateCommitMessage_Connected_TranslatesResult(t *testing.T) {
 	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo"}}
 	exec := fakeExecutor{}
+	reachability := fakeReachability{reachable: true}
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	s := New(
 		usecase.NewGetStatus(resolver, exec, exec),
@@ -135,6 +185,14 @@ func TestServer_GenerateCommitMessage_Connected_TranslatesResult(t *testing.T) {
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
 		usecase.NewGenerateCommitMessage(resolver, getDiffUC, fakeAICompleter{message: "generated message"}),
+		usecase.NewClone(reachability, exec, exec),
+		usecase.NewInitRepo(reachability, exec, exec),
+		usecase.NewBaseRefDefault(resolver, exec, exec),
+		usecase.NewSearchRefs(resolver, exec, exec),
+		usecase.NewCheckHooks(resolver, exec, exec),
+		usecase.NewReadIssueCommand(resolver, exec, exec),
+		usecase.NewWriteIssueCommand(resolver, exec, exec),
+		usecase.NewScanSetupScriptImports(resolver, exec, exec),
 	)
 
 	resp, err := s.GenerateCommitMessage(context.Background(), &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: "wt-1"})

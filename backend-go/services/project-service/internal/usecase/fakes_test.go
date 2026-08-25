@@ -208,6 +208,7 @@ type fakeRepoRepository struct {
 	reorderErr error
 	removeErr  error
 	getErr     error
+	updateErr  error
 }
 
 func newFakeRepoRepository() *fakeRepoRepository {
@@ -267,6 +268,18 @@ func (f *fakeRepoRepository) GetRepo(ctx context.Context, repoID string) (domain
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
 	return r, nil
+}
+
+// Update implements usecase.RepoRepository.Update.
+func (f *fakeRepoRepository) Update(ctx context.Context, repo domain.Repo) (domain.Repo, error) {
+	if f.updateErr != nil {
+		return domain.Repo{}, f.updateErr
+	}
+	if _, ok := f.repos[repo.ID]; !ok {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	f.repos[repo.ID] = repo
+	return repo, nil
 }
 
 func (f *fakeRepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
