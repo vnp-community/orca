@@ -15,8 +15,11 @@ import (
 // rule being enforced end-to-end); the gRPC adapter deliberately does not
 // forward it here.
 type ListIssuesInput struct {
-	Provider   domain.Provider
-	ProjectKey string
+	Provider    domain.Provider
+	ProjectKey  string
+	FilterJSON  string
+	Limit       int32
+	WorkspaceID string
 }
 
 // ListIssues queries issues from Jira or Linear on the caller's behalf —
@@ -35,6 +38,10 @@ func (uc *ListIssues) Execute(ctx context.Context, in ListIssuesInput) ([]domain
 	if err != nil {
 		return nil, apperrors.New(apperrors.KindUnauthenticated, "ISSUETRACKING_NO_TENANT", "no tenant in request context", err)
 	}
+	userID, ok := tenant.UserID(ctx)
+	if !ok {
+		return nil, apperrors.New(apperrors.KindUnauthenticated, "ISSUETRACKING_NO_USER", "no user in request context", nil)
+	}
 	if !in.Provider.Valid() {
 		return nil, apperrors.New(apperrors.KindInvalidArgument, "ISSUETRACKING_INVALID_PROVIDER", "provider must be jira or linear", domain.ErrInvalidProvider)
 	}
@@ -43,13 +50,12 @@ func (uc *ListIssues) Execute(ctx context.Context, in ListIssuesInput) ([]domain
 	if err != nil {
 		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_PROVIDER_UNAVAILABLE", "no adapter registered for provider", err)
 	}
-
-	cred, err := uc.credentials.Resolve(ctx, tenantID, in.Provider)
+	cred, err := uc.credentials.Resolve(ctx, tenantID, userID, in.Provider, in.WorkspaceID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_CREDENTIAL_RESOLUTION_FAILED", "no credential available for provider", err)
+		return nil, apperrors.New(apperrors.KindFailedPrecondition, "ISSUETRACKING_NOT_CONNECTED", "no credential available for provider", err)
 	}
 
-	issues, err := provider.ListIssues(ctx, cred, in.ProjectKey)
+	issues, err := provider.ListIssues(ctx, cred, in.ProjectKey, in.FilterJSON, int(in.Limit))
 	if err != nil {
 		return nil, apperrors.New(apperrors.KindInternal, "ISSUETRACKING_LIST_FAILED", "failed to list issues from provider", err)
 	}

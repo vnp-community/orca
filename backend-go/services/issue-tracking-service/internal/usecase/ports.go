@@ -6,6 +6,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/domain"
 )
@@ -28,8 +29,41 @@ type Credential struct {
 // own wire protocol (Jira REST, Linear GraphQL) — usecases depend only on
 // this port, never on a provider-specific client type, per design doc §4.
 type IssueTrackerProvider interface {
-	ListIssues(ctx context.Context, cred Credential, projectKey string) ([]domain.Issue, error)
-	CreateIssue(ctx context.Context, cred Credential, projectKey, title, description string) (domain.Issue, error)
+	Whoami(ctx context.Context, cred Credential) (domain.Viewer, error)
+
+	SearchIssues(ctx context.Context, cred Credential, query string, limit int) ([]domain.Issue, error)
+	ListIssues(ctx context.Context, cred Credential, projectKey, filterJSON string, limit int) ([]domain.Issue, error)
+	GetIssue(ctx context.Context, cred Credential, issueID string) (domain.Issue, error)
+	CreateIssue(ctx context.Context, cred Credential, in domain.NewIssueInput) (domain.Issue, error)
+	UpdateIssue(ctx context.Context, cred Credential, in domain.IssueUpdate) (domain.Issue, error)
+	AddIssueComment(ctx context.Context, cred Credential, issueID, bodyMarkdown string) (domain.IssueComment, error)
+	ListIssueComments(ctx context.Context, cred Credential, issueID string) ([]domain.IssueComment, error)
+
+	ListProjects(ctx context.Context, cred Credential, workspaceID string) ([]domain.ProjectRef, error)
+	ListIssueTypes(ctx context.Context, cred Credential, projectIDOrKey string) ([]domain.IssueTypeRef, error)
+	ListCreateFields(ctx context.Context, cred Credential, projectIDOrKey, issueTypeID string) ([]domain.CreateField, error)
+	ListAssignableUsers(ctx context.Context, cred Credential, projectIDOrKey, issueID string) ([]domain.UserRef, error)
+	ListPriorities(ctx context.Context, cred Credential) ([]domain.PriorityRef, error)
+	ListTransitions(ctx context.Context, cred Credential, issueID string) ([]domain.Transition, error)
+	GetProjectStatusOrder(ctx context.Context, cred Credential, projectIDOrKey string) (domain.ProjectStatusOrder, error)
+
+	// CreateProject/GetProject: a shared concept (both providers' "project"
+	// is a bounded set of issues with a name/lead/status) — wired only by
+	// linear.* today (SOL-016's mapping table has no jira.createProject
+	// channel); jira/client.go implements these as clear unsupported
+	// errors rather than a silent no-op.
+	CreateProject(ctx context.Context, cred Credential, workspaceID, teamID, name, description string) (domain.ProjectRef, error)
+	GetProject(ctx context.Context, cred Credential, projectID, workspaceID string) (domain.ProjectRef, error)
+
+	// ListTeams/ListTeamLabels/ListTeamMembers/GetCustomView/
+	// ListWorkflowStates are Linear-only concepts (SOL-016's "genuinely
+	// diverges" table) — jira/client.go implements these as clear
+	// unsupported errors to satisfy the interface.
+	ListTeams(ctx context.Context, cred Credential, workspaceID string) ([]domain.Team, error)
+	ListTeamLabels(ctx context.Context, cred Credential, teamID string) ([]domain.TeamLabel, error)
+	ListTeamMembers(ctx context.Context, cred Credential, teamID string) ([]domain.TeamMember, error)
+	GetCustomView(ctx context.Context, cred Credential, viewID, model string) (domain.CustomView, error)
+	ListWorkflowStates(ctx context.Context, cred Credential, teamID string) ([]domain.WorkflowState, error)
 }
 
 // ProviderRegistry resolves the IssueTrackerProvider implementation for a
@@ -39,22 +73,67 @@ type ProviderRegistry interface {
 	Resolve(provider domain.Provider) (IssueTrackerProvider, error)
 }
 
-// CredentialResolver resolves the per-tenant Jira/Linear credential before
-// every provider call (design doc §7, §9).
-//
-// STUB PORT: the real implementation calls credential-broker-service's
-// ResolveCredential RPC against Vault KV v2, one path per
-// (tenant, service, user) — see
-// specs/backend-go/architecture/06-secrets-vault-architecture.md's
-// "Integration OAuth tokens" row, which names Jira/Linear explicitly. This
-// scaffold's concrete implementation (internal/adapter/credential) is a
-// local-dev stub reading environment variables and MUST be replaced with a
-// real credential-broker-service client before this service is deployed
-// anywhere real tenant secrets exist. Same pattern scm-integration-service
-// uses for its own credential resolution.
+// CredentialResolver resolves the per-(tenant,user,provider,workspace)
+// credential before a provider call, and writes new credential material
+// during Connect. Resolve is keyed by the same 4-tuple ConnectionRepository
+// uses, not by an opaque credential_id directly — the usecase layer never
+// needs to know a credential_id exists; the adapter looks it up via
+// ConnectionRepository internally.
 type CredentialResolver interface {
-	Resolve(ctx context.Context, tenantID string, provider domain.Provider) (Credential, error)
+	// Resolve looks up the connection row for
+	// (tenantID, userID, provider, workspaceID) and calls
+	// credential-broker-service's ResolveCredential(credential_id) — the
+	// per-request read path. workspaceID may be "" to mean "the currently
+	// selected workspace."
+	Resolve(ctx context.Context, tenantID, userID string, provider domain.Provider, workspaceID string) (Credential, error)
+
+	// Write encrypts and persists cred under a composite owner_id
+	// ("<userID>:<provider>") via credential-broker-service.WriteCredential,
+	// returning the opaque credential_id the caller must store on the
+	// connection row it creates/updates.
+	Write(ctx context.Context, tenantID, userID string, provider domain.Provider, cred Credential) (credentialID string, err error)
+
+	// ExistingCredentialID checks whether a credential already exists for
+	// this composite owner_id via ResolveCredentialByOwner — used only by
+	// Connect's create-new-vs-already-connected bootstrap decision, never
+	// the per-request read path.
+	ExistingCredentialID(ctx context.Context, tenantID, userID string, provider domain.Provider) (credentialID string, found bool, err error)
 }
+
+// ConnectionRepository is the persistence port for issuetracking_connections
+// — one row per connected (tenant, user, provider, workspace).
+type ConnectionRepository interface {
+	// Upsert inserts or updates the row for
+	// (tenantID, userID, provider, workspace.ID). A first connect for a
+	// (tenant,user,provider) also sets is_selected=true; connecting an
+	// additional workspace under an already-connected provider defaults
+	// is_selected=false (SelectWorkspace changes it explicitly).
+	Upsert(ctx context.Context, tenantID, userID string, provider domain.Provider, workspace domain.Workspace, viewer domain.Viewer, credentialID string) (domain.ConnectionStatus, error)
+
+	// Delete removes the row for workspaceID, or every row for
+	// (tenantID, userID, provider) when workspaceID is "".
+	Delete(ctx context.Context, tenantID, userID string, provider domain.Provider, workspaceID string) error
+
+	// GetStatus returns every connected workspace for
+	// (tenantID, userID, provider) plus which one is_selected — the
+	// GetConnectionStatus/Connect/SelectWorkspace return shape.
+	GetStatus(ctx context.Context, tenantID, userID string, provider domain.Provider) (domain.ConnectionStatus, error)
+
+	// SelectWorkspace flips is_selected to workspaceID's row (or, when
+	// workspaceID == "all", clears any single selection — JiraSiteSelection
+	// allows "all" as a valid value) and returns the updated status.
+	SelectWorkspace(ctx context.Context, tenantID, userID string, provider domain.Provider, workspaceID string) (domain.ConnectionStatus, error)
+
+	// GetCredentialID resolves which credential_id backs
+	// (tenantID, userID, provider, workspaceID) — workspaceID == "" means
+	// "the selected workspace." Returns ErrConnectionNotFound if none.
+	GetCredentialID(ctx context.Context, tenantID, userID string, provider domain.Provider, workspaceID string) (credentialID string, err error)
+}
+
+// ErrConnectionNotFound is returned by ConnectionRepository methods (and
+// surfaced as ISSUETRACKING_NOT_CONNECTED at the usecase layer) when no
+// connection row exists for the requested key.
+var ErrConnectionNotFound = errors.New("usecase: no issue-tracking connection found")
 
 // OutboxEnqueuer is the outbound event port for issue linking —
 // issue-tracking-service durably records orca.issuetracking.link.created

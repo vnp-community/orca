@@ -99,6 +99,10 @@ func (f *fakeOrchestrationTaskRepository) UpdateStatusAndPromote(_ context.Conte
 type fakeDispatchContextRepository struct {
 	created []domain.DispatchContext
 	err     error
+
+	getLatestReturns domain.DispatchContext
+	getLatestErr     error
+	getLatestFunc    func(ctx context.Context, tenantID, taskID string) (domain.DispatchContext, error)
 }
 
 func (f *fakeDispatchContextRepository) CreateDispatchContext(_ context.Context, tenantID, handle, coordinatorRunID, orchestrationTaskID string) (domain.DispatchContext, error) {
@@ -115,6 +119,16 @@ func (f *fakeDispatchContextRepository) CreateDispatchContext(_ context.Context,
 	}
 	f.created = append(f.created, dc)
 	return dc, nil
+}
+
+func (f *fakeDispatchContextRepository) GetLatestForTask(ctx context.Context, tenantID, taskID string) (domain.DispatchContext, error) {
+	if f.getLatestFunc != nil {
+		return f.getLatestFunc(ctx, tenantID, taskID)
+	}
+	if f.getLatestErr != nil {
+		return domain.DispatchContext{}, f.getLatestErr
+	}
+	return f.getLatestReturns, nil
 }
 
 // fakeGateRepository is an in-memory GateRepository.

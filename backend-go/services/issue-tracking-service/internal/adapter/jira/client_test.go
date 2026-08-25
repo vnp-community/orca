@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/domain"
 	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/usecase"
 )
 
@@ -165,7 +166,7 @@ func TestCreateIssue_UsesResolvedIssueTypeNotHardcodedString(t *testing.T) {
 
 	client := New(server.Client())
 	cred := usecase.Credential{BaseURL: server.URL, Email: "a@example.com", Token: "tok"}
-	issue, err := client.CreateIssue(context.Background(), cred, "PROJ", "a title", "")
+	issue, err := client.CreateIssue(context.Background(), cred, domain.NewIssueInput{ProjectKey: "PROJ", Title: "a title"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -197,7 +198,7 @@ func TestCreateIssue_NoIssueTypesReturnsClearError(t *testing.T) {
 
 	client := New(server.Client())
 	cred := usecase.Credential{BaseURL: server.URL, Email: "a@example.com", Token: "tok"}
-	_, err := client.CreateIssue(context.Background(), cred, "PROJ", "a title", "")
+	_, err := client.CreateIssue(context.Background(), cred, domain.NewIssueInput{ProjectKey: "PROJ", Title: "a title"})
 	if err == nil {
 		t.Fatal("expected an error when the project has no issue types")
 	}

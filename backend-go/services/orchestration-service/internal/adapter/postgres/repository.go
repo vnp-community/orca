@@ -271,6 +271,37 @@ func (r *Repository) CreateDispatchContext(ctx context.Context, tenantID, handle
 	}, nil
 }
 
+// GetLatestForTask returns the most recently created dispatch_contexts row
+// for orchestrationTaskID — see usecase.DispatchContextRepository's doc
+// comment: a task's dispatch_contexts row is not unique (retries after
+// failure create new rows), so this orders by created_at DESC and takes
+// the first, matching CreateDispatchContext's own column set and
+// nullable-column handling.
+func (r *Repository) GetLatestForTask(ctx context.Context, tenantID, orchestrationTaskID string) (domain.DispatchContext, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, tenant_id, orchestration_task_id, handle, coordinator_run_id, status, created_at
+		FROM orchestration.dispatch_contexts
+		WHERE tenant_id = $1 AND orchestration_task_id = $2
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, tenantID, orchestrationTaskID)
+
+	var dc domain.DispatchContext
+	var status string
+	var orchestrationTaskIDCol *string
+	if err := row.Scan(&dc.ID, &dc.TenantID, &orchestrationTaskIDCol, &dc.Handle, &dc.CoordinatorRunID, &status, &dc.CreatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.DispatchContext{}, usecase.ErrDispatchContextNotFound
+		}
+		return domain.DispatchContext{}, fmt.Errorf("postgres: get latest dispatch context for task: %w", err)
+	}
+	if orchestrationTaskIDCol != nil {
+		dc.OrchestrationTaskID = *orchestrationTaskIDCol
+	}
+	dc.Status = domain.DispatchStatus(status)
+	return dc, nil
+}
+
 // ---- GateRepository -------------------------------------------------
 
 // CreateGate atomically resolves dispatchContextID to its owning

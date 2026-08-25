@@ -34,6 +34,13 @@ func withTenant(ctx context.Context, tenantID string) context.Context {
 	return tenant.WithTenantID(ctx, tenantID)
 }
 
+// withUser attaches the acting user id — the connection/credential and
+// issue-CRUD usecase groups (SOL-015) require both tenant and user in
+// context, unlike LinkIssue which only needs a tenant.
+func withUser(ctx context.Context, userID string) context.Context {
+	return tenant.WithUserID(ctx, userID)
+}
+
 func TestLinkIssue_RequiresTenantContext(t *testing.T) {
 	uc := NewLinkIssue(&fakeEnqueuer{})
 	err := uc.Execute(context.Background(), LinkIssueInput{IssueID: "PROJ-1", TaskID: "task-1"})

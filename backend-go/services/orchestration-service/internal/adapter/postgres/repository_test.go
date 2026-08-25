@@ -220,3 +220,55 @@ func TestRepository_CreateGate_FailsWhenDispatchContextHasNoTask(t *testing.T) {
 		t.Fatalf("expected usecase.ErrDispatchContextHasNoTask, got: %v", err)
 	}
 }
+
+// TestRepository_GetLatestForTask_ReturnsMostRecentAfterRetry proves the
+// "latest wins" contract GetDispatchContextForTask depends on: a task can
+// accumulate more than one dispatch_contexts row across retries (§8's
+// circuit-breaker note), and GetLatestForTask must return the most
+// recently created one, not the first.
+func TestRepository_GetLatestForTask_ReturnsMostRecentAfterRetry(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "99999999-9999-9999-9999-999999999999"
+	runID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-5")
+
+	task, err := domain.NewOrchestrationTask("", tenantID, runID, "", "", "retried task", nil, nil)
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	task, err = repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	first, err := repo.CreateDispatchContext(ctx, tenantID, "handle-a", runID, task.ID)
+	if err != nil {
+		t.Fatalf("create first dispatch context: %v", err)
+	}
+	_ = first
+	time.Sleep(10 * time.Millisecond) // ensure created_at strictly orders the second row after the first
+	second, err := repo.CreateDispatchContext(ctx, tenantID, "handle-b", runID, task.ID)
+	if err != nil {
+		t.Fatalf("create second (retry) dispatch context: %v", err)
+	}
+
+	got, err := repo.GetLatestForTask(ctx, tenantID, task.ID)
+	if err != nil {
+		t.Fatalf("get latest for task: %v", err)
+	}
+	if got.ID != second.ID {
+		t.Errorf("want the later dispatch context (id=%s), got id=%s", second.ID, got.ID)
+	}
+}
+
+func TestRepository_GetLatestForTask_NoRows_ReturnsErrDispatchContextNotFound(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	_, err := repo.GetLatestForTask(ctx, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "cccccccc-cccc-cccc-cccc-cccccccccccc")
+	if !errors.Is(err, usecase.ErrDispatchContextNotFound) {
+		t.Fatalf("want ErrDispatchContextNotFound, got %v", err)
+	}
+}
