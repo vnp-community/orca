@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/coder/websocket/wsjson"
 )
 
 // SessionValidator resolves the caller's identity from the orca_session
@@ -152,13 +151,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Detect WebSessionClient's dialect ONCE here — see
+		// normalizeInboundMessage's doc comment (session_dialect.go) for why
+		// the rest of this loop and handleInvoke/handleSubscribe never need
+		// to re-detect it. A native message (including type-less garbage)
+		// passes through unchanged.
+		msgDialect, msg := normalizeInboundMessage(msg)
+
 		switch msg.Type {
 		case "invoke":
 			if sh, ok := h.Registry.StreamHandlerFor(msg.Channel); ok {
-				go h.handleSubscribe(ctx, conn, &writeMu, identity, msg, sh)
+				go h.handleSubscribe(ctx, conn, &writeMu, identity, msg, sh, msgDialect)
 				continue
 			}
-			go h.handleInvoke(ctx, conn, &writeMu, identity, msg)
+			go h.handleInvoke(ctx, conn, &writeMu, identity, msg, msgDialect)
 		case "send":
 			go h.handleSend(ctx, identity, msg)
 		default:
@@ -183,7 +189,7 @@ const invokeTimeout = 25 * time.Second
 // response (the original bug — BUG-001).
 const writeTimeout = 5 * time.Second
 
-func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, identity Identity, msg InboundMessage) {
+func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, identity Identity, msg InboundMessage, msgDialect dialect) {
 	dispatchCtx, dispatchCancel := context.WithTimeout(ctx, invokeTimeout)
 	defer dispatchCancel()
 
@@ -233,12 +239,12 @@ func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeM
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), writeTimeout)
 
 	if err != nil {
-		_ = wsjson.Write(writeCtx, conn, ErrorMessage{Type: "error", ID: msg.ID, Message: err.Error()})
+		_ = writeDialectError(writeCtx, conn, msgDialect, msg.ID, err)
 		writeCancel()
 		writeMu.Unlock()
 		return
 	}
-	_ = wsjson.Write(writeCtx, conn, ResultMessage{Type: "result", ID: msg.ID, Result: result})
+	_ = writeDialectResult(writeCtx, conn, msgDialect, msg.ID, result)
 	writeCancel()
 	writeMu.Unlock()
 
@@ -286,16 +292,29 @@ func (h *Handler) binaryStreamIO(ctx context.Context, conn *websocket.Conn, writ
 // whole connection's lifetime, not just the moment sh() is called — wrapping
 // it in invokeTimeout would cancel that goroutine's context the instant
 // Open() returns, killing the subscription before its first event.
-func (h *Handler) handleSubscribe(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, identity Identity, msg InboundMessage, sh StreamHandler) {
+//
+// Phase 2, NOT implemented here: the initial ack below is dialect-aware
+// (msgDialect), so a session-client caller of a subscribe-shaped channel
+// (e.g. accounts.subscribe) gets a well-formed ack instead of a timeout.
+// pipePush's FOLLOW-UP events, however, are deliberately left untouched —
+// always native {"type":"push","channel","args"} frames. WebSessionClient
+// has no concept of a channel-keyed push; it only understands frames keyed
+// by the request id it sent (see WebSessionClient.handleSocketMessage's
+// isSubscriptionResponse/isEndResult checks in web-session-client.ts), so a
+// session-client caller of a stream channel gets an ack and then silently
+// no further updates — an improvement over today's total timeout, but not a
+// working subscription. See specs/backend-go/bugs/api-v1/BUG-005's
+// solution doc for the full writeup of this scoped-out gap.
+func (h *Handler) handleSubscribe(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, identity Identity, msg InboundMessage, sh StreamHandler, msgDialect dialect) {
 	events, err := sh(ctx, identity, msg.Args)
 
 	writeMu.Lock()
 	if err != nil {
-		_ = wsjson.Write(ctx, conn, ErrorMessage{Type: "error", ID: msg.ID, Message: err.Error()})
+		_ = writeDialectError(ctx, conn, msgDialect, msg.ID, err)
 		writeMu.Unlock()
 		return
 	}
-	_ = wsjson.Write(ctx, conn, ResultMessage{Type: "result", ID: msg.ID, Result: nil})
+	_ = writeDialectResult(ctx, conn, msgDialect, msg.ID, nil)
 	writeMu.Unlock()
 
 	pipePush(ctx, conn, writeMu, events)
@@ -305,6 +324,14 @@ func (h *Handler) handleSubscribe(ctx context.Context, conn *websocket.Conn, wri
 // "invoke", but never writes a response — matching rpc-client.ts's send(),
 // which doesn't wait for one. Errors are logged, not surfaced to the
 // client, since there's no request ID to correlate a response to.
+//
+// Not dialect-aware, deliberately: WebSessionClient's call()/subscribe()
+// (web-session-client.ts) always waits for a response — there is no
+// fire-and-forget send() on that client, so normalizeInboundMessage
+// (session_dialect.go) never produces msg.Type == "send" for the
+// session-client dialect, and this function only ever sees native "send"
+// messages.
+
 func (h *Handler) handleSend(ctx context.Context, identity Identity, msg InboundMessage) {
 	dispatchCtx, cancel := context.WithTimeout(ctx, invokeTimeout)
 	defer cancel()
