@@ -4,7 +4,7 @@ import "time"
 
 // TerminalSession is the domain view of one PTY/terminal session spawned on
 // a dev server's agent — mirrors orca.infrafleet.v1.TerminalSession and
-// migrations/0004_terminal_sessions. ConnectionID is empty for a host-local
+// migrations/0005_terminal_sessions. ConnectionID is empty for a host-local
 // session (see proto's SpawnTerminalSessionRequest doc comment); every
 // session spawned through usecase.SpawnTerminalSession today is
 // connection-bound, since host-local execution has no local pty adapter in

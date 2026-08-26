@@ -13,7 +13,7 @@ import (
 var _ usecase.BrowserProfileRepository = (*BrowserProfileStore)(nil)
 
 // BrowserProfileStore implements usecase.BrowserProfileRepository against
-// infra.browser_profiles (migrations/0004_browser_profiles) — split into its
+// infra.browser_profiles (migrations/0006_browser_profiles) — split into its
 // own type over the same pool Repository uses, rather than methods on
 // Repository directly, because Repository.List/Create already exist with
 // different signatures for DevServerRepository/ConnectionRepository (same
@@ -31,7 +31,7 @@ func NewBrowserProfileStore(pool *pgxpool.Pool) *BrowserProfileStore {
 }
 
 // List returns the browser profiles registered for devServerID, scoped to
-// tenantID — see migrations/0004_browser_profiles.up.sql.
+// tenantID — see migrations/0006_browser_profiles.up.sql.
 func (s *BrowserProfileStore) List(ctx context.Context, tenantID, devServerID string) ([]domain.BrowserProfile, error) {
 	const q = `
 		SELECT id, tenant_id, dev_server_id, name, source_browser, is_default, created_at

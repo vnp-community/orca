@@ -232,7 +232,7 @@ type InspectProcessResult struct {
 }
 
 // TerminalSessionRepository is the persistence port for infra.terminal_sessions
-// (migrations/0004_terminal_sessions) — the record of every PTY this service
+// (migrations/0005_terminal_sessions) — the record of every PTY this service
 // has spawned through the agent, independent of the agent's own in-memory
 // pty-daemon state (which does not survive this service's restart, unlike
 // Postgres). tenantID is threaded explicitly on every method, matching

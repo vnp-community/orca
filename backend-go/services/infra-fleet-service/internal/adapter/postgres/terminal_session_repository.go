@@ -13,7 +13,7 @@ import (
 )
 
 // TerminalSessionStore implements usecase.TerminalSessionRepository against
-// infra.terminal_sessions (migrations/0004_terminal_sessions) — split into
+// infra.terminal_sessions (migrations/0005_terminal_sessions) — split into
 // its own type over the same pool rather than a method on Repository, same
 // rationale as SshTargetStore (see Repository's doc comment): this table
 // has its own natural key shape (pty_id, a TEXT id assigned by the agent,
