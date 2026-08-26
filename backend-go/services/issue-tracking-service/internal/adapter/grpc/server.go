@@ -54,6 +54,13 @@ type Server struct {
 	listTeamMembers    *usecase.ListTeamMembers
 	getCustomView      *usecase.GetCustomView
 	listWorkflowStates *usecase.ListWorkflowStates
+
+	// credentials.* group (TASK-041) — SetIntegrationCredential/
+	// GetIntegrationCredentialStatus/ListIntegrationCredentials/RevokeAuth.
+	setIntegrationCredential       *usecase.SetIntegrationCredential
+	getIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus
+	listIntegrationCredentials     *usecase.ListIntegrationCredentials
+	revokeAuth                     *usecase.RevokeAuth
 }
 
 // Deps bundles every usecase pointer New needs — kept as a struct (not 25
@@ -91,6 +98,11 @@ type Deps struct {
 	ListTeamMembers    *usecase.ListTeamMembers
 	GetCustomView      *usecase.GetCustomView
 	ListWorkflowStates *usecase.ListWorkflowStates
+
+	SetIntegrationCredential       *usecase.SetIntegrationCredential
+	GetIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus
+	ListIntegrationCredentials     *usecase.ListIntegrationCredentials
+	RevokeAuth                     *usecase.RevokeAuth
 }
 
 func New(d Deps) *Server {
@@ -127,6 +139,11 @@ func New(d Deps) *Server {
 		listTeamMembers:    d.ListTeamMembers,
 		getCustomView:      d.GetCustomView,
 		listWorkflowStates: d.ListWorkflowStates,
+
+		setIntegrationCredential:       d.SetIntegrationCredential,
+		getIntegrationCredentialStatus: d.GetIntegrationCredentialStatus,
+		listIntegrationCredentials:     d.ListIntegrationCredentials,
+		revokeAuth:                     d.RevokeAuth,
 	}
 }
 
@@ -496,6 +513,56 @@ func (s *Server) ListWorkflowStates(ctx context.Context, req *issuetrackingv1.Li
 	return &issuetrackingv1.ListWorkflowStatesResponse{States: out}, nil
 }
 
+// ── credentials.* group (TASK-041) ──────────────────────────────────────
+
+func (s *Server) SetIntegrationCredential(ctx context.Context, req *issuetrackingv1.SetIntegrationCredentialRequest) (*issuetrackingv1.SetIntegrationCredentialResponse, error) {
+	if err := s.setIntegrationCredential.Execute(ctx, usecase.SetIntegrationCredentialInput{
+		TenantID:   req.GetTenantId(),
+		Provider:   toDomainProvider(req.GetProvider()),
+		Token:      req.GetToken(),
+		ConfigJSON: req.GetConfigJson(),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &issuetrackingv1.SetIntegrationCredentialResponse{}, nil
+}
+
+func (s *Server) GetIntegrationCredentialStatus(ctx context.Context, req *issuetrackingv1.GetIntegrationCredentialStatusRequest) (*issuetrackingv1.GetIntegrationCredentialStatusResponse, error) {
+	result, err := s.getIntegrationCredentialStatus.Execute(ctx, usecase.GetIntegrationCredentialStatusInput{
+		TenantID: req.GetTenantId(),
+		Provider: toDomainProvider(req.GetProvider()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &issuetrackingv1.GetIntegrationCredentialStatusResponse{
+		Configured: result.Configured,
+		ConfigJson: result.ConfigJSON,
+	}, nil
+}
+
+func (s *Server) ListIntegrationCredentials(ctx context.Context, req *issuetrackingv1.ListIntegrationCredentialsRequest) (*issuetrackingv1.ListIntegrationCredentialsResponse, error) {
+	providers, err := s.listIntegrationCredentials.Execute(ctx, req.GetTenantId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]issuetrackingv1.IssueProvider, 0, len(providers))
+	for _, p := range providers {
+		out = append(out, toProtoProvider(p))
+	}
+	return &issuetrackingv1.ListIntegrationCredentialsResponse{ConfiguredProviders: out}, nil
+}
+
+func (s *Server) RevokeAuth(ctx context.Context, req *issuetrackingv1.RevokeAuthRequest) (*issuetrackingv1.RevokeAuthResponse, error) {
+	if err := s.revokeAuth.Execute(ctx, usecase.RevokeAuthInput{
+		TenantID: req.GetTenantId(),
+		Provider: toDomainProvider(req.GetProvider()),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &issuetrackingv1.RevokeAuthResponse{}, nil
+}
+
 // ── translation helpers ──────────────────────────────────────────────────
 
 func toDomainProvider(p issuetrackingv1.IssueProvider) domain.Provider {
@@ -506,6 +573,19 @@ func toDomainProvider(p issuetrackingv1.IssueProvider) domain.Provider {
 		return domain.ProviderLinear
 	default:
 		return ""
+	}
+}
+
+// toProtoProvider is toDomainProvider's inverse — ListIntegrationCredentials'
+// response mapping.
+func toProtoProvider(p domain.Provider) issuetrackingv1.IssueProvider {
+	switch p {
+	case domain.ProviderJira:
+		return issuetrackingv1.IssueProvider_ISSUE_PROVIDER_JIRA
+	case domain.ProviderLinear:
+		return issuetrackingv1.IssueProvider_ISSUE_PROVIDER_LINEAR
+	default:
+		return issuetrackingv1.IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
 	}
 }
 

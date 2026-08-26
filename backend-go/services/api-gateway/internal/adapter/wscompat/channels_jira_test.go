@@ -44,6 +44,12 @@ type fakeIssueTrackingClient struct {
 	listTeamMembersFunc       func(ctx context.Context, in *issuetrackingv1.ListTeamMembersRequest) (*issuetrackingv1.ListTeamMembersResponse, error)
 	getCustomViewFunc         func(ctx context.Context, in *issuetrackingv1.GetCustomViewRequest) (*issuetrackingv1.CustomView, error)
 	listWorkflowStatesFunc    func(ctx context.Context, in *issuetrackingv1.ListWorkflowStatesRequest) (*issuetrackingv1.ListWorkflowStatesResponse, error)
+
+	// credentials.* group (channels_credentials_test.go, TASK-042).
+	setIntegrationCredentialFunc       func(ctx context.Context, in *issuetrackingv1.SetIntegrationCredentialRequest) (*issuetrackingv1.SetIntegrationCredentialResponse, error)
+	getIntegrationCredentialStatusFunc func(ctx context.Context, in *issuetrackingv1.GetIntegrationCredentialStatusRequest) (*issuetrackingv1.GetIntegrationCredentialStatusResponse, error)
+	listIntegrationCredentialsFunc     func(ctx context.Context, in *issuetrackingv1.ListIntegrationCredentialsRequest) (*issuetrackingv1.ListIntegrationCredentialsResponse, error)
+	revokeAuthFunc                     func(ctx context.Context, in *issuetrackingv1.RevokeAuthRequest) (*issuetrackingv1.RevokeAuthResponse, error)
 }
 
 func (f *fakeIssueTrackingClient) GetConnectionStatus(ctx context.Context, in *issuetrackingv1.GetConnectionStatusRequest, _ ...grpc.CallOption) (*issuetrackingv1.ConnectionStatus, error) {
@@ -148,6 +154,22 @@ func (f *fakeIssueTrackingClient) GetCustomView(ctx context.Context, in *issuetr
 
 func (f *fakeIssueTrackingClient) ListWorkflowStates(ctx context.Context, in *issuetrackingv1.ListWorkflowStatesRequest, _ ...grpc.CallOption) (*issuetrackingv1.ListWorkflowStatesResponse, error) {
 	return f.listWorkflowStatesFunc(ctx, in)
+}
+
+func (f *fakeIssueTrackingClient) SetIntegrationCredential(ctx context.Context, in *issuetrackingv1.SetIntegrationCredentialRequest, _ ...grpc.CallOption) (*issuetrackingv1.SetIntegrationCredentialResponse, error) {
+	return f.setIntegrationCredentialFunc(ctx, in)
+}
+
+func (f *fakeIssueTrackingClient) GetIntegrationCredentialStatus(ctx context.Context, in *issuetrackingv1.GetIntegrationCredentialStatusRequest, _ ...grpc.CallOption) (*issuetrackingv1.GetIntegrationCredentialStatusResponse, error) {
+	return f.getIntegrationCredentialStatusFunc(ctx, in)
+}
+
+func (f *fakeIssueTrackingClient) ListIntegrationCredentials(ctx context.Context, in *issuetrackingv1.ListIntegrationCredentialsRequest, _ ...grpc.CallOption) (*issuetrackingv1.ListIntegrationCredentialsResponse, error) {
+	return f.listIntegrationCredentialsFunc(ctx, in)
+}
+
+func (f *fakeIssueTrackingClient) RevokeAuth(ctx context.Context, in *issuetrackingv1.RevokeAuthRequest, _ ...grpc.CallOption) (*issuetrackingv1.RevokeAuthResponse, error) {
+	return f.revokeAuthFunc(ctx, in)
 }
 
 func TestJiraStatusChannel_Success(t *testing.T) {

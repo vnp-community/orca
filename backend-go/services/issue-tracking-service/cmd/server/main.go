@@ -180,6 +180,14 @@ func run() error {
 	getCustomViewUC := usecase.NewGetCustomView(registry, credentialResolver)
 	listWorkflowStatesUC := usecase.NewListWorkflowStates(registry, credentialResolver)
 
+	// credentials.* group (TASK-041) — credentialResolver (adapter/credential.Resolver)
+	// also satisfies CredentialWriter/CredentialStatusReader/CredentialLister/
+	// CredentialRevoker; no new dial needed.
+	setIntegrationCredentialUC := usecase.NewSetIntegrationCredential(credentialResolver)
+	getIntegrationCredentialStatusUC := usecase.NewGetIntegrationCredentialStatus(credentialResolver)
+	listIntegrationCredentialsUC := usecase.NewListIntegrationCredentials(credentialResolver)
+	revokeAuthUC := usecase.NewRevokeAuth(credentialResolver)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	issuetrackingv1.RegisterIssueTrackingServiceServer(grpcServer, issuetrackinggrpc.New(issuetrackinggrpc.Deps{
 		ListIssues:  listIssuesUC,
@@ -214,6 +222,11 @@ func run() error {
 		ListTeamMembers:    listTeamMembersUC,
 		GetCustomView:      getCustomViewUC,
 		ListWorkflowStates: listWorkflowStatesUC,
+
+		SetIntegrationCredential:       setIntegrationCredentialUC,
+		GetIntegrationCredentialStatus: getIntegrationCredentialStatusUC,
+		ListIntegrationCredentials:     listIntegrationCredentialsUC,
+		RevokeAuth:                     revokeAuthUC,
 	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
