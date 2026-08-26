@@ -20,31 +20,40 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InfraFleetService_RegisterDevServer_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
-	InfraFleetService_ResolveConnection_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
-	InfraFleetService_CreateSshTarget_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
-	InfraFleetService_GetFleetHealth_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
-	InfraFleetService_ScanWorkspacePorts_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
-	InfraFleetService_ListDevServers_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
-	InfraFleetService_CreateConnection_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
-	InfraFleetService_Relay_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/Relay"
-	InfraFleetService_ListSshTargets_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
-	InfraFleetService_GetSshState_FullMethodName            = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
-	InfraFleetService_EstablishConnection_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
-	InfraFleetService_KillWorkspacePort_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
-	InfraFleetService_SpawnTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
-	InfraFleetService_ResizeTerminalSession_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
-	InfraFleetService_KillTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
-	InfraFleetService_StopTerminalProcess_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/StopTerminalProcess"
-	InfraFleetService_ListTerminalSessions_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ListTerminalSessions"
-	InfraFleetService_WaitTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/WaitTerminalSession"
-	InfraFleetService_FocusTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/FocusTerminalSession"
-	InfraFleetService_GetTerminalAgentStatus_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
-	InfraFleetService_InspectTerminalProcess_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
-	InfraFleetService_AttachPty_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
-	InfraFleetService_ListBrowserProfiles_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
-	InfraFleetService_CreateBrowserProfile_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
-	InfraFleetService_DeleteBrowserProfile_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/DeleteBrowserProfile"
+	InfraFleetService_RegisterDevServer_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
+	InfraFleetService_ResolveConnection_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
+	InfraFleetService_CreateSshTarget_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
+	InfraFleetService_GetFleetHealth_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
+	InfraFleetService_ScanWorkspacePorts_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
+	InfraFleetService_ListDevServers_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
+	InfraFleetService_CreateConnection_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
+	InfraFleetService_Relay_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_ListSshTargets_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
+	InfraFleetService_GetSshState_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
+	InfraFleetService_EstablishConnection_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
+	InfraFleetService_KillWorkspacePort_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
+	InfraFleetService_SpawnTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
+	InfraFleetService_ResizeTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
+	InfraFleetService_KillTerminalSession_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
+	InfraFleetService_StopTerminalProcess_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/StopTerminalProcess"
+	InfraFleetService_ListTerminalSessions_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/ListTerminalSessions"
+	InfraFleetService_WaitTerminalSession_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/WaitTerminalSession"
+	InfraFleetService_FocusTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/FocusTerminalSession"
+	InfraFleetService_GetTerminalAgentStatus_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
+	InfraFleetService_InspectTerminalProcess_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
+	InfraFleetService_AttachPty_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
+	InfraFleetService_ListBrowserProfiles_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
+	InfraFleetService_CreateBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
+	InfraFleetService_DeleteBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/DeleteBrowserProfile"
+	InfraFleetService_ListEmulatorDevices_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListEmulatorDevices"
+	InfraFleetService_GetEmulatorAvailability_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/GetEmulatorAvailability"
+	InfraFleetService_AttachEmulatorSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/AttachEmulatorSession"
+	InfraFleetService_SendEmulatorTap_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorTap"
+	InfraFleetService_SendEmulatorGesture_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorGesture"
+	InfraFleetService_SendEmulatorButton_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorButton"
+	InfraFleetService_RotateEmulator_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/RotateEmulator"
+	InfraFleetService_ShutdownEmulator_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/ShutdownEmulator"
+	InfraFleetService_GetHostCapabilities_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetHostCapabilities"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -115,6 +124,30 @@ type InfraFleetServiceClient interface {
 	ListBrowserProfiles(ctx context.Context, in *ListBrowserProfilesRequest, opts ...grpc.CallOption) (*ListBrowserProfilesResponse, error)
 	CreateBrowserProfile(ctx context.Context, in *CreateBrowserProfileRequest, opts ...grpc.CallOption) (*CreateBrowserProfileResponse, error)
 	DeleteBrowserProfile(ctx context.Context, in *DeleteBrowserProfileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// --- Emulator/simulator control, relayed to the Dev Server Agent (TASK-048) ---
+	// Every RPC here except GetEmulatorAvailability requires connection_id —
+	// there is deliberately no local/backend-host fallback (driving emulators
+	// on the shared backend-go host is out of scope by design, see
+	// usecase.EmulatorRelay's doc comment). agent/ has no device.* RPC surface
+	// today (confirmed absent as of this pass) — every call below reaches a
+	// real agent and fails with a typed, permanent FailedPrecondition until
+	// agent/ gains one; see specs/backend-go/bugs/missing-v1/tasks/TASK-048.
+	ListEmulatorDevices(ctx context.Context, in *ListEmulatorDevicesRequest, opts ...grpc.CallOption) (*ListEmulatorDevicesResponse, error)
+	GetEmulatorAvailability(ctx context.Context, in *GetEmulatorAvailabilityRequest, opts ...grpc.CallOption) (*GetEmulatorAvailabilityResponse, error)
+	AttachEmulatorSession(ctx context.Context, in *AttachEmulatorSessionRequest, opts ...grpc.CallOption) (*EmulatorSession, error)
+	SendEmulatorTap(ctx context.Context, in *SendEmulatorTapRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SendEmulatorGesture(ctx context.Context, in *SendEmulatorGestureRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SendEmulatorButton(ctx context.Context, in *SendEmulatorButtonRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	RotateEmulator(ctx context.Context, in *RotateEmulatorRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ShutdownEmulator(ctx context.Context, in *ShutdownEmulatorRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetHostCapabilities is the per-target WSL/pwsh/git-bash probe (TASK-070)
+	// — connection_id empty resolves to the caller's own backend-go host and
+	// is answered locally and honestly (false/[]), no relay attempted,
+	// matching TASK-068's existing host.* stub semantics; a non-empty
+	// connection_id relays to the agent's host.capabilities method, which
+	// does not exist yet (confirmed absent as of this pass) — see
+	// usecase.GetHostCapabilities's doc comment.
+	GetHostCapabilities(ctx context.Context, in *GetHostCapabilitiesRequest, opts ...grpc.CallOption) (*GetHostCapabilitiesResponse, error)
 }
 
 type infraFleetServiceClient struct {
@@ -378,6 +411,96 @@ func (c *infraFleetServiceClient) DeleteBrowserProfile(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) ListEmulatorDevices(ctx context.Context, in *ListEmulatorDevicesRequest, opts ...grpc.CallOption) (*ListEmulatorDevicesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListEmulatorDevicesResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListEmulatorDevices_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetEmulatorAvailability(ctx context.Context, in *GetEmulatorAvailabilityRequest, opts ...grpc.CallOption) (*GetEmulatorAvailabilityResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetEmulatorAvailabilityResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetEmulatorAvailability_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) AttachEmulatorSession(ctx context.Context, in *AttachEmulatorSessionRequest, opts ...grpc.CallOption) (*EmulatorSession, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EmulatorSession)
+	err := c.cc.Invoke(ctx, InfraFleetService_AttachEmulatorSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) SendEmulatorTap(ctx context.Context, in *SendEmulatorTapRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_SendEmulatorTap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) SendEmulatorGesture(ctx context.Context, in *SendEmulatorGestureRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_SendEmulatorGesture_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) SendEmulatorButton(ctx context.Context, in *SendEmulatorButtonRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_SendEmulatorButton_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) RotateEmulator(ctx context.Context, in *RotateEmulatorRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_RotateEmulator_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ShutdownEmulator(ctx context.Context, in *ShutdownEmulatorRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_ShutdownEmulator_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetHostCapabilities(ctx context.Context, in *GetHostCapabilitiesRequest, opts ...grpc.CallOption) (*GetHostCapabilitiesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetHostCapabilitiesResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetHostCapabilities_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -446,6 +569,30 @@ type InfraFleetServiceServer interface {
 	ListBrowserProfiles(context.Context, *ListBrowserProfilesRequest) (*ListBrowserProfilesResponse, error)
 	CreateBrowserProfile(context.Context, *CreateBrowserProfileRequest) (*CreateBrowserProfileResponse, error)
 	DeleteBrowserProfile(context.Context, *DeleteBrowserProfileRequest) (*emptypb.Empty, error)
+	// --- Emulator/simulator control, relayed to the Dev Server Agent (TASK-048) ---
+	// Every RPC here except GetEmulatorAvailability requires connection_id —
+	// there is deliberately no local/backend-host fallback (driving emulators
+	// on the shared backend-go host is out of scope by design, see
+	// usecase.EmulatorRelay's doc comment). agent/ has no device.* RPC surface
+	// today (confirmed absent as of this pass) — every call below reaches a
+	// real agent and fails with a typed, permanent FailedPrecondition until
+	// agent/ gains one; see specs/backend-go/bugs/missing-v1/tasks/TASK-048.
+	ListEmulatorDevices(context.Context, *ListEmulatorDevicesRequest) (*ListEmulatorDevicesResponse, error)
+	GetEmulatorAvailability(context.Context, *GetEmulatorAvailabilityRequest) (*GetEmulatorAvailabilityResponse, error)
+	AttachEmulatorSession(context.Context, *AttachEmulatorSessionRequest) (*EmulatorSession, error)
+	SendEmulatorTap(context.Context, *SendEmulatorTapRequest) (*emptypb.Empty, error)
+	SendEmulatorGesture(context.Context, *SendEmulatorGestureRequest) (*emptypb.Empty, error)
+	SendEmulatorButton(context.Context, *SendEmulatorButtonRequest) (*emptypb.Empty, error)
+	RotateEmulator(context.Context, *RotateEmulatorRequest) (*emptypb.Empty, error)
+	ShutdownEmulator(context.Context, *ShutdownEmulatorRequest) (*emptypb.Empty, error)
+	// GetHostCapabilities is the per-target WSL/pwsh/git-bash probe (TASK-070)
+	// — connection_id empty resolves to the caller's own backend-go host and
+	// is answered locally and honestly (false/[]), no relay attempted,
+	// matching TASK-068's existing host.* stub semantics; a non-empty
+	// connection_id relays to the agent's host.capabilities method, which
+	// does not exist yet (confirmed absent as of this pass) — see
+	// usecase.GetHostCapabilities's doc comment.
+	GetHostCapabilities(context.Context, *GetHostCapabilitiesRequest) (*GetHostCapabilitiesResponse, error)
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -530,6 +677,33 @@ func (UnimplementedInfraFleetServiceServer) CreateBrowserProfile(context.Context
 }
 func (UnimplementedInfraFleetServiceServer) DeleteBrowserProfile(context.Context, *DeleteBrowserProfileRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteBrowserProfile not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListEmulatorDevices(context.Context, *ListEmulatorDevicesRequest) (*ListEmulatorDevicesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListEmulatorDevices not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetEmulatorAvailability(context.Context, *GetEmulatorAvailabilityRequest) (*GetEmulatorAvailabilityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEmulatorAvailability not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) AttachEmulatorSession(context.Context, *AttachEmulatorSessionRequest) (*EmulatorSession, error) {
+	return nil, status.Error(codes.Unimplemented, "method AttachEmulatorSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SendEmulatorTap(context.Context, *SendEmulatorTapRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendEmulatorTap not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SendEmulatorGesture(context.Context, *SendEmulatorGestureRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendEmulatorGesture not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SendEmulatorButton(context.Context, *SendEmulatorButtonRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendEmulatorButton not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) RotateEmulator(context.Context, *RotateEmulatorRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RotateEmulator not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ShutdownEmulator(context.Context, *ShutdownEmulatorRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ShutdownEmulator not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetHostCapabilities(context.Context, *GetHostCapabilitiesRequest) (*GetHostCapabilitiesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetHostCapabilities not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -991,6 +1165,168 @@ func _InfraFleetService_DeleteBrowserProfile_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_ListEmulatorDevices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListEmulatorDevicesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListEmulatorDevices(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListEmulatorDevices_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListEmulatorDevices(ctx, req.(*ListEmulatorDevicesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetEmulatorAvailability_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEmulatorAvailabilityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetEmulatorAvailability(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetEmulatorAvailability_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetEmulatorAvailability(ctx, req.(*GetEmulatorAvailabilityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_AttachEmulatorSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AttachEmulatorSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).AttachEmulatorSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_AttachEmulatorSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).AttachEmulatorSession(ctx, req.(*AttachEmulatorSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_SendEmulatorTap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendEmulatorTapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SendEmulatorTap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SendEmulatorTap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SendEmulatorTap(ctx, req.(*SendEmulatorTapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_SendEmulatorGesture_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendEmulatorGestureRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SendEmulatorGesture(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SendEmulatorGesture_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SendEmulatorGesture(ctx, req.(*SendEmulatorGestureRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_SendEmulatorButton_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendEmulatorButtonRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SendEmulatorButton(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SendEmulatorButton_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SendEmulatorButton(ctx, req.(*SendEmulatorButtonRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_RotateEmulator_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateEmulatorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).RotateEmulator(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_RotateEmulator_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).RotateEmulator(ctx, req.(*RotateEmulatorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ShutdownEmulator_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ShutdownEmulatorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ShutdownEmulator(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ShutdownEmulator_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ShutdownEmulator(ctx, req.(*ShutdownEmulatorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetHostCapabilities_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHostCapabilitiesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetHostCapabilities(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetHostCapabilities_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetHostCapabilities(ctx, req.(*GetHostCapabilitiesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1093,6 +1429,42 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteBrowserProfile",
 			Handler:    _InfraFleetService_DeleteBrowserProfile_Handler,
+		},
+		{
+			MethodName: "ListEmulatorDevices",
+			Handler:    _InfraFleetService_ListEmulatorDevices_Handler,
+		},
+		{
+			MethodName: "GetEmulatorAvailability",
+			Handler:    _InfraFleetService_GetEmulatorAvailability_Handler,
+		},
+		{
+			MethodName: "AttachEmulatorSession",
+			Handler:    _InfraFleetService_AttachEmulatorSession_Handler,
+		},
+		{
+			MethodName: "SendEmulatorTap",
+			Handler:    _InfraFleetService_SendEmulatorTap_Handler,
+		},
+		{
+			MethodName: "SendEmulatorGesture",
+			Handler:    _InfraFleetService_SendEmulatorGesture_Handler,
+		},
+		{
+			MethodName: "SendEmulatorButton",
+			Handler:    _InfraFleetService_SendEmulatorButton_Handler,
+		},
+		{
+			MethodName: "RotateEmulator",
+			Handler:    _InfraFleetService_RotateEmulator_Handler,
+		},
+		{
+			MethodName: "ShutdownEmulator",
+			Handler:    _InfraFleetService_ShutdownEmulator_Handler,
+		},
+		{
+			MethodName: "GetHostCapabilities",
+			Handler:    _InfraFleetService_GetHostCapabilities_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

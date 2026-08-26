@@ -246,6 +246,14 @@ func (c *Client) Exec(ctx context.Context, devServer domain.DevServer, method st
 	}
 	result, err := sess.call(ctx, method, params)
 	if err != nil {
+		// JSON-RPC standard "method not found" (-32601): the agent answered,
+		// it just doesn't implement method on this build — a permanent,
+		// typed condition callers must distinguish from a transport/timeout
+		// failure. See domain.ErrAgentMethodNotFound's doc comment.
+		var rpcErr *JSONRPCError
+		if errors.As(err, &rpcErr) && rpcErr.Code == jsonrpcMethodNotFoundCode {
+			return nil, fmt.Errorf("%w: %v", domain.ErrAgentMethodNotFound, err)
+		}
 		return nil, err
 	}
 	if len(result) == 0 {

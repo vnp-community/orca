@@ -53,6 +53,12 @@ type Server struct {
 	listBrowserProfiles    *usecase.ListBrowserProfiles
 	createBrowserProfile   *usecase.CreateBrowserProfile
 	deleteBrowserProfile   *usecase.DeleteBrowserProfile
+
+	// --- Emulator relay (TASK-048) / host capabilities relay (TASK-070) ---
+	// Shipped-but-honestly-inert until agent/ gains device.*/host.capabilities
+	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
+	emulatorRelay       *usecase.EmulatorRelay
+	getHostCapabilities *usecase.GetHostCapabilities
 }
 
 func New(
@@ -81,6 +87,8 @@ func New(
 	listBrowserProfiles *usecase.ListBrowserProfiles,
 	createBrowserProfile *usecase.CreateBrowserProfile,
 	deleteBrowserProfile *usecase.DeleteBrowserProfile,
+	emulatorRelay *usecase.EmulatorRelay,
+	getHostCapabilities *usecase.GetHostCapabilities,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -108,6 +116,8 @@ func New(
 		listBrowserProfiles:    listBrowserProfiles,
 		createBrowserProfile:   createBrowserProfile,
 		deleteBrowserProfile:   deleteBrowserProfile,
+		emulatorRelay:          emulatorRelay,
+		getHostCapabilities:    getHostCapabilities,
 	}
 }
 

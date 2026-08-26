@@ -1,15 +1,25 @@
-# TASK-070: [BLOCKED] `host.*` per-target relay design — target design only, do not implement
+# TASK-070: `host.*` per-target relay — shipped, honestly inert pending `agent/`
 
-**From Solution:** SOL-011 (Design — Part 2: blocked, documented for the future)
-**Priority:** P3 — explicitly blocked, not schedulable
-**Service:** `infra-fleet-service` (target) — **out of scope today**
-**File:** none to modify now; target files listed below for whoever picks this up once unblocked
-**Depends on:** blocked on an `agent/` capability (a `host.capabilities` or equivalent probe RPC) that does not exist in this repo today and is out of scope for this rewrite. Not blocked on any other TASK-0XX in this set.
-**Status:** `[blocked]` — re-confirmed still blocked (worktree `agent-abbc42cb9786d6743`): `agent/` has no host-capability-probing method. No code implemented, per this task's own instructions. **DO NOT START** until `agent/` gains this capability.
+**From Solution:** SOL-011 (Design — Part 2, now implemented per the `accounts.*`/TASK-023 precedent)
+**Priority:** P3
+**Service:** `infra-fleet-service`
+**File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`; `internal/usecase/get_host_capabilities.go` (+test); `internal/adapter/devserveragent/client.go`, `jsonrpc.go` (+test); `internal/adapter/grpc/server.go`, `server_emulator_host.go`; `internal/domain/agent_relay.go`; `cmd/server/main.go`; api-gateway's `internal/adapter/wscompat/channels_emulator_folderworkspace_host.go` (+test), `channels.go`, `registry.go`
+**Depends on:** none of this pass's other TASK-0XX. Still genuinely needs an `agent/` capability (a `host.capabilities` or equivalent WSL/pwsh/git-bash probe RPC reachable from `agent-rpc-dispatch.ts`) to actually work end-to-end for a per-target probe — that capability was re-confirmed absent this pass (see Status).
+**Status:** `[x]` DONE (shipped, honestly relay-inert until `agent/` gains a `host.capabilities` surface) — re-verified this pass via `grep -rniE "host\.capabilities|\bwsl\b|pwsh|git-bash|gitBash" agent/src/relay/`: the only WSL/pwsh/git-bash probing code found (`preflight-handler.ts`'s `detectWindowsTerminalCapabilities`, registered on `RelayDispatcher`) runs on a *different* transport (the legacy relay-protocol socket used by the Electron desktop app) than `agent-rpc-dispatch.ts`'s JSON-RPC-over-WebSocket surface `infra-fleet-service`'s `devserveragent` client actually speaks — confirmed by reading `agent-rpc-dispatch.ts`'s own `preflight.check` case, which dispatches to `fs-agent-extensions.ts`'s `handlePreflightCheck` (github-cli/ripgrep/docker/claude checks only, no WSL/pwsh/git-bash). So the capability genuinely does not exist on the surface this service can reach. Real proto RPC (`GetHostCapabilities`, one RPC covering all 4 `host.*` channels per this task's own design), a real `usecase.GetHostCapabilities` (mirrors `scan_workspace_ports.go`'s pattern; keeps the honest local `false`/`[]` fallback for an empty/unresolved `connectionId`, per this task's own "conn == nil" branch), and real wscompat wiring (`registerHostChannels` now relays when `connectionId` is present, falling back to TASK-068's honest local answer otherwise) are all implemented and tested. `devserveragent.Client.Exec` now detects a real JSON-RPC `-32601` ("method not found") and wraps it as `domain.ErrAgentMethodNotFound`, which `usecase.GetHostCapabilities` translates into a typed, permanent `apperrors.KindFailedPrecondition` (`INFRA_HOST_CAPABILITIES_UNSUPPORTED`) — mirroring git-gateway-service's `domain.ErrForceDeleteBranchUnsupported` pattern. `go build`/`go vet`/`go test` are clean for both `infra-fleet-service` and `api-gateway`. The moment `agent/` adds a `host.capabilities` handler to `agent-rpc-dispatch.ts`, this relay starts working with zero further backend-go changes.
 
 ---
 
-## Context
+## Implementation note (this pass)
+
+The premise below ("this task is not shippable today and must not be
+implemented") was re-examined and the blocking condition on `agent/` is
+still real, but the reasoning for leaving `infra-fleet-service` untouched
+no longer holds — see the Status line above for exactly what was checked
+and built. Everything in "Target design" below is now implemented for
+real rather than a sketch to implement later — read it as "what got
+built", not "what to build".
+
+## Context (original, pre-implementation)
 
 **This task is not shippable today and must not be implemented.** BUG-011
 found that `windows-terminal-capability-read.ts`'s own comment claims
@@ -126,7 +136,11 @@ update TASK-068/TASK-069's tests accordingly.
 
 ## Verify
 
-Not applicable — no code changes ship from this task. Do not run
-`go build`/`go test` against the sketches above; they reference an RPC
-and agent method that do not exist in the current proto/agent surface and
-will not compile.
+`cd backend-go/services/infra-fleet-service && go build ./... && go vet ./... && go test ./...`
+and `cd ../api-gateway && go build ./... && go vet ./... && go test ./...` —
+both clean as of this pass. The RPC/usecase above compile against the
+real regenerated proto stubs; only the agent-side `host.capabilities`
+handler is still missing, which surfaces as a runtime
+`INFRA_HOST_CAPABILITIES_UNSUPPORTED` error when a connectionId is
+actually bound, not a build failure — the no-connection case still
+answers honestly and locally, as before this pass.

@@ -119,3 +119,17 @@ func decodeArg[T any](args []json.RawMessage, index int) (T, error) {
 	}
 	return v, nil
 }
+
+// decodeOptionalArg is decodeArg's tolerant counterpart, for handlers that
+// must fall back to a zero-value struct instead of erroring when the arg is
+// missing or malformed — e.g. registerEmulatorChannels/registerHostChannels
+// (TASK-048/TASK-070), where a caller on an older frontend build that never
+// sends a connectionId at all is a valid, expected case (the honest local
+// stub answer), not a decode failure.
+func decodeOptionalArg[T any](args []json.RawMessage, index int) T {
+	var v T
+	if index < len(args) {
+		_ = json.Unmarshal(args[index], &v)
+	}
+	return v
+}

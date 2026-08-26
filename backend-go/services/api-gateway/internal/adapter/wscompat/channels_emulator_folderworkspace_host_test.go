@@ -8,17 +8,51 @@ import (
 
 	"google.golang.org/grpc"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 )
 
-// ── emulator.* (TASK-047) ─────────────────────────────────────────────────
+// fakeEmulatorHostClient is a minimal test double scoped to the emulator.*/
+// host.* RPCs this file's channel handlers call (TASK-048/TASK-070).
+type fakeEmulatorHostClient struct {
+	infrafleetv1.InfraFleetServiceClient
 
-func TestRegisterEmulatorChannels_AllReturnHonestNotSupportedError(t *testing.T) {
+	listEmulatorDevicesFunc     func(ctx context.Context, in *infrafleetv1.ListEmulatorDevicesRequest) (*infrafleetv1.ListEmulatorDevicesResponse, error)
+	getEmulatorAvailabilityFunc func(ctx context.Context, in *infrafleetv1.GetEmulatorAvailabilityRequest) (*infrafleetv1.GetEmulatorAvailabilityResponse, error)
+	attachEmulatorSessionFunc   func(ctx context.Context, in *infrafleetv1.AttachEmulatorSessionRequest) (*infrafleetv1.EmulatorSession, error)
+	getHostCapabilitiesFunc     func(ctx context.Context, in *infrafleetv1.GetHostCapabilitiesRequest) (*infrafleetv1.GetHostCapabilitiesResponse, error)
+
+	lastConnectionID string
+}
+
+func (f *fakeEmulatorHostClient) ListEmulatorDevices(ctx context.Context, in *infrafleetv1.ListEmulatorDevicesRequest, _ ...grpc.CallOption) (*infrafleetv1.ListEmulatorDevicesResponse, error) {
+	f.lastConnectionID = in.GetConnectionId()
+	return f.listEmulatorDevicesFunc(ctx, in)
+}
+
+func (f *fakeEmulatorHostClient) GetEmulatorAvailability(ctx context.Context, in *infrafleetv1.GetEmulatorAvailabilityRequest, _ ...grpc.CallOption) (*infrafleetv1.GetEmulatorAvailabilityResponse, error) {
+	f.lastConnectionID = in.GetConnectionId()
+	return f.getEmulatorAvailabilityFunc(ctx, in)
+}
+
+func (f *fakeEmulatorHostClient) AttachEmulatorSession(ctx context.Context, in *infrafleetv1.AttachEmulatorSessionRequest, _ ...grpc.CallOption) (*infrafleetv1.EmulatorSession, error) {
+	f.lastConnectionID = in.GetConnectionId()
+	return f.attachEmulatorSessionFunc(ctx, in)
+}
+
+func (f *fakeEmulatorHostClient) GetHostCapabilities(ctx context.Context, in *infrafleetv1.GetHostCapabilitiesRequest, _ ...grpc.CallOption) (*infrafleetv1.GetHostCapabilitiesResponse, error) {
+	f.lastConnectionID = in.GetConnectionId()
+	return f.getHostCapabilitiesFunc(ctx, in)
+}
+
+// ── emulator.* (TASK-046/TASK-048) ────────────────────────────────────────
+
+func TestRegisterEmulatorChannels_NoConnectionID_ReturnsHonestNotSupportedError(t *testing.T) {
 	r := NewRegistry()
-	registerEmulatorChannels(r)
+	registerEmulatorChannels(r, &fakeEmulatorHostClient{})
 
 	channels := []string{
-		"emulator.attach", "emulator.availability", "emulator.button",
+		"emulator.attach", "emulator.button",
 		"emulator.gesture", "emulator.listDevices", "emulator.rotate",
 		"emulator.shutdown", "emulator.tap",
 	}
@@ -41,11 +75,60 @@ func TestRegisterEmulatorChannels_AllReturnHonestNotSupportedError(t *testing.T)
 	}
 }
 
-// ── host.* (TASK-069) ──────────────────────────────────────────────────────
-
-func TestRegisterHostChannels_HonestLocalAnswers(t *testing.T) {
+// TASK-048 regression test: a connectionId present in the request must
+// prefer the relay path — proving RegisterRealChannels' "relay when
+// connection_id is present" rule for a namespace with NO local fallback
+// (unlike host.* below).
+func TestRegisterEmulatorChannels_WithConnectionID_Relays(t *testing.T) {
+	fake := &fakeEmulatorHostClient{
+		listEmulatorDevicesFunc: func(ctx context.Context, in *infrafleetv1.ListEmulatorDevicesRequest) (*infrafleetv1.ListEmulatorDevicesResponse, error) {
+			return &infrafleetv1.ListEmulatorDevicesResponse{Devices: []*infrafleetv1.EmulatorDevice{{Id: "emulator-5554"}}}, nil
+		},
+	}
 	r := NewRegistry()
-	registerHostChannels(r)
+	registerEmulatorChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"connectionId": "conn-1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "emulator.listDevices", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.lastConnectionID != "conn-1" {
+		t.Errorf("expected connectionId to be forwarded, got %q", fake.lastConnectionID)
+	}
+	devices, ok := result.([]*infrafleetv1.EmulatorDevice)
+	if !ok || len(devices) != 1 || devices[0].GetId() != "emulator-5554" {
+		t.Errorf("unexpected result: %#v", result)
+	}
+}
+
+// GetEmulatorAvailability has no connectionId requirement even in
+// wscompat, unlike every other emulator.* channel — see
+// registerEmulatorChannels's doc comment.
+func TestRegisterEmulatorChannels_Availability_AlwaysRelaysEvenWithoutConnectionID(t *testing.T) {
+	fake := &fakeEmulatorHostClient{
+		getEmulatorAvailabilityFunc: func(ctx context.Context, in *infrafleetv1.GetEmulatorAvailabilityRequest) (*infrafleetv1.GetEmulatorAvailabilityResponse, error) {
+			return &infrafleetv1.GetEmulatorAvailabilityResponse{Available: false, Reason: "no active dev server connection"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerEmulatorChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "emulator.availability", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok || m["available"] != false {
+		t.Errorf("unexpected result: %#v", result)
+	}
+}
+
+// ── host.* (TASK-068/TASK-070) ──────────────────────────────────────────────
+
+func TestRegisterHostChannels_NoConnectionID_HonestLocalAnswers(t *testing.T) {
+	r := NewRegistry()
+	registerHostChannels(r, &fakeEmulatorHostClient{})
 
 	tests := []struct {
 		channel string
@@ -76,6 +159,63 @@ func TestRegisterHostChannels_HonestLocalAnswers(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TASK-070 regression test: a connectionId present in the request must
+// prefer the relay path.
+func TestRegisterHostChannels_WithConnectionID_Relays(t *testing.T) {
+	fake := &fakeEmulatorHostClient{
+		getHostCapabilitiesFunc: func(ctx context.Context, in *infrafleetv1.GetHostCapabilitiesRequest) (*infrafleetv1.GetHostCapabilitiesResponse, error) {
+			return &infrafleetv1.GetHostCapabilitiesResponse{
+				WslAvailable: true, WslDistros: []string{"Ubuntu"}, PwshAvailable: true, GitBashAvailable: false,
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerHostChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"connectionId": "conn-1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "host.wsl.isAvailable", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.lastConnectionID != "conn-1" {
+		t.Errorf("expected connectionId to be forwarded, got %q", fake.lastConnectionID)
+	}
+	m, ok := result.(map[string]bool)
+	if !ok || !m["available"] {
+		t.Errorf("unexpected result: %#v", result)
+	}
+
+	distrosArgs := argsJSON(t, map[string]any{"connectionId": "conn-1"})
+	distrosResult, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "host.wsl.listDistros", distrosArgs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	distros, ok := distrosResult.([]string)
+	if !ok || len(distros) != 1 || distros[0] != "Ubuntu" {
+		t.Errorf("unexpected result: %#v", distrosResult)
+	}
+}
+
+// A real "method not found" translated into apperrors.KindFailedPrecondition
+// by infra-fleet-service surfaces here as an ordinary gRPC error — this file
+// deliberately does not add a second layer of translation on top.
+func TestRegisterHostChannels_RelayError_Propagates(t *testing.T) {
+	wantErr := errors.New("rpc error: code = FailedPrecondition desc = INFRA_HOST_CAPABILITIES_UNSUPPORTED")
+	fake := &fakeEmulatorHostClient{
+		getHostCapabilitiesFunc: func(ctx context.Context, in *infrafleetv1.GetHostCapabilitiesRequest) (*infrafleetv1.GetHostCapabilitiesResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerHostChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"connectionId": "conn-1"})
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "host.wsl.isAvailable", args)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("want error %v, got %v", wantErr, err)
 	}
 }
 
