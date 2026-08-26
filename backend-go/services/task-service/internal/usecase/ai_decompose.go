@@ -54,7 +54,11 @@ func (uc *AIDecompose) Execute(ctx context.Context, in AIDecomposeInput) ([]doma
 	if err != nil {
 		return nil, apperrors.New(apperrors.KindInternal, "TASK_AI_DECOMPOSE_PROVIDER_RESOLVE_FAILED", "failed to resolve AI provider context", err)
 	}
-	connectionID, connected, err := uc.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
+	// worktreePath (2nd return) isn't needed here — AIDecompose relays
+	// through AICompleter's ai.complete method, which has no worktreePath
+	// concept (see AICompleter's doc comment); only SimpleExecutor's
+	// agent.execPrompt call needs it (TASK-224 Gap 1).
+	connectionID, _, connected, err := uc.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil || !connected {
 		// A not-connected project is a real error, never a silent empty
 		// proposal list — see TASK-226's regression test for this.

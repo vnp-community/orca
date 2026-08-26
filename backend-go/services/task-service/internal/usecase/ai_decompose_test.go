@@ -20,12 +20,13 @@ func (f *fakeAIProviderContextResolver) ResolveContext(ctx context.Context, tena
 
 type fakeProjectExecutionResolver struct {
 	connectionID string
+	worktreePath string
 	connected    bool
 	err          error
 }
 
-func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, bool, error) {
-	return f.connectionID, f.connected, f.err
+func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, bool, error) {
+	return f.connectionID, f.worktreePath, f.connected, f.err
 }
 
 type fakeAICompleter struct {

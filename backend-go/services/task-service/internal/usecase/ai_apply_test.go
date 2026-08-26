@@ -12,9 +12,7 @@ func TestAIApply_CreatesSubtaskPerProposalAndLinksParentChild(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1", Title: "Parent"}
 	edges := &fakeEdgeRepository{}
-	createTask := NewCreateTask(tasks)
-	addEdge := NewAddEdge(edges)
-	uc := NewAIApply(createTask, addEdge)
+	uc := NewAIApply(newFakeTxRunner(tasks, edges))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	proposals := []domain.SubtaskProposal{
@@ -49,7 +47,7 @@ func TestAIApply_CreatesSubtaskPerProposalAndLinksParentChild(t *testing.T) {
 func TestAIApply_EmptyProposals_CreatesNothing(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1"}
-	uc := NewAIApply(NewCreateTask(tasks), NewAddEdge(&fakeEdgeRepository{}))
+	uc := NewAIApply(newFakeTxRunner(tasks, &fakeEdgeRepository{}))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	created, err := uc.Execute(ctx, AIApplyInput{TaskID: "parent"})
@@ -65,7 +63,7 @@ func TestAIApply_CreateFailurePropagates(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1"}
 	tasks.createErr = errors.New("boom")
-	uc := NewAIApply(NewCreateTask(tasks), NewAddEdge(&fakeEdgeRepository{}))
+	uc := NewAIApply(newFakeTxRunner(tasks, &fakeEdgeRepository{}))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, AIApplyInput{TaskID: "parent", Proposals: []domain.SubtaskProposal{{Title: "x"}}}); err == nil {
@@ -73,18 +71,21 @@ func TestAIApply_CreateFailurePropagates(t *testing.T) {
 	}
 }
 
-// TestAIApply_MidLoopFailure_SurfacesErrorButLeavesPartialSubtree locks in
-// ai_apply.go's documented non-transactional gap: a failure partway through
-// the proposal loop must be a real, detectable error (never silently
-// swallowed into an apparently-successful partial result) — but, absent a
-// WithTx/UnitOfWork primitive anywhere in this repo (checked, none exists),
-// the first proposal's task+edge are NOT rolled back. This test exists to
-// keep that gap honest and concrete rather than just prose in a doc comment.
-func TestAIApply_MidLoopFailure_SurfacesErrorButLeavesPartialSubtree(t *testing.T) {
+// TestAIApply_MidLoopFailure_RollsBackEntireSubtree closes TASK-224 Gap 2:
+// a failure partway through the proposal loop must be both a real,
+// detectable error AND leave NO partial subtree behind — proposal 1's
+// subtask+edge, already committed inside the same transaction as proposal
+// 2's failing AddEdge call, must roll back together. This replaces the
+// previous (pre-fix) test of the same scenario,
+// TestAIApply_MidLoopFailure_SurfacesErrorButLeavesPartialSubtree, which
+// asserted the OPPOSITE of the last assertion below (that proposal 1's
+// subtask WAS still present) — see ai_apply.go's doc comment for exactly
+// what changed and why.
+func TestAIApply_MidLoopFailure_RollsBackEntireSubtree(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1"}
 	edges := &fakeEdgeRepository{addErr: errors.New("boom"), addErrAfterCalls: 1}
-	uc := NewAIApply(NewCreateTask(tasks), NewAddEdge(edges))
+	uc := NewAIApply(newFakeTxRunner(tasks, edges))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	proposals := []domain.SubtaskProposal{
@@ -100,17 +101,18 @@ func TestAIApply_MidLoopFailure_SurfacesErrorButLeavesPartialSubtree(t *testing.
 		t.Errorf("expected no created subtasks returned to the caller on failure, got %+v", created)
 	}
 
-	// The gap itself, made concrete: proposal 1's subtask IS still present
-	// in the repository despite the error above, because this loop has no
-	// transaction to roll it back — exactly what ai_apply.go's doc comment
-	// flags.
-	foundFirstProposal := false
+	// The fix, made concrete: proposal 1's subtask must NOT remain in the
+	// repository after the rollback, even though its own CreateTask+AddEdge
+	// calls succeeded before proposal 2's AddEdge failed.
 	for _, tk := range tasks.tasks {
 		if tk.Title == "Design API" {
-			foundFirstProposal = true
+			t.Errorf("expected proposal 1's subtask to be rolled back, but found it still committed: %+v", tk)
 		}
 	}
-	if !foundFirstProposal {
-		t.Error("expected proposal 1's subtask to remain committed — if this starts failing, the non-transactional gap in ai_apply.go's doc comment may no longer be accurate")
+	if len(tasks.tasks) != 1 { // only "parent" should remain
+		t.Errorf("expected only the pre-existing parent task to remain, got %d tasks: %+v", len(tasks.tasks), tasks.tasks)
+	}
+	if len(edges.edges) != 0 {
+		t.Errorf("expected no edges to remain after rollback, got %+v", edges.edges)
 	}
 }

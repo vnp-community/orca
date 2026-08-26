@@ -26,18 +26,25 @@ func NewProjectExecutionResolver(client infrafleetv1.InfraFleetServiceClient) *P
 // ResolveConnection asks infra-fleet-service which host owns projectID.
 // Like git-gateway-service's worktreeID, task-service's projectID IS the
 // infra-fleet-service connectionId — passed through verbatim, and echoed
-// back as the connectionID on a successful resolve.
-func (p *ProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, bool, error) {
+// back as the connectionID on a successful resolve. worktreePath is
+// resp.GetRepoPath() verbatim — the same field git-gateway-service's own
+// ConnectionResolver (internal/adapter/grpcclient/resolver.go:82) reads for
+// its ResolvedConnection.RepoPath, per that response message's own doc
+// comment (proto/orca/infrafleet/v1/infrafleet.proto's
+// ResolveConnectionResponse.repo_path: "Callers like git-gateway-service's
+// RelayExecutor need repo_path alongside dev_server to know which path to
+// operate on").
+func (p *ProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, bool, error) {
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
-		return "", false, err
+		return "", "", false, err
 	}
 	resp, err := p.client.ResolveConnection(ctx, &infrafleetv1.ResolveConnectionRequest{ConnectionId: projectID})
 	if err != nil {
-		return "", false, fmt.Errorf("grpcclient: ResolveConnection(%q): %w", projectID, err)
+		return "", "", false, fmt.Errorf("grpcclient: ResolveConnection(%q): %w", projectID, err)
 	}
 	if !resp.GetConnected() {
-		return "", false, nil
+		return "", "", false, nil
 	}
-	return projectID, true, nil
+	return projectID, resp.GetRepoPath(), true, nil
 }

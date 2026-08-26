@@ -15,7 +15,7 @@ import (
 // each service's Relay client is a distinct generated gRPC stub over its
 // own dialed connection to infra-fleet-service.
 //
-// Unlike SimpleExecutor's agent.exec call, this one IS confirmed against
+// This method's "ai.complete" is confirmed against
 // specs/agent/api/agent-rpc-catalog-runtime.md's real ai.complete handler
 // contract (ai-complete-handler.ts:47, cited by git-gateway-service's own
 // RelayExecutor.Complete doc comment): params `prompt(required), format?,

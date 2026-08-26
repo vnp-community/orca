@@ -5,7 +5,82 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `internal/usecase/ports.go`, `internal/usecase/ai_decompose.go`, `ai_apply.go` (new), `internal/adapter/grpcclient/simple_executor.go` (real implementation, replaces `StubSimpleExecutor`), `internal/adapter/grpcclient/project_execution_resolver.go` (new), `internal/adapter/grpcclient/aidecompose_relay.go` (new), `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-223 (`AIApply` reuses `CreateTask`+`AddEdge`'s existing logic; `AIDecompose` reuses `TaskRepository.Get`, unaffected by TASK-223's new methods but grouped here since both this task and TASK-223 touch `ports.go`/`main.go` — rebase onto whichever merges first)
-**Status:** `[partial]` Real `SimpleExecutor`, `ProjectExecutionResolver`, `AICompleter`, `AIProviderContextResolver`, `AIDecompose`/`AIApply` usecases, proto RPCs, gRPC server wiring, and `main.go` dialing of infra-fleet-service + ai-provider-service are all implemented, unit-tested, and passing (`go build`/`go vet` clean; see TASK-226). `ComplexExecutor` stays a stub as specified — out of scope. Re-verified in this pass: `simple_executor.go`'s doc comment is still accurate — `specs/agent/api/agent-rpc-catalog-runtime.md` (confirmed present) still documents `agent.exec` as a `binary/args/cwd`-based "run this literal binary" primitive with **no live backend caller as of 2026-08-16**, superseded by `agent.execPrompt` (`prompt`+`worktreePath`-based) for this exact "dispatch an AI-driven task" use case — switching requires a real design decision (worktreePath resolution, prompt construction, model/account selection) not answered by this port's existing signature or any task-service code, so it remains unchanged, not guessed at. `ai.complete` (`AICompleter`/`AIDecompose`'s relay call) is likewise re-confirmed correct against that same spec, with a real, live backend caller (`TaskAIPlanner.decompose()`). AIApply's known non-transactional gap (no `WithTx`/`UnitOfWork` precedent anywhere in this repo) is unchanged and still flagged in `ai_apply.go`'s doc comment; this pass added `TestAIApply_MidLoopFailure_SurfacesErrorButLeavesPartialSubtree` (`ai_apply_test.go`), which locks in that a mid-loop failure is a real, detectable error to the caller (never a silently-succeeded partial subtree) while concretely demonstrating the first proposal's task does remain committed with no rollback — the gap is surfaced/reportable, not swallowed, exactly per this task's acceptance bar. Both flagged gaps are accepted, documented limitations, not code defects — stays `[partial]` honestly because the underlying design decisions (agent.execPrompt migration, a transaction primitive) are still genuinely unmade, not because anything is broken.
+**Status:** `[x]` DONE. Both gaps this task previously flagged `[partial]` are now genuinely closed, not just re-documented:
+
+- **Gap 1 (agent.exec → agent.execPrompt), closed for real.** Read both RPC
+  handlers in full: `agent/src/relay/agent-rpc-dispatch.ts`'s `case
+  'agent.exec'` (line 913, a generic `binary/args/cwd/stdin/env/timeoutMs`
+  "run this literal binary" primitive, result
+  `{stdout,stderr,exitCode,timedOut}`) and `case 'agent.execPrompt'` (line
+  992, delegating to `agent/src/relay/agent-print-mode-exec.ts`'s
+  `handleAgentExecPrompt`, lines 33-178: required `prompt`+`worktreePath`,
+  optional `stepId`/`trustPreset`/`model` (defaults to `"claude"`, the only
+  supported one)/`accountId`/`env`/`timeoutMs`, result
+  `{stdout,stderr,exitCode,timedOut,stepId}` — no `executionRef` field on
+  either method's REAL result shape; the prior wiring's `{executionRef}`
+  unmarshal target was already a fabrication). Found the real, already-proven
+  param-construction pattern at `backend/src/main/workflow/StepExecutors.ts:101-131`
+  (`executeAgent()`): `relay.call('agent.execPrompt', { stepId, prompt,
+  worktreePath, trustPreset, traceId, ...(resolved ? { accountId,
+  model } : {}) })` — accountId/model omitted ENTIRELY when unresolved,
+  falling back to the agent's own default account. `simple_executor.go`
+  now calls `agent.execPrompt`, resolves `worktreePath` from
+  infra-fleet-service's `ResolveConnectionResponse.repo_path` (the same
+  field git-gateway-service's `ConnectionResolver` already reads for its own
+  `RepoPath`, `internal/usecase/ports.go:26-37` in that service — extended
+  `usecase.ProjectExecutionResolver`'s signature to return it), builds the
+  prompt via a `buildExecutePrompt` helper following `ai_decompose.go`'s
+  existing `buildDecomposePrompt` plain-text convention, and omits
+  `accountId`/`model` per `StepExecutors.ts`'s own established
+  omit-when-unresolved convention (task-service has no per-task
+  AI-provider-account pin today). A non-zero exit code or `timedOut:true` is
+  now a real error, not a synthesized success. See
+  `internal/adapter/grpcclient/simple_executor.go`'s doc comment for the
+  full citation trail and honest limits kept unchanged (still
+  dispatch-only, no completion callback). Tests:
+  `simple_executor_test.go` (method name, params shape, non-zero-exit,
+  timed-out, no-worktree-path cases).
+- **Gap 2 (AIApply's non-transactional loop), closed for real.**
+  Re-searched the WHOLE `backend-go` tree (not just task-service) before
+  writing any code — the "no `WithTx`/`UnitOfWork` precedent exists
+  anywhere in this repo" premise this task previously stated is no longer
+  true (and, per `git log`, wasn't checked broadly enough even when it was
+  written): `project-service`, `issue-tracking-service`, `usage-service`,
+  `orchestration-service`, and `automation-service` all call
+  `pool.Begin(ctx)` directly, and `credential-broker-service` goes further
+  with a named `TxRunner`/`RunInTx` port + `dbtx` pool-or-tx abstraction in
+  its postgres adapter (`internal/usecase/ports.go`'s `TxRunner`,
+  `internal/adapter/postgres/repository.go`'s `dbtx`/`RunInTx` via
+  `pgx.BeginFunc`). Adopted credential-broker-service's `TxRunner` shape
+  exactly: added `usecase.TxRunner` (`RunInTx(ctx, fn func(ctx, tasks
+  TaskRepository, edges EdgeRepository) error) error`), implemented by
+  `internal/adapter/postgres.Repository.RunInTx` via `pgx.BeginFunc` and a
+  `dbtx` interface (`Exec`/`QueryRow`/`Query`) so every existing query
+  method works unchanged whether `r.db` is the pool or an open `pgx.Tx`.
+  `AIApply.Execute` now runs its entire create-subtask+add-edge loop inside
+  one `RunInTx` call; `main.go` wires `repo` itself (which already
+  implements `TxRunner`) into `NewAIApply`. Proof, not just an error path:
+  `internal/usecase/ai_apply_test.go`'s
+  `TestAIApply_MidLoopFailure_RollsBackEntireSubtree` (against an in-memory
+  `fakeTxRunner` mirroring credential-broker-service's own rollback-simulating
+  fake) AND `internal/adapter/postgres/repository_test.go`'s
+  `TestRepository_RunInTx_RollsBackAllWritesOnError` (against a REAL
+  Postgres transaction via testcontainers, forcing a genuine
+  `task_edges_single_parent` unique-constraint violation) both assert the
+  first proposal's subtask+edge do NOT survive after a later proposal
+  fails — not merely that an error is returned. `TestRepository_RunInTx_CommitsAllWritesTogether`
+  covers the happy path against real Postgres too. Both integration tests
+  pass individually (`go test -tags=integration
+  ./internal/adapter/postgres/... -run TestRepository_RunInTx -v`); the
+  package's pre-existing testcontainers readiness check (port-open, not
+  `pg_isready`) is flaky under back-to-back container churn independent of
+  this change — confirmed by re-running `TestRepository_Update_WrongTenant_Fails`
+  (an unrelated, pre-existing test) alone after it flaked in a full-package
+  run, which then passed.
+
+`go build ./... && go vet ./... && go test ./...` is clean for
+`task-service`. `ComplexExecutor` stays a stub as specified — out of
+scope, unchanged.
 
 ---
 

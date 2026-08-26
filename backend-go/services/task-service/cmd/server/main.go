@@ -122,7 +122,12 @@ func run() error {
 	deleteTaskUC := usecase.NewDeleteTask(repo)
 	getDependenciesUC := usecase.NewGetDependencies(repo, repo)
 	aiDecomposeUC := usecase.NewAIDecompose(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter)
-	aiApplyUC := usecase.NewAIApply(createTaskUC, addEdgeUC)
+	// repo also implements usecase.TxRunner (internal/adapter/postgres's
+	// RunInTx) — AIApply needs its create-subtask+add-edge loop to run in
+	// one transaction (TASK-224 Gap 2), not the standalone createTaskUC/
+	// addEdgeUC instances above (those stay wired to the plain CreateTask/
+	// AddEdge RPCs, which don't need a shared transaction).
+	aiApplyUC := usecase.NewAIApply(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(

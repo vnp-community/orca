@@ -9,12 +9,16 @@ import (
 
 // Add persists a single task_edges row. The cycle check runs in the
 // usecase layer (internal/usecase.AddEdge), not here — see that package's
-// doc comment. NOTE: this is a plain INSERT, not wrapped in the same
-// transaction as the cycle-check SELECT that precedes it in the usecase —
-// task-service.md §8 calls for check-and-write atomicity this scaffold
-// doesn't provide yet; see this service's README.
+// doc comment. NOTE: on AddEdge's own standalone RPC path, this is a plain
+// INSERT against r.db (the pool), not wrapped in the same transaction as
+// the cycle-check SELECT that precedes it in the usecase — task-service.md
+// §8 calls for check-and-write atomicity that path doesn't provide yet; see
+// this service's README. This is a DIFFERENT, narrower gap than TASK-224
+// Gap 2 (AIApply's create-subtask+add-edge loop): when Add runs inside
+// Repository.RunInTx's fn (r.db is a pgx.Tx there), it participates in that
+// transaction correctly — see ai_apply.go's doc comment.
 func (r *Repository) Add(ctx context.Context, tenantID string, edge domain.TaskEdge) error {
-	_, err := r.pool.Exec(ctx, `
+	_, err := r.db.Exec(ctx, `
 		INSERT INTO task.task_edges (tenant_id, from_task_id, to_task_id, edge_type)
 		VALUES ($1, $2, $3, $4)
 	`, tenantID, edge.FromTaskID, edge.ToTaskID, string(edge.Kind))
@@ -30,7 +34,7 @@ func (r *Repository) Add(ctx context.Context, tenantID string, edge domain.TaskE
 // this query simple; see this service's README for the scale follow-up
 // task-service.md §8 flags for large hierarchies.
 func (r *Repository) ListByKind(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
-	rows, err := r.pool.Query(ctx, `
+	rows, err := r.db.Query(ctx, `
 		SELECT from_task_id, to_task_id, edge_type
 		FROM task.task_edges
 		WHERE tenant_id = $1 AND edge_type = $2
@@ -45,7 +49,7 @@ func (r *Repository) ListByKind(ctx context.Context, tenantID string, kind domai
 // ListFrom returns the edges of the given kind originating at fromTaskID —
 // used by the Execute usecase's complexity branch (§3.1).
 func (r *Repository) ListFrom(ctx context.Context, tenantID, fromTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
-	rows, err := r.pool.Query(ctx, `
+	rows, err := r.db.Query(ctx, `
 		SELECT from_task_id, to_task_id, edge_type
 		FROM task.task_edges
 		WHERE tenant_id = $1 AND from_task_id = $2 AND edge_type = $3

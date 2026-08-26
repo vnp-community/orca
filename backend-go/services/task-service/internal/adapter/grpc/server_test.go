@@ -148,8 +148,8 @@ type fakeProjectExecutionResolver struct {
 	connected    bool
 }
 
-func (f fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, bool, error) {
-	return f.connectionID, f.connected, nil
+func (f fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, bool, error) {
+	return f.connectionID, "", f.connected, nil
 }
 
 type fakeAICompleter struct {
@@ -169,6 +169,20 @@ func ctxWithTenant(t *testing.T) context.Context {
 	return tenant.WithTenantID(context.Background(), "tenant-1")
 }
 
+// fakeTxRunner is a pass-through usecase.TxRunner for this file's wiring/
+// contract tests — no rollback simulation needed here (that's
+// internal/usecase/ai_apply_test.go's job); this just proves AIApply is
+// wired to a TxRunner reaching the same tasks/edges fakes the rest of
+// newTestServer's usecases share.
+type fakeTxRunner struct {
+	tasks *fakeTaskRepository
+	edges *fakeEdgeRepository
+}
+
+func (f fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context, tasks usecase.TaskRepository, edges usecase.EdgeRepository) error) error {
+	return fn(ctx, f.tasks, f.edges)
+}
+
 func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server {
 	createTaskUC := usecase.NewCreateTask(tasks)
 	addEdgeUC := usecase.NewAddEdge(edges)
@@ -185,7 +199,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		usecase.NewDeleteTask(tasks),
 		usecase.NewGetDependencies(tasks, edges),
 		usecase.NewAIDecompose(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "1. Do X"}),
-		usecase.NewAIApply(createTaskUC, addEdgeUC),
+		usecase.NewAIApply(fakeTxRunner{tasks: tasks, edges: edges}),
 	)
 }
 

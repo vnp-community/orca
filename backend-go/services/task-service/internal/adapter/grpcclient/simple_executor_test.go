@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -84,19 +85,24 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 // infra-fleet-service call.
 type fakeProjectExecutionResolver struct {
 	connectionID string
+	worktreePath string
 	connected    bool
 	err          error
 }
 
-func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, bool, error) {
-	return f.connectionID, f.connected, f.err
+func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, bool, error) {
+	return f.connectionID, f.worktreePath, f.connected, f.err
 }
 
-func TestSimpleExecutor_Execute_RelaysAgentExec(t *testing.T) {
+// TestSimpleExecutor_Execute_RelaysAgentExecPrompt locks in TASK-224 Gap 1's
+// fix: SimpleExecutor must call "agent.execPrompt" (prompt/worktreePath),
+// not "agent.exec" (binary/args/cwd) — see simple_executor.go's doc comment
+// for the full source citation behind this.
+func TestSimpleExecutor_Execute_RelaysAgentExecPrompt(t *testing.T) {
 	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
-	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{
-		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"executionRef":"exec-123"}`},
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
 	}
 	exec := NewSimpleExecutor(tasks, resolver, relay)
 
@@ -104,14 +110,24 @@ func TestSimpleExecutor_Execute_RelaysAgentExec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ref != "exec-123" {
-		t.Errorf("expected executionRef to pass through, got %q", ref)
+	if ref != "task-exec:t1:req-1" {
+		t.Errorf("expected a synthesized executionRef, got %q", ref)
 	}
-	if relay.gotRelay.GetMethod() != "agent.exec" {
-		t.Errorf("expected method=agent.exec, got %q", relay.gotRelay.GetMethod())
+	if relay.gotRelay.GetMethod() != "agent.execPrompt" {
+		t.Errorf("expected method=agent.execPrompt, got %q", relay.gotRelay.GetMethod())
 	}
 	if relay.gotRelay.GetConnectionId() != "conn-1" {
 		t.Errorf("expected resolved connectionId to be used, got %q", relay.gotRelay.GetConnectionId())
+	}
+	var sentParams agentExecPromptParams
+	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
+		t.Fatalf("params_json didn't decode: %v", err)
+	}
+	if sentParams.WorktreePath != "/srv/worktrees/p1" {
+		t.Errorf("expected resolved worktreePath to be forwarded, got %q", sentParams.WorktreePath)
+	}
+	if sentParams.Prompt == "" {
+		t.Error("expected a non-empty prompt naming the task")
 	}
 }
 
@@ -132,6 +148,24 @@ func TestSimpleExecutor_NotConnected_ReturnsTypedError(t *testing.T) {
 	}
 }
 
+// TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError covers
+// agent.execPrompt's required worktreePath field having nothing to resolve
+// it from — a distinct failure mode from "not connected at all".
+func TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true, worktreePath: ""}
+	exec := NewSimpleExecutor(tasks, resolver, &fakeInfraFleetServiceClient{})
+
+	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1")
+	if err == nil {
+		t.Fatal("expected a real error when connected but no worktreePath resolved")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Kind != apperrors.KindFailedPrecondition {
+		t.Fatalf("expected KindFailedPrecondition, got %v", err)
+	}
+}
+
 func TestSimpleExecutor_TaskNotFound(t *testing.T) {
 	exec := NewSimpleExecutor(&fakeTaskRepository{tasks: map[string]domain.Task{}}, &fakeProjectExecutionResolver{}, &fakeInfraFleetServiceClient{})
 	if _, err := exec.Execute(context.Background(), "tenant-1", "does-not-exist", "req-1"); err == nil {
@@ -141,11 +175,44 @@ func TestSimpleExecutor_TaskNotFound(t *testing.T) {
 
 func TestSimpleExecutor_RelayErrorPropagates(t *testing.T) {
 	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
-	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{relayErr: errors.New("boom")}
 	exec := NewSimpleExecutor(tasks, resolver, relay)
 
 	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
 		t.Fatal("expected an error when the relay call fails")
+	}
+}
+
+// TestSimpleExecutor_NonZeroExitCode_ReturnsError proves a failed
+// agent.execPrompt run (non-zero exit) surfaces as a real error rather than
+// a successful executionRef — there is no separate completion callback to
+// catch this later (see simple_executor.go's doc comment's honest-limits
+// note).
+func TestSimpleExecutor_NonZeroExitCode_ReturnsError(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"boom","exitCode":1,"timedOut":false}`},
+	}
+	exec := NewSimpleExecutor(tasks, resolver, relay)
+
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
+		t.Fatal("expected an error for a non-zero agent.execPrompt exit code")
+	}
+}
+
+// TestSimpleExecutor_TimedOut_ReturnsError mirrors the non-zero-exit case
+// for agent.execPrompt's other failure signal.
+func TestSimpleExecutor_TimedOut_ReturnsError(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":null,"timedOut":true}`},
+	}
+	exec := NewSimpleExecutor(tasks, resolver, relay)
+
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
+		t.Fatal("expected an error for a timed-out agent.execPrompt run")
 	}
 }
