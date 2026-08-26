@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a0480f57a839cc758` (accounts/aiProvider/browser/credentials pass, merged into `integration/missing-v1` as commit `cc3eb16ba`); proto RPCs (ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile) confirmed present in infrafleet.proto and wired end-to-end — this task doc's own Status line was never updated by that pass (a task-doc-capture gap, not a missing-code gap).
 
 ---
 

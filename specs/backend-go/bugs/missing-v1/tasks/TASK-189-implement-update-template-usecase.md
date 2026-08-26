@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `internal/domain/template.go`, `internal/usecase/ports.go`, `internal/usecase/update_template.go` (new), `internal/adapter/postgres/repository.go`, `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-188
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-aa8bd8599a599323a` (team/terminal/workflow/worktree pass, merged into `integration/missing-v1` as commit `baa34819a`); this task doc's own Status line was never updated by that implementing pass (a task-doc-capture gap, not a missing-code gap) — verified against the current merged code+tests during a later re-audit: build/vet/test clean.
 
 ---
 

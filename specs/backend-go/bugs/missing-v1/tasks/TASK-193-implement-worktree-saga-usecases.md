@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `internal/usecase/ports.go`, `internal/usecase/create_worktree.go`, `remove_worktree.go`, `detect_worktrees.go`, `prefetch_create_base.go`, `resolve_pr_base.go`, `resolve_mr_base.go` (all new), `internal/adapter/localgit/executor.go`, `internal/adapter/grpcclient/relay_executor.go`, `internal/adapter/grpcclient/project_client.go` (new), `internal/adapter/scmclient/` (new package)
 **Depends on:** TASK-192
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-aa8bd8599a599323a` (team/terminal/workflow/worktree pass, merged into `integration/missing-v1` as commit `baa34819a`); this task doc's own Status line was never updated by that implementing pass (a task-doc-capture gap, not a missing-code gap) — verified against the current merged code+tests during a later re-audit: build/vet/test clean.
 
 ---
 

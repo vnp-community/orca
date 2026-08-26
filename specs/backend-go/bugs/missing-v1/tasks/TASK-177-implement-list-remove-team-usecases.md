@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `internal/usecase/ports.go`, `internal/usecase/list_teams.go` (new), `internal/usecase/remove_team_member.go` (new), `internal/adapter/postgres/team_repository.go`, `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-176
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-aa8bd8599a599323a` (team/terminal/workflow/worktree pass, merged into `integration/missing-v1` as commit `baa34819a`); this task doc's own Status line was never updated by that implementing pass (a task-doc-capture gap, not a missing-code gap) — verified against the current merged code+tests during a later re-audit: build/vet/test clean.
 
 ---
 
