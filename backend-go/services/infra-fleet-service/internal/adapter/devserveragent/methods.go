@@ -1,12 +1,13 @@
-// methods.go holds the typed pty.* JSON-RPC wrappers TASK-181 adds to
-// DevServerAgentClient (SpawnPty/WritePty/ResizePty/KillPty/AgentStatus/
-// InspectProcess — StreamPty lives in client.go alongside session
-// management, see that file). Every method name/param shape below EXCEPT
-// AgentStatus/InspectProcess is grounded in the real agent source
-// (agent/src/relay/agent-rpc-dispatch.ts's pty.* case block and
-// pty-daemon-client.ts's exported handlers) — see each doc comment for the
-// exact citation. AgentStatus/InspectProcess are FLAGGED best-effort: see
-// their own doc comments below.
+// methods.go holds the typed pty.* JSON-RPC wrappers TASK-181/183 add to
+// DevServerAgentClient (SpawnPty/WritePty/ResizePty/KillPty/SendSignal/
+// AgentStatus/InspectProcess — StreamPty lives in client.go alongside
+// session management, see that file). Every method name/param shape below
+// EXCEPT AgentStatus's ReadyForInput heuristic is grounded in the real
+// agent source (agent/src/relay/agent-rpc-dispatch.ts's pty.* case block,
+// pty-daemon-client.ts's exported handlers, and
+// pty-agent-bridge.ts's real per-method implementations) — see each doc
+// comment for the exact citation. AgentStatus.ReadyForInput remains a
+// documented heuristic: see its own doc comment for why.
 package devserveragent
 
 import (
@@ -101,14 +102,42 @@ func (c *Client) KillPty(ctx context.Context, devServer domain.DevServer, ptyID 
 	return err
 }
 
-// ptyProcessSummary mirrors pty-handler.ts's PtyProcessSummary — confirmed
-// via that file's private listProcesses() method, which builds exactly
-// {id, cwd, title, terminalHandle?} per live pty. terminalHandle is omitted
-// here: neither AgentStatus nor InspectProcess needs it.
+// allowedSignals mirrors agent/src/relay/pty-agent-bridge.ts's
+// ALLOWED_SIGNALS set exactly — the agent rejects (-32602) anything outside
+// this set, so failing fast here gives a clearer error than a round trip.
+var allowedSignals = map[string]bool{
+	"SIGTERM": true, "SIGKILL": true, "SIGINT": true, "SIGHUP": true, "SIGTSTP": true,
+}
+
+// SendSignal calls pty.sendSignal — CONFIRMED real (TASK-183): the RPC is
+// registered in agent/src/relay/agent-rpc-dispatch.ts's 'pty.sendSignal'
+// case, forwarded verbatim by pty-daemon-client.ts's handlePtySendSignal to
+// the daemon-side implementation in pty-agent-bridge.ts's own
+// handlePtySendSignal, whose doc comment confirms
+// `Params: { id, signal }` and ALLOWED_SIGNALS = {SIGTERM, SIGKILL, SIGINT,
+// SIGHUP, SIGTSTP}. This replaces the former StopTerminalProcess-sends-
+// Ctrl-C(0x03)-via-WritePty workaround with a real signal primitive.
+func (c *Client) SendSignal(ctx context.Context, devServer domain.DevServer, ptyID string, signal string) error {
+	if !allowedSignals[signal] {
+		return fmt.Errorf("devserveragent: signal %q not in the agent's allowed set (SIGTERM/SIGKILL/SIGINT/SIGHUP/SIGTSTP)", signal)
+	}
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return err
+	}
+	_, err = sess.call(ctx, "pty.sendSignal", map[string]any{"id": ptyID, "signal": signal})
+	return err
+}
+
+// ptyProcessSummary mirrors pty-agent-bridge.ts's handlePtyListProcesses
+// result shape: {id, cwd, title, pid} per live pty (pid added in this pass —
+// see that function's doc comment — so InspectProcess can report a real pid
+// instead of always 0).
 type ptyProcessSummary struct {
 	ID    string `json:"id"`
 	Cwd   string `json:"cwd"`
 	Title string `json:"title"`
+	Pid   int32  `json:"pid"`
 }
 
 // findPtyProcess calls pty.listProcesses (confirmed real, see
@@ -154,17 +183,20 @@ var knownAgentTitles = []struct {
 // AgentStatus answers "is an agentic CLI running in this pane, and is it
 // ready for input" (GetTerminalAgentStatusResponse).
 //
-// FLAGGED (TASK-183): grepping agent/src/relay for an agent-status/
-// isRunningAgent pty.* RPC found nothing — there is no dedicated primitive
-// in the confirmed catalog. This is a best-effort heuristic built on
-// pty.listProcesses (see findPtyProcess): AgentRunning/AgentKind come from
-// matching the foreground process title against knownAgentTitles;
-// ReadyForInput is simply set equal to AgentRunning, since listProcesses's
-// {id,cwd,title} shape carries no busy/idle signal to distinguish "actively
-// streaming a response" from "idle at a prompt". Treat this whole method as
-// unconfirmed against a real agent build — a real implementation likely
-// needs a new agent-side RPC this pass did not add (agent/ changes were out
-// of scope here).
+// CONFIRMED (TASK-183 follow-up): grepping agent/src/relay for an
+// agent-status/isRunningAgent pty.* RPC still finds nothing — there is no
+// dedicated primitive in the real catalog, and this remains a heuristic
+// built on pty.listProcesses (see findPtyProcess): AgentRunning/AgentKind
+// come from matching the foreground process title against knownAgentTitles.
+// ReadyForInput is STILL set equal to AgentRunning and genuinely can't be
+// improved without an agent-side change beyond this pass's scope:
+// pty-agent-bridge.ts's handlePtyListProcesses (the confirmed real
+// implementation) reports only {id,cwd,title,pid} — no busy/idle signal
+// exists anywhere in the agent's pty.* RPC surface to distinguish "actively
+// streaming a response" from "idle at a prompt". Closing this for real needs
+// a new agent-side RPC (e.g. a raw-output-quiescence timer or an explicit
+// prompt-detection signal), not just wiring — left as a known, honestly
+// documented gap.
 func (c *Client) AgentStatus(ctx context.Context, devServer domain.DevServer, ptyID string) (usecase.AgentStatusResult, error) {
 	proc, found, err := c.findPtyProcess(ctx, devServer, ptyID)
 	if err != nil {
@@ -190,15 +222,16 @@ func agentKindFromTitle(title string) string {
 
 // InspectProcess answers InspectTerminalProcessRequest — Known=true when
 // pty.listProcesses reports an entry for ptyID (Command=its title,
-// Cwd=its cwd), Known=false otherwise (a real "unknown", per
+// Cwd=its cwd, Pid=its pid), Known=false otherwise (a real "unknown", per
 // InspectTerminalProcessResponse's own doc comment, not a fabricated zero
 // value).
 //
-// Pid is always 0 — FLAGGED: pty-handler.ts's listProcesses() result shape
-// ({id,cwd,title}) has no pid field; a real pid lives in the separate
-// pty.serialize RPC, which needs an explicit id list and returns a
-// different shape ({id,pid,cols,rows,cwd,...}) — wiring that in is a known
-// gap left for a follow-up, not implemented by this pass.
+// Pid is now real (TASK-183 follow-up): pty-agent-bridge.ts's
+// handlePtyListProcesses was extended to include `pid: entry.pty.pid`
+// (previously {id,cwd,title} only) specifically so this method didn't have
+// to hardcode 0. Note this is the PTY's own (shell) process id, not
+// necessarily the foreground child process's pid — the agent has no RPC
+// that exposes the latter.
 func (c *Client) InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (usecase.InspectProcessResult, error) {
 	proc, found, err := c.findPtyProcess(ctx, devServer, ptyID)
 	if err != nil {
@@ -207,5 +240,5 @@ func (c *Client) InspectProcess(ctx context.Context, devServer domain.DevServer,
 	if !found {
 		return usecase.InspectProcessResult{Known: false}, nil
 	}
-	return usecase.InspectProcessResult{Known: true, Command: proc.Title, Cwd: proc.Cwd}, nil
+	return usecase.InspectProcessResult{Known: true, Command: proc.Title, Cwd: proc.Cwd, Pid: proc.Pid}, nil
 }

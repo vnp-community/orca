@@ -6,6 +6,7 @@ import { registerTraceSink, type TraceEvent } from '../shared/trace'
 // Each spawn() call returns a fresh fake IPty whose onData/onExit callbacks
 // are captured so tests can drive output/exit deterministically.
 type FakePty = {
+  pid: number
   onData: (cb: (data: string) => void) => void
   onExit: (cb: (e: { exitCode: number; signal?: number }) => void) => void
   write: ReturnType<typeof vi.fn>
@@ -15,10 +16,12 @@ type FakePty = {
   emitExit: (exitCode: number, signal?: number) => void
 }
 
+let nextFakePid = 1000
 function makeFakePty(): FakePty {
   let dataCb: ((data: string) => void) | null = null
   let exitCb: ((e: { exitCode: number; signal?: number }) => void) | null = null
   return {
+    pid: nextFakePid++,
     onData: (cb) => { dataCb = cb },
     onExit: (cb) => { exitCb = cb },
     write: vi.fn(),
@@ -296,6 +299,22 @@ describe('pty-agent-bridge — terminal:* tracing (CR-TRACE-003)', () => {
       await handlePtySendSignal(2, { id: created.result.id, signal }, log)
     }
     expect(events.filter((e) => e.flow === 'terminal:destroy')).toHaveLength(0)
+  })
+
+  // Locks in the {id,cwd,title,pid} shape backend-go's
+  // devserveragent/methods.go decodes — pid was added so InspectProcess can
+  // report a real pid instead of always 0 (see infra-fleet-service TASK-183).
+  it('handlePtyListProcesses includes the real pty pid alongside id/cwd/title', async () => {
+    const { handlePtyCreate, handlePtyListProcesses } = await import('./pty-agent-bridge')
+    const created = (await handlePtyCreate(1, {}, log, vi.fn())) as { result: { id: string; cwd: string } }
+    const spawnedPid = lastSpawnedPty?.pid
+    expect(spawnedPid).toBeDefined()
+
+    const listed = (await handlePtyListProcesses(2, {}, log)) as { result: Array<{ id: string; cwd: string; title: string; pid: number }> }
+    const entry = listed.result.find((p) => p.id === created.result.id)
+    expect(entry).toBeDefined()
+    expect(entry?.pid).toBe(spawnedPid)
+    expect(entry?.cwd).toBe(created.result.cwd)
   })
 
   it('handlePtyWrite does NOT emit any trace span regardless of call count', async () => {

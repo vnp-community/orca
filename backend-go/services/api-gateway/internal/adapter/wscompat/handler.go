@@ -86,6 +86,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// happen to attach the same pty_id (see channels_terminal.go's package
 	// doc comment).
 	ctx := terminalStreamsContext(r.Context(), newTerminalStreamRegistry())
+	// binaryStreamRouterContext attaches a fresh, connection-scoped
+	// binaryStreamRouter (binary_stream_registry.go) so terminal.multiplex
+	// (and any future binary-framed channel) can demux inbound WS binary
+	// frames by StreamID without a StreamID collision across unrelated
+	// connections — same per-connection principle as terminalStreamsContext
+	// just above.
+	ctx = binaryStreamRouterContext(ctx, newBinaryStreamRouter())
 
 	// writeMu serializes writes to conn — coder/websocket, like most WS
 	// libraries, does not allow concurrent writers on one connection. Reads
@@ -106,9 +113,42 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var writeMu sync.Mutex
 
 	for {
-		var msg InboundMessage
-		if err := wsjson.Read(ctx, conn, &msg); err != nil {
+		// Read raw frames (not wsjson.Read) so a WS BINARY message —
+		// terminal.multiplex's opcode-framed sub-protocol
+		// (terminal_stream_frame.go) — never reaches json.Unmarshal. Before
+		// this change, ANY binary frame on this connection made wsjson.Read
+		// try to JSON-decode raw multiplex bytes, fail, and close the
+		// connection (websocket.StatusInvalidFramePayloadData) — silently
+		// breaking every other channel on the same connection too.
+		typ, data, err := conn.Read(ctx)
+		if err != nil {
 			// Normal on client disconnect/navigation — not logged as an error.
+			return
+		}
+
+		if typ == websocket.MessageBinary {
+			frame, ferr := DecodeTerminalStreamFrame(data)
+			if ferr != nil {
+				h.Logger.WarnContext(ctx, "wscompat: dropping malformed binary frame", slog.Any("error", ferr))
+				continue
+			}
+			// Dispatched in its own goroutine, same as every JSON invoke/send
+			// below — a Subscribe frame's AttachPty call (or any other slow
+			// handler) must not block reading the NEXT frame on this
+			// connection, including frames for other streamIds (the exact
+			// class of bug ServeHTTP's own "Concurrency" comment documents
+			// for the JSON path).
+			if router := binaryStreamRouterFromContext(ctx); router != nil {
+				go router.dispatch(frame)
+			}
+			continue
+		}
+
+		var msg InboundMessage
+		if err := json.Unmarshal(data, &msg); err != nil {
+			// Matches wsjson.Read's own failure behavior (see its doc
+			// comment) for a text frame that isn't valid JSON.
+			_ = conn.Close(websocket.StatusInvalidFramePayloadData, "failed to unmarshal JSON")
 			return
 		}
 
@@ -147,14 +187,32 @@ func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeM
 	dispatchCtx, dispatchCancel := context.WithTimeout(ctx, invokeTimeout)
 	defer dispatchCancel()
 
-	// Check the stream-channel path first (e.g. terminal.create): its ack
-	// AND its events channel both come out of one call — see
-	// DispatchStreamChannel's doc comment. Everything else falls through to
-	// the ordinary Dispatch path, exactly as before.
-	ack, events, isStreamChannel, err := h.Registry.DispatchStreamChannel(dispatchCtx, identity, msg.Channel, msg.Args)
-	result := ack
-	if !isStreamChannel {
-		result, err = h.Registry.Dispatch(dispatchCtx, identity, msg.Channel, msg.Args)
+	// Check the binary-stream path first (e.g. terminal.multiplex): its IO
+	// is bound to ctx, NOT dispatchCtx — the binary sub-protocol must
+	// outlive this one invoke's invokeTimeout deadline, same reasoning as
+	// channels_terminal.go's attachContext for AttachPty streams.
+	var result any
+	var events <-chan PushEvent
+	var isStreamChannel bool
+	var err error
+	if bh, ok := h.Registry.BinaryStreamHandlerFor(msg.Channel); ok {
+		// ctx, NOT dispatchCtx: dispatchCtx is cancelled by this very
+		// function's `defer dispatchCancel()` the moment handleInvoke
+		// returns (right after writing the ack below) — a
+		// BinaryStreamChannelHandler that watched dispatchCtx.Done() would
+		// tear its whole sub-protocol down within microseconds of acking,
+		// not when the connection actually closes. See BinaryStreamChannelHandler's
+		// doc comment.
+		result, err = bh(ctx, identity, msg.Args, h.binaryStreamIO(ctx, conn, writeMu))
+	} else {
+		// Check the stream-channel path next (e.g. terminal.create): its ack
+		// AND its events channel both come out of one call — see
+		// DispatchStreamChannel's doc comment. Everything else falls through
+		// to the ordinary Dispatch path, exactly as before.
+		result, events, isStreamChannel, err = h.Registry.DispatchStreamChannel(dispatchCtx, identity, msg.Channel, msg.Args)
+		if !isStreamChannel {
+			result, err = h.Registry.Dispatch(dispatchCtx, identity, msg.Channel, msg.Args)
+		}
 	}
 
 	// Attempt to acquire writeMu; log if we have to wait significantly
@@ -192,6 +250,30 @@ func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeM
 	// subscription must outlive this one invoke.
 	if isStreamChannel && err == nil && events != nil {
 		go pipePush(ctx, conn, writeMu, events)
+	}
+}
+
+// binaryStreamIO builds the BinaryStreamIO a BinaryStreamChannelHandler uses
+// to speak the binary sub-protocol on conn. SendBinary shares writeMu with
+// every other write path on this connection (handleInvoke's own
+// wsjson.Write, pipePush) — coder/websocket forbids concurrent writers on
+// one connection, the same reason every other write in this package already
+// serializes through writeMu. ctx is the connection-lifetime context (see
+// handleInvoke's call site for why it is NOT dispatchCtx).
+func (h *Handler) binaryStreamIO(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex) BinaryStreamIO {
+	router := binaryStreamRouterFromContext(ctx)
+	return BinaryStreamIO{
+		SendBinary: func(frame []byte) bool {
+			writeMu.Lock()
+			defer writeMu.Unlock()
+			return conn.Write(ctx, websocket.MessageBinary, frame) == nil
+		},
+		RegisterFrameHandler: func(streamID uint32, hnd BinaryFrameHandler) func() {
+			if router == nil {
+				return func() {}
+			}
+			return router.register(streamID, hnd)
+		},
 	}
 }
 

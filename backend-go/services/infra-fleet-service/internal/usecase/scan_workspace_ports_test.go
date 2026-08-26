@@ -30,8 +30,8 @@ type fakeDevServerAgentClient struct {
 
 	// healthy/healthErr drive Health's fake answer — used by
 	// establish_connection_test.go.
-	healthy   bool
-	healthErr error
+	healthy        bool
+	healthErr      error
 	spawnPtyResult SpawnPtyResult
 	spawnPtyErr    error
 	spawnPtyCalls  []SpawnPtyInput
@@ -44,6 +44,9 @@ type fakeDevServerAgentClient struct {
 
 	killPtyErr   error
 	killPtyCalls []string
+
+	sendSignalErr   error
+	sendSignalCalls []string // "ptyID:signal", for assertions
 
 	// streamPtyEvents, if non-nil, is returned as-is from StreamPty — the
 	// test owns writing to (and closing) it. streamPtyUnsubscribed records
@@ -111,6 +114,13 @@ func (f *fakeDevServerAgentClient) KillPty(ctx context.Context, devServer domain
 	f.killPtyCalls = append(f.killPtyCalls, ptyID)
 	f.mu.Unlock()
 	return f.killPtyErr
+}
+
+func (f *fakeDevServerAgentClient) SendSignal(ctx context.Context, devServer domain.DevServer, ptyID string, signal string) error {
+	f.mu.Lock()
+	f.sendSignalCalls = append(f.sendSignalCalls, ptyID+":"+signal)
+	f.mu.Unlock()
+	return f.sendSignalErr
 }
 
 func (f *fakeDevServerAgentClient) StreamPty(ctx context.Context, devServer domain.DevServer, ptyID string) (<-chan PtyEvent, func(), error) {

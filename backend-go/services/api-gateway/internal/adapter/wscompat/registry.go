@@ -35,6 +35,7 @@ type Registry struct {
 	handlers              map[string]ChannelHandler
 	streamHandlers        map[string]StreamHandler
 	streamChannelHandlers map[string]StreamChannelHandler
+	binaryStreamHandlers  map[string]BinaryStreamChannelHandler
 }
 
 func NewRegistry() *Registry {
@@ -42,6 +43,7 @@ func NewRegistry() *Registry {
 		handlers:              make(map[string]ChannelHandler),
 		streamHandlers:        make(map[string]StreamHandler),
 		streamChannelHandlers: make(map[string]StreamChannelHandler),
+		binaryStreamHandlers:  make(map[string]BinaryStreamChannelHandler),
 	}
 }
 
@@ -90,6 +92,25 @@ func (r *Registry) RegisterStream(channel string, h StreamHandler) {
 // StreamHandlerFor resolves channel's registered StreamHandler, if any.
 func (r *Registry) StreamHandlerFor(channel string) (StreamHandler, bool) {
 	h, ok := r.streamHandlers[channel]
+	return h, ok
+}
+
+// RegisterBinaryStreamHandler adds or replaces channel's
+// BinaryStreamChannelHandler (binary_stream_registry.go) — e.g.
+// terminal.multiplex. A channel is registered as exactly one of
+// ChannelHandler, StreamHandler, StreamChannelHandler, or
+// BinaryStreamChannelHandler, never more than one of the four.
+func (r *Registry) RegisterBinaryStreamHandler(channel string, h BinaryStreamChannelHandler) {
+	r.binaryStreamHandlers[channel] = h
+}
+
+// BinaryStreamHandlerFor resolves channel's registered
+// BinaryStreamChannelHandler, if any — checked by Handler.handleInvoke
+// before falling through to DispatchStreamChannel/Dispatch, the same
+// "check the more specific registration first" shape handler.go's ServeHTTP
+// already uses for StreamHandlerFor.
+func (r *Registry) BinaryStreamHandlerFor(channel string) (BinaryStreamChannelHandler, bool) {
+	h, ok := r.binaryStreamHandlers[channel]
 	return h, ok
 }
 

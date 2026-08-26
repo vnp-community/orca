@@ -165,6 +165,15 @@ type DevServerAgentClient interface {
 	ResizePty(ctx context.Context, devServer domain.DevServer, ptyID string, cols, rows int32) error
 	// KillPty calls pty.destroy.
 	KillPty(ctx context.Context, devServer domain.DevServer, ptyID string, graceful bool) error
+	// SendSignal calls the real pty.sendSignal RPC (confirmed in
+	// agent/src/relay/agent-rpc-dispatch.ts's 'pty.sendSignal' case and its
+	// real handler, agent/src/relay/pty-agent-bridge.ts's
+	// handlePtySendSignal) — a dedicated signal-delivery primitive that
+	// TASK-181's original port list omitted. signal must be one of the
+	// agent's ALLOWED_SIGNALS (SIGTERM/SIGKILL/SIGINT/SIGHUP/SIGTSTP) — see
+	// devserveragent/methods.go's SendSignal doc comment. Replaces the
+	// former StopTerminalProcess-sends-Ctrl-C-via-WritePty workaround.
+	SendSignal(ctx context.Context, devServer domain.DevServer, ptyID string, signal string) error
 	// StreamPty subscribes to ptyID's pty.data/pty.exit/pty.replay
 	// notifications over devServer's persistent session (see
 	// devserveragent/session.go's notification demux) and returns a
@@ -174,14 +183,18 @@ type DevServerAgentClient interface {
 	// and usecase.WaitTerminalSession are the two callers.
 	StreamPty(ctx context.Context, devServer domain.DevServer, ptyID string) (<-chan PtyEvent, func(), error)
 	// AgentStatus answers both terminal.agentStatus and terminal.isRunningAgent
-	// (see GetTerminalAgentStatusResponse's doc comment) — FLAGGED best-effort,
-	// see devserveragent/methods.go's AgentStatus doc comment for exactly
-	// what this is derived from (there is no dedicated agent-status RPC in
-	// the real pty.* catalog this pass could confirm).
+	// (see GetTerminalAgentStatusResponse's doc comment) — CONFIRMED derived
+	// from the real pty.listProcesses RPC (there is still no dedicated
+	// agent-status RPC in the catalog); ReadyForInput remains a heuristic
+	// (AgentRunning's value) because pty.listProcesses's {id,cwd,title,pid}
+	// shape carries no busy/idle signal — see
+	// devserveragent/methods.go's AgentStatus doc comment.
 	AgentStatus(ctx context.Context, devServer domain.DevServer, ptyID string) (AgentStatusResult, error)
-	// InspectProcess answers InspectTerminalProcessRequest — best-effort,
-	// Known=false when the agent can't (or this adapter can't) answer, never
-	// a fabricated zero value.
+	// InspectProcess answers InspectTerminalProcessRequest — Known=false
+	// when the agent can't (or this adapter can't) answer, never a
+	// fabricated zero value. Pid is real (agent/src/relay/pty-agent-bridge.ts's
+	// handlePtyListProcesses now includes it) as of this pass — see
+	// devserveragent/methods.go's InspectProcess doc comment.
 	InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (InspectProcessResult, error)
 }
 
