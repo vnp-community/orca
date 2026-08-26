@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/httpgateway/auth_routes_test.go` (new, or append to existing)
 **Depends on:** TASK-007
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `TestAuthSSORoute_Returns501` and `TestAuthSSORoute_AnyProviderReturns501` exist in `auth_routes_test.go` and pass.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `services/auth-service/internal/usecase/get_admin_stats.go` (new)
 **Depends on:** TASK-001, TASK-003 (counts `access_policies`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `GetAdminStats` usecase and the three `Count*` repository methods exist, wired into the gRPC server, build/vet clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `notification-service`
 **File:** `proto/orca/notification/v1/notification.proto`, `services/notification-service/internal/usecase/unregister_push_subscription.go` (new), `internal/adapter/postgres/repository.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `UnregisterPushSubscription` RPC exists in `notification.proto` (generated stubs present), the usecase and `DeleteByEndpoint` repository method are implemented idempotently, and the gRPC handler is wired; build/vet clean.
 
 ---
 

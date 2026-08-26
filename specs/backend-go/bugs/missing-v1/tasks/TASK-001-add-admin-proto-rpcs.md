@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `backend-go/proto/orca/auth/v1/auth.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — all 10 RPCs and their messages are present in `auth.proto`, `go build ./proto/...` is clean, and generated stubs (`proto/gen/go/orca/auth/v1/*.pb.go`) already reflect them.
 
 ---
 

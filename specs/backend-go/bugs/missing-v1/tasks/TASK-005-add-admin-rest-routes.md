@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/httpgateway/admin_routes.go` (new), `router.go`
 **Depends on:** TASK-001, TASK-002, TASK-003, TASK-004
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `admin_routes.go` mounts all 12 `/admin/api/*` routes (including the documented role-only narrowing for `PATCH /users/:id`) and `router.go` wires `mountAdminRoutes` alongside `mountAuthAdminRoutes`; build/vet clean.
 
 ---
 

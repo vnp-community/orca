@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/push_bridge.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `StreamHandler`/`PushEvent`/`pipePush` exist in `push_bridge.go` (with `PushEvent.Args` as `[]any` to match `rpc-client.ts`'s spread semantics, per envelope.go's `PushMessage`, a deliberate refinement over this doc's single-value sketch); builds clean.
 
 ---
 

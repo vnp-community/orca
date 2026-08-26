@@ -5,7 +5,7 @@
 **Service:** `api-gateway` + `notification-service`
 **File:** `services/api-gateway/internal/adapter/httpgateway/notification_routes_test.go`, `services/notification-service/internal/usecase/unregister_push_subscription_test.go` (new)
 **Depends on:** TASK-009, TASK-010
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `unregister_push_subscription_test.go` and `notification_routes_test.go` (including the known-endpoint/unknown-endpoint 204 cases and the `TestPushRoutes_NoAuthRequired` route-placement regression guard) all exist and pass.
 
 ---
 

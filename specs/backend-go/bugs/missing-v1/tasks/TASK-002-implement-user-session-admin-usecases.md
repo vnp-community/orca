@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `services/auth-service/internal/usecase/deactivate_user.go` (new), `reactivate_user.go` (new), `list_sessions_for_user.go` (new), `force_revoke_all_sessions.go` (new), plus repository interface + Postgres impl
 **Depends on:** TASK-001
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `DeactivateUser`/`ReactivateUser`/`ListSessionsForUser`/`ForceRevokeAllSessionsForUser` usecases, their repository ports, Postgres impls, and gRPC handlers all exist and pass `go build`/`go vet`.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `auth-service` + `api-gateway`
 **File:** `services/auth-service/internal/usecase/*_test.go` (new), `services/api-gateway/internal/adapter/httpgateway/admin_routes_test.go` (new)
 **Depends on:** TASK-002, TASK-003, TASK-004, TASK-005
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — all specified usecase tests (deactivate/reactivate round-trip, versioning + stale-version precondition failure, admin-stats counts) and all `admin_routes_test.go` route tests including the `/admin/api/audit` vs `/v1/auth/audit-log` contract-parity test are present and pass.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/httpgateway/notification_routes.go`, `router.go`
 **Depends on:** TASK-009
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `mountPushRoutes` serves `/api/vapid-public-key`, `/api/push-subscribe`, and `/api/push-unsubscribe` unauthenticated, mounted in `router.go` outside the authenticated group alongside the untouched existing authenticated `/v1/notifications/*` mount; build/vet clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/handler.go`, `registry.go`
 **Depends on:** TASK-012
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `Registry.streamHandlers`/`RegisterStream`/`StreamHandlerFor` and `handleSubscribe`'s ack-then-stream dispatch in `ServeHTTP`'s `"invoke"` case are all implemented; build/vet clean.
 
 ---
 

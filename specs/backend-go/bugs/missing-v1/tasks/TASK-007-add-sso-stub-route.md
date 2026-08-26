@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/httpgateway/auth_routes.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `GET /auth/sso/{provider}` returns the documented 501 `NOT_IMPLEMENTED` stub in `auth_routes.go`; build/vet clean.
 
 ---
 

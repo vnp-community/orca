@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/push_bridge_test.go` (new), `handler_test.go`
 **Depends on:** TASK-012, TASK-013, TASK-014, TASK-015
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `TestPipePush_*` (order/cancel/close), `TestHandleSubscribe_AcksThenStreams`, `TestHandleSubscribe_InterleavesWithConcurrentInvoke`, and `TestNotificationsSubscribe_DeliversPushFrame` all exist and pass under `-race`.
 
 ---
 

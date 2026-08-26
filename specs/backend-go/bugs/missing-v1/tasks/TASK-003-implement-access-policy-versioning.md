@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `services/auth-service/internal/usecase/{create,get,list,update,delete}_access_policy.go` (new), `internal/adapter/postgres/repository.go`
 **Depends on:** TASK-001
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — append-only `CreateAccessPolicy`/`GetAccessPolicy`/`ListAccessPolicies`/`UpdateAccessPolicy`/`DeleteAccessPolicy` usecases, `AccessPolicyRepository` port + Postgres impl, `PolicyDataPublisher` port (stubbed via `policypublisher.NoopPublisher`), and gRPC wiring all exist and build/vet clean.
 
 ---
 
