@@ -225,10 +225,15 @@ func run() error {
 	// first (cookie-authenticated browser sessions have no bearer JWT to
 	// present to authValidator), falling back to authValidator for
 	// mobile/CLI bearer-JWT callers.
-	wsHandler := wsbridge.New(logger, authValidator, sessionValidator, func(streamCtx context.Context, userID string) (notificationv1.NotificationService_StreamNotificationsClient, error) {
+	// notificationStreamOpener is shared verbatim (via an explicit type
+	// conversion, identical underlying func type) between wsbridge.New
+	// below and wscompat.RegisterPushChannels — see NotificationStreamOpener's
+	// doc comment: never construct a second stream-opening closure.
+	notificationStreamOpener := wsbridge.StreamOpener(func(streamCtx context.Context, userID string) (notificationv1.NotificationService_StreamNotificationsClient, error) {
 		streamCtx = gatewaygrpc.AttachIdentity(streamCtx, usecase.Identity{UserID: userID})
 		return notificationClient.StreamNotifications(streamCtx, &notificationv1.StreamNotificationsRequest{UserId: userID})
 	})
+	wsHandler := wsbridge.New(logger, authValidator, sessionValidator, notificationStreamOpener)
 
 	// wscompat: the legacy channel-based RPC transport the deployed
 	// frontend/ actually speaks over /ws (see internal/adapter/wscompat's
@@ -238,7 +243,17 @@ func run() error {
 	// call, not usecase.AuthValidator's JWT verification path — the
 	// browser's orca_session cookie holds a raw session token, never a JWT).
 	wsCompatRegistry := wscompat.NewRegistry()
-	wscompat.RegisterRealChannels(wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient, rateLimiter)
+	wscompat.RegisterRealChannels(
+		wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient,
+		tenantClient, projectClient, issueTrackingClient, orchestrationClient, scmClient, workflowClient,
+		aiProviderClient,
+		rateLimiter,
+	)
+	// RegisterPushChannels wires the StreamHandler-backed (push-capable)
+	// channels — a separate registration mechanism from RegisterRealChannels'
+	// request/response ChannelHandlers, see channels_push.go's doc comment.
+	clientEventBus := wscompat.NewClientEventBus()
+	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus)
 	wsCompatHandler := wscompat.New(logger, sessionValidator, wsCompatRegistry)
 
 	router := httpgateway.NewRouter(httpgateway.Deps{

@@ -33,6 +33,8 @@ import (
 	taskpostgres "github.com/stablyai/orca-go/services/task-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 )
 
@@ -76,12 +78,31 @@ func run() error {
 
 	repo := taskpostgres.New(pool)
 
-	// The three cross-service ports (team-scope resolution, simple/complex
-	// execution dispatch) are STUBS in this scaffold — see
-	// internal/adapter/grpcclient's doc comments and this service's README.
+	// team-scope resolution and complex (orchestration-service) execution
+	// dispatch are still STUBS — see internal/adapter/grpcclient's doc
+	// comments and this service's README. simple execution dispatch and
+	// the AI-relay path are real as of TASK-224, dialed against
+	// infra-fleet-service and ai-provider-service below.
 	teamScopeResolver := taskgrpcclient.NewStubTeamScopeResolver()
-	simpleExecutor := taskgrpcclient.NewStubSimpleExecutor()
 	complexExecutor := taskgrpcclient.NewStubComplexExecutor()
+
+	infraFleetConn, err := taskgrpcclient.Dial(cfg.InfraFleetServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing infra-fleet-service: %w", err)
+	}
+	defer func() { _ = infraFleetConn.Close() }()
+	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
+	projectExecutionResolver := taskgrpcclient.NewProjectExecutionResolver(infraFleetClient)
+	simpleExecutor := taskgrpcclient.NewSimpleExecutor(repo, projectExecutionResolver, infraFleetClient)
+	aiCompleter := taskgrpcclient.NewAICompleter(infraFleetClient)
+
+	aiProviderConn, err := taskgrpcclient.Dial(cfg.AIProviderServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing ai-provider-service: %w", err)
+	}
+	defer func() { _ = aiProviderConn.Close() }()
+	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
+	aiProviderContextResolver := taskgrpcclient.NewAIProviderContextResolver(aiProviderClient)
 
 	// opaEvaluator loads/compiles the orca-authz bundle once per distinct
 	// query string (common/policy.Evaluator's own cache) and is shared by
@@ -96,10 +117,22 @@ func run() error {
 	resolvePermissionUC := usecase.NewResolvePermission(repo, repo, teamScopeResolver, opaClient)
 	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor)
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
+	listTasksUC := usecase.NewListTasks(repo)
+	updateTaskUC := usecase.NewUpdateTask(repo)
+	deleteTaskUC := usecase.NewDeleteTask(repo)
+	getDependenciesUC := usecase.NewGetDependencies(repo, repo)
+	aiDecomposeUC := usecase.NewAIDecompose(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter)
+	// repo also implements usecase.TxRunner (internal/adapter/postgres's
+	// RunInTx) — AIApply needs its create-subtask+add-edge loop to run in
+	// one transaction (TASK-224 Gap 2), not the standalone createTaskUC/
+	// addEdgeUC instances above (those stay wired to the plain CreateTask/
+	// AddEdge RPCs, which don't need a shared transaction).
+	aiApplyUC := usecase.NewAIApply(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
+		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

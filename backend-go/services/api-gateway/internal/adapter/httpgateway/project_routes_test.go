@@ -55,6 +55,10 @@ type fakeProjectServiceClient struct {
 	addRepoResp    *projectv1.AddRepoResponse
 	addRepoErr     error
 
+	lastUpdateRepoReq *projectv1.UpdateRepoRequest
+	updateRepoResp    *projectv1.UpdateRepoResponse
+	updateRepoErr     error
+
 	lastListReposReq *projectv1.ListReposRequest
 	listReposResp    *projectv1.ListReposResponse
 	listReposErr     error
@@ -102,6 +106,74 @@ type fakeProjectServiceClient struct {
 	lastListProjectGroupsReq *projectv1.ListProjectGroupsRequest
 	listProjectGroupsResp    *projectv1.ListProjectGroupsResponse
 	listProjectGroupsErr     error
+
+	// FolderWorkspace methods below (TASK-061..065) — no REST route mounts
+	// any of these yet (project-service's folderWorkspace.* surface is
+	// wscompat-only, see wscompat/channels_emulator_folderworkspace_host.go),
+	// but the interface satisfaction assertion at the bottom of this file
+	// requires every ProjectServiceClient method to exist here regardless.
+	lastCreateFolderWorkspaceReq *projectv1.CreateFolderWorkspaceRequest
+	createFolderWorkspaceResp    *projectv1.CreateFolderWorkspaceResponse
+	createFolderWorkspaceErr     error
+
+	lastUpdateFolderWorkspaceReq *projectv1.UpdateFolderWorkspaceRequest
+	updateFolderWorkspaceResp    *projectv1.UpdateFolderWorkspaceResponse
+	updateFolderWorkspaceErr     error
+
+	lastDeleteFolderWorkspaceReq *projectv1.DeleteFolderWorkspaceRequest
+	deleteFolderWorkspaceResp    *projectv1.DeleteFolderWorkspaceResponse
+	deleteFolderWorkspaceErr     error
+
+	lastListFolderWorkspacesReq *projectv1.ListFolderWorkspacesRequest
+	listFolderWorkspacesResp    *projectv1.ListFolderWorkspacesResponse
+	listFolderWorkspacesErr     error
+
+	lastGetFolderWorkspacePathStatusReq *projectv1.GetFolderWorkspacePathStatusRequest
+	getFolderWorkspacePathStatusResp    *projectv1.GetFolderWorkspacePathStatusResponse
+	getFolderWorkspacePathStatusErr     error
+	lastListMembersReq *projectv1.ListMembersRequest
+	listMembersResp    *projectv1.ListMembersResponse
+	listMembersErr     error
+
+	lastRemoveMemberReq *projectv1.RemoveMemberRequest
+	removeMemberResp    *projectv1.RemoveMemberResponse
+	removeMemberErr     error
+
+	lastUpdateMemberRoleReq *projectv1.UpdateMemberRoleRequest
+	updateMemberRoleResp    *projectv1.UpdateMemberRoleResponse
+	updateMemberRoleErr     error
+
+	lastMoveProjectReq *projectv1.MoveProjectRequest
+	moveProjectResp    *projectv1.MoveProjectResponse
+	moveProjectErr     error
+
+	lastScanNestedReq *projectv1.ScanNestedRequest
+	scanNestedResp    *projectv1.ScanNestedResponse
+	scanNestedErr     error
+
+	lastImportNestedReq *projectv1.ImportNestedRequest
+	importNestedResp    *projectv1.ImportNestedResponse
+	importNestedErr     error
+
+	lastCreateHostSetupReq *projectv1.CreateHostSetupRequest
+	createHostSetupResp    *projectv1.CreateHostSetupResponse
+	createHostSetupErr     error
+
+	lastListHostSetupsReq *projectv1.ListHostSetupsRequest
+	listHostSetupsResp    *projectv1.ListHostSetupsResponse
+	listHostSetupsErr     error
+
+	lastUpdateHostSetupReq *projectv1.UpdateHostSetupRequest
+	updateHostSetupResp    *projectv1.UpdateHostSetupResponse
+	updateHostSetupErr     error
+
+	lastDeleteHostSetupReq *projectv1.DeleteHostSetupRequest
+	deleteHostSetupResp    *projectv1.DeleteHostSetupResponse
+	deleteHostSetupErr     error
+
+	lastSetupExistingFolderReq *projectv1.SetupExistingFolderRequest
+	setupExistingFolderResp    *projectv1.SetupExistingFolderResponse
+	setupExistingFolderErr     error
 }
 
 func (f *fakeProjectServiceClient) CreateProject(_ context.Context, in *projectv1.CreateProjectRequest, _ ...grpc.CallOption) (*projectv1.CreateProjectResponse, error) {
@@ -192,6 +264,14 @@ func (f *fakeProjectServiceClient) RemoveRepo(_ context.Context, in *projectv1.R
 	return f.removeRepoResp, nil
 }
 
+func (f *fakeProjectServiceClient) UpdateRepo(_ context.Context, in *projectv1.UpdateRepoRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoResponse, error) {
+	f.lastUpdateRepoReq = in
+	if f.updateRepoErr != nil {
+		return nil, f.updateRepoErr
+	}
+	return f.updateRepoResp, nil
+}
+
 func (f *fakeProjectServiceClient) RecordWorktreeCreated(_ context.Context, in *projectv1.RecordWorktreeCreatedRequest, _ ...grpc.CallOption) (*projectv1.RecordWorktreeCreatedResponse, error) {
 	f.lastRecordWorktreeCreatedReq = in
 	if f.recordWorktreeCreatedErr != nil {
@@ -262,6 +342,134 @@ func (f *fakeProjectServiceClient) ListProjectGroups(_ context.Context, in *proj
 		return nil, f.listProjectGroupsErr
 	}
 	return f.listProjectGroupsResp, nil
+}
+
+func (f *fakeProjectServiceClient) CreateFolderWorkspace(_ context.Context, in *projectv1.CreateFolderWorkspaceRequest, _ ...grpc.CallOption) (*projectv1.CreateFolderWorkspaceResponse, error) {
+	f.lastCreateFolderWorkspaceReq = in
+	if f.createFolderWorkspaceErr != nil {
+		return nil, f.createFolderWorkspaceErr
+	}
+	return f.createFolderWorkspaceResp, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateFolderWorkspace(_ context.Context, in *projectv1.UpdateFolderWorkspaceRequest, _ ...grpc.CallOption) (*projectv1.UpdateFolderWorkspaceResponse, error) {
+	f.lastUpdateFolderWorkspaceReq = in
+	if f.updateFolderWorkspaceErr != nil {
+		return nil, f.updateFolderWorkspaceErr
+	}
+	return f.updateFolderWorkspaceResp, nil
+}
+
+func (f *fakeProjectServiceClient) DeleteFolderWorkspace(_ context.Context, in *projectv1.DeleteFolderWorkspaceRequest, _ ...grpc.CallOption) (*projectv1.DeleteFolderWorkspaceResponse, error) {
+	f.lastDeleteFolderWorkspaceReq = in
+	if f.deleteFolderWorkspaceErr != nil {
+		return nil, f.deleteFolderWorkspaceErr
+	}
+	return f.deleteFolderWorkspaceResp, nil
+}
+
+func (f *fakeProjectServiceClient) ListFolderWorkspaces(_ context.Context, in *projectv1.ListFolderWorkspacesRequest, _ ...grpc.CallOption) (*projectv1.ListFolderWorkspacesResponse, error) {
+	f.lastListFolderWorkspacesReq = in
+	if f.listFolderWorkspacesErr != nil {
+		return nil, f.listFolderWorkspacesErr
+	}
+	return f.listFolderWorkspacesResp, nil
+}
+
+func (f *fakeProjectServiceClient) GetFolderWorkspacePathStatus(_ context.Context, in *projectv1.GetFolderWorkspacePathStatusRequest, _ ...grpc.CallOption) (*projectv1.GetFolderWorkspacePathStatusResponse, error) {
+	f.lastGetFolderWorkspacePathStatusReq = in
+	if f.getFolderWorkspacePathStatusErr != nil {
+		return nil, f.getFolderWorkspacePathStatusErr
+	}
+	return f.getFolderWorkspacePathStatusResp, nil
+}
+
+func (f *fakeProjectServiceClient) ListMembers(_ context.Context, in *projectv1.ListMembersRequest, _ ...grpc.CallOption) (*projectv1.ListMembersResponse, error) {
+	f.lastListMembersReq = in
+	if f.listMembersErr != nil {
+		return nil, f.listMembersErr
+	}
+	return f.listMembersResp, nil
+}
+
+func (f *fakeProjectServiceClient) RemoveMember(_ context.Context, in *projectv1.RemoveMemberRequest, _ ...grpc.CallOption) (*projectv1.RemoveMemberResponse, error) {
+	f.lastRemoveMemberReq = in
+	if f.removeMemberErr != nil {
+		return nil, f.removeMemberErr
+	}
+	return f.removeMemberResp, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateMemberRole(_ context.Context, in *projectv1.UpdateMemberRoleRequest, _ ...grpc.CallOption) (*projectv1.UpdateMemberRoleResponse, error) {
+	f.lastUpdateMemberRoleReq = in
+	if f.updateMemberRoleErr != nil {
+		return nil, f.updateMemberRoleErr
+	}
+	return f.updateMemberRoleResp, nil
+}
+
+func (f *fakeProjectServiceClient) MoveProject(_ context.Context, in *projectv1.MoveProjectRequest, _ ...grpc.CallOption) (*projectv1.MoveProjectResponse, error) {
+	f.lastMoveProjectReq = in
+	if f.moveProjectErr != nil {
+		return nil, f.moveProjectErr
+	}
+	return f.moveProjectResp, nil
+}
+
+func (f *fakeProjectServiceClient) ScanNested(_ context.Context, in *projectv1.ScanNestedRequest, _ ...grpc.CallOption) (*projectv1.ScanNestedResponse, error) {
+	f.lastScanNestedReq = in
+	if f.scanNestedErr != nil {
+		return nil, f.scanNestedErr
+	}
+	return f.scanNestedResp, nil
+}
+
+func (f *fakeProjectServiceClient) ImportNested(_ context.Context, in *projectv1.ImportNestedRequest, _ ...grpc.CallOption) (*projectv1.ImportNestedResponse, error) {
+	f.lastImportNestedReq = in
+	if f.importNestedErr != nil {
+		return nil, f.importNestedErr
+	}
+	return f.importNestedResp, nil
+}
+
+func (f *fakeProjectServiceClient) CreateHostSetup(_ context.Context, in *projectv1.CreateHostSetupRequest, _ ...grpc.CallOption) (*projectv1.CreateHostSetupResponse, error) {
+	f.lastCreateHostSetupReq = in
+	if f.createHostSetupErr != nil {
+		return nil, f.createHostSetupErr
+	}
+	return f.createHostSetupResp, nil
+}
+
+func (f *fakeProjectServiceClient) ListHostSetups(_ context.Context, in *projectv1.ListHostSetupsRequest, _ ...grpc.CallOption) (*projectv1.ListHostSetupsResponse, error) {
+	f.lastListHostSetupsReq = in
+	if f.listHostSetupsErr != nil {
+		return nil, f.listHostSetupsErr
+	}
+	return f.listHostSetupsResp, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateHostSetup(_ context.Context, in *projectv1.UpdateHostSetupRequest, _ ...grpc.CallOption) (*projectv1.UpdateHostSetupResponse, error) {
+	f.lastUpdateHostSetupReq = in
+	if f.updateHostSetupErr != nil {
+		return nil, f.updateHostSetupErr
+	}
+	return f.updateHostSetupResp, nil
+}
+
+func (f *fakeProjectServiceClient) DeleteHostSetup(_ context.Context, in *projectv1.DeleteHostSetupRequest, _ ...grpc.CallOption) (*projectv1.DeleteHostSetupResponse, error) {
+	f.lastDeleteHostSetupReq = in
+	if f.deleteHostSetupErr != nil {
+		return nil, f.deleteHostSetupErr
+	}
+	return f.deleteHostSetupResp, nil
+}
+
+func (f *fakeProjectServiceClient) SetupExistingFolder(_ context.Context, in *projectv1.SetupExistingFolderRequest, _ ...grpc.CallOption) (*projectv1.SetupExistingFolderResponse, error) {
+	f.lastSetupExistingFolderReq = in
+	if f.setupExistingFolderErr != nil {
+		return nil, f.setupExistingFolderErr
+	}
+	return f.setupExistingFolderResp, nil
 }
 
 var _ projectv1.ProjectServiceClient = (*fakeProjectServiceClient)(nil)

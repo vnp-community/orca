@@ -18,6 +18,18 @@ import (
 type AutomationRepository interface {
 	Create(ctx context.Context, automation domain.Automation) error
 	Get(ctx context.Context, tenantID, id string) (domain.Automation, error)
+	// List returns every automation for tenantID, cursor-paginated —
+	// automation.list is distinct from ListRuns (runs of one automation):
+	// this is "all automations for a tenant."
+	List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Automation, string, error)
+	// Update persists a partial field update (name/rrule/step_config_json/
+	// step_type/enabled/dtstart/timezone) — see UpdateAutomationRequest's
+	// field-mask-shaped design in automation.proto.
+	Update(ctx context.Context, tenantID string, automation domain.Automation) error
+	// Delete removes an automation and cascades to its runs
+	// (automation_runs.automation_id has ON DELETE CASCADE per
+	// migrations/0001_init.up.sql — no separate run-cleanup step needed).
+	Delete(ctx context.Context, tenantID, id string) error
 }
 
 // AutomationRunRepository is the persistence port for run bookkeeping.

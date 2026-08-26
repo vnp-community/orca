@@ -595,6 +595,97 @@ func (x *UpdateTaskStatusAndPromoteResponse) GetPromotedTaskIds() []string {
 	return nil
 }
 
+type GetDispatchContextForTaskRequest struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	OrchestrationTaskId string                 `protobuf:"bytes,1,opt,name=orchestration_task_id,json=orchestrationTaskId,proto3" json:"orchestration_task_id,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *GetDispatchContextForTaskRequest) Reset() {
+	*x = GetDispatchContextForTaskRequest{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDispatchContextForTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDispatchContextForTaskRequest) ProtoMessage() {}
+
+func (x *GetDispatchContextForTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDispatchContextForTaskRequest.ProtoReflect.Descriptor instead.
+func (*GetDispatchContextForTaskRequest) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetDispatchContextForTaskRequest) GetOrchestrationTaskId() string {
+	if x != nil {
+		return x.OrchestrationTaskId
+	}
+	return ""
+}
+
+type GetDispatchContextForTaskResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unset when no dispatch context exists yet for this task — a legitimate
+	// state (the task hasn't been dispatched), not an error. Reuses the
+	// existing DispatchContext message; no new message type needed.
+	Dispatch      *DispatchContext `protobuf:"bytes,1,opt,name=dispatch,proto3" json:"dispatch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDispatchContextForTaskResponse) Reset() {
+	*x = GetDispatchContextForTaskResponse{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDispatchContextForTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDispatchContextForTaskResponse) ProtoMessage() {}
+
+func (x *GetDispatchContextForTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDispatchContextForTaskResponse.ProtoReflect.Descriptor instead.
+func (*GetDispatchContextForTaskResponse) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetDispatchContextForTaskResponse) GetDispatch() *DispatchContext {
+	if x != nil {
+		return x.Dispatch
+	}
+	return nil
+}
+
 var File_orca_orchestration_v1_orchestration_proto protoreflect.FileDescriptor
 
 const file_orca_orchestration_v1_orchestration_proto_rawDesc = "" +
@@ -634,13 +725,18 @@ const file_orca_orchestration_v1_orchestration_proto_rawDesc = "" +
 	"\n" +
 	"new_status\x18\x02 \x01(\tR\tnewStatus\"P\n" +
 	"\"UpdateTaskStatusAndPromoteResponse\x12*\n" +
-	"\x11promoted_task_ids\x18\x01 \x03(\tR\x0fpromotedTaskIds2\xf8\x03\n" +
+	"\x11promoted_task_ids\x18\x01 \x03(\tR\x0fpromotedTaskIds\"V\n" +
+	" GetDispatchContextForTaskRequest\x122\n" +
+	"\x15orchestration_task_id\x18\x01 \x01(\tR\x13orchestrationTaskId\"g\n" +
+	"!GetDispatchContextForTaskResponse\x12B\n" +
+	"\bdispatch\x18\x01 \x01(\v2&.orca.orchestration.v1.DispatchContextR\bdispatch2\x89\x05\n" +
 	"\x14OrchestrationService\x12\x82\x01\n" +
 	"\x15CreateDispatchContext\x123.orca.orchestration.v1.CreateDispatchContextRequest\x1a4.orca.orchestration.v1.CreateDispatchContextResponse\x12a\n" +
 	"\n" +
 	"CreateGate\x12(.orca.orchestration.v1.CreateGateRequest\x1a).orca.orchestration.v1.CreateGateResponse\x12d\n" +
 	"\vResolveGate\x12).orca.orchestration.v1.ResolveGateRequest\x1a*.orca.orchestration.v1.ResolveGateResponse\x12\x91\x01\n" +
-	"\x1aUpdateTaskStatusAndPromote\x128.orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest\x1a9.orca.orchestration.v1.UpdateTaskStatusAndPromoteResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1;orchestrationv1b\x06proto3"
+	"\x1aUpdateTaskStatusAndPromote\x128.orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest\x1a9.orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse\x12\x8e\x01\n" +
+	"\x19GetDispatchContextForTask\x127.orca.orchestration.v1.GetDispatchContextForTaskRequest\x1a8.orca.orchestration.v1.GetDispatchContextForTaskResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1;orchestrationv1b\x06proto3"
 
 var (
 	file_orca_orchestration_v1_orchestration_proto_rawDescOnce sync.Once
@@ -654,7 +750,7 @@ func file_orca_orchestration_v1_orchestration_proto_rawDescGZIP() []byte {
 	return file_orca_orchestration_v1_orchestration_proto_rawDescData
 }
 
-var file_orca_orchestration_v1_orchestration_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_orca_orchestration_v1_orchestration_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_orca_orchestration_v1_orchestration_proto_goTypes = []any{
 	(*DispatchContext)(nil),                    // 0: orca.orchestration.v1.DispatchContext
 	(*CreateDispatchContextRequest)(nil),       // 1: orca.orchestration.v1.CreateDispatchContextRequest
@@ -666,24 +762,29 @@ var file_orca_orchestration_v1_orchestration_proto_goTypes = []any{
 	(*ResolveGateResponse)(nil),                // 7: orca.orchestration.v1.ResolveGateResponse
 	(*UpdateTaskStatusAndPromoteRequest)(nil),  // 8: orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest
 	(*UpdateTaskStatusAndPromoteResponse)(nil), // 9: orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse
+	(*GetDispatchContextForTaskRequest)(nil),   // 10: orca.orchestration.v1.GetDispatchContextForTaskRequest
+	(*GetDispatchContextForTaskResponse)(nil),  // 11: orca.orchestration.v1.GetDispatchContextForTaskResponse
 }
 var file_orca_orchestration_v1_orchestration_proto_depIdxs = []int32{
-	0, // 0: orca.orchestration.v1.CreateDispatchContextResponse.context:type_name -> orca.orchestration.v1.DispatchContext
-	3, // 1: orca.orchestration.v1.CreateGateResponse.gate:type_name -> orca.orchestration.v1.DecisionGate
-	3, // 2: orca.orchestration.v1.ResolveGateResponse.gate:type_name -> orca.orchestration.v1.DecisionGate
-	1, // 3: orca.orchestration.v1.OrchestrationService.CreateDispatchContext:input_type -> orca.orchestration.v1.CreateDispatchContextRequest
-	4, // 4: orca.orchestration.v1.OrchestrationService.CreateGate:input_type -> orca.orchestration.v1.CreateGateRequest
-	6, // 5: orca.orchestration.v1.OrchestrationService.ResolveGate:input_type -> orca.orchestration.v1.ResolveGateRequest
-	8, // 6: orca.orchestration.v1.OrchestrationService.UpdateTaskStatusAndPromote:input_type -> orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest
-	2, // 7: orca.orchestration.v1.OrchestrationService.CreateDispatchContext:output_type -> orca.orchestration.v1.CreateDispatchContextResponse
-	5, // 8: orca.orchestration.v1.OrchestrationService.CreateGate:output_type -> orca.orchestration.v1.CreateGateResponse
-	7, // 9: orca.orchestration.v1.OrchestrationService.ResolveGate:output_type -> orca.orchestration.v1.ResolveGateResponse
-	9, // 10: orca.orchestration.v1.OrchestrationService.UpdateTaskStatusAndPromote:output_type -> orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse
-	7, // [7:11] is the sub-list for method output_type
-	3, // [3:7] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0,  // 0: orca.orchestration.v1.CreateDispatchContextResponse.context:type_name -> orca.orchestration.v1.DispatchContext
+	3,  // 1: orca.orchestration.v1.CreateGateResponse.gate:type_name -> orca.orchestration.v1.DecisionGate
+	3,  // 2: orca.orchestration.v1.ResolveGateResponse.gate:type_name -> orca.orchestration.v1.DecisionGate
+	0,  // 3: orca.orchestration.v1.GetDispatchContextForTaskResponse.dispatch:type_name -> orca.orchestration.v1.DispatchContext
+	1,  // 4: orca.orchestration.v1.OrchestrationService.CreateDispatchContext:input_type -> orca.orchestration.v1.CreateDispatchContextRequest
+	4,  // 5: orca.orchestration.v1.OrchestrationService.CreateGate:input_type -> orca.orchestration.v1.CreateGateRequest
+	6,  // 6: orca.orchestration.v1.OrchestrationService.ResolveGate:input_type -> orca.orchestration.v1.ResolveGateRequest
+	8,  // 7: orca.orchestration.v1.OrchestrationService.UpdateTaskStatusAndPromote:input_type -> orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest
+	10, // 8: orca.orchestration.v1.OrchestrationService.GetDispatchContextForTask:input_type -> orca.orchestration.v1.GetDispatchContextForTaskRequest
+	2,  // 9: orca.orchestration.v1.OrchestrationService.CreateDispatchContext:output_type -> orca.orchestration.v1.CreateDispatchContextResponse
+	5,  // 10: orca.orchestration.v1.OrchestrationService.CreateGate:output_type -> orca.orchestration.v1.CreateGateResponse
+	7,  // 11: orca.orchestration.v1.OrchestrationService.ResolveGate:output_type -> orca.orchestration.v1.ResolveGateResponse
+	9,  // 12: orca.orchestration.v1.OrchestrationService.UpdateTaskStatusAndPromote:output_type -> orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse
+	11, // 13: orca.orchestration.v1.OrchestrationService.GetDispatchContextForTask:output_type -> orca.orchestration.v1.GetDispatchContextForTaskResponse
+	9,  // [9:14] is the sub-list for method output_type
+	4,  // [4:9] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_orca_orchestration_v1_orchestration_proto_init() }
@@ -697,7 +798,7 @@ func file_orca_orchestration_v1_orchestration_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_orchestration_v1_orchestration_proto_rawDesc), len(file_orca_orchestration_v1_orchestration_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

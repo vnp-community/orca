@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	WorkflowService_CreateTemplate_FullMethodName      = "/orca.workflow.v1.WorkflowService/CreateTemplate"
+	WorkflowService_UpdateTemplate_FullMethodName      = "/orca.workflow.v1.WorkflowService/UpdateTemplate"
 	WorkflowService_Execute_FullMethodName             = "/orca.workflow.v1.WorkflowService/Execute"
 	WorkflowService_GetExecution_FullMethodName        = "/orca.workflow.v1.WorkflowService/GetExecution"
 	WorkflowService_PauseExecution_FullMethodName      = "/orca.workflow.v1.WorkflowService/PauseExecution"
@@ -41,6 +42,13 @@ const (
 // See specs/backend-go/services/workflow-service.md.
 type WorkflowServiceClient interface {
 	CreateTemplate(ctx context.Context, in *CreateTemplateRequest, opts ...grpc.CallOption) (*CreateTemplateResponse, error)
+	// UpdateTemplate bumps templates.version on every write (never an
+	// in-place mutation) — deliberate scope addition beyond
+	// workflow-service.md §3's RPC sketch, flagged in SOL-030. Editing a
+	// template never retroactively changes a running execution:
+	// WorkflowExecution.DefinitionSnapshot freezes the resolved DAG at
+	// Execute time (§4), so no active-execution guard is needed here.
+	UpdateTemplate(ctx context.Context, in *UpdateTemplateRequest, opts ...grpc.CallOption) (*UpdateTemplateResponse, error)
 	Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (*ExecuteResponse, error)
 	GetExecution(ctx context.Context, in *GetExecutionRequest, opts ...grpc.CallOption) (*GetExecutionResponse, error)
 	PauseExecution(ctx context.Context, in *PauseExecutionRequest, opts ...grpc.CallOption) (*PauseExecutionResponse, error)
@@ -81,6 +89,16 @@ func (c *workflowServiceClient) CreateTemplate(ctx context.Context, in *CreateTe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateTemplateResponse)
 	err := c.cc.Invoke(ctx, WorkflowService_CreateTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) UpdateTemplate(ctx context.Context, in *UpdateTemplateRequest, opts ...grpc.CallOption) (*UpdateTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateTemplateResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_UpdateTemplate_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +205,13 @@ func (c *workflowServiceClient) HasActiveExecutions(ctx context.Context, in *Has
 // See specs/backend-go/services/workflow-service.md.
 type WorkflowServiceServer interface {
 	CreateTemplate(context.Context, *CreateTemplateRequest) (*CreateTemplateResponse, error)
+	// UpdateTemplate bumps templates.version on every write (never an
+	// in-place mutation) — deliberate scope addition beyond
+	// workflow-service.md §3's RPC sketch, flagged in SOL-030. Editing a
+	// template never retroactively changes a running execution:
+	// WorkflowExecution.DefinitionSnapshot freezes the resolved DAG at
+	// Execute time (§4), so no active-execution guard is needed here.
+	UpdateTemplate(context.Context, *UpdateTemplateRequest) (*UpdateTemplateResponse, error)
 	Execute(context.Context, *ExecuteRequest) (*ExecuteResponse, error)
 	GetExecution(context.Context, *GetExecutionRequest) (*GetExecutionResponse, error)
 	PauseExecution(context.Context, *PauseExecutionRequest) (*PauseExecutionResponse, error)
@@ -225,6 +250,9 @@ type UnimplementedWorkflowServiceServer struct{}
 
 func (UnimplementedWorkflowServiceServer) CreateTemplate(context.Context, *CreateTemplateRequest) (*CreateTemplateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateTemplate not implemented")
+}
+func (UnimplementedWorkflowServiceServer) UpdateTemplate(context.Context, *UpdateTemplateRequest) (*UpdateTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateTemplate not implemented")
 }
 func (UnimplementedWorkflowServiceServer) Execute(context.Context, *ExecuteRequest) (*ExecuteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Execute not implemented")
@@ -288,6 +316,24 @@ func _WorkflowService_CreateTemplate_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(WorkflowServiceServer).CreateTemplate(ctx, req.(*CreateTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_UpdateTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).UpdateTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_UpdateTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).UpdateTemplate(ctx, req.(*UpdateTemplateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -464,6 +510,10 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateTemplate",
 			Handler:    _WorkflowService_CreateTemplate_Handler,
+		},
+		{
+			MethodName: "UpdateTemplate",
+			Handler:    _WorkflowService_UpdateTemplate_Handler,
 		},
 		{
 			MethodName: "Execute",

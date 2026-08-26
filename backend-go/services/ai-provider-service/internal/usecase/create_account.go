@@ -84,7 +84,7 @@ func (uc *CreateAccount) Execute(ctx context.Context, in CreateAccountInput) (do
 	now := uc.now()
 	account, err := domain.NewProviderAccount(
 		uc.newID(), tenantID, in.ProviderType, domain.AccountStatusPending, ref.ID,
-		scope, in.UserID, in.ProjectID, nil, now, now,
+		scope, in.UserID, in.ProjectID, "", nil, now, now,
 	)
 	if err != nil {
 		return domain.ProviderAccount{}, apperrors.New(apperrors.KindInvalidArgument, "AIPROVIDER_INVALID_ACCOUNT", err.Error(), err)

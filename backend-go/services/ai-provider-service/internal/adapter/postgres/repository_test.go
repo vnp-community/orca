@@ -56,7 +56,7 @@ func TestRepository_CreateAndGet_RoundTrips(t *testing.T) {
 
 	account, err := domain.NewProviderAccount("acc-1", "11111111-1111-1111-1111-111111111111",
 		domain.ProviderTypeAnthropic, domain.AccountStatusPending, "cred-ref-1",
-		domain.ScopeServer, "", "", nil, now, now)
+		domain.ScopeServer, "", "", "", nil, now, now)
 	if err != nil {
 		t.Fatalf("building account: %v", err)
 	}
@@ -83,10 +83,10 @@ func TestRepository_List_FiltersByTenantAndScope(t *testing.T) {
 
 	userAccount, _ := domain.NewProviderAccount("acc-user", "11111111-1111-1111-1111-111111111111",
 		domain.ProviderTypeAnthropic, domain.AccountStatusActive, "cred-ref-1",
-		domain.ScopeUser, "22222222-2222-2222-2222-222222222222", "", nil, now, now)
+		domain.ScopeUser, "22222222-2222-2222-2222-222222222222", "", "", nil, now, now)
 	otherTenant, _ := domain.NewProviderAccount("acc-other", "33333333-3333-3333-3333-333333333333",
 		domain.ProviderTypeAnthropic, domain.AccountStatusActive, "cred-ref-2",
-		domain.ScopeUser, "22222222-2222-2222-2222-222222222222", "", nil, now, now)
+		domain.ScopeUser, "22222222-2222-2222-2222-222222222222", "", "", nil, now, now)
 	_ = repo.Create(ctx, userAccount)
 	_ = repo.Create(ctx, otherTenant)
 
@@ -109,7 +109,7 @@ func TestRepository_UpdateStatus_UpdatesCredentialRefOnRotation(t *testing.T) {
 
 	account, _ := domain.NewProviderAccount("acc-1", "11111111-1111-1111-1111-111111111111",
 		domain.ProviderTypeAnthropic, domain.AccountStatusActive, "cred-ref-old",
-		domain.ScopeServer, "", "", nil, now, now)
+		domain.ScopeServer, "", "", "", nil, now, now)
 	_ = repo.Create(ctx, account)
 
 	updated, err := repo.UpdateStatus(ctx, usecase.UpdateStatusInput{

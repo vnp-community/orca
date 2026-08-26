@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	// ErrEmptyConnectionTenant mirrors ErrEmptyDevServerTenant — a connection
@@ -21,6 +24,12 @@ type Connection struct {
 	DevServerID string
 	RepoPath    string
 	WorktreeID  string
+	// Status/LastActivityAt are set by EstablishConnection (ssh.connect,
+	// SOL-024/TASK-164) — empty/nil for connections predating this field
+	// (worktree-bound connections created via CreateConnection, not
+	// EstablishConnection). See migrations/0004_connection_status.
+	Status         string // "established" | "degraded" | "closed"
+	LastActivityAt *time.Time
 }
 
 // NewConnection constructs a Connection, enforcing the invariants a record

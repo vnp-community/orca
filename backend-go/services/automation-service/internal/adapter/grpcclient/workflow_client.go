@@ -39,6 +39,10 @@ func New(conn grpc.ClientConnInterface) *WorkflowClient {
 // gRPC round trip that closes TS Gap 3 (automation.runNow previously had no
 // working execution path).
 func (c *WorkflowClient) ExecuteAdHocStep(ctx context.Context, in usecase.ExecuteAdHocStepInput) (usecase.ExecuteAdHocStepOutput, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return usecase.ExecuteAdHocStepOutput{}, fmt.Errorf("grpcclient: workflow-service ExecuteAdHocStep: %w", err)
+	}
 	resp, err := c.client.ExecuteAdHocStep(ctx, &workflowv1.ExecuteAdHocStepRequest{
 		TenantId:       in.TenantID,
 		StepType:       toProtoStepType(in.StepType),

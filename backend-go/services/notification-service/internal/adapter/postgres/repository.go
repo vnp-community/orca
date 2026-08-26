@@ -97,6 +97,17 @@ func (r *Repository) ListByUser(ctx context.Context, tenantID, userID string) ([
 	return out, nil
 }
 
+// DeleteByEndpoint removes the subscription row for endpoint. DELETE
+// affecting 0 rows is not an error — idempotent by design (see
+// usecase.SubscriptionRepository's doc comment).
+func (r *Repository) DeleteByEndpoint(ctx context.Context, endpoint string) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM notification.push_subscriptions WHERE endpoint = $1`, endpoint)
+	if err != nil {
+		return fmt.Errorf("postgres: delete push subscription by endpoint: %w", err)
+	}
+	return nil
+}
+
 // GetPublicKey returns the tenant's active VAPID key metadata row.
 // Returns domain.ErrNoActiveVapidKey (not a raw pgx error) when none
 // exists, so usecase/ can map it to a NotFound status without depending

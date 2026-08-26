@@ -32,6 +32,10 @@ type TemplateRepository interface {
 	// feeds. Returns domain.ErrTemplateNotFound (wrapped) if templateID
 	// itself doesn't exist for tenantID.
 	ResolveChain(ctx context.Context, tenantID, templateID string, maxDepth int) ([]domain.WorkflowTemplate, error)
+	// Update performs the version-bump-on-write conditional UPDATE.
+	// Returns domain.ErrTemplateVersionConflict (wrapped) when
+	// expectedVersion doesn't match the current row's version.
+	Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32) (domain.WorkflowTemplate, error)
 }
 
 // ExecutionRepository is the persistence port for workflow executions.

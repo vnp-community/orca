@@ -13,6 +13,9 @@ type Config struct {
 	// dialed for real by internal/adapter/grpcclient as of Epic B
 	// (docs/execution-plan.md §8).
 	CredentialBrokerAddr string
+	// InfraFleetServiceAddr is infra-fleet-service's gRPC target — dialed
+	// by TestConnection's InfraFleetClient (TASK-028).
+	InfraFleetServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -21,7 +24,8 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                 base,
-		CredentialBrokerAddr: commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		Base:                  base,
+		CredentialBrokerAddr:  commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 	}, nil
 }

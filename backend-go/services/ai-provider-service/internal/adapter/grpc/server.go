@@ -9,6 +9,8 @@ package grpc
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/ai-provider-service/internal/domain"
 	"github.com/stablyai/orca-go/services/ai-provider-service/internal/usecase"
@@ -24,10 +26,35 @@ type Server struct {
 	resolveProvider *usecase.ResolveProvider
 	rotateKey       *usecase.RotateKey
 	getUsageToday   *usecase.GetUsageToday
+	listAccounts    *usecase.ListAccounts
+	updateAccount   *usecase.UpdateAccount
+	deleteAccount   *usecase.DeleteAccount
+	writeCredential *usecase.WriteCredential
+	testConnection  *usecase.TestConnection
 }
 
-func New(create *usecase.CreateAccount, resolve *usecase.ResolveProvider, rotate *usecase.RotateKey, usage *usecase.GetUsageToday) *Server {
-	return &Server{createAccount: create, resolveProvider: resolve, rotateKey: rotate, getUsageToday: usage}
+func New(
+	create *usecase.CreateAccount,
+	resolve *usecase.ResolveProvider,
+	rotate *usecase.RotateKey,
+	usage *usecase.GetUsageToday,
+	list *usecase.ListAccounts,
+	update *usecase.UpdateAccount,
+	del *usecase.DeleteAccount,
+	writeCredential *usecase.WriteCredential,
+	testConnection *usecase.TestConnection,
+) *Server {
+	return &Server{
+		createAccount:   create,
+		resolveProvider: resolve,
+		rotateKey:       rotate,
+		getUsageToday:   usage,
+		listAccounts:    list,
+		updateAccount:   update,
+		deleteAccount:   del,
+		writeCredential: writeCredential,
+		testConnection:  testConnection,
+	}
 }
 
 func (s *Server) CreateAccount(ctx context.Context, req *aiproviderv1.CreateAccountRequest) (*aiproviderv1.CreateAccountResponse, error) {
@@ -66,6 +93,58 @@ func (s *Server) GetUsageToday(ctx context.Context, req *aiproviderv1.GetUsageTo
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &aiproviderv1.GetUsageTodayResponse{CostUsd: state.CostUSD, RequestCount: state.RequestCount}, nil
+}
+
+func (s *Server) ListAccounts(ctx context.Context, req *aiproviderv1.ListAccountsRequest) (*aiproviderv1.ListAccountsResponse, error) {
+	accounts, err := s.listAccounts.Execute(ctx, usecase.ListAccountsInput{DevServerID: req.GetDevServerId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*aiproviderv1.ProviderAccount, 0, len(accounts))
+	for _, a := range accounts {
+		out = append(out, toProtoAccount(a))
+	}
+	return &aiproviderv1.ListAccountsResponse{Accounts: out}, nil
+}
+
+func (s *Server) UpdateAccount(ctx context.Context, req *aiproviderv1.UpdateAccountRequest) (*aiproviderv1.UpdateAccountResponse, error) {
+	account, err := s.updateAccount.Execute(ctx, usecase.UpdateFields{
+		AccountID: req.GetAccountId(),
+		Label:     req.GetLabel(),
+		ModelHint: req.GetModelHint(),
+		BaseURL:   req.GetBaseUrl(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &aiproviderv1.UpdateAccountResponse{Account: toProtoAccount(account)}, nil
+}
+
+func (s *Server) DeleteAccount(ctx context.Context, req *aiproviderv1.DeleteAccountRequest) (*emptypb.Empty, error) {
+	if err := s.deleteAccount.Execute(ctx, req.GetAccountId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) WriteCredential(ctx context.Context, req *aiproviderv1.WriteCredentialRequest) (*aiproviderv1.WriteCredentialResponse, error) {
+	account, err := s.writeCredential.Execute(ctx, usecase.WriteCredentialForAccountInput{
+		AccountID:     req.GetAccountId(),
+		EncryptedBlob: req.GetEncryptedBlob(),
+		IV:            req.GetIv(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &aiproviderv1.WriteCredentialResponse{Account: toProtoAccount(account)}, nil
+}
+
+func (s *Server) TestConnection(ctx context.Context, req *aiproviderv1.TestConnectionRequest) (*aiproviderv1.TestConnectionResponse, error) {
+	result, err := s.testConnection.Execute(ctx, usecase.TestConnectionInput{AccountID: req.GetAccountId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &aiproviderv1.TestConnectionResponse{Success: result.Success, Message: result.Message}, nil
 }
 
 // mapDomainError wraps a bare *domain.ErrNoProviderAvailable (which isn't an
@@ -141,5 +220,6 @@ func toProtoAccount(a domain.ProviderAccount) *aiproviderv1.ProviderAccount {
 		Type:          toProtoProviderType(a.ProviderType),
 		Status:        string(a.Status),
 		CredentialRef: a.CredentialRef,
+		DevServerId:   a.DevServerID,
 	}
 }

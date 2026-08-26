@@ -84,10 +84,11 @@ func run() error {
 	createGateUC := usecase.NewCreateGate(repo, serializer)
 	resolveGateUC := usecase.NewResolveGate(repo, serializer)
 	updateTaskStatusAndPromoteUC := usecase.NewUpdateTaskStatusAndPromote(repo, serializer)
+	getDispatchContextForTaskUC := usecase.NewGetDispatchContextForTask(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	orchestrationv1.RegisterOrchestrationServiceServer(grpcServer, orchgrpc.New(
-		createDispatchContextUC, createGateUC, resolveGateUC, updateTaskStatusAndPromoteUC,
+		createDispatchContextUC, createGateUC, resolveGateUC, updateTaskStatusAndPromoteUC, getDispatchContextForTaskUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

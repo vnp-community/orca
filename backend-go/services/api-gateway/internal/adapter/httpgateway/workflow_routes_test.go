@@ -61,6 +61,13 @@ func (f *fakeWorkflowServiceClient) CreateTemplate(_ context.Context, in *workfl
 	return f.createTemplateResp, nil
 }
 
+// UpdateTemplate: no route in this file's tests exercises it, so this exists
+// only to satisfy the workflowv1.WorkflowServiceClient interface this fake
+// must implement in full.
+func (f *fakeWorkflowServiceClient) UpdateTemplate(_ context.Context, _ *workflowv1.UpdateTemplateRequest, _ ...grpc.CallOption) (*workflowv1.UpdateTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
 func (f *fakeWorkflowServiceClient) Execute(_ context.Context, _ *workflowv1.ExecuteRequest, _ ...grpc.CallOption) (*workflowv1.ExecuteResponse, error) {
 	if f.executeErr != nil {
 		return nil, f.executeErr

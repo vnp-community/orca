@@ -4,6 +4,9 @@ package orca.infrafleet.v1;
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1";
 
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
 // InfraFleetService owns SSH targets, dev server registry, connection lifecycle,
 // the provider registry (connectionId -> host dispatch), and fleet health.
 // See specs/backend-go/services/infra-fleet-service.md.
@@ -29,6 +32,74 @@ service InfraFleetService {
   // shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
   // all go through this one).
   rpc Relay(RelayRequest) returns (RelayResponse);
+  // ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
+  // latter derives from this same read — see wscompat's registerSshChannels).
+  rpc ListSshTargets(ListSshTargetsRequest) returns (ListSshTargetsResponse);
+  // GetSshState is a local read (no dial) of whichever connection (if any)
+  // currently binds this SSH target's dev server.
+  rpc GetSshState(GetSshStateRequest) returns (GetSshStateResponse);
+  // EstablishConnection performs the actual SSH + Dev Server Agent
+  // handshake synchronously — it IS the connection-establishment act, not
+  // a record of one requested. See usecase.EstablishConnection's doc comment.
+  rpc EstablishConnection(EstablishConnectionRequest) returns (Connection);
+  rpc KillWorkspacePort(KillWorkspacePortRequest) returns (KillWorkspacePortResponse);
+
+  // --- Terminal/PTY lifecycle (control-plane, unary) ---
+  rpc SpawnTerminalSession(SpawnTerminalSessionRequest) returns (SpawnTerminalSessionResponse);
+  rpc ResizeTerminalSession(ResizeTerminalSessionRequest) returns (google.protobuf.Empty);
+  rpc KillTerminalSession(KillTerminalSessionRequest) returns (google.protobuf.Empty);      // terminal.close
+  rpc StopTerminalProcess(StopTerminalProcessRequest) returns (google.protobuf.Empty);      // terminal.stop — interrupt, not teardown
+  rpc ListTerminalSessions(ListTerminalSessionsRequest) returns (ListTerminalSessionsResponse);
+  rpc WaitTerminalSession(WaitTerminalSessionRequest) returns (WaitTerminalSessionResponse); // terminal.wait — bounded blocking poll
+  rpc FocusTerminalSession(FocusTerminalSessionRequest) returns (google.protobuf.Empty);     // terminal.focus — bookkeeping touch
+  rpc GetTerminalAgentStatus(GetTerminalAgentStatusRequest) returns (GetTerminalAgentStatusResponse); // backs BOTH terminal.agentStatus and terminal.isRunningAgent
+  rpc InspectTerminalProcess(InspectTerminalProcessRequest) returns (InspectTerminalProcessResponse); // best-effort — see message doc comment
+
+  // --- Terminal/PTY I/O ---
+  // The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
+  // names but §3 never enumerates. Bidirectional, not server-streaming-only:
+  // §3's RouteTerminalWrite only routes control-plane metadata, never per-
+  // byte input, so a client->server data channel was still missing — this
+  // RPC is opened once per terminal.create by api-gateway's wscompat bridge
+  // (TASK-186) and piped into `push` frames via TASK-012's pipePush.
+  rpc AttachPty(stream PtyClientFrame) returns (stream PtyServerFrame);
+
+  // ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile back
+  // api-gateway's browser.profileList/profileCreate/profileDelete channels
+  // (SOL-006 Group C) — Postgres-backed metadata CRUD, mirroring
+  // CreateSshTarget's shape. NOT the same as the 3 live-agent profile
+  // operations (profileClearDefaultCookies/profileDetectBrowsers/
+  // profileImportFromBrowser), which relay via Relay instead — see
+  // specs/backend-go/bugs/missing-v1/solutions/SOL-006-browser-channels.md.
+  rpc ListBrowserProfiles(ListBrowserProfilesRequest) returns (ListBrowserProfilesResponse);
+  rpc CreateBrowserProfile(CreateBrowserProfileRequest) returns (CreateBrowserProfileResponse);
+  rpc DeleteBrowserProfile(DeleteBrowserProfileRequest) returns (google.protobuf.Empty);
+
+  // --- Emulator/simulator control, relayed to the Dev Server Agent (TASK-048) ---
+  // Every RPC here except GetEmulatorAvailability requires connection_id —
+  // there is deliberately no local/backend-host fallback (driving emulators
+  // on the shared backend-go host is out of scope by design, see
+  // usecase.EmulatorRelay's doc comment). agent/ has no device.* RPC surface
+  // today (confirmed absent as of this pass) — every call below reaches a
+  // real agent and fails with a typed, permanent FailedPrecondition until
+  // agent/ gains one; see specs/backend-go/bugs/missing-v1/tasks/TASK-048.
+  rpc ListEmulatorDevices(ListEmulatorDevicesRequest) returns (ListEmulatorDevicesResponse);
+  rpc GetEmulatorAvailability(GetEmulatorAvailabilityRequest) returns (GetEmulatorAvailabilityResponse);
+  rpc AttachEmulatorSession(AttachEmulatorSessionRequest) returns (EmulatorSession);
+  rpc SendEmulatorTap(SendEmulatorTapRequest) returns (google.protobuf.Empty);
+  rpc SendEmulatorGesture(SendEmulatorGestureRequest) returns (google.protobuf.Empty);
+  rpc SendEmulatorButton(SendEmulatorButtonRequest) returns (google.protobuf.Empty);
+  rpc RotateEmulator(RotateEmulatorRequest) returns (google.protobuf.Empty);
+  rpc ShutdownEmulator(ShutdownEmulatorRequest) returns (google.protobuf.Empty);
+
+  // GetHostCapabilities is the per-target WSL/pwsh/git-bash probe (TASK-070)
+  // — connection_id empty resolves to the caller's own backend-go host and
+  // is answered locally and honestly (false/[]), no relay attempted,
+  // matching TASK-068's existing host.* stub semantics; a non-empty
+  // connection_id relays to the agent's host.capabilities method, which
+  // does not exist yet (confirmed absent as of this pass) — see
+  // usecase.GetHostCapabilities's doc comment.
+  rpc GetHostCapabilities(GetHostCapabilitiesRequest) returns (GetHostCapabilitiesResponse);
 }
 
 enum ConnectionMode {
@@ -66,7 +137,22 @@ message RegisterDevServerResponse {
 // (git-gateway-service, project-service, task-service) calls to answer
 // "which host owns this connectionId, and how do I reach it".
 message ResolveConnectionRequest {
+  // Exactly one of connection_id, dev_server_id, worktree_id is set. Empty
+  // connection_id with both alternates also empty resolves nothing
+  // (ResolveConnectionOutput{Connected: false}), matching today's
+  // empty-connectionId short-circuit.
   string connection_id = 1;
+  // dev_server_id resolves the dev server's current active connectionId,
+  // the reverse of connection_id's lookup direction — used by
+  // ai-provider-service's TestConnection (see
+  // specs/backend-go/bugs/missing-v1/tasks/TASK-028-implement-aiprovider-test-connection-usecase.md).
+  string dev_server_id = 2;
+  // worktree_id resolves the connectionId currently bound to a worktree —
+  // used by api-gateway's browser.* relay channels (see
+  // specs/backend-go/bugs/missing-v1/tasks/TASK-034-add-browser-pane-relay-wscompat-channels.md).
+  // Mirrors CreateConnectionRequest's (dev_server_id, repo_path,
+  // worktree_id) tuple in reverse.
+  string worktree_id = 3;
 }
 
 message ResolveConnectionResponse {
@@ -78,6 +164,13 @@ message ResolveConnectionResponse {
   // repo_path alongside dev_server to know which path to operate on.
   string repo_path = 3;
   string worktree_id = 4;
+  // connection_id is the resolved infra.connections.id — the value Relay's
+  // RelayRequest.connection_id expects. Populated regardless of which
+  // ResolveConnectionRequest key resolved this row, so a dev_server_id- or
+  // worktree_id-keyed caller (TestConnection, browser.* channels) has a
+  // valid Relay connection_id without re-deriving it from DevServer.id,
+  // which is a different id space (dev_servers.id, not connections.id).
+  string connection_id = 5;
 }
 
 message ListDevServersRequest {
@@ -150,4 +243,232 @@ message ScanWorkspacePortsRequest {
 
 message ScanWorkspacePortsResponse {
   repeated int32 open_ports = 1;
+}
+
+message KillWorkspacePortRequest {
+  string connection_id = 1;
+  string worktree_id = 2;
+  int32 pid = 3;
+  int32 port = 4;
+}
+
+message KillWorkspacePortResponse {
+  bool ok = 1;
+  string reason = 2; // populated only when ok is false
+}
+
+message SshTarget {
+  string id = 1;
+  string tenant_id = 2;
+  string host = 3;
+  string user = 4;
+  string vault_ssh_role = 5; // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+}
+
+message ListSshTargetsRequest {
+  // tenant_id intentionally absent — pulled from context, same convention
+  // as ListDevServersRequest.
+}
+
+message ListSshTargetsResponse {
+  repeated SshTarget ssh_targets = 1;
+}
+
+message GetSshStateRequest {
+  string ssh_target_id = 1;
+}
+
+message GetSshStateResponse {
+  bool connected = 1;
+  string connection_id = 2;       // empty when not connected
+  int64 last_activity_unix_ms = 3; // 0 when not connected or never active
+}
+
+message EstablishConnectionRequest {
+  string ssh_target_id = 1;
+}
+
+message Connection {
+  string id = 1;                 // the connectionId every other RPC keys on
+  string dev_server_id = 2;
+  string status = 3;             // "established" | "degraded" | "closed"
+  int64 established_at_unix_ms = 4;
+}
+message SpawnTerminalSessionRequest {
+  string connection_id = 1;  // empty = host-local; rejected in server-deployment mode, see usecase.SpawnTerminalSession
+  string cwd = 2;
+  string shell = 3;          // optional; agent applies its own default if empty
+  int32  cols = 4;
+  int32  rows = 5;
+}
+message SpawnTerminalSessionResponse {
+  TerminalSession session = 1;
+}
+message TerminalSession {
+  string pty_id = 1;
+  string connection_id = 2;
+  string cwd = 3;
+  int64  created_at_unix_ms = 4;
+  int64  last_active_at_unix_ms = 5;
+}
+
+message ResizeTerminalSessionRequest { string pty_id = 1; int32 cols = 2; int32 rows = 3; }
+message KillTerminalSessionRequest   { string pty_id = 1; }
+message StopTerminalProcessRequest   { string pty_id = 1; } // sends an interrupt signal to the pty's foreground process
+message ListTerminalSessionsRequest  { string connection_id = 1; } // empty = all sessions for the caller's tenant
+message ListTerminalSessionsResponse { repeated TerminalSession sessions = 1; }
+
+message WaitTerminalSessionRequest  {
+  string pty_id = 1;
+  int32  timeout_ms = 2; // capped server-side (default max 30s, see usecase.WaitTerminalSession)
+}
+message WaitTerminalSessionResponse { bool exited = 1; int32 exit_code = 2; bool timed_out = 3; }
+
+message FocusTerminalSessionRequest { string pty_id = 1; }
+
+message GetTerminalAgentStatusRequest  { string pty_id = 1; }
+message GetTerminalAgentStatusResponse {
+  bool   agent_running = 1;     // answers both terminal.agentStatus and terminal.isRunningAgent
+  string agent_kind = 2;        // best-effort, e.g. "claude" | "codex" | "" if unknown
+  bool   ready_for_input = 3;   // agentStatus's richer question: is it idle-and-ready, not just alive
+}
+
+message InspectTerminalProcessRequest  { string pty_id = 1; }
+message InspectTerminalProcessResponse {
+  bool   known = 1;    // false when the agent can't answer — an honest "unknown", not a fabricated zero value
+  int32  pid = 2;
+  string command = 3;
+  string cwd = 4;
+}
+
+message PtyClientFrame {
+  oneof frame {
+    AttachToSession attach = 1;  // first frame only: which pty_id this stream carries I/O for
+    PtyInput        input  = 2;  // terminal.send
+    PtyResize       resize = 3;  // low-latency in-stream resize (alternative to the unary RPC above)
+  }
+}
+message AttachToSession { string pty_id = 1; }
+message PtyInput  { bytes data = 1; }
+message PtyResize { int32 cols = 1; int32 rows = 2; }
+
+message PtyServerFrame {
+  oneof frame {
+    PtyOutput out    = 1;
+    PtyExited exited = 2;
+  }
+}
+message PtyOutput { bytes data = 1; }
+message PtyExited { int32 exit_code = 1; }
+message BrowserProfile {
+  string id = 1;
+  string tenant_id = 2;
+  string dev_server_id = 3;
+  string name = 4;
+  string source_browser = 5; // e.g. "chrome", "firefox" — set by profileImportFromBrowser; empty if manually created
+  bool is_default = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ListBrowserProfilesRequest {
+  string dev_server_id = 1; // required — a profile is dev-server-scoped, not tenant-wide
+}
+message ListBrowserProfilesResponse {
+  repeated BrowserProfile profiles = 1;
+}
+
+message CreateBrowserProfileRequest {
+  string dev_server_id = 1;
+  string name = 2;
+  string source_browser = 3; // optional
+  bool is_default = 4;
+}
+message CreateBrowserProfileResponse {
+  BrowserProfile profile = 1;
+}
+
+message DeleteBrowserProfileRequest {
+  string id = 1;
+}
+
+// --- Emulator/simulator control (TASK-048) --------------------------------
+
+message EmulatorDevice {
+  string id = 1;
+  string name = 2;
+  string platform = 3; // "android" | "ios" — agent-reported, opaque passthrough
+  string state = 4;    // e.g. "booted", "shutdown" — agent-reported, opaque passthrough
+}
+
+message ListEmulatorDevicesRequest {
+  string connection_id = 1; // required — no backend-host fallback, see rpc doc comment
+}
+message ListEmulatorDevicesResponse {
+  repeated EmulatorDevice devices = 1;
+}
+
+message GetEmulatorAvailabilityRequest {
+  string connection_id = 1; // may be empty — see rpc doc comment
+}
+message GetEmulatorAvailabilityResponse {
+  bool available = 1;
+  string reason = 2; // populated when available is false
+}
+
+message EmulatorSession {
+  string session_id = 1;
+  string device_id = 2;
+  string connection_id = 3; // which dev server this device runs on
+  string platform = 4;      // "android" | "ios"
+}
+
+message AttachEmulatorSessionRequest {
+  string connection_id = 1;
+  string device_id = 2;
+}
+
+message SendEmulatorTapRequest {
+  string connection_id = 1;
+  string session_id = 2;
+  int32 x = 3;
+  int32 y = 4;
+}
+
+message SendEmulatorGestureRequest {
+  string connection_id = 1;
+  string session_id = 2;
+  int32 start_x = 3;
+  int32 start_y = 4;
+  int32 end_x = 5;
+  int32 end_y = 6;
+  int32 duration_ms = 7;
+}
+
+message SendEmulatorButtonRequest {
+  string connection_id = 1;
+  string session_id = 2;
+  string button = 3; // e.g. "home", "back", "volume_up" — agent-defined vocabulary
+}
+
+message RotateEmulatorRequest {
+  string connection_id = 1;
+  string session_id = 2;
+  string orientation = 3; // "portrait" | "landscape"
+}
+
+message ShutdownEmulatorRequest {
+  string connection_id = 1;
+  string session_id = 2;
+}
+
+// --- Host capability probing (TASK-070) -----------------------------------
+
+message GetHostCapabilitiesRequest {
+  string connection_id = 1; // empty = caller's own backend-go host
+}
+message GetHostCapabilitiesResponse {
+  bool wsl_available = 1;
+  repeated string wsl_distros = 2;
+  bool pwsh_available = 3;
+  bool git_bash_available = 4;
 }

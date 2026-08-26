@@ -88,6 +88,10 @@ func run() error {
 	defer pool.Close()
 
 	repo := issuetrackingpostgres.New(pool)
+	// connectionRepo is the same Repository value as repo — connections.go
+	// adds the usecase.ConnectionRepository methods to the one Repository
+	// type this service already has.
+	connectionRepo := repo
 
 	registry := providerregistry.New().
 		Register(domain.ProviderJira, jira.New(nil)).
@@ -103,7 +107,7 @@ func run() error {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}
 	defer func() { _ = brokerConn.Close() }()
-	credentialResolver := credential.New(brokerConn)
+	credentialResolver := credential.New(brokerConn, connectionRepo)
 
 	healthSrv := health.New()
 	healthSrv.Register("postgres", func() error {
@@ -147,8 +151,83 @@ func run() error {
 	createIssueUC := usecase.NewCreateIssue(registry, credentialResolver)
 	linkIssueUC := usecase.NewLinkIssue(repo)
 
+	connectUC := usecase.NewConnect(registry, credentialResolver, connectionRepo)
+	disconnectUC := usecase.NewDisconnect(connectionRepo)
+	selectWorkspaceUC := usecase.NewSelectWorkspace(connectionRepo)
+	getConnectionStatusUC := usecase.NewGetConnectionStatus(connectionRepo)
+	testConnectionUC := usecase.NewTestConnection(registry, credentialResolver)
+
+	searchIssuesUC := usecase.NewSearchIssues(registry, credentialResolver)
+	getIssueUC := usecase.NewGetIssue(registry, credentialResolver)
+	updateIssueUC := usecase.NewUpdateIssue(registry, credentialResolver)
+	addIssueCommentUC := usecase.NewAddIssueComment(registry, credentialResolver)
+	listIssueCommentsUC := usecase.NewListIssueComments(registry, credentialResolver)
+
+	listProjectsUC := usecase.NewListProjects(registry, credentialResolver)
+	listIssueTypesUC := usecase.NewListIssueTypes(registry, credentialResolver)
+	listCreateFieldsUC := usecase.NewListCreateFields(registry, credentialResolver)
+	listAssignableUsersUC := usecase.NewListAssignableUsers(registry, credentialResolver)
+	listPrioritiesUC := usecase.NewListPriorities(registry, credentialResolver)
+	listTransitionsUC := usecase.NewListTransitions(registry, credentialResolver)
+	getProjectStatusOrderUC := usecase.NewGetProjectStatusOrder(registry, credentialResolver)
+
+	createProjectUC := usecase.NewCreateProject(registry, credentialResolver)
+	getProjectUC := usecase.NewGetProject(registry, credentialResolver)
+
+	listTeamsUC := usecase.NewListTeams(registry, credentialResolver)
+	listTeamLabelsUC := usecase.NewListTeamLabels(registry, credentialResolver)
+	listTeamMembersUC := usecase.NewListTeamMembers(registry, credentialResolver)
+	getCustomViewUC := usecase.NewGetCustomView(registry, credentialResolver)
+	listWorkflowStatesUC := usecase.NewListWorkflowStates(registry, credentialResolver)
+
+	// credentials.* group (TASK-041) — credentialResolver (adapter/credential.Resolver)
+	// also satisfies CredentialWriter/CredentialStatusReader/CredentialLister/
+	// CredentialRevoker; no new dial needed.
+	setIntegrationCredentialUC := usecase.NewSetIntegrationCredential(credentialResolver)
+	getIntegrationCredentialStatusUC := usecase.NewGetIntegrationCredentialStatus(credentialResolver)
+	listIntegrationCredentialsUC := usecase.NewListIntegrationCredentials(credentialResolver)
+	revokeAuthUC := usecase.NewRevokeAuth(credentialResolver)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	issuetrackingv1.RegisterIssueTrackingServiceServer(grpcServer, issuetrackinggrpc.New(listIssuesUC, createIssueUC, linkIssueUC))
+	issuetrackingv1.RegisterIssueTrackingServiceServer(grpcServer, issuetrackinggrpc.New(issuetrackinggrpc.Deps{
+		ListIssues:  listIssuesUC,
+		CreateIssue: createIssueUC,
+		LinkIssue:   linkIssueUC,
+
+		Connect:             connectUC,
+		Disconnect:          disconnectUC,
+		SelectWorkspace:     selectWorkspaceUC,
+		GetConnectionStatus: getConnectionStatusUC,
+		TestConnection:      testConnectionUC,
+
+		SearchIssues:      searchIssuesUC,
+		GetIssue:          getIssueUC,
+		UpdateIssue:       updateIssueUC,
+		AddIssueComment:   addIssueCommentUC,
+		ListIssueComments: listIssueCommentsUC,
+
+		ListProjects:          listProjectsUC,
+		ListIssueTypes:        listIssueTypesUC,
+		ListCreateFields:      listCreateFieldsUC,
+		ListAssignableUsers:   listAssignableUsersUC,
+		ListPriorities:        listPrioritiesUC,
+		ListTransitions:       listTransitionsUC,
+		GetProjectStatusOrder: getProjectStatusOrderUC,
+
+		CreateProject: createProjectUC,
+		GetProject:    getProjectUC,
+
+		ListTeams:          listTeamsUC,
+		ListTeamLabels:     listTeamLabelsUC,
+		ListTeamMembers:    listTeamMembersUC,
+		GetCustomView:      getCustomViewUC,
+		ListWorkflowStates: listWorkflowStatesUC,
+
+		SetIntegrationCredential:       setIntegrationCredentialUC,
+		GetIntegrationCredentialStatus: getIntegrationCredentialStatusUC,
+		ListIntegrationCredentials:     listIntegrationCredentialsUC,
+		RevokeAuth:                     revokeAuthUC,
+	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	httpServer := &http.Server{

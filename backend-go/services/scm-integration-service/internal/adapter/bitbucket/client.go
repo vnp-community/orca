@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -27,6 +28,14 @@ const DefaultBaseURL = "https://api.bitbucket.org/2.0"
 // usecase.ScmProvider before this adapter implements it — every method
 // currently in the interface is real.
 var ErrNotImplemented = errors.New("bitbucket: not implemented")
+
+// ErrCapabilityUnsupported is returned by the SOL-012 GitHub-mutation-shaped
+// ScmProvider methods (MergePullRequest/RequestPullRequestReviewers/
+// RemovePullRequestReviewers/SetPullRequestAutoMerge/UpdateIssue/
+// GetPullRequestForBranch/ResolveRepoSlug) — this adapter has no REST
+// mapping for these yet, mirroring the azuredevops/gitea
+// ErrCapabilityUnsupported precedent (§4) rather than faking support.
+var ErrCapabilityUnsupported = errors.New("bitbucket: capability not supported")
 
 // Client implements usecase.ScmProvider against Bitbucket Cloud's REST API.
 type Client struct {
@@ -280,4 +289,65 @@ func (c *Client) GetRateLimitStatus(ctx context.Context, cred usecase.Credential
 		status.ResetAt = time.Unix(reset, 0)
 	}
 	return status, nil
+}
+
+// MergePullRequest, RequestPullRequestReviewers, RemovePullRequestReviewers,
+// SetPullRequestAutoMerge, UpdateIssue, GetPullRequestForBranch, and
+// ResolveRepoSlug are the SOL-012 GitHub-mutation-shaped ScmProvider
+// additions — not implemented for Bitbucket in this pass, see
+// ErrCapabilityUnsupported's doc comment.
+func (c *Client) MergePullRequest(_ context.Context, _ usecase.Credential, _ string, _ int32, _ usecase.MergePullRequestInput) (domain.PullRequest, bool, string, error) {
+	return domain.PullRequest{}, false, "", ErrCapabilityUnsupported
+}
+
+func (c *Client) RequestPullRequestReviewers(_ context.Context, _ usecase.Credential, _ string, _ int32, _, _ []string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) RemovePullRequestReviewers(_ context.Context, _ usecase.Credential, _ string, _ int32, _ []string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) SetPullRequestAutoMerge(_ context.Context, _ usecase.Credential, _ string, _ int32, _ bool, _ string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) UpdateIssue(_ context.Context, _ usecase.Credential, _ string, _ int32, _ usecase.IssuePatch) (domain.Issue, error) {
+	return domain.Issue{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) GetPullRequestForBranch(_ context.Context, _ usecase.Credential, _, _ string) (domain.PullRequest, bool, error) {
+	return domain.PullRequest{}, false, ErrCapabilityUnsupported
+}
+
+func (c *Client) ResolveRepoSlug(_ context.Context, _ usecase.Credential, _ string) (string, string, error) {
+	return "", "", ErrCapabilityUnsupported
+}
+
+// BranchExists calls Bitbucket Cloud's REST API: GET
+// /2.0/repositories/{workspace}/{repo_slug}/refs/branches/{name} — 200
+// exists, 404 doesn't. repo is already "workspace/repo_slug"-shaped, same
+// convention as this adapter's other methods.
+func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo, branch string) (bool, error) {
+	reqURL := fmt.Sprintf("%s/repositories/%s/refs/branches/%s", c.baseURL, repo, url.PathEscape(branch))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("bitbucket: build branch exists request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("bitbucket: branch exists request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("bitbucket: branch exists: unexpected status %d", resp.StatusCode)
+	}
 }

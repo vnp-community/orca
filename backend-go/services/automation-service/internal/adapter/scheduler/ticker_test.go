@@ -31,6 +31,23 @@ func (f *fakeAutomationRepository) Get(ctx context.Context, tenantID, id string)
 	return a, nil
 }
 
+// List/Update/Delete are unused by ticker_test.go's scenarios (the
+// scheduler only ever Creates/Gets/ClaimDues) — stubbed only to satisfy
+// usecase.AutomationRepository.
+func (f *fakeAutomationRepository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Automation, string, error) {
+	return nil, "", nil
+}
+
+func (f *fakeAutomationRepository) Update(ctx context.Context, tenantID string, a domain.Automation) error {
+	f.byID[a.ID] = a
+	return nil
+}
+
+func (f *fakeAutomationRepository) Delete(ctx context.Context, tenantID, id string) error {
+	delete(f.byID, id)
+	return nil
+}
+
 type fakeAutomationRunRepository struct {
 	byID map[string]domain.AutomationRun
 }

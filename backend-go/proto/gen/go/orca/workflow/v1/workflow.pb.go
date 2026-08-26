@@ -87,6 +87,7 @@ type WorkflowTemplate struct {
 	DagJson          string                 `protobuf:"bytes,4,opt,name=dag_json,json=dagJson,proto3" json:"dag_json,omitempty"`
 	Scope            string                 `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`                                                 // company | team | personal
 	ParentTemplateId string                 `protobuf:"bytes,6,opt,name=parent_template_id,json=parentTemplateId,proto3" json:"parent_template_id,omitempty"` // empty = root of its inheritance chain; see ResolveTemplate
+	Version          int32                  `protobuf:"varint,7,opt,name=version,proto3" json:"version,omitempty"`                                            // bumped by UpdateTemplate on every write; 1 at creation
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -161,6 +162,13 @@ func (x *WorkflowTemplate) GetParentTemplateId() string {
 		return x.ParentTemplateId
 	}
 	return ""
+}
+
+func (x *WorkflowTemplate) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 type CreateTemplateRequest struct {
@@ -1297,18 +1305,151 @@ func (x *ResolveTemplateResponse) GetChain() []*WorkflowTemplate {
 	return nil
 }
 
+type UpdateTemplateRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Field-mask-free: every field is always sent (matches
+	// CreateTemplateRequest's shape — no PATCH-style partial update in this
+	// reduced surface, same simplification project-service.md's
+	// UpdateProject accepts for its own non-dev_server_id fields).
+	Name             string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	DagJson          string `protobuf:"bytes,3,opt,name=dag_json,json=dagJson,proto3" json:"dag_json,omitempty"`
+	Scope            string `protobuf:"bytes,4,opt,name=scope,proto3" json:"scope,omitempty"`
+	ParentTemplateId string `protobuf:"bytes,5,opt,name=parent_template_id,json=parentTemplateId,proto3" json:"parent_template_id,omitempty"` // empty = detach from any parent
+	ExpectedVersion  int32  `protobuf:"varint,6,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`     // optimistic concurrency: reject if templates.version has moved
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UpdateTemplateRequest) Reset() {
+	*x = UpdateTemplateRequest{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTemplateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTemplateRequest) ProtoMessage() {}
+
+func (x *UpdateTemplateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTemplateRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTemplateRequest) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *UpdateTemplateRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateTemplateRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateTemplateRequest) GetDagJson() string {
+	if x != nil {
+		return x.DagJson
+	}
+	return ""
+}
+
+func (x *UpdateTemplateRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *UpdateTemplateRequest) GetParentTemplateId() string {
+	if x != nil {
+		return x.ParentTemplateId
+	}
+	return ""
+}
+
+func (x *UpdateTemplateRequest) GetExpectedVersion() int32 {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return 0
+}
+
+type UpdateTemplateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Template      *WorkflowTemplate      `protobuf:"bytes,1,opt,name=template,proto3" json:"template,omitempty"` // includes the bumped version
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTemplateResponse) Reset() {
+	*x = UpdateTemplateResponse{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTemplateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTemplateResponse) ProtoMessage() {}
+
+func (x *UpdateTemplateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTemplateResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTemplateResponse) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *UpdateTemplateResponse) GetTemplate() *WorkflowTemplate {
+	if x != nil {
+		return x.Template
+	}
+	return nil
+}
+
 var File_orca_workflow_v1_workflow_proto protoreflect.FileDescriptor
 
 const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\n" +
-	"\x1forca/workflow/v1/workflow.proto\x12\x10orca.workflow.v1\"\xb2\x01\n" +
+	"\x1forca/workflow/v1/workflow.proto\x12\x10orca.workflow.v1\"\xcc\x01\n" +
 	"\x10WorkflowTemplate\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x19\n" +
 	"\bdag_json\x18\x04 \x01(\tR\adagJson\x12\x14\n" +
 	"\x05scope\x18\x05 \x01(\tR\x05scope\x12,\n" +
-	"\x12parent_template_id\x18\x06 \x01(\tR\x10parentTemplateId\"\xa7\x01\n" +
+	"\x12parent_template_id\x18\x06 \x01(\tR\x10parentTemplateId\x12\x18\n" +
+	"\aversion\x18\a \x01(\x05R\aversion\"\xa7\x01\n" +
 	"\x15CreateTemplateRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -1383,16 +1524,26 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"templateId\"\x93\x01\n" +
 	"\x17ResolveTemplateResponse\x12>\n" +
 	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate\x128\n" +
-	"\x05chain\x18\x02 \x03(\v2\".orca.workflow.v1.WorkflowTemplateR\x05chain*\x9b\x01\n" +
+	"\x05chain\x18\x02 \x03(\v2\".orca.workflow.v1.WorkflowTemplateR\x05chain\"\xc5\x01\n" +
+	"\x15UpdateTemplateRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
+	"\bdag_json\x18\x03 \x01(\tR\adagJson\x12\x14\n" +
+	"\x05scope\x18\x04 \x01(\tR\x05scope\x12,\n" +
+	"\x12parent_template_id\x18\x05 \x01(\tR\x10parentTemplateId\x12)\n" +
+	"\x10expected_version\x18\x06 \x01(\x05R\x0fexpectedVersion\"X\n" +
+	"\x16UpdateTemplateResponse\x12>\n" +
+	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate*\x9b\x01\n" +
 	"\bStepType\x12\x19\n" +
 	"\x15STEP_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTEP_TYPE_AGENT\x10\x01\x12\x13\n" +
 	"\x0fSTEP_TYPE_SHELL\x10\x02\x12\x1a\n" +
 	"\x16STEP_TYPE_NOTIFICATION\x10\x03\x12\x15\n" +
 	"\x11STEP_TYPE_WEBHOOK\x10\x04\x12\x17\n" +
-	"\x13STEP_TYPE_CONDITION\x10\x052\x83\b\n" +
+	"\x13STEP_TYPE_CONDITION\x10\x052\xe8\b\n" +
 	"\x0fWorkflowService\x12c\n" +
-	"\x0eCreateTemplate\x12'.orca.workflow.v1.CreateTemplateRequest\x1a(.orca.workflow.v1.CreateTemplateResponse\x12N\n" +
+	"\x0eCreateTemplate\x12'.orca.workflow.v1.CreateTemplateRequest\x1a(.orca.workflow.v1.CreateTemplateResponse\x12c\n" +
+	"\x0eUpdateTemplate\x12'.orca.workflow.v1.UpdateTemplateRequest\x1a(.orca.workflow.v1.UpdateTemplateResponse\x12N\n" +
 	"\aExecute\x12 .orca.workflow.v1.ExecuteRequest\x1a!.orca.workflow.v1.ExecuteResponse\x12]\n" +
 	"\fGetExecution\x12%.orca.workflow.v1.GetExecutionRequest\x1a&.orca.workflow.v1.GetExecutionResponse\x12c\n" +
 	"\x0ePauseExecution\x12'.orca.workflow.v1.PauseExecutionRequest\x1a(.orca.workflow.v1.PauseExecutionResponse\x12f\n" +
@@ -1416,7 +1567,7 @@ func file_orca_workflow_v1_workflow_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_workflow_v1_workflow_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_workflow_v1_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_orca_workflow_v1_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_orca_workflow_v1_workflow_proto_goTypes = []any{
 	(StepType)(0),                       // 0: orca.workflow.v1.StepType
 	(*WorkflowTemplate)(nil),            // 1: orca.workflow.v1.WorkflowTemplate
@@ -1442,6 +1593,8 @@ var file_orca_workflow_v1_workflow_proto_goTypes = []any{
 	(*ListTemplatesResponse)(nil),       // 21: orca.workflow.v1.ListTemplatesResponse
 	(*ResolveTemplateRequest)(nil),      // 22: orca.workflow.v1.ResolveTemplateRequest
 	(*ResolveTemplateResponse)(nil),     // 23: orca.workflow.v1.ResolveTemplateResponse
+	(*UpdateTemplateRequest)(nil),       // 24: orca.workflow.v1.UpdateTemplateRequest
+	(*UpdateTemplateResponse)(nil),      // 25: orca.workflow.v1.UpdateTemplateResponse
 }
 var file_orca_workflow_v1_workflow_proto_depIdxs = []int32{
 	1,  // 0: orca.workflow.v1.CreateTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
@@ -1455,31 +1608,34 @@ var file_orca_workflow_v1_workflow_proto_depIdxs = []int32{
 	1,  // 8: orca.workflow.v1.ListTemplatesResponse.templates:type_name -> orca.workflow.v1.WorkflowTemplate
 	1,  // 9: orca.workflow.v1.ResolveTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
 	1,  // 10: orca.workflow.v1.ResolveTemplateResponse.chain:type_name -> orca.workflow.v1.WorkflowTemplate
-	2,  // 11: orca.workflow.v1.WorkflowService.CreateTemplate:input_type -> orca.workflow.v1.CreateTemplateRequest
-	4,  // 12: orca.workflow.v1.WorkflowService.Execute:input_type -> orca.workflow.v1.ExecuteRequest
-	7,  // 13: orca.workflow.v1.WorkflowService.GetExecution:input_type -> orca.workflow.v1.GetExecutionRequest
-	9,  // 14: orca.workflow.v1.WorkflowService.PauseExecution:input_type -> orca.workflow.v1.PauseExecutionRequest
-	11, // 15: orca.workflow.v1.WorkflowService.ResumeExecution:input_type -> orca.workflow.v1.ResumeExecutionRequest
-	13, // 16: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:input_type -> orca.workflow.v1.ExecuteAdHocStepRequest
-	18, // 17: orca.workflow.v1.WorkflowService.CancelExecution:input_type -> orca.workflow.v1.CancelExecutionRequest
-	20, // 18: orca.workflow.v1.WorkflowService.ListTemplates:input_type -> orca.workflow.v1.ListTemplatesRequest
-	22, // 19: orca.workflow.v1.WorkflowService.ResolveTemplate:input_type -> orca.workflow.v1.ResolveTemplateRequest
-	16, // 20: orca.workflow.v1.WorkflowService.HasActiveExecutions:input_type -> orca.workflow.v1.HasActiveExecutionsRequest
-	3,  // 21: orca.workflow.v1.WorkflowService.CreateTemplate:output_type -> orca.workflow.v1.CreateTemplateResponse
-	6,  // 22: orca.workflow.v1.WorkflowService.Execute:output_type -> orca.workflow.v1.ExecuteResponse
-	8,  // 23: orca.workflow.v1.WorkflowService.GetExecution:output_type -> orca.workflow.v1.GetExecutionResponse
-	10, // 24: orca.workflow.v1.WorkflowService.PauseExecution:output_type -> orca.workflow.v1.PauseExecutionResponse
-	12, // 25: orca.workflow.v1.WorkflowService.ResumeExecution:output_type -> orca.workflow.v1.ResumeExecutionResponse
-	15, // 26: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:output_type -> orca.workflow.v1.ExecuteAdHocStepResponse
-	19, // 27: orca.workflow.v1.WorkflowService.CancelExecution:output_type -> orca.workflow.v1.CancelExecutionResponse
-	21, // 28: orca.workflow.v1.WorkflowService.ListTemplates:output_type -> orca.workflow.v1.ListTemplatesResponse
-	23, // 29: orca.workflow.v1.WorkflowService.ResolveTemplate:output_type -> orca.workflow.v1.ResolveTemplateResponse
-	17, // 30: orca.workflow.v1.WorkflowService.HasActiveExecutions:output_type -> orca.workflow.v1.HasActiveExecutionsResponse
-	21, // [21:31] is the sub-list for method output_type
-	11, // [11:21] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	1,  // 11: orca.workflow.v1.UpdateTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
+	2,  // 12: orca.workflow.v1.WorkflowService.CreateTemplate:input_type -> orca.workflow.v1.CreateTemplateRequest
+	24, // 13: orca.workflow.v1.WorkflowService.UpdateTemplate:input_type -> orca.workflow.v1.UpdateTemplateRequest
+	4,  // 14: orca.workflow.v1.WorkflowService.Execute:input_type -> orca.workflow.v1.ExecuteRequest
+	7,  // 15: orca.workflow.v1.WorkflowService.GetExecution:input_type -> orca.workflow.v1.GetExecutionRequest
+	9,  // 16: orca.workflow.v1.WorkflowService.PauseExecution:input_type -> orca.workflow.v1.PauseExecutionRequest
+	11, // 17: orca.workflow.v1.WorkflowService.ResumeExecution:input_type -> orca.workflow.v1.ResumeExecutionRequest
+	13, // 18: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:input_type -> orca.workflow.v1.ExecuteAdHocStepRequest
+	18, // 19: orca.workflow.v1.WorkflowService.CancelExecution:input_type -> orca.workflow.v1.CancelExecutionRequest
+	20, // 20: orca.workflow.v1.WorkflowService.ListTemplates:input_type -> orca.workflow.v1.ListTemplatesRequest
+	22, // 21: orca.workflow.v1.WorkflowService.ResolveTemplate:input_type -> orca.workflow.v1.ResolveTemplateRequest
+	16, // 22: orca.workflow.v1.WorkflowService.HasActiveExecutions:input_type -> orca.workflow.v1.HasActiveExecutionsRequest
+	3,  // 23: orca.workflow.v1.WorkflowService.CreateTemplate:output_type -> orca.workflow.v1.CreateTemplateResponse
+	25, // 24: orca.workflow.v1.WorkflowService.UpdateTemplate:output_type -> orca.workflow.v1.UpdateTemplateResponse
+	6,  // 25: orca.workflow.v1.WorkflowService.Execute:output_type -> orca.workflow.v1.ExecuteResponse
+	8,  // 26: orca.workflow.v1.WorkflowService.GetExecution:output_type -> orca.workflow.v1.GetExecutionResponse
+	10, // 27: orca.workflow.v1.WorkflowService.PauseExecution:output_type -> orca.workflow.v1.PauseExecutionResponse
+	12, // 28: orca.workflow.v1.WorkflowService.ResumeExecution:output_type -> orca.workflow.v1.ResumeExecutionResponse
+	15, // 29: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:output_type -> orca.workflow.v1.ExecuteAdHocStepResponse
+	19, // 30: orca.workflow.v1.WorkflowService.CancelExecution:output_type -> orca.workflow.v1.CancelExecutionResponse
+	21, // 31: orca.workflow.v1.WorkflowService.ListTemplates:output_type -> orca.workflow.v1.ListTemplatesResponse
+	23, // 32: orca.workflow.v1.WorkflowService.ResolveTemplate:output_type -> orca.workflow.v1.ResolveTemplateResponse
+	17, // 33: orca.workflow.v1.WorkflowService.HasActiveExecutions:output_type -> orca.workflow.v1.HasActiveExecutionsResponse
+	23, // [23:34] is the sub-list for method output_type
+	12, // [12:23] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_orca_workflow_v1_workflow_proto_init() }
@@ -1493,7 +1649,7 @@ func file_orca_workflow_v1_workflow_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_workflow_v1_workflow_proto_rawDesc), len(file_orca_workflow_v1_workflow_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   23,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

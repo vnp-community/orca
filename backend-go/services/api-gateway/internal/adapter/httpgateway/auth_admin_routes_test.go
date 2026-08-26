@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -25,6 +26,21 @@ import (
 type fakeAdminAuthServiceClient struct {
 	listUsersResp *authv1.ListUsersResponse
 	err           error
+
+	statsResp             *authv1.GetAdminStatsResponse
+	queryAuditLogResp     *authv1.QueryAuditLogResponse
+	deactivateUserResp    *authv1.DeactivateUserResponse
+	listSessionsResp      *authv1.ListSessionsForUserResponse
+	forceRevokeAllResp    *authv1.ForceRevokeAllSessionsForUserResponse
+	listPoliciesResp      *authv1.ListAccessPoliciesResponse
+	createPolicyResp      *authv1.AccessPolicy
+	updatePolicyResp      *authv1.AccessPolicy
+	lastCreatePolicyReq   *authv1.CreateAccessPolicyRequest
+	lastUpdatePolicyReq   *authv1.UpdateAccessPolicyRequest
+	lastDeactivateUserReq *authv1.DeactivateUserRequest
+	lastListSessionsReq   *authv1.ListSessionsForUserRequest
+	lastForceRevokeAllReq *authv1.ForceRevokeAllSessionsForUserRequest
+	lastDeletePolicyReq   *authv1.DeleteAccessPolicyRequest
 }
 
 func (f *fakeAdminAuthServiceClient) Login(ctx context.Context, in *authv1.LoginRequest, opts ...grpc.CallOption) (*authv1.LoginResponse, error) {
@@ -63,11 +79,90 @@ func (f *fakeAdminAuthServiceClient) UpdateUserRole(ctx context.Context, in *aut
 }
 
 func (f *fakeAdminAuthServiceClient) RevokeSession(ctx context.Context, in *authv1.RevokeSessionRequest, opts ...grpc.CallOption) (*authv1.RevokeSessionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by this test")
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &authv1.RevokeSessionResponse{}, nil
 }
 
 func (f *fakeAdminAuthServiceClient) QueryAuditLog(ctx context.Context, in *authv1.QueryAuditLogRequest, opts ...grpc.CallOption) (*authv1.QueryAuditLogResponse, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.queryAuditLogResp != nil {
+		return f.queryAuditLogResp, nil
+	}
+	return &authv1.QueryAuditLogResponse{}, nil
+}
+
+func (f *fakeAdminAuthServiceClient) DeactivateUser(ctx context.Context, in *authv1.DeactivateUserRequest, opts ...grpc.CallOption) (*authv1.DeactivateUserResponse, error) {
+	f.lastDeactivateUserReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.deactivateUserResp, nil
+}
+
+func (f *fakeAdminAuthServiceClient) ReactivateUser(ctx context.Context, in *authv1.ReactivateUserRequest, opts ...grpc.CallOption) (*authv1.ReactivateUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) ListSessionsForUser(ctx context.Context, in *authv1.ListSessionsForUserRequest, opts ...grpc.CallOption) (*authv1.ListSessionsForUserResponse, error) {
+	f.lastListSessionsReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.listSessionsResp, nil
+}
+
+func (f *fakeAdminAuthServiceClient) ForceRevokeAllSessionsForUser(ctx context.Context, in *authv1.ForceRevokeAllSessionsForUserRequest, opts ...grpc.CallOption) (*authv1.ForceRevokeAllSessionsForUserResponse, error) {
+	f.lastForceRevokeAllReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.forceRevokeAllResp, nil
+}
+
+func (f *fakeAdminAuthServiceClient) CreateAccessPolicy(ctx context.Context, in *authv1.CreateAccessPolicyRequest, opts ...grpc.CallOption) (*authv1.AccessPolicy, error) {
+	f.lastCreatePolicyReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.createPolicyResp, nil
+}
+
+func (f *fakeAdminAuthServiceClient) GetAccessPolicy(ctx context.Context, in *authv1.GetAccessPolicyRequest, opts ...grpc.CallOption) (*authv1.AccessPolicy, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) ListAccessPolicies(ctx context.Context, in *authv1.ListAccessPoliciesRequest, opts ...grpc.CallOption) (*authv1.ListAccessPoliciesResponse, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.listPoliciesResp, nil
+}
+
+func (f *fakeAdminAuthServiceClient) UpdateAccessPolicy(ctx context.Context, in *authv1.UpdateAccessPolicyRequest, opts ...grpc.CallOption) (*authv1.AccessPolicy, error) {
+	f.lastUpdatePolicyReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.updatePolicyResp, nil
+}
+
+func (f *fakeAdminAuthServiceClient) DeleteAccessPolicy(ctx context.Context, in *authv1.DeleteAccessPolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	f.lastDeletePolicyReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (f *fakeAdminAuthServiceClient) GetAdminStats(ctx context.Context, in *authv1.GetAdminStatsRequest, opts ...grpc.CallOption) (*authv1.GetAdminStatsResponse, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.statsResp, nil
 }
 
 var _ authv1.AuthServiceClient = (*fakeAdminAuthServiceClient)(nil)

@@ -72,3 +72,47 @@ func handleGetVapidPublicKey(client notificationv1.NotificationServiceClient) ht
 		writeJSON(w, http.StatusOK, resp)
 	}
 }
+
+// mountPushRoutes wires the web-push REST surface at the literal,
+// UNAUTHENTICATED paths specs/frontend/api/http-endpoints.md documents
+// (`/api/vapid-public-key`, `/api/push-subscribe`, `/api/push-unsubscribe`)
+// — distinct from mountNotificationRoutes's `/v1/notifications/*` mount of
+// (mostly) the same RPCs behind authMiddleware. Per http-endpoints.md these
+// routes are unauthenticated by design: a browser registering for push
+// notifications does so before/independent of any session, and the
+// service-worker's push-subscribe call has no session cookie to present
+// either. See router.go's mounting order — this MUST be called outside the
+// authed route group, never inside it (regression guard: BUG-003,
+// TestPushRoutes_NoAuthRequired in notification_routes_test.go).
+func mountPushRoutes(r chi.Router, client notificationv1.NotificationServiceClient) {
+	r.Get("/api/vapid-public-key", handleGetVapidPublicKey(client))
+	r.Post("/api/push-subscribe", handleSubscribe(client))
+	r.Post("/api/push-unsubscribe", handleUnsubscribe(client))
+}
+
+// unsubscribeRequestBody is the REST request shape for POST
+// /api/push-unsubscribe.
+type unsubscribeRequestBody struct {
+	Endpoint string `json:"endpoint"`
+}
+
+func handleUnsubscribe(client notificationv1.NotificationServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body unsubscribeRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid JSON body: "+err.Error())
+			return
+		}
+
+		// Unauthenticated by design (see http-endpoints.md) — no identity
+		// to attach. Tenant/user scoping comes from the endpoint row's own
+		// lookup server-side, not from caller identity.
+		if _, err := client.UnregisterPushSubscription(r.Context(), &notificationv1.UnregisterPushSubscriptionRequest{
+			Endpoint: body.Endpoint,
+		}); err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}

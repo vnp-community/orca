@@ -78,6 +78,8 @@ func run() error {
 	repoRepo := projectpostgres.NewRepoRepository(pool)
 	worktreeRepo := projectpostgres.NewWorktreeRepository(pool)
 	projectGroupRepo := projectpostgres.NewProjectGroupRepository(pool)
+	folderWorkspaceRepo := projectpostgres.NewFolderWorkspaceRepository(pool)
+	hostSetupRepo := projectpostgres.NewHostSetupRepository(pool)
 
 	// Real clients — Epic C (docs/execution-plan.md §10, 2026-08-17) closed
 	// the gap these were previously stubs for. Dialed lazily (doesn't block
@@ -94,6 +96,18 @@ func run() error {
 	}
 	defer func() { _ = taskChecker.Close() }()
 
+	devServerRelay, err := projectgrpcclient.NewDevServerRelay(cfg.InfraFleetServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing infra-fleet-service: %w", err)
+	}
+	defer func() { _ = devServerRelay.Close() }()
+
+	devServerLister, err := projectgrpcclient.NewInfraFleetDevServerLister(cfg.InfraFleetServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing infra-fleet-service (dev server lister): %w", err)
+	}
+	defer func() { _ = devServerLister.Close() }()
+
 	// Shared embedded-OPA evaluator (common/policy) for project-role/
 	// global-admin authorization — mirrors auth-service/annotation-service/
 	// task-service's own composition-root wiring. One Evaluator, pointed at
@@ -104,6 +118,9 @@ func run() error {
 	getProjectUC := usecase.NewGetProject(repo, opa)
 	listProjectsUC := usecase.NewListProjects(repo)
 	addMemberUC := usecase.NewAddMember(repo, opa)
+	listMembersUC := usecase.NewListMembers(repo, opa)
+	removeMemberUC := usecase.NewRemoveMember(repo, opa)
+	updateMemberRoleUC := usecase.NewUpdateMemberRole(repo, opa)
 	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker, opa)
 	updateProjectUC := usecase.NewUpdateProject(repo, opa)
 	deleteProjectUC := usecase.NewDeleteProject(repo, workflowChecker, taskChecker, opa)
@@ -116,6 +133,7 @@ func run() error {
 	listReposUC := usecase.NewListRepos(repoRepo, repo, opa)
 	reorderReposUC := usecase.NewReorderRepos(repoRepo, repo, opa)
 	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
+	updateRepoUC := usecase.NewUpdateRepo(repoRepo, repo, opa)
 
 	recordWorktreeCreatedUC := usecase.NewRecordWorktreeCreated(worktreeRepo)
 	recordWorktreeRemovedUC := usecase.NewRecordWorktreeRemoved(worktreeRepo)
@@ -127,6 +145,17 @@ func run() error {
 	updateProjectGroupUC := usecase.NewUpdateProjectGroup(projectGroupRepo)
 	deleteProjectGroupUC := usecase.NewDeleteProjectGroup(projectGroupRepo)
 	listProjectGroupsUC := usecase.NewListProjectGroups(projectGroupRepo)
+	moveProjectUC := usecase.NewMoveProject(repo, projectGroupRepo, opa)
+	scanNestedUC := usecase.NewScanNested(devServerRelay)
+	importNestedUC := usecase.NewImportNested(projectGroupRepo)
+
+	createHostSetupUC := usecase.NewCreateHostSetup(hostSetupRepo, devServerLister)
+	listHostSetupsUC := usecase.NewListHostSetups(hostSetupRepo)
+	updateHostSetupUC := usecase.NewUpdateHostSetup(hostSetupRepo)
+	deleteHostSetupUC := usecase.NewDeleteHostSetup(hostSetupRepo)
+	setupExistingFolderUC := usecase.NewSetupExistingFolder(hostSetupRepo, repo, repoRepo, devServerRelay)
+
+	folderWorkspaceUC := usecase.NewFolderWorkspaceUseCase(folderWorkspaceRepo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
@@ -138,10 +167,15 @@ func run() error {
 		UpdateProject:   updateProjectUC,
 		DeleteProject:   deleteProjectUC,
 
+		ListMembers:      listMembersUC,
+		RemoveMember:     removeMemberUC,
+		UpdateMemberRole: updateMemberRoleUC,
+
 		AddRepo:      addRepoUC,
 		ListRepos:    listReposUC,
 		ReorderRepos: reorderReposUC,
 		RemoveRepo:   removeRepoUC,
+		UpdateRepo:   updateRepoUC,
 
 		RecordWorktreeCreated: recordWorktreeCreatedUC,
 		RecordWorktreeRemoved: recordWorktreeRemovedUC,
@@ -153,6 +187,17 @@ func run() error {
 		UpdateProjectGroup: updateProjectGroupUC,
 		DeleteProjectGroup: deleteProjectGroupUC,
 		ListProjectGroups:  listProjectGroupsUC,
+
+		FolderWorkspaces: folderWorkspaceUC,
+		MoveProject:        moveProjectUC,
+		ScanNested:         scanNestedUC,
+		ImportNested:       importNestedUC,
+
+		CreateHostSetup:     createHostSetupUC,
+		ListHostSetups:      listHostSetupsUC,
+		UpdateHostSetup:     updateHostSetupUC,
+		DeleteHostSetup:     deleteHostSetupUC,
+		SetupExistingFolder: setupExistingFolderUC,
 	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

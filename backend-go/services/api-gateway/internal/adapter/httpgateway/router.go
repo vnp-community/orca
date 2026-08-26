@@ -88,6 +88,11 @@ func NewRouter(deps Deps) http.Handler {
 		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator)
 	}
 	mountTraceRoutes(r)
+	// mountPushRoutes is unauthenticated by design (see its doc comment) —
+	// mounted here, outside the authed group below, never moved inside it.
+	if deps.NotificationClient != nil {
+		mountPushRoutes(r, deps.NotificationClient)
+	}
 	if deps.WSCompatHandler != nil {
 		r.Get("/ws", deps.WSCompatHandler)
 	}
@@ -106,6 +111,7 @@ func NewRouter(deps Deps) http.Handler {
 		// degrades to that prefix's 501 stub instead of panicking.
 		if deps.AuthClient != nil {
 			mountAuthAdminRoutes(authed, deps.AuthClient)
+			mountAdminRoutes(authed, deps.AuthClient)
 		}
 		if deps.AnnotationClient != nil {
 			mountAnnotationRoutes(authed, deps.AnnotationClient)

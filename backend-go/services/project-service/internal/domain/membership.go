@@ -58,3 +58,17 @@ func NewProjectMember(projectID, userID string, role ProjectRole) (ProjectMember
 	}
 	return ProjectMember{ProjectID: projectID, UserID: userID, Role: role}, nil
 }
+
+// ErrProjectWouldBeOwnerless is returned by AssertNotLastOwnerRemoval.
+var ErrProjectWouldBeOwnerless = errors.New("domain: project must retain at least one owner")
+
+// AssertNotLastOwnerRemoval enforces project-service.md §4's invariant:
+// removing membership or demoting a role must never leave zero owners.
+// targetRoleAfter is "" for a removal (no role after), or the new role for
+// a demotion/promotion.
+func AssertNotLastOwnerRemoval(currentOwnerCount int, targetIsCurrentlyOwner bool, targetRoleAfter ProjectRole) error {
+	if targetIsCurrentlyOwner && targetRoleAfter != ProjectRoleOwner && currentOwnerCount <= 1 {
+		return ErrProjectWouldBeOwnerless
+	}
+	return nil
+}

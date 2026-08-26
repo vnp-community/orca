@@ -13,8 +13,9 @@ import (
 // "test against fakes, not a real database" pattern from
 // specs/backend-go/standards/testing-strategy.md's unit-test section.
 type fakeSubscriptionRepository struct {
-	saved   []domain.PushSubscription
-	saveErr error
+	saved     []domain.PushSubscription
+	saveErr   error
+	deleteErr error
 }
 
 func (f *fakeSubscriptionRepository) Save(ctx context.Context, sub domain.PushSubscription) error {
@@ -33,6 +34,20 @@ func (f *fakeSubscriptionRepository) ListByUser(ctx context.Context, tenantID, u
 		}
 	}
 	return out, nil
+}
+
+func (f *fakeSubscriptionRepository) DeleteByEndpoint(ctx context.Context, endpoint string) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	out := f.saved[:0]
+	for _, s := range f.saved {
+		if s.Endpoint != endpoint {
+			out = append(out, s)
+		}
+	}
+	f.saved = out
+	return nil
 }
 
 func withTenant(ctx context.Context, tenantID string) context.Context {

@@ -99,6 +99,62 @@ func (r *Resolver) Write(ctx context.Context, tenantID string, provider domain.S
 	return nil
 }
 
+// WriteRaw implements usecase.CredentialWriter.WriteRaw — same owner_id
+// convention as Write, but a manually pasted token instead of an
+// OAuthToken (no Scope), plus the new ConfigJson passthrough (TASK-037/038).
+func (r *Resolver) WriteRaw(ctx context.Context, tenantID string, provider domain.ScmProvider, token, configJSON string) error {
+	_, err := r.client.WriteCredential(ctx, &credentialbrokerv1.WriteCredentialRequest{
+		TenantId:          tenantID,
+		OwnerId:           string(provider),
+		Category:          credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_SCM_OAUTH,
+		EncryptedEnvelope: []byte(token),
+		ConfigJson:        configJSON,
+	})
+	if err != nil {
+		return fmt.Errorf("credentialbroker: writing raw %s credential: %w", provider, err)
+	}
+	return nil
+}
+
+var _ usecase.CredentialStatusReader = (*Resolver)(nil)
+
+// GetStatus implements usecase.CredentialStatusReader via
+// GetCredentialMetadataByOwner (TASK-038) — metadata only, never plaintext.
+func (r *Resolver) GetStatus(ctx context.Context, tenantID string, provider domain.ScmProvider) (bool, string, error) {
+	resp, err := r.client.GetCredentialMetadataByOwner(ctx, &credentialbrokerv1.GetCredentialMetadataByOwnerRequest{
+		TenantId: tenantID,
+		Category: credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_SCM_OAUTH,
+		OwnerId:  string(provider),
+	})
+	if err != nil {
+		return false, "", fmt.Errorf("credentialbroker: fetching %s credential status: %w", provider, err)
+	}
+	metadata := resp.GetMetadata()
+	if metadata == nil {
+		return false, "", nil
+	}
+	return true, metadata.GetConfigJson(), nil
+}
+
+var _ usecase.CredentialLister = (*Resolver)(nil)
+
+// ListConfiguredProviders implements usecase.CredentialLister via
+// ListCredentialsByCategory (TASK-038).
+func (r *Resolver) ListConfiguredProviders(ctx context.Context, tenantID string) ([]domain.ScmProvider, error) {
+	resp, err := r.client.ListCredentialsByCategory(ctx, &credentialbrokerv1.ListCredentialsByCategoryRequest{
+		TenantId: tenantID,
+		Category: credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_SCM_OAUTH,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("credentialbroker: listing scm credentials: %w", err)
+	}
+	providers := make([]domain.ScmProvider, 0, len(resp.GetCredentials()))
+	for _, m := range resp.GetCredentials() {
+		providers = append(providers, domain.ScmProvider(m.GetOwnerId()))
+	}
+	return providers, nil
+}
+
 var _ usecase.CredentialRevoker = (*Resolver)(nil)
 
 // RevokeByOwner implements usecase.CredentialRevoker via

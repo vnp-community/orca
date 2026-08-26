@@ -72,6 +72,14 @@ type DispatchContextRepository interface {
 	// remains trivially atomic on its own (no separate task-status
 	// transition happens here).
 	CreateDispatchContext(ctx context.Context, tenantID, handle, coordinatorRunID, orchestrationTaskID string) (domain.DispatchContext, error)
+
+	// GetLatestForTask returns the most recently created dispatch_contexts
+	// row for orchestrationTaskID, or ErrDispatchContextNotFound if none
+	// exists. A task's dispatch_contexts row is not unique (retries after
+	// failure create new rows, §8's circuit-breaker note) — "latest" is
+	// the current dispatch, which is what dispatchShow's "which terminal
+	// is this on" question actually needs, not full attempt history.
+	GetLatestForTask(ctx context.Context, tenantID, orchestrationTaskID string) (domain.DispatchContext, error)
 }
 
 // GateRepository is the persistence port for decision gates.

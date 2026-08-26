@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -29,6 +30,9 @@ type fakeNotificationServiceClient struct {
 
 	vapidResp *notificationv1.GetVapidPublicKeyResponse
 	vapidErr  error
+
+	unregisterReq *notificationv1.UnregisterPushSubscriptionRequest
+	unregisterErr error
 }
 
 func (f *fakeNotificationServiceClient) Subscribe(_ context.Context, in *notificationv1.SubscribeRequest, _ ...grpc.CallOption) (*notificationv1.SubscribeResponse, error) {
@@ -44,6 +48,14 @@ func (f *fakeNotificationServiceClient) GetVapidPublicKey(_ context.Context, _ *
 		return nil, f.vapidErr
 	}
 	return f.vapidResp, nil
+}
+
+func (f *fakeNotificationServiceClient) UnregisterPushSubscription(_ context.Context, in *notificationv1.UnregisterPushSubscriptionRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	f.unregisterReq = in
+	if f.unregisterErr != nil {
+		return nil, f.unregisterErr
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (f *fakeNotificationServiceClient) StreamNotifications(_ context.Context, _ *notificationv1.StreamNotificationsRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[notificationv1.NotificationServiceStreamNotificationsResponse], error) {
@@ -126,6 +138,95 @@ func TestHandleGetVapidPublicKey_Success(t *testing.T) {
 	}
 	if resp.PublicKey != "vapid-public-key" {
 		t.Fatalf("PublicKey = %q, want %q", resp.PublicKey, "vapid-public-key")
+	}
+}
+
+// pushTestRouter mounts mountPushRoutes standalone, WITHOUT injecting any
+// identity into request context — these routes are unauthenticated by
+// design (see mountPushRoutes's doc comment), so a test router for them
+// must not simulate authMiddleware the way notificationTestRouter does for
+// the authenticated /v1/notifications/* mount.
+func pushTestRouter(client notificationv1.NotificationServiceClient) http.Handler {
+	r := chi.NewRouter()
+	mountPushRoutes(r, client)
+	return r
+}
+
+func TestHandlePushUnsubscribe_KnownEndpoint(t *testing.T) {
+	fake := &fakeNotificationServiceClient{}
+	router := pushTestRouter(fake)
+
+	body, err := json.Marshal(unsubscribeRequestBody{Endpoint: "https://push.example.com/ep"})
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/push-unsubscribe", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNoContent, rec.Body.String())
+	}
+	if fake.unregisterReq.GetEndpoint() != "https://push.example.com/ep" {
+		t.Fatalf("UnregisterPushSubscription called with Endpoint = %q", fake.unregisterReq.GetEndpoint())
+	}
+}
+
+// TestHandlePushUnsubscribe_UnknownEndpoint_StillReturns204 guards
+// idempotency at the REST boundary: re-unsubscribing an endpoint that was
+// never registered (or already removed) must not surface as an error.
+func TestHandlePushUnsubscribe_UnknownEndpoint_StillReturns204(t *testing.T) {
+	fake := &fakeNotificationServiceClient{} // UnregisterPushSubscription succeeds unconditionally (no unregisterErr set)
+	router := pushTestRouter(fake)
+
+	body, err := json.Marshal(unsubscribeRequestBody{Endpoint: "https://push.example.com/never-subscribed"})
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/push-unsubscribe", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d (idempotent, not an error); body=%s", rec.Code, http.StatusNoContent, rec.Body.String())
+	}
+}
+
+// TestPushRoutes_NoAuthRequired is the route-placement regression test
+// TASK-011 calls out explicitly: GET /api/vapid-public-key and POST
+// /api/push-subscribe (and push-unsubscribe) must succeed with NO identity
+// in request context — guards against these accidentally being remounted
+// inside the authenticated group later (BUG-003).
+func TestPushRoutes_NoAuthRequired(t *testing.T) {
+	fake := &fakeNotificationServiceClient{
+		vapidResp:     &notificationv1.GetVapidPublicKeyResponse{PublicKey: "vapid-key"},
+		subscribeResp: &notificationv1.SubscribeResponse{SubscriptionId: "sub-1"},
+	}
+	router := pushTestRouter(fake)
+
+	// GET /api/vapid-public-key — no identity in context at all (unlike
+	// notificationTestRouter's tests, this router never injects one).
+	req := httptest.NewRequest(http.MethodGet, "/api/vapid-public-key", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /api/vapid-public-key: status = %d, want %d (push routes must not require auth — regression against BUG-003); body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+
+	subBody, _ := json.Marshal(subscribeRequestBody{Endpoint: "https://push.example.com/ep"})
+	req = httptest.NewRequest(http.MethodPost, "/api/push-subscribe", bytes.NewReader(subBody))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("POST /api/push-subscribe: status = %d, want %d (push routes must not require auth — regression against BUG-003); body=%s", w.Code, http.StatusCreated, w.Body.String())
+	}
+
+	unsubBody, _ := json.Marshal(unsubscribeRequestBody{Endpoint: "https://push.example.com/ep"})
+	req = httptest.NewRequest(http.MethodPost, "/api/push-unsubscribe", bytes.NewReader(unsubBody))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("POST /api/push-unsubscribe: status = %d, want %d (push routes must not require auth — regression against BUG-003); body=%s", w.Code, http.StatusNoContent, w.Body.String())
 	}
 }
 

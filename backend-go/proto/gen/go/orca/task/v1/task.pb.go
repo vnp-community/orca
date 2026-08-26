@@ -9,6 +9,8 @@ package taskv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -898,11 +900,605 @@ func (x *HasActiveExecutionsResponse) GetHasActive() bool {
 	return false
 }
 
+type ListTasksRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"` // optional filter, empty = no filter
+	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageSize      int32                  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTasksRequest) Reset() {
+	*x = ListTasksRequest{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTasksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTasksRequest) ProtoMessage() {}
+
+func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTasksRequest.ProtoReflect.Descriptor instead.
+func (*ListTasksRequest) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListTasksRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *ListTasksRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListTasksRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type ListTasksResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tasks         []*Task                `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTasksResponse) Reset() {
+	*x = ListTasksResponse{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTasksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTasksResponse) ProtoMessage() {}
+
+func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTasksResponse.ProtoReflect.Descriptor instead.
+func (*ListTasksResponse) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListTasksResponse) GetTasks() []*Task {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
+func (x *ListTasksResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+// UpdateTask uses optional (wrapper-typed) fields, same field-mask shape as
+// UpdateAutomationRequest — a status-only edit (the common case, e.g.
+// marking done) shouldn't require resending title. Status transitions into
+// "in_progress" are rejected at the domain layer (domain.Task.SetStatus) —
+// that transition is ExecuteTask's job only.
+type UpdateTaskRequest struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Id            string                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title         *wrapperspb.StringValue `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Status        *wrapperspb.StringValue `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTaskRequest) Reset() {
+	*x = UpdateTaskRequest{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTaskRequest) ProtoMessage() {}
+
+func (x *UpdateTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTaskRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTaskRequest) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *UpdateTaskRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateTaskRequest) GetTitle() *wrapperspb.StringValue {
+	if x != nil {
+		return x.Title
+	}
+	return nil
+}
+
+func (x *UpdateTaskRequest) GetStatus() *wrapperspb.StringValue {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+type UpdateTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Task          *Task                  `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTaskResponse) Reset() {
+	*x = UpdateTaskResponse{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTaskResponse) ProtoMessage() {}
+
+func (x *UpdateTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTaskResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTaskResponse) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *UpdateTaskResponse) GetTask() *Task {
+	if x != nil {
+		return x.Task
+	}
+	return nil
+}
+
+type DeleteTaskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTaskRequest) Reset() {
+	*x = DeleteTaskRequest{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTaskRequest) ProtoMessage() {}
+
+func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTaskRequest.ProtoReflect.Descriptor instead.
+func (*DeleteTaskRequest) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *DeleteTaskRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+// GetDependencies walks depends_on edges FROM task_id — distinct from
+// AddEdge (write) and from the parent_child ancestor walk GetAncestors
+// does internally (not on this proto's surface yet).
+type GetDependenciesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDependenciesRequest) Reset() {
+	*x = GetDependenciesRequest{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDependenciesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDependenciesRequest) ProtoMessage() {}
+
+func (x *GetDependenciesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDependenciesRequest.ProtoReflect.Descriptor instead.
+func (*GetDependenciesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetDependenciesRequest) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+type GetDependenciesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Dependencies  []*Task                `protobuf:"bytes,1,rep,name=dependencies,proto3" json:"dependencies,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDependenciesResponse) Reset() {
+	*x = GetDependenciesResponse{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDependenciesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDependenciesResponse) ProtoMessage() {}
+
+func (x *GetDependenciesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDependenciesResponse.ProtoReflect.Descriptor instead.
+func (*GetDependenciesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetDependenciesResponse) GetDependencies() []*Task {
+	if x != nil {
+		return x.Dependencies
+	}
+	return nil
+}
+
+type AIDecomposeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIDecomposeRequest) Reset() {
+	*x = AIDecomposeRequest{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIDecomposeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIDecomposeRequest) ProtoMessage() {}
+
+func (x *AIDecomposeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIDecomposeRequest.ProtoReflect.Descriptor instead.
+func (*AIDecomposeRequest) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *AIDecomposeRequest) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+type SubtaskProposal struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubtaskProposal) Reset() {
+	*x = SubtaskProposal{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubtaskProposal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubtaskProposal) ProtoMessage() {}
+
+func (x *SubtaskProposal) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubtaskProposal.ProtoReflect.Descriptor instead.
+func (*SubtaskProposal) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *SubtaskProposal) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *SubtaskProposal) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+type AIDecomposeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Proposals     []*SubtaskProposal     `protobuf:"bytes,1,rep,name=proposals,proto3" json:"proposals,omitempty"` // review-before-commit — not yet written to task_edges
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIDecomposeResponse) Reset() {
+	*x = AIDecomposeResponse{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIDecomposeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIDecomposeResponse) ProtoMessage() {}
+
+func (x *AIDecomposeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIDecomposeResponse.ProtoReflect.Descriptor instead.
+func (*AIDecomposeResponse) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *AIDecomposeResponse) GetProposals() []*SubtaskProposal {
+	if x != nil {
+		return x.Proposals
+	}
+	return nil
+}
+
+// AIApply commits a (possibly user-edited) proposal set from a prior
+// AIDecompose call — the two-step review-before-commit shape.
+type AIApplyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Proposals     []*SubtaskProposal     `protobuf:"bytes,2,rep,name=proposals,proto3" json:"proposals,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AIApplyRequest) Reset() {
+	*x = AIApplyRequest{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIApplyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIApplyRequest) ProtoMessage() {}
+
+func (x *AIApplyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIApplyRequest.ProtoReflect.Descriptor instead.
+func (*AIApplyRequest) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *AIApplyRequest) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *AIApplyRequest) GetProposals() []*SubtaskProposal {
+	if x != nil {
+		return x.Proposals
+	}
+	return nil
+}
+
+type AIApplyResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CreatedSubtasks []*Task                `protobuf:"bytes,1,rep,name=created_subtasks,json=createdSubtasks,proto3" json:"created_subtasks,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AIApplyResponse) Reset() {
+	*x = AIApplyResponse{}
+	mi := &file_orca_task_v1_task_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIApplyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIApplyResponse) ProtoMessage() {}
+
+func (x *AIApplyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_task_v1_task_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIApplyResponse.ProtoReflect.Descriptor instead.
+func (*AIApplyResponse) Descriptor() ([]byte, []int) {
+	return file_orca_task_v1_task_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *AIApplyResponse) GetCreatedSubtasks() []*Task {
+	if x != nil {
+		return x.CreatedSubtasks
+	}
+	return nil
+}
+
 var File_orca_task_v1_task_proto protoreflect.FileDescriptor
 
 const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\n" +
-	"\x17orca/task/v1/task.proto\x12\forca.task.v1\"\x9d\x01\n" +
+	"\x17orca/task/v1/task.proto\x12\forca.task.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\x9d\x01\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x14\n" +
@@ -954,7 +1550,40 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\"<\n" +
 	"\x1bHasActiveExecutionsResponse\x12\x1d\n" +
 	"\n" +
-	"has_active\x18\x01 \x01(\bR\thasActive*[\n" +
+	"has_active\x18\x01 \x01(\bR\thasActive\"m\n" +
+	"\x10ListTasksRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\x12\x1b\n" +
+	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"e\n" +
+	"\x11ListTasksResponse\x12(\n" +
+	"\x05tasks\x18\x01 \x03(\v2\x12.orca.task.v1.TaskR\x05tasks\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x8d\x01\n" +
+	"\x11UpdateTaskRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x122\n" +
+	"\x05title\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x05title\x124\n" +
+	"\x06status\x18\x03 \x01(\v2\x1c.google.protobuf.StringValueR\x06status\"<\n" +
+	"\x12UpdateTaskResponse\x12&\n" +
+	"\x04task\x18\x01 \x01(\v2\x12.orca.task.v1.TaskR\x04task\"#\n" +
+	"\x11DeleteTaskRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"1\n" +
+	"\x16GetDependenciesRequest\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\"Q\n" +
+	"\x17GetDependenciesResponse\x126\n" +
+	"\fdependencies\x18\x01 \x03(\v2\x12.orca.task.v1.TaskR\fdependencies\"-\n" +
+	"\x12AIDecomposeRequest\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\"I\n" +
+	"\x0fSubtaskProposal\x12\x14\n" +
+	"\x05title\x18\x01 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\"R\n" +
+	"\x13AIDecomposeResponse\x12;\n" +
+	"\tproposals\x18\x01 \x03(\v2\x1d.orca.task.v1.SubtaskProposalR\tproposals\"f\n" +
+	"\x0eAIApplyRequest\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12;\n" +
+	"\tproposals\x18\x02 \x03(\v2\x1d.orca.task.v1.SubtaskProposalR\tproposals\"P\n" +
+	"\x0fAIApplyResponse\x12=\n" +
+	"\x10created_subtasks\x18\x01 \x03(\v2\x12.orca.task.v1.TaskR\x0fcreatedSubtasks*[\n" +
 	"\bEdgeType\x12\x19\n" +
 	"\x15EDGE_TYPE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16EDGE_TYPE_PARENT_CHILD\x10\x01\x12\x18\n" +
@@ -966,7 +1595,7 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\x11GRANT_LEVEL_ADMIN\x10\x02\x12\x14\n" +
 	"\x10GRANT_LEVEL_USER\x10\x03\x12\x14\n" +
 	"\x10GRANT_LEVEL_TEAM\x10\x04\x12\x17\n" +
-	"\x13GRANT_LEVEL_COMPANY\x10\x052\xe0\x04\n" +
+	"\x13GRANT_LEVEL_COMPANY\x10\x052\xc2\b\n" +
 	"\vTaskService\x12O\n" +
 	"\n" +
 	"CreateTask\x12\x1f.orca.task.v1.CreateTaskRequest\x1a .orca.task.v1.CreateTaskResponse\x12F\n" +
@@ -975,7 +1604,15 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\x05Grant\x12\x1a.orca.task.v1.GrantRequest\x1a\x1b.orca.task.v1.GrantResponse\x12d\n" +
 	"\x11ResolvePermission\x12&.orca.task.v1.ResolvePermissionRequest\x1a'.orca.task.v1.ResolvePermissionResponse\x12\\\n" +
 	"\aExecute\x12'.orca.task.v1.TaskServiceExecuteRequest\x1a(.orca.task.v1.TaskServiceExecuteResponse\x12j\n" +
-	"\x13HasActiveExecutions\x12(.orca.task.v1.HasActiveExecutionsRequest\x1a).orca.task.v1.HasActiveExecutionsResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv1b\x06proto3"
+	"\x13HasActiveExecutions\x12(.orca.task.v1.HasActiveExecutionsRequest\x1a).orca.task.v1.HasActiveExecutionsResponse\x12L\n" +
+	"\tListTasks\x12\x1e.orca.task.v1.ListTasksRequest\x1a\x1f.orca.task.v1.ListTasksResponse\x12O\n" +
+	"\n" +
+	"UpdateTask\x12\x1f.orca.task.v1.UpdateTaskRequest\x1a .orca.task.v1.UpdateTaskResponse\x12E\n" +
+	"\n" +
+	"DeleteTask\x12\x1f.orca.task.v1.DeleteTaskRequest\x1a\x16.google.protobuf.Empty\x12^\n" +
+	"\x0fGetDependencies\x12$.orca.task.v1.GetDependenciesRequest\x1a%.orca.task.v1.GetDependenciesResponse\x12R\n" +
+	"\vAIDecompose\x12 .orca.task.v1.AIDecomposeRequest\x1a!.orca.task.v1.AIDecomposeResponse\x12F\n" +
+	"\aAIApply\x12\x1c.orca.task.v1.AIApplyRequest\x1a\x1d.orca.task.v1.AIApplyResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv1b\x06proto3"
 
 var (
 	file_orca_task_v1_task_proto_rawDescOnce sync.Once
@@ -990,7 +1627,7 @@ func file_orca_task_v1_task_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_task_v1_task_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_orca_task_v1_task_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_orca_task_v1_task_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_orca_task_v1_task_proto_goTypes = []any{
 	(EdgeType)(0),                       // 0: orca.task.v1.EdgeType
 	(GrantLevel)(0),                     // 1: orca.task.v1.GrantLevel
@@ -1009,6 +1646,20 @@ var file_orca_task_v1_task_proto_goTypes = []any{
 	(*TaskServiceExecuteResponse)(nil),  // 14: orca.task.v1.TaskServiceExecuteResponse
 	(*HasActiveExecutionsRequest)(nil),  // 15: orca.task.v1.HasActiveExecutionsRequest
 	(*HasActiveExecutionsResponse)(nil), // 16: orca.task.v1.HasActiveExecutionsResponse
+	(*ListTasksRequest)(nil),            // 17: orca.task.v1.ListTasksRequest
+	(*ListTasksResponse)(nil),           // 18: orca.task.v1.ListTasksResponse
+	(*UpdateTaskRequest)(nil),           // 19: orca.task.v1.UpdateTaskRequest
+	(*UpdateTaskResponse)(nil),          // 20: orca.task.v1.UpdateTaskResponse
+	(*DeleteTaskRequest)(nil),           // 21: orca.task.v1.DeleteTaskRequest
+	(*GetDependenciesRequest)(nil),      // 22: orca.task.v1.GetDependenciesRequest
+	(*GetDependenciesResponse)(nil),     // 23: orca.task.v1.GetDependenciesResponse
+	(*AIDecomposeRequest)(nil),          // 24: orca.task.v1.AIDecomposeRequest
+	(*SubtaskProposal)(nil),             // 25: orca.task.v1.SubtaskProposal
+	(*AIDecomposeResponse)(nil),         // 26: orca.task.v1.AIDecomposeResponse
+	(*AIApplyRequest)(nil),              // 27: orca.task.v1.AIApplyRequest
+	(*AIApplyResponse)(nil),             // 28: orca.task.v1.AIApplyResponse
+	(*wrapperspb.StringValue)(nil),      // 29: google.protobuf.StringValue
+	(*emptypb.Empty)(nil),               // 30: google.protobuf.Empty
 }
 var file_orca_task_v1_task_proto_depIdxs = []int32{
 	2,  // 0: orca.task.v1.CreateTaskResponse.task:type_name -> orca.task.v1.Task
@@ -1016,25 +1667,45 @@ var file_orca_task_v1_task_proto_depIdxs = []int32{
 	0,  // 2: orca.task.v1.AddEdgeRequest.type:type_name -> orca.task.v1.EdgeType
 	1,  // 3: orca.task.v1.GrantRequest.level:type_name -> orca.task.v1.GrantLevel
 	1,  // 4: orca.task.v1.ResolvePermissionResponse.effective_level:type_name -> orca.task.v1.GrantLevel
-	3,  // 5: orca.task.v1.TaskService.CreateTask:input_type -> orca.task.v1.CreateTaskRequest
-	5,  // 6: orca.task.v1.TaskService.GetTask:input_type -> orca.task.v1.GetTaskRequest
-	7,  // 7: orca.task.v1.TaskService.AddEdge:input_type -> orca.task.v1.AddEdgeRequest
-	9,  // 8: orca.task.v1.TaskService.Grant:input_type -> orca.task.v1.GrantRequest
-	11, // 9: orca.task.v1.TaskService.ResolvePermission:input_type -> orca.task.v1.ResolvePermissionRequest
-	13, // 10: orca.task.v1.TaskService.Execute:input_type -> orca.task.v1.TaskServiceExecuteRequest
-	15, // 11: orca.task.v1.TaskService.HasActiveExecutions:input_type -> orca.task.v1.HasActiveExecutionsRequest
-	4,  // 12: orca.task.v1.TaskService.CreateTask:output_type -> orca.task.v1.CreateTaskResponse
-	6,  // 13: orca.task.v1.TaskService.GetTask:output_type -> orca.task.v1.GetTaskResponse
-	8,  // 14: orca.task.v1.TaskService.AddEdge:output_type -> orca.task.v1.AddEdgeResponse
-	10, // 15: orca.task.v1.TaskService.Grant:output_type -> orca.task.v1.GrantResponse
-	12, // 16: orca.task.v1.TaskService.ResolvePermission:output_type -> orca.task.v1.ResolvePermissionResponse
-	14, // 17: orca.task.v1.TaskService.Execute:output_type -> orca.task.v1.TaskServiceExecuteResponse
-	16, // 18: orca.task.v1.TaskService.HasActiveExecutions:output_type -> orca.task.v1.HasActiveExecutionsResponse
-	12, // [12:19] is the sub-list for method output_type
-	5,  // [5:12] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	2,  // 5: orca.task.v1.ListTasksResponse.tasks:type_name -> orca.task.v1.Task
+	29, // 6: orca.task.v1.UpdateTaskRequest.title:type_name -> google.protobuf.StringValue
+	29, // 7: orca.task.v1.UpdateTaskRequest.status:type_name -> google.protobuf.StringValue
+	2,  // 8: orca.task.v1.UpdateTaskResponse.task:type_name -> orca.task.v1.Task
+	2,  // 9: orca.task.v1.GetDependenciesResponse.dependencies:type_name -> orca.task.v1.Task
+	25, // 10: orca.task.v1.AIDecomposeResponse.proposals:type_name -> orca.task.v1.SubtaskProposal
+	25, // 11: orca.task.v1.AIApplyRequest.proposals:type_name -> orca.task.v1.SubtaskProposal
+	2,  // 12: orca.task.v1.AIApplyResponse.created_subtasks:type_name -> orca.task.v1.Task
+	3,  // 13: orca.task.v1.TaskService.CreateTask:input_type -> orca.task.v1.CreateTaskRequest
+	5,  // 14: orca.task.v1.TaskService.GetTask:input_type -> orca.task.v1.GetTaskRequest
+	7,  // 15: orca.task.v1.TaskService.AddEdge:input_type -> orca.task.v1.AddEdgeRequest
+	9,  // 16: orca.task.v1.TaskService.Grant:input_type -> orca.task.v1.GrantRequest
+	11, // 17: orca.task.v1.TaskService.ResolvePermission:input_type -> orca.task.v1.ResolvePermissionRequest
+	13, // 18: orca.task.v1.TaskService.Execute:input_type -> orca.task.v1.TaskServiceExecuteRequest
+	15, // 19: orca.task.v1.TaskService.HasActiveExecutions:input_type -> orca.task.v1.HasActiveExecutionsRequest
+	17, // 20: orca.task.v1.TaskService.ListTasks:input_type -> orca.task.v1.ListTasksRequest
+	19, // 21: orca.task.v1.TaskService.UpdateTask:input_type -> orca.task.v1.UpdateTaskRequest
+	21, // 22: orca.task.v1.TaskService.DeleteTask:input_type -> orca.task.v1.DeleteTaskRequest
+	22, // 23: orca.task.v1.TaskService.GetDependencies:input_type -> orca.task.v1.GetDependenciesRequest
+	24, // 24: orca.task.v1.TaskService.AIDecompose:input_type -> orca.task.v1.AIDecomposeRequest
+	27, // 25: orca.task.v1.TaskService.AIApply:input_type -> orca.task.v1.AIApplyRequest
+	4,  // 26: orca.task.v1.TaskService.CreateTask:output_type -> orca.task.v1.CreateTaskResponse
+	6,  // 27: orca.task.v1.TaskService.GetTask:output_type -> orca.task.v1.GetTaskResponse
+	8,  // 28: orca.task.v1.TaskService.AddEdge:output_type -> orca.task.v1.AddEdgeResponse
+	10, // 29: orca.task.v1.TaskService.Grant:output_type -> orca.task.v1.GrantResponse
+	12, // 30: orca.task.v1.TaskService.ResolvePermission:output_type -> orca.task.v1.ResolvePermissionResponse
+	14, // 31: orca.task.v1.TaskService.Execute:output_type -> orca.task.v1.TaskServiceExecuteResponse
+	16, // 32: orca.task.v1.TaskService.HasActiveExecutions:output_type -> orca.task.v1.HasActiveExecutionsResponse
+	18, // 33: orca.task.v1.TaskService.ListTasks:output_type -> orca.task.v1.ListTasksResponse
+	20, // 34: orca.task.v1.TaskService.UpdateTask:output_type -> orca.task.v1.UpdateTaskResponse
+	30, // 35: orca.task.v1.TaskService.DeleteTask:output_type -> google.protobuf.Empty
+	23, // 36: orca.task.v1.TaskService.GetDependencies:output_type -> orca.task.v1.GetDependenciesResponse
+	26, // 37: orca.task.v1.TaskService.AIDecompose:output_type -> orca.task.v1.AIDecomposeResponse
+	28, // 38: orca.task.v1.TaskService.AIApply:output_type -> orca.task.v1.AIApplyResponse
+	26, // [26:39] is the sub-list for method output_type
+	13, // [13:26] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_orca_task_v1_task_proto_init() }
@@ -1048,7 +1719,7 @@ func file_orca_task_v1_task_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_task_v1_task_proto_rawDesc), len(file_orca_task_v1_task_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   15,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

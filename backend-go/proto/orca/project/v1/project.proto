@@ -13,6 +13,9 @@ service ProjectService {
   rpc GetProject(GetProjectRequest) returns (GetProjectResponse);
   rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
   rpc AddMember(AddMemberRequest) returns (AddMemberResponse);
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+  rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
+  rpc UpdateMemberRole(UpdateMemberRoleRequest) returns (UpdateMemberRoleResponse);
   rpc RebindDevServer(RebindDevServerRequest) returns (RebindDevServerResponse);
 
   // UpdateProject's field list deliberately excludes dev_server_id —
@@ -27,6 +30,7 @@ service ProjectService {
   rpc ListRepos(ListReposRequest) returns (ListReposResponse);
   rpc ReorderRepos(ReorderReposRequest) returns (ReorderReposResponse);
   rpc RemoveRepo(RemoveRepoRequest) returns (RemoveRepoResponse);
+  rpc UpdateRepo(UpdateRepoRequest) returns (UpdateRepoResponse);
 
   // Worktree surface — metadata only, never authoritative for on-disk
   // existence (git-gateway-service reconciles on demand, per
@@ -43,6 +47,32 @@ service ProjectService {
   rpc UpdateProjectGroup(UpdateProjectGroupRequest) returns (UpdateProjectGroupResponse);
   rpc DeleteProjectGroup(DeleteProjectGroupRequest) returns (DeleteProjectGroupResponse);
   rpc ListProjectGroups(ListProjectGroupsRequest) returns (ListProjectGroupsResponse);
+
+  // Folder workspaces — standalone, non-git filesystem paths added directly
+  // to the workspace. No project_id — see FolderWorkspace's doc comment
+  // below. See specs/backend-go/bugs/missing-v1/solutions/SOL-010-folderworkspace-channels.md.
+  rpc CreateFolderWorkspace(CreateFolderWorkspaceRequest) returns (CreateFolderWorkspaceResponse);
+  rpc UpdateFolderWorkspace(UpdateFolderWorkspaceRequest) returns (UpdateFolderWorkspaceResponse);
+  rpc DeleteFolderWorkspace(DeleteFolderWorkspaceRequest) returns (DeleteFolderWorkspaceResponse);
+  rpc ListFolderWorkspaces(ListFolderWorkspacesRequest) returns (ListFolderWorkspacesResponse);
+  // GetFolderWorkspacePathStatus is a DB-conflict check against this
+  // service's own tables, NOT a live filesystem probe — see the response
+  // message's doc comment.
+  rpc GetFolderWorkspacePathStatus(GetFolderWorkspacePathStatusRequest) returns (GetFolderWorkspacePathStatusResponse);
+
+  // MoveProject/ScanNested/ImportNested: nested-repo import workflow —
+  // project-service.md §5's project_groups.project_id column, first
+  // exercised by these RPCs.
+  rpc MoveProject(MoveProjectRequest) returns (MoveProjectResponse);
+  rpc ScanNested(ScanNestedRequest) returns (ScanNestedResponse);
+  rpc ImportNested(ImportNestedRequest) returns (ImportNestedResponse);
+
+  // ── projectHostSetup.* — pre-project dev-server-folder wizard ─────────
+  rpc CreateHostSetup(CreateHostSetupRequest) returns (CreateHostSetupResponse);
+  rpc ListHostSetups(ListHostSetupsRequest) returns (ListHostSetupsResponse);
+  rpc UpdateHostSetup(UpdateHostSetupRequest) returns (UpdateHostSetupResponse);
+  rpc DeleteHostSetup(DeleteHostSetupRequest) returns (DeleteHostSetupResponse);
+  rpc SetupExistingFolder(SetupExistingFolderRequest) returns (SetupExistingFolderResponse);
 }
 
 message Project {
@@ -102,6 +132,36 @@ message AddMemberRequest {
 }
 
 message AddMemberResponse {}
+
+message Member {
+  string user_id = 1;
+  ProjectRole role = 2;
+}
+
+message ListMembersRequest {
+  string project_id = 1;
+}
+
+message ListMembersResponse {
+  repeated Member members = 1;
+}
+
+message RemoveMemberRequest {
+  string project_id = 1;
+  string user_id = 2;
+}
+
+message RemoveMemberResponse {}
+
+message UpdateMemberRoleRequest {
+  string project_id = 1;
+  string user_id = 2;
+  ProjectRole role = 3;
+}
+
+message UpdateMemberRoleResponse {
+  Member member = 1;
+}
 
 // RebindDevServer closes TS's PROJECT_HAS_ACTIVE_WORKFLOWS gap: the usecase
 // layer checks workflow-service/task-service for active executions before
@@ -172,6 +232,16 @@ message RemoveRepoRequest {
 
 message RemoveRepoResponse {}
 
+message UpdateRepoRequest {
+  string repo_id = 1;
+  string url = 2;          // empty = no change
+  string display_name = 3; // empty = no change
+}
+
+message UpdateRepoResponse {
+  Repo repo = 1;
+}
+
 message Worktree {
   string id = 1;
   string project_id = 2;
@@ -229,6 +299,7 @@ message ProjectGroup {
   string tenant_id = 2;
   string name = 3;
   string parent_group_id = 4; // empty = root of its tree
+  string project_id = 5;      // empty = pure folder node, not yet linked to a project
 }
 
 message CreateProjectGroupRequest {
@@ -259,4 +330,148 @@ message ListProjectGroupsRequest {}
 
 message ListProjectGroupsResponse {
   repeated ProjectGroup groups = 1;
+}
+
+// FolderWorkspace is a standalone, non-git filesystem path added directly
+// to the workspace — distinct from ProjectGroup (a project-organizing tree
+// node with no path field) and from Repo (git-backed, owned by a Project).
+// See specs/backend-go/bugs/missing-v1/solutions/SOL-010-folderworkspace-channels.md.
+message FolderWorkspace {
+  string id = 1;
+  string dev_server_id = 2;   // logical FK -> infra-fleet-service.dev_servers
+  string path = 3;            // absolute path on the bound dev server
+  string name = 4;            // display name (defaults to basename(path) if unset on create)
+  string added_by = 5;        // logical FK -> tenant-service.users
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message CreateFolderWorkspaceRequest {
+  string dev_server_id = 1;
+  string path = 2;
+  string name = 3;
+}
+
+message CreateFolderWorkspaceResponse {
+  FolderWorkspace folder_workspace = 1;
+}
+
+message UpdateFolderWorkspaceRequest {
+  string id = 1;
+  string name = 2;   // the only mutable field — path/dev_server_id are re-add, not edit
+}
+
+message UpdateFolderWorkspaceResponse {
+  FolderWorkspace folder_workspace = 1;
+}
+
+message DeleteFolderWorkspaceRequest {
+  string id = 1;
+}
+
+message DeleteFolderWorkspaceResponse {}
+
+message ListFolderWorkspacesRequest {} // tenant-scoped, no filter params observed at the frontend call site
+
+message ListFolderWorkspacesResponse {
+  repeated FolderWorkspace folder_workspaces = 1;
+}
+
+// GetFolderWorkspacePathStatus answers purely from project-service's own
+// tables — a DB-conflict check, NOT a live filesystem probe. See this RPC's
+// design note in SOL-010 before changing that assumption.
+message GetFolderWorkspacePathStatusRequest {
+  string dev_server_id = 1;
+  string path = 2;
+}
+
+message GetFolderWorkspacePathStatusResponse {
+  // PATH_STATUS_AVAILABLE | PATH_STATUS_ALREADY_FOLDER_WORKSPACE |
+  // PATH_STATUS_ALREADY_REPO | PATH_STATUS_INVALID
+  string status = 1;
+  string existing_folder_workspace_id = 2;  // set when status == ALREADY_FOLDER_WORKSPACE
+}
+
+message MoveProjectRequest {
+  string project_id = 1;
+  string target_parent_group_id = 2; // empty = move to tree root
+}
+
+message MoveProjectResponse {
+  ProjectGroup group = 1; // the project's (possibly newly-created) leaf group node, relocated
+}
+
+message ScanNestedRequest {
+  string dev_server_id = 1;
+  string root_path = 2; // absolute path on that dev server to scan under
+}
+
+message NestedRepoCandidate {
+  string path = 1;
+  string suggested_name = 2;
+  bool is_git_repo = 3;
+}
+
+message ScanNestedResponse {
+  repeated NestedRepoCandidate candidates = 1;
+}
+
+message ImportNestedRequest {
+  string dev_server_id = 1;
+  string parent_group_id = 2; // where the imported tree attaches; empty = root
+  repeated NestedRepoCandidate selected = 3; // subset of a prior ScanNested's candidates the caller chose
+}
+
+message ImportNestedResponse {
+  repeated ProjectGroup created_groups = 1;
+  repeated Project created_projects = 2;
+}
+
+message HostSetup {
+  string id = 1;
+  string tenant_id = 2;
+  string dev_server_id = 3; // logical FK -> infra-fleet-service.dev_servers
+  string folder_path = 4;
+  string display_name = 5;
+  string status = 6;        // pending | validated | completed | failed
+  string project_id = 7;    // empty until completed
+}
+
+message CreateHostSetupRequest {
+  string dev_server_id = 1;
+  string folder_path = 2;
+  string display_name = 3;
+}
+message CreateHostSetupResponse {
+  HostSetup setup = 1;
+}
+
+message ListHostSetupsRequest {}
+message ListHostSetupsResponse {
+  repeated HostSetup setups = 1;
+}
+
+message UpdateHostSetupRequest {
+  string id = 1;
+  string folder_path = 2;  // empty = no change
+  string display_name = 3; // empty = no change
+}
+message UpdateHostSetupResponse {
+  HostSetup setup = 1;
+}
+
+message DeleteHostSetupRequest {
+  string id = 1;
+}
+message DeleteHostSetupResponse {}
+
+// SetupExistingFolder validates folder_path exists on dev_server_id
+// (relayed to the Dev Server Agent via infra-fleet-service, never checked
+// against project-service's own host), then creates a real Project + Repo
+// from it and marks the HostSetup completed (or failed).
+message SetupExistingFolderRequest {
+  string id = 1; // the HostSetup being finalized
+}
+message SetupExistingFolderResponse {
+  HostSetup setup = 1;  // status now "completed" or "failed"
+  Project project = 2;  // set only on success
 }

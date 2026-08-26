@@ -23,6 +23,7 @@ const (
 	OrchestrationService_CreateGate_FullMethodName                 = "/orca.orchestration.v1.OrchestrationService/CreateGate"
 	OrchestrationService_ResolveGate_FullMethodName                = "/orca.orchestration.v1.OrchestrationService/ResolveGate"
 	OrchestrationService_UpdateTaskStatusAndPromote_FullMethodName = "/orca.orchestration.v1.OrchestrationService/UpdateTaskStatusAndPromote"
+	OrchestrationService_GetDispatchContextForTask_FullMethodName  = "/orca.orchestration.v1.OrchestrationService/GetDispatchContextForTask"
 )
 
 // OrchestrationServiceClient is the client API for OrchestrationService service.
@@ -39,6 +40,13 @@ type OrchestrationServiceClient interface {
 	// UpdateTaskStatusAndPromote is one atomic RPC (single DB transaction) —
 	// mirrors TS's updateTaskStatus -> promoteReadyTasks chain.
 	UpdateTaskStatusAndPromote(ctx context.Context, in *UpdateTaskStatusAndPromoteRequest, opts ...grpc.CallOption) (*UpdateTaskStatusAndPromoteResponse, error)
+	// GetDispatchContextForTask is orchestration-service's first read RPC —
+	// a scope addition beyond both the shipped proto and
+	// orchestration-service.md §3's own drafted surface (neither has a
+	// dispatch-context read). Backs orchestration.dispatchShow: "which
+	// terminal was this task dispatched to." See SOL-018 for the "not a
+	// missing assignee_handle field, a missing read RPC" distinction.
+	GetDispatchContextForTask(ctx context.Context, in *GetDispatchContextForTaskRequest, opts ...grpc.CallOption) (*GetDispatchContextForTaskResponse, error)
 }
 
 type orchestrationServiceClient struct {
@@ -89,6 +97,16 @@ func (c *orchestrationServiceClient) UpdateTaskStatusAndPromote(ctx context.Cont
 	return out, nil
 }
 
+func (c *orchestrationServiceClient) GetDispatchContextForTask(ctx context.Context, in *GetDispatchContextForTaskRequest, opts ...grpc.CallOption) (*GetDispatchContextForTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDispatchContextForTaskResponse)
+	err := c.cc.Invoke(ctx, OrchestrationService_GetDispatchContextForTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestrationServiceServer is the server API for OrchestrationService service.
 // All implementations must embed UnimplementedOrchestrationServiceServer
 // for forward compatibility.
@@ -103,6 +121,13 @@ type OrchestrationServiceServer interface {
 	// UpdateTaskStatusAndPromote is one atomic RPC (single DB transaction) —
 	// mirrors TS's updateTaskStatus -> promoteReadyTasks chain.
 	UpdateTaskStatusAndPromote(context.Context, *UpdateTaskStatusAndPromoteRequest) (*UpdateTaskStatusAndPromoteResponse, error)
+	// GetDispatchContextForTask is orchestration-service's first read RPC —
+	// a scope addition beyond both the shipped proto and
+	// orchestration-service.md §3's own drafted surface (neither has a
+	// dispatch-context read). Backs orchestration.dispatchShow: "which
+	// terminal was this task dispatched to." See SOL-018 for the "not a
+	// missing assignee_handle field, a missing read RPC" distinction.
+	GetDispatchContextForTask(context.Context, *GetDispatchContextForTaskRequest) (*GetDispatchContextForTaskResponse, error)
 	mustEmbedUnimplementedOrchestrationServiceServer()
 }
 
@@ -124,6 +149,9 @@ func (UnimplementedOrchestrationServiceServer) ResolveGate(context.Context, *Res
 }
 func (UnimplementedOrchestrationServiceServer) UpdateTaskStatusAndPromote(context.Context, *UpdateTaskStatusAndPromoteRequest) (*UpdateTaskStatusAndPromoteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateTaskStatusAndPromote not implemented")
+}
+func (UnimplementedOrchestrationServiceServer) GetDispatchContextForTask(context.Context, *GetDispatchContextForTaskRequest) (*GetDispatchContextForTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDispatchContextForTask not implemented")
 }
 func (UnimplementedOrchestrationServiceServer) mustEmbedUnimplementedOrchestrationServiceServer() {}
 func (UnimplementedOrchestrationServiceServer) testEmbeddedByValue()                              {}
@@ -218,6 +246,24 @@ func _OrchestrationService_UpdateTaskStatusAndPromote_Handler(srv interface{}, c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestrationService_GetDispatchContextForTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDispatchContextForTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestrationServiceServer).GetDispatchContextForTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestrationService_GetDispatchContextForTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestrationServiceServer).GetDispatchContextForTask(ctx, req.(*GetDispatchContextForTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestrationService_ServiceDesc is the grpc.ServiceDesc for OrchestrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -240,6 +286,10 @@ var OrchestrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateTaskStatusAndPromote",
 			Handler:    _OrchestrationService_UpdateTaskStatusAndPromote_Handler,
+		},
+		{
+			MethodName: "GetDispatchContextForTask",
+			Handler:    _OrchestrationService_GetDispatchContextForTask_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

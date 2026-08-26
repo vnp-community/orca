@@ -9,6 +9,7 @@ package tenantv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -1005,11 +1006,714 @@ func (x *ListTeamMembersResponse) GetMembers() []*TeamMember {
 	return nil
 }
 
+// UserProfile is the wire shape of tenant.user_profiles — mirrors
+// domain.UserProfile.
+type UserProfile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	CompanyId     string                 `protobuf:"bytes,2,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
+	DepartmentId  string                 `protobuf:"bytes,3,opt,name=department_id,json=departmentId,proto3" json:"department_id,omitempty"` // empty = company-only inheritance
+	SettingsJson  string                 `protobuf:"bytes,4,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserProfile) Reset() {
+	*x = UserProfile{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserProfile) ProtoMessage() {}
+
+func (x *UserProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserProfile.ProtoReflect.Descriptor instead.
+func (*UserProfile) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *UserProfile) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UserProfile) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
+}
+
+func (x *UserProfile) GetDepartmentId() string {
+	if x != nil {
+		return x.DepartmentId
+	}
+	return ""
+}
+
+func (x *UserProfile) GetSettingsJson() string {
+	if x != nil {
+		return x.SettingsJson
+	}
+	return ""
+}
+
+type GetUserProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserProfileRequest) Reset() {
+	*x = GetUserProfileRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserProfileRequest) ProtoMessage() {}
+
+func (x *GetUserProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserProfileRequest.ProtoReflect.Descriptor instead.
+func (*GetUserProfileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetUserProfileRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetUserProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *UserProfile           `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserProfileResponse) Reset() {
+	*x = GetUserProfileResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserProfileResponse) ProtoMessage() {}
+
+func (x *GetUserProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserProfileResponse.ProtoReflect.Descriptor instead.
+func (*GetUserProfileResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetUserProfileResponse) GetProfile() *UserProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type ListDepartmentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CompanyId     string                 `protobuf:"bytes,1,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDepartmentsRequest) Reset() {
+	*x = ListDepartmentsRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDepartmentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDepartmentsRequest) ProtoMessage() {}
+
+func (x *ListDepartmentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDepartmentsRequest.ProtoReflect.Descriptor instead.
+func (*ListDepartmentsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ListDepartmentsRequest) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
+}
+
+type ListDepartmentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Departments   []*Department          `protobuf:"bytes,1,rep,name=departments,proto3" json:"departments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDepartmentsResponse) Reset() {
+	*x = ListDepartmentsResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDepartmentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDepartmentsResponse) ProtoMessage() {}
+
+func (x *ListDepartmentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDepartmentsResponse.ProtoReflect.Descriptor instead.
+func (*ListDepartmentsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListDepartmentsResponse) GetDepartments() []*Department {
+	if x != nil {
+		return x.Departments
+	}
+	return nil
+}
+
+type UpdateCompanyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                                     // empty = no change
+	SettingsJson  string                 `protobuf:"bytes,3,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"` // empty = no change
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateCompanyRequest) Reset() {
+	*x = UpdateCompanyRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateCompanyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateCompanyRequest) ProtoMessage() {}
+
+func (x *UpdateCompanyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateCompanyRequest.ProtoReflect.Descriptor instead.
+func (*UpdateCompanyRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *UpdateCompanyRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateCompanyRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateCompanyRequest) GetSettingsJson() string {
+	if x != nil {
+		return x.SettingsJson
+	}
+	return ""
+}
+
+type UpdateCompanyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Company       *Company               `protobuf:"bytes,1,opt,name=company,proto3" json:"company,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateCompanyResponse) Reset() {
+	*x = UpdateCompanyResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateCompanyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateCompanyResponse) ProtoMessage() {}
+
+func (x *UpdateCompanyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateCompanyResponse.ProtoReflect.Descriptor instead.
+func (*UpdateCompanyResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *UpdateCompanyResponse) GetCompany() *Company {
+	if x != nil {
+		return x.Company
+	}
+	return nil
+}
+
+type UpdateDepartmentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                                     // empty = no change
+	SettingsJson  string                 `protobuf:"bytes,3,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"` // empty = no change
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateDepartmentRequest) Reset() {
+	*x = UpdateDepartmentRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateDepartmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateDepartmentRequest) ProtoMessage() {}
+
+func (x *UpdateDepartmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateDepartmentRequest.ProtoReflect.Descriptor instead.
+func (*UpdateDepartmentRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *UpdateDepartmentRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdateDepartmentRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateDepartmentRequest) GetSettingsJson() string {
+	if x != nil {
+		return x.SettingsJson
+	}
+	return ""
+}
+
+type UpdateDepartmentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Department    *Department            `protobuf:"bytes,1,opt,name=department,proto3" json:"department,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateDepartmentResponse) Reset() {
+	*x = UpdateDepartmentResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateDepartmentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateDepartmentResponse) ProtoMessage() {}
+
+func (x *UpdateDepartmentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateDepartmentResponse.ProtoReflect.Descriptor instead.
+func (*UpdateDepartmentResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *UpdateDepartmentResponse) GetDepartment() *Department {
+	if x != nil {
+		return x.Department
+	}
+	return nil
+}
+
+// UpdateUserProfileRequest: department_id is only applied when
+// clear_department is true OR department_id is non-empty — this avoids the
+// "" = no-change vs "" = clear ambiguity UserProfile's own semantics create
+// (see this task's Context). settings_json empty = no change, same as
+// every other Update*Request in this file.
+type UpdateUserProfileRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	UserId          string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	DepartmentId    string                 `protobuf:"bytes,2,opt,name=department_id,json=departmentId,proto3" json:"department_id,omitempty"`           // ignored unless clear_department is also set
+	ClearDepartment bool                   `protobuf:"varint,3,opt,name=clear_department,json=clearDepartment,proto3" json:"clear_department,omitempty"` // true = set department_id to empty ("company-only")
+	SettingsJson    string                 `protobuf:"bytes,4,opt,name=settings_json,json=settingsJson,proto3" json:"settings_json,omitempty"`           // empty = no change
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UpdateUserProfileRequest) Reset() {
+	*x = UpdateUserProfileRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserProfileRequest) ProtoMessage() {}
+
+func (x *UpdateUserProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserProfileRequest.ProtoReflect.Descriptor instead.
+func (*UpdateUserProfileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *UpdateUserProfileRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UpdateUserProfileRequest) GetDepartmentId() string {
+	if x != nil {
+		return x.DepartmentId
+	}
+	return ""
+}
+
+func (x *UpdateUserProfileRequest) GetClearDepartment() bool {
+	if x != nil {
+		return x.ClearDepartment
+	}
+	return false
+}
+
+func (x *UpdateUserProfileRequest) GetSettingsJson() string {
+	if x != nil {
+		return x.SettingsJson
+	}
+	return ""
+}
+
+type UpdateUserProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *UserProfile           `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserProfileResponse) Reset() {
+	*x = UpdateUserProfileResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserProfileResponse) ProtoMessage() {}
+
+func (x *UpdateUserProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserProfileResponse.ProtoReflect.Descriptor instead.
+func (*UpdateUserProfileResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *UpdateUserProfileResponse) GetProfile() *UserProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type ListTeamsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamsRequest) Reset() {
+	*x = ListTeamsRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamsRequest) ProtoMessage() {}
+
+func (x *ListTeamsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamsRequest.ProtoReflect.Descriptor instead.
+func (*ListTeamsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{31}
+}
+
+type ListTeamsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Teams         []*Team                `protobuf:"bytes,1,rep,name=teams,proto3" json:"teams,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamsResponse) Reset() {
+	*x = ListTeamsResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamsResponse) ProtoMessage() {}
+
+func (x *ListTeamsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamsResponse.ProtoReflect.Descriptor instead.
+func (*ListTeamsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ListTeamsResponse) GetTeams() []*Team {
+	if x != nil {
+		return x.Teams
+	}
+	return nil
+}
+
+type RemoveTeamMemberRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TeamId        string                 `protobuf:"bytes,1,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveTeamMemberRequest) Reset() {
+	*x = RemoveTeamMemberRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveTeamMemberRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveTeamMemberRequest) ProtoMessage() {}
+
+func (x *RemoveTeamMemberRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveTeamMemberRequest.ProtoReflect.Descriptor instead.
+func (*RemoveTeamMemberRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *RemoveTeamMemberRequest) GetTeamId() string {
+	if x != nil {
+		return x.TeamId
+	}
+	return ""
+}
+
+func (x *RemoveTeamMemberRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
 var File_orca_tenant_v1_tenant_proto protoreflect.FileDescriptor
 
 const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\n" +
-	"\x1borca/tenant/v1/tenant.proto\x12\x0eorca.tenant.v1\"R\n" +
+	"\x1borca/tenant/v1/tenant.proto\x12\x0eorca.tenant.v1\x1a\x1bgoogle/protobuf/empty.proto\"R\n" +
 	"\aCompany\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12#\n" +
@@ -1070,7 +1774,49 @@ const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\bpriority\x18\x02 \x01(\x05R\bpriority\"O\n" +
 	"\x17ListTeamMembersResponse\x124\n" +
-	"\amembers\x18\x01 \x03(\v2\x1a.orca.tenant.v1.TeamMemberR\amembers2\xa3\x06\n" +
+	"\amembers\x18\x01 \x03(\v2\x1a.orca.tenant.v1.TeamMemberR\amembers\"\x8f\x01\n" +
+	"\vUserProfile\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\x02 \x01(\tR\tcompanyId\x12#\n" +
+	"\rdepartment_id\x18\x03 \x01(\tR\fdepartmentId\x12#\n" +
+	"\rsettings_json\x18\x04 \x01(\tR\fsettingsJson\"0\n" +
+	"\x15GetUserProfileRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"O\n" +
+	"\x16GetUserProfileResponse\x125\n" +
+	"\aprofile\x18\x01 \x01(\v2\x1b.orca.tenant.v1.UserProfileR\aprofile\"7\n" +
+	"\x16ListDepartmentsRequest\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\x01 \x01(\tR\tcompanyId\"W\n" +
+	"\x17ListDepartmentsResponse\x12<\n" +
+	"\vdepartments\x18\x01 \x03(\v2\x1a.orca.tenant.v1.DepartmentR\vdepartments\"_\n" +
+	"\x14UpdateCompanyRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12#\n" +
+	"\rsettings_json\x18\x03 \x01(\tR\fsettingsJson\"J\n" +
+	"\x15UpdateCompanyResponse\x121\n" +
+	"\acompany\x18\x01 \x01(\v2\x17.orca.tenant.v1.CompanyR\acompany\"b\n" +
+	"\x17UpdateDepartmentRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12#\n" +
+	"\rsettings_json\x18\x03 \x01(\tR\fsettingsJson\"V\n" +
+	"\x18UpdateDepartmentResponse\x12:\n" +
+	"\n" +
+	"department\x18\x01 \x01(\v2\x1a.orca.tenant.v1.DepartmentR\n" +
+	"department\"\xa8\x01\n" +
+	"\x18UpdateUserProfileRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12#\n" +
+	"\rdepartment_id\x18\x02 \x01(\tR\fdepartmentId\x12)\n" +
+	"\x10clear_department\x18\x03 \x01(\bR\x0fclearDepartment\x12#\n" +
+	"\rsettings_json\x18\x04 \x01(\tR\fsettingsJson\"R\n" +
+	"\x19UpdateUserProfileResponse\x125\n" +
+	"\aprofile\x18\x01 \x01(\v2\x1b.orca.tenant.v1.UserProfileR\aprofile\"\x12\n" +
+	"\x10ListTeamsRequest\"?\n" +
+	"\x11ListTeamsResponse\x12*\n" +
+	"\x05teams\x18\x01 \x03(\v2\x14.orca.tenant.v1.TeamR\x05teams\"K\n" +
+	"\x17RemoveTeamMemberRequest\x12\x17\n" +
+	"\ateam_id\x18\x01 \x01(\tR\x06teamId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId2\xbe\v\n" +
 	"\rTenantService\x12\\\n" +
 	"\rCreateCompany\x12$.orca.tenant.v1.CreateCompanyRequest\x1a%.orca.tenant.v1.CreateCompanyResponse\x12_\n" +
 	"\x0eValidateTenant\x12%.orca.tenant.v1.ValidateTenantRequest\x1a&.orca.tenant.v1.ValidateTenantResponse\x12e\n" +
@@ -1080,7 +1826,14 @@ const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\n" +
 	"CreateTeam\x12!.orca.tenant.v1.CreateTeamRequest\x1a\".orca.tenant.v1.CreateTeamResponse\x12\\\n" +
 	"\rAddTeamMember\x12$.orca.tenant.v1.AddTeamMemberRequest\x1a%.orca.tenant.v1.AddTeamMemberResponse\x12b\n" +
-	"\x0fListTeamMembers\x12&.orca.tenant.v1.ListTeamMembersRequest\x1a'.orca.tenant.v1.ListTeamMembersResponseBBZ@github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1;tenantv1b\x06proto3"
+	"\x0fListTeamMembers\x12&.orca.tenant.v1.ListTeamMembersRequest\x1a'.orca.tenant.v1.ListTeamMembersResponse\x12_\n" +
+	"\x0eGetUserProfile\x12%.orca.tenant.v1.GetUserProfileRequest\x1a&.orca.tenant.v1.GetUserProfileResponse\x12b\n" +
+	"\x0fListDepartments\x12&.orca.tenant.v1.ListDepartmentsRequest\x1a'.orca.tenant.v1.ListDepartmentsResponse\x12\\\n" +
+	"\rUpdateCompany\x12$.orca.tenant.v1.UpdateCompanyRequest\x1a%.orca.tenant.v1.UpdateCompanyResponse\x12e\n" +
+	"\x10UpdateDepartment\x12'.orca.tenant.v1.UpdateDepartmentRequest\x1a(.orca.tenant.v1.UpdateDepartmentResponse\x12h\n" +
+	"\x11UpdateUserProfile\x12(.orca.tenant.v1.UpdateUserProfileRequest\x1a).orca.tenant.v1.UpdateUserProfileResponse\x12P\n" +
+	"\tListTeams\x12 .orca.tenant.v1.ListTeamsRequest\x1a!.orca.tenant.v1.ListTeamsResponse\x12S\n" +
+	"\x10RemoveTeamMember\x12'.orca.tenant.v1.RemoveTeamMemberRequest\x1a\x16.google.protobuf.EmptyBBZ@github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1;tenantv1b\x06proto3"
 
 var (
 	file_orca_tenant_v1_tenant_proto_rawDescOnce sync.Once
@@ -1094,7 +1847,7 @@ func file_orca_tenant_v1_tenant_proto_rawDescGZIP() []byte {
 	return file_orca_tenant_v1_tenant_proto_rawDescData
 }
 
-var file_orca_tenant_v1_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_orca_tenant_v1_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_orca_tenant_v1_tenant_proto_goTypes = []any{
 	(*Company)(nil),                    // 0: orca.tenant.v1.Company
 	(*Department)(nil),                 // 1: orca.tenant.v1.Department
@@ -1116,33 +1869,68 @@ var file_orca_tenant_v1_tenant_proto_goTypes = []any{
 	(*ListTeamMembersRequest)(nil),     // 17: orca.tenant.v1.ListTeamMembersRequest
 	(*TeamMember)(nil),                 // 18: orca.tenant.v1.TeamMember
 	(*ListTeamMembersResponse)(nil),    // 19: orca.tenant.v1.ListTeamMembersResponse
+	(*UserProfile)(nil),                // 20: orca.tenant.v1.UserProfile
+	(*GetUserProfileRequest)(nil),      // 21: orca.tenant.v1.GetUserProfileRequest
+	(*GetUserProfileResponse)(nil),     // 22: orca.tenant.v1.GetUserProfileResponse
+	(*ListDepartmentsRequest)(nil),     // 23: orca.tenant.v1.ListDepartmentsRequest
+	(*ListDepartmentsResponse)(nil),    // 24: orca.tenant.v1.ListDepartmentsResponse
+	(*UpdateCompanyRequest)(nil),       // 25: orca.tenant.v1.UpdateCompanyRequest
+	(*UpdateCompanyResponse)(nil),      // 26: orca.tenant.v1.UpdateCompanyResponse
+	(*UpdateDepartmentRequest)(nil),    // 27: orca.tenant.v1.UpdateDepartmentRequest
+	(*UpdateDepartmentResponse)(nil),   // 28: orca.tenant.v1.UpdateDepartmentResponse
+	(*UpdateUserProfileRequest)(nil),   // 29: orca.tenant.v1.UpdateUserProfileRequest
+	(*UpdateUserProfileResponse)(nil),  // 30: orca.tenant.v1.UpdateUserProfileResponse
+	(*ListTeamsRequest)(nil),           // 31: orca.tenant.v1.ListTeamsRequest
+	(*ListTeamsResponse)(nil),          // 32: orca.tenant.v1.ListTeamsResponse
+	(*RemoveTeamMemberRequest)(nil),    // 33: orca.tenant.v1.RemoveTeamMemberRequest
+	(*emptypb.Empty)(nil),              // 34: google.protobuf.Empty
 }
 var file_orca_tenant_v1_tenant_proto_depIdxs = []int32{
 	0,  // 0: orca.tenant.v1.CreateCompanyResponse.company:type_name -> orca.tenant.v1.Company
 	1,  // 1: orca.tenant.v1.CreateDepartmentResponse.department:type_name -> orca.tenant.v1.Department
 	12, // 2: orca.tenant.v1.CreateTeamResponse.team:type_name -> orca.tenant.v1.Team
 	18, // 3: orca.tenant.v1.ListTeamMembersResponse.members:type_name -> orca.tenant.v1.TeamMember
-	2,  // 4: orca.tenant.v1.TenantService.CreateCompany:input_type -> orca.tenant.v1.CreateCompanyRequest
-	4,  // 5: orca.tenant.v1.TenantService.ValidateTenant:input_type -> orca.tenant.v1.ValidateTenantRequest
-	6,  // 6: orca.tenant.v1.TenantService.CreateDepartment:input_type -> orca.tenant.v1.CreateDepartmentRequest
-	8,  // 7: orca.tenant.v1.TenantService.SetUserDepartment:input_type -> orca.tenant.v1.SetUserDepartmentRequest
-	10, // 8: orca.tenant.v1.TenantService.GetResolvedProfile:input_type -> orca.tenant.v1.GetResolvedProfileRequest
-	13, // 9: orca.tenant.v1.TenantService.CreateTeam:input_type -> orca.tenant.v1.CreateTeamRequest
-	15, // 10: orca.tenant.v1.TenantService.AddTeamMember:input_type -> orca.tenant.v1.AddTeamMemberRequest
-	17, // 11: orca.tenant.v1.TenantService.ListTeamMembers:input_type -> orca.tenant.v1.ListTeamMembersRequest
-	3,  // 12: orca.tenant.v1.TenantService.CreateCompany:output_type -> orca.tenant.v1.CreateCompanyResponse
-	5,  // 13: orca.tenant.v1.TenantService.ValidateTenant:output_type -> orca.tenant.v1.ValidateTenantResponse
-	7,  // 14: orca.tenant.v1.TenantService.CreateDepartment:output_type -> orca.tenant.v1.CreateDepartmentResponse
-	9,  // 15: orca.tenant.v1.TenantService.SetUserDepartment:output_type -> orca.tenant.v1.SetUserDepartmentResponse
-	11, // 16: orca.tenant.v1.TenantService.GetResolvedProfile:output_type -> orca.tenant.v1.GetResolvedProfileResponse
-	14, // 17: orca.tenant.v1.TenantService.CreateTeam:output_type -> orca.tenant.v1.CreateTeamResponse
-	16, // 18: orca.tenant.v1.TenantService.AddTeamMember:output_type -> orca.tenant.v1.AddTeamMemberResponse
-	19, // 19: orca.tenant.v1.TenantService.ListTeamMembers:output_type -> orca.tenant.v1.ListTeamMembersResponse
-	12, // [12:20] is the sub-list for method output_type
-	4,  // [4:12] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	20, // 4: orca.tenant.v1.GetUserProfileResponse.profile:type_name -> orca.tenant.v1.UserProfile
+	1,  // 5: orca.tenant.v1.ListDepartmentsResponse.departments:type_name -> orca.tenant.v1.Department
+	0,  // 6: orca.tenant.v1.UpdateCompanyResponse.company:type_name -> orca.tenant.v1.Company
+	1,  // 7: orca.tenant.v1.UpdateDepartmentResponse.department:type_name -> orca.tenant.v1.Department
+	20, // 8: orca.tenant.v1.UpdateUserProfileResponse.profile:type_name -> orca.tenant.v1.UserProfile
+	12, // 9: orca.tenant.v1.ListTeamsResponse.teams:type_name -> orca.tenant.v1.Team
+	2,  // 10: orca.tenant.v1.TenantService.CreateCompany:input_type -> orca.tenant.v1.CreateCompanyRequest
+	4,  // 11: orca.tenant.v1.TenantService.ValidateTenant:input_type -> orca.tenant.v1.ValidateTenantRequest
+	6,  // 12: orca.tenant.v1.TenantService.CreateDepartment:input_type -> orca.tenant.v1.CreateDepartmentRequest
+	8,  // 13: orca.tenant.v1.TenantService.SetUserDepartment:input_type -> orca.tenant.v1.SetUserDepartmentRequest
+	10, // 14: orca.tenant.v1.TenantService.GetResolvedProfile:input_type -> orca.tenant.v1.GetResolvedProfileRequest
+	13, // 15: orca.tenant.v1.TenantService.CreateTeam:input_type -> orca.tenant.v1.CreateTeamRequest
+	15, // 16: orca.tenant.v1.TenantService.AddTeamMember:input_type -> orca.tenant.v1.AddTeamMemberRequest
+	17, // 17: orca.tenant.v1.TenantService.ListTeamMembers:input_type -> orca.tenant.v1.ListTeamMembersRequest
+	21, // 18: orca.tenant.v1.TenantService.GetUserProfile:input_type -> orca.tenant.v1.GetUserProfileRequest
+	23, // 19: orca.tenant.v1.TenantService.ListDepartments:input_type -> orca.tenant.v1.ListDepartmentsRequest
+	25, // 20: orca.tenant.v1.TenantService.UpdateCompany:input_type -> orca.tenant.v1.UpdateCompanyRequest
+	27, // 21: orca.tenant.v1.TenantService.UpdateDepartment:input_type -> orca.tenant.v1.UpdateDepartmentRequest
+	29, // 22: orca.tenant.v1.TenantService.UpdateUserProfile:input_type -> orca.tenant.v1.UpdateUserProfileRequest
+	31, // 23: orca.tenant.v1.TenantService.ListTeams:input_type -> orca.tenant.v1.ListTeamsRequest
+	33, // 24: orca.tenant.v1.TenantService.RemoveTeamMember:input_type -> orca.tenant.v1.RemoveTeamMemberRequest
+	3,  // 25: orca.tenant.v1.TenantService.CreateCompany:output_type -> orca.tenant.v1.CreateCompanyResponse
+	5,  // 26: orca.tenant.v1.TenantService.ValidateTenant:output_type -> orca.tenant.v1.ValidateTenantResponse
+	7,  // 27: orca.tenant.v1.TenantService.CreateDepartment:output_type -> orca.tenant.v1.CreateDepartmentResponse
+	9,  // 28: orca.tenant.v1.TenantService.SetUserDepartment:output_type -> orca.tenant.v1.SetUserDepartmentResponse
+	11, // 29: orca.tenant.v1.TenantService.GetResolvedProfile:output_type -> orca.tenant.v1.GetResolvedProfileResponse
+	14, // 30: orca.tenant.v1.TenantService.CreateTeam:output_type -> orca.tenant.v1.CreateTeamResponse
+	16, // 31: orca.tenant.v1.TenantService.AddTeamMember:output_type -> orca.tenant.v1.AddTeamMemberResponse
+	19, // 32: orca.tenant.v1.TenantService.ListTeamMembers:output_type -> orca.tenant.v1.ListTeamMembersResponse
+	22, // 33: orca.tenant.v1.TenantService.GetUserProfile:output_type -> orca.tenant.v1.GetUserProfileResponse
+	24, // 34: orca.tenant.v1.TenantService.ListDepartments:output_type -> orca.tenant.v1.ListDepartmentsResponse
+	26, // 35: orca.tenant.v1.TenantService.UpdateCompany:output_type -> orca.tenant.v1.UpdateCompanyResponse
+	28, // 36: orca.tenant.v1.TenantService.UpdateDepartment:output_type -> orca.tenant.v1.UpdateDepartmentResponse
+	30, // 37: orca.tenant.v1.TenantService.UpdateUserProfile:output_type -> orca.tenant.v1.UpdateUserProfileResponse
+	32, // 38: orca.tenant.v1.TenantService.ListTeams:output_type -> orca.tenant.v1.ListTeamsResponse
+	34, // 39: orca.tenant.v1.TenantService.RemoveTeamMember:output_type -> google.protobuf.Empty
+	25, // [25:40] is the sub-list for method output_type
+	10, // [10:25] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_orca_tenant_v1_tenant_proto_init() }
@@ -1156,7 +1944,7 @@ func file_orca_tenant_v1_tenant_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_tenant_v1_tenant_proto_rawDesc), len(file_orca_tenant_v1_tenant_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

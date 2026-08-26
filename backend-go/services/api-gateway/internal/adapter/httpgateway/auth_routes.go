@@ -117,6 +117,15 @@ func mountAuthRoutes(mux chi.Router, authClient authv1.AuthServiceClient, cookie
 			"localEnabled": true,
 		})
 	})
+
+	// SSO is not implemented anywhere in the target architecture yet
+	// (auth-service.md's RPC surface has no OAuth/provider-login concept) —
+	// /auth/config already reports providers: [] honestly. This route exists
+	// only so a client that somehow reaches it gets the same documented 501
+	// the old TS backend returned, instead of a bare 404.
+	mux.Get("/auth/sso/{provider}", func(w http.ResponseWriter, r *http.Request) {
+		writeJSONError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "SSO login is not yet supported")
+	})
 }
 
 func setSessionCookie(w http.ResponseWriter, token string) {

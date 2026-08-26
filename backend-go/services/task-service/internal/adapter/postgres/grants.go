@@ -28,7 +28,7 @@ func (r *Repository) Grant(ctx context.Context, tenantID string, grant domain.Gr
 	if !ok {
 		return fmt.Errorf("postgres: unrecognized grant level %v", grant.Level)
 	}
-	_, err := r.pool.Exec(ctx, `
+	_, err := r.db.Exec(ctx, `
 		INSERT INTO task.task_grants (tenant_id, task_id, subject_id, level, apply_tree)
 		VALUES ($1, $2, $3, $4, $5)
 	`, tenantID, grant.TaskID, grant.SubjectID, level, grant.ApplyTree)
@@ -48,7 +48,7 @@ func (r *Repository) ListGrantsForAncestors(ctx context.Context, tenantID string
 		return out, nil
 	}
 
-	rows, err := r.pool.Query(ctx, `
+	rows, err := r.db.Query(ctx, `
 		SELECT task_id, subject_id, level, apply_tree
 		FROM task.task_grants
 		WHERE tenant_id = $1 AND task_id = ANY($2)

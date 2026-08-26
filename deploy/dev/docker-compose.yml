@@ -132,11 +132,17 @@ services:
     networks:
       - orca-go-net
 
-  # Vault dev-mode auto-mounts secret/ (KV) only, never transit/ — nothing
-  # else in this deploy set enables it, so auth-service's TransitEnsureKey
-  # (common/secrets/vault.go) 404s on every boot without this. Idempotent
-  # (checks `vault secrets list` before enabling) so it's safe to re-run on
-  # every `docker compose up -d`, incl. against a live long-running vault.
+  # Vault dev-mode auto-mounts secret/ (KV) only, never transit/ or any named
+  # KV v2 mount — nothing else in this deploy set enables either, so
+  # auth-service's TransitEnsureKey (common/secrets/vault.go) 404s on every
+  # boot without transit/, and credential-broker-service's WriteCredential
+  # fails CREDENTIAL_VAULT_WRITE_FAILED (confirmed by running TASK-220/043's
+  # real docker-compose E2E verification against this stack) without the
+  # `credential-secrets` KV v2 mount its own README documents as required
+  # setup (services/credential-broker-service/README.md, `internal/usecase/
+  # vault_paths.go`'s `kvMount`). Both checks are idempotent (read
+  # `vault secrets list` before enabling) so it's safe to re-run on every
+  # `docker compose up -d`, incl. against a live long-running vault.
   vault-init:
     image: hashicorp/vault:1.17
     container_name: orca-go-vault-init
@@ -147,6 +153,8 @@ services:
         set -e
         vault secrets list -address="$$VAULT_ADDR" | grep -q '^transit/' \
           || vault secrets enable -address="$$VAULT_ADDR" -path=transit transit
+        vault secrets list -address="$$VAULT_ADDR" | grep -q '^credential-secrets/' \
+          || vault secrets enable -address="$$VAULT_ADDR" -path=credential-secrets -version=2 kv
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN:-dev-root-token}
@@ -372,6 +380,10 @@ services:
     depends_on:
       infra-fleet-service: { condition: service_started }
       project-service: { condition: service_started }
+      # ai-provider-service: DiscoverCommitMessageModels (TASK-211) dials it
+      # directly. grpc.NewClient is lazy (non-blocking), so this is
+      # startup-ordering hygiene, not a hard requirement.
+      ai-provider-service: { condition: service_started }
 
   scm-integration-service:
     <<: *go-defaults

@@ -9,6 +9,7 @@ package aiproviderv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -92,6 +93,11 @@ type ProviderAccount struct {
 	Type          ProviderType           `protobuf:"varint,3,opt,name=type,proto3,enum=orca.aiprovider.v1.ProviderType" json:"type,omitempty"`
 	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                                    // active | rotating | revoked
 	CredentialRef string                 `protobuf:"bytes,5,opt,name=credential_ref,json=credentialRef,proto3" json:"credential_ref,omitempty"` // credential-broker-service metadata id, never a secret value
+	// dev_server_id is which dev server holds this account's pushed
+	// ciphertext (ai-provider-service.md §9's PushCiphertext flow) — needed
+	// by TestConnection (TASK-028) to know where to relay. Empty for
+	// accounts that have never had a credential pushed to a dev server yet.
+	DevServerId   string `protobuf:"bytes,6,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -157,6 +163,13 @@ func (x *ProviderAccount) GetStatus() string {
 func (x *ProviderAccount) GetCredentialRef() string {
 	if x != nil {
 		return x.CredentialRef
+	}
+	return ""
+}
+
+func (x *ProviderAccount) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
 	}
 	return ""
 }
@@ -549,17 +562,480 @@ func (x *GetUsageTodayResponse) GetRequestCount() int64 {
 	return 0
 }
 
+type ListAccountsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`            // ignored server-side, taken from ctx metadata — matches ResolveProviderRequest's convention
+	DevServerId   string                 `protobuf:"bytes,2,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"` // optional filter — matches the frontend's { devServerId } param
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountsRequest) Reset() {
+	*x = ListAccountsRequest{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountsRequest) ProtoMessage() {}
+
+func (x *ListAccountsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountsRequest.ProtoReflect.Descriptor instead.
+func (*ListAccountsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListAccountsRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ListAccountsRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+type ListAccountsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accounts      []*ProviderAccount     `protobuf:"bytes,1,rep,name=accounts,proto3" json:"accounts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountsResponse) Reset() {
+	*x = ListAccountsResponse{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountsResponse) ProtoMessage() {}
+
+func (x *ListAccountsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountsResponse.ProtoReflect.Descriptor instead.
+func (*ListAccountsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListAccountsResponse) GetAccounts() []*ProviderAccount {
+	if x != nil {
+		return x.Accounts
+	}
+	return nil
+}
+
+type UpdateAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	ModelHint     string                 `protobuf:"bytes,3,opt,name=model_hint,json=modelHint,proto3" json:"model_hint,omitempty"`
+	BaseUrl       string                 `protobuf:"bytes,4,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAccountRequest) Reset() {
+	*x = UpdateAccountRequest{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAccountRequest) ProtoMessage() {}
+
+func (x *UpdateAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAccountRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAccountRequest) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *UpdateAccountRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UpdateAccountRequest) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *UpdateAccountRequest) GetModelHint() string {
+	if x != nil {
+		return x.ModelHint
+	}
+	return ""
+}
+
+func (x *UpdateAccountRequest) GetBaseUrl() string {
+	if x != nil {
+		return x.BaseUrl
+	}
+	return ""
+}
+
+type UpdateAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *ProviderAccount       `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAccountResponse) Reset() {
+	*x = UpdateAccountResponse{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAccountResponse) ProtoMessage() {}
+
+func (x *UpdateAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAccountResponse.ProtoReflect.Descriptor instead.
+func (*UpdateAccountResponse) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *UpdateAccountResponse) GetAccount() *ProviderAccount {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+type DeleteAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAccountRequest) Reset() {
+	*x = DeleteAccountRequest{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAccountRequest) ProtoMessage() {}
+
+func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAccountRequest.ProtoReflect.Descriptor instead.
+func (*DeleteAccountRequest) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *DeleteAccountRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+// WriteCredentialRequest/Response mirror ai-provider-service.md §3's sketch
+// — encrypted_blob/iv are client-side-encrypted, forwarded unopened (ADR-008).
+type WriteCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	EncryptedBlob []byte                 `protobuf:"bytes,2,opt,name=encrypted_blob,json=encryptedBlob,proto3" json:"encrypted_blob,omitempty"`
+	Iv            []byte                 `protobuf:"bytes,3,opt,name=iv,proto3" json:"iv,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteCredentialRequest) Reset() {
+	*x = WriteCredentialRequest{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteCredentialRequest) ProtoMessage() {}
+
+func (x *WriteCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteCredentialRequest.ProtoReflect.Descriptor instead.
+func (*WriteCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *WriteCredentialRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *WriteCredentialRequest) GetEncryptedBlob() []byte {
+	if x != nil {
+		return x.EncryptedBlob
+	}
+	return nil
+}
+
+func (x *WriteCredentialRequest) GetIv() []byte {
+	if x != nil {
+		return x.Iv
+	}
+	return nil
+}
+
+type WriteCredentialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *ProviderAccount       `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteCredentialResponse) Reset() {
+	*x = WriteCredentialResponse{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteCredentialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteCredentialResponse) ProtoMessage() {}
+
+func (x *WriteCredentialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteCredentialResponse.ProtoReflect.Descriptor instead.
+func (*WriteCredentialResponse) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *WriteCredentialResponse) GetAccount() *ProviderAccount {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+type TestConnectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	TraceId       string                 `protobuf:"bytes,2,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"` // threaded into the outbound Relay call's request-id metadata for tracing correlation, not persisted
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestConnectionRequest) Reset() {
+	*x = TestConnectionRequest{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestConnectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestConnectionRequest) ProtoMessage() {}
+
+func (x *TestConnectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestConnectionRequest.ProtoReflect.Descriptor instead.
+func (*TestConnectionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *TestConnectionRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *TestConnectionRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+type TestConnectionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"` // human-readable result/error detail from the agent's live check, never a secret
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestConnectionResponse) Reset() {
+	*x = TestConnectionResponse{}
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestConnectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestConnectionResponse) ProtoMessage() {}
+
+func (x *TestConnectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_aiprovider_v1_aiprovider_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestConnectionResponse.ProtoReflect.Descriptor instead.
+func (*TestConnectionResponse) Descriptor() ([]byte, []int) {
+	return file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *TestConnectionResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *TestConnectionResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_orca_aiprovider_v1_aiprovider_proto protoreflect.FileDescriptor
 
 const file_orca_aiprovider_v1_aiprovider_proto_rawDesc = "" +
 	"\n" +
-	"#orca/aiprovider/v1/aiprovider.proto\x12\x12orca.aiprovider.v1\"\xb3\x01\n" +
+	"#orca/aiprovider/v1/aiprovider.proto\x12\x12orca.aiprovider.v1\x1a\x1bgoogle/protobuf/empty.proto\"\xd7\x01\n" +
 	"\x0fProviderAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x124\n" +
 	"\x04type\x18\x03 \x01(\x0e2 .orca.aiprovider.v1.ProviderTypeR\x04type\x12\x16\n" +
 	"\x06status\x18\x04 \x01(\tR\x06status\x12%\n" +
-	"\x0ecredential_ref\x18\x05 \x01(\tR\rcredentialRef\"i\n" +
+	"\x0ecredential_ref\x18\x05 \x01(\tR\rcredentialRef\x12\"\n" +
+	"\rdev_server_id\x18\x06 \x01(\tR\vdevServerId\"i\n" +
 	"\x14CreateAccountRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x124\n" +
 	"\x04type\x18\x02 \x01(\x0e2 .orca.aiprovider.v1.ProviderTypeR\x04type\"V\n" +
@@ -582,7 +1058,38 @@ const file_orca_aiprovider_v1_aiprovider_proto_rawDesc = "" +
 	"account_id\x18\x01 \x01(\tR\taccountId\"W\n" +
 	"\x15GetUsageTodayResponse\x12\x19\n" +
 	"\bcost_usd\x18\x01 \x01(\x01R\acostUsd\x12#\n" +
-	"\rrequest_count\x18\x02 \x01(\x03R\frequestCount*\xe8\x01\n" +
+	"\rrequest_count\x18\x02 \x01(\x03R\frequestCount\"V\n" +
+	"\x13ListAccountsRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\"\n" +
+	"\rdev_server_id\x18\x02 \x01(\tR\vdevServerId\"W\n" +
+	"\x14ListAccountsResponse\x12?\n" +
+	"\baccounts\x18\x01 \x03(\v2#.orca.aiprovider.v1.ProviderAccountR\baccounts\"\x85\x01\n" +
+	"\x14UpdateAccountRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1d\n" +
+	"\n" +
+	"model_hint\x18\x03 \x01(\tR\tmodelHint\x12\x19\n" +
+	"\bbase_url\x18\x04 \x01(\tR\abaseUrl\"V\n" +
+	"\x15UpdateAccountResponse\x12=\n" +
+	"\aaccount\x18\x01 \x01(\v2#.orca.aiprovider.v1.ProviderAccountR\aaccount\"5\n" +
+	"\x14DeleteAccountRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"n\n" +
+	"\x16WriteCredentialRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12%\n" +
+	"\x0eencrypted_blob\x18\x02 \x01(\fR\rencryptedBlob\x12\x0e\n" +
+	"\x02iv\x18\x03 \x01(\fR\x02iv\"X\n" +
+	"\x17WriteCredentialResponse\x12=\n" +
+	"\aaccount\x18\x01 \x01(\v2#.orca.aiprovider.v1.ProviderAccountR\aaccount\"Q\n" +
+	"\x15TestConnectionRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
+	"\btrace_id\x18\x02 \x01(\tR\atraceId\"L\n" +
+	"\x16TestConnectionResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage*\xe8\x01\n" +
 	"\fProviderType\x12\x1d\n" +
 	"\x19PROVIDER_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17PROVIDER_TYPE_ANTHROPIC\x10\x01\x12\x18\n" +
@@ -591,12 +1098,17 @@ const file_orca_aiprovider_v1_aiprovider_proto_rawDesc = "" +
 	"\x13PROVIDER_TYPE_AZURE\x10\x04\x12\x1d\n" +
 	"\x19PROVIDER_TYPE_AWS_BEDROCK\x10\x05\x12\x18\n" +
 	"\x14PROVIDER_TYPE_OLLAMA\x10\x06\x12\x16\n" +
-	"\x12PROVIDER_TYPE_VLLM\x10\a2\xa5\x03\n" +
+	"\x12PROVIDER_TYPE_VLLM\x10\a2\x96\a\n" +
 	"\x11AiProviderService\x12d\n" +
 	"\rCreateAccount\x12(.orca.aiprovider.v1.CreateAccountRequest\x1a).orca.aiprovider.v1.CreateAccountResponse\x12j\n" +
 	"\x0fResolveProvider\x12*.orca.aiprovider.v1.ResolveProviderRequest\x1a+.orca.aiprovider.v1.ResolveProviderResponse\x12X\n" +
 	"\tRotateKey\x12$.orca.aiprovider.v1.RotateKeyRequest\x1a%.orca.aiprovider.v1.RotateKeyResponse\x12d\n" +
-	"\rGetUsageToday\x12(.orca.aiprovider.v1.GetUsageTodayRequest\x1a).orca.aiprovider.v1.GetUsageTodayResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1;aiproviderv1b\x06proto3"
+	"\rGetUsageToday\x12(.orca.aiprovider.v1.GetUsageTodayRequest\x1a).orca.aiprovider.v1.GetUsageTodayResponse\x12a\n" +
+	"\fListAccounts\x12'.orca.aiprovider.v1.ListAccountsRequest\x1a(.orca.aiprovider.v1.ListAccountsResponse\x12d\n" +
+	"\rUpdateAccount\x12(.orca.aiprovider.v1.UpdateAccountRequest\x1a).orca.aiprovider.v1.UpdateAccountResponse\x12Q\n" +
+	"\rDeleteAccount\x12(.orca.aiprovider.v1.DeleteAccountRequest\x1a\x16.google.protobuf.Empty\x12j\n" +
+	"\x0fWriteCredential\x12*.orca.aiprovider.v1.WriteCredentialRequest\x1a+.orca.aiprovider.v1.WriteCredentialResponse\x12g\n" +
+	"\x0eTestConnection\x12).orca.aiprovider.v1.TestConnectionRequest\x1a*.orca.aiprovider.v1.TestConnectionResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1;aiproviderv1b\x06proto3"
 
 var (
 	file_orca_aiprovider_v1_aiprovider_proto_rawDescOnce sync.Once
@@ -611,7 +1123,7 @@ func file_orca_aiprovider_v1_aiprovider_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_aiprovider_v1_aiprovider_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_aiprovider_v1_aiprovider_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_orca_aiprovider_v1_aiprovider_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_orca_aiprovider_v1_aiprovider_proto_goTypes = []any{
 	(ProviderType)(0),               // 0: orca.aiprovider.v1.ProviderType
 	(*ProviderAccount)(nil),         // 1: orca.aiprovider.v1.ProviderAccount
@@ -623,26 +1135,49 @@ var file_orca_aiprovider_v1_aiprovider_proto_goTypes = []any{
 	(*RotateKeyResponse)(nil),       // 7: orca.aiprovider.v1.RotateKeyResponse
 	(*GetUsageTodayRequest)(nil),    // 8: orca.aiprovider.v1.GetUsageTodayRequest
 	(*GetUsageTodayResponse)(nil),   // 9: orca.aiprovider.v1.GetUsageTodayResponse
+	(*ListAccountsRequest)(nil),     // 10: orca.aiprovider.v1.ListAccountsRequest
+	(*ListAccountsResponse)(nil),    // 11: orca.aiprovider.v1.ListAccountsResponse
+	(*UpdateAccountRequest)(nil),    // 12: orca.aiprovider.v1.UpdateAccountRequest
+	(*UpdateAccountResponse)(nil),   // 13: orca.aiprovider.v1.UpdateAccountResponse
+	(*DeleteAccountRequest)(nil),    // 14: orca.aiprovider.v1.DeleteAccountRequest
+	(*WriteCredentialRequest)(nil),  // 15: orca.aiprovider.v1.WriteCredentialRequest
+	(*WriteCredentialResponse)(nil), // 16: orca.aiprovider.v1.WriteCredentialResponse
+	(*TestConnectionRequest)(nil),   // 17: orca.aiprovider.v1.TestConnectionRequest
+	(*TestConnectionResponse)(nil),  // 18: orca.aiprovider.v1.TestConnectionResponse
+	(*emptypb.Empty)(nil),           // 19: google.protobuf.Empty
 }
 var file_orca_aiprovider_v1_aiprovider_proto_depIdxs = []int32{
-	0, // 0: orca.aiprovider.v1.ProviderAccount.type:type_name -> orca.aiprovider.v1.ProviderType
-	0, // 1: orca.aiprovider.v1.CreateAccountRequest.type:type_name -> orca.aiprovider.v1.ProviderType
-	1, // 2: orca.aiprovider.v1.CreateAccountResponse.account:type_name -> orca.aiprovider.v1.ProviderAccount
-	1, // 3: orca.aiprovider.v1.ResolveProviderResponse.account:type_name -> orca.aiprovider.v1.ProviderAccount
-	1, // 4: orca.aiprovider.v1.RotateKeyResponse.account:type_name -> orca.aiprovider.v1.ProviderAccount
-	2, // 5: orca.aiprovider.v1.AiProviderService.CreateAccount:input_type -> orca.aiprovider.v1.CreateAccountRequest
-	4, // 6: orca.aiprovider.v1.AiProviderService.ResolveProvider:input_type -> orca.aiprovider.v1.ResolveProviderRequest
-	6, // 7: orca.aiprovider.v1.AiProviderService.RotateKey:input_type -> orca.aiprovider.v1.RotateKeyRequest
-	8, // 8: orca.aiprovider.v1.AiProviderService.GetUsageToday:input_type -> orca.aiprovider.v1.GetUsageTodayRequest
-	3, // 9: orca.aiprovider.v1.AiProviderService.CreateAccount:output_type -> orca.aiprovider.v1.CreateAccountResponse
-	5, // 10: orca.aiprovider.v1.AiProviderService.ResolveProvider:output_type -> orca.aiprovider.v1.ResolveProviderResponse
-	7, // 11: orca.aiprovider.v1.AiProviderService.RotateKey:output_type -> orca.aiprovider.v1.RotateKeyResponse
-	9, // 12: orca.aiprovider.v1.AiProviderService.GetUsageToday:output_type -> orca.aiprovider.v1.GetUsageTodayResponse
-	9, // [9:13] is the sub-list for method output_type
-	5, // [5:9] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	0,  // 0: orca.aiprovider.v1.ProviderAccount.type:type_name -> orca.aiprovider.v1.ProviderType
+	0,  // 1: orca.aiprovider.v1.CreateAccountRequest.type:type_name -> orca.aiprovider.v1.ProviderType
+	1,  // 2: orca.aiprovider.v1.CreateAccountResponse.account:type_name -> orca.aiprovider.v1.ProviderAccount
+	1,  // 3: orca.aiprovider.v1.ResolveProviderResponse.account:type_name -> orca.aiprovider.v1.ProviderAccount
+	1,  // 4: orca.aiprovider.v1.RotateKeyResponse.account:type_name -> orca.aiprovider.v1.ProviderAccount
+	1,  // 5: orca.aiprovider.v1.ListAccountsResponse.accounts:type_name -> orca.aiprovider.v1.ProviderAccount
+	1,  // 6: orca.aiprovider.v1.UpdateAccountResponse.account:type_name -> orca.aiprovider.v1.ProviderAccount
+	1,  // 7: orca.aiprovider.v1.WriteCredentialResponse.account:type_name -> orca.aiprovider.v1.ProviderAccount
+	2,  // 8: orca.aiprovider.v1.AiProviderService.CreateAccount:input_type -> orca.aiprovider.v1.CreateAccountRequest
+	4,  // 9: orca.aiprovider.v1.AiProviderService.ResolveProvider:input_type -> orca.aiprovider.v1.ResolveProviderRequest
+	6,  // 10: orca.aiprovider.v1.AiProviderService.RotateKey:input_type -> orca.aiprovider.v1.RotateKeyRequest
+	8,  // 11: orca.aiprovider.v1.AiProviderService.GetUsageToday:input_type -> orca.aiprovider.v1.GetUsageTodayRequest
+	10, // 12: orca.aiprovider.v1.AiProviderService.ListAccounts:input_type -> orca.aiprovider.v1.ListAccountsRequest
+	12, // 13: orca.aiprovider.v1.AiProviderService.UpdateAccount:input_type -> orca.aiprovider.v1.UpdateAccountRequest
+	14, // 14: orca.aiprovider.v1.AiProviderService.DeleteAccount:input_type -> orca.aiprovider.v1.DeleteAccountRequest
+	15, // 15: orca.aiprovider.v1.AiProviderService.WriteCredential:input_type -> orca.aiprovider.v1.WriteCredentialRequest
+	17, // 16: orca.aiprovider.v1.AiProviderService.TestConnection:input_type -> orca.aiprovider.v1.TestConnectionRequest
+	3,  // 17: orca.aiprovider.v1.AiProviderService.CreateAccount:output_type -> orca.aiprovider.v1.CreateAccountResponse
+	5,  // 18: orca.aiprovider.v1.AiProviderService.ResolveProvider:output_type -> orca.aiprovider.v1.ResolveProviderResponse
+	7,  // 19: orca.aiprovider.v1.AiProviderService.RotateKey:output_type -> orca.aiprovider.v1.RotateKeyResponse
+	9,  // 20: orca.aiprovider.v1.AiProviderService.GetUsageToday:output_type -> orca.aiprovider.v1.GetUsageTodayResponse
+	11, // 21: orca.aiprovider.v1.AiProviderService.ListAccounts:output_type -> orca.aiprovider.v1.ListAccountsResponse
+	13, // 22: orca.aiprovider.v1.AiProviderService.UpdateAccount:output_type -> orca.aiprovider.v1.UpdateAccountResponse
+	19, // 23: orca.aiprovider.v1.AiProviderService.DeleteAccount:output_type -> google.protobuf.Empty
+	16, // 24: orca.aiprovider.v1.AiProviderService.WriteCredential:output_type -> orca.aiprovider.v1.WriteCredentialResponse
+	18, // 25: orca.aiprovider.v1.AiProviderService.TestConnection:output_type -> orca.aiprovider.v1.TestConnectionResponse
+	17, // [17:26] is the sub-list for method output_type
+	8,  // [8:17] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_orca_aiprovider_v1_aiprovider_proto_init() }
@@ -656,7 +1191,7 @@ func file_orca_aiprovider_v1_aiprovider_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_aiprovider_v1_aiprovider_proto_rawDesc), len(file_orca_aiprovider_v1_aiprovider_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

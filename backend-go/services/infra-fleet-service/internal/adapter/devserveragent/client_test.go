@@ -3,12 +3,14 @@ package devserveragent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,6 +33,50 @@ type fakeAgent struct {
 	requireToken    string
 	results         map[string]any // method -> result to reply with
 	rejectHandshake bool
+
+	// pushNotifications, if set, are sent (no id, matching a real
+	// pty.data/pty.exit/pty.replay push) shortly after the handshake
+	// completes — TASK-183/187's StreamPty test support. Fixed field names
+	// (id/data/exitCode) mirror ptyNotificationParams's FLAGGED best-effort
+	// shape (see session.go).
+	pushNotifications []fakeAgentNotification
+
+	// receivedParams records the raw params of the most recent request seen
+	// per method — lets a test assert the exact field names/values Client
+	// sent over the wire (e.g. WritePty/ResizePty/KillPty's {id,...} params),
+	// not just that some pre-registered result came back.
+	paramsMu       sync.Mutex
+	receivedParams map[string]json.RawMessage
+}
+
+// lastParams returns the raw params this fake agent most recently received
+// for method, decoded into a map for easy field assertions. Fails the test
+// if method was never called.
+func (f *fakeAgent) lastParams(t *testing.T, method string) map[string]any {
+	t.Helper()
+	f.paramsMu.Lock()
+	raw, ok := f.receivedParams[method]
+	f.paramsMu.Unlock()
+	if !ok {
+		t.Fatalf("fake agent never received a call to %q", method)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decoding params for %q: %v", method, err)
+	}
+	return out
+}
+
+type fakeAgentNotification struct {
+	method   string
+	ptyID    string
+	data     string
+	exitCode int32
+}
+
+func (n fakeAgentNotification) toJSONRPC() JSONRPCNotification {
+	params, _ := json.Marshal(map[string]any{"id": n.ptyID, "data": n.data, "exitCode": n.exitCode})
+	return JSONRPCNotification{JSONRPC: "2.0", Method: n.method, Params: params}
 }
 
 func (f *fakeAgent) handler(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +124,30 @@ func (f *fakeAgent) handler(w http.ResponseWriter, r *http.Request) {
 			resp := JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: result}
 			frame, _ := EncodeJSONRPCFrame(resp, 1, decoded.ID)
 			_ = conn.Write(ctx, websocket.MessageBinary, frame)
+
+			if len(f.pushNotifications) > 0 {
+				go func() {
+					time.Sleep(20 * time.Millisecond) // give the client time to subscribe before pushing
+					for i, n := range f.pushNotifications {
+						frame, err := EncodeJSONRPCFrame(n.toJSONRPC(), uint32(100+i), 0)
+						if err != nil {
+							continue
+						}
+						if err := conn.Write(context.Background(), websocket.MessageBinary, frame); err != nil {
+							return
+						}
+					}
+				}()
+			}
 			continue
 		}
+
+		f.paramsMu.Lock()
+		if f.receivedParams == nil {
+			f.receivedParams = make(map[string]json.RawMessage)
+		}
+		f.receivedParams[req.Method] = req.Params
+		f.paramsMu.Unlock()
 
 		result, known := f.results[req.Method]
 		if !known {
@@ -147,6 +215,34 @@ func TestClientExecSucceedsAgainstFakeAgent(t *testing.T) {
 	git, ok := result["git"].(map[string]any)
 	if !ok || git["installed"] != true {
 		t.Errorf("result = %+v, want git.installed=true", result)
+	}
+}
+
+// TestClientExecTranslatesMethodNotFound is the direct regression test for
+// TASK-048/TASK-070's "shipped but honestly inert" contract: a real agent
+// that doesn't know a method (e.g. today's agent/ build, which has no
+// device.*/host.capabilities handler) returns a real JSON-RPC -32601, and
+// Exec must translate that into domain.ErrAgentMethodNotFound rather than a
+// bare/opaque error, so usecase.EmulatorRelay/usecase.GetHostCapabilities
+// can distinguish it from a transport failure via errors.Is.
+func TestClientExecTranslatesMethodNotFound(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-mnf", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	_, err = client.Exec(context.Background(), devServer, "device.list", nil)
+	if err == nil {
+		t.Fatal("expected an error for a method the fake agent doesn't implement")
+	}
+	if !errors.Is(err, domain.ErrAgentMethodNotFound) {
+		t.Errorf("expected errors.Is(err, domain.ErrAgentMethodNotFound), got %v", err)
 	}
 }
 

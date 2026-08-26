@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -46,6 +47,21 @@ type fakeTenantServiceClient struct {
 
 	listTeamMembersResp *tenantv1.ListTeamMembersResponse
 	listTeamMembersErr  error
+
+	getUserProfileResp *tenantv1.GetUserProfileResponse
+	getUserProfileErr  error
+
+	listDepartmentsResp *tenantv1.ListDepartmentsResponse
+	listDepartmentsErr  error
+
+	updateCompanyResp *tenantv1.UpdateCompanyResponse
+	updateCompanyErr  error
+
+	updateDepartmentResp *tenantv1.UpdateDepartmentResponse
+	updateDepartmentErr  error
+
+	updateUserProfileResp *tenantv1.UpdateUserProfileResponse
+	updateUserProfileErr  error
 }
 
 func (f *fakeTenantServiceClient) CreateCompany(_ context.Context, _ *tenantv1.CreateCompanyRequest, _ ...grpc.CallOption) (*tenantv1.CreateCompanyResponse, error) {
@@ -103,6 +119,52 @@ func (f *fakeTenantServiceClient) ListTeamMembers(_ context.Context, _ *tenantv1
 		return nil, f.listTeamMembersErr
 	}
 	return f.listTeamMembersResp, nil
+}
+
+func (f *fakeTenantServiceClient) GetUserProfile(_ context.Context, _ *tenantv1.GetUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.GetUserProfileResponse, error) {
+	if f.getUserProfileErr != nil {
+		return nil, f.getUserProfileErr
+	}
+	return f.getUserProfileResp, nil
+}
+
+func (f *fakeTenantServiceClient) ListDepartments(_ context.Context, _ *tenantv1.ListDepartmentsRequest, _ ...grpc.CallOption) (*tenantv1.ListDepartmentsResponse, error) {
+	if f.listDepartmentsErr != nil {
+		return nil, f.listDepartmentsErr
+	}
+	return f.listDepartmentsResp, nil
+}
+
+func (f *fakeTenantServiceClient) UpdateCompany(_ context.Context, _ *tenantv1.UpdateCompanyRequest, _ ...grpc.CallOption) (*tenantv1.UpdateCompanyResponse, error) {
+	if f.updateCompanyErr != nil {
+		return nil, f.updateCompanyErr
+	}
+	return f.updateCompanyResp, nil
+}
+
+func (f *fakeTenantServiceClient) UpdateDepartment(_ context.Context, _ *tenantv1.UpdateDepartmentRequest, _ ...grpc.CallOption) (*tenantv1.UpdateDepartmentResponse, error) {
+	if f.updateDepartmentErr != nil {
+		return nil, f.updateDepartmentErr
+	}
+	return f.updateDepartmentResp, nil
+}
+
+func (f *fakeTenantServiceClient) UpdateUserProfile(_ context.Context, _ *tenantv1.UpdateUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.UpdateUserProfileResponse, error) {
+	if f.updateUserProfileErr != nil {
+		return nil, f.updateUserProfileErr
+	}
+	return f.updateUserProfileResp, nil
+}
+
+// ListTeams and RemoveTeamMember: no route in this file's tests exercises
+// them, so these exist only to satisfy the tenantv1.TenantServiceClient
+// interface this fake must implement in full.
+func (f *fakeTenantServiceClient) ListTeams(_ context.Context, _ *tenantv1.ListTeamsRequest, _ ...grpc.CallOption) (*tenantv1.ListTeamsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) RemoveTeamMember(_ context.Context, _ *tenantv1.RemoveTeamMemberRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
 }
 
 // tenantTestRouter mounts mountTenantRoutes standalone (router.go isn't

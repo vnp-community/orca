@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package orca.automation.v1;
 
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
 import "orca/workflow/v1/workflow.proto";
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1;automationv1";
@@ -21,6 +23,10 @@ service AutomationService {
   // the external source's own idempotency key, reused as-is for
   // automation_runs' (tenant_id, request_id) unique index.
   rpc HandleExternalTrigger(HandleExternalTriggerRequest) returns (HandleExternalTriggerResponse);
+
+  rpc ListAutomations(ListAutomationsRequest) returns (ListAutomationsResponse);
+  rpc UpdateAutomation(UpdateAutomationRequest) returns (UpdateAutomationResponse);
+  rpc DeleteAutomation(DeleteAutomationRequest) returns (google.protobuf.Empty);
 }
 
 message Automation {
@@ -89,4 +95,39 @@ message HandleExternalTriggerRequest {
 
 message HandleExternalTriggerResponse {
   AutomationRun run = 1;
+}
+
+message ListAutomationsRequest {
+  string tenant_id = 1;
+  string page_token = 2;
+  int32 page_size = 3;
+}
+message ListAutomationsResponse {
+  repeated Automation automations = 1;
+  string next_page_token = 2;
+}
+
+// UpdateAutomationRequest uses optional (wrapper-typed) fields rather than
+// full-replace semantics — a partial edit (e.g. just toggling `enabled`) is
+// the frontend's real use case (an automation's on/off switch in the UI
+// list), and full-replace would force every caller to re-send fields it
+// isn't changing.
+message UpdateAutomationRequest {
+  string id = 1;
+  string tenant_id = 2;
+  google.protobuf.StringValue name = 3;
+  google.protobuf.StringValue rrule = 4;
+  google.protobuf.StringValue step_config_json = 5;
+  orca.workflow.v1.StepType step_type = 6; // 0 (unspecified) = no change
+  google.protobuf.BoolValue enabled = 7;
+  google.protobuf.StringValue dtstart = 8;
+  google.protobuf.StringValue timezone = 9;
+}
+message UpdateAutomationResponse {
+  Automation automation = 1;
+}
+
+message DeleteAutomationRequest {
+  string id = 1;
+  string tenant_id = 2;
 }

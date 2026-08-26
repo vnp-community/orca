@@ -9,6 +9,8 @@ package issuetrackingv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -70,19 +72,519 @@ func (IssueProvider) EnumDescriptor() ([]byte, []int) {
 	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{0}
 }
 
-type Issue struct {
+// Workspace unifies Jira's "site" and Linear's "workspace" — one connected
+// account can have more than one (JiraConnectionStatus.sites in the
+// frontend), so ConnectionStatus carries a list.
+type Workspace struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	State         string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
-	Url           string                 `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Url           string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"` // Jira site base URL; empty for Linear
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *Workspace) Reset() {
+	*x = Workspace{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Workspace) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Workspace) ProtoMessage() {}
+
+func (x *Workspace) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Workspace.ProtoReflect.Descriptor instead.
+func (*Workspace) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Workspace) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Workspace) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Workspace) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+type ConnectionStatus struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Connected           bool                   `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"`
+	ViewerId            string                 `protobuf:"bytes,2,opt,name=viewer_id,json=viewerId,proto3" json:"viewer_id,omitempty"`
+	ViewerDisplayName   string                 `protobuf:"bytes,3,opt,name=viewer_display_name,json=viewerDisplayName,proto3" json:"viewer_display_name,omitempty"`
+	ViewerEmail         string                 `protobuf:"bytes,4,opt,name=viewer_email,json=viewerEmail,proto3" json:"viewer_email,omitempty"`
+	Workspaces          []*Workspace           `protobuf:"bytes,5,rep,name=workspaces,proto3" json:"workspaces,omitempty"`
+	ActiveWorkspaceId   string                 `protobuf:"bytes,6,opt,name=active_workspace_id,json=activeWorkspaceId,proto3" json:"active_workspace_id,omitempty"`
+	SelectedWorkspaceId string                 `protobuf:"bytes,7,opt,name=selected_workspace_id,json=selectedWorkspaceId,proto3" json:"selected_workspace_id,omitempty"` // "" | "all" | a specific id — see JiraSiteSelection
+	CredentialError     string                 `protobuf:"bytes,8,opt,name=credential_error,json=credentialError,proto3" json:"credential_error,omitempty"`               // set when a stored credential exists but resolution/decrypt failed
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ConnectionStatus) Reset() {
+	*x = ConnectionStatus{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectionStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectionStatus) ProtoMessage() {}
+
+func (x *ConnectionStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectionStatus.ProtoReflect.Descriptor instead.
+func (*ConnectionStatus) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ConnectionStatus) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+func (x *ConnectionStatus) GetViewerId() string {
+	if x != nil {
+		return x.ViewerId
+	}
+	return ""
+}
+
+func (x *ConnectionStatus) GetViewerDisplayName() string {
+	if x != nil {
+		return x.ViewerDisplayName
+	}
+	return ""
+}
+
+func (x *ConnectionStatus) GetViewerEmail() string {
+	if x != nil {
+		return x.ViewerEmail
+	}
+	return ""
+}
+
+func (x *ConnectionStatus) GetWorkspaces() []*Workspace {
+	if x != nil {
+		return x.Workspaces
+	}
+	return nil
+}
+
+func (x *ConnectionStatus) GetActiveWorkspaceId() string {
+	if x != nil {
+		return x.ActiveWorkspaceId
+	}
+	return ""
+}
+
+func (x *ConnectionStatus) GetSelectedWorkspaceId() string {
+	if x != nil {
+		return x.SelectedWorkspaceId
+	}
+	return ""
+}
+
+func (x *ConnectionStatus) GetCredentialError() string {
+	if x != nil {
+		return x.CredentialError
+	}
+	return ""
+}
+
+type ConnectRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	SiteUrl       string                 `protobuf:"bytes,2,opt,name=site_url,json=siteUrl,proto3" json:"site_url,omitempty"` // Jira only
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`                    // Jira only
+	Token         string                 `protobuf:"bytes,4,opt,name=token,proto3" json:"token,omitempty"`                    // Jira API token, or Linear personal API key / OAuth access token
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConnectRequest) Reset() {
+	*x = ConnectRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConnectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConnectRequest) ProtoMessage() {}
+
+func (x *ConnectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConnectRequest.ProtoReflect.Descriptor instead.
+func (*ConnectRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ConnectRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *ConnectRequest) GetSiteUrl() string {
+	if x != nil {
+		return x.SiteUrl
+	}
+	return ""
+}
+
+func (x *ConnectRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *ConnectRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type DisconnectRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"` // optional — disconnect one site/workspace; empty disconnects all
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DisconnectRequest) Reset() {
+	*x = DisconnectRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DisconnectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DisconnectRequest) ProtoMessage() {}
+
+func (x *DisconnectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DisconnectRequest.ProtoReflect.Descriptor instead.
+func (*DisconnectRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DisconnectRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *DisconnectRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type SelectWorkspaceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"` // "" | "all" | a specific workspace id
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SelectWorkspaceRequest) Reset() {
+	*x = SelectWorkspaceRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SelectWorkspaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SelectWorkspaceRequest) ProtoMessage() {}
+
+func (x *SelectWorkspaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SelectWorkspaceRequest.ProtoReflect.Descriptor instead.
+func (*SelectWorkspaceRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SelectWorkspaceRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *SelectWorkspaceRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type GetConnectionStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetConnectionStatusRequest) Reset() {
+	*x = GetConnectionStatusRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConnectionStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConnectionStatusRequest) ProtoMessage() {}
+
+func (x *GetConnectionStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConnectionStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetConnectionStatusRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetConnectionStatusRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+type TestConnectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"` // optional
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestConnectionRequest) Reset() {
+	*x = TestConnectionRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestConnectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestConnectionRequest) ProtoMessage() {}
+
+func (x *TestConnectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestConnectionRequest.ProtoReflect.Descriptor instead.
+func (*TestConnectionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TestConnectionRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *TestConnectionRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type TestConnectionResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"` // set when ok is false
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestConnectionResult) Reset() {
+	*x = TestConnectionResult{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestConnectionResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestConnectionResult) ProtoMessage() {}
+
+func (x *TestConnectionResult) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestConnectionResult.ProtoReflect.Descriptor instead.
+func (*TestConnectionResult) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TestConnectionResult) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *TestConnectionResult) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type Issue struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Fields 1-4 keep their original wire numbers/names from the baseline
+	// Issue{id,title,state,url} message — buf breaking-verified: no existing
+	// caller's wire format changes. Every new field below is appended at a
+	// previously-unused number (5+), not interleaved among the original four.
+	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title               string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	State               string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"` // kept for back-compat with existing callers
+	Url                 string                 `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`
+	ProviderIssueId     string                 `protobuf:"bytes,5,opt,name=provider_issue_id,json=providerIssueId,proto3" json:"provider_issue_id,omitempty"` // raw provider id/key, for round-tripping mutations
+	Key                 string                 `protobuf:"bytes,6,opt,name=key,proto3" json:"key,omitempty"`                                                  // "PROJ-123" (Jira) / "ENG-42" (Linear identifier)
+	DescriptionMarkdown string                 `protobuf:"bytes,7,opt,name=description_markdown,json=descriptionMarkdown,proto3" json:"description_markdown,omitempty"`
+	WorkflowState       *WorkflowState         `protobuf:"bytes,8,opt,name=workflow_state,json=workflowState,proto3" json:"workflow_state,omitempty"`
+	Project             *Project               `protobuf:"bytes,9,opt,name=project,proto3" json:"project,omitempty"`
+	IssueType           *IssueType             `protobuf:"bytes,10,opt,name=issue_type,json=issueType,proto3" json:"issue_type,omitempty"` // Jira only; unset for Linear
+	Labels              []string               `protobuf:"bytes,11,rep,name=labels,proto3" json:"labels,omitempty"`
+	Assignee            *UserRef               `protobuf:"bytes,12,opt,name=assignee,proto3" json:"assignee,omitempty"`
+	Reporter            *UserRef               `protobuf:"bytes,13,opt,name=reporter,proto3" json:"reporter,omitempty"` // Jira only
+	Priority            *Priority              `protobuf:"bytes,14,opt,name=priority,proto3" json:"priority,omitempty"`
+	CustomFieldsJson    string                 `protobuf:"bytes,15,opt,name=custom_fields_json,json=customFieldsJson,proto3" json:"custom_fields_json,omitempty"` // JSON-encoded map — Jira create/edit custom fields
+	CreatedAt           *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt           *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
 func (x *Issue) Reset() {
 	*x = Issue{}
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[0]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -94,7 +596,7 @@ func (x *Issue) String() string {
 func (*Issue) ProtoMessage() {}
 
 func (x *Issue) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[0]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -107,7 +609,7 @@ func (x *Issue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Issue.ProtoReflect.Descriptor instead.
 func (*Issue) Descriptor() ([]byte, []int) {
-	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{0}
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Issue) GetId() string {
@@ -138,18 +640,497 @@ func (x *Issue) GetUrl() string {
 	return ""
 }
 
-type ListIssuesRequest struct {
+func (x *Issue) GetProviderIssueId() string {
+	if x != nil {
+		return x.ProviderIssueId
+	}
+	return ""
+}
+
+func (x *Issue) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *Issue) GetDescriptionMarkdown() string {
+	if x != nil {
+		return x.DescriptionMarkdown
+	}
+	return ""
+}
+
+func (x *Issue) GetWorkflowState() *WorkflowState {
+	if x != nil {
+		return x.WorkflowState
+	}
+	return nil
+}
+
+func (x *Issue) GetProject() *Project {
+	if x != nil {
+		return x.Project
+	}
+	return nil
+}
+
+func (x *Issue) GetIssueType() *IssueType {
+	if x != nil {
+		return x.IssueType
+	}
+	return nil
+}
+
+func (x *Issue) GetLabels() []string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
+func (x *Issue) GetAssignee() *UserRef {
+	if x != nil {
+		return x.Assignee
+	}
+	return nil
+}
+
+func (x *Issue) GetReporter() *UserRef {
+	if x != nil {
+		return x.Reporter
+	}
+	return nil
+}
+
+func (x *Issue) GetPriority() *Priority {
+	if x != nil {
+		return x.Priority
+	}
+	return nil
+}
+
+func (x *Issue) GetCustomFieldsJson() string {
+	if x != nil {
+		return x.CustomFieldsJson
+	}
+	return ""
+}
+
+func (x *Issue) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Issue) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type Project struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
-	ProjectKey    string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Project) Reset() {
+	*x = Project{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Project) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Project) ProtoMessage() {}
+
+func (x *Project) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Project.ProtoReflect.Descriptor instead.
+func (*Project) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Project) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Project) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *Project) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Project) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type IssueType struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Subtask       bool                   `protobuf:"varint,3,opt,name=subtask,proto3" json:"subtask,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IssueType) Reset() {
+	*x = IssueType{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IssueType) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IssueType) ProtoMessage() {}
+
+func (x *IssueType) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IssueType.ProtoReflect.Descriptor instead.
+func (*IssueType) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *IssueType) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *IssueType) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *IssueType) GetSubtask() bool {
+	if x != nil {
+		return x.Subtask
+	}
+	return false
+}
+
+type WorkflowState struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Category      string                 `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkflowState) Reset() {
+	*x = WorkflowState{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkflowState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkflowState) ProtoMessage() {}
+
+func (x *WorkflowState) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkflowState.ProtoReflect.Descriptor instead.
+func (*WorkflowState) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *WorkflowState) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *WorkflowState) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *WorkflowState) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+type UserRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	AvatarUrl     string                 `protobuf:"bytes,4,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserRef) Reset() {
+	*x = UserRef{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserRef) ProtoMessage() {}
+
+func (x *UserRef) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserRef.ProtoReflect.Descriptor instead.
+func (*UserRef) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *UserRef) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UserRef) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *UserRef) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *UserRef) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+type Priority struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Priority) Reset() {
+	*x = Priority{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Priority) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Priority) ProtoMessage() {}
+
+func (x *Priority) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Priority.ProtoReflect.Descriptor instead.
+func (*Priority) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *Priority) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Priority) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type IssueComment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	BodyMarkdown  string                 `protobuf:"bytes,2,opt,name=body_markdown,json=bodyMarkdown,proto3" json:"body_markdown,omitempty"`
+	Author        *UserRef               `protobuf:"bytes,3,opt,name=author,proto3" json:"author,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IssueComment) Reset() {
+	*x = IssueComment{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IssueComment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IssueComment) ProtoMessage() {}
+
+func (x *IssueComment) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IssueComment.ProtoReflect.Descriptor instead.
+func (*IssueComment) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *IssueComment) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *IssueComment) GetBodyMarkdown() string {
+	if x != nil {
+		return x.BodyMarkdown
+	}
+	return ""
+}
+
+func (x *IssueComment) GetAuthor() *UserRef {
+	if x != nil {
+		return x.Author
+	}
+	return nil
+}
+
+func (x *IssueComment) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *IssueComment) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type ListIssuesRequest struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	TenantId   string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider   IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	ProjectKey string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	// New, additive:
+	FilterJson    string `protobuf:"bytes,4,opt,name=filter_json,json=filterJson,proto3" json:"filter_json,omitempty"` // JSON-encoded provider-specific filter object
+	Limit         int32  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	WorkspaceId   string `protobuf:"bytes,6,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"` // site/workspace selector
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListIssuesRequest) Reset() {
 	*x = ListIssuesRequest{}
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[1]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -161,7 +1142,7 @@ func (x *ListIssuesRequest) String() string {
 func (*ListIssuesRequest) ProtoMessage() {}
 
 func (x *ListIssuesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[1]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -174,7 +1155,7 @@ func (x *ListIssuesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIssuesRequest.ProtoReflect.Descriptor instead.
 func (*ListIssuesRequest) Descriptor() ([]byte, []int) {
-	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{1}
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListIssuesRequest) GetTenantId() string {
@@ -198,6 +1179,27 @@ func (x *ListIssuesRequest) GetProjectKey() string {
 	return ""
 }
 
+func (x *ListIssuesRequest) GetFilterJson() string {
+	if x != nil {
+		return x.FilterJson
+	}
+	return ""
+}
+
+func (x *ListIssuesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListIssuesRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
 type ListIssuesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Issues        []*Issue               `protobuf:"bytes,1,rep,name=issues,proto3" json:"issues,omitempty"`
@@ -207,7 +1209,7 @@ type ListIssuesResponse struct {
 
 func (x *ListIssuesResponse) Reset() {
 	*x = ListIssuesResponse{}
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[2]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -219,7 +1221,7 @@ func (x *ListIssuesResponse) String() string {
 func (*ListIssuesResponse) ProtoMessage() {}
 
 func (x *ListIssuesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[2]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -232,7 +1234,7 @@ func (x *ListIssuesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIssuesResponse.ProtoReflect.Descriptor instead.
 func (*ListIssuesResponse) Descriptor() ([]byte, []int) {
-	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{2}
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListIssuesResponse) GetIssues() []*Issue {
@@ -242,20 +1244,202 @@ func (x *ListIssuesResponse) GetIssues() []*Issue {
 	return nil
 }
 
-type CreateIssueRequest struct {
+type SearchIssuesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
-	ProjectKey    string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
-	Title         string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
-	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	Query         string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"` // Jira: JQL string. Linear: free-text/filter query.
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *SearchIssuesRequest) Reset() {
+	*x = SearchIssuesRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchIssuesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchIssuesRequest) ProtoMessage() {}
+
+func (x *SearchIssuesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchIssuesRequest.ProtoReflect.Descriptor instead.
+func (*SearchIssuesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *SearchIssuesRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *SearchIssuesRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchIssuesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *SearchIssuesRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type SearchIssuesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Issues        []*Issue               `protobuf:"bytes,1,rep,name=issues,proto3" json:"issues,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchIssuesResponse) Reset() {
+	*x = SearchIssuesResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchIssuesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchIssuesResponse) ProtoMessage() {}
+
+func (x *SearchIssuesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchIssuesResponse.ProtoReflect.Descriptor instead.
+func (*SearchIssuesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SearchIssuesResponse) GetIssues() []*Issue {
+	if x != nil {
+		return x.Issues
+	}
+	return nil
+}
+
+type GetIssueRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	IssueId       string                 `protobuf:"bytes,2,opt,name=issue_id,json=issueId,proto3" json:"issue_id,omitempty"` // provider_issue_id/key — see Issue.provider_issue_id
+	WorkspaceId   string                 `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIssueRequest) Reset() {
+	*x = GetIssueRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIssueRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIssueRequest) ProtoMessage() {}
+
+func (x *GetIssueRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIssueRequest.ProtoReflect.Descriptor instead.
+func (*GetIssueRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetIssueRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *GetIssueRequest) GetIssueId() string {
+	if x != nil {
+		return x.IssueId
+	}
+	return ""
+}
+
+func (x *GetIssueRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type CreateIssueRequest struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	TenantId    string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider    IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	ProjectKey  string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	Title       string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	Description string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	// New, additive:
+	IssueTypeId      string   `protobuf:"bytes,6,opt,name=issue_type_id,json=issueTypeId,proto3" json:"issue_type_id,omitempty"` // Jira
+	AssigneeId       string   `protobuf:"bytes,7,opt,name=assignee_id,json=assigneeId,proto3" json:"assignee_id,omitempty"`
+	PriorityId       string   `protobuf:"bytes,8,opt,name=priority_id,json=priorityId,proto3" json:"priority_id,omitempty"`
+	LabelIds         []string `protobuf:"bytes,9,rep,name=label_ids,json=labelIds,proto3" json:"label_ids,omitempty"`
+	ParentIssueId    string   `protobuf:"bytes,10,opt,name=parent_issue_id,json=parentIssueId,proto3" json:"parent_issue_id,omitempty"`          // Linear sub-issue
+	CustomFieldsJson string   `protobuf:"bytes,11,opt,name=custom_fields_json,json=customFieldsJson,proto3" json:"custom_fields_json,omitempty"` // arbitrary Jira create-field bag, keyed by field key
+	WorkspaceId      string   `protobuf:"bytes,12,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	TeamId           string   `protobuf:"bytes,13,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"`    // Linear: replaces project_key as the primary grouping
+	StateId          string   `protobuf:"bytes,14,opt,name=state_id,json=stateId,proto3" json:"state_id,omitempty"` // Linear: initial workflow state, no Jira equivalent (Jira issues start in a fixed default status)
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
 func (x *CreateIssueRequest) Reset() {
 	*x = CreateIssueRequest{}
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[3]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +1451,7 @@ func (x *CreateIssueRequest) String() string {
 func (*CreateIssueRequest) ProtoMessage() {}
 
 func (x *CreateIssueRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[3]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +1464,7 @@ func (x *CreateIssueRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateIssueRequest.ProtoReflect.Descriptor instead.
 func (*CreateIssueRequest) Descriptor() ([]byte, []int) {
-	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{3}
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CreateIssueRequest) GetTenantId() string {
@@ -318,6 +1502,69 @@ func (x *CreateIssueRequest) GetDescription() string {
 	return ""
 }
 
+func (x *CreateIssueRequest) GetIssueTypeId() string {
+	if x != nil {
+		return x.IssueTypeId
+	}
+	return ""
+}
+
+func (x *CreateIssueRequest) GetAssigneeId() string {
+	if x != nil {
+		return x.AssigneeId
+	}
+	return ""
+}
+
+func (x *CreateIssueRequest) GetPriorityId() string {
+	if x != nil {
+		return x.PriorityId
+	}
+	return ""
+}
+
+func (x *CreateIssueRequest) GetLabelIds() []string {
+	if x != nil {
+		return x.LabelIds
+	}
+	return nil
+}
+
+func (x *CreateIssueRequest) GetParentIssueId() string {
+	if x != nil {
+		return x.ParentIssueId
+	}
+	return ""
+}
+
+func (x *CreateIssueRequest) GetCustomFieldsJson() string {
+	if x != nil {
+		return x.CustomFieldsJson
+	}
+	return ""
+}
+
+func (x *CreateIssueRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *CreateIssueRequest) GetTeamId() string {
+	if x != nil {
+		return x.TeamId
+	}
+	return ""
+}
+
+func (x *CreateIssueRequest) GetStateId() string {
+	if x != nil {
+		return x.StateId
+	}
+	return ""
+}
+
 type CreateIssueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Issue         *Issue                 `protobuf:"bytes,1,opt,name=issue,proto3" json:"issue,omitempty"`
@@ -327,7 +1574,7 @@ type CreateIssueResponse struct {
 
 func (x *CreateIssueResponse) Reset() {
 	*x = CreateIssueResponse{}
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[4]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -339,7 +1586,7 @@ func (x *CreateIssueResponse) String() string {
 func (*CreateIssueResponse) ProtoMessage() {}
 
 func (x *CreateIssueResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[4]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -352,12 +1599,2013 @@ func (x *CreateIssueResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateIssueResponse.ProtoReflect.Descriptor instead.
 func (*CreateIssueResponse) Descriptor() ([]byte, []int) {
-	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{4}
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *CreateIssueResponse) GetIssue() *Issue {
 	if x != nil {
 		return x.Issue
+	}
+	return nil
+}
+
+type UpdateIssueRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Provider         IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	IssueId          string                 `protobuf:"bytes,2,opt,name=issue_id,json=issueId,proto3" json:"issue_id,omitempty"`
+	Title            string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`             // empty = leave unchanged
+	Description      string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"` // empty = leave unchanged
+	AssigneeId       string                 `protobuf:"bytes,5,opt,name=assignee_id,json=assigneeId,proto3" json:"assignee_id,omitempty"`
+	PriorityId       string                 `protobuf:"bytes,6,opt,name=priority_id,json=priorityId,proto3" json:"priority_id,omitempty"`
+	LabelIds         []string               `protobuf:"bytes,7,rep,name=label_ids,json=labelIds,proto3" json:"label_ids,omitempty"`
+	WorkflowStateId  string                 `protobuf:"bytes,8,opt,name=workflow_state_id,json=workflowStateId,proto3" json:"workflow_state_id,omitempty"` // == jira.updateIssue's transition target / linear's stateId
+	CustomFieldsJson string                 `protobuf:"bytes,9,opt,name=custom_fields_json,json=customFieldsJson,proto3" json:"custom_fields_json,omitempty"`
+	WorkspaceId      string                 `protobuf:"bytes,10,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UpdateIssueRequest) Reset() {
+	*x = UpdateIssueRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateIssueRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateIssueRequest) ProtoMessage() {}
+
+func (x *UpdateIssueRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateIssueRequest.ProtoReflect.Descriptor instead.
+func (*UpdateIssueRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *UpdateIssueRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *UpdateIssueRequest) GetIssueId() string {
+	if x != nil {
+		return x.IssueId
+	}
+	return ""
+}
+
+func (x *UpdateIssueRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *UpdateIssueRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *UpdateIssueRequest) GetAssigneeId() string {
+	if x != nil {
+		return x.AssigneeId
+	}
+	return ""
+}
+
+func (x *UpdateIssueRequest) GetPriorityId() string {
+	if x != nil {
+		return x.PriorityId
+	}
+	return ""
+}
+
+func (x *UpdateIssueRequest) GetLabelIds() []string {
+	if x != nil {
+		return x.LabelIds
+	}
+	return nil
+}
+
+func (x *UpdateIssueRequest) GetWorkflowStateId() string {
+	if x != nil {
+		return x.WorkflowStateId
+	}
+	return ""
+}
+
+func (x *UpdateIssueRequest) GetCustomFieldsJson() string {
+	if x != nil {
+		return x.CustomFieldsJson
+	}
+	return ""
+}
+
+func (x *UpdateIssueRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type AddIssueCommentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	IssueId       string                 `protobuf:"bytes,2,opt,name=issue_id,json=issueId,proto3" json:"issue_id,omitempty"`
+	BodyMarkdown  string                 `protobuf:"bytes,3,opt,name=body_markdown,json=bodyMarkdown,proto3" json:"body_markdown,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddIssueCommentRequest) Reset() {
+	*x = AddIssueCommentRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddIssueCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddIssueCommentRequest) ProtoMessage() {}
+
+func (x *AddIssueCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddIssueCommentRequest.ProtoReflect.Descriptor instead.
+func (*AddIssueCommentRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *AddIssueCommentRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *AddIssueCommentRequest) GetIssueId() string {
+	if x != nil {
+		return x.IssueId
+	}
+	return ""
+}
+
+func (x *AddIssueCommentRequest) GetBodyMarkdown() string {
+	if x != nil {
+		return x.BodyMarkdown
+	}
+	return ""
+}
+
+func (x *AddIssueCommentRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListIssueCommentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	IssueId       string                 `protobuf:"bytes,2,opt,name=issue_id,json=issueId,proto3" json:"issue_id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIssueCommentsRequest) Reset() {
+	*x = ListIssueCommentsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIssueCommentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIssueCommentsRequest) ProtoMessage() {}
+
+func (x *ListIssueCommentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIssueCommentsRequest.ProtoReflect.Descriptor instead.
+func (*ListIssueCommentsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListIssueCommentsRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *ListIssueCommentsRequest) GetIssueId() string {
+	if x != nil {
+		return x.IssueId
+	}
+	return ""
+}
+
+func (x *ListIssueCommentsRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListIssueCommentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Comments      []*IssueComment        `protobuf:"bytes,1,rep,name=comments,proto3" json:"comments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIssueCommentsResponse) Reset() {
+	*x = ListIssueCommentsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIssueCommentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIssueCommentsResponse) ProtoMessage() {}
+
+func (x *ListIssueCommentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIssueCommentsResponse.ProtoReflect.Descriptor instead.
+func (*ListIssueCommentsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ListIssueCommentsResponse) GetComments() []*IssueComment {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+type ListProjectsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProjectsRequest) Reset() {
+	*x = ListProjectsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProjectsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProjectsRequest) ProtoMessage() {}
+
+func (x *ListProjectsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProjectsRequest.ProtoReflect.Descriptor instead.
+func (*ListProjectsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ListProjectsRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *ListProjectsRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListProjectsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Projects      []*Project             `protobuf:"bytes,1,rep,name=projects,proto3" json:"projects,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProjectsResponse) Reset() {
+	*x = ListProjectsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProjectsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProjectsResponse) ProtoMessage() {}
+
+func (x *ListProjectsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProjectsResponse.ProtoReflect.Descriptor instead.
+func (*ListProjectsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ListProjectsResponse) GetProjects() []*Project {
+	if x != nil {
+		return x.Projects
+	}
+	return nil
+}
+
+type ListIssueTypesRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProjectIdOrKey string                 `protobuf:"bytes,1,opt,name=project_id_or_key,json=projectIdOrKey,proto3" json:"project_id_or_key,omitempty"`
+	WorkspaceId    string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListIssueTypesRequest) Reset() {
+	*x = ListIssueTypesRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIssueTypesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIssueTypesRequest) ProtoMessage() {}
+
+func (x *ListIssueTypesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIssueTypesRequest.ProtoReflect.Descriptor instead.
+func (*ListIssueTypesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ListIssueTypesRequest) GetProjectIdOrKey() string {
+	if x != nil {
+		return x.ProjectIdOrKey
+	}
+	return ""
+}
+
+func (x *ListIssueTypesRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListIssueTypesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IssueTypes    []*IssueType           `protobuf:"bytes,1,rep,name=issue_types,json=issueTypes,proto3" json:"issue_types,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIssueTypesResponse) Reset() {
+	*x = ListIssueTypesResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIssueTypesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIssueTypesResponse) ProtoMessage() {}
+
+func (x *ListIssueTypesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIssueTypesResponse.ProtoReflect.Descriptor instead.
+func (*ListIssueTypesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ListIssueTypesResponse) GetIssueTypes() []*IssueType {
+	if x != nil {
+		return x.IssueTypes
+	}
+	return nil
+}
+
+type CreateField struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Key               string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Name              string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Required          bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
+	SchemaType        string                 `protobuf:"bytes,4,opt,name=schema_type,json=schemaType,proto3" json:"schema_type,omitempty"`
+	SchemaItems       string                 `protobuf:"bytes,5,opt,name=schema_items,json=schemaItems,proto3" json:"schema_items,omitempty"`
+	SchemaCustom      string                 `protobuf:"bytes,6,opt,name=schema_custom,json=schemaCustom,proto3" json:"schema_custom,omitempty"`
+	AllowedValuesJson string                 `protobuf:"bytes,7,opt,name=allowed_values_json,json=allowedValuesJson,proto3" json:"allowed_values_json,omitempty"` // JSON array — heterogeneous per-field shape, not worth a message
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *CreateField) Reset() {
+	*x = CreateField{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateField) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateField) ProtoMessage() {}
+
+func (x *CreateField) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateField.ProtoReflect.Descriptor instead.
+func (*CreateField) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *CreateField) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *CreateField) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateField) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *CreateField) GetSchemaType() string {
+	if x != nil {
+		return x.SchemaType
+	}
+	return ""
+}
+
+func (x *CreateField) GetSchemaItems() string {
+	if x != nil {
+		return x.SchemaItems
+	}
+	return ""
+}
+
+func (x *CreateField) GetSchemaCustom() string {
+	if x != nil {
+		return x.SchemaCustom
+	}
+	return ""
+}
+
+func (x *CreateField) GetAllowedValuesJson() string {
+	if x != nil {
+		return x.AllowedValuesJson
+	}
+	return ""
+}
+
+type ListCreateFieldsRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProjectIdOrKey string                 `protobuf:"bytes,1,opt,name=project_id_or_key,json=projectIdOrKey,proto3" json:"project_id_or_key,omitempty"`
+	IssueTypeId    string                 `protobuf:"bytes,2,opt,name=issue_type_id,json=issueTypeId,proto3" json:"issue_type_id,omitempty"`
+	WorkspaceId    string                 `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListCreateFieldsRequest) Reset() {
+	*x = ListCreateFieldsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCreateFieldsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCreateFieldsRequest) ProtoMessage() {}
+
+func (x *ListCreateFieldsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCreateFieldsRequest.ProtoReflect.Descriptor instead.
+func (*ListCreateFieldsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ListCreateFieldsRequest) GetProjectIdOrKey() string {
+	if x != nil {
+		return x.ProjectIdOrKey
+	}
+	return ""
+}
+
+func (x *ListCreateFieldsRequest) GetIssueTypeId() string {
+	if x != nil {
+		return x.IssueTypeId
+	}
+	return ""
+}
+
+func (x *ListCreateFieldsRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListCreateFieldsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Fields        []*CreateField         `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCreateFieldsResponse) Reset() {
+	*x = ListCreateFieldsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCreateFieldsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCreateFieldsResponse) ProtoMessage() {}
+
+func (x *ListCreateFieldsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCreateFieldsResponse.ProtoReflect.Descriptor instead.
+func (*ListCreateFieldsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ListCreateFieldsResponse) GetFields() []*CreateField {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+type ListAssignableUsersRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Provider       IssueProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	ProjectIdOrKey string                 `protobuf:"bytes,2,opt,name=project_id_or_key,json=projectIdOrKey,proto3" json:"project_id_or_key,omitempty"` // Jira
+	IssueId        string                 `protobuf:"bytes,3,opt,name=issue_id,json=issueId,proto3" json:"issue_id,omitempty"`                          // optional — narrows to users assignable to this specific issue
+	WorkspaceId    string                 `protobuf:"bytes,4,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListAssignableUsersRequest) Reset() {
+	*x = ListAssignableUsersRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAssignableUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAssignableUsersRequest) ProtoMessage() {}
+
+func (x *ListAssignableUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAssignableUsersRequest.ProtoReflect.Descriptor instead.
+func (*ListAssignableUsersRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ListAssignableUsersRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *ListAssignableUsersRequest) GetProjectIdOrKey() string {
+	if x != nil {
+		return x.ProjectIdOrKey
+	}
+	return ""
+}
+
+func (x *ListAssignableUsersRequest) GetIssueId() string {
+	if x != nil {
+		return x.IssueId
+	}
+	return ""
+}
+
+func (x *ListAssignableUsersRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListAssignableUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*UserRef             `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAssignableUsersResponse) Reset() {
+	*x = ListAssignableUsersResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAssignableUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAssignableUsersResponse) ProtoMessage() {}
+
+func (x *ListAssignableUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAssignableUsersResponse.ProtoReflect.Descriptor instead.
+func (*ListAssignableUsersResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ListAssignableUsersResponse) GetUsers() []*UserRef {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+type ListPrioritiesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPrioritiesRequest) Reset() {
+	*x = ListPrioritiesRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPrioritiesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPrioritiesRequest) ProtoMessage() {}
+
+func (x *ListPrioritiesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPrioritiesRequest.ProtoReflect.Descriptor instead.
+func (*ListPrioritiesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ListPrioritiesRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListPrioritiesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Priorities    []*Priority            `protobuf:"bytes,1,rep,name=priorities,proto3" json:"priorities,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPrioritiesResponse) Reset() {
+	*x = ListPrioritiesResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPrioritiesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPrioritiesResponse) ProtoMessage() {}
+
+func (x *ListPrioritiesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPrioritiesResponse.ProtoReflect.Descriptor instead.
+func (*ListPrioritiesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ListPrioritiesResponse) GetPriorities() []*Priority {
+	if x != nil {
+		return x.Priorities
+	}
+	return nil
+}
+
+type Transition struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	To            *WorkflowState         `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Transition) Reset() {
+	*x = Transition{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Transition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Transition) ProtoMessage() {}
+
+func (x *Transition) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Transition.ProtoReflect.Descriptor instead.
+func (*Transition) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *Transition) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Transition) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Transition) GetTo() *WorkflowState {
+	if x != nil {
+		return x.To
+	}
+	return nil
+}
+
+type ListTransitionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IssueId       string                 `protobuf:"bytes,1,opt,name=issue_id,json=issueId,proto3" json:"issue_id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTransitionsRequest) Reset() {
+	*x = ListTransitionsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTransitionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTransitionsRequest) ProtoMessage() {}
+
+func (x *ListTransitionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTransitionsRequest.ProtoReflect.Descriptor instead.
+func (*ListTransitionsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ListTransitionsRequest) GetIssueId() string {
+	if x != nil {
+		return x.IssueId
+	}
+	return ""
+}
+
+func (x *ListTransitionsRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListTransitionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Transitions   []*Transition          `protobuf:"bytes,1,rep,name=transitions,proto3" json:"transitions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTransitionsResponse) Reset() {
+	*x = ListTransitionsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTransitionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTransitionsResponse) ProtoMessage() {}
+
+func (x *ListTransitionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTransitionsResponse.ProtoReflect.Descriptor instead.
+func (*ListTransitionsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ListTransitionsResponse) GetTransitions() []*Transition {
+	if x != nil {
+		return x.Transitions
+	}
+	return nil
+}
+
+type GetProjectStatusOrderRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProjectIdOrKey string                 `protobuf:"bytes,1,opt,name=project_id_or_key,json=projectIdOrKey,proto3" json:"project_id_or_key,omitempty"`
+	WorkspaceId    string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetProjectStatusOrderRequest) Reset() {
+	*x = GetProjectStatusOrderRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectStatusOrderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectStatusOrderRequest) ProtoMessage() {}
+
+func (x *GetProjectStatusOrderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectStatusOrderRequest.ProtoReflect.Descriptor instead.
+func (*GetProjectStatusOrderRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *GetProjectStatusOrderRequest) GetProjectIdOrKey() string {
+	if x != nil {
+		return x.ProjectIdOrKey
+	}
+	return ""
+}
+
+func (x *GetProjectStatusOrderRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type GetProjectStatusOrderResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// status_ids_by_column mirrors JiraProjectStatusOrder.statusIdsByColumn —
+	// Jira's per-project Kanban column grouping, a list of columns, each a
+	// list of status ids in that column.
+	StatusIdsByColumn []*StatusIDList `protobuf:"bytes,1,rep,name=status_ids_by_column,json=statusIdsByColumn,proto3" json:"status_ids_by_column,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *GetProjectStatusOrderResponse) Reset() {
+	*x = GetProjectStatusOrderResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectStatusOrderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectStatusOrderResponse) ProtoMessage() {}
+
+func (x *GetProjectStatusOrderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectStatusOrderResponse.ProtoReflect.Descriptor instead.
+func (*GetProjectStatusOrderResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *GetProjectStatusOrderResponse) GetStatusIdsByColumn() []*StatusIDList {
+	if x != nil {
+		return x.StatusIdsByColumn
+	}
+	return nil
+}
+
+type StatusIDList struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StatusIds     []string               `protobuf:"bytes,1,rep,name=status_ids,json=statusIds,proto3" json:"status_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StatusIDList) Reset() {
+	*x = StatusIDList{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StatusIDList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StatusIDList) ProtoMessage() {}
+
+func (x *StatusIDList) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StatusIDList.ProtoReflect.Descriptor instead.
+func (*StatusIDList) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *StatusIDList) GetStatusIds() []string {
+	if x != nil {
+		return x.StatusIds
+	}
+	return nil
+}
+
+// Team is deliberately its own message, not a repurposed Project — see
+// SOL-016's "genuinely diverges" table: a Team owns workflow states
+// (teamStates), labels (teamLabels), and membership (teamMembers), none of
+// which a Jira Project has in this proto.
+type Team struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Key           string                 `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"` // Linear's short team key, e.g. "ENG"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Team) Reset() {
+	*x = Team{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Team) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Team) ProtoMessage() {}
+
+func (x *Team) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Team.ProtoReflect.Descriptor instead.
+func (*Team) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *Team) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Team) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *Team) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Team) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+type Label struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Color         string                 `protobuf:"bytes,3,opt,name=color,proto3" json:"color,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Label) Reset() {
+	*x = Label{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Label) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Label) ProtoMessage() {}
+
+func (x *Label) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Label.ProtoReflect.Descriptor instead.
+func (*Label) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *Label) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Label) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Label) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
+}
+
+type Member struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	AvatarUrl     string                 `protobuf:"bytes,3,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Member) Reset() {
+	*x = Member{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Member) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Member) ProtoMessage() {}
+
+func (x *Member) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Member.ProtoReflect.Descriptor instead.
+func (*Member) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *Member) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Member) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *Member) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+// CustomView has no Jira analog — Linear-only concept, not force-fit into
+// any shared message (see SOL-016's rationale table).
+type CustomView struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Model         string                 `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`                 // "issue" | "project"
+	TeamId        string                 `protobuf:"bytes,5,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"` // optional — a view can be workspace-scoped or team-scoped
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CustomView) Reset() {
+	*x = CustomView{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CustomView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CustomView) ProtoMessage() {}
+
+func (x *CustomView) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CustomView.ProtoReflect.Descriptor instead.
+func (*CustomView) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *CustomView) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CustomView) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *CustomView) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CustomView) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *CustomView) GetTeamId() string {
+	if x != nil {
+		return x.TeamId
+	}
+	return ""
+}
+
+type CreateProjectRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	TeamId        string                 `protobuf:"bytes,2,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"` // Linear projects are created within a team
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateProjectRequest) Reset() {
+	*x = CreateProjectRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateProjectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateProjectRequest) ProtoMessage() {}
+
+func (x *CreateProjectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateProjectRequest.ProtoReflect.Descriptor instead.
+func (*CreateProjectRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *CreateProjectRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+func (x *CreateProjectRequest) GetTeamId() string {
+	if x != nil {
+		return x.TeamId
+	}
+	return ""
+}
+
+func (x *CreateProjectRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateProjectRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+type GetProjectRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProjectRequest) Reset() {
+	*x = GetProjectRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectRequest) ProtoMessage() {}
+
+func (x *GetProjectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectRequest.ProtoReflect.Descriptor instead.
+func (*GetProjectRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *GetProjectRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *GetProjectRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListTeamsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkspaceId   string                 `protobuf:"bytes,1,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamsRequest) Reset() {
+	*x = ListTeamsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamsRequest) ProtoMessage() {}
+
+func (x *ListTeamsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamsRequest.ProtoReflect.Descriptor instead.
+func (*ListTeamsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *ListTeamsRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListTeamsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Teams         []*Team                `protobuf:"bytes,1,rep,name=teams,proto3" json:"teams,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamsResponse) Reset() {
+	*x = ListTeamsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamsResponse) ProtoMessage() {}
+
+func (x *ListTeamsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamsResponse.ProtoReflect.Descriptor instead.
+func (*ListTeamsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *ListTeamsResponse) GetTeams() []*Team {
+	if x != nil {
+		return x.Teams
+	}
+	return nil
+}
+
+type ListTeamLabelsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TeamId        string                 `protobuf:"bytes,1,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamLabelsRequest) Reset() {
+	*x = ListTeamLabelsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamLabelsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamLabelsRequest) ProtoMessage() {}
+
+func (x *ListTeamLabelsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamLabelsRequest.ProtoReflect.Descriptor instead.
+func (*ListTeamLabelsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *ListTeamLabelsRequest) GetTeamId() string {
+	if x != nil {
+		return x.TeamId
+	}
+	return ""
+}
+
+func (x *ListTeamLabelsRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListTeamLabelsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Labels        []*Label               `protobuf:"bytes,1,rep,name=labels,proto3" json:"labels,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamLabelsResponse) Reset() {
+	*x = ListTeamLabelsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamLabelsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamLabelsResponse) ProtoMessage() {}
+
+func (x *ListTeamLabelsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamLabelsResponse.ProtoReflect.Descriptor instead.
+func (*ListTeamLabelsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *ListTeamLabelsResponse) GetLabels() []*Label {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
+type ListTeamMembersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TeamId        string                 `protobuf:"bytes,1,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamMembersRequest) Reset() {
+	*x = ListTeamMembersRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamMembersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamMembersRequest) ProtoMessage() {}
+
+func (x *ListTeamMembersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamMembersRequest.ProtoReflect.Descriptor instead.
+func (*ListTeamMembersRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *ListTeamMembersRequest) GetTeamId() string {
+	if x != nil {
+		return x.TeamId
+	}
+	return ""
+}
+
+func (x *ListTeamMembersRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListTeamMembersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Members       []*Member              `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamMembersResponse) Reset() {
+	*x = ListTeamMembersResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamMembersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamMembersResponse) ProtoMessage() {}
+
+func (x *ListTeamMembersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamMembersResponse.ProtoReflect.Descriptor instead.
+func (*ListTeamMembersResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *ListTeamMembersResponse) GetMembers() []*Member {
+	if x != nil {
+		return x.Members
+	}
+	return nil
+}
+
+type GetCustomViewRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ViewId        string                 `protobuf:"bytes,1,opt,name=view_id,json=viewId,proto3" json:"view_id,omitempty"`
+	Model         string                 `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,3,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCustomViewRequest) Reset() {
+	*x = GetCustomViewRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCustomViewRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCustomViewRequest) ProtoMessage() {}
+
+func (x *GetCustomViewRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCustomViewRequest.ProtoReflect.Descriptor instead.
+func (*GetCustomViewRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *GetCustomViewRequest) GetViewId() string {
+	if x != nil {
+		return x.ViewId
+	}
+	return ""
+}
+
+func (x *GetCustomViewRequest) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *GetCustomViewRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListWorkflowStatesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TeamId        string                 `protobuf:"bytes,1,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"`
+	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkflowStatesRequest) Reset() {
+	*x = ListWorkflowStatesRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkflowStatesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkflowStatesRequest) ProtoMessage() {}
+
+func (x *ListWorkflowStatesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkflowStatesRequest.ProtoReflect.Descriptor instead.
+func (*ListWorkflowStatesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *ListWorkflowStatesRequest) GetTeamId() string {
+	if x != nil {
+		return x.TeamId
+	}
+	return ""
+}
+
+func (x *ListWorkflowStatesRequest) GetWorkspaceId() string {
+	if x != nil {
+		return x.WorkspaceId
+	}
+	return ""
+}
+
+type ListWorkflowStatesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	States        []*WorkflowState       `protobuf:"bytes,1,rep,name=states,proto3" json:"states,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkflowStatesResponse) Reset() {
+	*x = ListWorkflowStatesResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkflowStatesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkflowStatesResponse) ProtoMessage() {}
+
+func (x *ListWorkflowStatesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkflowStatesResponse.ProtoReflect.Descriptor instead.
+func (*ListWorkflowStatesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *ListWorkflowStatesResponse) GetStates() []*WorkflowState {
+	if x != nil {
+		return x.States
 	}
 	return nil
 }
@@ -375,7 +3623,7 @@ type LinkIssueRequest struct {
 
 func (x *LinkIssueRequest) Reset() {
 	*x = LinkIssueRequest{}
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[5]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -387,7 +3635,7 @@ func (x *LinkIssueRequest) String() string {
 func (*LinkIssueRequest) ProtoMessage() {}
 
 func (x *LinkIssueRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[5]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -400,7 +3648,7 @@ func (x *LinkIssueRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkIssueRequest.ProtoReflect.Descriptor instead.
 func (*LinkIssueRequest) Descriptor() ([]byte, []int) {
-	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{5}
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *LinkIssueRequest) GetIssueId() string {
@@ -425,7 +3673,7 @@ type LinkIssueResponse struct {
 
 func (x *LinkIssueResponse) Reset() {
 	*x = LinkIssueResponse{}
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[6]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -437,7 +3685,7 @@ func (x *LinkIssueResponse) String() string {
 func (*LinkIssueResponse) ProtoMessage() {}
 
 func (x *LinkIssueResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[6]
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -450,48 +3698,730 @@ func (x *LinkIssueResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LinkIssueResponse.ProtoReflect.Descriptor instead.
 func (*LinkIssueResponse) Descriptor() ([]byte, []int) {
-	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{6}
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{59}
+}
+
+type SetIntegrationCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
+	ConfigJson    string                 `protobuf:"bytes,4,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // optional, non-secret — e.g. Jira's baseUrl/email
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetIntegrationCredentialRequest) Reset() {
+	*x = SetIntegrationCredentialRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetIntegrationCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetIntegrationCredentialRequest) ProtoMessage() {}
+
+func (x *SetIntegrationCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetIntegrationCredentialRequest.ProtoReflect.Descriptor instead.
+func (*SetIntegrationCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *SetIntegrationCredentialRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *SetIntegrationCredentialRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *SetIntegrationCredentialRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *SetIntegrationCredentialRequest) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type SetIntegrationCredentialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetIntegrationCredentialResponse) Reset() {
+	*x = SetIntegrationCredentialResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetIntegrationCredentialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetIntegrationCredentialResponse) ProtoMessage() {}
+
+func (x *SetIntegrationCredentialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetIntegrationCredentialResponse.ProtoReflect.Descriptor instead.
+func (*SetIntegrationCredentialResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{61}
+}
+
+type GetIntegrationCredentialStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIntegrationCredentialStatusRequest) Reset() {
+	*x = GetIntegrationCredentialStatusRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIntegrationCredentialStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIntegrationCredentialStatusRequest) ProtoMessage() {}
+
+func (x *GetIntegrationCredentialStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIntegrationCredentialStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetIntegrationCredentialStatusRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *GetIntegrationCredentialStatusRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *GetIntegrationCredentialStatusRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+type GetIntegrationCredentialStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Configured    bool                   `protobuf:"varint,1,opt,name=configured,proto3" json:"configured,omitempty"`
+	ConfigJson    string                 `protobuf:"bytes,2,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIntegrationCredentialStatusResponse) Reset() {
+	*x = GetIntegrationCredentialStatusResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIntegrationCredentialStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIntegrationCredentialStatusResponse) ProtoMessage() {}
+
+func (x *GetIntegrationCredentialStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIntegrationCredentialStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetIntegrationCredentialStatusResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *GetIntegrationCredentialStatusResponse) GetConfigured() bool {
+	if x != nil {
+		return x.Configured
+	}
+	return false
+}
+
+func (x *GetIntegrationCredentialStatusResponse) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type ListIntegrationCredentialsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIntegrationCredentialsRequest) Reset() {
+	*x = ListIntegrationCredentialsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIntegrationCredentialsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIntegrationCredentialsRequest) ProtoMessage() {}
+
+func (x *ListIntegrationCredentialsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIntegrationCredentialsRequest.ProtoReflect.Descriptor instead.
+func (*ListIntegrationCredentialsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *ListIntegrationCredentialsRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+type ListIntegrationCredentialsResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ConfiguredProviders []IssueProvider        `protobuf:"varint,1,rep,packed,name=configured_providers,json=configuredProviders,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"configured_providers,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ListIntegrationCredentialsResponse) Reset() {
+	*x = ListIntegrationCredentialsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIntegrationCredentialsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIntegrationCredentialsResponse) ProtoMessage() {}
+
+func (x *ListIntegrationCredentialsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIntegrationCredentialsResponse.ProtoReflect.Descriptor instead.
+func (*ListIntegrationCredentialsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *ListIntegrationCredentialsResponse) GetConfiguredProviders() []IssueProvider {
+	if x != nil {
+		return x.ConfiguredProviders
+	}
+	return nil
+}
+
+type RevokeAuthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAuthRequest) Reset() {
+	*x = RevokeAuthRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAuthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAuthRequest) ProtoMessage() {}
+
+func (x *RevokeAuthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAuthRequest.ProtoReflect.Descriptor instead.
+func (*RevokeAuthRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *RevokeAuthRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RevokeAuthRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+type RevokeAuthResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAuthResponse) Reset() {
+	*x = RevokeAuthResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAuthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAuthResponse) ProtoMessage() {}
+
+func (x *RevokeAuthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAuthResponse.ProtoReflect.Descriptor instead.
+func (*RevokeAuthResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{67}
 }
 
 var File_orca_issuetracking_v1_issuetracking_proto protoreflect.FileDescriptor
 
 const file_orca_issuetracking_v1_issuetracking_proto_rawDesc = "" +
 	"\n" +
-	")orca/issuetracking/v1/issuetracking.proto\x12\x15orca.issuetracking.v1\"U\n" +
+	")orca/issuetracking/v1/issuetracking.proto\x12\x15orca.issuetracking.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"A\n" +
+	"\tWorkspace\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\"\xf1\x02\n" +
+	"\x10ConnectionStatus\x12\x1c\n" +
+	"\tconnected\x18\x01 \x01(\bR\tconnected\x12\x1b\n" +
+	"\tviewer_id\x18\x02 \x01(\tR\bviewerId\x12.\n" +
+	"\x13viewer_display_name\x18\x03 \x01(\tR\x11viewerDisplayName\x12!\n" +
+	"\fviewer_email\x18\x04 \x01(\tR\vviewerEmail\x12@\n" +
+	"\n" +
+	"workspaces\x18\x05 \x03(\v2 .orca.issuetracking.v1.WorkspaceR\n" +
+	"workspaces\x12.\n" +
+	"\x13active_workspace_id\x18\x06 \x01(\tR\x11activeWorkspaceId\x122\n" +
+	"\x15selected_workspace_id\x18\a \x01(\tR\x13selectedWorkspaceId\x12)\n" +
+	"\x10credential_error\x18\b \x01(\tR\x0fcredentialError\"\x99\x01\n" +
+	"\x0eConnectRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x19\n" +
+	"\bsite_url\x18\x02 \x01(\tR\asiteUrl\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
+	"\x05token\x18\x04 \x01(\tR\x05token\"x\n" +
+	"\x11DisconnectRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"}\n" +
+	"\x16SelectWorkspaceRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"^\n" +
+	"\x1aGetConnectionStatusRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\"|\n" +
+	"\x15TestConnectionRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"<\n" +
+	"\x14TestConnectionResult\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\xff\x05\n" +
 	"\x05Issue\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +
 	"\x05state\x18\x03 \x01(\tR\x05state\x12\x10\n" +
-	"\x03url\x18\x04 \x01(\tR\x03url\"\x93\x01\n" +
+	"\x03url\x18\x04 \x01(\tR\x03url\x12*\n" +
+	"\x11provider_issue_id\x18\x05 \x01(\tR\x0fproviderIssueId\x12\x10\n" +
+	"\x03key\x18\x06 \x01(\tR\x03key\x121\n" +
+	"\x14description_markdown\x18\a \x01(\tR\x13descriptionMarkdown\x12K\n" +
+	"\x0eworkflow_state\x18\b \x01(\v2$.orca.issuetracking.v1.WorkflowStateR\rworkflowState\x128\n" +
+	"\aproject\x18\t \x01(\v2\x1e.orca.issuetracking.v1.ProjectR\aproject\x12?\n" +
+	"\n" +
+	"issue_type\x18\n" +
+	" \x01(\v2 .orca.issuetracking.v1.IssueTypeR\tissueType\x12\x16\n" +
+	"\x06labels\x18\v \x03(\tR\x06labels\x12:\n" +
+	"\bassignee\x18\f \x01(\v2\x1e.orca.issuetracking.v1.UserRefR\bassignee\x12:\n" +
+	"\breporter\x18\r \x01(\v2\x1e.orca.issuetracking.v1.UserRefR\breporter\x12;\n" +
+	"\bpriority\x18\x0e \x01(\v2\x1f.orca.issuetracking.v1.PriorityR\bpriority\x12,\n" +
+	"\x12custom_fields_json\x18\x0f \x01(\tR\x10customFieldsJson\x129\n" +
+	"\n" +
+	"created_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"b\n" +
+	"\aProject\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12!\n" +
+	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\"I\n" +
+	"\tIssueType\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
+	"\asubtask\x18\x03 \x01(\bR\asubtask\"O\n" +
+	"\rWorkflowState\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
+	"\bcategory\x18\x03 \x01(\tR\bcategory\"q\n" +
+	"\aUserRef\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\x04 \x01(\tR\tavatarUrl\".\n" +
+	"\bPriority\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xf1\x01\n" +
+	"\fIssueComment\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rbody_markdown\x18\x02 \x01(\tR\fbodyMarkdown\x126\n" +
+	"\x06author\x18\x03 \x01(\v2\x1e.orca.issuetracking.v1.UserRefR\x06author\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xed\x01\n" +
 	"\x11ListIssuesRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
 	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x1f\n" +
 	"\vproject_key\x18\x03 \x01(\tR\n" +
-	"projectKey\"J\n" +
+	"projectKey\x12\x1f\n" +
+	"\vfilter_json\x18\x04 \x01(\tR\n" +
+	"filterJson\x12\x14\n" +
+	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12!\n" +
+	"\fworkspace_id\x18\x06 \x01(\tR\vworkspaceId\"J\n" +
 	"\x12ListIssuesResponse\x124\n" +
-	"\x06issues\x18\x01 \x03(\v2\x1c.orca.issuetracking.v1.IssueR\x06issues\"\xcc\x01\n" +
+	"\x06issues\x18\x01 \x03(\v2\x1c.orca.issuetracking.v1.IssueR\x06issues\"\xa6\x01\n" +
+	"\x13SearchIssuesRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12!\n" +
+	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\"L\n" +
+	"\x14SearchIssuesResponse\x124\n" +
+	"\x06issues\x18\x01 \x03(\v2\x1c.orca.issuetracking.v1.IssueR\x06issues\"\x91\x01\n" +
+	"\x0fGetIssueRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x19\n" +
+	"\bissue_id\x18\x02 \x01(\tR\aissueId\x12!\n" +
+	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\"\xfc\x03\n" +
 	"\x12CreateIssueRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
 	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x1f\n" +
 	"\vproject_key\x18\x03 \x01(\tR\n" +
 	"projectKey\x12\x14\n" +
 	"\x05title\x18\x04 \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\x05 \x01(\tR\vdescription\"I\n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\"\n" +
+	"\rissue_type_id\x18\x06 \x01(\tR\vissueTypeId\x12\x1f\n" +
+	"\vassignee_id\x18\a \x01(\tR\n" +
+	"assigneeId\x12\x1f\n" +
+	"\vpriority_id\x18\b \x01(\tR\n" +
+	"priorityId\x12\x1b\n" +
+	"\tlabel_ids\x18\t \x03(\tR\blabelIds\x12&\n" +
+	"\x0fparent_issue_id\x18\n" +
+	" \x01(\tR\rparentIssueId\x12,\n" +
+	"\x12custom_fields_json\x18\v \x01(\tR\x10customFieldsJson\x12!\n" +
+	"\fworkspace_id\x18\f \x01(\tR\vworkspaceId\x12\x17\n" +
+	"\ateam_id\x18\r \x01(\tR\x06teamId\x12\x19\n" +
+	"\bstate_id\x18\x0e \x01(\tR\astateId\"I\n" +
 	"\x13CreateIssueResponse\x122\n" +
-	"\x05issue\x18\x01 \x01(\v2\x1c.orca.issuetracking.v1.IssueR\x05issue\"F\n" +
+	"\x05issue\x18\x01 \x01(\v2\x1c.orca.issuetracking.v1.IssueR\x05issue\"\x85\x03\n" +
+	"\x12UpdateIssueRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x19\n" +
+	"\bissue_id\x18\x02 \x01(\tR\aissueId\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1f\n" +
+	"\vassignee_id\x18\x05 \x01(\tR\n" +
+	"assigneeId\x12\x1f\n" +
+	"\vpriority_id\x18\x06 \x01(\tR\n" +
+	"priorityId\x12\x1b\n" +
+	"\tlabel_ids\x18\a \x03(\tR\blabelIds\x12*\n" +
+	"\x11workflow_state_id\x18\b \x01(\tR\x0fworkflowStateId\x12,\n" +
+	"\x12custom_fields_json\x18\t \x01(\tR\x10customFieldsJson\x12!\n" +
+	"\fworkspace_id\x18\n" +
+	" \x01(\tR\vworkspaceId\"\xbd\x01\n" +
+	"\x16AddIssueCommentRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x19\n" +
+	"\bissue_id\x18\x02 \x01(\tR\aissueId\x12#\n" +
+	"\rbody_markdown\x18\x03 \x01(\tR\fbodyMarkdown\x12!\n" +
+	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\"\x9a\x01\n" +
+	"\x18ListIssueCommentsRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x19\n" +
+	"\bissue_id\x18\x02 \x01(\tR\aissueId\x12!\n" +
+	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\"\\\n" +
+	"\x19ListIssueCommentsResponse\x12?\n" +
+	"\bcomments\x18\x01 \x03(\v2#.orca.issuetracking.v1.IssueCommentR\bcomments\"z\n" +
+	"\x13ListProjectsRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"R\n" +
+	"\x14ListProjectsResponse\x12:\n" +
+	"\bprojects\x18\x01 \x03(\v2\x1e.orca.issuetracking.v1.ProjectR\bprojects\"e\n" +
+	"\x15ListIssueTypesRequest\x12)\n" +
+	"\x11project_id_or_key\x18\x01 \x01(\tR\x0eprojectIdOrKey\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"[\n" +
+	"\x16ListIssueTypesResponse\x12A\n" +
+	"\vissue_types\x18\x01 \x03(\v2 .orca.issuetracking.v1.IssueTypeR\n" +
+	"issueTypes\"\xe8\x01\n" +
+	"\vCreateField\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
+	"\brequired\x18\x03 \x01(\bR\brequired\x12\x1f\n" +
+	"\vschema_type\x18\x04 \x01(\tR\n" +
+	"schemaType\x12!\n" +
+	"\fschema_items\x18\x05 \x01(\tR\vschemaItems\x12#\n" +
+	"\rschema_custom\x18\x06 \x01(\tR\fschemaCustom\x12.\n" +
+	"\x13allowed_values_json\x18\a \x01(\tR\x11allowedValuesJson\"\x8b\x01\n" +
+	"\x17ListCreateFieldsRequest\x12)\n" +
+	"\x11project_id_or_key\x18\x01 \x01(\tR\x0eprojectIdOrKey\x12\"\n" +
+	"\rissue_type_id\x18\x02 \x01(\tR\vissueTypeId\x12!\n" +
+	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\"V\n" +
+	"\x18ListCreateFieldsResponse\x12:\n" +
+	"\x06fields\x18\x01 \x03(\v2\".orca.issuetracking.v1.CreateFieldR\x06fields\"\xc7\x01\n" +
+	"\x1aListAssignableUsersRequest\x12@\n" +
+	"\bprovider\x18\x01 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12)\n" +
+	"\x11project_id_or_key\x18\x02 \x01(\tR\x0eprojectIdOrKey\x12\x19\n" +
+	"\bissue_id\x18\x03 \x01(\tR\aissueId\x12!\n" +
+	"\fworkspace_id\x18\x04 \x01(\tR\vworkspaceId\"S\n" +
+	"\x1bListAssignableUsersResponse\x124\n" +
+	"\x05users\x18\x01 \x03(\v2\x1e.orca.issuetracking.v1.UserRefR\x05users\":\n" +
+	"\x15ListPrioritiesRequest\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"Y\n" +
+	"\x16ListPrioritiesResponse\x12?\n" +
+	"\n" +
+	"priorities\x18\x01 \x03(\v2\x1f.orca.issuetracking.v1.PriorityR\n" +
+	"priorities\"f\n" +
+	"\n" +
+	"Transition\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
+	"\x02to\x18\x03 \x01(\v2$.orca.issuetracking.v1.WorkflowStateR\x02to\"V\n" +
+	"\x16ListTransitionsRequest\x12\x19\n" +
+	"\bissue_id\x18\x01 \x01(\tR\aissueId\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"^\n" +
+	"\x17ListTransitionsResponse\x12C\n" +
+	"\vtransitions\x18\x01 \x03(\v2!.orca.issuetracking.v1.TransitionR\vtransitions\"l\n" +
+	"\x1cGetProjectStatusOrderRequest\x12)\n" +
+	"\x11project_id_or_key\x18\x01 \x01(\tR\x0eprojectIdOrKey\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"u\n" +
+	"\x1dGetProjectStatusOrderResponse\x12T\n" +
+	"\x14status_ids_by_column\x18\x01 \x03(\v2#.orca.issuetracking.v1.StatusIDListR\x11statusIdsByColumn\"-\n" +
+	"\fStatusIDList\x12\x1d\n" +
+	"\n" +
+	"status_ids\x18\x01 \x03(\tR\tstatusIds\"_\n" +
+	"\x04Team\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x10\n" +
+	"\x03key\x18\x04 \x01(\tR\x03key\"A\n" +
+	"\x05Label\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05color\x18\x03 \x01(\tR\x05color\"Z\n" +
+	"\x06Member\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\x03 \x01(\tR\tavatarUrl\"\x82\x01\n" +
+	"\n" +
+	"CustomView\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
+	"\x05model\x18\x04 \x01(\tR\x05model\x12\x17\n" +
+	"\ateam_id\x18\x05 \x01(\tR\x06teamId\"\x88\x01\n" +
+	"\x14CreateProjectRequest\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x17\n" +
+	"\ateam_id\x18\x02 \x01(\tR\x06teamId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\"U\n" +
+	"\x11GetProjectRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"5\n" +
+	"\x10ListTeamsRequest\x12!\n" +
+	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\"F\n" +
+	"\x11ListTeamsResponse\x121\n" +
+	"\x05teams\x18\x01 \x03(\v2\x1b.orca.issuetracking.v1.TeamR\x05teams\"S\n" +
+	"\x15ListTeamLabelsRequest\x12\x17\n" +
+	"\ateam_id\x18\x01 \x01(\tR\x06teamId\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"N\n" +
+	"\x16ListTeamLabelsResponse\x124\n" +
+	"\x06labels\x18\x01 \x03(\v2\x1c.orca.issuetracking.v1.LabelR\x06labels\"T\n" +
+	"\x16ListTeamMembersRequest\x12\x17\n" +
+	"\ateam_id\x18\x01 \x01(\tR\x06teamId\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"R\n" +
+	"\x17ListTeamMembersResponse\x127\n" +
+	"\amembers\x18\x01 \x03(\v2\x1d.orca.issuetracking.v1.MemberR\amembers\"h\n" +
+	"\x14GetCustomViewRequest\x12\x17\n" +
+	"\aview_id\x18\x01 \x01(\tR\x06viewId\x12\x14\n" +
+	"\x05model\x18\x02 \x01(\tR\x05model\x12!\n" +
+	"\fworkspace_id\x18\x03 \x01(\tR\vworkspaceId\"W\n" +
+	"\x19ListWorkflowStatesRequest\x12\x17\n" +
+	"\ateam_id\x18\x01 \x01(\tR\x06teamId\x12!\n" +
+	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\"Z\n" +
+	"\x1aListWorkflowStatesResponse\x12<\n" +
+	"\x06states\x18\x01 \x03(\v2$.orca.issuetracking.v1.WorkflowStateR\x06states\"F\n" +
 	"\x10LinkIssueRequest\x12\x19\n" +
 	"\bissue_id\x18\x01 \x01(\tR\aissueId\x12\x17\n" +
 	"\atask_id\x18\x02 \x01(\tR\x06taskId\"\x13\n" +
-	"\x11LinkIssueResponse*c\n" +
+	"\x11LinkIssueResponse\"\xb7\x01\n" +
+	"\x1fSetIntegrationCredentialRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\x12\x1f\n" +
+	"\vconfig_json\x18\x04 \x01(\tR\n" +
+	"configJson\"\"\n" +
+	" SetIntegrationCredentialResponse\"\x86\x01\n" +
+	"%GetIntegrationCredentialStatusRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\"i\n" +
+	"&GetIntegrationCredentialStatusResponse\x12\x1e\n" +
+	"\n" +
+	"configured\x18\x01 \x01(\bR\n" +
+	"configured\x12\x1f\n" +
+	"\vconfig_json\x18\x02 \x01(\tR\n" +
+	"configJson\"@\n" +
+	"!ListIntegrationCredentialsRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\"}\n" +
+	"\"ListIntegrationCredentialsResponse\x12W\n" +
+	"\x14configured_providers\x18\x01 \x03(\x0e2$.orca.issuetracking.v1.IssueProviderR\x13configuredProviders\"r\n" +
+	"\x11RevokeAuthRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\"\x14\n" +
+	"\x12RevokeAuthResponse*c\n" +
 	"\rIssueProvider\x12\x1e\n" +
 	"\x1aISSUE_PROVIDER_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ISSUE_PROVIDER_JIRA\x10\x01\x12\x19\n" +
-	"\x15ISSUE_PROVIDER_LINEAR\x10\x022\xbf\x02\n" +
+	"\x15ISSUE_PROVIDER_LINEAR\x10\x022\xd0\x1a\n" +
 	"\x14IssueTrackingService\x12a\n" +
 	"\n" +
 	"ListIssues\x12(.orca.issuetracking.v1.ListIssuesRequest\x1a).orca.issuetracking.v1.ListIssuesResponse\x12d\n" +
 	"\vCreateIssue\x12).orca.issuetracking.v1.CreateIssueRequest\x1a*.orca.issuetracking.v1.CreateIssueResponse\x12^\n" +
-	"\tLinkIssue\x12'.orca.issuetracking.v1.LinkIssueRequest\x1a(.orca.issuetracking.v1.LinkIssueResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1;issuetrackingv1b\x06proto3"
+	"\tLinkIssue\x12'.orca.issuetracking.v1.LinkIssueRequest\x1a(.orca.issuetracking.v1.LinkIssueResponse\x12Y\n" +
+	"\aConnect\x12%.orca.issuetracking.v1.ConnectRequest\x1a'.orca.issuetracking.v1.ConnectionStatus\x12N\n" +
+	"\n" +
+	"Disconnect\x12(.orca.issuetracking.v1.DisconnectRequest\x1a\x16.google.protobuf.Empty\x12i\n" +
+	"\x0fSelectWorkspace\x12-.orca.issuetracking.v1.SelectWorkspaceRequest\x1a'.orca.issuetracking.v1.ConnectionStatus\x12q\n" +
+	"\x13GetConnectionStatus\x121.orca.issuetracking.v1.GetConnectionStatusRequest\x1a'.orca.issuetracking.v1.ConnectionStatus\x12k\n" +
+	"\x0eTestConnection\x12,.orca.issuetracking.v1.TestConnectionRequest\x1a+.orca.issuetracking.v1.TestConnectionResult\x12g\n" +
+	"\fSearchIssues\x12*.orca.issuetracking.v1.SearchIssuesRequest\x1a+.orca.issuetracking.v1.SearchIssuesResponse\x12P\n" +
+	"\bGetIssue\x12&.orca.issuetracking.v1.GetIssueRequest\x1a\x1c.orca.issuetracking.v1.Issue\x12V\n" +
+	"\vUpdateIssue\x12).orca.issuetracking.v1.UpdateIssueRequest\x1a\x1c.orca.issuetracking.v1.Issue\x12e\n" +
+	"\x0fAddIssueComment\x12-.orca.issuetracking.v1.AddIssueCommentRequest\x1a#.orca.issuetracking.v1.IssueComment\x12v\n" +
+	"\x11ListIssueComments\x12/.orca.issuetracking.v1.ListIssueCommentsRequest\x1a0.orca.issuetracking.v1.ListIssueCommentsResponse\x12g\n" +
+	"\fListProjects\x12*.orca.issuetracking.v1.ListProjectsRequest\x1a+.orca.issuetracking.v1.ListProjectsResponse\x12m\n" +
+	"\x0eListIssueTypes\x12,.orca.issuetracking.v1.ListIssueTypesRequest\x1a-.orca.issuetracking.v1.ListIssueTypesResponse\x12s\n" +
+	"\x10ListCreateFields\x12..orca.issuetracking.v1.ListCreateFieldsRequest\x1a/.orca.issuetracking.v1.ListCreateFieldsResponse\x12|\n" +
+	"\x13ListAssignableUsers\x121.orca.issuetracking.v1.ListAssignableUsersRequest\x1a2.orca.issuetracking.v1.ListAssignableUsersResponse\x12m\n" +
+	"\x0eListPriorities\x12,.orca.issuetracking.v1.ListPrioritiesRequest\x1a-.orca.issuetracking.v1.ListPrioritiesResponse\x12p\n" +
+	"\x0fListTransitions\x12-.orca.issuetracking.v1.ListTransitionsRequest\x1a..orca.issuetracking.v1.ListTransitionsResponse\x12\x82\x01\n" +
+	"\x15GetProjectStatusOrder\x123.orca.issuetracking.v1.GetProjectStatusOrderRequest\x1a4.orca.issuetracking.v1.GetProjectStatusOrderResponse\x12\\\n" +
+	"\rCreateProject\x12+.orca.issuetracking.v1.CreateProjectRequest\x1a\x1e.orca.issuetracking.v1.Project\x12V\n" +
+	"\n" +
+	"GetProject\x12(.orca.issuetracking.v1.GetProjectRequest\x1a\x1e.orca.issuetracking.v1.Project\x12^\n" +
+	"\tListTeams\x12'.orca.issuetracking.v1.ListTeamsRequest\x1a(.orca.issuetracking.v1.ListTeamsResponse\x12m\n" +
+	"\x0eListTeamLabels\x12,.orca.issuetracking.v1.ListTeamLabelsRequest\x1a-.orca.issuetracking.v1.ListTeamLabelsResponse\x12p\n" +
+	"\x0fListTeamMembers\x12-.orca.issuetracking.v1.ListTeamMembersRequest\x1a..orca.issuetracking.v1.ListTeamMembersResponse\x12_\n" +
+	"\rGetCustomView\x12+.orca.issuetracking.v1.GetCustomViewRequest\x1a!.orca.issuetracking.v1.CustomView\x12y\n" +
+	"\x12ListWorkflowStates\x120.orca.issuetracking.v1.ListWorkflowStatesRequest\x1a1.orca.issuetracking.v1.ListWorkflowStatesResponse\x12\x8b\x01\n" +
+	"\x18SetIntegrationCredential\x126.orca.issuetracking.v1.SetIntegrationCredentialRequest\x1a7.orca.issuetracking.v1.SetIntegrationCredentialResponse\x12\x9d\x01\n" +
+	"\x1eGetIntegrationCredentialStatus\x12<.orca.issuetracking.v1.GetIntegrationCredentialStatusRequest\x1a=.orca.issuetracking.v1.GetIntegrationCredentialStatusResponse\x12\x91\x01\n" +
+	"\x1aListIntegrationCredentials\x128.orca.issuetracking.v1.ListIntegrationCredentialsRequest\x1a9.orca.issuetracking.v1.ListIntegrationCredentialsResponse\x12a\n" +
+	"\n" +
+	"RevokeAuth\x12(.orca.issuetracking.v1.RevokeAuthRequest\x1a).orca.issuetracking.v1.RevokeAuthResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1;issuetrackingv1b\x06proto3"
 
 var (
 	file_orca_issuetracking_v1_issuetracking_proto_rawDescOnce sync.Once
@@ -506,33 +4436,194 @@ func file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_issuetracking_v1_issuetracking_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_issuetracking_v1_issuetracking_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_orca_issuetracking_v1_issuetracking_proto_msgTypes = make([]protoimpl.MessageInfo, 68)
 var file_orca_issuetracking_v1_issuetracking_proto_goTypes = []any{
-	(IssueProvider)(0),          // 0: orca.issuetracking.v1.IssueProvider
-	(*Issue)(nil),               // 1: orca.issuetracking.v1.Issue
-	(*ListIssuesRequest)(nil),   // 2: orca.issuetracking.v1.ListIssuesRequest
-	(*ListIssuesResponse)(nil),  // 3: orca.issuetracking.v1.ListIssuesResponse
-	(*CreateIssueRequest)(nil),  // 4: orca.issuetracking.v1.CreateIssueRequest
-	(*CreateIssueResponse)(nil), // 5: orca.issuetracking.v1.CreateIssueResponse
-	(*LinkIssueRequest)(nil),    // 6: orca.issuetracking.v1.LinkIssueRequest
-	(*LinkIssueResponse)(nil),   // 7: orca.issuetracking.v1.LinkIssueResponse
+	(IssueProvider)(0),                             // 0: orca.issuetracking.v1.IssueProvider
+	(*Workspace)(nil),                              // 1: orca.issuetracking.v1.Workspace
+	(*ConnectionStatus)(nil),                       // 2: orca.issuetracking.v1.ConnectionStatus
+	(*ConnectRequest)(nil),                         // 3: orca.issuetracking.v1.ConnectRequest
+	(*DisconnectRequest)(nil),                      // 4: orca.issuetracking.v1.DisconnectRequest
+	(*SelectWorkspaceRequest)(nil),                 // 5: orca.issuetracking.v1.SelectWorkspaceRequest
+	(*GetConnectionStatusRequest)(nil),             // 6: orca.issuetracking.v1.GetConnectionStatusRequest
+	(*TestConnectionRequest)(nil),                  // 7: orca.issuetracking.v1.TestConnectionRequest
+	(*TestConnectionResult)(nil),                   // 8: orca.issuetracking.v1.TestConnectionResult
+	(*Issue)(nil),                                  // 9: orca.issuetracking.v1.Issue
+	(*Project)(nil),                                // 10: orca.issuetracking.v1.Project
+	(*IssueType)(nil),                              // 11: orca.issuetracking.v1.IssueType
+	(*WorkflowState)(nil),                          // 12: orca.issuetracking.v1.WorkflowState
+	(*UserRef)(nil),                                // 13: orca.issuetracking.v1.UserRef
+	(*Priority)(nil),                               // 14: orca.issuetracking.v1.Priority
+	(*IssueComment)(nil),                           // 15: orca.issuetracking.v1.IssueComment
+	(*ListIssuesRequest)(nil),                      // 16: orca.issuetracking.v1.ListIssuesRequest
+	(*ListIssuesResponse)(nil),                     // 17: orca.issuetracking.v1.ListIssuesResponse
+	(*SearchIssuesRequest)(nil),                    // 18: orca.issuetracking.v1.SearchIssuesRequest
+	(*SearchIssuesResponse)(nil),                   // 19: orca.issuetracking.v1.SearchIssuesResponse
+	(*GetIssueRequest)(nil),                        // 20: orca.issuetracking.v1.GetIssueRequest
+	(*CreateIssueRequest)(nil),                     // 21: orca.issuetracking.v1.CreateIssueRequest
+	(*CreateIssueResponse)(nil),                    // 22: orca.issuetracking.v1.CreateIssueResponse
+	(*UpdateIssueRequest)(nil),                     // 23: orca.issuetracking.v1.UpdateIssueRequest
+	(*AddIssueCommentRequest)(nil),                 // 24: orca.issuetracking.v1.AddIssueCommentRequest
+	(*ListIssueCommentsRequest)(nil),               // 25: orca.issuetracking.v1.ListIssueCommentsRequest
+	(*ListIssueCommentsResponse)(nil),              // 26: orca.issuetracking.v1.ListIssueCommentsResponse
+	(*ListProjectsRequest)(nil),                    // 27: orca.issuetracking.v1.ListProjectsRequest
+	(*ListProjectsResponse)(nil),                   // 28: orca.issuetracking.v1.ListProjectsResponse
+	(*ListIssueTypesRequest)(nil),                  // 29: orca.issuetracking.v1.ListIssueTypesRequest
+	(*ListIssueTypesResponse)(nil),                 // 30: orca.issuetracking.v1.ListIssueTypesResponse
+	(*CreateField)(nil),                            // 31: orca.issuetracking.v1.CreateField
+	(*ListCreateFieldsRequest)(nil),                // 32: orca.issuetracking.v1.ListCreateFieldsRequest
+	(*ListCreateFieldsResponse)(nil),               // 33: orca.issuetracking.v1.ListCreateFieldsResponse
+	(*ListAssignableUsersRequest)(nil),             // 34: orca.issuetracking.v1.ListAssignableUsersRequest
+	(*ListAssignableUsersResponse)(nil),            // 35: orca.issuetracking.v1.ListAssignableUsersResponse
+	(*ListPrioritiesRequest)(nil),                  // 36: orca.issuetracking.v1.ListPrioritiesRequest
+	(*ListPrioritiesResponse)(nil),                 // 37: orca.issuetracking.v1.ListPrioritiesResponse
+	(*Transition)(nil),                             // 38: orca.issuetracking.v1.Transition
+	(*ListTransitionsRequest)(nil),                 // 39: orca.issuetracking.v1.ListTransitionsRequest
+	(*ListTransitionsResponse)(nil),                // 40: orca.issuetracking.v1.ListTransitionsResponse
+	(*GetProjectStatusOrderRequest)(nil),           // 41: orca.issuetracking.v1.GetProjectStatusOrderRequest
+	(*GetProjectStatusOrderResponse)(nil),          // 42: orca.issuetracking.v1.GetProjectStatusOrderResponse
+	(*StatusIDList)(nil),                           // 43: orca.issuetracking.v1.StatusIDList
+	(*Team)(nil),                                   // 44: orca.issuetracking.v1.Team
+	(*Label)(nil),                                  // 45: orca.issuetracking.v1.Label
+	(*Member)(nil),                                 // 46: orca.issuetracking.v1.Member
+	(*CustomView)(nil),                             // 47: orca.issuetracking.v1.CustomView
+	(*CreateProjectRequest)(nil),                   // 48: orca.issuetracking.v1.CreateProjectRequest
+	(*GetProjectRequest)(nil),                      // 49: orca.issuetracking.v1.GetProjectRequest
+	(*ListTeamsRequest)(nil),                       // 50: orca.issuetracking.v1.ListTeamsRequest
+	(*ListTeamsResponse)(nil),                      // 51: orca.issuetracking.v1.ListTeamsResponse
+	(*ListTeamLabelsRequest)(nil),                  // 52: orca.issuetracking.v1.ListTeamLabelsRequest
+	(*ListTeamLabelsResponse)(nil),                 // 53: orca.issuetracking.v1.ListTeamLabelsResponse
+	(*ListTeamMembersRequest)(nil),                 // 54: orca.issuetracking.v1.ListTeamMembersRequest
+	(*ListTeamMembersResponse)(nil),                // 55: orca.issuetracking.v1.ListTeamMembersResponse
+	(*GetCustomViewRequest)(nil),                   // 56: orca.issuetracking.v1.GetCustomViewRequest
+	(*ListWorkflowStatesRequest)(nil),              // 57: orca.issuetracking.v1.ListWorkflowStatesRequest
+	(*ListWorkflowStatesResponse)(nil),             // 58: orca.issuetracking.v1.ListWorkflowStatesResponse
+	(*LinkIssueRequest)(nil),                       // 59: orca.issuetracking.v1.LinkIssueRequest
+	(*LinkIssueResponse)(nil),                      // 60: orca.issuetracking.v1.LinkIssueResponse
+	(*SetIntegrationCredentialRequest)(nil),        // 61: orca.issuetracking.v1.SetIntegrationCredentialRequest
+	(*SetIntegrationCredentialResponse)(nil),       // 62: orca.issuetracking.v1.SetIntegrationCredentialResponse
+	(*GetIntegrationCredentialStatusRequest)(nil),  // 63: orca.issuetracking.v1.GetIntegrationCredentialStatusRequest
+	(*GetIntegrationCredentialStatusResponse)(nil), // 64: orca.issuetracking.v1.GetIntegrationCredentialStatusResponse
+	(*ListIntegrationCredentialsRequest)(nil),      // 65: orca.issuetracking.v1.ListIntegrationCredentialsRequest
+	(*ListIntegrationCredentialsResponse)(nil),     // 66: orca.issuetracking.v1.ListIntegrationCredentialsResponse
+	(*RevokeAuthRequest)(nil),                      // 67: orca.issuetracking.v1.RevokeAuthRequest
+	(*RevokeAuthResponse)(nil),                     // 68: orca.issuetracking.v1.RevokeAuthResponse
+	(*timestamppb.Timestamp)(nil),                  // 69: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                          // 70: google.protobuf.Empty
 }
 var file_orca_issuetracking_v1_issuetracking_proto_depIdxs = []int32{
-	0, // 0: orca.issuetracking.v1.ListIssuesRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
-	1, // 1: orca.issuetracking.v1.ListIssuesResponse.issues:type_name -> orca.issuetracking.v1.Issue
-	0, // 2: orca.issuetracking.v1.CreateIssueRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
-	1, // 3: orca.issuetracking.v1.CreateIssueResponse.issue:type_name -> orca.issuetracking.v1.Issue
-	2, // 4: orca.issuetracking.v1.IssueTrackingService.ListIssues:input_type -> orca.issuetracking.v1.ListIssuesRequest
-	4, // 5: orca.issuetracking.v1.IssueTrackingService.CreateIssue:input_type -> orca.issuetracking.v1.CreateIssueRequest
-	6, // 6: orca.issuetracking.v1.IssueTrackingService.LinkIssue:input_type -> orca.issuetracking.v1.LinkIssueRequest
-	3, // 7: orca.issuetracking.v1.IssueTrackingService.ListIssues:output_type -> orca.issuetracking.v1.ListIssuesResponse
-	5, // 8: orca.issuetracking.v1.IssueTrackingService.CreateIssue:output_type -> orca.issuetracking.v1.CreateIssueResponse
-	7, // 9: orca.issuetracking.v1.IssueTrackingService.LinkIssue:output_type -> orca.issuetracking.v1.LinkIssueResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	1,  // 0: orca.issuetracking.v1.ConnectionStatus.workspaces:type_name -> orca.issuetracking.v1.Workspace
+	0,  // 1: orca.issuetracking.v1.ConnectRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 2: orca.issuetracking.v1.DisconnectRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 3: orca.issuetracking.v1.SelectWorkspaceRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 4: orca.issuetracking.v1.GetConnectionStatusRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 5: orca.issuetracking.v1.TestConnectionRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	12, // 6: orca.issuetracking.v1.Issue.workflow_state:type_name -> orca.issuetracking.v1.WorkflowState
+	10, // 7: orca.issuetracking.v1.Issue.project:type_name -> orca.issuetracking.v1.Project
+	11, // 8: orca.issuetracking.v1.Issue.issue_type:type_name -> orca.issuetracking.v1.IssueType
+	13, // 9: orca.issuetracking.v1.Issue.assignee:type_name -> orca.issuetracking.v1.UserRef
+	13, // 10: orca.issuetracking.v1.Issue.reporter:type_name -> orca.issuetracking.v1.UserRef
+	14, // 11: orca.issuetracking.v1.Issue.priority:type_name -> orca.issuetracking.v1.Priority
+	69, // 12: orca.issuetracking.v1.Issue.created_at:type_name -> google.protobuf.Timestamp
+	69, // 13: orca.issuetracking.v1.Issue.updated_at:type_name -> google.protobuf.Timestamp
+	13, // 14: orca.issuetracking.v1.IssueComment.author:type_name -> orca.issuetracking.v1.UserRef
+	69, // 15: orca.issuetracking.v1.IssueComment.created_at:type_name -> google.protobuf.Timestamp
+	69, // 16: orca.issuetracking.v1.IssueComment.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 17: orca.issuetracking.v1.ListIssuesRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	9,  // 18: orca.issuetracking.v1.ListIssuesResponse.issues:type_name -> orca.issuetracking.v1.Issue
+	0,  // 19: orca.issuetracking.v1.SearchIssuesRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	9,  // 20: orca.issuetracking.v1.SearchIssuesResponse.issues:type_name -> orca.issuetracking.v1.Issue
+	0,  // 21: orca.issuetracking.v1.GetIssueRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 22: orca.issuetracking.v1.CreateIssueRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	9,  // 23: orca.issuetracking.v1.CreateIssueResponse.issue:type_name -> orca.issuetracking.v1.Issue
+	0,  // 24: orca.issuetracking.v1.UpdateIssueRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 25: orca.issuetracking.v1.AddIssueCommentRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 26: orca.issuetracking.v1.ListIssueCommentsRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	15, // 27: orca.issuetracking.v1.ListIssueCommentsResponse.comments:type_name -> orca.issuetracking.v1.IssueComment
+	0,  // 28: orca.issuetracking.v1.ListProjectsRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	10, // 29: orca.issuetracking.v1.ListProjectsResponse.projects:type_name -> orca.issuetracking.v1.Project
+	11, // 30: orca.issuetracking.v1.ListIssueTypesResponse.issue_types:type_name -> orca.issuetracking.v1.IssueType
+	31, // 31: orca.issuetracking.v1.ListCreateFieldsResponse.fields:type_name -> orca.issuetracking.v1.CreateField
+	0,  // 32: orca.issuetracking.v1.ListAssignableUsersRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	13, // 33: orca.issuetracking.v1.ListAssignableUsersResponse.users:type_name -> orca.issuetracking.v1.UserRef
+	14, // 34: orca.issuetracking.v1.ListPrioritiesResponse.priorities:type_name -> orca.issuetracking.v1.Priority
+	12, // 35: orca.issuetracking.v1.Transition.to:type_name -> orca.issuetracking.v1.WorkflowState
+	38, // 36: orca.issuetracking.v1.ListTransitionsResponse.transitions:type_name -> orca.issuetracking.v1.Transition
+	43, // 37: orca.issuetracking.v1.GetProjectStatusOrderResponse.status_ids_by_column:type_name -> orca.issuetracking.v1.StatusIDList
+	44, // 38: orca.issuetracking.v1.ListTeamsResponse.teams:type_name -> orca.issuetracking.v1.Team
+	45, // 39: orca.issuetracking.v1.ListTeamLabelsResponse.labels:type_name -> orca.issuetracking.v1.Label
+	46, // 40: orca.issuetracking.v1.ListTeamMembersResponse.members:type_name -> orca.issuetracking.v1.Member
+	12, // 41: orca.issuetracking.v1.ListWorkflowStatesResponse.states:type_name -> orca.issuetracking.v1.WorkflowState
+	0,  // 42: orca.issuetracking.v1.SetIntegrationCredentialRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 43: orca.issuetracking.v1.GetIntegrationCredentialStatusRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 44: orca.issuetracking.v1.ListIntegrationCredentialsResponse.configured_providers:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 45: orca.issuetracking.v1.RevokeAuthRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	16, // 46: orca.issuetracking.v1.IssueTrackingService.ListIssues:input_type -> orca.issuetracking.v1.ListIssuesRequest
+	21, // 47: orca.issuetracking.v1.IssueTrackingService.CreateIssue:input_type -> orca.issuetracking.v1.CreateIssueRequest
+	59, // 48: orca.issuetracking.v1.IssueTrackingService.LinkIssue:input_type -> orca.issuetracking.v1.LinkIssueRequest
+	3,  // 49: orca.issuetracking.v1.IssueTrackingService.Connect:input_type -> orca.issuetracking.v1.ConnectRequest
+	4,  // 50: orca.issuetracking.v1.IssueTrackingService.Disconnect:input_type -> orca.issuetracking.v1.DisconnectRequest
+	5,  // 51: orca.issuetracking.v1.IssueTrackingService.SelectWorkspace:input_type -> orca.issuetracking.v1.SelectWorkspaceRequest
+	6,  // 52: orca.issuetracking.v1.IssueTrackingService.GetConnectionStatus:input_type -> orca.issuetracking.v1.GetConnectionStatusRequest
+	7,  // 53: orca.issuetracking.v1.IssueTrackingService.TestConnection:input_type -> orca.issuetracking.v1.TestConnectionRequest
+	18, // 54: orca.issuetracking.v1.IssueTrackingService.SearchIssues:input_type -> orca.issuetracking.v1.SearchIssuesRequest
+	20, // 55: orca.issuetracking.v1.IssueTrackingService.GetIssue:input_type -> orca.issuetracking.v1.GetIssueRequest
+	23, // 56: orca.issuetracking.v1.IssueTrackingService.UpdateIssue:input_type -> orca.issuetracking.v1.UpdateIssueRequest
+	24, // 57: orca.issuetracking.v1.IssueTrackingService.AddIssueComment:input_type -> orca.issuetracking.v1.AddIssueCommentRequest
+	25, // 58: orca.issuetracking.v1.IssueTrackingService.ListIssueComments:input_type -> orca.issuetracking.v1.ListIssueCommentsRequest
+	27, // 59: orca.issuetracking.v1.IssueTrackingService.ListProjects:input_type -> orca.issuetracking.v1.ListProjectsRequest
+	29, // 60: orca.issuetracking.v1.IssueTrackingService.ListIssueTypes:input_type -> orca.issuetracking.v1.ListIssueTypesRequest
+	32, // 61: orca.issuetracking.v1.IssueTrackingService.ListCreateFields:input_type -> orca.issuetracking.v1.ListCreateFieldsRequest
+	34, // 62: orca.issuetracking.v1.IssueTrackingService.ListAssignableUsers:input_type -> orca.issuetracking.v1.ListAssignableUsersRequest
+	36, // 63: orca.issuetracking.v1.IssueTrackingService.ListPriorities:input_type -> orca.issuetracking.v1.ListPrioritiesRequest
+	39, // 64: orca.issuetracking.v1.IssueTrackingService.ListTransitions:input_type -> orca.issuetracking.v1.ListTransitionsRequest
+	41, // 65: orca.issuetracking.v1.IssueTrackingService.GetProjectStatusOrder:input_type -> orca.issuetracking.v1.GetProjectStatusOrderRequest
+	48, // 66: orca.issuetracking.v1.IssueTrackingService.CreateProject:input_type -> orca.issuetracking.v1.CreateProjectRequest
+	49, // 67: orca.issuetracking.v1.IssueTrackingService.GetProject:input_type -> orca.issuetracking.v1.GetProjectRequest
+	50, // 68: orca.issuetracking.v1.IssueTrackingService.ListTeams:input_type -> orca.issuetracking.v1.ListTeamsRequest
+	52, // 69: orca.issuetracking.v1.IssueTrackingService.ListTeamLabels:input_type -> orca.issuetracking.v1.ListTeamLabelsRequest
+	54, // 70: orca.issuetracking.v1.IssueTrackingService.ListTeamMembers:input_type -> orca.issuetracking.v1.ListTeamMembersRequest
+	56, // 71: orca.issuetracking.v1.IssueTrackingService.GetCustomView:input_type -> orca.issuetracking.v1.GetCustomViewRequest
+	57, // 72: orca.issuetracking.v1.IssueTrackingService.ListWorkflowStates:input_type -> orca.issuetracking.v1.ListWorkflowStatesRequest
+	61, // 73: orca.issuetracking.v1.IssueTrackingService.SetIntegrationCredential:input_type -> orca.issuetracking.v1.SetIntegrationCredentialRequest
+	63, // 74: orca.issuetracking.v1.IssueTrackingService.GetIntegrationCredentialStatus:input_type -> orca.issuetracking.v1.GetIntegrationCredentialStatusRequest
+	65, // 75: orca.issuetracking.v1.IssueTrackingService.ListIntegrationCredentials:input_type -> orca.issuetracking.v1.ListIntegrationCredentialsRequest
+	67, // 76: orca.issuetracking.v1.IssueTrackingService.RevokeAuth:input_type -> orca.issuetracking.v1.RevokeAuthRequest
+	17, // 77: orca.issuetracking.v1.IssueTrackingService.ListIssues:output_type -> orca.issuetracking.v1.ListIssuesResponse
+	22, // 78: orca.issuetracking.v1.IssueTrackingService.CreateIssue:output_type -> orca.issuetracking.v1.CreateIssueResponse
+	60, // 79: orca.issuetracking.v1.IssueTrackingService.LinkIssue:output_type -> orca.issuetracking.v1.LinkIssueResponse
+	2,  // 80: orca.issuetracking.v1.IssueTrackingService.Connect:output_type -> orca.issuetracking.v1.ConnectionStatus
+	70, // 81: orca.issuetracking.v1.IssueTrackingService.Disconnect:output_type -> google.protobuf.Empty
+	2,  // 82: orca.issuetracking.v1.IssueTrackingService.SelectWorkspace:output_type -> orca.issuetracking.v1.ConnectionStatus
+	2,  // 83: orca.issuetracking.v1.IssueTrackingService.GetConnectionStatus:output_type -> orca.issuetracking.v1.ConnectionStatus
+	8,  // 84: orca.issuetracking.v1.IssueTrackingService.TestConnection:output_type -> orca.issuetracking.v1.TestConnectionResult
+	19, // 85: orca.issuetracking.v1.IssueTrackingService.SearchIssues:output_type -> orca.issuetracking.v1.SearchIssuesResponse
+	9,  // 86: orca.issuetracking.v1.IssueTrackingService.GetIssue:output_type -> orca.issuetracking.v1.Issue
+	9,  // 87: orca.issuetracking.v1.IssueTrackingService.UpdateIssue:output_type -> orca.issuetracking.v1.Issue
+	15, // 88: orca.issuetracking.v1.IssueTrackingService.AddIssueComment:output_type -> orca.issuetracking.v1.IssueComment
+	26, // 89: orca.issuetracking.v1.IssueTrackingService.ListIssueComments:output_type -> orca.issuetracking.v1.ListIssueCommentsResponse
+	28, // 90: orca.issuetracking.v1.IssueTrackingService.ListProjects:output_type -> orca.issuetracking.v1.ListProjectsResponse
+	30, // 91: orca.issuetracking.v1.IssueTrackingService.ListIssueTypes:output_type -> orca.issuetracking.v1.ListIssueTypesResponse
+	33, // 92: orca.issuetracking.v1.IssueTrackingService.ListCreateFields:output_type -> orca.issuetracking.v1.ListCreateFieldsResponse
+	35, // 93: orca.issuetracking.v1.IssueTrackingService.ListAssignableUsers:output_type -> orca.issuetracking.v1.ListAssignableUsersResponse
+	37, // 94: orca.issuetracking.v1.IssueTrackingService.ListPriorities:output_type -> orca.issuetracking.v1.ListPrioritiesResponse
+	40, // 95: orca.issuetracking.v1.IssueTrackingService.ListTransitions:output_type -> orca.issuetracking.v1.ListTransitionsResponse
+	42, // 96: orca.issuetracking.v1.IssueTrackingService.GetProjectStatusOrder:output_type -> orca.issuetracking.v1.GetProjectStatusOrderResponse
+	10, // 97: orca.issuetracking.v1.IssueTrackingService.CreateProject:output_type -> orca.issuetracking.v1.Project
+	10, // 98: orca.issuetracking.v1.IssueTrackingService.GetProject:output_type -> orca.issuetracking.v1.Project
+	51, // 99: orca.issuetracking.v1.IssueTrackingService.ListTeams:output_type -> orca.issuetracking.v1.ListTeamsResponse
+	53, // 100: orca.issuetracking.v1.IssueTrackingService.ListTeamLabels:output_type -> orca.issuetracking.v1.ListTeamLabelsResponse
+	55, // 101: orca.issuetracking.v1.IssueTrackingService.ListTeamMembers:output_type -> orca.issuetracking.v1.ListTeamMembersResponse
+	47, // 102: orca.issuetracking.v1.IssueTrackingService.GetCustomView:output_type -> orca.issuetracking.v1.CustomView
+	58, // 103: orca.issuetracking.v1.IssueTrackingService.ListWorkflowStates:output_type -> orca.issuetracking.v1.ListWorkflowStatesResponse
+	62, // 104: orca.issuetracking.v1.IssueTrackingService.SetIntegrationCredential:output_type -> orca.issuetracking.v1.SetIntegrationCredentialResponse
+	64, // 105: orca.issuetracking.v1.IssueTrackingService.GetIntegrationCredentialStatus:output_type -> orca.issuetracking.v1.GetIntegrationCredentialStatusResponse
+	66, // 106: orca.issuetracking.v1.IssueTrackingService.ListIntegrationCredentials:output_type -> orca.issuetracking.v1.ListIntegrationCredentialsResponse
+	68, // 107: orca.issuetracking.v1.IssueTrackingService.RevokeAuth:output_type -> orca.issuetracking.v1.RevokeAuthResponse
+	77, // [77:108] is the sub-list for method output_type
+	46, // [46:77] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_orca_issuetracking_v1_issuetracking_proto_init() }
@@ -546,7 +4637,7 @@ func file_orca_issuetracking_v1_issuetracking_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_issuetracking_v1_issuetracking_proto_rawDesc), len(file_orca_issuetracking_v1_issuetracking_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   68,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

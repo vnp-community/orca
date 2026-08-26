@@ -29,6 +29,7 @@ type Server struct {
 	cancelExecution     *usecase.CancelExecution
 	listTemplates       *usecase.ListTemplates
 	resolveTemplate     *usecase.ResolveTemplate
+	updateTemplate      *usecase.UpdateTemplate
 }
 
 func New(
@@ -42,6 +43,7 @@ func New(
 	cancelExecution *usecase.CancelExecution,
 	listTemplates *usecase.ListTemplates,
 	resolveTemplate *usecase.ResolveTemplate,
+	updateTemplate *usecase.UpdateTemplate,
 ) *Server {
 	return &Server{
 		createTemplate:      createTemplate,
@@ -54,6 +56,7 @@ func New(
 		cancelExecution:     cancelExecution,
 		listTemplates:       listTemplates,
 		resolveTemplate:     resolveTemplate,
+		updateTemplate:      updateTemplate,
 	}
 }
 
@@ -163,6 +166,21 @@ func (s *Server) ResolveTemplate(ctx context.Context, req *workflowv1.ResolveTem
 	return &workflowv1.ResolveTemplateResponse{Template: toProtoTemplate(out.Template), Chain: chain}, nil
 }
 
+func (s *Server) UpdateTemplate(ctx context.Context, req *workflowv1.UpdateTemplateRequest) (*workflowv1.UpdateTemplateResponse, error) {
+	updated, err := s.updateTemplate.Execute(ctx, usecase.UpdateTemplateInput{
+		ID:               req.GetId(),
+		Name:             req.GetName(),
+		DAGJSON:          req.GetDagJson(),
+		Scope:            domain.Scope(req.GetScope()),
+		ParentTemplateID: req.GetParentTemplateId(),
+		ExpectedVersion:  req.GetExpectedVersion(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.UpdateTemplateResponse{Template: toProtoTemplate(updated)}, nil
+}
+
 func toDomainStepType(t workflowv1.StepType) domain.StepType {
 	switch t {
 	case workflowv1.StepType_STEP_TYPE_AGENT:
@@ -188,6 +206,7 @@ func toProtoTemplate(t domain.WorkflowTemplate) *workflowv1.WorkflowTemplate {
 		DagJson:          t.DAGJSON,
 		Scope:            string(t.Scope),
 		ParentTemplateId: t.ParentTemplateID,
+		Version:          t.Version,
 	}
 }
 

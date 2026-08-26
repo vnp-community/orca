@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
@@ -235,4 +236,64 @@ func (c *Client) ListPullRequests(ctx context.Context, cred usecase.Credential, 
 // part of Gitea's documented API contract.
 func (c *Client) GetRateLimitStatus(_ context.Context, _ usecase.Credential) (domain.RateLimitStatus, error) {
 	return domain.RateLimitStatus{}, ErrCapabilityUnsupported
+}
+
+// MergePullRequest, RequestPullRequestReviewers, RemovePullRequestReviewers,
+// SetPullRequestAutoMerge, UpdateIssue, GetPullRequestForBranch, and
+// ResolveRepoSlug are the SOL-012 GitHub-mutation-shaped ScmProvider
+// additions — not implemented for Gitea in this pass, mirroring
+// GetRateLimitStatus's ErrCapabilityUnsupported precedent above rather than
+// faking support.
+func (c *Client) MergePullRequest(_ context.Context, _ usecase.Credential, _ string, _ int32, _ usecase.MergePullRequestInput) (domain.PullRequest, bool, string, error) {
+	return domain.PullRequest{}, false, "", ErrCapabilityUnsupported
+}
+
+func (c *Client) RequestPullRequestReviewers(_ context.Context, _ usecase.Credential, _ string, _ int32, _, _ []string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) RemovePullRequestReviewers(_ context.Context, _ usecase.Credential, _ string, _ int32, _ []string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) SetPullRequestAutoMerge(_ context.Context, _ usecase.Credential, _ string, _ int32, _ bool, _ string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) UpdateIssue(_ context.Context, _ usecase.Credential, _ string, _ int32, _ usecase.IssuePatch) (domain.Issue, error) {
+	return domain.Issue{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) GetPullRequestForBranch(_ context.Context, _ usecase.Credential, _, _ string) (domain.PullRequest, bool, error) {
+	return domain.PullRequest{}, false, ErrCapabilityUnsupported
+}
+
+func (c *Client) ResolveRepoSlug(_ context.Context, _ usecase.Credential, _ string) (string, string, error) {
+	return "", "", ErrCapabilityUnsupported
+}
+
+// BranchExists calls Gitea's REST API: GET /repos/{owner}/{repo}/branches/{branch}
+// — GitHub-shaped API, identical 200/404 shape to GitHub's own BranchExists.
+func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo, branch string) (bool, error) {
+	reqURL := fmt.Sprintf("%s/repos/%s/branches/%s", c.baseURL, repo, url.PathEscape(branch))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("gitea: build branch exists request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("gitea: branch exists request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("gitea: branch exists: unexpected status %d", resp.StatusCode)
+	}
 }

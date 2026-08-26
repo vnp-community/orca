@@ -204,6 +204,72 @@ func (r *Repository) GetMembership(ctx context.Context, projectID, userID string
 	return m, nil
 }
 
+func (r *Repository) ListMembers(ctx context.Context, projectID string) ([]domain.ProjectMember, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT project_id, user_id, role
+		FROM project.project_members
+		WHERE project_id = $1
+		ORDER BY user_id
+	`, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query project members: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.ProjectMember
+	for rows.Next() {
+		var m domain.ProjectMember
+		var role string
+		if err := rows.Scan(&m.ProjectID, &m.UserID, &role); err != nil {
+			return nil, fmt.Errorf("postgres: scan project member row: %w", err)
+		}
+		m.Role = domain.ProjectRole(role)
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) RemoveMember(ctx context.Context, projectID, userID string) error {
+	tag, err := r.pool.Exec(ctx, `
+		DELETE FROM project.project_members WHERE project_id = $1 AND user_id = $2
+	`, projectID, userID)
+	if err != nil {
+		return fmt.Errorf("postgres: delete project member: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrMembershipNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdateMemberRole(ctx context.Context, projectID, userID string, role domain.ProjectRole) (domain.ProjectMember, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE project.project_members SET role = $3
+		WHERE project_id = $1 AND user_id = $2
+	`, projectID, userID, string(role))
+	if err != nil {
+		return domain.ProjectMember{}, fmt.Errorf("postgres: update project member role: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ProjectMember{}, domain.ErrMembershipNotFound
+	}
+	return domain.ProjectMember{ProjectID: projectID, UserID: userID, Role: role}, nil
+}
+
+// CountOwners is the read RemoveMember/UpdateMemberRole use to enforce the
+// "≥1 owner" invariant before mutating — see usecase.AssertNotLastOwnerRemoval.
+func (r *Repository) CountOwners(ctx context.Context, projectID string) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM project.project_members
+		WHERE project_id = $1 AND role = $2
+	`, projectID, string(domain.ProjectRoleOwner)).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: count project owners: %w", err)
+	}
+	return count, nil
+}
+
 // rowScanner is satisfied by both pgx.Rows and pgx.Row, letting one scan
 // helper serve both a single-row QueryRow and a multi-row Query loop.
 type rowScanner interface {

@@ -14,6 +14,16 @@ type fakeSshTargetRepository struct {
 	createErr error
 	byID      map[string]domain.SshTarget
 	getErr    error
+
+	// single, when its ID is non-empty, is returned by Get regardless of
+	// tenantID/id — a test convenience for establish_connection_test.go's
+	// single-target fixtures.
+	single domain.SshTarget
+
+	// targets (tenantID -> targets) and listErr drive List's fake answer —
+	// used by list_ssh_targets_test.go.
+	targets map[string][]domain.SshTarget
+	listErr error
 }
 
 func (f *fakeSshTargetRepository) Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error) {
@@ -28,7 +38,18 @@ func (f *fakeSshTargetRepository) Get(ctx context.Context, tenantID, id string) 
 	if f.getErr != nil {
 		return domain.SshTarget{}, f.getErr
 	}
+	if f.single.ID != "" {
+		return f.single, nil
+	}
 	return f.byID[id], nil
+}
+
+// List implements usecase.SshTargetRepository.List.
+func (f *fakeSshTargetRepository) List(ctx context.Context, tenantID string) ([]domain.SshTarget, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	return f.targets[tenantID], nil
 }
 
 func TestCreateSshTarget_RequiresTenantContext(t *testing.T) {

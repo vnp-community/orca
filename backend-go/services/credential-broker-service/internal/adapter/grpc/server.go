@@ -35,14 +35,16 @@ const requestingServiceMetadataKey = "x-orca-service-id"
 type Server struct {
 	credentialbrokerv1.UnimplementedCredentialBrokerServiceServer
 
-	writeCredential          *usecase.WriteCredential
-	resolveCredential        *usecase.ResolveCredential
-	rotateCredential         *usecase.RotateCredential
-	revokeCredential         *usecase.RevokeCredential
-	getCredentialMetadata    *usecase.GetCredentialMetadata
-	resolveCredentialByOwner *usecase.ResolveCredentialByOwner
-	revokeCredentialByOwner  *usecase.RevokeCredentialByOwner
-	signVapidPayload         *usecase.SignVapidPayload
+	writeCredential              *usecase.WriteCredential
+	resolveCredential            *usecase.ResolveCredential
+	rotateCredential             *usecase.RotateCredential
+	revokeCredential             *usecase.RevokeCredential
+	getCredentialMetadata        *usecase.GetCredentialMetadata
+	resolveCredentialByOwner     *usecase.ResolveCredentialByOwner
+	revokeCredentialByOwner      *usecase.RevokeCredentialByOwner
+	signVapidPayload             *usecase.SignVapidPayload
+	getCredentialMetadataByOwner *usecase.GetCredentialMetadataByOwner
+	listCredentialsByCategory    *usecase.ListCredentialsByCategory
 }
 
 func New(
@@ -54,16 +56,20 @@ func New(
 	resolveByOwner *usecase.ResolveCredentialByOwner,
 	revokeByOwner *usecase.RevokeCredentialByOwner,
 	signVapid *usecase.SignVapidPayload,
+	getMetadataByOwner *usecase.GetCredentialMetadataByOwner,
+	listByCategory *usecase.ListCredentialsByCategory,
 ) *Server {
 	return &Server{
-		writeCredential:          write,
-		resolveCredential:        resolve,
-		rotateCredential:         rotate,
-		revokeCredential:         revoke,
-		getCredentialMetadata:    getMetadata,
-		resolveCredentialByOwner: resolveByOwner,
-		revokeCredentialByOwner:  revokeByOwner,
-		signVapidPayload:         signVapid,
+		writeCredential:              write,
+		resolveCredential:            resolve,
+		rotateCredential:             rotate,
+		revokeCredential:             revoke,
+		getCredentialMetadata:        getMetadata,
+		resolveCredentialByOwner:     resolveByOwner,
+		revokeCredentialByOwner:      revokeByOwner,
+		signVapidPayload:             signVapid,
+		getCredentialMetadataByOwner: getMetadataByOwner,
+		listCredentialsByCategory:    listByCategory,
 	}
 }
 
@@ -73,6 +79,7 @@ func (s *Server) WriteCredential(ctx context.Context, req *credentialbrokerv1.Wr
 		OwnerID:           req.GetOwnerId(),
 		Category:          toDomainCategory(req.GetCategory()),
 		EncryptedEnvelope: req.GetEncryptedEnvelope(),
+		ConfigJSON:        req.GetConfigJson(),
 		RequestingService: requestingService(ctx),
 	})
 	if err != nil {
@@ -151,6 +158,40 @@ func (s *Server) RevokeCredentialByOwner(ctx context.Context, req *credentialbro
 	return &credentialbrokerv1.RevokeCredentialByOwnerResponse{}, nil
 }
 
+// GetCredentialMetadataByOwner is a pure metadata read — see
+// usecase.GetCredentialMetadataByOwner's doc comment. Found=false maps to a
+// response with metadata left unset, not an error, per that field's
+// `optional` proto declaration.
+func (s *Server) GetCredentialMetadataByOwner(ctx context.Context, req *credentialbrokerv1.GetCredentialMetadataByOwnerRequest) (*credentialbrokerv1.GetCredentialMetadataByOwnerResponse, error) {
+	result, err := s.getCredentialMetadataByOwner.Execute(ctx, usecase.GetCredentialMetadataByOwnerInput{
+		TenantID: req.GetTenantId(),
+		Category: toDomainCategory(req.GetCategory()),
+		OwnerID:  req.GetOwnerId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	if !result.Found {
+		return &credentialbrokerv1.GetCredentialMetadataByOwnerResponse{}, nil
+	}
+	return &credentialbrokerv1.GetCredentialMetadataByOwnerResponse{Metadata: toProtoMetadata(result.Metadata)}, nil
+}
+
+func (s *Server) ListCredentialsByCategory(ctx context.Context, req *credentialbrokerv1.ListCredentialsByCategoryRequest) (*credentialbrokerv1.ListCredentialsByCategoryResponse, error) {
+	rows, err := s.listCredentialsByCategory.Execute(ctx, usecase.ListCredentialsByCategoryInput{
+		TenantID: req.GetTenantId(),
+		Category: toDomainCategory(req.GetCategory()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	credentials := make([]*credentialbrokerv1.CredentialMetadata, 0, len(rows))
+	for _, m := range rows {
+		credentials = append(credentials, toProtoMetadata(m))
+	}
+	return &credentialbrokerv1.ListCredentialsByCategoryResponse{Credentials: credentials}, nil
+}
+
 func (s *Server) SignVapidPayload(ctx context.Context, req *credentialbrokerv1.SignVapidPayloadRequest) (*credentialbrokerv1.SignVapidPayloadResponse, error) {
 	signature, err := s.signVapidPayload.Execute(ctx, usecase.SignVapidPayloadInput{
 		TenantID: req.GetTenantId(),
@@ -210,11 +251,12 @@ func toProtoCategory(c domain.Category) credentialbrokerv1.CredentialCategory {
 
 func toProtoMetadata(m domain.CredentialMetadata) *credentialbrokerv1.CredentialMetadata {
 	return &credentialbrokerv1.CredentialMetadata{
-		Id:        m.ID,
-		TenantId:  m.TenantID,
-		OwnerId:   m.OwnerID,
-		Category:  toProtoCategory(m.Category),
-		Status:    string(m.Status),
-		VaultPath: m.VaultPath,
+		Id:         m.ID,
+		TenantId:   m.TenantID,
+		OwnerId:    m.OwnerID,
+		Category:   toProtoCategory(m.Category),
+		Status:     string(m.Status),
+		VaultPath:  m.VaultPath,
+		ConfigJson: m.ConfigJSON,
 	}
 }

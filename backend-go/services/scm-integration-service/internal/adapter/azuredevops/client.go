@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -255,4 +256,80 @@ func (c *Client) GetRateLimitStatus(ctx context.Context, cred usecase.Credential
 		status.ResetAt = time.Unix(reset, 0)
 	}
 	return status, nil
+}
+
+// MergePullRequest, RequestPullRequestReviewers, RemovePullRequestReviewers,
+// SetPullRequestAutoMerge, UpdateIssue, GetPullRequestForBranch, and
+// ResolveRepoSlug are the SOL-012 GitHub-mutation-shaped ScmProvider
+// additions — not implemented for Azure DevOps in this pass, mirroring
+// ListIssues' ErrCapabilityUnsupported precedent above rather than faking
+// support.
+func (c *Client) MergePullRequest(_ context.Context, _ usecase.Credential, _ string, _ int32, _ usecase.MergePullRequestInput) (domain.PullRequest, bool, string, error) {
+	return domain.PullRequest{}, false, "", ErrCapabilityUnsupported
+}
+
+func (c *Client) RequestPullRequestReviewers(_ context.Context, _ usecase.Credential, _ string, _ int32, _, _ []string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) RemovePullRequestReviewers(_ context.Context, _ usecase.Credential, _ string, _ int32, _ []string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) SetPullRequestAutoMerge(_ context.Context, _ usecase.Credential, _ string, _ int32, _ bool, _ string) (domain.PullRequest, error) {
+	return domain.PullRequest{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) UpdateIssue(_ context.Context, _ usecase.Credential, _ string, _ int32, _ usecase.IssuePatch) (domain.Issue, error) {
+	return domain.Issue{}, ErrCapabilityUnsupported
+}
+
+func (c *Client) GetPullRequestForBranch(_ context.Context, _ usecase.Credential, _, _ string) (domain.PullRequest, bool, error) {
+	return domain.PullRequest{}, false, ErrCapabilityUnsupported
+}
+
+func (c *Client) ResolveRepoSlug(_ context.Context, _ usecase.Credential, _ string) (string, string, error) {
+	return "", "", ErrCapabilityUnsupported
+}
+
+// azureDevOpsRefList mirrors Azure DevOps' GET .../refs?filter=heads/{branch}
+// response envelope — {value: [...], count}. Azure DevOps always returns 200
+// for this endpoint; branch existence is len(value) > 0, not the status
+// code, unlike GitHub/GitLab/Bitbucket/Gitea's 200-vs-404 convention.
+type azureDevOpsRefList struct {
+	Value []struct {
+		Name string `json:"name"`
+	} `json:"value"`
+	Count int `json:"count"`
+}
+
+// BranchExists calls Azure DevOps' REST API: GET
+// {org}/{project}/_apis/git/repositories/{repositoryId}/refs?filter=heads/{branch}.
+func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo, branch string) (bool, error) {
+	org, project, repositoryID, err := splitRepo(repo)
+	if err != nil {
+		return false, err
+	}
+	reqURL := fmt.Sprintf("%s/%s/%s/_apis/git/repositories/%s/refs?filter=%s&api-version=%s",
+		c.baseURL, org, project, repositoryID, url.QueryEscape("heads/"+branch), apiVersion)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("azuredevops: build branch exists request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("azuredevops: branch exists request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("azuredevops: branch exists: unexpected status %d", resp.StatusCode)
+	}
+	var raw azureDevOpsRefList
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return false, fmt.Errorf("azuredevops: decode branch exists response: %w", err)
+	}
+	return len(raw.Value) > 0, nil
 }

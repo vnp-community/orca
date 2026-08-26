@@ -16,6 +16,14 @@ type Config struct {
 	// services/task-service && go run ./cmd/server`); override for
 	// container images that lay the bundle out elsewhere.
 	OPABundlePath string
+
+	// InfraFleetServiceAddr is where SimpleExecutor/AIDecompose's real
+	// (TASK-224) grpcclient adapters dial infra-fleet-service's
+	// ResolveConnection and Relay RPCs.
+	InfraFleetServiceAddr string
+	// AIProviderServiceAddr is where AIDecompose's AIProviderContextResolver
+	// dials ai-provider-service's ResolveProvider RPC.
+	AIProviderServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -24,7 +32,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:          base,
-		OPABundlePath: commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		Base:                  base,
+		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 	}, nil
 }

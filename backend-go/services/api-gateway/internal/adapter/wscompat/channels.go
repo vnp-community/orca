@@ -24,11 +24,18 @@ import (
 	"encoding/json"
 	"time"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
+	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
+	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
+	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
@@ -68,6 +75,13 @@ func RegisterRealChannels(
 	gitClient gitgatewayv1.GitGatewayServiceClient,
 	automationClient automationv1.AutomationServiceClient,
 	infraFleetClient infrafleetv1.InfraFleetServiceClient,
+	tenantClient tenantv1.TenantServiceClient,
+	projectClient projectv1.ProjectServiceClient,
+	issueTrackingClient issuetrackingv1.IssueTrackingServiceClient,
+	orchestrationClient orchestrationv1.OrchestrationServiceClient,
+	scmClient scmintegrationv1.ScmIntegrationServiceClient,
+	workflowClient workflowv1.WorkflowServiceClient,
+	aiProviderClient aiproviderv1.AiProviderServiceClient,
 	rateLimits rateLimitReader,
 ) {
 	registerAnnotationChannels(r, annotationClient)
@@ -79,6 +93,36 @@ func RegisterRealChannels(
 	registerFleetChannels(r, infraFleetClient)
 	registerCrashReportChannels(r)
 	registerRateLimitChannels(r, rateLimits)
+
+	// Final integration pass — every group below was implemented as a
+	// standalone channels_*.go file (channels.go itself deliberately
+	// untouched by that work, per this batch's shared-file-avoidance
+	// convention) and is wired in here in one place rather than at each
+	// group's own call site, per each file's own "wire this from
+	// RegisterRealChannels" doc comment. See each file's package/function
+	// doc comment for which TASK-* IDs it covers.
+	registerAccountsChannels(r, infraFleetClient)
+	registerAiProviderChannels(r, aiProviderClient)
+	registerCredentialsChannels(r, scmClient, issueTrackingClient)
+	registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)
+	registerRepoSshStatusWorkspaceChannels(r, projectClient, gitClient, infraFleetClient)
+	registerSCMChannels(r, scmClient)
+	registerBrowserChannels(r, infraFleetClient)
+	registerBrowserProfileChannels(r, infraFleetClient)
+	// registerGitDeepChannels must be called after registerGitChannels:
+	// both register "git.diff", and only the deep version threads FilePath
+	// through (TASK-228's per-file diff fix) — Registry.Register overwrites
+	// on a repeated key, so call order decides which handler wins.
+	registerGitDeepChannels(r, gitClient)
+	registerFilesChannels(r, gitClient)
+	registerAutomationTaskChannels(r, automationClient, taskClient)
+	registerWorktreeChannels(r, gitClient, projectClient)
+	registerWorkspaceChannels(r, gitClient, projectClient)
+	registerEmulatorFolderWorkspaceHostChannels(r, projectClient, infraFleetClient)
+	registerTeamChannels(r, tenantClient)
+	registerTerminalChannels(r, infraFleetClient)
+	registerTenantProjectChannels(r, tenantClient, projectClient)
+	registerWorkflowChannels(r, workflowClient)
 }
 
 // ── annotation.* ────────────────────────────────────────────────────────

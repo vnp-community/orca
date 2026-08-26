@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -32,6 +33,11 @@ type fakeInfraFleetServiceClient struct {
 	listDevServersFn     func(*infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
 	createConnectionFn   func(*infrafleetv1.CreateConnectionRequest) (*infrafleetv1.CreateConnectionResponse, error)
 	relayFn              func(*infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+
+	listSshTargetsFn      func(*infrafleetv1.ListSshTargetsRequest) (*infrafleetv1.ListSshTargetsResponse, error)
+	getSshStateFn         func(*infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error)
+	establishConnectionFn func(*infrafleetv1.EstablishConnectionRequest) (*infrafleetv1.Connection, error)
+	killWorkspacePortFn   func(*infrafleetv1.KillWorkspacePortRequest) (*infrafleetv1.KillWorkspacePortResponse, error)
 }
 
 func (f *fakeInfraFleetServiceClient) RegisterDevServer(_ context.Context, in *infrafleetv1.RegisterDevServerRequest, _ ...grpc.CallOption) (*infrafleetv1.RegisterDevServerResponse, error) {
@@ -64,6 +70,124 @@ func (f *fakeInfraFleetServiceClient) CreateConnection(_ context.Context, in *in
 
 func (f *fakeInfraFleetServiceClient) Relay(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
 	return f.relayFn(in)
+}
+
+func (f *fakeInfraFleetServiceClient) ListSshTargets(_ context.Context, in *infrafleetv1.ListSshTargetsRequest, _ ...grpc.CallOption) (*infrafleetv1.ListSshTargetsResponse, error) {
+	return f.listSshTargetsFn(in)
+}
+
+func (f *fakeInfraFleetServiceClient) GetSshState(_ context.Context, in *infrafleetv1.GetSshStateRequest, _ ...grpc.CallOption) (*infrafleetv1.GetSshStateResponse, error) {
+	return f.getSshStateFn(in)
+}
+
+func (f *fakeInfraFleetServiceClient) EstablishConnection(_ context.Context, in *infrafleetv1.EstablishConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.Connection, error) {
+	return f.establishConnectionFn(in)
+}
+
+func (f *fakeInfraFleetServiceClient) KillWorkspacePort(_ context.Context, in *infrafleetv1.KillWorkspacePortRequest, _ ...grpc.CallOption) (*infrafleetv1.KillWorkspacePortResponse, error) {
+	return f.killWorkspacePortFn(in)
+}
+
+// Terminal/PTY RPCs (TASK-180..185): no httpgateway route exercises these
+// (they're wired through wscompat's channels_terminal.go instead, with its
+// own fake client — see channels_terminal_test.go), so these exist only to
+// satisfy the infrafleetv1.InfraFleetServiceClient interface this fake must
+// implement in full; every one is an unconditional Unimplemented stub.
+func (f *fakeInfraFleetServiceClient) SpawnTerminalSession(context.Context, *infrafleetv1.SpawnTerminalSessionRequest, ...grpc.CallOption) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) ResizeTerminalSession(context.Context, *infrafleetv1.ResizeTerminalSessionRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) KillTerminalSession(context.Context, *infrafleetv1.KillTerminalSessionRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) StopTerminalProcess(context.Context, *infrafleetv1.StopTerminalProcessRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) ListTerminalSessions(context.Context, *infrafleetv1.ListTerminalSessionsRequest, ...grpc.CallOption) (*infrafleetv1.ListTerminalSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) WaitTerminalSession(context.Context, *infrafleetv1.WaitTerminalSessionRequest, ...grpc.CallOption) (*infrafleetv1.WaitTerminalSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) FocusTerminalSession(context.Context, *infrafleetv1.FocusTerminalSessionRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) GetTerminalAgentStatus(context.Context, *infrafleetv1.GetTerminalAgentStatusRequest, ...grpc.CallOption) (*infrafleetv1.GetTerminalAgentStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) InspectTerminalProcess(context.Context, *infrafleetv1.InspectTerminalProcessRequest, ...grpc.CallOption) (*infrafleetv1.InspectTerminalProcessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) AttachPty(context.Context, ...grpc.CallOption) (grpc.BidiStreamingClient[infrafleetv1.PtyClientFrame, infrafleetv1.PtyServerFrame], error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+// ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile: no
+// httpgateway route exercises these (they're wired through wscompat's
+// channels_browser.go instead) — same unconditional Unimplemented-stub
+// convention as this file's terminal RPCs above.
+func (f *fakeInfraFleetServiceClient) ListBrowserProfiles(context.Context, *infrafleetv1.ListBrowserProfilesRequest, ...grpc.CallOption) (*infrafleetv1.ListBrowserProfilesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) CreateBrowserProfile(context.Context, *infrafleetv1.CreateBrowserProfileRequest, ...grpc.CallOption) (*infrafleetv1.CreateBrowserProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+// ListEmulatorDevices..GetHostCapabilities: no httpgateway route exercises
+// these (TASK-048/TASK-070 relay through wscompat's
+// channels_emulator_folderworkspace_host.go instead) — same
+// unconditional Unimplemented-stub convention as this file's terminal/
+// browser-profile RPCs above.
+func (f *fakeInfraFleetServiceClient) ListEmulatorDevices(context.Context, *infrafleetv1.ListEmulatorDevicesRequest, ...grpc.CallOption) (*infrafleetv1.ListEmulatorDevicesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) GetEmulatorAvailability(context.Context, *infrafleetv1.GetEmulatorAvailabilityRequest, ...grpc.CallOption) (*infrafleetv1.GetEmulatorAvailabilityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) AttachEmulatorSession(context.Context, *infrafleetv1.AttachEmulatorSessionRequest, ...grpc.CallOption) (*infrafleetv1.EmulatorSession, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) SendEmulatorTap(context.Context, *infrafleetv1.SendEmulatorTapRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) SendEmulatorGesture(context.Context, *infrafleetv1.SendEmulatorGestureRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) SendEmulatorButton(context.Context, *infrafleetv1.SendEmulatorButtonRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) RotateEmulator(context.Context, *infrafleetv1.RotateEmulatorRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) ShutdownEmulator(context.Context, *infrafleetv1.ShutdownEmulatorRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) GetHostCapabilities(context.Context, *infrafleetv1.GetHostCapabilitiesRequest, ...grpc.CallOption) (*infrafleetv1.GetHostCapabilitiesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) DeleteBrowserProfile(context.Context, *infrafleetv1.DeleteBrowserProfileRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
 // testInfraRouter mounts mountInfraRoutes alone on a fresh chi router — no
