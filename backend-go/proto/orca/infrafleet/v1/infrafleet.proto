@@ -74,6 +74,32 @@ service InfraFleetService {
   rpc ListBrowserProfiles(ListBrowserProfilesRequest) returns (ListBrowserProfilesResponse);
   rpc CreateBrowserProfile(CreateBrowserProfileRequest) returns (CreateBrowserProfileResponse);
   rpc DeleteBrowserProfile(DeleteBrowserProfileRequest) returns (google.protobuf.Empty);
+
+  // --- Emulator/simulator control, relayed to the Dev Server Agent (TASK-048) ---
+  // Every RPC here except GetEmulatorAvailability requires connection_id —
+  // there is deliberately no local/backend-host fallback (driving emulators
+  // on the shared backend-go host is out of scope by design, see
+  // usecase.EmulatorRelay's doc comment). agent/ has no device.* RPC surface
+  // today (confirmed absent as of this pass) — every call below reaches a
+  // real agent and fails with a typed, permanent FailedPrecondition until
+  // agent/ gains one; see specs/backend-go/bugs/missing-v1/tasks/TASK-048.
+  rpc ListEmulatorDevices(ListEmulatorDevicesRequest) returns (ListEmulatorDevicesResponse);
+  rpc GetEmulatorAvailability(GetEmulatorAvailabilityRequest) returns (GetEmulatorAvailabilityResponse);
+  rpc AttachEmulatorSession(AttachEmulatorSessionRequest) returns (EmulatorSession);
+  rpc SendEmulatorTap(SendEmulatorTapRequest) returns (google.protobuf.Empty);
+  rpc SendEmulatorGesture(SendEmulatorGestureRequest) returns (google.protobuf.Empty);
+  rpc SendEmulatorButton(SendEmulatorButtonRequest) returns (google.protobuf.Empty);
+  rpc RotateEmulator(RotateEmulatorRequest) returns (google.protobuf.Empty);
+  rpc ShutdownEmulator(ShutdownEmulatorRequest) returns (google.protobuf.Empty);
+
+  // GetHostCapabilities is the per-target WSL/pwsh/git-bash probe (TASK-070)
+  // — connection_id empty resolves to the caller's own backend-go host and
+  // is answered locally and honestly (false/[]), no relay attempted,
+  // matching TASK-068's existing host.* stub semantics; a non-empty
+  // connection_id relays to the agent's host.capabilities method, which
+  // does not exist yet (confirmed absent as of this pass) — see
+  // usecase.GetHostCapabilities's doc comment.
+  rpc GetHostCapabilities(GetHostCapabilitiesRequest) returns (GetHostCapabilitiesResponse);
 }
 
 enum ConnectionMode {
@@ -363,4 +389,86 @@ message CreateBrowserProfileResponse {
 
 message DeleteBrowserProfileRequest {
   string id = 1;
+}
+
+// --- Emulator/simulator control (TASK-048) --------------------------------
+
+message EmulatorDevice {
+  string id = 1;
+  string name = 2;
+  string platform = 3; // "android" | "ios" — agent-reported, opaque passthrough
+  string state = 4;    // e.g. "booted", "shutdown" — agent-reported, opaque passthrough
+}
+
+message ListEmulatorDevicesRequest {
+  string connection_id = 1; // required — no backend-host fallback, see rpc doc comment
+}
+message ListEmulatorDevicesResponse {
+  repeated EmulatorDevice devices = 1;
+}
+
+message GetEmulatorAvailabilityRequest {
+  string connection_id = 1; // may be empty — see rpc doc comment
+}
+message GetEmulatorAvailabilityResponse {
+  bool available = 1;
+  string reason = 2; // populated when available is false
+}
+
+message EmulatorSession {
+  string session_id = 1;
+  string device_id = 2;
+  string connection_id = 3; // which dev server this device runs on
+  string platform = 4;      // "android" | "ios"
+}
+
+message AttachEmulatorSessionRequest {
+  string connection_id = 1;
+  string device_id = 2;
+}
+
+message SendEmulatorTapRequest {
+  string connection_id = 1;
+  string session_id = 2;
+  int32 x = 3;
+  int32 y = 4;
+}
+
+message SendEmulatorGestureRequest {
+  string connection_id = 1;
+  string session_id = 2;
+  int32 start_x = 3;
+  int32 start_y = 4;
+  int32 end_x = 5;
+  int32 end_y = 6;
+  int32 duration_ms = 7;
+}
+
+message SendEmulatorButtonRequest {
+  string connection_id = 1;
+  string session_id = 2;
+  string button = 3; // e.g. "home", "back", "volume_up" — agent-defined vocabulary
+}
+
+message RotateEmulatorRequest {
+  string connection_id = 1;
+  string session_id = 2;
+  string orientation = 3; // "portrait" | "landscape"
+}
+
+message ShutdownEmulatorRequest {
+  string connection_id = 1;
+  string session_id = 2;
+}
+
+// --- Host capability probing (TASK-070) -----------------------------------
+
+message GetHostCapabilitiesRequest {
+  string connection_id = 1; // empty = caller's own backend-go host
+}
+message GetHostCapabilitiesResponse {
+  bool wsl_available = 1;
+  repeated string wsl_distros = 2;
+  bool pwsh_available = 3;
+  bool git_bash_available = 4;
 }

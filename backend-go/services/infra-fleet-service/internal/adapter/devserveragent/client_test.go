@@ -3,6 +3,7 @@ package devserveragent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -214,6 +215,34 @@ func TestClientExecSucceedsAgainstFakeAgent(t *testing.T) {
 	git, ok := result["git"].(map[string]any)
 	if !ok || git["installed"] != true {
 		t.Errorf("result = %+v, want git.installed=true", result)
+	}
+}
+
+// TestClientExecTranslatesMethodNotFound is the direct regression test for
+// TASK-048/TASK-070's "shipped but honestly inert" contract: a real agent
+// that doesn't know a method (e.g. today's agent/ build, which has no
+// device.*/host.capabilities handler) returns a real JSON-RPC -32601, and
+// Exec must translate that into domain.ErrAgentMethodNotFound rather than a
+// bare/opaque error, so usecase.EmulatorRelay/usecase.GetHostCapabilities
+// can distinguish it from a transport failure via errors.Is.
+func TestClientExecTranslatesMethodNotFound(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-mnf", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	_, err = client.Exec(context.Background(), devServer, "device.list", nil)
+	if err == nil {
+		t.Fatal("expected an error for a method the fake agent doesn't implement")
+	}
+	if !errors.Is(err, domain.ErrAgentMethodNotFound) {
+		t.Errorf("expected errors.Is(err, domain.ErrAgentMethodNotFound), got %v", err)
 	}
 }
 

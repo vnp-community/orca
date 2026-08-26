@@ -151,6 +151,12 @@ func run() error {
 	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
 	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
 
+	// --- Emulator relay (TASK-048) / host capabilities relay (TASK-070) ---
+	// Shipped-but-honestly-inert until agent/ gains device.*/host.capabilities
+	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
+	emulatorRelayUC := usecase.NewEmulatorRelay(repo, agentClient)
+	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -178,6 +184,8 @@ func run() error {
 		listBrowserProfilesUC,
 		createBrowserProfileUC,
 		deleteBrowserProfileUC,
+		emulatorRelayUC,
+		getHostCapabilitiesUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

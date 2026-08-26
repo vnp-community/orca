@@ -34,6 +34,14 @@ func (e *JSONRPCError) Error() string {
 	return e.Message
 }
 
+// jsonrpcMethodNotFoundCode is the JSON-RPC 2.0 standard "method not
+// found" code — mirrors agent/src/shared/agent-wire-protocol.ts's
+// AgentErrorCode.MethodNotFound. Client.Exec checks a response's
+// JSONRPCError.Code against this to detect a permanent "this agent build
+// doesn't implement that method" condition (domain.ErrAgentMethodNotFound),
+// as opposed to a transient/transport failure.
+const jsonrpcMethodNotFoundCode = -32601
+
 // EncodeJSONRPCFrame marshals msg and wraps it in a Regular frame — the Go
 // equivalent of relay-protocol.ts's encodeJsonRpcFrame.
 func EncodeJSONRPCFrame(msg any, id, ack uint32) ([]byte, error) {

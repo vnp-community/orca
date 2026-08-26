@@ -1,18 +1,7 @@
 // Channels for three independently-shippable namespaces bundled into one
 // file and one entry point (registerEmulatorFolderWorkspaceHostChannels) —
-// see specs/backend-go/bugs/missing-v1/tasks/TASK-046, TASK-061..067,
-// TASK-068 for each namespace's own design doc. Kept out of channels.go
-// deliberately: this pass's integration instructions route every new
-// channel registration through its own file so parallel passes touching
-// channels.go don't collide — see this repo's active-worktree task brief.
-//
-// Wiring note for whoever merges this into RegisterRealChannels
-// (channels.go): add a `projectClient projectv1.ProjectServiceClient`
-// parameter to RegisterRealChannels (already dialed as `projectClient` in
-// api-gateway/cmd/server/main.go for the /v1/projects REST routes — reuse
-// it, don't dial a second client) and call
-// `registerEmulatorFolderWorkspaceHostChannels(r, projectClient)` from
-// inside it, alongside the other register*Channels calls.
+// see specs/backend-go/bugs/missing-v1/tasks/TASK-046, TASK-048, TASK-061..067,
+// TASK-068, TASK-070 for each namespace's own design doc.
 package wscompat
 
 import (
@@ -20,76 +9,269 @@ import (
 	"encoding/json"
 	"errors"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+
+	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
 // registerEmulatorFolderWorkspaceHostChannels wires every channel this
-// file gives real backend-go implementations to: emulator.* (honest
-// permanent-unsupported stub, TASK-046), host.* (honest local-answer
-// stub, TASK-068), and folderWorkspace.* (real project-service CRUD,
-// TASK-066).
-func registerEmulatorFolderWorkspaceHostChannels(r *Registry, projectClient projectv1.ProjectServiceClient) {
-	registerEmulatorChannels(r)
-	registerHostChannels(r)
+// file gives real backend-go implementations to: emulator.* (relay when a
+// connectionId is present, TASK-048; honest permanent-unsupported stub
+// otherwise, TASK-046), host.* (relay when a connectionId is present,
+// TASK-070; honest local-answer stub otherwise, TASK-068), and
+// folderWorkspace.* (real project-service CRUD, TASK-066).
+func registerEmulatorFolderWorkspaceHostChannels(r *Registry, projectClient projectv1.ProjectServiceClient, infraFleetClient infrafleetv1.InfraFleetServiceClient) {
+	registerEmulatorChannels(r, infraFleetClient)
+	registerHostChannels(r, infraFleetClient)
 	registerFolderWorkspaceChannels(r, projectClient)
 }
 
 // ── emulator.* ──────────────────────────────────────────────────────────
 //
 // Mobile emulator/simulator control (ADB/xcrun simctl device driving) has
-// no backend-go implementation and, per
+// no backend-go-local implementation and, per
 // 02-microservices-decomposition.md's "What's deliberately not a separate
 // service" section, is explicitly excluded from the Go server deployment
-// by design — not a gap awaiting a future pass. The architecturally sound
-// alternative (relay to the Dev Server Agent) requires a new agent/
-// capability that does not exist today; agent/ changes are out of scope
-// for this rewrite. See specs/backend-go/bugs/missing-v1/tasks/TASK-048
-// for the blocked, documented-only relay design. Every emulator.* channel
-// below returns this same typed, permanent answer instead of falling
-// through to notImplementedHandler's generic "not yet" wording, which
-// would incorrectly imply this is only temporarily missing.
+// by design. The architecturally sound alternative — relay to the Dev
+// Server Agent via infra-fleet-service's real ListEmulatorDevices/
+// GetEmulatorAvailability/AttachEmulatorSession/SendEmulatorTap/
+// SendEmulatorGesture/SendEmulatorButton/RotateEmulator/ShutdownEmulator
+// RPCs (TASK-048) — is now wired for real below, but is honestly inert
+// until agent/ gains a device.* JSON-RPC surface: every relay call reaches
+// a real agent and gets back a real, permanent
+// FailedPrecondition/INFRA_EMULATOR_UNSUPPORTED (see
+// usecase.EmulatorRelay in infra-fleet-service), which this file surfaces
+// as-is rather than translating further.
+//
+// Per TASK-048's own design, there is NO local/backend-host fallback: a
+// call with no connectionId (or one that can't be resolved) gets the same
+// permanent errEmulatorNotSupported answer TASK-046 shipped, not a
+// disguised relay attempt — driving emulators on the shared backend-go
+// host is out of scope by design, unlike host.* below, which DOES have an
+// honest local answer to fall back to.
 var errEmulatorNotSupported = errors.New(
 	"mobile emulator control is not supported by the Go backend — " +
 		"see specs/backend-go/bugs/missing-v1/solutions/SOL-008-emulator-channels.md")
 
-func registerEmulatorChannels(r *Registry) {
-	for _, channel := range []string{
-		"emulator.attach", "emulator.availability", "emulator.button",
-		"emulator.gesture", "emulator.listDevices", "emulator.rotate",
-		"emulator.shutdown", "emulator.tap",
-	} {
-		r.Register(channel, func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+type emulatorConnectionArgs struct {
+	ConnectionID string `json:"connectionId"`
+}
+
+func registerEmulatorChannels(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
+	r.Register("emulator.listDevices", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		in := decodeOptionalArg[emulatorConnectionArgs](args, 0)
+		if in.ConnectionID == "" {
 			return nil, errEmulatorNotSupported
+		}
+		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+		defer cancel()
+		resp, err := client.ListEmulatorDevices(rpcCtx, &infrafleetv1.ListEmulatorDevicesRequest{ConnectionId: in.ConnectionID})
+		if err != nil {
+			return nil, err
+		}
+		return resp.GetDevices(), nil
+	})
+
+	r.Register("emulator.availability", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		in := decodeOptionalArg[emulatorConnectionArgs](args, 0)
+		// Unlike every other emulator.* channel, GetEmulatorAvailability has
+		// no connectionId requirement on infra-fleet-service's side either
+		// (see its usecase's doc comment) — always relay so a genuinely
+		// empty connectionId still gets infra-fleet-service's honest
+		// false/reason answer instead of this file's harder permanent error.
+		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+		defer cancel()
+		resp, err := client.GetEmulatorAvailability(rpcCtx, &infrafleetv1.GetEmulatorAvailabilityRequest{ConnectionId: in.ConnectionID})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"available": resp.GetAvailable(), "reason": resp.GetReason()}, nil
+	})
+
+	r.Register("emulator.attach", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type attachArgs struct {
+			ConnectionID string `json:"connectionId"`
+			DeviceID     string `json:"deviceId"`
+		}
+		in := decodeOptionalArg[attachArgs](args, 0)
+		if in.ConnectionID == "" {
+			return nil, errEmulatorNotSupported
+		}
+		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+		defer cancel()
+		return client.AttachEmulatorSession(rpcCtx, &infrafleetv1.AttachEmulatorSessionRequest{ConnectionId: in.ConnectionID, DeviceId: in.DeviceID})
+	})
+
+	r.Register("emulator.tap", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type tapArgs struct {
+			ConnectionID string `json:"connectionId"`
+			SessionID    string `json:"sessionId"`
+			X            int32  `json:"x"`
+			Y            int32  `json:"y"`
+		}
+		in := decodeOptionalArg[tapArgs](args, 0)
+		if in.ConnectionID == "" {
+			return nil, errEmulatorNotSupported
+		}
+		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+		defer cancel()
+		_, err := client.SendEmulatorTap(rpcCtx, &infrafleetv1.SendEmulatorTapRequest{
+			ConnectionId: in.ConnectionID, SessionId: in.SessionID, X: in.X, Y: in.Y,
 		})
-	}
+		return map[string]bool{"ok": err == nil}, err
+	})
+
+	r.Register("emulator.gesture", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type gestureArgs struct {
+			ConnectionID string `json:"connectionId"`
+			SessionID    string `json:"sessionId"`
+			StartX       int32  `json:"startX"`
+			StartY       int32  `json:"startY"`
+			EndX         int32  `json:"endX"`
+			EndY         int32  `json:"endY"`
+			DurationMs   int32  `json:"durationMs"`
+		}
+		in := decodeOptionalArg[gestureArgs](args, 0)
+		if in.ConnectionID == "" {
+			return nil, errEmulatorNotSupported
+		}
+		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+		defer cancel()
+		_, err := client.SendEmulatorGesture(rpcCtx, &infrafleetv1.SendEmulatorGestureRequest{
+			ConnectionId: in.ConnectionID, SessionId: in.SessionID,
+			StartX: in.StartX, StartY: in.StartY, EndX: in.EndX, EndY: in.EndY, DurationMs: in.DurationMs,
+		})
+		return map[string]bool{"ok": err == nil}, err
+	})
+
+	r.Register("emulator.button", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type buttonArgs struct {
+			ConnectionID string `json:"connectionId"`
+			SessionID    string `json:"sessionId"`
+			Button       string `json:"button"`
+		}
+		in := decodeOptionalArg[buttonArgs](args, 0)
+		if in.ConnectionID == "" {
+			return nil, errEmulatorNotSupported
+		}
+		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+		defer cancel()
+		_, err := client.SendEmulatorButton(rpcCtx, &infrafleetv1.SendEmulatorButtonRequest{
+			ConnectionId: in.ConnectionID, SessionId: in.SessionID, Button: in.Button,
+		})
+		return map[string]bool{"ok": err == nil}, err
+	})
+
+	r.Register("emulator.rotate", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type rotateArgs struct {
+			ConnectionID string `json:"connectionId"`
+			SessionID    string `json:"sessionId"`
+			Orientation  string `json:"orientation"`
+		}
+		in := decodeOptionalArg[rotateArgs](args, 0)
+		if in.ConnectionID == "" {
+			return nil, errEmulatorNotSupported
+		}
+		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+		defer cancel()
+		_, err := client.RotateEmulator(rpcCtx, &infrafleetv1.RotateEmulatorRequest{
+			ConnectionId: in.ConnectionID, SessionId: in.SessionID, Orientation: in.Orientation,
+		})
+		return map[string]bool{"ok": err == nil}, err
+	})
+
+	r.Register("emulator.shutdown", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type shutdownArgs struct {
+			ConnectionID string `json:"connectionId"`
+			SessionID    string `json:"sessionId"`
+		}
+		in := decodeOptionalArg[shutdownArgs](args, 0)
+		if in.ConnectionID == "" {
+			return nil, errEmulatorNotSupported
+		}
+		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+		defer cancel()
+		_, err := client.ShutdownEmulator(rpcCtx, &infrafleetv1.ShutdownEmulatorRequest{
+			ConnectionId: in.ConnectionID, SessionId: in.SessionID,
+		})
+		return map[string]bool{"ok": err == nil}, err
+	})
 }
 
 // ── host.* ──────────────────────────────────────────────────────────────
 //
-// WSL/PowerShell/git-bash availability on the *backend-go host itself* —
-// per BUG-011, the old backend probed only its own process host, never a
-// per-target dev server. backend-go's own host is a Linux container
-// (10-deployment-infrastructure.md's deployment model) with none of these
-// three tools meaningful on it, so "false"/"[]" is the honest answer here,
-// not a placeholder — same posture as preflight.check's honest gh/glab
-// false answers (channels.go's registerPreflightChannels). Per-target
-// (does the CALLER'S ACTIVE DEV SERVER have these) is a distinct, more
-// useful question — see specs/backend-go/bugs/missing-v1/tasks/TASK-070
-// for that design, which is blocked on an agent/ capability that doesn't
-// exist yet.
-func registerHostChannels(r *Registry) {
+// WSL/PowerShell/git-bash availability, now resolved per-target via
+// infra-fleet-service's real GetHostCapabilities RPC (TASK-070) when a
+// connectionId is present in the request. Per BUG-011, the old backend
+// probed only its own process host, never a per-target dev server — this
+// closes that gap for real, but is honestly inert until agent/ gains a
+// host.capabilities method: a resolved connectionId reaches a real agent
+// and gets back a real, permanent
+// FailedPrecondition/INFRA_HOST_CAPABILITIES_UNSUPPORTED (see
+// usecase.GetHostCapabilities in infra-fleet-service).
+//
+// Unlike emulator.* above, host.* DOES keep its local-honest-answer
+// fallback: no connectionId in the request (today's frontend contract,
+// same as before this pass) skips the relay entirely and answers
+// false/[] directly, matching TASK-068's original stub and
+// infra-fleet-service's own GetHostCapabilities "conn == nil" branch — the
+// two are kept in sync deliberately so a bug in one doesn't silently
+// diverge from the other.
+type hostConnectionArgs struct {
+	ConnectionID string `json:"connectionId"`
+}
+
+func registerHostChannels(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
 	r.Register("host.wsl.isAvailable", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		return map[string]bool{"available": false}, nil
+		caps, err := resolveHostCapabilities(ctx, id, client, args)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]bool{"available": caps.GetWslAvailable()}, nil
 	})
 	r.Register("host.wsl.listDistros", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		return []string{}, nil
+		caps, err := resolveHostCapabilities(ctx, id, client, args)
+		if err != nil {
+			return nil, err
+		}
+		distros := caps.GetWslDistros()
+		if distros == nil {
+			distros = []string{}
+		}
+		return distros, nil
 	})
 	r.Register("host.pwsh.isAvailable", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		return map[string]bool{"available": false}, nil
+		caps, err := resolveHostCapabilities(ctx, id, client, args)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]bool{"available": caps.GetPwshAvailable()}, nil
 	})
 	r.Register("host.gitBash.isAvailable", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		return map[string]bool{"available": false}, nil
+		caps, err := resolveHostCapabilities(ctx, id, client, args)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]bool{"available": caps.GetGitBashAvailable()}, nil
 	})
+}
+
+// resolveHostCapabilities is the single relay-or-local-answer decision
+// shared by all 4 host.* channels — a short-TTL cache per this file's
+// package doc comment note is a follow-up, not added here to keep this
+// pass's diff to the plumbing itself.
+func resolveHostCapabilities(ctx context.Context, id Identity, client infrafleetv1.InfraFleetServiceClient, args []json.RawMessage) (*infrafleetv1.GetHostCapabilitiesResponse, error) {
+	in := decodeOptionalArg[hostConnectionArgs](args, 0)
+	if in.ConnectionID == "" {
+		// Local honest answer — no relay target, see this file's host.*
+		// doc comment.
+		return &infrafleetv1.GetHostCapabilitiesResponse{WslDistros: []string{}}, nil
+	}
+	rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
+	defer cancel()
+	return client.GetHostCapabilities(rpcCtx, &infrafleetv1.GetHostCapabilitiesRequest{ConnectionId: in.ConnectionID})
 }
 
 // ── folderWorkspace.* ─────────────────────────────────────────────────────

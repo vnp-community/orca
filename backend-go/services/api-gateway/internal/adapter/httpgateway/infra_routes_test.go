@@ -145,6 +145,47 @@ func (f *fakeInfraFleetServiceClient) CreateBrowserProfile(context.Context, *inf
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+// ListEmulatorDevices..GetHostCapabilities: no httpgateway route exercises
+// these (TASK-048/TASK-070 relay through wscompat's
+// channels_emulator_folderworkspace_host.go instead) — same
+// unconditional Unimplemented-stub convention as this file's terminal/
+// browser-profile RPCs above.
+func (f *fakeInfraFleetServiceClient) ListEmulatorDevices(context.Context, *infrafleetv1.ListEmulatorDevicesRequest, ...grpc.CallOption) (*infrafleetv1.ListEmulatorDevicesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) GetEmulatorAvailability(context.Context, *infrafleetv1.GetEmulatorAvailabilityRequest, ...grpc.CallOption) (*infrafleetv1.GetEmulatorAvailabilityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) AttachEmulatorSession(context.Context, *infrafleetv1.AttachEmulatorSessionRequest, ...grpc.CallOption) (*infrafleetv1.EmulatorSession, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) SendEmulatorTap(context.Context, *infrafleetv1.SendEmulatorTapRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) SendEmulatorGesture(context.Context, *infrafleetv1.SendEmulatorGestureRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) SendEmulatorButton(context.Context, *infrafleetv1.SendEmulatorButtonRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) RotateEmulator(context.Context, *infrafleetv1.RotateEmulatorRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) ShutdownEmulator(context.Context, *infrafleetv1.ShutdownEmulatorRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) GetHostCapabilities(context.Context, *infrafleetv1.GetHostCapabilitiesRequest, ...grpc.CallOption) (*infrafleetv1.GetHostCapabilitiesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 func (f *fakeInfraFleetServiceClient) DeleteBrowserProfile(context.Context, *infrafleetv1.DeleteBrowserProfileRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
