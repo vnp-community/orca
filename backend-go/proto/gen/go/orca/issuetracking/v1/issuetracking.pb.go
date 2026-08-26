@@ -3701,6 +3701,390 @@ func (*LinkIssueResponse) Descriptor() ([]byte, []int) {
 	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{59}
 }
 
+type SetIntegrationCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
+	ConfigJson    string                 `protobuf:"bytes,4,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // optional, non-secret — e.g. Jira's baseUrl/email
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetIntegrationCredentialRequest) Reset() {
+	*x = SetIntegrationCredentialRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetIntegrationCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetIntegrationCredentialRequest) ProtoMessage() {}
+
+func (x *SetIntegrationCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetIntegrationCredentialRequest.ProtoReflect.Descriptor instead.
+func (*SetIntegrationCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *SetIntegrationCredentialRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *SetIntegrationCredentialRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *SetIntegrationCredentialRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *SetIntegrationCredentialRequest) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type SetIntegrationCredentialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetIntegrationCredentialResponse) Reset() {
+	*x = SetIntegrationCredentialResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetIntegrationCredentialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetIntegrationCredentialResponse) ProtoMessage() {}
+
+func (x *SetIntegrationCredentialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetIntegrationCredentialResponse.ProtoReflect.Descriptor instead.
+func (*SetIntegrationCredentialResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{61}
+}
+
+type GetIntegrationCredentialStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIntegrationCredentialStatusRequest) Reset() {
+	*x = GetIntegrationCredentialStatusRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIntegrationCredentialStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIntegrationCredentialStatusRequest) ProtoMessage() {}
+
+func (x *GetIntegrationCredentialStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIntegrationCredentialStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetIntegrationCredentialStatusRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *GetIntegrationCredentialStatusRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *GetIntegrationCredentialStatusRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+type GetIntegrationCredentialStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Configured    bool                   `protobuf:"varint,1,opt,name=configured,proto3" json:"configured,omitempty"`
+	ConfigJson    string                 `protobuf:"bytes,2,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIntegrationCredentialStatusResponse) Reset() {
+	*x = GetIntegrationCredentialStatusResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIntegrationCredentialStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIntegrationCredentialStatusResponse) ProtoMessage() {}
+
+func (x *GetIntegrationCredentialStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIntegrationCredentialStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetIntegrationCredentialStatusResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *GetIntegrationCredentialStatusResponse) GetConfigured() bool {
+	if x != nil {
+		return x.Configured
+	}
+	return false
+}
+
+func (x *GetIntegrationCredentialStatusResponse) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type ListIntegrationCredentialsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIntegrationCredentialsRequest) Reset() {
+	*x = ListIntegrationCredentialsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIntegrationCredentialsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIntegrationCredentialsRequest) ProtoMessage() {}
+
+func (x *ListIntegrationCredentialsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIntegrationCredentialsRequest.ProtoReflect.Descriptor instead.
+func (*ListIntegrationCredentialsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *ListIntegrationCredentialsRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+type ListIntegrationCredentialsResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ConfiguredProviders []IssueProvider        `protobuf:"varint,1,rep,packed,name=configured_providers,json=configuredProviders,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"configured_providers,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ListIntegrationCredentialsResponse) Reset() {
+	*x = ListIntegrationCredentialsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIntegrationCredentialsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIntegrationCredentialsResponse) ProtoMessage() {}
+
+func (x *ListIntegrationCredentialsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIntegrationCredentialsResponse.ProtoReflect.Descriptor instead.
+func (*ListIntegrationCredentialsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *ListIntegrationCredentialsResponse) GetConfiguredProviders() []IssueProvider {
+	if x != nil {
+		return x.ConfiguredProviders
+	}
+	return nil
+}
+
+type RevokeAuthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAuthRequest) Reset() {
+	*x = RevokeAuthRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAuthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAuthRequest) ProtoMessage() {}
+
+func (x *RevokeAuthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAuthRequest.ProtoReflect.Descriptor instead.
+func (*RevokeAuthRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *RevokeAuthRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RevokeAuthRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+type RevokeAuthResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAuthResponse) Reset() {
+	*x = RevokeAuthResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAuthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAuthResponse) ProtoMessage() {}
+
+func (x *RevokeAuthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAuthResponse.ProtoReflect.Descriptor instead.
+func (*RevokeAuthResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{67}
+}
+
 var File_orca_issuetracking_v1_issuetracking_proto protoreflect.FileDescriptor
 
 const file_orca_issuetracking_v1_issuetracking_proto_rawDesc = "" +
@@ -3973,11 +4357,35 @@ const file_orca_issuetracking_v1_issuetracking_proto_rawDesc = "" +
 	"\x10LinkIssueRequest\x12\x19\n" +
 	"\bissue_id\x18\x01 \x01(\tR\aissueId\x12\x17\n" +
 	"\atask_id\x18\x02 \x01(\tR\x06taskId\"\x13\n" +
-	"\x11LinkIssueResponse*c\n" +
+	"\x11LinkIssueResponse\"\xb7\x01\n" +
+	"\x1fSetIntegrationCredentialRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\x12\x1f\n" +
+	"\vconfig_json\x18\x04 \x01(\tR\n" +
+	"configJson\"\"\n" +
+	" SetIntegrationCredentialResponse\"\x86\x01\n" +
+	"%GetIntegrationCredentialStatusRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\"i\n" +
+	"&GetIntegrationCredentialStatusResponse\x12\x1e\n" +
+	"\n" +
+	"configured\x18\x01 \x01(\bR\n" +
+	"configured\x12\x1f\n" +
+	"\vconfig_json\x18\x02 \x01(\tR\n" +
+	"configJson\"@\n" +
+	"!ListIntegrationCredentialsRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\"}\n" +
+	"\"ListIntegrationCredentialsResponse\x12W\n" +
+	"\x14configured_providers\x18\x01 \x03(\x0e2$.orca.issuetracking.v1.IssueProviderR\x13configuredProviders\"r\n" +
+	"\x11RevokeAuthRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\"\x14\n" +
+	"\x12RevokeAuthResponse*c\n" +
 	"\rIssueProvider\x12\x1e\n" +
 	"\x1aISSUE_PROVIDER_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ISSUE_PROVIDER_JIRA\x10\x01\x12\x19\n" +
-	"\x15ISSUE_PROVIDER_LINEAR\x10\x022\xab\x16\n" +
+	"\x15ISSUE_PROVIDER_LINEAR\x10\x022\xd0\x1a\n" +
 	"\x14IssueTrackingService\x12a\n" +
 	"\n" +
 	"ListIssues\x12(.orca.issuetracking.v1.ListIssuesRequest\x1a).orca.issuetracking.v1.ListIssuesResponse\x12d\n" +
@@ -4008,7 +4416,12 @@ const file_orca_issuetracking_v1_issuetracking_proto_rawDesc = "" +
 	"\x0eListTeamLabels\x12,.orca.issuetracking.v1.ListTeamLabelsRequest\x1a-.orca.issuetracking.v1.ListTeamLabelsResponse\x12p\n" +
 	"\x0fListTeamMembers\x12-.orca.issuetracking.v1.ListTeamMembersRequest\x1a..orca.issuetracking.v1.ListTeamMembersResponse\x12_\n" +
 	"\rGetCustomView\x12+.orca.issuetracking.v1.GetCustomViewRequest\x1a!.orca.issuetracking.v1.CustomView\x12y\n" +
-	"\x12ListWorkflowStates\x120.orca.issuetracking.v1.ListWorkflowStatesRequest\x1a1.orca.issuetracking.v1.ListWorkflowStatesResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1;issuetrackingv1b\x06proto3"
+	"\x12ListWorkflowStates\x120.orca.issuetracking.v1.ListWorkflowStatesRequest\x1a1.orca.issuetracking.v1.ListWorkflowStatesResponse\x12\x8b\x01\n" +
+	"\x18SetIntegrationCredential\x126.orca.issuetracking.v1.SetIntegrationCredentialRequest\x1a7.orca.issuetracking.v1.SetIntegrationCredentialResponse\x12\x9d\x01\n" +
+	"\x1eGetIntegrationCredentialStatus\x12<.orca.issuetracking.v1.GetIntegrationCredentialStatusRequest\x1a=.orca.issuetracking.v1.GetIntegrationCredentialStatusResponse\x12\x91\x01\n" +
+	"\x1aListIntegrationCredentials\x128.orca.issuetracking.v1.ListIntegrationCredentialsRequest\x1a9.orca.issuetracking.v1.ListIntegrationCredentialsResponse\x12a\n" +
+	"\n" +
+	"RevokeAuth\x12(.orca.issuetracking.v1.RevokeAuthRequest\x1a).orca.issuetracking.v1.RevokeAuthResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1;issuetrackingv1b\x06proto3"
 
 var (
 	file_orca_issuetracking_v1_issuetracking_proto_rawDescOnce sync.Once
@@ -4023,71 +4436,79 @@ func file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_issuetracking_v1_issuetracking_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_issuetracking_v1_issuetracking_proto_msgTypes = make([]protoimpl.MessageInfo, 60)
+var file_orca_issuetracking_v1_issuetracking_proto_msgTypes = make([]protoimpl.MessageInfo, 68)
 var file_orca_issuetracking_v1_issuetracking_proto_goTypes = []any{
-	(IssueProvider)(0),                    // 0: orca.issuetracking.v1.IssueProvider
-	(*Workspace)(nil),                     // 1: orca.issuetracking.v1.Workspace
-	(*ConnectionStatus)(nil),              // 2: orca.issuetracking.v1.ConnectionStatus
-	(*ConnectRequest)(nil),                // 3: orca.issuetracking.v1.ConnectRequest
-	(*DisconnectRequest)(nil),             // 4: orca.issuetracking.v1.DisconnectRequest
-	(*SelectWorkspaceRequest)(nil),        // 5: orca.issuetracking.v1.SelectWorkspaceRequest
-	(*GetConnectionStatusRequest)(nil),    // 6: orca.issuetracking.v1.GetConnectionStatusRequest
-	(*TestConnectionRequest)(nil),         // 7: orca.issuetracking.v1.TestConnectionRequest
-	(*TestConnectionResult)(nil),          // 8: orca.issuetracking.v1.TestConnectionResult
-	(*Issue)(nil),                         // 9: orca.issuetracking.v1.Issue
-	(*Project)(nil),                       // 10: orca.issuetracking.v1.Project
-	(*IssueType)(nil),                     // 11: orca.issuetracking.v1.IssueType
-	(*WorkflowState)(nil),                 // 12: orca.issuetracking.v1.WorkflowState
-	(*UserRef)(nil),                       // 13: orca.issuetracking.v1.UserRef
-	(*Priority)(nil),                      // 14: orca.issuetracking.v1.Priority
-	(*IssueComment)(nil),                  // 15: orca.issuetracking.v1.IssueComment
-	(*ListIssuesRequest)(nil),             // 16: orca.issuetracking.v1.ListIssuesRequest
-	(*ListIssuesResponse)(nil),            // 17: orca.issuetracking.v1.ListIssuesResponse
-	(*SearchIssuesRequest)(nil),           // 18: orca.issuetracking.v1.SearchIssuesRequest
-	(*SearchIssuesResponse)(nil),          // 19: orca.issuetracking.v1.SearchIssuesResponse
-	(*GetIssueRequest)(nil),               // 20: orca.issuetracking.v1.GetIssueRequest
-	(*CreateIssueRequest)(nil),            // 21: orca.issuetracking.v1.CreateIssueRequest
-	(*CreateIssueResponse)(nil),           // 22: orca.issuetracking.v1.CreateIssueResponse
-	(*UpdateIssueRequest)(nil),            // 23: orca.issuetracking.v1.UpdateIssueRequest
-	(*AddIssueCommentRequest)(nil),        // 24: orca.issuetracking.v1.AddIssueCommentRequest
-	(*ListIssueCommentsRequest)(nil),      // 25: orca.issuetracking.v1.ListIssueCommentsRequest
-	(*ListIssueCommentsResponse)(nil),     // 26: orca.issuetracking.v1.ListIssueCommentsResponse
-	(*ListProjectsRequest)(nil),           // 27: orca.issuetracking.v1.ListProjectsRequest
-	(*ListProjectsResponse)(nil),          // 28: orca.issuetracking.v1.ListProjectsResponse
-	(*ListIssueTypesRequest)(nil),         // 29: orca.issuetracking.v1.ListIssueTypesRequest
-	(*ListIssueTypesResponse)(nil),        // 30: orca.issuetracking.v1.ListIssueTypesResponse
-	(*CreateField)(nil),                   // 31: orca.issuetracking.v1.CreateField
-	(*ListCreateFieldsRequest)(nil),       // 32: orca.issuetracking.v1.ListCreateFieldsRequest
-	(*ListCreateFieldsResponse)(nil),      // 33: orca.issuetracking.v1.ListCreateFieldsResponse
-	(*ListAssignableUsersRequest)(nil),    // 34: orca.issuetracking.v1.ListAssignableUsersRequest
-	(*ListAssignableUsersResponse)(nil),   // 35: orca.issuetracking.v1.ListAssignableUsersResponse
-	(*ListPrioritiesRequest)(nil),         // 36: orca.issuetracking.v1.ListPrioritiesRequest
-	(*ListPrioritiesResponse)(nil),        // 37: orca.issuetracking.v1.ListPrioritiesResponse
-	(*Transition)(nil),                    // 38: orca.issuetracking.v1.Transition
-	(*ListTransitionsRequest)(nil),        // 39: orca.issuetracking.v1.ListTransitionsRequest
-	(*ListTransitionsResponse)(nil),       // 40: orca.issuetracking.v1.ListTransitionsResponse
-	(*GetProjectStatusOrderRequest)(nil),  // 41: orca.issuetracking.v1.GetProjectStatusOrderRequest
-	(*GetProjectStatusOrderResponse)(nil), // 42: orca.issuetracking.v1.GetProjectStatusOrderResponse
-	(*StatusIDList)(nil),                  // 43: orca.issuetracking.v1.StatusIDList
-	(*Team)(nil),                          // 44: orca.issuetracking.v1.Team
-	(*Label)(nil),                         // 45: orca.issuetracking.v1.Label
-	(*Member)(nil),                        // 46: orca.issuetracking.v1.Member
-	(*CustomView)(nil),                    // 47: orca.issuetracking.v1.CustomView
-	(*CreateProjectRequest)(nil),          // 48: orca.issuetracking.v1.CreateProjectRequest
-	(*GetProjectRequest)(nil),             // 49: orca.issuetracking.v1.GetProjectRequest
-	(*ListTeamsRequest)(nil),              // 50: orca.issuetracking.v1.ListTeamsRequest
-	(*ListTeamsResponse)(nil),             // 51: orca.issuetracking.v1.ListTeamsResponse
-	(*ListTeamLabelsRequest)(nil),         // 52: orca.issuetracking.v1.ListTeamLabelsRequest
-	(*ListTeamLabelsResponse)(nil),        // 53: orca.issuetracking.v1.ListTeamLabelsResponse
-	(*ListTeamMembersRequest)(nil),        // 54: orca.issuetracking.v1.ListTeamMembersRequest
-	(*ListTeamMembersResponse)(nil),       // 55: orca.issuetracking.v1.ListTeamMembersResponse
-	(*GetCustomViewRequest)(nil),          // 56: orca.issuetracking.v1.GetCustomViewRequest
-	(*ListWorkflowStatesRequest)(nil),     // 57: orca.issuetracking.v1.ListWorkflowStatesRequest
-	(*ListWorkflowStatesResponse)(nil),    // 58: orca.issuetracking.v1.ListWorkflowStatesResponse
-	(*LinkIssueRequest)(nil),              // 59: orca.issuetracking.v1.LinkIssueRequest
-	(*LinkIssueResponse)(nil),             // 60: orca.issuetracking.v1.LinkIssueResponse
-	(*timestamppb.Timestamp)(nil),         // 61: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                 // 62: google.protobuf.Empty
+	(IssueProvider)(0),                             // 0: orca.issuetracking.v1.IssueProvider
+	(*Workspace)(nil),                              // 1: orca.issuetracking.v1.Workspace
+	(*ConnectionStatus)(nil),                       // 2: orca.issuetracking.v1.ConnectionStatus
+	(*ConnectRequest)(nil),                         // 3: orca.issuetracking.v1.ConnectRequest
+	(*DisconnectRequest)(nil),                      // 4: orca.issuetracking.v1.DisconnectRequest
+	(*SelectWorkspaceRequest)(nil),                 // 5: orca.issuetracking.v1.SelectWorkspaceRequest
+	(*GetConnectionStatusRequest)(nil),             // 6: orca.issuetracking.v1.GetConnectionStatusRequest
+	(*TestConnectionRequest)(nil),                  // 7: orca.issuetracking.v1.TestConnectionRequest
+	(*TestConnectionResult)(nil),                   // 8: orca.issuetracking.v1.TestConnectionResult
+	(*Issue)(nil),                                  // 9: orca.issuetracking.v1.Issue
+	(*Project)(nil),                                // 10: orca.issuetracking.v1.Project
+	(*IssueType)(nil),                              // 11: orca.issuetracking.v1.IssueType
+	(*WorkflowState)(nil),                          // 12: orca.issuetracking.v1.WorkflowState
+	(*UserRef)(nil),                                // 13: orca.issuetracking.v1.UserRef
+	(*Priority)(nil),                               // 14: orca.issuetracking.v1.Priority
+	(*IssueComment)(nil),                           // 15: orca.issuetracking.v1.IssueComment
+	(*ListIssuesRequest)(nil),                      // 16: orca.issuetracking.v1.ListIssuesRequest
+	(*ListIssuesResponse)(nil),                     // 17: orca.issuetracking.v1.ListIssuesResponse
+	(*SearchIssuesRequest)(nil),                    // 18: orca.issuetracking.v1.SearchIssuesRequest
+	(*SearchIssuesResponse)(nil),                   // 19: orca.issuetracking.v1.SearchIssuesResponse
+	(*GetIssueRequest)(nil),                        // 20: orca.issuetracking.v1.GetIssueRequest
+	(*CreateIssueRequest)(nil),                     // 21: orca.issuetracking.v1.CreateIssueRequest
+	(*CreateIssueResponse)(nil),                    // 22: orca.issuetracking.v1.CreateIssueResponse
+	(*UpdateIssueRequest)(nil),                     // 23: orca.issuetracking.v1.UpdateIssueRequest
+	(*AddIssueCommentRequest)(nil),                 // 24: orca.issuetracking.v1.AddIssueCommentRequest
+	(*ListIssueCommentsRequest)(nil),               // 25: orca.issuetracking.v1.ListIssueCommentsRequest
+	(*ListIssueCommentsResponse)(nil),              // 26: orca.issuetracking.v1.ListIssueCommentsResponse
+	(*ListProjectsRequest)(nil),                    // 27: orca.issuetracking.v1.ListProjectsRequest
+	(*ListProjectsResponse)(nil),                   // 28: orca.issuetracking.v1.ListProjectsResponse
+	(*ListIssueTypesRequest)(nil),                  // 29: orca.issuetracking.v1.ListIssueTypesRequest
+	(*ListIssueTypesResponse)(nil),                 // 30: orca.issuetracking.v1.ListIssueTypesResponse
+	(*CreateField)(nil),                            // 31: orca.issuetracking.v1.CreateField
+	(*ListCreateFieldsRequest)(nil),                // 32: orca.issuetracking.v1.ListCreateFieldsRequest
+	(*ListCreateFieldsResponse)(nil),               // 33: orca.issuetracking.v1.ListCreateFieldsResponse
+	(*ListAssignableUsersRequest)(nil),             // 34: orca.issuetracking.v1.ListAssignableUsersRequest
+	(*ListAssignableUsersResponse)(nil),            // 35: orca.issuetracking.v1.ListAssignableUsersResponse
+	(*ListPrioritiesRequest)(nil),                  // 36: orca.issuetracking.v1.ListPrioritiesRequest
+	(*ListPrioritiesResponse)(nil),                 // 37: orca.issuetracking.v1.ListPrioritiesResponse
+	(*Transition)(nil),                             // 38: orca.issuetracking.v1.Transition
+	(*ListTransitionsRequest)(nil),                 // 39: orca.issuetracking.v1.ListTransitionsRequest
+	(*ListTransitionsResponse)(nil),                // 40: orca.issuetracking.v1.ListTransitionsResponse
+	(*GetProjectStatusOrderRequest)(nil),           // 41: orca.issuetracking.v1.GetProjectStatusOrderRequest
+	(*GetProjectStatusOrderResponse)(nil),          // 42: orca.issuetracking.v1.GetProjectStatusOrderResponse
+	(*StatusIDList)(nil),                           // 43: orca.issuetracking.v1.StatusIDList
+	(*Team)(nil),                                   // 44: orca.issuetracking.v1.Team
+	(*Label)(nil),                                  // 45: orca.issuetracking.v1.Label
+	(*Member)(nil),                                 // 46: orca.issuetracking.v1.Member
+	(*CustomView)(nil),                             // 47: orca.issuetracking.v1.CustomView
+	(*CreateProjectRequest)(nil),                   // 48: orca.issuetracking.v1.CreateProjectRequest
+	(*GetProjectRequest)(nil),                      // 49: orca.issuetracking.v1.GetProjectRequest
+	(*ListTeamsRequest)(nil),                       // 50: orca.issuetracking.v1.ListTeamsRequest
+	(*ListTeamsResponse)(nil),                      // 51: orca.issuetracking.v1.ListTeamsResponse
+	(*ListTeamLabelsRequest)(nil),                  // 52: orca.issuetracking.v1.ListTeamLabelsRequest
+	(*ListTeamLabelsResponse)(nil),                 // 53: orca.issuetracking.v1.ListTeamLabelsResponse
+	(*ListTeamMembersRequest)(nil),                 // 54: orca.issuetracking.v1.ListTeamMembersRequest
+	(*ListTeamMembersResponse)(nil),                // 55: orca.issuetracking.v1.ListTeamMembersResponse
+	(*GetCustomViewRequest)(nil),                   // 56: orca.issuetracking.v1.GetCustomViewRequest
+	(*ListWorkflowStatesRequest)(nil),              // 57: orca.issuetracking.v1.ListWorkflowStatesRequest
+	(*ListWorkflowStatesResponse)(nil),             // 58: orca.issuetracking.v1.ListWorkflowStatesResponse
+	(*LinkIssueRequest)(nil),                       // 59: orca.issuetracking.v1.LinkIssueRequest
+	(*LinkIssueResponse)(nil),                      // 60: orca.issuetracking.v1.LinkIssueResponse
+	(*SetIntegrationCredentialRequest)(nil),        // 61: orca.issuetracking.v1.SetIntegrationCredentialRequest
+	(*SetIntegrationCredentialResponse)(nil),       // 62: orca.issuetracking.v1.SetIntegrationCredentialResponse
+	(*GetIntegrationCredentialStatusRequest)(nil),  // 63: orca.issuetracking.v1.GetIntegrationCredentialStatusRequest
+	(*GetIntegrationCredentialStatusResponse)(nil), // 64: orca.issuetracking.v1.GetIntegrationCredentialStatusResponse
+	(*ListIntegrationCredentialsRequest)(nil),      // 65: orca.issuetracking.v1.ListIntegrationCredentialsRequest
+	(*ListIntegrationCredentialsResponse)(nil),     // 66: orca.issuetracking.v1.ListIntegrationCredentialsResponse
+	(*RevokeAuthRequest)(nil),                      // 67: orca.issuetracking.v1.RevokeAuthRequest
+	(*RevokeAuthResponse)(nil),                     // 68: orca.issuetracking.v1.RevokeAuthResponse
+	(*timestamppb.Timestamp)(nil),                  // 69: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                          // 70: google.protobuf.Empty
 }
 var file_orca_issuetracking_v1_issuetracking_proto_depIdxs = []int32{
 	1,  // 0: orca.issuetracking.v1.ConnectionStatus.workspaces:type_name -> orca.issuetracking.v1.Workspace
@@ -4102,11 +4523,11 @@ var file_orca_issuetracking_v1_issuetracking_proto_depIdxs = []int32{
 	13, // 9: orca.issuetracking.v1.Issue.assignee:type_name -> orca.issuetracking.v1.UserRef
 	13, // 10: orca.issuetracking.v1.Issue.reporter:type_name -> orca.issuetracking.v1.UserRef
 	14, // 11: orca.issuetracking.v1.Issue.priority:type_name -> orca.issuetracking.v1.Priority
-	61, // 12: orca.issuetracking.v1.Issue.created_at:type_name -> google.protobuf.Timestamp
-	61, // 13: orca.issuetracking.v1.Issue.updated_at:type_name -> google.protobuf.Timestamp
+	69, // 12: orca.issuetracking.v1.Issue.created_at:type_name -> google.protobuf.Timestamp
+	69, // 13: orca.issuetracking.v1.Issue.updated_at:type_name -> google.protobuf.Timestamp
 	13, // 14: orca.issuetracking.v1.IssueComment.author:type_name -> orca.issuetracking.v1.UserRef
-	61, // 15: orca.issuetracking.v1.IssueComment.created_at:type_name -> google.protobuf.Timestamp
-	61, // 16: orca.issuetracking.v1.IssueComment.updated_at:type_name -> google.protobuf.Timestamp
+	69, // 15: orca.issuetracking.v1.IssueComment.created_at:type_name -> google.protobuf.Timestamp
+	69, // 16: orca.issuetracking.v1.IssueComment.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 17: orca.issuetracking.v1.ListIssuesRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
 	9,  // 18: orca.issuetracking.v1.ListIssuesResponse.issues:type_name -> orca.issuetracking.v1.Issue
 	0,  // 19: orca.issuetracking.v1.SearchIssuesRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
@@ -4132,65 +4553,77 @@ var file_orca_issuetracking_v1_issuetracking_proto_depIdxs = []int32{
 	45, // 39: orca.issuetracking.v1.ListTeamLabelsResponse.labels:type_name -> orca.issuetracking.v1.Label
 	46, // 40: orca.issuetracking.v1.ListTeamMembersResponse.members:type_name -> orca.issuetracking.v1.Member
 	12, // 41: orca.issuetracking.v1.ListWorkflowStatesResponse.states:type_name -> orca.issuetracking.v1.WorkflowState
-	16, // 42: orca.issuetracking.v1.IssueTrackingService.ListIssues:input_type -> orca.issuetracking.v1.ListIssuesRequest
-	21, // 43: orca.issuetracking.v1.IssueTrackingService.CreateIssue:input_type -> orca.issuetracking.v1.CreateIssueRequest
-	59, // 44: orca.issuetracking.v1.IssueTrackingService.LinkIssue:input_type -> orca.issuetracking.v1.LinkIssueRequest
-	3,  // 45: orca.issuetracking.v1.IssueTrackingService.Connect:input_type -> orca.issuetracking.v1.ConnectRequest
-	4,  // 46: orca.issuetracking.v1.IssueTrackingService.Disconnect:input_type -> orca.issuetracking.v1.DisconnectRequest
-	5,  // 47: orca.issuetracking.v1.IssueTrackingService.SelectWorkspace:input_type -> orca.issuetracking.v1.SelectWorkspaceRequest
-	6,  // 48: orca.issuetracking.v1.IssueTrackingService.GetConnectionStatus:input_type -> orca.issuetracking.v1.GetConnectionStatusRequest
-	7,  // 49: orca.issuetracking.v1.IssueTrackingService.TestConnection:input_type -> orca.issuetracking.v1.TestConnectionRequest
-	18, // 50: orca.issuetracking.v1.IssueTrackingService.SearchIssues:input_type -> orca.issuetracking.v1.SearchIssuesRequest
-	20, // 51: orca.issuetracking.v1.IssueTrackingService.GetIssue:input_type -> orca.issuetracking.v1.GetIssueRequest
-	23, // 52: orca.issuetracking.v1.IssueTrackingService.UpdateIssue:input_type -> orca.issuetracking.v1.UpdateIssueRequest
-	24, // 53: orca.issuetracking.v1.IssueTrackingService.AddIssueComment:input_type -> orca.issuetracking.v1.AddIssueCommentRequest
-	25, // 54: orca.issuetracking.v1.IssueTrackingService.ListIssueComments:input_type -> orca.issuetracking.v1.ListIssueCommentsRequest
-	27, // 55: orca.issuetracking.v1.IssueTrackingService.ListProjects:input_type -> orca.issuetracking.v1.ListProjectsRequest
-	29, // 56: orca.issuetracking.v1.IssueTrackingService.ListIssueTypes:input_type -> orca.issuetracking.v1.ListIssueTypesRequest
-	32, // 57: orca.issuetracking.v1.IssueTrackingService.ListCreateFields:input_type -> orca.issuetracking.v1.ListCreateFieldsRequest
-	34, // 58: orca.issuetracking.v1.IssueTrackingService.ListAssignableUsers:input_type -> orca.issuetracking.v1.ListAssignableUsersRequest
-	36, // 59: orca.issuetracking.v1.IssueTrackingService.ListPriorities:input_type -> orca.issuetracking.v1.ListPrioritiesRequest
-	39, // 60: orca.issuetracking.v1.IssueTrackingService.ListTransitions:input_type -> orca.issuetracking.v1.ListTransitionsRequest
-	41, // 61: orca.issuetracking.v1.IssueTrackingService.GetProjectStatusOrder:input_type -> orca.issuetracking.v1.GetProjectStatusOrderRequest
-	48, // 62: orca.issuetracking.v1.IssueTrackingService.CreateProject:input_type -> orca.issuetracking.v1.CreateProjectRequest
-	49, // 63: orca.issuetracking.v1.IssueTrackingService.GetProject:input_type -> orca.issuetracking.v1.GetProjectRequest
-	50, // 64: orca.issuetracking.v1.IssueTrackingService.ListTeams:input_type -> orca.issuetracking.v1.ListTeamsRequest
-	52, // 65: orca.issuetracking.v1.IssueTrackingService.ListTeamLabels:input_type -> orca.issuetracking.v1.ListTeamLabelsRequest
-	54, // 66: orca.issuetracking.v1.IssueTrackingService.ListTeamMembers:input_type -> orca.issuetracking.v1.ListTeamMembersRequest
-	56, // 67: orca.issuetracking.v1.IssueTrackingService.GetCustomView:input_type -> orca.issuetracking.v1.GetCustomViewRequest
-	57, // 68: orca.issuetracking.v1.IssueTrackingService.ListWorkflowStates:input_type -> orca.issuetracking.v1.ListWorkflowStatesRequest
-	17, // 69: orca.issuetracking.v1.IssueTrackingService.ListIssues:output_type -> orca.issuetracking.v1.ListIssuesResponse
-	22, // 70: orca.issuetracking.v1.IssueTrackingService.CreateIssue:output_type -> orca.issuetracking.v1.CreateIssueResponse
-	60, // 71: orca.issuetracking.v1.IssueTrackingService.LinkIssue:output_type -> orca.issuetracking.v1.LinkIssueResponse
-	2,  // 72: orca.issuetracking.v1.IssueTrackingService.Connect:output_type -> orca.issuetracking.v1.ConnectionStatus
-	62, // 73: orca.issuetracking.v1.IssueTrackingService.Disconnect:output_type -> google.protobuf.Empty
-	2,  // 74: orca.issuetracking.v1.IssueTrackingService.SelectWorkspace:output_type -> orca.issuetracking.v1.ConnectionStatus
-	2,  // 75: orca.issuetracking.v1.IssueTrackingService.GetConnectionStatus:output_type -> orca.issuetracking.v1.ConnectionStatus
-	8,  // 76: orca.issuetracking.v1.IssueTrackingService.TestConnection:output_type -> orca.issuetracking.v1.TestConnectionResult
-	19, // 77: orca.issuetracking.v1.IssueTrackingService.SearchIssues:output_type -> orca.issuetracking.v1.SearchIssuesResponse
-	9,  // 78: orca.issuetracking.v1.IssueTrackingService.GetIssue:output_type -> orca.issuetracking.v1.Issue
-	9,  // 79: orca.issuetracking.v1.IssueTrackingService.UpdateIssue:output_type -> orca.issuetracking.v1.Issue
-	15, // 80: orca.issuetracking.v1.IssueTrackingService.AddIssueComment:output_type -> orca.issuetracking.v1.IssueComment
-	26, // 81: orca.issuetracking.v1.IssueTrackingService.ListIssueComments:output_type -> orca.issuetracking.v1.ListIssueCommentsResponse
-	28, // 82: orca.issuetracking.v1.IssueTrackingService.ListProjects:output_type -> orca.issuetracking.v1.ListProjectsResponse
-	30, // 83: orca.issuetracking.v1.IssueTrackingService.ListIssueTypes:output_type -> orca.issuetracking.v1.ListIssueTypesResponse
-	33, // 84: orca.issuetracking.v1.IssueTrackingService.ListCreateFields:output_type -> orca.issuetracking.v1.ListCreateFieldsResponse
-	35, // 85: orca.issuetracking.v1.IssueTrackingService.ListAssignableUsers:output_type -> orca.issuetracking.v1.ListAssignableUsersResponse
-	37, // 86: orca.issuetracking.v1.IssueTrackingService.ListPriorities:output_type -> orca.issuetracking.v1.ListPrioritiesResponse
-	40, // 87: orca.issuetracking.v1.IssueTrackingService.ListTransitions:output_type -> orca.issuetracking.v1.ListTransitionsResponse
-	42, // 88: orca.issuetracking.v1.IssueTrackingService.GetProjectStatusOrder:output_type -> orca.issuetracking.v1.GetProjectStatusOrderResponse
-	10, // 89: orca.issuetracking.v1.IssueTrackingService.CreateProject:output_type -> orca.issuetracking.v1.Project
-	10, // 90: orca.issuetracking.v1.IssueTrackingService.GetProject:output_type -> orca.issuetracking.v1.Project
-	51, // 91: orca.issuetracking.v1.IssueTrackingService.ListTeams:output_type -> orca.issuetracking.v1.ListTeamsResponse
-	53, // 92: orca.issuetracking.v1.IssueTrackingService.ListTeamLabels:output_type -> orca.issuetracking.v1.ListTeamLabelsResponse
-	55, // 93: orca.issuetracking.v1.IssueTrackingService.ListTeamMembers:output_type -> orca.issuetracking.v1.ListTeamMembersResponse
-	47, // 94: orca.issuetracking.v1.IssueTrackingService.GetCustomView:output_type -> orca.issuetracking.v1.CustomView
-	58, // 95: orca.issuetracking.v1.IssueTrackingService.ListWorkflowStates:output_type -> orca.issuetracking.v1.ListWorkflowStatesResponse
-	69, // [69:96] is the sub-list for method output_type
-	42, // [42:69] is the sub-list for method input_type
-	42, // [42:42] is the sub-list for extension type_name
-	42, // [42:42] is the sub-list for extension extendee
-	0,  // [0:42] is the sub-list for field type_name
+	0,  // 42: orca.issuetracking.v1.SetIntegrationCredentialRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 43: orca.issuetracking.v1.GetIntegrationCredentialStatusRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 44: orca.issuetracking.v1.ListIntegrationCredentialsResponse.configured_providers:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 45: orca.issuetracking.v1.RevokeAuthRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	16, // 46: orca.issuetracking.v1.IssueTrackingService.ListIssues:input_type -> orca.issuetracking.v1.ListIssuesRequest
+	21, // 47: orca.issuetracking.v1.IssueTrackingService.CreateIssue:input_type -> orca.issuetracking.v1.CreateIssueRequest
+	59, // 48: orca.issuetracking.v1.IssueTrackingService.LinkIssue:input_type -> orca.issuetracking.v1.LinkIssueRequest
+	3,  // 49: orca.issuetracking.v1.IssueTrackingService.Connect:input_type -> orca.issuetracking.v1.ConnectRequest
+	4,  // 50: orca.issuetracking.v1.IssueTrackingService.Disconnect:input_type -> orca.issuetracking.v1.DisconnectRequest
+	5,  // 51: orca.issuetracking.v1.IssueTrackingService.SelectWorkspace:input_type -> orca.issuetracking.v1.SelectWorkspaceRequest
+	6,  // 52: orca.issuetracking.v1.IssueTrackingService.GetConnectionStatus:input_type -> orca.issuetracking.v1.GetConnectionStatusRequest
+	7,  // 53: orca.issuetracking.v1.IssueTrackingService.TestConnection:input_type -> orca.issuetracking.v1.TestConnectionRequest
+	18, // 54: orca.issuetracking.v1.IssueTrackingService.SearchIssues:input_type -> orca.issuetracking.v1.SearchIssuesRequest
+	20, // 55: orca.issuetracking.v1.IssueTrackingService.GetIssue:input_type -> orca.issuetracking.v1.GetIssueRequest
+	23, // 56: orca.issuetracking.v1.IssueTrackingService.UpdateIssue:input_type -> orca.issuetracking.v1.UpdateIssueRequest
+	24, // 57: orca.issuetracking.v1.IssueTrackingService.AddIssueComment:input_type -> orca.issuetracking.v1.AddIssueCommentRequest
+	25, // 58: orca.issuetracking.v1.IssueTrackingService.ListIssueComments:input_type -> orca.issuetracking.v1.ListIssueCommentsRequest
+	27, // 59: orca.issuetracking.v1.IssueTrackingService.ListProjects:input_type -> orca.issuetracking.v1.ListProjectsRequest
+	29, // 60: orca.issuetracking.v1.IssueTrackingService.ListIssueTypes:input_type -> orca.issuetracking.v1.ListIssueTypesRequest
+	32, // 61: orca.issuetracking.v1.IssueTrackingService.ListCreateFields:input_type -> orca.issuetracking.v1.ListCreateFieldsRequest
+	34, // 62: orca.issuetracking.v1.IssueTrackingService.ListAssignableUsers:input_type -> orca.issuetracking.v1.ListAssignableUsersRequest
+	36, // 63: orca.issuetracking.v1.IssueTrackingService.ListPriorities:input_type -> orca.issuetracking.v1.ListPrioritiesRequest
+	39, // 64: orca.issuetracking.v1.IssueTrackingService.ListTransitions:input_type -> orca.issuetracking.v1.ListTransitionsRequest
+	41, // 65: orca.issuetracking.v1.IssueTrackingService.GetProjectStatusOrder:input_type -> orca.issuetracking.v1.GetProjectStatusOrderRequest
+	48, // 66: orca.issuetracking.v1.IssueTrackingService.CreateProject:input_type -> orca.issuetracking.v1.CreateProjectRequest
+	49, // 67: orca.issuetracking.v1.IssueTrackingService.GetProject:input_type -> orca.issuetracking.v1.GetProjectRequest
+	50, // 68: orca.issuetracking.v1.IssueTrackingService.ListTeams:input_type -> orca.issuetracking.v1.ListTeamsRequest
+	52, // 69: orca.issuetracking.v1.IssueTrackingService.ListTeamLabels:input_type -> orca.issuetracking.v1.ListTeamLabelsRequest
+	54, // 70: orca.issuetracking.v1.IssueTrackingService.ListTeamMembers:input_type -> orca.issuetracking.v1.ListTeamMembersRequest
+	56, // 71: orca.issuetracking.v1.IssueTrackingService.GetCustomView:input_type -> orca.issuetracking.v1.GetCustomViewRequest
+	57, // 72: orca.issuetracking.v1.IssueTrackingService.ListWorkflowStates:input_type -> orca.issuetracking.v1.ListWorkflowStatesRequest
+	61, // 73: orca.issuetracking.v1.IssueTrackingService.SetIntegrationCredential:input_type -> orca.issuetracking.v1.SetIntegrationCredentialRequest
+	63, // 74: orca.issuetracking.v1.IssueTrackingService.GetIntegrationCredentialStatus:input_type -> orca.issuetracking.v1.GetIntegrationCredentialStatusRequest
+	65, // 75: orca.issuetracking.v1.IssueTrackingService.ListIntegrationCredentials:input_type -> orca.issuetracking.v1.ListIntegrationCredentialsRequest
+	67, // 76: orca.issuetracking.v1.IssueTrackingService.RevokeAuth:input_type -> orca.issuetracking.v1.RevokeAuthRequest
+	17, // 77: orca.issuetracking.v1.IssueTrackingService.ListIssues:output_type -> orca.issuetracking.v1.ListIssuesResponse
+	22, // 78: orca.issuetracking.v1.IssueTrackingService.CreateIssue:output_type -> orca.issuetracking.v1.CreateIssueResponse
+	60, // 79: orca.issuetracking.v1.IssueTrackingService.LinkIssue:output_type -> orca.issuetracking.v1.LinkIssueResponse
+	2,  // 80: orca.issuetracking.v1.IssueTrackingService.Connect:output_type -> orca.issuetracking.v1.ConnectionStatus
+	70, // 81: orca.issuetracking.v1.IssueTrackingService.Disconnect:output_type -> google.protobuf.Empty
+	2,  // 82: orca.issuetracking.v1.IssueTrackingService.SelectWorkspace:output_type -> orca.issuetracking.v1.ConnectionStatus
+	2,  // 83: orca.issuetracking.v1.IssueTrackingService.GetConnectionStatus:output_type -> orca.issuetracking.v1.ConnectionStatus
+	8,  // 84: orca.issuetracking.v1.IssueTrackingService.TestConnection:output_type -> orca.issuetracking.v1.TestConnectionResult
+	19, // 85: orca.issuetracking.v1.IssueTrackingService.SearchIssues:output_type -> orca.issuetracking.v1.SearchIssuesResponse
+	9,  // 86: orca.issuetracking.v1.IssueTrackingService.GetIssue:output_type -> orca.issuetracking.v1.Issue
+	9,  // 87: orca.issuetracking.v1.IssueTrackingService.UpdateIssue:output_type -> orca.issuetracking.v1.Issue
+	15, // 88: orca.issuetracking.v1.IssueTrackingService.AddIssueComment:output_type -> orca.issuetracking.v1.IssueComment
+	26, // 89: orca.issuetracking.v1.IssueTrackingService.ListIssueComments:output_type -> orca.issuetracking.v1.ListIssueCommentsResponse
+	28, // 90: orca.issuetracking.v1.IssueTrackingService.ListProjects:output_type -> orca.issuetracking.v1.ListProjectsResponse
+	30, // 91: orca.issuetracking.v1.IssueTrackingService.ListIssueTypes:output_type -> orca.issuetracking.v1.ListIssueTypesResponse
+	33, // 92: orca.issuetracking.v1.IssueTrackingService.ListCreateFields:output_type -> orca.issuetracking.v1.ListCreateFieldsResponse
+	35, // 93: orca.issuetracking.v1.IssueTrackingService.ListAssignableUsers:output_type -> orca.issuetracking.v1.ListAssignableUsersResponse
+	37, // 94: orca.issuetracking.v1.IssueTrackingService.ListPriorities:output_type -> orca.issuetracking.v1.ListPrioritiesResponse
+	40, // 95: orca.issuetracking.v1.IssueTrackingService.ListTransitions:output_type -> orca.issuetracking.v1.ListTransitionsResponse
+	42, // 96: orca.issuetracking.v1.IssueTrackingService.GetProjectStatusOrder:output_type -> orca.issuetracking.v1.GetProjectStatusOrderResponse
+	10, // 97: orca.issuetracking.v1.IssueTrackingService.CreateProject:output_type -> orca.issuetracking.v1.Project
+	10, // 98: orca.issuetracking.v1.IssueTrackingService.GetProject:output_type -> orca.issuetracking.v1.Project
+	51, // 99: orca.issuetracking.v1.IssueTrackingService.ListTeams:output_type -> orca.issuetracking.v1.ListTeamsResponse
+	53, // 100: orca.issuetracking.v1.IssueTrackingService.ListTeamLabels:output_type -> orca.issuetracking.v1.ListTeamLabelsResponse
+	55, // 101: orca.issuetracking.v1.IssueTrackingService.ListTeamMembers:output_type -> orca.issuetracking.v1.ListTeamMembersResponse
+	47, // 102: orca.issuetracking.v1.IssueTrackingService.GetCustomView:output_type -> orca.issuetracking.v1.CustomView
+	58, // 103: orca.issuetracking.v1.IssueTrackingService.ListWorkflowStates:output_type -> orca.issuetracking.v1.ListWorkflowStatesResponse
+	62, // 104: orca.issuetracking.v1.IssueTrackingService.SetIntegrationCredential:output_type -> orca.issuetracking.v1.SetIntegrationCredentialResponse
+	64, // 105: orca.issuetracking.v1.IssueTrackingService.GetIntegrationCredentialStatus:output_type -> orca.issuetracking.v1.GetIntegrationCredentialStatusResponse
+	66, // 106: orca.issuetracking.v1.IssueTrackingService.ListIntegrationCredentials:output_type -> orca.issuetracking.v1.ListIntegrationCredentialsResponse
+	68, // 107: orca.issuetracking.v1.IssueTrackingService.RevokeAuth:output_type -> orca.issuetracking.v1.RevokeAuthResponse
+	77, // [77:108] is the sub-list for method output_type
+	46, // [46:77] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_orca_issuetracking_v1_issuetracking_proto_init() }
@@ -4204,7 +4637,7 @@ func file_orca_issuetracking_v1_issuetracking_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_issuetracking_v1_issuetracking_proto_rawDesc), len(file_orca_issuetracking_v1_issuetracking_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   60,
+			NumMessages:   68,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

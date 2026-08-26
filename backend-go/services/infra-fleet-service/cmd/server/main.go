@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -84,6 +85,7 @@ func run() error {
 	repo := infrapostgres.New(pool)
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
 	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
+	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
 	// wired below via agentwsserver) are both real, and so is relay-ssh now
@@ -145,6 +147,9 @@ func run() error {
 	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient)
 	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
 	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter)
+	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
+	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
+	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
@@ -170,6 +175,9 @@ func run() error {
 		getTerminalAgentStatusUC,
 		inspectTerminalProcessUC,
 		attachPtyUC,
+		listBrowserProfilesUC,
+		createBrowserProfileUC,
+		deleteBrowserProfileUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

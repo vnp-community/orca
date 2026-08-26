@@ -33,7 +33,7 @@ func TestNewProviderAccount_ValidatesInvariants(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NewProviderAccount("acc-1", tt.tenantID, tt.provider, tt.status, "cred-ref-1",
-				tt.scope, tt.userID, tt.projectID, nil, now, now)
+				tt.scope, tt.userID, tt.projectID, "", nil, now, now)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -51,7 +51,7 @@ func TestProviderAccount_HasNoSecretField(t *testing.T) {
 	// gets caught in review, even though Go can't enforce it at compile time.
 	now := time.Now()
 	acc, err := NewProviderAccount("acc-1", "t1", ProviderTypeAnthropic, AccountStatusActive,
-		"cred-ref-1", ScopeServer, "", "", nil, now, now)
+		"cred-ref-1", ScopeServer, "", "", "", nil, now, now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestProviderAccount_HasNoSecretField(t *testing.T) {
 func TestProviderAccount_Resolvable(t *testing.T) {
 	now := time.Now()
 	for _, status := range []AccountStatus{AccountStatusPending, AccountStatusActive, AccountStatusRotating, AccountStatusRevoked, AccountStatusError} {
-		acc, err := NewProviderAccount("acc-1", "t1", ProviderTypeAnthropic, status, "cred-ref-1", ScopeServer, "", "", nil, now, now)
+		acc, err := NewProviderAccount("acc-1", "t1", ProviderTypeAnthropic, status, "cred-ref-1", ScopeServer, "", "", "", nil, now, now)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

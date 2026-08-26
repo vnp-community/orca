@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_browser_profiles.go` (new), `channels.go`
 **Depends on:** TASK-025, TASK-032
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a0480f57a839cc758` (sub-scope), build/vet/test clean (all packages pass). Staged via `git add`, not yet committed by the parent agent. Pending merge.
 
 ---
 

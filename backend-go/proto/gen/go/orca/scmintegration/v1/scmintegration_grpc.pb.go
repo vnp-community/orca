@@ -20,41 +20,44 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ScmIntegrationService_ListIssues_FullMethodName                    = "/orca.scmintegration.v1.ScmIntegrationService/ListIssues"
-	ScmIntegrationService_CreatePullRequest_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
-	ScmIntegrationService_ListPullRequests_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
-	ScmIntegrationService_GetRateLimitStatus_FullMethodName            = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
-	ScmIntegrationService_GetAuthStatus_FullMethodName                 = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
-	ScmIntegrationService_StartOAuthFlow_FullMethodName                = "/orca.scmintegration.v1.ScmIntegrationService/StartOAuthFlow"
-	ScmIntegrationService_CompleteOAuthFlow_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/CompleteOAuthFlow"
-	ScmIntegrationService_RevokeAuth_FullMethodName                    = "/orca.scmintegration.v1.ScmIntegrationService/RevokeAuth"
-	ScmIntegrationService_MergePullRequest_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/MergePullRequest"
-	ScmIntegrationService_RequestPullRequestReviewers_FullMethodName   = "/orca.scmintegration.v1.ScmIntegrationService/RequestPullRequestReviewers"
-	ScmIntegrationService_RemovePullRequestReviewers_FullMethodName    = "/orca.scmintegration.v1.ScmIntegrationService/RemovePullRequestReviewers"
-	ScmIntegrationService_SetPullRequestAutoMerge_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/SetPullRequestAutoMerge"
-	ScmIntegrationService_UpdateIssue_FullMethodName                   = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssue"
-	ScmIntegrationService_GetPullRequestForBranch_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/GetPullRequestForBranch"
-	ScmIntegrationService_ResolveRepoSlug_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ResolveRepoSlug"
-	ScmIntegrationService_ListAccessibleProjects_FullMethodName        = "/orca.scmintegration.v1.ScmIntegrationService/ListAccessibleProjects"
-	ScmIntegrationService_ResolveProjectRef_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/ResolveProjectRef"
-	ScmIntegrationService_ListProjectViews_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ListProjectViews"
-	ScmIntegrationService_ViewProjectTable_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ViewProjectTable"
-	ScmIntegrationService_UpdateProjectItemField_FullMethodName        = "/orca.scmintegration.v1.ScmIntegrationService/UpdateProjectItemField"
-	ScmIntegrationService_ClearProjectItemField_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/ClearProjectItemField"
-	ScmIntegrationService_GetWorkItemDetailsBySlug_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/GetWorkItemDetailsBySlug"
-	ScmIntegrationService_UpdateIssueBySlug_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueBySlug"
-	ScmIntegrationService_UpdatePullRequestBySlug_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/UpdatePullRequestBySlug"
-	ScmIntegrationService_UpdateIssueTypeBySlug_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueTypeBySlug"
-	ScmIntegrationService_ListIssueTypesBySlug_FullMethodName          = "/orca.scmintegration.v1.ScmIntegrationService/ListIssueTypesBySlug"
-	ScmIntegrationService_ListAssignableUsersBySlug_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/ListAssignableUsersBySlug"
-	ScmIntegrationService_ListLabelsBySlug_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ListLabelsBySlug"
-	ScmIntegrationService_AddIssueCommentBySlug_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/AddIssueCommentBySlug"
-	ScmIntegrationService_UpdateIssueCommentBySlug_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueCommentBySlug"
-	ScmIntegrationService_DeleteIssueCommentBySlug_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/DeleteIssueCommentBySlug"
-	ScmIntegrationService_ListMergeRequests_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/ListMergeRequests"
-	ScmIntegrationService_ResolveMergeRequestDiscussion_FullMethodName = "/orca.scmintegration.v1.ScmIntegrationService/ResolveMergeRequestDiscussion"
-	ScmIntegrationService_GetWorkItemDetails_FullMethodName            = "/orca.scmintegration.v1.ScmIntegrationService/GetWorkItemDetails"
-	ScmIntegrationService_CheckHostedReviewEligibility_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/CheckHostedReviewEligibility"
+	ScmIntegrationService_ListIssues_FullMethodName                     = "/orca.scmintegration.v1.ScmIntegrationService/ListIssues"
+	ScmIntegrationService_CreatePullRequest_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
+	ScmIntegrationService_ListPullRequests_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
+	ScmIntegrationService_GetRateLimitStatus_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
+	ScmIntegrationService_GetAuthStatus_FullMethodName                  = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
+	ScmIntegrationService_StartOAuthFlow_FullMethodName                 = "/orca.scmintegration.v1.ScmIntegrationService/StartOAuthFlow"
+	ScmIntegrationService_CompleteOAuthFlow_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/CompleteOAuthFlow"
+	ScmIntegrationService_RevokeAuth_FullMethodName                     = "/orca.scmintegration.v1.ScmIntegrationService/RevokeAuth"
+	ScmIntegrationService_MergePullRequest_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/MergePullRequest"
+	ScmIntegrationService_RequestPullRequestReviewers_FullMethodName    = "/orca.scmintegration.v1.ScmIntegrationService/RequestPullRequestReviewers"
+	ScmIntegrationService_RemovePullRequestReviewers_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/RemovePullRequestReviewers"
+	ScmIntegrationService_SetPullRequestAutoMerge_FullMethodName        = "/orca.scmintegration.v1.ScmIntegrationService/SetPullRequestAutoMerge"
+	ScmIntegrationService_UpdateIssue_FullMethodName                    = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssue"
+	ScmIntegrationService_GetPullRequestForBranch_FullMethodName        = "/orca.scmintegration.v1.ScmIntegrationService/GetPullRequestForBranch"
+	ScmIntegrationService_ResolveRepoSlug_FullMethodName                = "/orca.scmintegration.v1.ScmIntegrationService/ResolveRepoSlug"
+	ScmIntegrationService_ListAccessibleProjects_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/ListAccessibleProjects"
+	ScmIntegrationService_ResolveProjectRef_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ResolveProjectRef"
+	ScmIntegrationService_ListProjectViews_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ListProjectViews"
+	ScmIntegrationService_ViewProjectTable_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ViewProjectTable"
+	ScmIntegrationService_UpdateProjectItemField_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/UpdateProjectItemField"
+	ScmIntegrationService_ClearProjectItemField_FullMethodName          = "/orca.scmintegration.v1.ScmIntegrationService/ClearProjectItemField"
+	ScmIntegrationService_GetWorkItemDetailsBySlug_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/GetWorkItemDetailsBySlug"
+	ScmIntegrationService_UpdateIssueBySlug_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueBySlug"
+	ScmIntegrationService_UpdatePullRequestBySlug_FullMethodName        = "/orca.scmintegration.v1.ScmIntegrationService/UpdatePullRequestBySlug"
+	ScmIntegrationService_UpdateIssueTypeBySlug_FullMethodName          = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueTypeBySlug"
+	ScmIntegrationService_ListIssueTypesBySlug_FullMethodName           = "/orca.scmintegration.v1.ScmIntegrationService/ListIssueTypesBySlug"
+	ScmIntegrationService_ListAssignableUsersBySlug_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/ListAssignableUsersBySlug"
+	ScmIntegrationService_ListLabelsBySlug_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ListLabelsBySlug"
+	ScmIntegrationService_AddIssueCommentBySlug_FullMethodName          = "/orca.scmintegration.v1.ScmIntegrationService/AddIssueCommentBySlug"
+	ScmIntegrationService_UpdateIssueCommentBySlug_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueCommentBySlug"
+	ScmIntegrationService_DeleteIssueCommentBySlug_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/DeleteIssueCommentBySlug"
+	ScmIntegrationService_ListMergeRequests_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ListMergeRequests"
+	ScmIntegrationService_ResolveMergeRequestDiscussion_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/ResolveMergeRequestDiscussion"
+	ScmIntegrationService_GetWorkItemDetails_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/GetWorkItemDetails"
+	ScmIntegrationService_CheckHostedReviewEligibility_FullMethodName   = "/orca.scmintegration.v1.ScmIntegrationService/CheckHostedReviewEligibility"
+	ScmIntegrationService_SetIntegrationCredential_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/SetIntegrationCredential"
+	ScmIntegrationService_GetIntegrationCredentialStatus_FullMethodName = "/orca.scmintegration.v1.ScmIntegrationService/GetIntegrationCredentialStatus"
+	ScmIntegrationService_ListIntegrationCredentials_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/ListIntegrationCredentials"
 )
 
 // ScmIntegrationServiceClient is the client API for ScmIntegrationService service.
@@ -126,6 +129,15 @@ type ScmIntegrationServiceClient interface {
 	// a mutation: does CreatePullRequest have a reasonable chance of
 	// succeeding for this repo+branch right now. See SOL-014.
 	CheckHostedReviewEligibility(ctx context.Context, in *CheckHostedReviewEligibilityRequest, opts ...grpc.CallOption) (*HostedReviewEligibility, error)
+	// SetIntegrationCredential/GetIntegrationCredentialStatus/
+	// ListIntegrationCredentials back api-gateway's credentials.set/status/
+	// list channels for bitbucket/azure-devops/gitea (SOL-007). Reuses the
+	// same CREDENTIAL_CATEGORY_SCM_OAUTH / owner_id=provider-name convention
+	// CompleteOAuthFlow already established — see complete_oauth_flow.go's
+	// doc comment.
+	SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error)
+	GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error)
+	ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error)
 }
 
 type scmIntegrationServiceClient struct {
@@ -486,6 +498,36 @@ func (c *scmIntegrationServiceClient) CheckHostedReviewEligibility(ctx context.C
 	return out, nil
 }
 
+func (c *scmIntegrationServiceClient) SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetIntegrationCredentialResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_SetIntegrationCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIntegrationCredentialStatusResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_GetIntegrationCredentialStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIntegrationCredentialsResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListIntegrationCredentials_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScmIntegrationServiceServer is the server API for ScmIntegrationService service.
 // All implementations must embed UnimplementedScmIntegrationServiceServer
 // for forward compatibility.
@@ -555,6 +597,15 @@ type ScmIntegrationServiceServer interface {
 	// a mutation: does CreatePullRequest have a reasonable chance of
 	// succeeding for this repo+branch right now. See SOL-014.
 	CheckHostedReviewEligibility(context.Context, *CheckHostedReviewEligibilityRequest) (*HostedReviewEligibility, error)
+	// SetIntegrationCredential/GetIntegrationCredentialStatus/
+	// ListIntegrationCredentials back api-gateway's credentials.set/status/
+	// list channels for bitbucket/azure-devops/gitea (SOL-007). Reuses the
+	// same CREDENTIAL_CATEGORY_SCM_OAUTH / owner_id=provider-name convention
+	// CompleteOAuthFlow already established — see complete_oauth_flow.go's
+	// doc comment.
+	SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error)
+	GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error)
+	ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error)
 	mustEmbedUnimplementedScmIntegrationServiceServer()
 }
 
@@ -669,6 +720,15 @@ func (UnimplementedScmIntegrationServiceServer) GetWorkItemDetails(context.Conte
 }
 func (UnimplementedScmIntegrationServiceServer) CheckHostedReviewEligibility(context.Context, *CheckHostedReviewEligibilityRequest) (*HostedReviewEligibility, error) {
 	return nil, status.Error(codes.Unimplemented, "method CheckHostedReviewEligibility not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetIntegrationCredential not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIntegrationCredentialStatus not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIntegrationCredentials not implemented")
 }
 func (UnimplementedScmIntegrationServiceServer) mustEmbedUnimplementedScmIntegrationServiceServer() {}
 func (UnimplementedScmIntegrationServiceServer) testEmbeddedByValue()                               {}
@@ -1321,6 +1381,60 @@ func _ScmIntegrationService_CheckHostedReviewEligibility_Handler(srv interface{}
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScmIntegrationService_SetIntegrationCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetIntegrationCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).SetIntegrationCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_SetIntegrationCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).SetIntegrationCredential(ctx, req.(*SetIntegrationCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_GetIntegrationCredentialStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIntegrationCredentialStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).GetIntegrationCredentialStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_GetIntegrationCredentialStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).GetIntegrationCredentialStatus(ctx, req.(*GetIntegrationCredentialStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListIntegrationCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIntegrationCredentialsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListIntegrationCredentials(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListIntegrationCredentials_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListIntegrationCredentials(ctx, req.(*ListIntegrationCredentialsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScmIntegrationService_ServiceDesc is the grpc.ServiceDesc for ScmIntegrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1467,6 +1581,18 @@ var ScmIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckHostedReviewEligibility",
 			Handler:    _ScmIntegrationService_CheckHostedReviewEligibility_Handler,
+		},
+		{
+			MethodName: "SetIntegrationCredential",
+			Handler:    _ScmIntegrationService_SetIntegrationCredential_Handler,
+		},
+		{
+			MethodName: "GetIntegrationCredentialStatus",
+			Handler:    _ScmIntegrationService_GetIntegrationCredentialStatus_Handler,
+		},
+		{
+			MethodName: "ListIntegrationCredentials",
+			Handler:    _ScmIntegrationService_ListIntegrationCredentials_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

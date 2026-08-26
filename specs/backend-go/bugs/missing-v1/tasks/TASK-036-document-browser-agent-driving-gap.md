@@ -5,7 +5,7 @@
 **Service:** `agent` (out of scope) / product decision
 **File:** none — this task produces no code change; see "What to do" below
 **Depends on:** TASK-034
-**Status:** `[ ]` TODO
+**Status:** `[blocked]` — confirmed still blocked pending the product decision on live remote browser panes/`agent/` CDP capability. No code implemented, per this task's own instructions. Re-confirmed in worktree `agent-a0480f57a839cc758`.
 
 ---
 

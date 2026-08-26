@@ -11,6 +11,7 @@ import (
 
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/grpcmw"
@@ -49,6 +50,9 @@ type Server struct {
 	getTerminalAgentStatus *usecase.GetTerminalAgentStatus
 	inspectTerminalProcess *usecase.InspectTerminalProcess
 	attachPty              *usecase.AttachPty
+	listBrowserProfiles    *usecase.ListBrowserProfiles
+	createBrowserProfile   *usecase.CreateBrowserProfile
+	deleteBrowserProfile   *usecase.DeleteBrowserProfile
 }
 
 func New(
@@ -74,6 +78,9 @@ func New(
 	getTerminalAgentStatus *usecase.GetTerminalAgentStatus,
 	inspectTerminalProcess *usecase.InspectTerminalProcess,
 	attachPty *usecase.AttachPty,
+	listBrowserProfiles *usecase.ListBrowserProfiles,
+	createBrowserProfile *usecase.CreateBrowserProfile,
+	deleteBrowserProfile *usecase.DeleteBrowserProfile,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -98,6 +105,9 @@ func New(
 		getTerminalAgentStatus: getTerminalAgentStatus,
 		inspectTerminalProcess: inspectTerminalProcess,
 		attachPty:              attachPty,
+		listBrowserProfiles:    listBrowserProfiles,
+		createBrowserProfile:   createBrowserProfile,
+		deleteBrowserProfile:   deleteBrowserProfile,
 	}
 }
 
@@ -116,7 +126,11 @@ func (s *Server) RegisterDevServer(ctx context.Context, req *infrafleetv1.Regist
 // ResolveConnection is THE core dispatch primitive every dependent service
 // calls — see usecase.ResolveConnection's doc comment.
 func (s *Server) ResolveConnection(ctx context.Context, req *infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error) {
-	out, err := s.resolveConnection.Execute(ctx, req.GetConnectionId())
+	out, err := s.resolveConnection.Execute(ctx, usecase.ResolveConnectionInput{
+		ConnectionID: req.GetConnectionId(),
+		DevServerID:  req.GetDevServerId(),
+		WorktreeID:   req.GetWorktreeId(),
+	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -125,6 +139,7 @@ func (s *Server) ResolveConnection(ctx context.Context, req *infrafleetv1.Resolv
 		resp.DevServer = toProtoDevServer(out.DevServer)
 		resp.RepoPath = out.RepoPath
 		resp.WorktreeId = out.WorktreeID
+		resp.ConnectionId = out.ConnectionID
 	}
 	return resp, nil
 }
@@ -268,6 +283,44 @@ func (s *Server) KillWorkspacePort(ctx context.Context, req *infrafleetv1.KillWo
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &infrafleetv1.KillWorkspacePortResponse{Ok: ok, Reason: reason}, nil
+}
+
+// ListBrowserProfiles backs the frontend's browser.profileList channel —
+// see usecase.ListBrowserProfiles's doc comment (SOL-006 Group C).
+func (s *Server) ListBrowserProfiles(ctx context.Context, req *infrafleetv1.ListBrowserProfilesRequest) (*infrafleetv1.ListBrowserProfilesResponse, error) {
+	profiles, err := s.listBrowserProfiles.Execute(ctx, req.GetDevServerId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.BrowserProfile, 0, len(profiles))
+	for _, p := range profiles {
+		out = append(out, toProtoBrowserProfile(p))
+	}
+	return &infrafleetv1.ListBrowserProfilesResponse{Profiles: out}, nil
+}
+
+// CreateBrowserProfile backs the frontend's browser.profileCreate channel —
+// see usecase.CreateBrowserProfile's doc comment (SOL-006 Group C).
+func (s *Server) CreateBrowserProfile(ctx context.Context, req *infrafleetv1.CreateBrowserProfileRequest) (*infrafleetv1.CreateBrowserProfileResponse, error) {
+	profile, err := s.createBrowserProfile.Execute(ctx, usecase.CreateBrowserProfileInput{
+		DevServerID:   req.GetDevServerId(),
+		Name:          req.GetName(),
+		SourceBrowser: req.GetSourceBrowser(),
+		IsDefault:     req.GetIsDefault(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CreateBrowserProfileResponse{Profile: toProtoBrowserProfile(profile)}, nil
+}
+
+// DeleteBrowserProfile backs the frontend's browser.profileDelete channel —
+// see usecase.DeleteBrowserProfile's doc comment (SOL-006 Group C).
+func (s *Server) DeleteBrowserProfile(ctx context.Context, req *infrafleetv1.DeleteBrowserProfileRequest) (*emptypb.Empty, error) {
+	if err := s.deleteBrowserProfile.Execute(ctx, req.GetId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func toDomainConnectionMode(m infrafleetv1.ConnectionMode) domain.ConnectionMode {
@@ -510,6 +563,18 @@ func toProtoTerminalSession(session domain.TerminalSession) *infrafleetv1.Termin
 		Cwd:                session.Cwd,
 		CreatedAtUnixMs:    session.CreatedAt.UnixMilli(),
 		LastActiveAtUnixMs: session.LastActiveAt.UnixMilli(),
+	}
+}
+
+func toProtoBrowserProfile(p domain.BrowserProfile) *infrafleetv1.BrowserProfile {
+	return &infrafleetv1.BrowserProfile{
+		Id:            p.ID,
+		TenantId:      p.TenantID,
+		DevServerId:   p.DevServerID,
+		Name:          p.Name,
+		SourceBrowser: p.SourceBrowser,
+		IsDefault:     p.IsDefault,
+		CreatedAt:     timestamppb.New(p.CreatedAt),
 	}
 }
 

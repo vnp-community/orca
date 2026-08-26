@@ -151,6 +151,9 @@ func run() error {
 	startOAuthFlowUC := usecase.NewStartOAuthFlow(oauthRegistry, stateCodec, nil)
 	completeOAuthFlowUC := usecase.NewCompleteOAuthFlow(oauthRegistry, stateCodec, credentials)
 	revokeAuthUC := usecase.NewRevokeAuth(credentials)
+	setIntegrationCredentialUC := usecase.NewSetIntegrationCredential(credentials)
+	getIntegrationCredentialStatusUC := usecase.NewGetIntegrationCredentialStatus(credentials)
+	listIntegrationCredentialsUC := usecase.NewListIntegrationCredentials(credentials)
 
 	// SOL-012 shape 1/2 — GitHub PR/issue mutations + repo/branch resolution
 	// (TASK-076). registry already fans out per-provider; these usecases
@@ -208,6 +211,7 @@ func run() error {
 		addIssueCommentBySlugUC, updateIssueCommentBySlugUC, deleteIssueCommentBySlugUC,
 		listMergeRequestsUC, resolveMergeRequestDiscussionUC, getWorkItemDetailsUC,
 		checkHostedReviewEligibilityUC,
+		setIntegrationCredentialUC, getIntegrationCredentialStatusUC, listIntegrationCredentialsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

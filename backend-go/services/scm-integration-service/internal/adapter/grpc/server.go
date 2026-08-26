@@ -65,6 +65,9 @@ type Server struct {
 
 	// SOL-014 — hostedReview.getCreationEligibility (TASK-088).
 	checkHostedReviewEligibility *usecase.CheckHostedReviewEligibility
+	setIntegrationCredential       *usecase.SetIntegrationCredential
+	getIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus
+	listIntegrationCredentials     *usecase.ListIntegrationCredentials
 }
 
 func New(
@@ -103,6 +106,9 @@ func New(
 	resolveMergeRequestDiscussion *usecase.ResolveMergeRequestDiscussion,
 	getWorkItemDetails *usecase.GetWorkItemDetails,
 	checkHostedReviewEligibility *usecase.CheckHostedReviewEligibility,
+	setIntegrationCredential *usecase.SetIntegrationCredential,
+	getIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus,
+	listIntegrationCredentials *usecase.ListIntegrationCredentials,
 ) *Server {
 	return &Server{
 		listIssues:         listIssues,
@@ -144,6 +150,9 @@ func New(
 		getWorkItemDetails:            getWorkItemDetails,
 
 		checkHostedReviewEligibility: checkHostedReviewEligibility,
+		setIntegrationCredential:       setIntegrationCredential,
+		getIntegrationCredentialStatus: getIntegrationCredentialStatus,
+		listIntegrationCredentials:     listIntegrationCredentials,
 	}
 }
 
@@ -630,6 +639,44 @@ func (s *Server) CheckHostedReviewEligibility(ctx context.Context, req *scminteg
 	return resp, nil
 }
 
+func (s *Server) SetIntegrationCredential(ctx context.Context, req *scmintegrationv1.SetIntegrationCredentialRequest) (*scmintegrationv1.SetIntegrationCredentialResponse, error) {
+	if err := s.setIntegrationCredential.Execute(ctx, usecase.SetIntegrationCredentialInput{
+		TenantID:   req.GetTenantId(),
+		Provider:   toDomainProvider(req.GetProvider()),
+		Token:      req.GetToken(),
+		ConfigJSON: req.GetConfigJson(),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.SetIntegrationCredentialResponse{}, nil
+}
+
+func (s *Server) GetIntegrationCredentialStatus(ctx context.Context, req *scmintegrationv1.GetIntegrationCredentialStatusRequest) (*scmintegrationv1.GetIntegrationCredentialStatusResponse, error) {
+	result, err := s.getIntegrationCredentialStatus.Execute(ctx, usecase.GetIntegrationCredentialStatusInput{
+		TenantID: req.GetTenantId(),
+		Provider: toDomainProvider(req.GetProvider()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.GetIntegrationCredentialStatusResponse{
+		Configured: result.Configured,
+		ConfigJson: result.ConfigJSON,
+	}, nil
+}
+
+func (s *Server) ListIntegrationCredentials(ctx context.Context, req *scmintegrationv1.ListIntegrationCredentialsRequest) (*scmintegrationv1.ListIntegrationCredentialsResponse, error) {
+	providers, err := s.listIntegrationCredentials.Execute(ctx, req.GetTenantId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]scmintegrationv1.ScmProvider, 0, len(providers))
+	for _, p := range providers {
+		out = append(out, toProtoProvider(p))
+	}
+	return &scmintegrationv1.ListIntegrationCredentialsResponse{ConfiguredProviders: out}, nil
+}
+
 func toDomainProvider(p scmintegrationv1.ScmProvider) domain.ScmProvider {
 	switch p {
 	case scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB:
@@ -644,6 +691,23 @@ func toDomainProvider(p scmintegrationv1.ScmProvider) domain.ScmProvider {
 		return domain.ScmProviderGitea
 	default:
 		return ""
+	}
+}
+
+func toProtoProvider(p domain.ScmProvider) scmintegrationv1.ScmProvider {
+	switch p {
+	case domain.ScmProviderGitHub:
+		return scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB
+	case domain.ScmProviderGitLab:
+		return scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB
+	case domain.ScmProviderBitbucket:
+		return scmintegrationv1.ScmProvider_SCM_PROVIDER_BITBUCKET
+	case domain.ScmProviderAzureDevOps:
+		return scmintegrationv1.ScmProvider_SCM_PROVIDER_AZURE_DEVOPS
+	case domain.ScmProviderGitea:
+		return scmintegrationv1.ScmProvider_SCM_PROVIDER_GITEA
+	default:
+		return scmintegrationv1.ScmProvider_SCM_PROVIDER_UNSPECIFIED
 	}
 }
 

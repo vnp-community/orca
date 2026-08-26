@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`, `api-gateway`
 **File:** `services/infra-fleet-service/internal/usecase/{list_browser_profiles_test.go,create_browser_profile_test.go,delete_browser_profile_test.go}` (new), `services/api-gateway/internal/adapter/wscompat/{channels_browser_test.go,channels_browser_profiles_test.go}` (new)
 **Depends on:** TASK-032, TASK-033, TASK-034
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — all browser + browser.profile* channel tests and CRUD tests pass. Worktree `agent-a0480f57a839cc758`, staged not committed.
 
 ---
 

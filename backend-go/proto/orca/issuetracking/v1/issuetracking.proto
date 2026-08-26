@@ -62,6 +62,16 @@ service IssueTrackingService {
   // this stays Linear-only for now, same as ListTeams/ListTeamLabels/
   // ListTeamMembers/GetCustomView above.
   rpc ListWorkflowStates(ListWorkflowStatesRequest) returns (ListWorkflowStatesResponse);
+
+  // SetIntegrationCredential/GetIntegrationCredentialStatus/
+  // ListIntegrationCredentials/RevokeAuth back api-gateway's
+  // credentials.set/status/list/revoke channels for jira/linear
+  // (SOL-007). Unlike scm-integration-service, this service has no prior
+  // OAuth-flow surface — RevokeAuth is new here too, not reused.
+  rpc SetIntegrationCredential(SetIntegrationCredentialRequest) returns (SetIntegrationCredentialResponse);
+  rpc GetIntegrationCredentialStatus(GetIntegrationCredentialStatusRequest) returns (GetIntegrationCredentialStatusResponse);
+  rpc ListIntegrationCredentials(ListIntegrationCredentialsRequest) returns (ListIntegrationCredentialsResponse);
+  rpc RevokeAuth(RevokeAuthRequest) returns (RevokeAuthResponse);
 }
 
 enum IssueProvider {
@@ -383,3 +393,33 @@ message LinkIssueRequest {
 }
 
 message LinkIssueResponse {}
+
+message SetIntegrationCredentialRequest {
+  string tenant_id = 1;
+  IssueProvider provider = 2;
+  string token = 3;
+  string config_json = 4; // optional, non-secret — e.g. Jira's baseUrl/email
+}
+message SetIntegrationCredentialResponse {}
+
+message GetIntegrationCredentialStatusRequest {
+  string tenant_id = 1;
+  IssueProvider provider = 2;
+}
+message GetIntegrationCredentialStatusResponse {
+  bool configured = 1;
+  string config_json = 2;
+}
+
+message ListIntegrationCredentialsRequest {
+  string tenant_id = 1;
+}
+message ListIntegrationCredentialsResponse {
+  repeated IssueProvider configured_providers = 1;
+}
+
+message RevokeAuthRequest {
+  string tenant_id = 1;
+  IssueProvider provider = 2;
+}
+message RevokeAuthResponse {}

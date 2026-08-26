@@ -4522,6 +4522,302 @@ func (x *HostedReviewEligibility) GetExistingPullRequest() *PullRequest {
 	return nil
 }
 
+type SetIntegrationCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      ScmProvider            `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`                             // raw PAT/token, transport-encrypted at the edge same as every other credential write
+	ConfigJson    string                 `protobuf:"bytes,4,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // optional, non-secret
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetIntegrationCredentialRequest) Reset() {
+	*x = SetIntegrationCredentialRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetIntegrationCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetIntegrationCredentialRequest) ProtoMessage() {}
+
+func (x *SetIntegrationCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetIntegrationCredentialRequest.ProtoReflect.Descriptor instead.
+func (*SetIntegrationCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *SetIntegrationCredentialRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *SetIntegrationCredentialRequest) GetProvider() ScmProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return ScmProvider_SCM_PROVIDER_UNSPECIFIED
+}
+
+func (x *SetIntegrationCredentialRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *SetIntegrationCredentialRequest) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type SetIntegrationCredentialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetIntegrationCredentialResponse) Reset() {
+	*x = SetIntegrationCredentialResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetIntegrationCredentialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetIntegrationCredentialResponse) ProtoMessage() {}
+
+func (x *SetIntegrationCredentialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetIntegrationCredentialResponse.ProtoReflect.Descriptor instead.
+func (*SetIntegrationCredentialResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{70}
+}
+
+type GetIntegrationCredentialStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      ScmProvider            `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIntegrationCredentialStatusRequest) Reset() {
+	*x = GetIntegrationCredentialStatusRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIntegrationCredentialStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIntegrationCredentialStatusRequest) ProtoMessage() {}
+
+func (x *GetIntegrationCredentialStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIntegrationCredentialStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetIntegrationCredentialStatusRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *GetIntegrationCredentialStatusRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *GetIntegrationCredentialStatusRequest) GetProvider() ScmProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return ScmProvider_SCM_PROVIDER_UNSPECIFIED
+}
+
+type GetIntegrationCredentialStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Configured    bool                   `protobuf:"varint,1,opt,name=configured,proto3" json:"configured,omitempty"`
+	ConfigJson    string                 `protobuf:"bytes,2,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // present only when configured
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIntegrationCredentialStatusResponse) Reset() {
+	*x = GetIntegrationCredentialStatusResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIntegrationCredentialStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIntegrationCredentialStatusResponse) ProtoMessage() {}
+
+func (x *GetIntegrationCredentialStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIntegrationCredentialStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetIntegrationCredentialStatusResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *GetIntegrationCredentialStatusResponse) GetConfigured() bool {
+	if x != nil {
+		return x.Configured
+	}
+	return false
+}
+
+func (x *GetIntegrationCredentialStatusResponse) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type ListIntegrationCredentialsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIntegrationCredentialsRequest) Reset() {
+	*x = ListIntegrationCredentialsRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIntegrationCredentialsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIntegrationCredentialsRequest) ProtoMessage() {}
+
+func (x *ListIntegrationCredentialsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIntegrationCredentialsRequest.ProtoReflect.Descriptor instead.
+func (*ListIntegrationCredentialsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *ListIntegrationCredentialsRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+type ListIntegrationCredentialsResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ConfiguredProviders []ScmProvider          `protobuf:"varint,1,rep,packed,name=configured_providers,json=configuredProviders,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"configured_providers,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ListIntegrationCredentialsResponse) Reset() {
+	*x = ListIntegrationCredentialsResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIntegrationCredentialsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIntegrationCredentialsResponse) ProtoMessage() {}
+
+func (x *ListIntegrationCredentialsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIntegrationCredentialsResponse.ProtoReflect.Descriptor instead.
+func (*ListIntegrationCredentialsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *ListIntegrationCredentialsResponse) GetConfiguredProviders() []ScmProvider {
+	if x != nil {
+		return x.ConfiguredProviders
+	}
+	return nil
+}
+
 var File_orca_scmintegration_v1_scmintegration_proto protoreflect.FileDescriptor
 
 const file_orca_scmintegration_v1_scmintegration_proto_rawDesc = "" +
@@ -4863,14 +5159,34 @@ const file_orca_scmintegration_v1_scmintegration_proto_rawDesc = "" +
 	"\x17HostedReviewEligibility\x12\x1a\n" +
 	"\beligible\x18\x01 \x01(\bR\beligible\x12+\n" +
 	"\x11ineligible_reason\x18\x02 \x01(\tR\x10ineligibleReason\x12W\n" +
-	"\x15existing_pull_request\x18\x03 \x01(\v2#.orca.scmintegration.v1.PullRequestR\x13existingPullRequest*\xb0\x01\n" +
+	"\x15existing_pull_request\x18\x03 \x01(\v2#.orca.scmintegration.v1.PullRequestR\x13existingPullRequest\"\xb6\x01\n" +
+	"\x1fSetIntegrationCredentialRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12?\n" +
+	"\bprovider\x18\x02 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\x12\x1f\n" +
+	"\vconfig_json\x18\x04 \x01(\tR\n" +
+	"configJson\"\"\n" +
+	" SetIntegrationCredentialResponse\"\x85\x01\n" +
+	"%GetIntegrationCredentialStatusRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12?\n" +
+	"\bprovider\x18\x02 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\"i\n" +
+	"&GetIntegrationCredentialStatusResponse\x12\x1e\n" +
+	"\n" +
+	"configured\x18\x01 \x01(\bR\n" +
+	"configured\x12\x1f\n" +
+	"\vconfig_json\x18\x02 \x01(\tR\n" +
+	"configJson\"@\n" +
+	"!ListIntegrationCredentialsRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\"|\n" +
+	"\"ListIntegrationCredentialsResponse\x12V\n" +
+	"\x14configured_providers\x18\x01 \x03(\x0e2#.orca.scmintegration.v1.ScmProviderR\x13configuredProviders*\xb0\x01\n" +
 	"\vScmProvider\x12\x1c\n" +
 	"\x18SCM_PROVIDER_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13SCM_PROVIDER_GITHUB\x10\x01\x12\x17\n" +
 	"\x13SCM_PROVIDER_GITLAB\x10\x02\x12\x1a\n" +
 	"\x16SCM_PROVIDER_BITBUCKET\x10\x03\x12\x1d\n" +
 	"\x19SCM_PROVIDER_AZURE_DEVOPS\x10\x04\x12\x16\n" +
-	"\x12SCM_PROVIDER_GITEA\x10\x052\xae!\n" +
+	"\x12SCM_PROVIDER_GITEA\x10\x052\xf6$\n" +
 	"\x15ScmIntegrationService\x12c\n" +
 	"\n" +
 	"ListIssues\x12).orca.scmintegration.v1.ListIssuesRequest\x1a*.orca.scmintegration.v1.ListIssuesResponse\x12x\n" +
@@ -4908,7 +5224,10 @@ const file_orca_scmintegration_v1_scmintegration_proto_rawDesc = "" +
 	"\x11ListMergeRequests\x120.orca.scmintegration.v1.ListMergeRequestsRequest\x1a1.orca.scmintegration.v1.ListMergeRequestsResponse\x12\x8d\x01\n" +
 	"\x1dResolveMergeRequestDiscussion\x12<.orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest\x1a..orca.scmintegration.v1.MergeRequestDiscussion\x12v\n" +
 	"\x12GetWorkItemDetails\x121.orca.scmintegration.v1.GetWorkItemDetailsRequest\x1a-.orca.scmintegration.v1.WorkItemDetailsGitLab\x12\x8c\x01\n" +
-	"\x1cCheckHostedReviewEligibility\x12;.orca.scmintegration.v1.CheckHostedReviewEligibilityRequest\x1a/.orca.scmintegration.v1.HostedReviewEligibilityBRZPgithub.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1;scmintegrationv1b\x06proto3"
+	"\x1cCheckHostedReviewEligibility\x12;.orca.scmintegration.v1.CheckHostedReviewEligibilityRequest\x1a/.orca.scmintegration.v1.HostedReviewEligibility\x12\x8d\x01\n" +
+	"\x18SetIntegrationCredential\x127.orca.scmintegration.v1.SetIntegrationCredentialRequest\x1a8.orca.scmintegration.v1.SetIntegrationCredentialResponse\x12\x9f\x01\n" +
+	"\x1eGetIntegrationCredentialStatus\x12=.orca.scmintegration.v1.GetIntegrationCredentialStatusRequest\x1a>.orca.scmintegration.v1.GetIntegrationCredentialStatusResponse\x12\x93\x01\n" +
+	"\x1aListIntegrationCredentials\x129.orca.scmintegration.v1.ListIntegrationCredentialsRequest\x1a:.orca.scmintegration.v1.ListIntegrationCredentialsResponseBRZPgithub.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1;scmintegrationv1b\x06proto3"
 
 var (
 	file_orca_scmintegration_v1_scmintegration_proto_rawDescOnce sync.Once
@@ -4923,79 +5242,85 @@ func file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_scmintegration_v1_scmintegration_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_scmintegration_v1_scmintegration_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
+var file_orca_scmintegration_v1_scmintegration_proto_msgTypes = make([]protoimpl.MessageInfo, 75)
 var file_orca_scmintegration_v1_scmintegration_proto_goTypes = []any{
-	(ScmProvider)(0),                             // 0: orca.scmintegration.v1.ScmProvider
-	(*Issue)(nil),                                // 1: orca.scmintegration.v1.Issue
-	(*ListIssuesRequest)(nil),                    // 2: orca.scmintegration.v1.ListIssuesRequest
-	(*ListIssuesResponse)(nil),                   // 3: orca.scmintegration.v1.ListIssuesResponse
-	(*CreatePullRequestRequest)(nil),             // 4: orca.scmintegration.v1.CreatePullRequestRequest
-	(*PullRequest)(nil),                          // 5: orca.scmintegration.v1.PullRequest
-	(*CreatePullRequestResponse)(nil),            // 6: orca.scmintegration.v1.CreatePullRequestResponse
-	(*ListPullRequestsRequest)(nil),              // 7: orca.scmintegration.v1.ListPullRequestsRequest
-	(*ListPullRequestsResponse)(nil),             // 8: orca.scmintegration.v1.ListPullRequestsResponse
-	(*GetRateLimitStatusRequest)(nil),            // 9: orca.scmintegration.v1.GetRateLimitStatusRequest
-	(*GetRateLimitStatusResponse)(nil),           // 10: orca.scmintegration.v1.GetRateLimitStatusResponse
-	(*GetAuthStatusRequest)(nil),                 // 11: orca.scmintegration.v1.GetAuthStatusRequest
-	(*GetAuthStatusResponse)(nil),                // 12: orca.scmintegration.v1.GetAuthStatusResponse
-	(*StartOAuthFlowRequest)(nil),                // 13: orca.scmintegration.v1.StartOAuthFlowRequest
-	(*StartOAuthFlowResponse)(nil),               // 14: orca.scmintegration.v1.StartOAuthFlowResponse
-	(*CompleteOAuthFlowRequest)(nil),             // 15: orca.scmintegration.v1.CompleteOAuthFlowRequest
-	(*CompleteOAuthFlowResponse)(nil),            // 16: orca.scmintegration.v1.CompleteOAuthFlowResponse
-	(*RevokeAuthRequest)(nil),                    // 17: orca.scmintegration.v1.RevokeAuthRequest
-	(*RevokeAuthResponse)(nil),                   // 18: orca.scmintegration.v1.RevokeAuthResponse
-	(*MergePullRequestRequest)(nil),              // 19: orca.scmintegration.v1.MergePullRequestRequest
-	(*MergePullRequestResponse)(nil),             // 20: orca.scmintegration.v1.MergePullRequestResponse
-	(*RequestPullRequestReviewersRequest)(nil),   // 21: orca.scmintegration.v1.RequestPullRequestReviewersRequest
-	(*RemovePullRequestReviewersRequest)(nil),    // 22: orca.scmintegration.v1.RemovePullRequestReviewersRequest
-	(*SetPullRequestAutoMergeRequest)(nil),       // 23: orca.scmintegration.v1.SetPullRequestAutoMergeRequest
-	(*UpdateIssueRequest)(nil),                   // 24: orca.scmintegration.v1.UpdateIssueRequest
-	(*GetPullRequestForBranchRequest)(nil),       // 25: orca.scmintegration.v1.GetPullRequestForBranchRequest
-	(*GetPullRequestForBranchResponse)(nil),      // 26: orca.scmintegration.v1.GetPullRequestForBranchResponse
-	(*ResolveRepoSlugRequest)(nil),               // 27: orca.scmintegration.v1.ResolveRepoSlugRequest
-	(*ResolveRepoSlugResponse)(nil),              // 28: orca.scmintegration.v1.ResolveRepoSlugResponse
-	(*ProjectFieldValue)(nil),                    // 29: orca.scmintegration.v1.ProjectFieldValue
-	(*ProjectItem)(nil),                          // 30: orca.scmintegration.v1.ProjectItem
-	(*Project)(nil),                              // 31: orca.scmintegration.v1.Project
-	(*ProjectView)(nil),                          // 32: orca.scmintegration.v1.ProjectView
-	(*IssueType)(nil),                            // 33: orca.scmintegration.v1.IssueType
-	(*AssignableUser)(nil),                       // 34: orca.scmintegration.v1.AssignableUser
-	(*Label)(nil),                                // 35: orca.scmintegration.v1.Label
-	(*ProjectComment)(nil),                       // 36: orca.scmintegration.v1.ProjectComment
-	(*WorkItemDetails)(nil),                      // 37: orca.scmintegration.v1.WorkItemDetails
-	(*ListAccessibleProjectsRequest)(nil),        // 38: orca.scmintegration.v1.ListAccessibleProjectsRequest
-	(*ListAccessibleProjectsResponse)(nil),       // 39: orca.scmintegration.v1.ListAccessibleProjectsResponse
-	(*ResolveProjectRefRequest)(nil),             // 40: orca.scmintegration.v1.ResolveProjectRefRequest
-	(*ResolveProjectRefResponse)(nil),            // 41: orca.scmintegration.v1.ResolveProjectRefResponse
-	(*ListProjectViewsRequest)(nil),              // 42: orca.scmintegration.v1.ListProjectViewsRequest
-	(*ListProjectViewsResponse)(nil),             // 43: orca.scmintegration.v1.ListProjectViewsResponse
-	(*ViewProjectTableRequest)(nil),              // 44: orca.scmintegration.v1.ViewProjectTableRequest
-	(*ViewProjectTableResponse)(nil),             // 45: orca.scmintegration.v1.ViewProjectTableResponse
-	(*UpdateProjectItemFieldRequest)(nil),        // 46: orca.scmintegration.v1.UpdateProjectItemFieldRequest
-	(*ClearProjectItemFieldRequest)(nil),         // 47: orca.scmintegration.v1.ClearProjectItemFieldRequest
-	(*GetWorkItemDetailsBySlugRequest)(nil),      // 48: orca.scmintegration.v1.GetWorkItemDetailsBySlugRequest
-	(*UpdateIssueBySlugRequest)(nil),             // 49: orca.scmintegration.v1.UpdateIssueBySlugRequest
-	(*UpdatePullRequestBySlugRequest)(nil),       // 50: orca.scmintegration.v1.UpdatePullRequestBySlugRequest
-	(*UpdateIssueTypeBySlugRequest)(nil),         // 51: orca.scmintegration.v1.UpdateIssueTypeBySlugRequest
-	(*ListIssueTypesBySlugRequest)(nil),          // 52: orca.scmintegration.v1.ListIssueTypesBySlugRequest
-	(*ListIssueTypesBySlugResponse)(nil),         // 53: orca.scmintegration.v1.ListIssueTypesBySlugResponse
-	(*ListAssignableUsersBySlugRequest)(nil),     // 54: orca.scmintegration.v1.ListAssignableUsersBySlugRequest
-	(*ListAssignableUsersBySlugResponse)(nil),    // 55: orca.scmintegration.v1.ListAssignableUsersBySlugResponse
-	(*ListLabelsBySlugRequest)(nil),              // 56: orca.scmintegration.v1.ListLabelsBySlugRequest
-	(*ListLabelsBySlugResponse)(nil),             // 57: orca.scmintegration.v1.ListLabelsBySlugResponse
-	(*AddIssueCommentBySlugRequest)(nil),         // 58: orca.scmintegration.v1.AddIssueCommentBySlugRequest
-	(*UpdateIssueCommentBySlugRequest)(nil),      // 59: orca.scmintegration.v1.UpdateIssueCommentBySlugRequest
-	(*DeleteIssueCommentBySlugRequest)(nil),      // 60: orca.scmintegration.v1.DeleteIssueCommentBySlugRequest
-	(*MergeRequest)(nil),                         // 61: orca.scmintegration.v1.MergeRequest
-	(*ListMergeRequestsRequest)(nil),             // 62: orca.scmintegration.v1.ListMergeRequestsRequest
-	(*ListMergeRequestsResponse)(nil),            // 63: orca.scmintegration.v1.ListMergeRequestsResponse
-	(*MergeRequestDiscussion)(nil),               // 64: orca.scmintegration.v1.MergeRequestDiscussion
-	(*ResolveMergeRequestDiscussionRequest)(nil), // 65: orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest
-	(*GetWorkItemDetailsRequest)(nil),            // 66: orca.scmintegration.v1.GetWorkItemDetailsRequest
-	(*WorkItemDetailsGitLab)(nil),                // 67: orca.scmintegration.v1.WorkItemDetailsGitLab
-	(*CheckHostedReviewEligibilityRequest)(nil),  // 68: orca.scmintegration.v1.CheckHostedReviewEligibilityRequest
-	(*HostedReviewEligibility)(nil),              // 69: orca.scmintegration.v1.HostedReviewEligibility
-	(*emptypb.Empty)(nil),                        // 70: google.protobuf.Empty
+	(ScmProvider)(0),                               // 0: orca.scmintegration.v1.ScmProvider
+	(*Issue)(nil),                                  // 1: orca.scmintegration.v1.Issue
+	(*ListIssuesRequest)(nil),                      // 2: orca.scmintegration.v1.ListIssuesRequest
+	(*ListIssuesResponse)(nil),                     // 3: orca.scmintegration.v1.ListIssuesResponse
+	(*CreatePullRequestRequest)(nil),               // 4: orca.scmintegration.v1.CreatePullRequestRequest
+	(*PullRequest)(nil),                            // 5: orca.scmintegration.v1.PullRequest
+	(*CreatePullRequestResponse)(nil),              // 6: orca.scmintegration.v1.CreatePullRequestResponse
+	(*ListPullRequestsRequest)(nil),                // 7: orca.scmintegration.v1.ListPullRequestsRequest
+	(*ListPullRequestsResponse)(nil),               // 8: orca.scmintegration.v1.ListPullRequestsResponse
+	(*GetRateLimitStatusRequest)(nil),              // 9: orca.scmintegration.v1.GetRateLimitStatusRequest
+	(*GetRateLimitStatusResponse)(nil),             // 10: orca.scmintegration.v1.GetRateLimitStatusResponse
+	(*GetAuthStatusRequest)(nil),                   // 11: orca.scmintegration.v1.GetAuthStatusRequest
+	(*GetAuthStatusResponse)(nil),                  // 12: orca.scmintegration.v1.GetAuthStatusResponse
+	(*StartOAuthFlowRequest)(nil),                  // 13: orca.scmintegration.v1.StartOAuthFlowRequest
+	(*StartOAuthFlowResponse)(nil),                 // 14: orca.scmintegration.v1.StartOAuthFlowResponse
+	(*CompleteOAuthFlowRequest)(nil),               // 15: orca.scmintegration.v1.CompleteOAuthFlowRequest
+	(*CompleteOAuthFlowResponse)(nil),              // 16: orca.scmintegration.v1.CompleteOAuthFlowResponse
+	(*RevokeAuthRequest)(nil),                      // 17: orca.scmintegration.v1.RevokeAuthRequest
+	(*RevokeAuthResponse)(nil),                     // 18: orca.scmintegration.v1.RevokeAuthResponse
+	(*MergePullRequestRequest)(nil),                // 19: orca.scmintegration.v1.MergePullRequestRequest
+	(*MergePullRequestResponse)(nil),               // 20: orca.scmintegration.v1.MergePullRequestResponse
+	(*RequestPullRequestReviewersRequest)(nil),     // 21: orca.scmintegration.v1.RequestPullRequestReviewersRequest
+	(*RemovePullRequestReviewersRequest)(nil),      // 22: orca.scmintegration.v1.RemovePullRequestReviewersRequest
+	(*SetPullRequestAutoMergeRequest)(nil),         // 23: orca.scmintegration.v1.SetPullRequestAutoMergeRequest
+	(*UpdateIssueRequest)(nil),                     // 24: orca.scmintegration.v1.UpdateIssueRequest
+	(*GetPullRequestForBranchRequest)(nil),         // 25: orca.scmintegration.v1.GetPullRequestForBranchRequest
+	(*GetPullRequestForBranchResponse)(nil),        // 26: orca.scmintegration.v1.GetPullRequestForBranchResponse
+	(*ResolveRepoSlugRequest)(nil),                 // 27: orca.scmintegration.v1.ResolveRepoSlugRequest
+	(*ResolveRepoSlugResponse)(nil),                // 28: orca.scmintegration.v1.ResolveRepoSlugResponse
+	(*ProjectFieldValue)(nil),                      // 29: orca.scmintegration.v1.ProjectFieldValue
+	(*ProjectItem)(nil),                            // 30: orca.scmintegration.v1.ProjectItem
+	(*Project)(nil),                                // 31: orca.scmintegration.v1.Project
+	(*ProjectView)(nil),                            // 32: orca.scmintegration.v1.ProjectView
+	(*IssueType)(nil),                              // 33: orca.scmintegration.v1.IssueType
+	(*AssignableUser)(nil),                         // 34: orca.scmintegration.v1.AssignableUser
+	(*Label)(nil),                                  // 35: orca.scmintegration.v1.Label
+	(*ProjectComment)(nil),                         // 36: orca.scmintegration.v1.ProjectComment
+	(*WorkItemDetails)(nil),                        // 37: orca.scmintegration.v1.WorkItemDetails
+	(*ListAccessibleProjectsRequest)(nil),          // 38: orca.scmintegration.v1.ListAccessibleProjectsRequest
+	(*ListAccessibleProjectsResponse)(nil),         // 39: orca.scmintegration.v1.ListAccessibleProjectsResponse
+	(*ResolveProjectRefRequest)(nil),               // 40: orca.scmintegration.v1.ResolveProjectRefRequest
+	(*ResolveProjectRefResponse)(nil),              // 41: orca.scmintegration.v1.ResolveProjectRefResponse
+	(*ListProjectViewsRequest)(nil),                // 42: orca.scmintegration.v1.ListProjectViewsRequest
+	(*ListProjectViewsResponse)(nil),               // 43: orca.scmintegration.v1.ListProjectViewsResponse
+	(*ViewProjectTableRequest)(nil),                // 44: orca.scmintegration.v1.ViewProjectTableRequest
+	(*ViewProjectTableResponse)(nil),               // 45: orca.scmintegration.v1.ViewProjectTableResponse
+	(*UpdateProjectItemFieldRequest)(nil),          // 46: orca.scmintegration.v1.UpdateProjectItemFieldRequest
+	(*ClearProjectItemFieldRequest)(nil),           // 47: orca.scmintegration.v1.ClearProjectItemFieldRequest
+	(*GetWorkItemDetailsBySlugRequest)(nil),        // 48: orca.scmintegration.v1.GetWorkItemDetailsBySlugRequest
+	(*UpdateIssueBySlugRequest)(nil),               // 49: orca.scmintegration.v1.UpdateIssueBySlugRequest
+	(*UpdatePullRequestBySlugRequest)(nil),         // 50: orca.scmintegration.v1.UpdatePullRequestBySlugRequest
+	(*UpdateIssueTypeBySlugRequest)(nil),           // 51: orca.scmintegration.v1.UpdateIssueTypeBySlugRequest
+	(*ListIssueTypesBySlugRequest)(nil),            // 52: orca.scmintegration.v1.ListIssueTypesBySlugRequest
+	(*ListIssueTypesBySlugResponse)(nil),           // 53: orca.scmintegration.v1.ListIssueTypesBySlugResponse
+	(*ListAssignableUsersBySlugRequest)(nil),       // 54: orca.scmintegration.v1.ListAssignableUsersBySlugRequest
+	(*ListAssignableUsersBySlugResponse)(nil),      // 55: orca.scmintegration.v1.ListAssignableUsersBySlugResponse
+	(*ListLabelsBySlugRequest)(nil),                // 56: orca.scmintegration.v1.ListLabelsBySlugRequest
+	(*ListLabelsBySlugResponse)(nil),               // 57: orca.scmintegration.v1.ListLabelsBySlugResponse
+	(*AddIssueCommentBySlugRequest)(nil),           // 58: orca.scmintegration.v1.AddIssueCommentBySlugRequest
+	(*UpdateIssueCommentBySlugRequest)(nil),        // 59: orca.scmintegration.v1.UpdateIssueCommentBySlugRequest
+	(*DeleteIssueCommentBySlugRequest)(nil),        // 60: orca.scmintegration.v1.DeleteIssueCommentBySlugRequest
+	(*MergeRequest)(nil),                           // 61: orca.scmintegration.v1.MergeRequest
+	(*ListMergeRequestsRequest)(nil),               // 62: orca.scmintegration.v1.ListMergeRequestsRequest
+	(*ListMergeRequestsResponse)(nil),              // 63: orca.scmintegration.v1.ListMergeRequestsResponse
+	(*MergeRequestDiscussion)(nil),                 // 64: orca.scmintegration.v1.MergeRequestDiscussion
+	(*ResolveMergeRequestDiscussionRequest)(nil),   // 65: orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest
+	(*GetWorkItemDetailsRequest)(nil),              // 66: orca.scmintegration.v1.GetWorkItemDetailsRequest
+	(*WorkItemDetailsGitLab)(nil),                  // 67: orca.scmintegration.v1.WorkItemDetailsGitLab
+	(*CheckHostedReviewEligibilityRequest)(nil),    // 68: orca.scmintegration.v1.CheckHostedReviewEligibilityRequest
+	(*HostedReviewEligibility)(nil),                // 69: orca.scmintegration.v1.HostedReviewEligibility
+	(*SetIntegrationCredentialRequest)(nil),        // 70: orca.scmintegration.v1.SetIntegrationCredentialRequest
+	(*SetIntegrationCredentialResponse)(nil),       // 71: orca.scmintegration.v1.SetIntegrationCredentialResponse
+	(*GetIntegrationCredentialStatusRequest)(nil),  // 72: orca.scmintegration.v1.GetIntegrationCredentialStatusRequest
+	(*GetIntegrationCredentialStatusResponse)(nil), // 73: orca.scmintegration.v1.GetIntegrationCredentialStatusResponse
+	(*ListIntegrationCredentialsRequest)(nil),      // 74: orca.scmintegration.v1.ListIntegrationCredentialsRequest
+	(*ListIntegrationCredentialsResponse)(nil),     // 75: orca.scmintegration.v1.ListIntegrationCredentialsResponse
+	(*emptypb.Empty)(nil),                          // 76: google.protobuf.Empty
 }
 var file_orca_scmintegration_v1_scmintegration_proto_depIdxs = []int32{
 	0,  // 0: orca.scmintegration.v1.ListIssuesRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
@@ -5031,81 +5356,90 @@ var file_orca_scmintegration_v1_scmintegration_proto_depIdxs = []int32{
 	61, // 30: orca.scmintegration.v1.ListMergeRequestsResponse.merge_requests:type_name -> orca.scmintegration.v1.MergeRequest
 	0,  // 31: orca.scmintegration.v1.CheckHostedReviewEligibilityRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
 	5,  // 32: orca.scmintegration.v1.HostedReviewEligibility.existing_pull_request:type_name -> orca.scmintegration.v1.PullRequest
-	2,  // 33: orca.scmintegration.v1.ScmIntegrationService.ListIssues:input_type -> orca.scmintegration.v1.ListIssuesRequest
-	4,  // 34: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:input_type -> orca.scmintegration.v1.CreatePullRequestRequest
-	7,  // 35: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:input_type -> orca.scmintegration.v1.ListPullRequestsRequest
-	9,  // 36: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:input_type -> orca.scmintegration.v1.GetRateLimitStatusRequest
-	11, // 37: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:input_type -> orca.scmintegration.v1.GetAuthStatusRequest
-	13, // 38: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:input_type -> orca.scmintegration.v1.StartOAuthFlowRequest
-	15, // 39: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:input_type -> orca.scmintegration.v1.CompleteOAuthFlowRequest
-	17, // 40: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:input_type -> orca.scmintegration.v1.RevokeAuthRequest
-	19, // 41: orca.scmintegration.v1.ScmIntegrationService.MergePullRequest:input_type -> orca.scmintegration.v1.MergePullRequestRequest
-	21, // 42: orca.scmintegration.v1.ScmIntegrationService.RequestPullRequestReviewers:input_type -> orca.scmintegration.v1.RequestPullRequestReviewersRequest
-	22, // 43: orca.scmintegration.v1.ScmIntegrationService.RemovePullRequestReviewers:input_type -> orca.scmintegration.v1.RemovePullRequestReviewersRequest
-	23, // 44: orca.scmintegration.v1.ScmIntegrationService.SetPullRequestAutoMerge:input_type -> orca.scmintegration.v1.SetPullRequestAutoMergeRequest
-	24, // 45: orca.scmintegration.v1.ScmIntegrationService.UpdateIssue:input_type -> orca.scmintegration.v1.UpdateIssueRequest
-	25, // 46: orca.scmintegration.v1.ScmIntegrationService.GetPullRequestForBranch:input_type -> orca.scmintegration.v1.GetPullRequestForBranchRequest
-	27, // 47: orca.scmintegration.v1.ScmIntegrationService.ResolveRepoSlug:input_type -> orca.scmintegration.v1.ResolveRepoSlugRequest
-	38, // 48: orca.scmintegration.v1.ScmIntegrationService.ListAccessibleProjects:input_type -> orca.scmintegration.v1.ListAccessibleProjectsRequest
-	40, // 49: orca.scmintegration.v1.ScmIntegrationService.ResolveProjectRef:input_type -> orca.scmintegration.v1.ResolveProjectRefRequest
-	42, // 50: orca.scmintegration.v1.ScmIntegrationService.ListProjectViews:input_type -> orca.scmintegration.v1.ListProjectViewsRequest
-	44, // 51: orca.scmintegration.v1.ScmIntegrationService.ViewProjectTable:input_type -> orca.scmintegration.v1.ViewProjectTableRequest
-	46, // 52: orca.scmintegration.v1.ScmIntegrationService.UpdateProjectItemField:input_type -> orca.scmintegration.v1.UpdateProjectItemFieldRequest
-	47, // 53: orca.scmintegration.v1.ScmIntegrationService.ClearProjectItemField:input_type -> orca.scmintegration.v1.ClearProjectItemFieldRequest
-	48, // 54: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetailsBySlug:input_type -> orca.scmintegration.v1.GetWorkItemDetailsBySlugRequest
-	49, // 55: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueBySlug:input_type -> orca.scmintegration.v1.UpdateIssueBySlugRequest
-	50, // 56: orca.scmintegration.v1.ScmIntegrationService.UpdatePullRequestBySlug:input_type -> orca.scmintegration.v1.UpdatePullRequestBySlugRequest
-	51, // 57: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueTypeBySlug:input_type -> orca.scmintegration.v1.UpdateIssueTypeBySlugRequest
-	52, // 58: orca.scmintegration.v1.ScmIntegrationService.ListIssueTypesBySlug:input_type -> orca.scmintegration.v1.ListIssueTypesBySlugRequest
-	54, // 59: orca.scmintegration.v1.ScmIntegrationService.ListAssignableUsersBySlug:input_type -> orca.scmintegration.v1.ListAssignableUsersBySlugRequest
-	56, // 60: orca.scmintegration.v1.ScmIntegrationService.ListLabelsBySlug:input_type -> orca.scmintegration.v1.ListLabelsBySlugRequest
-	58, // 61: orca.scmintegration.v1.ScmIntegrationService.AddIssueCommentBySlug:input_type -> orca.scmintegration.v1.AddIssueCommentBySlugRequest
-	59, // 62: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueCommentBySlug:input_type -> orca.scmintegration.v1.UpdateIssueCommentBySlugRequest
-	60, // 63: orca.scmintegration.v1.ScmIntegrationService.DeleteIssueCommentBySlug:input_type -> orca.scmintegration.v1.DeleteIssueCommentBySlugRequest
-	62, // 64: orca.scmintegration.v1.ScmIntegrationService.ListMergeRequests:input_type -> orca.scmintegration.v1.ListMergeRequestsRequest
-	65, // 65: orca.scmintegration.v1.ScmIntegrationService.ResolveMergeRequestDiscussion:input_type -> orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest
-	66, // 66: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetails:input_type -> orca.scmintegration.v1.GetWorkItemDetailsRequest
-	68, // 67: orca.scmintegration.v1.ScmIntegrationService.CheckHostedReviewEligibility:input_type -> orca.scmintegration.v1.CheckHostedReviewEligibilityRequest
-	3,  // 68: orca.scmintegration.v1.ScmIntegrationService.ListIssues:output_type -> orca.scmintegration.v1.ListIssuesResponse
-	6,  // 69: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:output_type -> orca.scmintegration.v1.CreatePullRequestResponse
-	8,  // 70: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:output_type -> orca.scmintegration.v1.ListPullRequestsResponse
-	10, // 71: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:output_type -> orca.scmintegration.v1.GetRateLimitStatusResponse
-	12, // 72: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:output_type -> orca.scmintegration.v1.GetAuthStatusResponse
-	14, // 73: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:output_type -> orca.scmintegration.v1.StartOAuthFlowResponse
-	16, // 74: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:output_type -> orca.scmintegration.v1.CompleteOAuthFlowResponse
-	18, // 75: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:output_type -> orca.scmintegration.v1.RevokeAuthResponse
-	20, // 76: orca.scmintegration.v1.ScmIntegrationService.MergePullRequest:output_type -> orca.scmintegration.v1.MergePullRequestResponse
-	5,  // 77: orca.scmintegration.v1.ScmIntegrationService.RequestPullRequestReviewers:output_type -> orca.scmintegration.v1.PullRequest
-	5,  // 78: orca.scmintegration.v1.ScmIntegrationService.RemovePullRequestReviewers:output_type -> orca.scmintegration.v1.PullRequest
-	5,  // 79: orca.scmintegration.v1.ScmIntegrationService.SetPullRequestAutoMerge:output_type -> orca.scmintegration.v1.PullRequest
-	1,  // 80: orca.scmintegration.v1.ScmIntegrationService.UpdateIssue:output_type -> orca.scmintegration.v1.Issue
-	26, // 81: orca.scmintegration.v1.ScmIntegrationService.GetPullRequestForBranch:output_type -> orca.scmintegration.v1.GetPullRequestForBranchResponse
-	28, // 82: orca.scmintegration.v1.ScmIntegrationService.ResolveRepoSlug:output_type -> orca.scmintegration.v1.ResolveRepoSlugResponse
-	39, // 83: orca.scmintegration.v1.ScmIntegrationService.ListAccessibleProjects:output_type -> orca.scmintegration.v1.ListAccessibleProjectsResponse
-	41, // 84: orca.scmintegration.v1.ScmIntegrationService.ResolveProjectRef:output_type -> orca.scmintegration.v1.ResolveProjectRefResponse
-	43, // 85: orca.scmintegration.v1.ScmIntegrationService.ListProjectViews:output_type -> orca.scmintegration.v1.ListProjectViewsResponse
-	45, // 86: orca.scmintegration.v1.ScmIntegrationService.ViewProjectTable:output_type -> orca.scmintegration.v1.ViewProjectTableResponse
-	30, // 87: orca.scmintegration.v1.ScmIntegrationService.UpdateProjectItemField:output_type -> orca.scmintegration.v1.ProjectItem
-	30, // 88: orca.scmintegration.v1.ScmIntegrationService.ClearProjectItemField:output_type -> orca.scmintegration.v1.ProjectItem
-	37, // 89: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetailsBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
-	37, // 90: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
-	37, // 91: orca.scmintegration.v1.ScmIntegrationService.UpdatePullRequestBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
-	37, // 92: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueTypeBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
-	53, // 93: orca.scmintegration.v1.ScmIntegrationService.ListIssueTypesBySlug:output_type -> orca.scmintegration.v1.ListIssueTypesBySlugResponse
-	55, // 94: orca.scmintegration.v1.ScmIntegrationService.ListAssignableUsersBySlug:output_type -> orca.scmintegration.v1.ListAssignableUsersBySlugResponse
-	57, // 95: orca.scmintegration.v1.ScmIntegrationService.ListLabelsBySlug:output_type -> orca.scmintegration.v1.ListLabelsBySlugResponse
-	36, // 96: orca.scmintegration.v1.ScmIntegrationService.AddIssueCommentBySlug:output_type -> orca.scmintegration.v1.ProjectComment
-	36, // 97: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueCommentBySlug:output_type -> orca.scmintegration.v1.ProjectComment
-	70, // 98: orca.scmintegration.v1.ScmIntegrationService.DeleteIssueCommentBySlug:output_type -> google.protobuf.Empty
-	63, // 99: orca.scmintegration.v1.ScmIntegrationService.ListMergeRequests:output_type -> orca.scmintegration.v1.ListMergeRequestsResponse
-	64, // 100: orca.scmintegration.v1.ScmIntegrationService.ResolveMergeRequestDiscussion:output_type -> orca.scmintegration.v1.MergeRequestDiscussion
-	67, // 101: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetails:output_type -> orca.scmintegration.v1.WorkItemDetailsGitLab
-	69, // 102: orca.scmintegration.v1.ScmIntegrationService.CheckHostedReviewEligibility:output_type -> orca.scmintegration.v1.HostedReviewEligibility
-	68, // [68:103] is the sub-list for method output_type
-	33, // [33:68] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	0,  // 33: orca.scmintegration.v1.SetIntegrationCredentialRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 34: orca.scmintegration.v1.GetIntegrationCredentialStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 35: orca.scmintegration.v1.ListIntegrationCredentialsResponse.configured_providers:type_name -> orca.scmintegration.v1.ScmProvider
+	2,  // 36: orca.scmintegration.v1.ScmIntegrationService.ListIssues:input_type -> orca.scmintegration.v1.ListIssuesRequest
+	4,  // 37: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:input_type -> orca.scmintegration.v1.CreatePullRequestRequest
+	7,  // 38: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:input_type -> orca.scmintegration.v1.ListPullRequestsRequest
+	9,  // 39: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:input_type -> orca.scmintegration.v1.GetRateLimitStatusRequest
+	11, // 40: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:input_type -> orca.scmintegration.v1.GetAuthStatusRequest
+	13, // 41: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:input_type -> orca.scmintegration.v1.StartOAuthFlowRequest
+	15, // 42: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:input_type -> orca.scmintegration.v1.CompleteOAuthFlowRequest
+	17, // 43: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:input_type -> orca.scmintegration.v1.RevokeAuthRequest
+	19, // 44: orca.scmintegration.v1.ScmIntegrationService.MergePullRequest:input_type -> orca.scmintegration.v1.MergePullRequestRequest
+	21, // 45: orca.scmintegration.v1.ScmIntegrationService.RequestPullRequestReviewers:input_type -> orca.scmintegration.v1.RequestPullRequestReviewersRequest
+	22, // 46: orca.scmintegration.v1.ScmIntegrationService.RemovePullRequestReviewers:input_type -> orca.scmintegration.v1.RemovePullRequestReviewersRequest
+	23, // 47: orca.scmintegration.v1.ScmIntegrationService.SetPullRequestAutoMerge:input_type -> orca.scmintegration.v1.SetPullRequestAutoMergeRequest
+	24, // 48: orca.scmintegration.v1.ScmIntegrationService.UpdateIssue:input_type -> orca.scmintegration.v1.UpdateIssueRequest
+	25, // 49: orca.scmintegration.v1.ScmIntegrationService.GetPullRequestForBranch:input_type -> orca.scmintegration.v1.GetPullRequestForBranchRequest
+	27, // 50: orca.scmintegration.v1.ScmIntegrationService.ResolveRepoSlug:input_type -> orca.scmintegration.v1.ResolveRepoSlugRequest
+	38, // 51: orca.scmintegration.v1.ScmIntegrationService.ListAccessibleProjects:input_type -> orca.scmintegration.v1.ListAccessibleProjectsRequest
+	40, // 52: orca.scmintegration.v1.ScmIntegrationService.ResolveProjectRef:input_type -> orca.scmintegration.v1.ResolveProjectRefRequest
+	42, // 53: orca.scmintegration.v1.ScmIntegrationService.ListProjectViews:input_type -> orca.scmintegration.v1.ListProjectViewsRequest
+	44, // 54: orca.scmintegration.v1.ScmIntegrationService.ViewProjectTable:input_type -> orca.scmintegration.v1.ViewProjectTableRequest
+	46, // 55: orca.scmintegration.v1.ScmIntegrationService.UpdateProjectItemField:input_type -> orca.scmintegration.v1.UpdateProjectItemFieldRequest
+	47, // 56: orca.scmintegration.v1.ScmIntegrationService.ClearProjectItemField:input_type -> orca.scmintegration.v1.ClearProjectItemFieldRequest
+	48, // 57: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetailsBySlug:input_type -> orca.scmintegration.v1.GetWorkItemDetailsBySlugRequest
+	49, // 58: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueBySlug:input_type -> orca.scmintegration.v1.UpdateIssueBySlugRequest
+	50, // 59: orca.scmintegration.v1.ScmIntegrationService.UpdatePullRequestBySlug:input_type -> orca.scmintegration.v1.UpdatePullRequestBySlugRequest
+	51, // 60: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueTypeBySlug:input_type -> orca.scmintegration.v1.UpdateIssueTypeBySlugRequest
+	52, // 61: orca.scmintegration.v1.ScmIntegrationService.ListIssueTypesBySlug:input_type -> orca.scmintegration.v1.ListIssueTypesBySlugRequest
+	54, // 62: orca.scmintegration.v1.ScmIntegrationService.ListAssignableUsersBySlug:input_type -> orca.scmintegration.v1.ListAssignableUsersBySlugRequest
+	56, // 63: orca.scmintegration.v1.ScmIntegrationService.ListLabelsBySlug:input_type -> orca.scmintegration.v1.ListLabelsBySlugRequest
+	58, // 64: orca.scmintegration.v1.ScmIntegrationService.AddIssueCommentBySlug:input_type -> orca.scmintegration.v1.AddIssueCommentBySlugRequest
+	59, // 65: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueCommentBySlug:input_type -> orca.scmintegration.v1.UpdateIssueCommentBySlugRequest
+	60, // 66: orca.scmintegration.v1.ScmIntegrationService.DeleteIssueCommentBySlug:input_type -> orca.scmintegration.v1.DeleteIssueCommentBySlugRequest
+	62, // 67: orca.scmintegration.v1.ScmIntegrationService.ListMergeRequests:input_type -> orca.scmintegration.v1.ListMergeRequestsRequest
+	65, // 68: orca.scmintegration.v1.ScmIntegrationService.ResolveMergeRequestDiscussion:input_type -> orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest
+	66, // 69: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetails:input_type -> orca.scmintegration.v1.GetWorkItemDetailsRequest
+	68, // 70: orca.scmintegration.v1.ScmIntegrationService.CheckHostedReviewEligibility:input_type -> orca.scmintegration.v1.CheckHostedReviewEligibilityRequest
+	70, // 71: orca.scmintegration.v1.ScmIntegrationService.SetIntegrationCredential:input_type -> orca.scmintegration.v1.SetIntegrationCredentialRequest
+	72, // 72: orca.scmintegration.v1.ScmIntegrationService.GetIntegrationCredentialStatus:input_type -> orca.scmintegration.v1.GetIntegrationCredentialStatusRequest
+	74, // 73: orca.scmintegration.v1.ScmIntegrationService.ListIntegrationCredentials:input_type -> orca.scmintegration.v1.ListIntegrationCredentialsRequest
+	3,  // 74: orca.scmintegration.v1.ScmIntegrationService.ListIssues:output_type -> orca.scmintegration.v1.ListIssuesResponse
+	6,  // 75: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:output_type -> orca.scmintegration.v1.CreatePullRequestResponse
+	8,  // 76: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:output_type -> orca.scmintegration.v1.ListPullRequestsResponse
+	10, // 77: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:output_type -> orca.scmintegration.v1.GetRateLimitStatusResponse
+	12, // 78: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:output_type -> orca.scmintegration.v1.GetAuthStatusResponse
+	14, // 79: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:output_type -> orca.scmintegration.v1.StartOAuthFlowResponse
+	16, // 80: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:output_type -> orca.scmintegration.v1.CompleteOAuthFlowResponse
+	18, // 81: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:output_type -> orca.scmintegration.v1.RevokeAuthResponse
+	20, // 82: orca.scmintegration.v1.ScmIntegrationService.MergePullRequest:output_type -> orca.scmintegration.v1.MergePullRequestResponse
+	5,  // 83: orca.scmintegration.v1.ScmIntegrationService.RequestPullRequestReviewers:output_type -> orca.scmintegration.v1.PullRequest
+	5,  // 84: orca.scmintegration.v1.ScmIntegrationService.RemovePullRequestReviewers:output_type -> orca.scmintegration.v1.PullRequest
+	5,  // 85: orca.scmintegration.v1.ScmIntegrationService.SetPullRequestAutoMerge:output_type -> orca.scmintegration.v1.PullRequest
+	1,  // 86: orca.scmintegration.v1.ScmIntegrationService.UpdateIssue:output_type -> orca.scmintegration.v1.Issue
+	26, // 87: orca.scmintegration.v1.ScmIntegrationService.GetPullRequestForBranch:output_type -> orca.scmintegration.v1.GetPullRequestForBranchResponse
+	28, // 88: orca.scmintegration.v1.ScmIntegrationService.ResolveRepoSlug:output_type -> orca.scmintegration.v1.ResolveRepoSlugResponse
+	39, // 89: orca.scmintegration.v1.ScmIntegrationService.ListAccessibleProjects:output_type -> orca.scmintegration.v1.ListAccessibleProjectsResponse
+	41, // 90: orca.scmintegration.v1.ScmIntegrationService.ResolveProjectRef:output_type -> orca.scmintegration.v1.ResolveProjectRefResponse
+	43, // 91: orca.scmintegration.v1.ScmIntegrationService.ListProjectViews:output_type -> orca.scmintegration.v1.ListProjectViewsResponse
+	45, // 92: orca.scmintegration.v1.ScmIntegrationService.ViewProjectTable:output_type -> orca.scmintegration.v1.ViewProjectTableResponse
+	30, // 93: orca.scmintegration.v1.ScmIntegrationService.UpdateProjectItemField:output_type -> orca.scmintegration.v1.ProjectItem
+	30, // 94: orca.scmintegration.v1.ScmIntegrationService.ClearProjectItemField:output_type -> orca.scmintegration.v1.ProjectItem
+	37, // 95: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetailsBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
+	37, // 96: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
+	37, // 97: orca.scmintegration.v1.ScmIntegrationService.UpdatePullRequestBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
+	37, // 98: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueTypeBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
+	53, // 99: orca.scmintegration.v1.ScmIntegrationService.ListIssueTypesBySlug:output_type -> orca.scmintegration.v1.ListIssueTypesBySlugResponse
+	55, // 100: orca.scmintegration.v1.ScmIntegrationService.ListAssignableUsersBySlug:output_type -> orca.scmintegration.v1.ListAssignableUsersBySlugResponse
+	57, // 101: orca.scmintegration.v1.ScmIntegrationService.ListLabelsBySlug:output_type -> orca.scmintegration.v1.ListLabelsBySlugResponse
+	36, // 102: orca.scmintegration.v1.ScmIntegrationService.AddIssueCommentBySlug:output_type -> orca.scmintegration.v1.ProjectComment
+	36, // 103: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueCommentBySlug:output_type -> orca.scmintegration.v1.ProjectComment
+	76, // 104: orca.scmintegration.v1.ScmIntegrationService.DeleteIssueCommentBySlug:output_type -> google.protobuf.Empty
+	63, // 105: orca.scmintegration.v1.ScmIntegrationService.ListMergeRequests:output_type -> orca.scmintegration.v1.ListMergeRequestsResponse
+	64, // 106: orca.scmintegration.v1.ScmIntegrationService.ResolveMergeRequestDiscussion:output_type -> orca.scmintegration.v1.MergeRequestDiscussion
+	67, // 107: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetails:output_type -> orca.scmintegration.v1.WorkItemDetailsGitLab
+	69, // 108: orca.scmintegration.v1.ScmIntegrationService.CheckHostedReviewEligibility:output_type -> orca.scmintegration.v1.HostedReviewEligibility
+	71, // 109: orca.scmintegration.v1.ScmIntegrationService.SetIntegrationCredential:output_type -> orca.scmintegration.v1.SetIntegrationCredentialResponse
+	73, // 110: orca.scmintegration.v1.ScmIntegrationService.GetIntegrationCredentialStatus:output_type -> orca.scmintegration.v1.GetIntegrationCredentialStatusResponse
+	75, // 111: orca.scmintegration.v1.ScmIntegrationService.ListIntegrationCredentials:output_type -> orca.scmintegration.v1.ListIntegrationCredentialsResponse
+	74, // [74:112] is the sub-list for method output_type
+	36, // [36:74] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_orca_scmintegration_v1_scmintegration_proto_init() }
@@ -5122,7 +5456,7 @@ func file_orca_scmintegration_v1_scmintegration_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_scmintegration_v1_scmintegration_proto_rawDesc), len(file_orca_scmintegration_v1_scmintegration_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   69,
+			NumMessages:   75,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

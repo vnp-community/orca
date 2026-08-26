@@ -10,6 +10,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -271,8 +272,23 @@ func (x *RegisterDevServerResponse) GetDevServer() *DevServer {
 // (git-gateway-service, project-service, task-service) calls to answer
 // "which host owns this connectionId, and how do I reach it".
 type ResolveConnectionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Exactly one of connection_id, dev_server_id, worktree_id is set. Empty
+	// connection_id with both alternates also empty resolves nothing
+	// (ResolveConnectionOutput{Connected: false}), matching today's
+	// empty-connectionId short-circuit.
+	ConnectionId string `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	// dev_server_id resolves the dev server's current active connectionId,
+	// the reverse of connection_id's lookup direction — used by
+	// ai-provider-service's TestConnection (see
+	// specs/backend-go/bugs/missing-v1/tasks/TASK-028-implement-aiprovider-test-connection-usecase.md).
+	DevServerId string `protobuf:"bytes,2,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	// worktree_id resolves the connectionId currently bound to a worktree —
+	// used by api-gateway's browser.* relay channels (see
+	// specs/backend-go/bugs/missing-v1/tasks/TASK-034-add-browser-pane-relay-wscompat-channels.md).
+	// Mirrors CreateConnectionRequest's (dev_server_id, repo_path,
+	// worktree_id) tuple in reverse.
+	WorktreeId    string `protobuf:"bytes,3,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -314,6 +330,20 @@ func (x *ResolveConnectionRequest) GetConnectionId() string {
 	return ""
 }
 
+func (x *ResolveConnectionRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *ResolveConnectionRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
 type ResolveConnectionResponse struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Connected bool                   `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"` // false => execute locally, no relay
@@ -322,8 +352,15 @@ type ResolveConnectionResponse struct {
 	// infra.connections (migrations/0002_connections) — empty when connected
 	// is false. Callers like git-gateway-service's RelayExecutor need
 	// repo_path alongside dev_server to know which path to operate on.
-	RepoPath      string `protobuf:"bytes,3,opt,name=repo_path,json=repoPath,proto3" json:"repo_path,omitempty"`
-	WorktreeId    string `protobuf:"bytes,4,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	RepoPath   string `protobuf:"bytes,3,opt,name=repo_path,json=repoPath,proto3" json:"repo_path,omitempty"`
+	WorktreeId string `protobuf:"bytes,4,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	// connection_id is the resolved infra.connections.id — the value Relay's
+	// RelayRequest.connection_id expects. Populated regardless of which
+	// ResolveConnectionRequest key resolved this row, so a dev_server_id- or
+	// worktree_id-keyed caller (TestConnection, browser.* channels) has a
+	// valid Relay connection_id without re-deriving it from DevServer.id,
+	// which is a different id space (dev_servers.id, not connections.id).
+	ConnectionId  string `protobuf:"bytes,5,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -382,6 +419,13 @@ func (x *ResolveConnectionResponse) GetRepoPath() string {
 func (x *ResolveConnectionResponse) GetWorktreeId() string {
 	if x != nil {
 		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ResolveConnectionResponse) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
 	}
 	return ""
 }
@@ -2763,11 +2807,347 @@ func (x *PtyExited) GetExitCode() int32 {
 	return 0
 }
 
+type BrowserProfile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	DevServerId   string                 `protobuf:"bytes,3,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	SourceBrowser string                 `protobuf:"bytes,5,opt,name=source_browser,json=sourceBrowser,proto3" json:"source_browser,omitempty"` // e.g. "chrome", "firefox" — set by profileImportFromBrowser; empty if manually created
+	IsDefault     bool                   `protobuf:"varint,6,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BrowserProfile) Reset() {
+	*x = BrowserProfile{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BrowserProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BrowserProfile) ProtoMessage() {}
+
+func (x *BrowserProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BrowserProfile.ProtoReflect.Descriptor instead.
+func (*BrowserProfile) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *BrowserProfile) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *BrowserProfile) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *BrowserProfile) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *BrowserProfile) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *BrowserProfile) GetSourceBrowser() string {
+	if x != nil {
+		return x.SourceBrowser
+	}
+	return ""
+}
+
+func (x *BrowserProfile) GetIsDefault() bool {
+	if x != nil {
+		return x.IsDefault
+	}
+	return false
+}
+
+func (x *BrowserProfile) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type ListBrowserProfilesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"` // required — a profile is dev-server-scoped, not tenant-wide
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBrowserProfilesRequest) Reset() {
+	*x = ListBrowserProfilesRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBrowserProfilesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBrowserProfilesRequest) ProtoMessage() {}
+
+func (x *ListBrowserProfilesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBrowserProfilesRequest.ProtoReflect.Descriptor instead.
+func (*ListBrowserProfilesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *ListBrowserProfilesRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+type ListBrowserProfilesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profiles      []*BrowserProfile      `protobuf:"bytes,1,rep,name=profiles,proto3" json:"profiles,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBrowserProfilesResponse) Reset() {
+	*x = ListBrowserProfilesResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBrowserProfilesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBrowserProfilesResponse) ProtoMessage() {}
+
+func (x *ListBrowserProfilesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBrowserProfilesResponse.ProtoReflect.Descriptor instead.
+func (*ListBrowserProfilesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *ListBrowserProfilesResponse) GetProfiles() []*BrowserProfile {
+	if x != nil {
+		return x.Profiles
+	}
+	return nil
+}
+
+type CreateBrowserProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	SourceBrowser string                 `protobuf:"bytes,3,opt,name=source_browser,json=sourceBrowser,proto3" json:"source_browser,omitempty"` // optional
+	IsDefault     bool                   `protobuf:"varint,4,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateBrowserProfileRequest) Reset() {
+	*x = CreateBrowserProfileRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBrowserProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBrowserProfileRequest) ProtoMessage() {}
+
+func (x *CreateBrowserProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBrowserProfileRequest.ProtoReflect.Descriptor instead.
+func (*CreateBrowserProfileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *CreateBrowserProfileRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *CreateBrowserProfileRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateBrowserProfileRequest) GetSourceBrowser() string {
+	if x != nil {
+		return x.SourceBrowser
+	}
+	return ""
+}
+
+func (x *CreateBrowserProfileRequest) GetIsDefault() bool {
+	if x != nil {
+		return x.IsDefault
+	}
+	return false
+}
+
+type CreateBrowserProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *BrowserProfile        `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateBrowserProfileResponse) Reset() {
+	*x = CreateBrowserProfileResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBrowserProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBrowserProfileResponse) ProtoMessage() {}
+
+func (x *CreateBrowserProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBrowserProfileResponse.ProtoReflect.Descriptor instead.
+func (*CreateBrowserProfileResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *CreateBrowserProfileResponse) GetProfile() *BrowserProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type DeleteBrowserProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteBrowserProfileRequest) Reset() {
+	*x = DeleteBrowserProfileRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteBrowserProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteBrowserProfileRequest) ProtoMessage() {}
+
+func (x *DeleteBrowserProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteBrowserProfileRequest.ProtoReflect.Descriptor instead.
+func (*DeleteBrowserProfileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *DeleteBrowserProfileRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 var File_orca_infrafleet_v1_infrafleet_proto protoreflect.FileDescriptor
 
 const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\n" +
-	"#orca/infrafleet/v1/infrafleet.proto\x12\x12orca.infrafleet.v1\x1a\x1bgoogle/protobuf/empty.proto\"\xa8\x01\n" +
+	"#orca/infrafleet/v1/infrafleet.proto\x12\x12orca.infrafleet.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa8\x01\n" +
 	"\tDevServer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -2781,16 +3161,20 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\rssh_target_id\x18\x04 \x01(\tR\vsshTargetId\"Y\n" +
 	"\x19RegisterDevServerResponse\x12<\n" +
 	"\n" +
-	"dev_server\x18\x01 \x01(\v2\x1d.orca.infrafleet.v1.DevServerR\tdevServer\"?\n" +
+	"dev_server\x18\x01 \x01(\v2\x1d.orca.infrafleet.v1.DevServerR\tdevServer\"\x84\x01\n" +
 	"\x18ResolveConnectionRequest\x12#\n" +
-	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\"\xb5\x01\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\"\n" +
+	"\rdev_server_id\x18\x02 \x01(\tR\vdevServerId\x12\x1f\n" +
+	"\vworktree_id\x18\x03 \x01(\tR\n" +
+	"worktreeId\"\xda\x01\n" +
 	"\x19ResolveConnectionResponse\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x12<\n" +
 	"\n" +
 	"dev_server\x18\x02 \x01(\v2\x1d.orca.infrafleet.v1.DevServerR\tdevServer\x12\x1b\n" +
 	"\trepo_path\x18\x03 \x01(\tR\brepoPath\x12\x1f\n" +
 	"\vworktree_id\x18\x04 \x01(\tR\n" +
-	"worktreeId\"\x17\n" +
+	"worktreeId\x12#\n" +
+	"\rconnection_id\x18\x05 \x01(\tR\fconnectionId\"\x17\n" +
 	"\x15ListDevServersRequest\"X\n" +
 	"\x16ListDevServersResponse\x12>\n" +
 	"\vdev_servers\x18\x01 \x03(\v2\x1d.orca.infrafleet.v1.DevServerR\n" +
@@ -2940,12 +3324,36 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\tPtyOutput\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\"(\n" +
 	"\tPtyExited\x12\x1b\n" +
-	"\texit_code\x18\x01 \x01(\x05R\bexitCode*\x9b\x01\n" +
+	"\texit_code\x18\x01 \x01(\x05R\bexitCode\"\xf6\x01\n" +
+	"\x0eBrowserProfile\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\"\n" +
+	"\rdev_server_id\x18\x03 \x01(\tR\vdevServerId\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12%\n" +
+	"\x0esource_browser\x18\x05 \x01(\tR\rsourceBrowser\x12\x1d\n" +
+	"\n" +
+	"is_default\x18\x06 \x01(\bR\tisDefault\x129\n" +
+	"\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"@\n" +
+	"\x1aListBrowserProfilesRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\"]\n" +
+	"\x1bListBrowserProfilesResponse\x12>\n" +
+	"\bprofiles\x18\x01 \x03(\v2\".orca.infrafleet.v1.BrowserProfileR\bprofiles\"\x9b\x01\n" +
+	"\x1bCreateBrowserProfileRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12%\n" +
+	"\x0esource_browser\x18\x03 \x01(\tR\rsourceBrowser\x12\x1d\n" +
+	"\n" +
+	"is_default\x18\x04 \x01(\bR\tisDefault\"\\\n" +
+	"\x1cCreateBrowserProfileResponse\x12<\n" +
+	"\aprofile\x18\x01 \x01(\v2\".orca.infrafleet.v1.BrowserProfileR\aprofile\"-\n" +
+	"\x1bDeleteBrowserProfileRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id*\x9b\x01\n" +
 	"\x0eConnectionMode\x12\x1f\n" +
 	"\x1bCONNECTION_MODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CONNECTION_MODE_RELAY_SSH\x10\x01\x12#\n" +
 	"\x1fCONNECTION_MODE_RELAY_WEBSOCKET\x10\x02\x12$\n" +
-	" CONNECTION_MODE_DIRECT_WEBSOCKET\x10\x032\xd4\x12\n" +
+	" CONNECTION_MODE_DIRECT_WEBSOCKET\x10\x032\xa8\x15\n" +
 	"\x11InfraFleetService\x12p\n" +
 	"\x11RegisterDevServer\x12,.orca.infrafleet.v1.RegisterDevServerRequest\x1a-.orca.infrafleet.v1.RegisterDevServerResponse\x12p\n" +
 	"\x11ResolveConnection\x12,.orca.infrafleet.v1.ResolveConnectionRequest\x1a-.orca.infrafleet.v1.ResolveConnectionResponse\x12j\n" +
@@ -2968,7 +3376,10 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x14FocusTerminalSession\x12/.orca.infrafleet.v1.FocusTerminalSessionRequest\x1a\x16.google.protobuf.Empty\x12\x7f\n" +
 	"\x16GetTerminalAgentStatus\x121.orca.infrafleet.v1.GetTerminalAgentStatusRequest\x1a2.orca.infrafleet.v1.GetTerminalAgentStatusResponse\x12\x7f\n" +
 	"\x16InspectTerminalProcess\x121.orca.infrafleet.v1.InspectTerminalProcessRequest\x1a2.orca.infrafleet.v1.InspectTerminalProcessResponse\x12W\n" +
-	"\tAttachPty\x12\".orca.infrafleet.v1.PtyClientFrame\x1a\".orca.infrafleet.v1.PtyServerFrame(\x010\x01BJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1b\x06proto3"
+	"\tAttachPty\x12\".orca.infrafleet.v1.PtyClientFrame\x1a\".orca.infrafleet.v1.PtyServerFrame(\x010\x01\x12v\n" +
+	"\x13ListBrowserProfiles\x12..orca.infrafleet.v1.ListBrowserProfilesRequest\x1a/.orca.infrafleet.v1.ListBrowserProfilesResponse\x12y\n" +
+	"\x14CreateBrowserProfile\x12/.orca.infrafleet.v1.CreateBrowserProfileRequest\x1a0.orca.infrafleet.v1.CreateBrowserProfileResponse\x12_\n" +
+	"\x14DeleteBrowserProfile\x12/.orca.infrafleet.v1.DeleteBrowserProfileRequest\x1a\x16.google.protobuf.EmptyBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1b\x06proto3"
 
 var (
 	file_orca_infrafleet_v1_infrafleet_proto_rawDescOnce sync.Once
@@ -2983,7 +3394,7 @@ func file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_infrafleet_v1_infrafleet_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_infrafleet_v1_infrafleet_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_orca_infrafleet_v1_infrafleet_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
 var file_orca_infrafleet_v1_infrafleet_proto_goTypes = []any{
 	(ConnectionMode)(0),                    // 0: orca.infrafleet.v1.ConnectionMode
 	(*DevServer)(nil),                      // 1: orca.infrafleet.v1.DevServer
@@ -3035,7 +3446,14 @@ var file_orca_infrafleet_v1_infrafleet_proto_goTypes = []any{
 	(*PtyServerFrame)(nil),                 // 47: orca.infrafleet.v1.PtyServerFrame
 	(*PtyOutput)(nil),                      // 48: orca.infrafleet.v1.PtyOutput
 	(*PtyExited)(nil),                      // 49: orca.infrafleet.v1.PtyExited
-	(*emptypb.Empty)(nil),                  // 50: google.protobuf.Empty
+	(*BrowserProfile)(nil),                 // 50: orca.infrafleet.v1.BrowserProfile
+	(*ListBrowserProfilesRequest)(nil),     // 51: orca.infrafleet.v1.ListBrowserProfilesRequest
+	(*ListBrowserProfilesResponse)(nil),    // 52: orca.infrafleet.v1.ListBrowserProfilesResponse
+	(*CreateBrowserProfileRequest)(nil),    // 53: orca.infrafleet.v1.CreateBrowserProfileRequest
+	(*CreateBrowserProfileResponse)(nil),   // 54: orca.infrafleet.v1.CreateBrowserProfileResponse
+	(*DeleteBrowserProfileRequest)(nil),    // 55: orca.infrafleet.v1.DeleteBrowserProfileRequest
+	(*timestamppb.Timestamp)(nil),          // 56: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                  // 57: google.protobuf.Empty
 }
 var file_orca_infrafleet_v1_infrafleet_proto_depIdxs = []int32{
 	0,  // 0: orca.infrafleet.v1.DevServer.mode:type_name -> orca.infrafleet.v1.ConnectionMode
@@ -3052,55 +3470,64 @@ var file_orca_infrafleet_v1_infrafleet_proto_depIdxs = []int32{
 	46, // 11: orca.infrafleet.v1.PtyClientFrame.resize:type_name -> orca.infrafleet.v1.PtyResize
 	48, // 12: orca.infrafleet.v1.PtyServerFrame.out:type_name -> orca.infrafleet.v1.PtyOutput
 	49, // 13: orca.infrafleet.v1.PtyServerFrame.exited:type_name -> orca.infrafleet.v1.PtyExited
-	2,  // 14: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:input_type -> orca.infrafleet.v1.RegisterDevServerRequest
-	4,  // 15: orca.infrafleet.v1.InfraFleetService.ResolveConnection:input_type -> orca.infrafleet.v1.ResolveConnectionRequest
-	12, // 16: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:input_type -> orca.infrafleet.v1.CreateSshTargetRequest
-	14, // 17: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:input_type -> orca.infrafleet.v1.GetFleetHealthRequest
-	17, // 18: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:input_type -> orca.infrafleet.v1.ScanWorkspacePortsRequest
-	6,  // 19: orca.infrafleet.v1.InfraFleetService.ListDevServers:input_type -> orca.infrafleet.v1.ListDevServersRequest
-	8,  // 20: orca.infrafleet.v1.InfraFleetService.CreateConnection:input_type -> orca.infrafleet.v1.CreateConnectionRequest
-	10, // 21: orca.infrafleet.v1.InfraFleetService.Relay:input_type -> orca.infrafleet.v1.RelayRequest
-	22, // 22: orca.infrafleet.v1.InfraFleetService.ListSshTargets:input_type -> orca.infrafleet.v1.ListSshTargetsRequest
-	24, // 23: orca.infrafleet.v1.InfraFleetService.GetSshState:input_type -> orca.infrafleet.v1.GetSshStateRequest
-	26, // 24: orca.infrafleet.v1.InfraFleetService.EstablishConnection:input_type -> orca.infrafleet.v1.EstablishConnectionRequest
-	19, // 25: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:input_type -> orca.infrafleet.v1.KillWorkspacePortRequest
-	28, // 26: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:input_type -> orca.infrafleet.v1.SpawnTerminalSessionRequest
-	31, // 27: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:input_type -> orca.infrafleet.v1.ResizeTerminalSessionRequest
-	32, // 28: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:input_type -> orca.infrafleet.v1.KillTerminalSessionRequest
-	33, // 29: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:input_type -> orca.infrafleet.v1.StopTerminalProcessRequest
-	34, // 30: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:input_type -> orca.infrafleet.v1.ListTerminalSessionsRequest
-	36, // 31: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:input_type -> orca.infrafleet.v1.WaitTerminalSessionRequest
-	38, // 32: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:input_type -> orca.infrafleet.v1.FocusTerminalSessionRequest
-	39, // 33: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:input_type -> orca.infrafleet.v1.GetTerminalAgentStatusRequest
-	41, // 34: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:input_type -> orca.infrafleet.v1.InspectTerminalProcessRequest
-	43, // 35: orca.infrafleet.v1.InfraFleetService.AttachPty:input_type -> orca.infrafleet.v1.PtyClientFrame
-	3,  // 36: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:output_type -> orca.infrafleet.v1.RegisterDevServerResponse
-	5,  // 37: orca.infrafleet.v1.InfraFleetService.ResolveConnection:output_type -> orca.infrafleet.v1.ResolveConnectionResponse
-	13, // 38: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:output_type -> orca.infrafleet.v1.CreateSshTargetResponse
-	16, // 39: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:output_type -> orca.infrafleet.v1.GetFleetHealthResponse
-	18, // 40: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:output_type -> orca.infrafleet.v1.ScanWorkspacePortsResponse
-	7,  // 41: orca.infrafleet.v1.InfraFleetService.ListDevServers:output_type -> orca.infrafleet.v1.ListDevServersResponse
-	9,  // 42: orca.infrafleet.v1.InfraFleetService.CreateConnection:output_type -> orca.infrafleet.v1.CreateConnectionResponse
-	11, // 43: orca.infrafleet.v1.InfraFleetService.Relay:output_type -> orca.infrafleet.v1.RelayResponse
-	23, // 44: orca.infrafleet.v1.InfraFleetService.ListSshTargets:output_type -> orca.infrafleet.v1.ListSshTargetsResponse
-	25, // 45: orca.infrafleet.v1.InfraFleetService.GetSshState:output_type -> orca.infrafleet.v1.GetSshStateResponse
-	27, // 46: orca.infrafleet.v1.InfraFleetService.EstablishConnection:output_type -> orca.infrafleet.v1.Connection
-	20, // 47: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:output_type -> orca.infrafleet.v1.KillWorkspacePortResponse
-	29, // 48: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:output_type -> orca.infrafleet.v1.SpawnTerminalSessionResponse
-	50, // 49: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:output_type -> google.protobuf.Empty
-	50, // 50: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:output_type -> google.protobuf.Empty
-	50, // 51: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:output_type -> google.protobuf.Empty
-	35, // 52: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:output_type -> orca.infrafleet.v1.ListTerminalSessionsResponse
-	37, // 53: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:output_type -> orca.infrafleet.v1.WaitTerminalSessionResponse
-	50, // 54: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:output_type -> google.protobuf.Empty
-	40, // 55: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:output_type -> orca.infrafleet.v1.GetTerminalAgentStatusResponse
-	42, // 56: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:output_type -> orca.infrafleet.v1.InspectTerminalProcessResponse
-	47, // 57: orca.infrafleet.v1.InfraFleetService.AttachPty:output_type -> orca.infrafleet.v1.PtyServerFrame
-	36, // [36:58] is the sub-list for method output_type
-	14, // [14:36] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	56, // 14: orca.infrafleet.v1.BrowserProfile.created_at:type_name -> google.protobuf.Timestamp
+	50, // 15: orca.infrafleet.v1.ListBrowserProfilesResponse.profiles:type_name -> orca.infrafleet.v1.BrowserProfile
+	50, // 16: orca.infrafleet.v1.CreateBrowserProfileResponse.profile:type_name -> orca.infrafleet.v1.BrowserProfile
+	2,  // 17: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:input_type -> orca.infrafleet.v1.RegisterDevServerRequest
+	4,  // 18: orca.infrafleet.v1.InfraFleetService.ResolveConnection:input_type -> orca.infrafleet.v1.ResolveConnectionRequest
+	12, // 19: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:input_type -> orca.infrafleet.v1.CreateSshTargetRequest
+	14, // 20: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:input_type -> orca.infrafleet.v1.GetFleetHealthRequest
+	17, // 21: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:input_type -> orca.infrafleet.v1.ScanWorkspacePortsRequest
+	6,  // 22: orca.infrafleet.v1.InfraFleetService.ListDevServers:input_type -> orca.infrafleet.v1.ListDevServersRequest
+	8,  // 23: orca.infrafleet.v1.InfraFleetService.CreateConnection:input_type -> orca.infrafleet.v1.CreateConnectionRequest
+	10, // 24: orca.infrafleet.v1.InfraFleetService.Relay:input_type -> orca.infrafleet.v1.RelayRequest
+	22, // 25: orca.infrafleet.v1.InfraFleetService.ListSshTargets:input_type -> orca.infrafleet.v1.ListSshTargetsRequest
+	24, // 26: orca.infrafleet.v1.InfraFleetService.GetSshState:input_type -> orca.infrafleet.v1.GetSshStateRequest
+	26, // 27: orca.infrafleet.v1.InfraFleetService.EstablishConnection:input_type -> orca.infrafleet.v1.EstablishConnectionRequest
+	19, // 28: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:input_type -> orca.infrafleet.v1.KillWorkspacePortRequest
+	28, // 29: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:input_type -> orca.infrafleet.v1.SpawnTerminalSessionRequest
+	31, // 30: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:input_type -> orca.infrafleet.v1.ResizeTerminalSessionRequest
+	32, // 31: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:input_type -> orca.infrafleet.v1.KillTerminalSessionRequest
+	33, // 32: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:input_type -> orca.infrafleet.v1.StopTerminalProcessRequest
+	34, // 33: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:input_type -> orca.infrafleet.v1.ListTerminalSessionsRequest
+	36, // 34: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:input_type -> orca.infrafleet.v1.WaitTerminalSessionRequest
+	38, // 35: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:input_type -> orca.infrafleet.v1.FocusTerminalSessionRequest
+	39, // 36: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:input_type -> orca.infrafleet.v1.GetTerminalAgentStatusRequest
+	41, // 37: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:input_type -> orca.infrafleet.v1.InspectTerminalProcessRequest
+	43, // 38: orca.infrafleet.v1.InfraFleetService.AttachPty:input_type -> orca.infrafleet.v1.PtyClientFrame
+	51, // 39: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:input_type -> orca.infrafleet.v1.ListBrowserProfilesRequest
+	53, // 40: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:input_type -> orca.infrafleet.v1.CreateBrowserProfileRequest
+	55, // 41: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:input_type -> orca.infrafleet.v1.DeleteBrowserProfileRequest
+	3,  // 42: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:output_type -> orca.infrafleet.v1.RegisterDevServerResponse
+	5,  // 43: orca.infrafleet.v1.InfraFleetService.ResolveConnection:output_type -> orca.infrafleet.v1.ResolveConnectionResponse
+	13, // 44: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:output_type -> orca.infrafleet.v1.CreateSshTargetResponse
+	16, // 45: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:output_type -> orca.infrafleet.v1.GetFleetHealthResponse
+	18, // 46: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:output_type -> orca.infrafleet.v1.ScanWorkspacePortsResponse
+	7,  // 47: orca.infrafleet.v1.InfraFleetService.ListDevServers:output_type -> orca.infrafleet.v1.ListDevServersResponse
+	9,  // 48: orca.infrafleet.v1.InfraFleetService.CreateConnection:output_type -> orca.infrafleet.v1.CreateConnectionResponse
+	11, // 49: orca.infrafleet.v1.InfraFleetService.Relay:output_type -> orca.infrafleet.v1.RelayResponse
+	23, // 50: orca.infrafleet.v1.InfraFleetService.ListSshTargets:output_type -> orca.infrafleet.v1.ListSshTargetsResponse
+	25, // 51: orca.infrafleet.v1.InfraFleetService.GetSshState:output_type -> orca.infrafleet.v1.GetSshStateResponse
+	27, // 52: orca.infrafleet.v1.InfraFleetService.EstablishConnection:output_type -> orca.infrafleet.v1.Connection
+	20, // 53: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:output_type -> orca.infrafleet.v1.KillWorkspacePortResponse
+	29, // 54: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:output_type -> orca.infrafleet.v1.SpawnTerminalSessionResponse
+	57, // 55: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:output_type -> google.protobuf.Empty
+	57, // 56: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:output_type -> google.protobuf.Empty
+	57, // 57: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:output_type -> google.protobuf.Empty
+	35, // 58: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:output_type -> orca.infrafleet.v1.ListTerminalSessionsResponse
+	37, // 59: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:output_type -> orca.infrafleet.v1.WaitTerminalSessionResponse
+	57, // 60: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:output_type -> google.protobuf.Empty
+	40, // 61: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:output_type -> orca.infrafleet.v1.GetTerminalAgentStatusResponse
+	42, // 62: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:output_type -> orca.infrafleet.v1.InspectTerminalProcessResponse
+	47, // 63: orca.infrafleet.v1.InfraFleetService.AttachPty:output_type -> orca.infrafleet.v1.PtyServerFrame
+	52, // 64: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:output_type -> orca.infrafleet.v1.ListBrowserProfilesResponse
+	54, // 65: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:output_type -> orca.infrafleet.v1.CreateBrowserProfileResponse
+	57, // 66: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:output_type -> google.protobuf.Empty
+	42, // [42:67] is the sub-list for method output_type
+	17, // [17:42] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_orca_infrafleet_v1_infrafleet_proto_init() }
@@ -3123,7 +3550,7 @@ func file_orca_infrafleet_v1_infrafleet_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_infrafleet_v1_infrafleet_proto_rawDesc), len(file_orca_infrafleet_v1_infrafleet_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   49,
+			NumMessages:   55,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

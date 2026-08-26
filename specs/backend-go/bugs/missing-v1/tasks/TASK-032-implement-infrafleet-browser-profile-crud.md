@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `migrations/0004_browser_profiles.up.sql` (new), `internal/domain/browser_profile.go` (new), `internal/usecase/{ports.go,list_browser_profiles.go,create_browser_profile.go,delete_browser_profile.go}` (new), `internal/adapter/postgres/browser_profile_repository.go` (new), `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-031
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a0480f57a839cc758` (sub-scope), build/vet/test clean (all packages pass). Staged via `git add`, not yet committed by the parent agent. Pending merge.
 
 ---
 

@@ -22,9 +22,21 @@ import (
 // when Scope == ScopeProject, ignored when Scope == ScopeServer. Leaving
 // Scope at its zero value lists every scope for the tenant.
 type ListAccountsFilter struct {
-	TenantID   string
-	Scope      domain.AccountScope // zero value = any scope
-	ScopeRefID string
+	TenantID    string
+	Scope       domain.AccountScope // zero value = any scope
+	ScopeRefID  string
+	DevServerID string // optional — empty means no filter
+}
+
+// UpdateFields is UpdateAccount's usecase input — only the 3 fields
+// ai-provider-service.md documents as user-editable outside the status
+// machine.
+type UpdateFields struct {
+	TenantID  string
+	AccountID string
+	Label     string
+	ModelHint string
+	BaseURL   string
 }
 
 // UpdateStatusInput is the single mutation entry point for an existing
@@ -51,6 +63,14 @@ type ProviderAccountRepository interface {
 	Get(ctx context.Context, tenantID, id string) (domain.ProviderAccount, error)
 	List(ctx context.Context, filter ListAccountsFilter) ([]domain.ProviderAccount, error)
 	UpdateStatus(ctx context.Context, in UpdateStatusInput) (domain.ProviderAccount, error)
+	// Update mutates the user-editable metadata fields — Label/ModelHint/
+	// BaseURL — distinct from UpdateStatus, which only mutates lifecycle
+	// fields (status/credential_ref/rotation grace). Never touches Status
+	// or CredentialRef.
+	Update(ctx context.Context, in UpdateFields) (domain.ProviderAccount, error)
+	// Delete soft-deletes: sets status='revoked' and deleted_at=now(), never
+	// a hard DELETE — preserves the row for audit and usage_daily's FK.
+	Delete(ctx context.Context, tenantID, accountID string) error
 }
 
 // UsageRepository is the persistence port for the daily quota/spend rollup
@@ -121,6 +141,31 @@ type CredentialBrokerClient interface {
 	// resolving to plaintext only ever happens on the execution plane
 	// (ai-provider-service.md §9), which this service is not.
 	ResolveCredential(ctx context.Context, credentialRef string) (CredentialRef, error)
+}
+
+// ConnectionTestResult is TestConnection's usecase-level result — mirrors
+// TestConnectionResponse{success, message}. No field here can ever hold
+// key material — the agent decrypts locally and returns only a
+// success/failure verdict.
+type ConnectionTestResult struct {
+	Success bool
+	Message string
+}
+
+// InfraFleetClient is the narrow port TestConnection uses to reach
+// infra-fleet-service's Relay RPC — NOT to be confused with
+// infra-fleet-service's own Relay RPC on the other side of this call.
+// Implemented by internal/adapter/grpcclient against a real
+// infra-fleet-service gRPC connection. ai-provider-service never gains its
+// own Dev Server Agent adapter (§6) — this is the one indirect path to the
+// execution plane, entirely mediated by infra-fleet-service.
+type InfraFleetClient interface {
+	// Relay resolves devServerID to its current active connectionId (via
+	// infra-fleet-service's ResolveConnection with dev_server_id set — see
+	// specs/backend-go/bugs/missing-v1/tasks/TASK-025-add-infrafleet-connection-resolve-by-devserver-worktree.md)
+	// then calls infra-fleet-service's Relay RPC with method/params.
+	// Returns the agent's decoded JSON-RPC result.
+	Relay(ctx context.Context, devServerID, method string, params map[string]any) (map[string]any, error)
 }
 
 // ProviderResolutionPort is the interface the ResolveProvider usecase
