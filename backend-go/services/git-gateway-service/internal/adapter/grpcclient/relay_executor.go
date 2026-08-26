@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
@@ -142,6 +143,21 @@ func (r *RelayExecutor) Stage(ctx context.Context, repoPath string, paths []stri
 	var result domain.SimpleResult
 	err := r.relay(ctx, repoPath, "git.bulkStage", map[string]any{
 		"worktreePath": repoPath, "filePaths": paths,
+	}, &result)
+	return result, err
+}
+
+// CreateWorktree/RemoveWorktree/FetchAndResolveRef/ListWorktreePaths below
+// follow this file's existing relay(...) helper pattern exactly (SOL-031 /
+// TASK-193). Same best-effort-param-shape caveat this file's doc comment
+// already states for git.status/git.diff/etc. applies here — git.worktreeAdd/
+// git.worktreeRemove/git.fetchRef/git.worktreeList are not verified against
+// a real Dev Server Agent handler; reconcile before removing this note.
+
+func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error) {
+	var result domain.WorktreeCreateResult
+	err := r.relay(ctx, repoPath, "git.worktreeAdd", map[string]any{
+		"repoPath": repoPath, "branch": branch, "baseRef": baseRef,
 	}, &result)
 	return result, err
 }
@@ -297,6 +313,57 @@ func (r *RelayExecutor) ScanSetupScriptImports(ctx context.Context, repoPath str
 	}
 	err := r.relay(ctx, repoPath, "git.scanSetupScriptImports", map[string]any{"repoPath": repoPath}, &result)
 	return result.ImportedPaths, err
+}
+
+func (r *RelayExecutor) RemoveWorktree(ctx context.Context, worktreePath string, force bool) error {
+	return r.relay(ctx, worktreePath, "git.worktreeRemove", map[string]any{
+		"worktreePath": worktreePath, "force": force,
+	}, nil)
+}
+
+func (r *RelayExecutor) FetchAndResolveRef(ctx context.Context, repoPath, ref string) (string, error) {
+	var result struct {
+		SHA string `json:"sha"`
+	}
+	err := r.relay(ctx, repoPath, "git.fetchRef", map[string]any{
+		"repoPath": repoPath, "ref": ref,
+	}, &result)
+	return result.SHA, err
+}
+
+func (r *RelayExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+	var result struct {
+		Paths []string `json:"paths"`
+	}
+	err := r.relay(ctx, repoPath, "git.worktreeList", map[string]any{
+		"repoPath": repoPath,
+	}, &result)
+	return result.Paths, err
+}
+
+// ForceDeleteBranch implements the REQUIRED (TASK-194) GitExecutor method —
+// see domain.ErrForceDeleteBranchUnsupported's doc comment for why the
+// operational-fallback sentinel lives in internal/domain rather than here.
+func (r *RelayExecutor) ForceDeleteBranch(ctx context.Context, repoPath, branch string) error {
+	err := r.relay(ctx, repoPath, "git.forceDeleteBranch", map[string]any{
+		"repoPath": repoPath, "branch": branch,
+	}, nil)
+	if err != nil && isMethodNotFoundError(err) {
+		return fmt.Errorf("%w: %v", domain.ErrForceDeleteBranchUnsupported, err)
+	}
+	return err
+}
+
+// isMethodNotFoundError is a placeholder heuristic for detecting an
+// agent's "unknown method" response through the Relay RPC's error path —
+// FLAGGED: confirm the real error shape RelayResponse/infra-fleet-service's
+// Relay RPC surfaces for an unsupported agent method before finalizing;
+// this may need to check a gRPC status code (codes.Unimplemented) rather
+// than string-matching, depending on how infra-fleet-service's Relay
+// usecase translates an agent-side JSON-RPC "method not found" today.
+func isMethodNotFoundError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "method not found") || strings.Contains(msg, "unknown method")
 }
 
 // Complete implements usecase.AICompleter by relaying to the Dev Server

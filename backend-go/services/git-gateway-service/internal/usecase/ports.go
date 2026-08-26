@@ -105,8 +105,35 @@ type GitExecutor interface {
 	ReadIssueCommand(ctx context.Context, repoPath string) (content string, exists bool, err error)
 	WriteIssueCommand(ctx context.Context, repoPath, content string) error
 	ScanSetupScriptImports(ctx context.Context, repoPath string) (importedPaths []string, err error)
-}
 
+	// New, SOL-031 (TASK-193):
+	CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error)
+	RemoveWorktree(ctx context.Context, worktreePath string, force bool) error
+	// FetchAndResolveRef ensures ref is fetched/up to date in repoPath's
+	// local clone and returns its resolved SHA — shared by
+	// PrefetchCreateBase and ResolvePrBase/ResolveMrBase's "confirm the
+	// platform's base branch actually exists locally" step.
+	FetchAndResolveRef(ctx context.Context, repoPath, ref string) (sha string, err error)
+	// ListWorktreePaths returns the raw on-disk worktree paths for repoPath
+	// (`git worktree list --porcelain`, no bookkeeping join) — DetectWorktrees
+	// needs this. Added directly to the interface rather than behind a
+	// runtime type assertion (TASK-193 Step 8's own correction: a
+	// compile-time-required method is available one edit away, so ship
+	// that instead of a type-assertion sketch).
+	ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error)
+	// ForceDeleteBranch is REQUIRED on every GitExecutor implementation —
+	// deliberately not an optional/type-asserted method (TASK-194). This is
+	// the structural fix for the old TS backend's forceDeletePreservedBranch?
+	// crash-bug class (BUG-031): Go's compiler now refuses to build ANY
+	// GitExecutor implementation missing this method, closing the "one
+	// provider variant silently lacks it" gap by construction, not by
+	// convention. The operational fallback for an outdated relay-side
+	// agent build that genuinely doesn't support this is handled inside
+	// RelayExecutor.ForceDeleteBranch's own body (a typed, caught error via
+	// domain.ErrForceDeleteBranchUnsupported), independent of this
+	// compile-time guarantee.
+	ForceDeleteBranch(ctx context.Context, repoPath, branch string) error
+}
 
 // DevServerReachability resolves whether devServerID is a live,
 // agent-reachable remote host (relay branch) or this service should
@@ -195,12 +222,61 @@ func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver
 	return local, conn, nil
 }
 
+// ProjectClient wraps project-service's worktree-bookkeeping RPCs — a new
+// outbound call this service didn't previously need to make for writes
+// (git-gateway-service.md §7 lists "Calls project-service" for reads only
+// today). Implemented by internal/adapter/grpcclient against
+// project-service's existing RecordWorktreeCreated/RecordWorktreeRemoved
+// RPCs (no project-service proto change — those RPCs already exist).
+//
+// GetRepo is this task's own addition on top of that existing surface: see
+// its doc comment on domain.RepoInfo and internal/adapter/grpcclient's
+// project_client.go for the confirmed proto gap — project.proto has no
+// single-repo-by-id lookup RPC (only ListRepos(project_id)), so today's
+// grpcclient implementation returns a typed, catchable error rather than a
+// real answer, until project-service grows one.
+type ProjectClient interface {
+	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
+	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error)
+	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
+}
+
+// SCMClient wraps scm-integration-service's PR/MR base-branch lookups — a
+// new outbound dependency edge git-gateway-service --> scm-integration-service
+// that git-gateway-service.md §7's current dependency list (project-service,
+// infra-fleet-service only) doesn't yet document, flagged here as a scope
+// addition (SOL-031).
+//
+// KNOWN GAP: scm-integration-service's current proto
+// (proto/orca/scmintegration/v1/scmintegration.proto) has NO RPC to fetch
+// a single PR/MR's base branch by number — only ListPullRequests/
+// CreatePullRequest/ListIssues exist. internal/adapter/scmclient is
+// therefore wired against a port that has no real backing RPC yet; its
+// implementation returns a typed apperrors.KindInternal error until
+// scm-integration-service adds one (out of this task's scope — a
+// follow-up proto task, not assumed here).
+type SCMClient interface {
+	GetPullRequestBase(ctx context.Context, repoID string, prNumber int32) (baseBranch, baseSHA string, err error)
+	GetMergeRequestBase(ctx context.Context, repoID string, mrNumber int32) (baseBranch, baseSHA string, err error)
+}
+
 // dispatchExecutor is the resolve-and-dispatch logic every RPC-shaped
 // usecase in this package shares: ask ConnectionResolver which host owns
 // worktreeID, then return whichever GitExecutor answers for that host plus
 // the resolved repo path to operate against. Centralized here so the
 // routing behavior — connected=false -> local, connected=true -> relay — is
 // implemented and tested exactly once.
+//
+// worktreeID here is also reused, unchanged, as the dispatch key for the
+// repo-scoped worktree usecases (CreateWorktree, DetectWorktrees,
+// PrefetchCreateBase, ResolvePrBase, ResolveMrBase) — see those usecases'
+// doc comments for why passing a bare, caller-supplied repoID straight
+// through here (without first confirming it via ProjectClient.GetRepo)
+// would silently conflate a repo id with a worktree/connection id;
+// resolved by having each of them call ProjectClient.GetRepo first and
+// pass its echoed-back repo.ID into dispatchExecutor, the same shape
+// CreateWorktree's own uc.projects.GetRepo call establishes, rather than
+// forwarding the raw request field.
 func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, relay GitExecutor, worktreeID string) (GitExecutor, string, error) {
 	conn, err := resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {

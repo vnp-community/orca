@@ -59,6 +59,7 @@ type Server struct {
 	listMarkdownDocuments *usecase.ListMarkdownDocumentsUseCase
 	renameFile            *usecase.RenameFileUseCase
 	copyFile              *usecase.CopyFileUseCase
+
 	clone                  *usecase.Clone
 	initRepo               *usecase.InitRepo
 	baseRefDefault         *usecase.BaseRefDefault
@@ -67,11 +68,20 @@ type Server struct {
 	readIssueCommand       *usecase.ReadIssueCommand
 	writeIssueCommand      *usecase.WriteIssueCommand
 	scanSetupScriptImports *usecase.ScanSetupScriptImports
+
+	// New, SOL-031 (TASK-192/193/194):
+	createWorktree     *usecase.CreateWorktree
+	removeWorktree     *usecase.RemoveWorktree
+	forceDeleteBranch  *usecase.ForceDeleteBranch
+	detectWorktrees    *usecase.DetectWorktrees
+	prefetchCreateBase *usecase.PrefetchCreateBase
+	resolvePrBase      *usecase.ResolvePrBase
+	resolveMrBase      *usecase.ResolveMrBase
 }
 
 // New wires every usecase this server dispatches to. Parameter order
 // mirrors this struct's field order above (git.* core, staging,
-// history/compare, remote, AI-assist, then files.*).
+// history/compare, remote, AI-assist, files.*, repo.*, then worktree.*).
 func New(
 	getStatus *usecase.GetStatus,
 	getDiff *usecase.GetDiff,
@@ -111,6 +121,13 @@ func New(
 	readIssueCommand *usecase.ReadIssueCommand,
 	writeIssueCommand *usecase.WriteIssueCommand,
 	scanSetupScriptImports *usecase.ScanSetupScriptImports,
+	createWorktree *usecase.CreateWorktree,
+	removeWorktree *usecase.RemoveWorktree,
+	forceDeleteBranch *usecase.ForceDeleteBranch,
+	detectWorktrees *usecase.DetectWorktrees,
+	prefetchCreateBase *usecase.PrefetchCreateBase,
+	resolvePrBase *usecase.ResolvePrBase,
+	resolveMrBase *usecase.ResolveMrBase,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -152,6 +169,14 @@ func New(
 		readIssueCommand:       readIssueCommand,
 		writeIssueCommand:      writeIssueCommand,
 		scanSetupScriptImports: scanSetupScriptImports,
+
+		createWorktree:     createWorktree,
+		removeWorktree:     removeWorktree,
+		forceDeleteBranch:  forceDeleteBranch,
+		detectWorktrees:    detectWorktrees,
+		prefetchCreateBase: prefetchCreateBase,
+		resolvePrBase:      resolvePrBase,
+		resolveMrBase:      resolveMrBase,
 	}
 }
 
@@ -521,6 +546,64 @@ func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.S
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.ScanSetupScriptImportsResponse{ImportedPaths: paths}, nil
+}
+
+// ── worktree.* (SOL-031, TASK-192/193/194) ─────────────────────────────────
+
+func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+	result, err := s.createWorktree.Execute(ctx, usecase.CreateWorktreeInput{
+		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: result.WorktreeID, Path: result.Path, HeadSha: result.HeadSHA}, nil
+}
+
+func (s *Server) RemoveWorktree(ctx context.Context, req *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error) {
+	if err := s.removeWorktree.Execute(ctx, req.GetWorktreeId(), req.GetForce()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ForceDeleteBranch(ctx context.Context, req *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error) {
+	if err := s.forceDeleteBranch.Execute(ctx, req.GetWorktreeId(), req.GetBranch()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) DetectWorktrees(ctx context.Context, req *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error) {
+	paths, err := s.detectWorktrees.Execute(ctx, req.GetRepoId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.DetectWorktreesResponse{OnDiskPaths: paths}, nil
+}
+
+func (s *Server) PrefetchCreateBase(ctx context.Context, req *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error) {
+	sha, err := s.prefetchCreateBase.Execute(ctx, req.GetRepoId(), req.GetBaseRef())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.PrefetchCreateBaseResponse{ResolvedSha: sha}, nil
+}
+
+func (s *Server) ResolvePrBase(ctx context.Context, req *gitgatewayv1.ResolvePrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error) {
+	resolved, err := s.resolvePrBase.Execute(ctx, req.GetRepoId(), req.GetPrNumber())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ResolveBaseResponse{BaseBranch: resolved.Branch, BaseSha: resolved.SHA}, nil
+}
+
+func (s *Server) ResolveMrBase(ctx context.Context, req *gitgatewayv1.ResolveMrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error) {
+	resolved, err := s.resolveMrBase.Execute(ctx, req.GetRepoId(), req.GetMrNumber())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ResolveBaseResponse{BaseBranch: resolved.Branch, BaseSha: resolved.SHA}, nil
 }
 
 func toProtoFileStatuses(files []domain.FileStatus) []*gitgatewayv1.FileStatus {

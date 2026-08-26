@@ -4,6 +4,8 @@ package orca.tenant.v1;
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1;tenantv1";
 
+import "google/protobuf/empty.proto";
+
 // TenantService owns companies, departments, user profiles (3-layer resolution), teams.
 // This is the origin of tenant_id for every other service. See specs/backend-go/services/tenant-service.md.
 service TenantService {
@@ -22,6 +24,13 @@ service TenantService {
   rpc UpdateCompany(UpdateCompanyRequest) returns (UpdateCompanyResponse);
   rpc UpdateDepartment(UpdateDepartmentRequest) returns (UpdateDepartmentResponse);
   rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UpdateUserProfileResponse);
+  // ListTeams(ListTeamsRequest) returns (ListTeamsResponse) — the missing
+  // half of team.* CRUD (create/get exist; list never did). See
+  // tenant-service.md §3.
+  rpc ListTeams(ListTeamsRequest) returns (ListTeamsResponse);
+
+  // RemoveTeamMember — documented gap, services/tenant-service/README.md:101.
+  rpc RemoveTeamMember(RemoveTeamMemberRequest) returns (google.protobuf.Empty);
 }
 
 message Company {
@@ -174,4 +183,21 @@ message UpdateUserProfileRequest {
 
 message UpdateUserProfileResponse {
   UserProfile profile = 1;
+}
+
+message ListTeamsRequest {
+  // company_id intentionally omitted — same pattern AddTeamMemberRequest/
+  // SetUserDepartmentRequest already use: the scoping company comes from
+  // the validated request context (tenant.RequireTenantID), never a
+  // client-supplied field, per tenant-service.md §9's "never inferred from
+  // a nested resource ID" rule.
+}
+
+message ListTeamsResponse {
+  repeated Team teams = 1;
+}
+
+message RemoveTeamMemberRequest {
+  string team_id = 1;
+  string user_id = 2;
 }

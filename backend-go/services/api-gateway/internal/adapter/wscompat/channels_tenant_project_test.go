@@ -13,11 +13,11 @@ import (
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 )
 
-// fakeTenantServiceClient is a minimal test double for
+// fakeTenantServiceClient2 is a minimal test double for
 // tenantv1.TenantServiceClient — embeds the nil interface, overrides only
 // the methods this file's channel handlers call, same pattern as
 // fakeInfraFleetClient (channels_test.go).
-type fakeTenantServiceClient struct {
+type fakeTenantServiceClient2 struct {
 	tenantv1.TenantServiceClient
 
 	getResolvedProfileFunc func(ctx context.Context, in *tenantv1.GetResolvedProfileRequest) (*tenantv1.GetResolvedProfileResponse, error)
@@ -28,22 +28,22 @@ type fakeTenantServiceClient struct {
 	updateUserProfileFunc  func(ctx context.Context, in *tenantv1.UpdateUserProfileRequest) (*tenantv1.UpdateUserProfileResponse, error)
 }
 
-func (f *fakeTenantServiceClient) GetResolvedProfile(ctx context.Context, in *tenantv1.GetResolvedProfileRequest, _ ...grpc.CallOption) (*tenantv1.GetResolvedProfileResponse, error) {
+func (f *fakeTenantServiceClient2) GetResolvedProfile(ctx context.Context, in *tenantv1.GetResolvedProfileRequest, _ ...grpc.CallOption) (*tenantv1.GetResolvedProfileResponse, error) {
 	return f.getResolvedProfileFunc(ctx, in)
 }
-func (f *fakeTenantServiceClient) GetUserProfile(ctx context.Context, in *tenantv1.GetUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.GetUserProfileResponse, error) {
+func (f *fakeTenantServiceClient2) GetUserProfile(ctx context.Context, in *tenantv1.GetUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.GetUserProfileResponse, error) {
 	return f.getUserProfileFunc(ctx, in)
 }
-func (f *fakeTenantServiceClient) ListDepartments(ctx context.Context, in *tenantv1.ListDepartmentsRequest, _ ...grpc.CallOption) (*tenantv1.ListDepartmentsResponse, error) {
+func (f *fakeTenantServiceClient2) ListDepartments(ctx context.Context, in *tenantv1.ListDepartmentsRequest, _ ...grpc.CallOption) (*tenantv1.ListDepartmentsResponse, error) {
 	return f.listDepartmentsFunc(ctx, in)
 }
-func (f *fakeTenantServiceClient) UpdateCompany(ctx context.Context, in *tenantv1.UpdateCompanyRequest, _ ...grpc.CallOption) (*tenantv1.UpdateCompanyResponse, error) {
+func (f *fakeTenantServiceClient2) UpdateCompany(ctx context.Context, in *tenantv1.UpdateCompanyRequest, _ ...grpc.CallOption) (*tenantv1.UpdateCompanyResponse, error) {
 	return f.updateCompanyFunc(ctx, in)
 }
-func (f *fakeTenantServiceClient) UpdateDepartment(ctx context.Context, in *tenantv1.UpdateDepartmentRequest, _ ...grpc.CallOption) (*tenantv1.UpdateDepartmentResponse, error) {
+func (f *fakeTenantServiceClient2) UpdateDepartment(ctx context.Context, in *tenantv1.UpdateDepartmentRequest, _ ...grpc.CallOption) (*tenantv1.UpdateDepartmentResponse, error) {
 	return f.updateDepartmentFunc(ctx, in)
 }
-func (f *fakeTenantServiceClient) UpdateUserProfile(ctx context.Context, in *tenantv1.UpdateUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.UpdateUserProfileResponse, error) {
+func (f *fakeTenantServiceClient2) UpdateUserProfile(ctx context.Context, in *tenantv1.UpdateUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.UpdateUserProfileResponse, error) {
 	return f.updateUserProfileFunc(ctx, in)
 }
 
@@ -138,7 +138,7 @@ func (f *fakeProjectServiceClient2) SetupExistingFolder(ctx context.Context, in 
 
 func TestProfileGetResolvedChannel_Success(t *testing.T) {
 	var gotCtx context.Context
-	fake := &fakeTenantServiceClient{
+	fake := &fakeTenantServiceClient2{
 		getResolvedProfileFunc: func(ctx context.Context, in *tenantv1.GetResolvedProfileRequest) (*tenantv1.GetResolvedProfileResponse, error) {
 			gotCtx = ctx
 			if in.GetUserId() != "user-1" {
@@ -165,7 +165,7 @@ func TestProfileGetResolvedChannel_Success(t *testing.T) {
 }
 
 func TestProfileGetUserProfileChannel_Success(t *testing.T) {
-	fake := &fakeTenantServiceClient{
+	fake := &fakeTenantServiceClient2{
 		getUserProfileFunc: func(ctx context.Context, in *tenantv1.GetUserProfileRequest) (*tenantv1.GetUserProfileResponse, error) {
 			if in.GetUserId() != "user-2" {
 				t.Errorf("want userId user-2, got %q", in.GetUserId())
@@ -188,7 +188,7 @@ func TestProfileGetUserProfileChannel_Success(t *testing.T) {
 }
 
 func TestProfileListDeptsChannel_Success(t *testing.T) {
-	fake := &fakeTenantServiceClient{
+	fake := &fakeTenantServiceClient2{
 		listDepartmentsFunc: func(ctx context.Context, in *tenantv1.ListDepartmentsRequest) (*tenantv1.ListDepartmentsResponse, error) {
 			if in.GetCompanyId() != "co-1" {
 				t.Errorf("want companyId co-1, got %q", in.GetCompanyId())
@@ -212,7 +212,7 @@ func TestProfileListDeptsChannel_Success(t *testing.T) {
 
 func TestProfileUpdateCompanyChannel_Success(t *testing.T) {
 	var gotReq *tenantv1.UpdateCompanyRequest
-	fake := &fakeTenantServiceClient{
+	fake := &fakeTenantServiceClient2{
 		updateCompanyFunc: func(ctx context.Context, in *tenantv1.UpdateCompanyRequest) (*tenantv1.UpdateCompanyResponse, error) {
 			gotReq = in
 			return &tenantv1.UpdateCompanyResponse{Company: &tenantv1.Company{Id: in.GetId(), Name: in.GetName()}}, nil
@@ -237,7 +237,7 @@ func TestProfileUpdateCompanyChannel_Success(t *testing.T) {
 
 func TestProfileUpdateDeptChannel_Success(t *testing.T) {
 	var gotReq *tenantv1.UpdateDepartmentRequest
-	fake := &fakeTenantServiceClient{
+	fake := &fakeTenantServiceClient2{
 		updateDepartmentFunc: func(ctx context.Context, in *tenantv1.UpdateDepartmentRequest) (*tenantv1.UpdateDepartmentResponse, error) {
 			gotReq = in
 			return &tenantv1.UpdateDepartmentResponse{Department: &tenantv1.Department{Id: in.GetId(), Name: in.GetName()}}, nil
@@ -262,7 +262,7 @@ func TestProfileUpdateDeptChannel_Success(t *testing.T) {
 
 func TestProfileUpdateUserChannel_Success(t *testing.T) {
 	var gotReq *tenantv1.UpdateUserProfileRequest
-	fake := &fakeTenantServiceClient{
+	fake := &fakeTenantServiceClient2{
 		updateUserProfileFunc: func(ctx context.Context, in *tenantv1.UpdateUserProfileRequest) (*tenantv1.UpdateUserProfileResponse, error) {
 			gotReq = in
 			return &tenantv1.UpdateUserProfileResponse{Profile: &tenantv1.UserProfile{UserId: in.GetUserId()}}, nil
@@ -288,7 +288,7 @@ func TestProfileUpdateUserChannel_Success(t *testing.T) {
 
 func TestProfileChannels_PropagateErrors(t *testing.T) {
 	wantErr := errors.New("tenant-service unavailable")
-	fake := &fakeTenantServiceClient{
+	fake := &fakeTenantServiceClient2{
 		getResolvedProfileFunc: func(ctx context.Context, in *tenantv1.GetResolvedProfileRequest) (*tenantv1.GetResolvedProfileResponse, error) {
 			return nil, wantErr
 		},
@@ -338,7 +338,7 @@ func TestProfileChannels_PropagateErrors(t *testing.T) {
 
 func TestProfileChannels_AttachIdentity(t *testing.T) {
 	var gotCtx context.Context
-	fake := &fakeTenantServiceClient{
+	fake := &fakeTenantServiceClient2{
 		getResolvedProfileFunc: func(ctx context.Context, in *tenantv1.GetResolvedProfileRequest) (*tenantv1.GetResolvedProfileResponse, error) {
 			gotCtx = ctx
 			return &tenantv1.GetResolvedProfileResponse{}, nil

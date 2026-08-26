@@ -72,3 +72,35 @@ func ParseJSONRPCResponse(payload []byte) (JSONRPCResponse, bool, error) {
 	}
 	return resp, true, nil
 }
+
+// JSONRPCNotification mirrors relay-protocol.ts's notification shape (a
+// method + params, no id) — the mirror image of ParseJSONRPCResponse's own
+// hasID/hasMethod filter. Used by session.go's read loop to demux
+// pty.data/pty.exit/pty.replay pushes (see routeNotification) — the only
+// notification methods this adapter currently understands; TASK-183's
+// "Two RPC surfaces" package doc comment note applies here too: every other
+// notification the agent might send is simply not routed anywhere yet.
+type JSONRPCNotification struct {
+	JSONRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
+}
+
+// ParseJSONRPCNotification parses payload as a notification: an object with
+// "method" and no "id".
+func ParseJSONRPCNotification(payload []byte) (JSONRPCNotification, bool, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		return JSONRPCNotification{}, false, err
+	}
+	_, hasID := raw["id"]
+	_, hasMethod := raw["method"]
+	if hasID || !hasMethod {
+		return JSONRPCNotification{}, false, nil
+	}
+	var notif JSONRPCNotification
+	if err := json.Unmarshal(payload, &notif); err != nil {
+		return JSONRPCNotification{}, false, err
+	}
+	return notif, true, nil
+}

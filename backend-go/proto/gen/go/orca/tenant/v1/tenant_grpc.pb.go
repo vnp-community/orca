@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -32,6 +33,8 @@ const (
 	TenantService_UpdateCompany_FullMethodName      = "/orca.tenant.v1.TenantService/UpdateCompany"
 	TenantService_UpdateDepartment_FullMethodName   = "/orca.tenant.v1.TenantService/UpdateDepartment"
 	TenantService_UpdateUserProfile_FullMethodName  = "/orca.tenant.v1.TenantService/UpdateUserProfile"
+	TenantService_ListTeams_FullMethodName          = "/orca.tenant.v1.TenantService/ListTeams"
+	TenantService_RemoveTeamMember_FullMethodName   = "/orca.tenant.v1.TenantService/RemoveTeamMember"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -55,6 +58,12 @@ type TenantServiceClient interface {
 	UpdateCompany(ctx context.Context, in *UpdateCompanyRequest, opts ...grpc.CallOption) (*UpdateCompanyResponse, error)
 	UpdateDepartment(ctx context.Context, in *UpdateDepartmentRequest, opts ...grpc.CallOption) (*UpdateDepartmentResponse, error)
 	UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UpdateUserProfileResponse, error)
+	// ListTeams(ListTeamsRequest) returns (ListTeamsResponse) — the missing
+	// half of team.* CRUD (create/get exist; list never did). See
+	// tenant-service.md §3.
+	ListTeams(ctx context.Context, in *ListTeamsRequest, opts ...grpc.CallOption) (*ListTeamsResponse, error)
+	// RemoveTeamMember — documented gap, services/tenant-service/README.md:101.
+	RemoveTeamMember(ctx context.Context, in *RemoveTeamMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type tenantServiceClient struct {
@@ -195,6 +204,26 @@ func (c *tenantServiceClient) UpdateUserProfile(ctx context.Context, in *UpdateU
 	return out, nil
 }
 
+func (c *tenantServiceClient) ListTeams(ctx context.Context, in *ListTeamsRequest, opts ...grpc.CallOption) (*ListTeamsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTeamsResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListTeams_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) RemoveTeamMember(ctx context.Context, in *RemoveTeamMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_RemoveTeamMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantServiceServer is the server API for TenantService service.
 // All implementations must embed UnimplementedTenantServiceServer
 // for forward compatibility.
@@ -216,6 +245,12 @@ type TenantServiceServer interface {
 	UpdateCompany(context.Context, *UpdateCompanyRequest) (*UpdateCompanyResponse, error)
 	UpdateDepartment(context.Context, *UpdateDepartmentRequest) (*UpdateDepartmentResponse, error)
 	UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UpdateUserProfileResponse, error)
+	// ListTeams(ListTeamsRequest) returns (ListTeamsResponse) — the missing
+	// half of team.* CRUD (create/get exist; list never did). See
+	// tenant-service.md §3.
+	ListTeams(context.Context, *ListTeamsRequest) (*ListTeamsResponse, error)
+	// RemoveTeamMember — documented gap, services/tenant-service/README.md:101.
+	RemoveTeamMember(context.Context, *RemoveTeamMemberRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }
 
@@ -264,6 +299,12 @@ func (UnimplementedTenantServiceServer) UpdateDepartment(context.Context, *Updat
 }
 func (UnimplementedTenantServiceServer) UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UpdateUserProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateUserProfile not implemented")
+}
+func (UnimplementedTenantServiceServer) ListTeams(context.Context, *ListTeamsRequest) (*ListTeamsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTeams not implemented")
+}
+func (UnimplementedTenantServiceServer) RemoveTeamMember(context.Context, *RemoveTeamMemberRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveTeamMember not implemented")
 }
 func (UnimplementedTenantServiceServer) mustEmbedUnimplementedTenantServiceServer() {}
 func (UnimplementedTenantServiceServer) testEmbeddedByValue()                       {}
@@ -520,6 +561,42 @@ func _TenantService_UpdateUserProfile_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_ListTeams_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTeamsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListTeams(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListTeams_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListTeams(ctx, req.(*ListTeamsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_RemoveTeamMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveTeamMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).RemoveTeamMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_RemoveTeamMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).RemoveTeamMember(ctx, req.(*RemoveTeamMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantService_ServiceDesc is the grpc.ServiceDesc for TenantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -578,6 +655,14 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateUserProfile",
 			Handler:    _TenantService_UpdateUserProfile_Handler,
+		},
+		{
+			MethodName: "ListTeams",
+			Handler:    _TenantService_ListTeams_Handler,
+		},
+		{
+			MethodName: "RemoveTeamMember",
+			Handler:    _TenantService_RemoveTeamMember_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

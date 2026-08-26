@@ -9,6 +9,7 @@ package tenantv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -1576,11 +1577,143 @@ func (x *UpdateUserProfileResponse) GetProfile() *UserProfile {
 	return nil
 }
 
+type ListTeamsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamsRequest) Reset() {
+	*x = ListTeamsRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamsRequest) ProtoMessage() {}
+
+func (x *ListTeamsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamsRequest.ProtoReflect.Descriptor instead.
+func (*ListTeamsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{31}
+}
+
+type ListTeamsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Teams         []*Team                `protobuf:"bytes,1,rep,name=teams,proto3" json:"teams,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTeamsResponse) Reset() {
+	*x = ListTeamsResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTeamsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTeamsResponse) ProtoMessage() {}
+
+func (x *ListTeamsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTeamsResponse.ProtoReflect.Descriptor instead.
+func (*ListTeamsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ListTeamsResponse) GetTeams() []*Team {
+	if x != nil {
+		return x.Teams
+	}
+	return nil
+}
+
+type RemoveTeamMemberRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TeamId        string                 `protobuf:"bytes,1,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveTeamMemberRequest) Reset() {
+	*x = RemoveTeamMemberRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveTeamMemberRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveTeamMemberRequest) ProtoMessage() {}
+
+func (x *RemoveTeamMemberRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveTeamMemberRequest.ProtoReflect.Descriptor instead.
+func (*RemoveTeamMemberRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *RemoveTeamMemberRequest) GetTeamId() string {
+	if x != nil {
+		return x.TeamId
+	}
+	return ""
+}
+
+func (x *RemoveTeamMemberRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
 var File_orca_tenant_v1_tenant_proto protoreflect.FileDescriptor
 
 const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\n" +
-	"\x1borca/tenant/v1/tenant.proto\x12\x0eorca.tenant.v1\"R\n" +
+	"\x1borca/tenant/v1/tenant.proto\x12\x0eorca.tenant.v1\x1a\x1bgoogle/protobuf/empty.proto\"R\n" +
 	"\aCompany\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12#\n" +
@@ -1677,8 +1810,13 @@ const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\x10clear_department\x18\x03 \x01(\bR\x0fclearDepartment\x12#\n" +
 	"\rsettings_json\x18\x04 \x01(\tR\fsettingsJson\"R\n" +
 	"\x19UpdateUserProfileResponse\x125\n" +
-	"\aprofile\x18\x01 \x01(\v2\x1b.orca.tenant.v1.UserProfileR\aprofile2\x97\n" +
-	"\n" +
+	"\aprofile\x18\x01 \x01(\v2\x1b.orca.tenant.v1.UserProfileR\aprofile\"\x12\n" +
+	"\x10ListTeamsRequest\"?\n" +
+	"\x11ListTeamsResponse\x12*\n" +
+	"\x05teams\x18\x01 \x03(\v2\x14.orca.tenant.v1.TeamR\x05teams\"K\n" +
+	"\x17RemoveTeamMemberRequest\x12\x17\n" +
+	"\ateam_id\x18\x01 \x01(\tR\x06teamId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId2\xbe\v\n" +
 	"\rTenantService\x12\\\n" +
 	"\rCreateCompany\x12$.orca.tenant.v1.CreateCompanyRequest\x1a%.orca.tenant.v1.CreateCompanyResponse\x12_\n" +
 	"\x0eValidateTenant\x12%.orca.tenant.v1.ValidateTenantRequest\x1a&.orca.tenant.v1.ValidateTenantResponse\x12e\n" +
@@ -1693,7 +1831,9 @@ const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\x0fListDepartments\x12&.orca.tenant.v1.ListDepartmentsRequest\x1a'.orca.tenant.v1.ListDepartmentsResponse\x12\\\n" +
 	"\rUpdateCompany\x12$.orca.tenant.v1.UpdateCompanyRequest\x1a%.orca.tenant.v1.UpdateCompanyResponse\x12e\n" +
 	"\x10UpdateDepartment\x12'.orca.tenant.v1.UpdateDepartmentRequest\x1a(.orca.tenant.v1.UpdateDepartmentResponse\x12h\n" +
-	"\x11UpdateUserProfile\x12(.orca.tenant.v1.UpdateUserProfileRequest\x1a).orca.tenant.v1.UpdateUserProfileResponseBBZ@github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1;tenantv1b\x06proto3"
+	"\x11UpdateUserProfile\x12(.orca.tenant.v1.UpdateUserProfileRequest\x1a).orca.tenant.v1.UpdateUserProfileResponse\x12P\n" +
+	"\tListTeams\x12 .orca.tenant.v1.ListTeamsRequest\x1a!.orca.tenant.v1.ListTeamsResponse\x12S\n" +
+	"\x10RemoveTeamMember\x12'.orca.tenant.v1.RemoveTeamMemberRequest\x1a\x16.google.protobuf.EmptyBBZ@github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1;tenantv1b\x06proto3"
 
 var (
 	file_orca_tenant_v1_tenant_proto_rawDescOnce sync.Once
@@ -1707,7 +1847,7 @@ func file_orca_tenant_v1_tenant_proto_rawDescGZIP() []byte {
 	return file_orca_tenant_v1_tenant_proto_rawDescData
 }
 
-var file_orca_tenant_v1_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_orca_tenant_v1_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_orca_tenant_v1_tenant_proto_goTypes = []any{
 	(*Company)(nil),                    // 0: orca.tenant.v1.Company
 	(*Department)(nil),                 // 1: orca.tenant.v1.Department
@@ -1740,6 +1880,10 @@ var file_orca_tenant_v1_tenant_proto_goTypes = []any{
 	(*UpdateDepartmentResponse)(nil),   // 28: orca.tenant.v1.UpdateDepartmentResponse
 	(*UpdateUserProfileRequest)(nil),   // 29: orca.tenant.v1.UpdateUserProfileRequest
 	(*UpdateUserProfileResponse)(nil),  // 30: orca.tenant.v1.UpdateUserProfileResponse
+	(*ListTeamsRequest)(nil),           // 31: orca.tenant.v1.ListTeamsRequest
+	(*ListTeamsResponse)(nil),          // 32: orca.tenant.v1.ListTeamsResponse
+	(*RemoveTeamMemberRequest)(nil),    // 33: orca.tenant.v1.RemoveTeamMemberRequest
+	(*emptypb.Empty)(nil),              // 34: google.protobuf.Empty
 }
 var file_orca_tenant_v1_tenant_proto_depIdxs = []int32{
 	0,  // 0: orca.tenant.v1.CreateCompanyResponse.company:type_name -> orca.tenant.v1.Company
@@ -1751,37 +1895,42 @@ var file_orca_tenant_v1_tenant_proto_depIdxs = []int32{
 	0,  // 6: orca.tenant.v1.UpdateCompanyResponse.company:type_name -> orca.tenant.v1.Company
 	1,  // 7: orca.tenant.v1.UpdateDepartmentResponse.department:type_name -> orca.tenant.v1.Department
 	20, // 8: orca.tenant.v1.UpdateUserProfileResponse.profile:type_name -> orca.tenant.v1.UserProfile
-	2,  // 9: orca.tenant.v1.TenantService.CreateCompany:input_type -> orca.tenant.v1.CreateCompanyRequest
-	4,  // 10: orca.tenant.v1.TenantService.ValidateTenant:input_type -> orca.tenant.v1.ValidateTenantRequest
-	6,  // 11: orca.tenant.v1.TenantService.CreateDepartment:input_type -> orca.tenant.v1.CreateDepartmentRequest
-	8,  // 12: orca.tenant.v1.TenantService.SetUserDepartment:input_type -> orca.tenant.v1.SetUserDepartmentRequest
-	10, // 13: orca.tenant.v1.TenantService.GetResolvedProfile:input_type -> orca.tenant.v1.GetResolvedProfileRequest
-	13, // 14: orca.tenant.v1.TenantService.CreateTeam:input_type -> orca.tenant.v1.CreateTeamRequest
-	15, // 15: orca.tenant.v1.TenantService.AddTeamMember:input_type -> orca.tenant.v1.AddTeamMemberRequest
-	17, // 16: orca.tenant.v1.TenantService.ListTeamMembers:input_type -> orca.tenant.v1.ListTeamMembersRequest
-	21, // 17: orca.tenant.v1.TenantService.GetUserProfile:input_type -> orca.tenant.v1.GetUserProfileRequest
-	23, // 18: orca.tenant.v1.TenantService.ListDepartments:input_type -> orca.tenant.v1.ListDepartmentsRequest
-	25, // 19: orca.tenant.v1.TenantService.UpdateCompany:input_type -> orca.tenant.v1.UpdateCompanyRequest
-	27, // 20: orca.tenant.v1.TenantService.UpdateDepartment:input_type -> orca.tenant.v1.UpdateDepartmentRequest
-	29, // 21: orca.tenant.v1.TenantService.UpdateUserProfile:input_type -> orca.tenant.v1.UpdateUserProfileRequest
-	3,  // 22: orca.tenant.v1.TenantService.CreateCompany:output_type -> orca.tenant.v1.CreateCompanyResponse
-	5,  // 23: orca.tenant.v1.TenantService.ValidateTenant:output_type -> orca.tenant.v1.ValidateTenantResponse
-	7,  // 24: orca.tenant.v1.TenantService.CreateDepartment:output_type -> orca.tenant.v1.CreateDepartmentResponse
-	9,  // 25: orca.tenant.v1.TenantService.SetUserDepartment:output_type -> orca.tenant.v1.SetUserDepartmentResponse
-	11, // 26: orca.tenant.v1.TenantService.GetResolvedProfile:output_type -> orca.tenant.v1.GetResolvedProfileResponse
-	14, // 27: orca.tenant.v1.TenantService.CreateTeam:output_type -> orca.tenant.v1.CreateTeamResponse
-	16, // 28: orca.tenant.v1.TenantService.AddTeamMember:output_type -> orca.tenant.v1.AddTeamMemberResponse
-	19, // 29: orca.tenant.v1.TenantService.ListTeamMembers:output_type -> orca.tenant.v1.ListTeamMembersResponse
-	22, // 30: orca.tenant.v1.TenantService.GetUserProfile:output_type -> orca.tenant.v1.GetUserProfileResponse
-	24, // 31: orca.tenant.v1.TenantService.ListDepartments:output_type -> orca.tenant.v1.ListDepartmentsResponse
-	26, // 32: orca.tenant.v1.TenantService.UpdateCompany:output_type -> orca.tenant.v1.UpdateCompanyResponse
-	28, // 33: orca.tenant.v1.TenantService.UpdateDepartment:output_type -> orca.tenant.v1.UpdateDepartmentResponse
-	30, // 34: orca.tenant.v1.TenantService.UpdateUserProfile:output_type -> orca.tenant.v1.UpdateUserProfileResponse
-	22, // [22:35] is the sub-list for method output_type
-	9,  // [9:22] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	12, // 9: orca.tenant.v1.ListTeamsResponse.teams:type_name -> orca.tenant.v1.Team
+	2,  // 10: orca.tenant.v1.TenantService.CreateCompany:input_type -> orca.tenant.v1.CreateCompanyRequest
+	4,  // 11: orca.tenant.v1.TenantService.ValidateTenant:input_type -> orca.tenant.v1.ValidateTenantRequest
+	6,  // 12: orca.tenant.v1.TenantService.CreateDepartment:input_type -> orca.tenant.v1.CreateDepartmentRequest
+	8,  // 13: orca.tenant.v1.TenantService.SetUserDepartment:input_type -> orca.tenant.v1.SetUserDepartmentRequest
+	10, // 14: orca.tenant.v1.TenantService.GetResolvedProfile:input_type -> orca.tenant.v1.GetResolvedProfileRequest
+	13, // 15: orca.tenant.v1.TenantService.CreateTeam:input_type -> orca.tenant.v1.CreateTeamRequest
+	15, // 16: orca.tenant.v1.TenantService.AddTeamMember:input_type -> orca.tenant.v1.AddTeamMemberRequest
+	17, // 17: orca.tenant.v1.TenantService.ListTeamMembers:input_type -> orca.tenant.v1.ListTeamMembersRequest
+	21, // 18: orca.tenant.v1.TenantService.GetUserProfile:input_type -> orca.tenant.v1.GetUserProfileRequest
+	23, // 19: orca.tenant.v1.TenantService.ListDepartments:input_type -> orca.tenant.v1.ListDepartmentsRequest
+	25, // 20: orca.tenant.v1.TenantService.UpdateCompany:input_type -> orca.tenant.v1.UpdateCompanyRequest
+	27, // 21: orca.tenant.v1.TenantService.UpdateDepartment:input_type -> orca.tenant.v1.UpdateDepartmentRequest
+	29, // 22: orca.tenant.v1.TenantService.UpdateUserProfile:input_type -> orca.tenant.v1.UpdateUserProfileRequest
+	31, // 23: orca.tenant.v1.TenantService.ListTeams:input_type -> orca.tenant.v1.ListTeamsRequest
+	33, // 24: orca.tenant.v1.TenantService.RemoveTeamMember:input_type -> orca.tenant.v1.RemoveTeamMemberRequest
+	3,  // 25: orca.tenant.v1.TenantService.CreateCompany:output_type -> orca.tenant.v1.CreateCompanyResponse
+	5,  // 26: orca.tenant.v1.TenantService.ValidateTenant:output_type -> orca.tenant.v1.ValidateTenantResponse
+	7,  // 27: orca.tenant.v1.TenantService.CreateDepartment:output_type -> orca.tenant.v1.CreateDepartmentResponse
+	9,  // 28: orca.tenant.v1.TenantService.SetUserDepartment:output_type -> orca.tenant.v1.SetUserDepartmentResponse
+	11, // 29: orca.tenant.v1.TenantService.GetResolvedProfile:output_type -> orca.tenant.v1.GetResolvedProfileResponse
+	14, // 30: orca.tenant.v1.TenantService.CreateTeam:output_type -> orca.tenant.v1.CreateTeamResponse
+	16, // 31: orca.tenant.v1.TenantService.AddTeamMember:output_type -> orca.tenant.v1.AddTeamMemberResponse
+	19, // 32: orca.tenant.v1.TenantService.ListTeamMembers:output_type -> orca.tenant.v1.ListTeamMembersResponse
+	22, // 33: orca.tenant.v1.TenantService.GetUserProfile:output_type -> orca.tenant.v1.GetUserProfileResponse
+	24, // 34: orca.tenant.v1.TenantService.ListDepartments:output_type -> orca.tenant.v1.ListDepartmentsResponse
+	26, // 35: orca.tenant.v1.TenantService.UpdateCompany:output_type -> orca.tenant.v1.UpdateCompanyResponse
+	28, // 36: orca.tenant.v1.TenantService.UpdateDepartment:output_type -> orca.tenant.v1.UpdateDepartmentResponse
+	30, // 37: orca.tenant.v1.TenantService.UpdateUserProfile:output_type -> orca.tenant.v1.UpdateUserProfileResponse
+	32, // 38: orca.tenant.v1.TenantService.ListTeams:output_type -> orca.tenant.v1.ListTeamsResponse
+	34, // 39: orca.tenant.v1.TenantService.RemoveTeamMember:output_type -> google.protobuf.Empty
+	25, // [25:40] is the sub-list for method output_type
+	10, // [10:25] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_orca_tenant_v1_tenant_proto_init() }
@@ -1795,7 +1944,7 @@ func file_orca_tenant_v1_tenant_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_tenant_v1_tenant_proto_rawDesc), len(file_orca_tenant_v1_tenant_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

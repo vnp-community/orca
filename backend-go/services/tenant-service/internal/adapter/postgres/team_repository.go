@@ -60,6 +60,37 @@ func (r *TeamRepository) Get(ctx context.Context, companyID, id string) (domain.
 	return team, true, nil
 }
 
+// ListByCompany backs usecase.ListTeams — every tenant.teams row scoped to
+// companyID.
+func (r *TeamRepository) ListByCompany(ctx context.Context, companyID string) ([]domain.Team, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, company_id, name, settings_json FROM tenant.teams WHERE company_id = $1
+	`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query teams: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Team
+	for rows.Next() {
+		var t domain.Team
+		var settingsJSON string
+		if err := rows.Scan(&t.ID, &t.CompanyID, &t.Name, &settingsJSON); err != nil {
+			return nil, fmt.Errorf("postgres: scan team row: %w", err)
+		}
+		settings, err := unmarshalSettings(settingsJSON)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: unmarshal team settings: %w", err)
+		}
+		t.Settings = settings
+		out = append(out, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate team rows: %w", err)
+	}
+	return out, nil
+}
+
 // AddMember upserts a tenant.team_members row — AddTeamMemberRequest is
 // documented as an upsert (role + priority) in tenant-service.md §3.
 func (r *TeamRepository) AddMember(ctx context.Context, m domain.TeamMember) error {
@@ -71,6 +102,19 @@ func (r *TeamRepository) AddMember(ctx context.Context, m domain.TeamMember) err
 		return fmt.Errorf("postgres: upsert team member: %w", err)
 	}
 	return nil
+}
+
+// RemoveMember deletes one tenant.team_members row — backs
+// usecase.RemoveTeamMember. tag.RowsAffected()==0 means the row was
+// already gone (idempotent no-op), not an error.
+func (r *TeamRepository) RemoveMember(ctx context.Context, teamID, userID string) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		DELETE FROM tenant.team_members WHERE team_id = $1 AND user_id = $2
+	`, teamID, userID)
+	if err != nil {
+		return false, fmt.Errorf("postgres: delete team member: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func (r *TeamRepository) ListMembers(ctx context.Context, teamID string) ([]domain.TeamMember, error) {

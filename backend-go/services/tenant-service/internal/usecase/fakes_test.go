@@ -226,13 +226,15 @@ func (f *fakeUserProfileRepository) ListUserIDsByCompany(ctx context.Context, co
 type teamKey struct{ companyID, id string }
 
 type fakeTeamRepository struct {
-	byKey     map[teamKey]domain.Team
-	members   map[string][]domain.TeamMember // teamID -> members
-	createErr error
-	getErr    error
-	addErr    error
-	listErr   error
-	layersErr error
+	byKey       map[teamKey]domain.Team
+	members     map[string][]domain.TeamMember // teamID -> members
+	createErr   error
+	getErr      error
+	addErr      error
+	listErr     error
+	layersErr   error
+	listByCoErr error
+	removeErr   error
 }
 
 func newFakeTeamRepository() *fakeTeamRepository {
@@ -258,6 +260,19 @@ func (f *fakeTeamRepository) Get(ctx context.Context, companyID, id string) (dom
 	return t, ok, nil
 }
 
+func (f *fakeTeamRepository) ListByCompany(ctx context.Context, companyID string) ([]domain.Team, error) {
+	if f.listByCoErr != nil {
+		return nil, f.listByCoErr
+	}
+	var out []domain.Team
+	for key, t := range f.byKey {
+		if key.companyID == companyID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
 func (f *fakeTeamRepository) AddMember(ctx context.Context, m domain.TeamMember) error {
 	if f.addErr != nil {
 		return f.addErr
@@ -272,6 +287,20 @@ func (f *fakeTeamRepository) AddMember(ctx context.Context, m domain.TeamMember)
 	}
 	f.members[m.TeamID] = append(members, m)
 	return nil
+}
+
+func (f *fakeTeamRepository) RemoveMember(ctx context.Context, teamID, userID string) (bool, error) {
+	if f.removeErr != nil {
+		return false, f.removeErr
+	}
+	members := f.members[teamID]
+	for i, m := range members {
+		if m.UserID == userID {
+			f.members[teamID] = append(members[:i], members[i+1:]...)
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (f *fakeTeamRepository) ListMembers(ctx context.Context, teamID string) ([]domain.TeamMember, error) {

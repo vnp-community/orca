@@ -13,13 +13,13 @@ import (
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 )
 
-// fakeProjectClient is a minimal test double for
+// fakeRepoProjectClient is a minimal test double for
 // projectv1.ProjectServiceClient — embeds the (nil) interface so it
 // satisfies every method, overriding only what registerRepoChannels' tests
 // exercise. Kept local to this file (not channels_test.go's fakes) to avoid
 // merge conflicts with the parallel git.*/files.* pass — see this file's
 // sibling channels_repo_ssh_status_workspace.go's top doc comment.
-type fakeProjectClient struct {
+type fakeRepoProjectClient struct {
 	projectv1.ProjectServiceClient
 
 	addRepoFunc      func(ctx context.Context, in *projectv1.AddRepoRequest) (*projectv1.AddRepoResponse, error)
@@ -29,26 +29,26 @@ type fakeProjectClient struct {
 	updateRepoFunc   func(ctx context.Context, in *projectv1.UpdateRepoRequest) (*projectv1.UpdateRepoResponse, error)
 }
 
-func (f *fakeProjectClient) AddRepo(ctx context.Context, in *projectv1.AddRepoRequest, _ ...grpc.CallOption) (*projectv1.AddRepoResponse, error) {
+func (f *fakeRepoProjectClient) AddRepo(ctx context.Context, in *projectv1.AddRepoRequest, _ ...grpc.CallOption) (*projectv1.AddRepoResponse, error) {
 	return f.addRepoFunc(ctx, in)
 }
-func (f *fakeProjectClient) ListRepos(ctx context.Context, in *projectv1.ListReposRequest, _ ...grpc.CallOption) (*projectv1.ListReposResponse, error) {
+func (f *fakeRepoProjectClient) ListRepos(ctx context.Context, in *projectv1.ListReposRequest, _ ...grpc.CallOption) (*projectv1.ListReposResponse, error) {
 	return f.listReposFunc(ctx, in)
 }
-func (f *fakeProjectClient) ReorderRepos(ctx context.Context, in *projectv1.ReorderReposRequest, _ ...grpc.CallOption) (*projectv1.ReorderReposResponse, error) {
+func (f *fakeRepoProjectClient) ReorderRepos(ctx context.Context, in *projectv1.ReorderReposRequest, _ ...grpc.CallOption) (*projectv1.ReorderReposResponse, error) {
 	return f.reorderReposFunc(ctx, in)
 }
-func (f *fakeProjectClient) RemoveRepo(ctx context.Context, in *projectv1.RemoveRepoRequest, _ ...grpc.CallOption) (*projectv1.RemoveRepoResponse, error) {
+func (f *fakeRepoProjectClient) RemoveRepo(ctx context.Context, in *projectv1.RemoveRepoRequest, _ ...grpc.CallOption) (*projectv1.RemoveRepoResponse, error) {
 	return f.removeRepoFunc(ctx, in)
 }
-func (f *fakeProjectClient) UpdateRepo(ctx context.Context, in *projectv1.UpdateRepoRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoResponse, error) {
+func (f *fakeRepoProjectClient) UpdateRepo(ctx context.Context, in *projectv1.UpdateRepoRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoResponse, error) {
 	return f.updateRepoFunc(ctx, in)
 }
 
-// fakeGitGatewayClient is a minimal test double for
+// fakeRepoGitGatewayClient is a minimal test double for
 // gitgatewayv1.GitGatewayServiceClient covering only the 8 repo.*-owned
 // RPCs this file's channels call.
-type fakeGitGatewayClient struct {
+type fakeRepoGitGatewayClient struct {
 	gitgatewayv1.GitGatewayServiceClient
 
 	cloneFunc                  func(ctx context.Context, in *gitgatewayv1.CloneRequest) (*gitgatewayv1.CloneResponse, error)
@@ -61,32 +61,32 @@ type fakeGitGatewayClient struct {
 	scanSetupScriptImportsFunc func(ctx context.Context, in *gitgatewayv1.ScanSetupScriptImportsRequest) (*gitgatewayv1.ScanSetupScriptImportsResponse, error)
 }
 
-func (f *fakeGitGatewayClient) Clone(ctx context.Context, in *gitgatewayv1.CloneRequest, _ ...grpc.CallOption) (*gitgatewayv1.CloneResponse, error) {
+func (f *fakeRepoGitGatewayClient) Clone(ctx context.Context, in *gitgatewayv1.CloneRequest, _ ...grpc.CallOption) (*gitgatewayv1.CloneResponse, error) {
 	return f.cloneFunc(ctx, in)
 }
-func (f *fakeGitGatewayClient) BaseRefDefault(ctx context.Context, in *gitgatewayv1.BaseRefDefaultRequest, _ ...grpc.CallOption) (*gitgatewayv1.BaseRefDefaultResponse, error) {
+func (f *fakeRepoGitGatewayClient) BaseRefDefault(ctx context.Context, in *gitgatewayv1.BaseRefDefaultRequest, _ ...grpc.CallOption) (*gitgatewayv1.BaseRefDefaultResponse, error) {
 	return f.baseRefDefaultFunc(ctx, in)
 }
-func (f *fakeGitGatewayClient) SearchRefs(ctx context.Context, in *gitgatewayv1.SearchRefsRequest, _ ...grpc.CallOption) (*gitgatewayv1.SearchRefsResponse, error) {
+func (f *fakeRepoGitGatewayClient) SearchRefs(ctx context.Context, in *gitgatewayv1.SearchRefsRequest, _ ...grpc.CallOption) (*gitgatewayv1.SearchRefsResponse, error) {
 	return f.searchRefsFunc(ctx, in)
 }
-func (f *fakeGitGatewayClient) InitRepo(ctx context.Context, in *gitgatewayv1.InitRepoRequest, _ ...grpc.CallOption) (*gitgatewayv1.InitRepoResponse, error) {
+func (f *fakeRepoGitGatewayClient) InitRepo(ctx context.Context, in *gitgatewayv1.InitRepoRequest, _ ...grpc.CallOption) (*gitgatewayv1.InitRepoResponse, error) {
 	return f.initRepoFunc(ctx, in)
 }
-func (f *fakeGitGatewayClient) CheckHooks(ctx context.Context, in *gitgatewayv1.CheckHooksRequest, _ ...grpc.CallOption) (*gitgatewayv1.CheckHooksResponse, error) {
+func (f *fakeRepoGitGatewayClient) CheckHooks(ctx context.Context, in *gitgatewayv1.CheckHooksRequest, _ ...grpc.CallOption) (*gitgatewayv1.CheckHooksResponse, error) {
 	return f.checkHooksFunc(ctx, in)
 }
-func (f *fakeGitGatewayClient) ReadIssueCommand(ctx context.Context, in *gitgatewayv1.ReadIssueCommandRequest, _ ...grpc.CallOption) (*gitgatewayv1.ReadIssueCommandResponse, error) {
+func (f *fakeRepoGitGatewayClient) ReadIssueCommand(ctx context.Context, in *gitgatewayv1.ReadIssueCommandRequest, _ ...grpc.CallOption) (*gitgatewayv1.ReadIssueCommandResponse, error) {
 	return f.readIssueCommandFunc(ctx, in)
 }
 
 // WriteIssueCommand returns google.protobuf.Empty on the wire; this fake
 // ignores that and reports via error only, since none of this file's tests
 // need to inspect a successful Empty response's fields.
-func (f *fakeGitGatewayClient) WriteIssueCommand(ctx context.Context, in *gitgatewayv1.WriteIssueCommandRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+func (f *fakeRepoGitGatewayClient) WriteIssueCommand(ctx context.Context, in *gitgatewayv1.WriteIssueCommandRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
 	return f.writeIssueCommandFunc(ctx, in)
 }
-func (f *fakeGitGatewayClient) ScanSetupScriptImports(ctx context.Context, in *gitgatewayv1.ScanSetupScriptImportsRequest, _ ...grpc.CallOption) (*gitgatewayv1.ScanSetupScriptImportsResponse, error) {
+func (f *fakeRepoGitGatewayClient) ScanSetupScriptImports(ctx context.Context, in *gitgatewayv1.ScanSetupScriptImportsRequest, _ ...grpc.CallOption) (*gitgatewayv1.ScanSetupScriptImportsResponse, error) {
 	return f.scanSetupScriptImportsFunc(ctx, in)
 }
 
@@ -123,9 +123,9 @@ func (f *fakeRepoSshStatusWorkspaceInfraFleetClient) KillWorkspacePort(ctx conte
 // ── repo.* ───────────────────────────────────────────────────────────────
 
 func TestRegisterRepoChannels_AddListReorderRmUpdate(t *testing.T) {
-	fake := &fakeProjectClient{}
+	fake := &fakeRepoProjectClient{}
 	r := NewRegistry()
-	registerRepoChannels(r, fake, &fakeGitGatewayClient{})
+	registerRepoChannels(r, fake, &fakeRepoGitGatewayClient{})
 
 	t.Run("repo.add", func(t *testing.T) {
 		var gotReq *projectv1.AddRepoRequest
@@ -217,9 +217,9 @@ func TestRegisterRepoChannels_AddListReorderRmUpdate(t *testing.T) {
 }
 
 func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
-	git := &fakeGitGatewayClient{}
+	git := &fakeRepoGitGatewayClient{}
 	r := NewRegistry()
-	registerRepoChannels(r, &fakeProjectClient{}, git)
+	registerRepoChannels(r, &fakeRepoProjectClient{}, git)
 
 	t.Run("repo.clone", func(t *testing.T) {
 		var gotReq *gitgatewayv1.CloneRequest
@@ -352,7 +352,7 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 
 func TestRegisterRepoChannels_RegistrationCoverage(t *testing.T) {
 	r := NewRegistry()
-	registerRepoChannels(r, &fakeProjectClient{}, &fakeGitGatewayClient{})
+	registerRepoChannels(r, &fakeRepoProjectClient{}, &fakeRepoGitGatewayClient{})
 
 	want := []string{
 		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update",
@@ -562,7 +562,7 @@ func TestRegisterWorkspacePortsChannels(t *testing.T) {
 
 func TestRegisterRepoSshStatusWorkspaceChannels_RegistersEverything(t *testing.T) {
 	r := NewRegistry()
-	registerRepoSshStatusWorkspaceChannels(r, &fakeProjectClient{}, &fakeGitGatewayClient{}, &fakeRepoSshStatusWorkspaceInfraFleetClient{})
+	registerRepoSshStatusWorkspaceChannels(r, &fakeRepoProjectClient{}, &fakeRepoGitGatewayClient{}, &fakeRepoSshStatusWorkspaceInfraFleetClient{})
 
 	want := []string{
 		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update",

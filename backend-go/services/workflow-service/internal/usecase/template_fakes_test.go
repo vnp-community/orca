@@ -16,6 +16,15 @@ type fakeTemplateRepository struct {
 	createErr  error
 	listErr    error
 	resolveErr error
+	updateErr  error
+
+	// updateCalls counts Update invocations — update_template_test.go
+	// asserts on this to confirm the cycle check short-circuits before any
+	// write is attempted.
+	updateCalls int
+	// lastUpdateExpectedVersion captures the last expectedVersion Update
+	// was called with, so tests can confirm it's forwarded unchanged.
+	lastUpdateExpectedVersion int32
 }
 
 func newFakeTemplateRepository() *fakeTemplateRepository {
@@ -100,4 +109,18 @@ func (f *fakeTemplateRepository) ResolveChain(ctx context.Context, tenantID, tem
 		cur = parent
 	}
 	return chain, nil
+}
+
+// Update mirrors the real repository's version-bump-on-write contract: on
+// success it returns tmpl with Version = expectedVersion+1 (the bumped
+// value a real conditional UPDATE's RETURNING clause would produce).
+func (f *fakeTemplateRepository) Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32) (domain.WorkflowTemplate, error) {
+	f.updateCalls++
+	f.lastUpdateExpectedVersion = expectedVersion
+	if f.updateErr != nil {
+		return domain.WorkflowTemplate{}, f.updateErr
+	}
+	tmpl.Version = expectedVersion + 1
+	f.templates[tmpl.ID] = tmpl
+	return tmpl, nil
 }

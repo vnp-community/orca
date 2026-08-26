@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -153,6 +154,17 @@ func (f *fakeTenantServiceClient) UpdateUserProfile(_ context.Context, _ *tenant
 		return nil, f.updateUserProfileErr
 	}
 	return f.updateUserProfileResp, nil
+}
+
+// ListTeams and RemoveTeamMember: no route in this file's tests exercises
+// them, so these exist only to satisfy the tenantv1.TenantServiceClient
+// interface this fake must implement in full.
+func (f *fakeTenantServiceClient) ListTeams(_ context.Context, _ *tenantv1.ListTeamsRequest, _ ...grpc.CallOption) (*tenantv1.ListTeamsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) RemoveTeamMember(_ context.Context, _ *tenantv1.RemoveTeamMemberRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
 }
 
 // tenantTestRouter mounts mountTenantRoutes standalone (router.go isn't

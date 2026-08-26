@@ -4,6 +4,8 @@ package orca.infrafleet.v1;
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1";
 
+import "google/protobuf/empty.proto";
+
 // InfraFleetService owns SSH targets, dev server registry, connection lifecycle,
 // the provider registry (connectionId -> host dispatch), and fleet health.
 // See specs/backend-go/services/infra-fleet-service.md.
@@ -40,6 +42,26 @@ service InfraFleetService {
   // a record of one requested. See usecase.EstablishConnection's doc comment.
   rpc EstablishConnection(EstablishConnectionRequest) returns (Connection);
   rpc KillWorkspacePort(KillWorkspacePortRequest) returns (KillWorkspacePortResponse);
+
+  // --- Terminal/PTY lifecycle (control-plane, unary) ---
+  rpc SpawnTerminalSession(SpawnTerminalSessionRequest) returns (SpawnTerminalSessionResponse);
+  rpc ResizeTerminalSession(ResizeTerminalSessionRequest) returns (google.protobuf.Empty);
+  rpc KillTerminalSession(KillTerminalSessionRequest) returns (google.protobuf.Empty);      // terminal.close
+  rpc StopTerminalProcess(StopTerminalProcessRequest) returns (google.protobuf.Empty);      // terminal.stop — interrupt, not teardown
+  rpc ListTerminalSessions(ListTerminalSessionsRequest) returns (ListTerminalSessionsResponse);
+  rpc WaitTerminalSession(WaitTerminalSessionRequest) returns (WaitTerminalSessionResponse); // terminal.wait — bounded blocking poll
+  rpc FocusTerminalSession(FocusTerminalSessionRequest) returns (google.protobuf.Empty);     // terminal.focus — bookkeeping touch
+  rpc GetTerminalAgentStatus(GetTerminalAgentStatusRequest) returns (GetTerminalAgentStatusResponse); // backs BOTH terminal.agentStatus and terminal.isRunningAgent
+  rpc InspectTerminalProcess(InspectTerminalProcessRequest) returns (InspectTerminalProcessResponse); // best-effort — see message doc comment
+
+  // --- Terminal/PTY I/O ---
+  // The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
+  // names but §3 never enumerates. Bidirectional, not server-streaming-only:
+  // §3's RouteTerminalWrite only routes control-plane metadata, never per-
+  // byte input, so a client->server data channel was still missing — this
+  // RPC is opened once per terminal.create by api-gateway's wscompat bridge
+  // (TASK-186) and piped into `push` frames via TASK-012's pipePush.
+  rpc AttachPty(stream PtyClientFrame) returns (stream PtyServerFrame);
 }
 
 enum ConnectionMode {
@@ -212,3 +234,69 @@ message Connection {
   string status = 3;             // "established" | "degraded" | "closed"
   int64 established_at_unix_ms = 4;
 }
+message SpawnTerminalSessionRequest {
+  string connection_id = 1;  // empty = host-local; rejected in server-deployment mode, see usecase.SpawnTerminalSession
+  string cwd = 2;
+  string shell = 3;          // optional; agent applies its own default if empty
+  int32  cols = 4;
+  int32  rows = 5;
+}
+message SpawnTerminalSessionResponse {
+  TerminalSession session = 1;
+}
+message TerminalSession {
+  string pty_id = 1;
+  string connection_id = 2;
+  string cwd = 3;
+  int64  created_at_unix_ms = 4;
+  int64  last_active_at_unix_ms = 5;
+}
+
+message ResizeTerminalSessionRequest { string pty_id = 1; int32 cols = 2; int32 rows = 3; }
+message KillTerminalSessionRequest   { string pty_id = 1; }
+message StopTerminalProcessRequest   { string pty_id = 1; } // sends an interrupt signal to the pty's foreground process
+message ListTerminalSessionsRequest  { string connection_id = 1; } // empty = all sessions for the caller's tenant
+message ListTerminalSessionsResponse { repeated TerminalSession sessions = 1; }
+
+message WaitTerminalSessionRequest  {
+  string pty_id = 1;
+  int32  timeout_ms = 2; // capped server-side (default max 30s, see usecase.WaitTerminalSession)
+}
+message WaitTerminalSessionResponse { bool exited = 1; int32 exit_code = 2; bool timed_out = 3; }
+
+message FocusTerminalSessionRequest { string pty_id = 1; }
+
+message GetTerminalAgentStatusRequest  { string pty_id = 1; }
+message GetTerminalAgentStatusResponse {
+  bool   agent_running = 1;     // answers both terminal.agentStatus and terminal.isRunningAgent
+  string agent_kind = 2;        // best-effort, e.g. "claude" | "codex" | "" if unknown
+  bool   ready_for_input = 3;   // agentStatus's richer question: is it idle-and-ready, not just alive
+}
+
+message InspectTerminalProcessRequest  { string pty_id = 1; }
+message InspectTerminalProcessResponse {
+  bool   known = 1;    // false when the agent can't answer — an honest "unknown", not a fabricated zero value
+  int32  pid = 2;
+  string command = 3;
+  string cwd = 4;
+}
+
+message PtyClientFrame {
+  oneof frame {
+    AttachToSession attach = 1;  // first frame only: which pty_id this stream carries I/O for
+    PtyInput        input  = 2;  // terminal.send
+    PtyResize       resize = 3;  // low-latency in-stream resize (alternative to the unary RPC above)
+  }
+}
+message AttachToSession { string pty_id = 1; }
+message PtyInput  { bytes data = 1; }
+message PtyResize { int32 cols = 1; int32 rows = 2; }
+
+message PtyServerFrame {
+  oneof frame {
+    PtyOutput out    = 1;
+    PtyExited exited = 2;
+  }
+}
+message PtyOutput { bytes data = 1; }
+message PtyExited { int32 exit_code = 1; }

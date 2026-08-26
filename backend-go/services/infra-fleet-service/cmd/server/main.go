@@ -83,6 +83,7 @@ func run() error {
 	// be the same Go value.
 	repo := infrapostgres.New(pool)
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
+	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
 	// wired below via agentwsserver) are both real, and so is relay-ssh now
@@ -131,6 +132,20 @@ func run() error {
 	establishConnectionUC := usecase.NewEstablishConnection(sshTargetStore, repo, repo, agentClient)
 	killWorkspacePortUC := usecase.NewKillWorkspacePort(repo, agentClient)
 
+	// --- Terminal/PTY (TASK-185) --- one ConnectionStreamLimiter shared by
+	// AttachPty across every stream this process serves.
+	ptyStreamLimiter := usecase.NewConnectionStreamLimiter(0)
+	spawnTerminalSessionUC := usecase.NewSpawnTerminalSession(repo, agentClient, terminalSessionStore, cfg.ServerDeployment)
+	resizeTerminalSessionUC := usecase.NewResizeTerminalSession(terminalSessionStore, repo, agentClient)
+	killTerminalSessionUC := usecase.NewKillTerminalSession(terminalSessionStore, repo, agentClient)
+	stopTerminalProcessUC := usecase.NewStopTerminalProcess(terminalSessionStore, repo, agentClient)
+	listTerminalSessionsUC := usecase.NewListTerminalSessions(terminalSessionStore)
+	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, agentClient)
+	focusTerminalSessionUC := usecase.NewFocusTerminalSession(terminalSessionStore)
+	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient)
+	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
+	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -145,6 +160,16 @@ func run() error {
 		getSshStateUC,
 		establishConnectionUC,
 		killWorkspacePortUC,
+		spawnTerminalSessionUC,
+		resizeTerminalSessionUC,
+		killTerminalSessionUC,
+		stopTerminalProcessUC,
+		listTerminalSessionsUC,
+		waitTerminalSessionUC,
+		focusTerminalSessionUC,
+		getTerminalAgentStatusUC,
+		inspectTerminalProcessUC,
+		attachPtyUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
