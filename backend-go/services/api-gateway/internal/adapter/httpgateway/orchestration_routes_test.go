@@ -23,6 +23,8 @@ import (
 // per method, and records the last request/context it saw so tests can
 // assert on what mountOrchestrationRoutes actually sent upstream.
 type fakeOrchestrationServiceClient struct {
+	orchestrationv1.OrchestrationServiceClient
+
 	createDispatchContextResp    *orchestrationv1.CreateDispatchContextResponse
 	createDispatchContextErr     error
 	lastCreateDispatchContextReq *orchestrationv1.CreateDispatchContextRequest

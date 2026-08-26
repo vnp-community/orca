@@ -4,7 +4,10 @@
 // framework, no provider-specific (Jira/Linear) wire shapes.
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // Provider distinguishes which external issue tracker an Issue/operation
 // targets — Jira and Linear, per issue-tracking-service.md §4's
@@ -47,10 +50,95 @@ var (
 // state name, and a browsable URL back to the provider. issue-tracking-service
 // never persists this — every read is live against Jira/Linear (design doc §2).
 type Issue struct {
-	ID    string
-	Title string
-	State string
-	URL   string
+	ID                  string
+	ProviderIssueID     string
+	Key                 string
+	Title               string
+	DescriptionMarkdown string
+	State               string
+	WorkflowState       WorkflowState
+	URL                 string
+	Project             ProjectRef
+	IssueType           IssueTypeRef
+	Labels              []string
+	Assignee            UserRef
+	Reporter            UserRef
+	Priority            PriorityRef
+	CustomFieldsJSON    string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
+type ProjectRef struct {
+	ID          string
+	Key         string
+	Name        string
+	WorkspaceID string
+}
+
+type IssueTypeRef struct {
+	ID      string
+	Name    string
+	Subtask bool
+}
+
+type WorkflowState struct {
+	ID       string
+	Name     string
+	Category string // todo|in_progress|done|cancelled
+}
+
+type UserRef struct {
+	ID          string
+	DisplayName string
+	Email       string
+	AvatarURL   string
+}
+
+type PriorityRef struct {
+	ID   string
+	Name string
+}
+
+// IssueComment is one comment on an Issue.
+type IssueComment struct {
+	ID           string
+	BodyMarkdown string
+	Author       UserRef
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// NewIssueInput is what CreateIssue passes to IssueTrackerProvider.CreateIssue
+// — replaces the old (projectKey, title, description string) positional
+// signature now that Jira/Linear both need issue type, assignee, priority,
+// labels, and (Linear) parent-issue/team/state.
+type NewIssueInput struct {
+	ProjectKey       string // Jira project key; unused by Linear (TeamID instead)
+	TeamID           string // Linear team id/key; unused by Jira
+	StateID          string // Linear initial workflow state; unused by Jira
+	Title            string
+	Description      string
+	IssueTypeID      string
+	AssigneeID       string
+	PriorityID       string
+	LabelIDs         []string
+	ParentIssueID    string
+	CustomFieldsJSON string
+}
+
+// IssueUpdate is what UpdateIssue passes to IssueTrackerProvider.UpdateIssue.
+// Every field empty/nil means "leave unchanged" — matches
+// UpdateIssueRequest's proto contract.
+type IssueUpdate struct {
+	IssueID          string
+	Title            string
+	Description      string
+	AssigneeID       string
+	PriorityID       string
+	LabelIDs         []string
+	WorkflowStateID  string
+	CustomFieldsJSON string
 }
 
 // NewIssue constructs an Issue, enforcing the minimal invariants every
@@ -65,4 +153,65 @@ func NewIssue(id, title, state, url string) (Issue, error) {
 		return Issue{}, ErrEmptyTitle
 	}
 	return Issue{ID: id, Title: title, State: state, URL: url}, nil
+}
+
+// ---- metadata-lookup value objects (SOL-015 scope additions) -------------
+
+type CreateFieldOption struct {
+	ID    string
+	Value string
+	Name  string
+}
+
+type CreateField struct {
+	Key           string
+	Name          string
+	Required      bool
+	SchemaType    string
+	SchemaItems   string
+	SchemaCustom  string
+	AllowedValues []CreateFieldOption
+}
+
+type Transition struct {
+	ID   string
+	Name string
+	To   WorkflowState
+}
+
+// ProjectStatusOrder is Jira's per-project Kanban column grouping — a list
+// of columns, each an ordered list of status ids in that column. No Linear
+// equivalent (Linear's ListWorkflowStates already returns an ordered flat
+// list).
+type ProjectStatusOrder struct {
+	StatusIDsByColumn [][]string
+}
+
+// ---- Linear-only value objects (SOL-016) ----------------------------------
+
+type Team struct {
+	ID          string
+	WorkspaceID string
+	Name        string
+	Key         string
+}
+
+type TeamLabel struct {
+	ID    string
+	Name  string
+	Color string
+}
+
+type TeamMember struct {
+	ID          string
+	DisplayName string
+	AvatarURL   string
+}
+
+type CustomView struct {
+	ID          string
+	WorkspaceID string
+	Name        string
+	Model       string // "issue" | "project"
+	TeamID      string
 }
