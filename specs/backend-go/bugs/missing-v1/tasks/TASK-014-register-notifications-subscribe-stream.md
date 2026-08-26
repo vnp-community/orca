@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-012, TASK-013
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `registerNotificationStreamChannel` is registered via `RegisterPushChannels` (wired from `main.go` with the same `notificationStreamOpener` instance passed to `wsbridge.New`), and tests cover the happy-path push-frame delivery, opener error propagation, a non-EOF `stream.Recv()` error closing the output channel cleanly, and `ctx` cancellation closing it without leaking the forwarding goroutine.
 
 ---
 

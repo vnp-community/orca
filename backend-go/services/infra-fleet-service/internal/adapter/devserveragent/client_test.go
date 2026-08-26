@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,6 +39,31 @@ type fakeAgent struct {
 	// (id/data/exitCode) mirror ptyNotificationParams's FLAGGED best-effort
 	// shape (see session.go).
 	pushNotifications []fakeAgentNotification
+
+	// receivedParams records the raw params of the most recent request seen
+	// per method — lets a test assert the exact field names/values Client
+	// sent over the wire (e.g. WritePty/ResizePty/KillPty's {id,...} params),
+	// not just that some pre-registered result came back.
+	paramsMu       sync.Mutex
+	receivedParams map[string]json.RawMessage
+}
+
+// lastParams returns the raw params this fake agent most recently received
+// for method, decoded into a map for easy field assertions. Fails the test
+// if method was never called.
+func (f *fakeAgent) lastParams(t *testing.T, method string) map[string]any {
+	t.Helper()
+	f.paramsMu.Lock()
+	raw, ok := f.receivedParams[method]
+	f.paramsMu.Unlock()
+	if !ok {
+		t.Fatalf("fake agent never received a call to %q", method)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decoding params for %q: %v", method, err)
+	}
+	return out
 }
 
 type fakeAgentNotification struct {
@@ -114,6 +140,13 @@ func (f *fakeAgent) handler(w http.ResponseWriter, r *http.Request) {
 			}
 			continue
 		}
+
+		f.paramsMu.Lock()
+		if f.receivedParams == nil {
+			f.receivedParams = make(map[string]json.RawMessage)
+		}
+		f.receivedParams[req.Method] = req.Params
+		f.paramsMu.Unlock()
 
 		result, known := f.results[req.Method]
 		if !known {

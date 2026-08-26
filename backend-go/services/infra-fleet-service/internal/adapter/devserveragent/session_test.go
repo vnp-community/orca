@@ -74,6 +74,110 @@ func (a *reconnectTestAgent) handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// notificationFor builds a JSONRPCNotification with the {id,data,exitCode}
+// params shape session.go's routeNotification decodes — mirrors
+// fakeAgentNotification.toJSONRPC in client_test.go, but these tests call
+// session.routeNotification directly (no network, no fake agent) since
+// subscribePty/unsubscribePty/routeNotification only touch in-memory state.
+func notificationFor(t *testing.T, method, ptyID, data string, exitCode int32) JSONRPCNotification {
+	t.Helper()
+	params, err := json.Marshal(map[string]any{"id": ptyID, "data": data, "exitCode": exitCode})
+	if err != nil {
+		t.Fatalf("marshaling notification params: %v", err)
+	}
+	return JSONRPCNotification{JSONRPC: "2.0", Method: method, Params: params}
+}
+
+// TestSession_RouteNotification_RoutesOnlyToMatchingPtyID is a direct,
+// network-free test of the notification demux: two subscribers on the same
+// session, keyed by different ptyIds, must each see only their own
+// notifications — the core guarantee StreamPty's callers depend on.
+func TestSession_RouteNotification_RoutesOnlyToMatchingPtyID(t *testing.T) {
+	sess := newSession("example.invalid", DefaultConfig(), slog.Default())
+
+	chA := sess.subscribePty("pty-a")
+	t.Cleanup(func() { sess.unsubscribePty("pty-a", chA) })
+	chB := sess.subscribePty("pty-b")
+	t.Cleanup(func() { sess.unsubscribePty("pty-b", chB) })
+
+	sess.routeNotification(notificationFor(t, "pty.data", "pty-a", "hello-a", 0))
+
+	select {
+	case n := <-chA:
+		if n.PtyID != "pty-a" || string(n.Data) != "hello-a" {
+			t.Errorf("chA received %+v, want PtyID=pty-a Data=hello-a", n)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for chA to receive its notification")
+	}
+
+	select {
+	case n := <-chB:
+		t.Fatalf("chB (subscribed to a different ptyId) received a notification meant for pty-a: %+v", n)
+	case <-time.After(50 * time.Millisecond):
+		// expected: nothing was routed to chB
+	}
+}
+
+// TestSession_UnsubscribePty_ClosesChannelAndStopsRouting checks both halves
+// of unsubscribePty's contract: the returned channel is closed (so a caller
+// ranging over it terminates), and the session no longer routes further
+// notifications for that ptyId anywhere (no leaked entry in s.ptySubs to
+// panic or leak on a later routeNotification call).
+func TestSession_UnsubscribePty_ClosesChannelAndStopsRouting(t *testing.T) {
+	sess := newSession("example.invalid", DefaultConfig(), slog.Default())
+
+	ch := sess.subscribePty("pty-1")
+	sess.unsubscribePty("pty-1", ch)
+
+	if _, ok := <-ch; ok {
+		t.Fatal("expected ch to be closed after unsubscribePty")
+	}
+
+	sess.ptyMu.Lock()
+	_, stillPresent := sess.ptySubs["pty-1"]
+	sess.ptyMu.Unlock()
+	if stillPresent {
+		t.Error("expected ptySubs to have no entry for pty-1 after its only subscriber unsubscribed")
+	}
+
+	// A notification arriving after unsubscribe must not panic (send on a
+	// closed channel) and must simply be dropped.
+	sess.routeNotification(notificationFor(t, "pty.data", "pty-1", "too-late", 0))
+}
+
+// TestSession_RouteNotification_NonBlockingWhenSubscriberChannelFull proves
+// the read loop's "never block on a slow consumer" contract: filling a
+// subscriber's buffered channel to capacity and then routing one more
+// notification must return immediately (drop, not block) rather than
+// wedging routeNotification (and therefore readLoop) forever.
+func TestSession_RouteNotification_NonBlockingWhenSubscriberChannelFull(t *testing.T) {
+	sess := newSession("example.invalid", DefaultConfig(), slog.Default())
+
+	ch := sess.subscribePty("pty-full")
+	t.Cleanup(func() { sess.unsubscribePty("pty-full", ch) })
+
+	// subscribePty's channel is buffered 64 (see its doc comment) — fill it
+	// without draining, then verify one more route doesn't block.
+	for i := 0; i < cap(ch); i++ {
+		sess.routeNotification(notificationFor(t, "pty.data", "pty-full", "fill", 0))
+	}
+
+	done := make(chan struct{})
+	go func() {
+		sess.routeNotification(notificationFor(t, "pty.data", "pty-full", "overflow", 0))
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// expected: routeNotification dropped the overflow notification
+		// rather than blocking on the full channel.
+	case <-time.After(time.Second):
+		t.Fatal("routeNotification blocked on a full subscriber channel instead of dropping")
+	}
+}
+
 func TestSession_BackgroundReconnect_RecoversAfterDropWithoutCallerRetry(t *testing.T) {
 	agent := &reconnectTestAgent{token: fakeAgentToken}
 	server := httptest.NewServer(http.HandlerFunc(agent.handler))

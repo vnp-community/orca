@@ -33,6 +33,77 @@ func TestClientSpawnPtySucceedsAgainstFakeAgent(t *testing.T) {
 	}
 }
 
+// TestClientSpawnPty_MissingIDInResponse_ReturnsClearError closes a gap
+// between methods.go's original design intent (a malformed pty.create
+// response should fail loudly, not surface an empty PtyID several layers
+// up) and what the code actually did before this test was added.
+func TestClientSpawnPty_MissingIDInResponse_ReturnsClearError(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
+		// No "id" field — a malformed/degenerate agent response.
+		"pty.create": map[string]any{"cols": 80, "rows": 24, "cwd": "/work", "shell": "/bin/bash"},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-missing-id", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	result, err := client.SpawnPty(context.Background(), devServer, usecase.SpawnPtyInput{Cwd: "/repo"})
+	if err == nil {
+		t.Fatalf("expected an error for a pty.create response missing id, got result=%+v", result)
+	}
+}
+
+// TestClientWriteResizeKillPty_SendsExpectedParams verifies not just that
+// the right method name resolves (the fake agent replies per-method
+// regardless of params) but that the actual request params reaching the
+// wire use the field names methods.go's doc comments claim are confirmed
+// against agent-rpc-dispatch.ts ({id,data}/{id,cols,rows}/{id,graceful}).
+func TestClientWriteResizeKillPty_SendsExpectedParams(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
+		"pty.write":   map[string]any{},
+		"pty.resize":  map[string]any{},
+		"pty.destroy": map[string]any{},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-params", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if err := client.WritePty(context.Background(), devServer, "pty-9", []byte("ls\n")); err != nil {
+		t.Fatalf("WritePty: %v", err)
+	}
+	writeParams := agent.lastParams(t, "pty.write")
+	if writeParams["id"] != "pty-9" || writeParams["data"] != "ls\n" {
+		t.Errorf("pty.write params = %+v, want id=pty-9 data=%q", writeParams, "ls\n")
+	}
+
+	if err := client.ResizePty(context.Background(), devServer, "pty-9", 100, 40); err != nil {
+		t.Fatalf("ResizePty: %v", err)
+	}
+	resizeParams := agent.lastParams(t, "pty.resize")
+	if resizeParams["id"] != "pty-9" || resizeParams["cols"] != float64(100) || resizeParams["rows"] != float64(40) {
+		t.Errorf("pty.resize params = %+v, want id=pty-9 cols=100 rows=40", resizeParams)
+	}
+
+	if err := client.KillPty(context.Background(), devServer, "pty-9", true); err != nil {
+		t.Fatalf("KillPty: %v", err)
+	}
+	killParams := agent.lastParams(t, "pty.destroy")
+	if killParams["id"] != "pty-9" || killParams["graceful"] != true {
+		t.Errorf("pty.destroy params = %+v, want id=pty-9 graceful=true", killParams)
+	}
+}
+
 func TestClientWriteResizeKillPty_CallExpectedMethods(t *testing.T) {
 	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
 		"pty.write":   map[string]any{},
@@ -163,5 +234,111 @@ func TestClientStreamPty_RoutesDataAndExitNotifications(t *testing.T) {
 		case <-deadline:
 			t.Fatalf("timed out waiting for events (gotData=%v gotExit=%v)", gotData, gotExit)
 		}
+	}
+}
+
+// TestClientStreamPty_TwoConcurrentSubscriptions_EachGetsOwnEvents proves
+// the demux is genuinely per-subscriber, not just "not obviously wrong" —
+// two StreamPty calls for two different ptyIds live on the same session at
+// once, and each must see only its own pty's notifications, never the
+// other's.
+func TestClientStreamPty_TwoConcurrentSubscriptions_EachGetsOwnEvents(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}, pushNotifications: []fakeAgentNotification{
+		{method: "pty.data", ptyID: "pty-a", data: "from-a-1"},
+		{method: "pty.data", ptyID: "pty-b", data: "from-b-1"},
+		{method: "pty.data", ptyID: "pty-a", data: "from-a-2"},
+		{method: "pty.exit", ptyID: "pty-b", exitCode: 7},
+		{method: "pty.exit", ptyID: "pty-a", exitCode: 0},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-5", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	// Connect first so both subscriptions attach before the fake agent's
+	// delayed push fires (mirrors the single-subscriber test above).
+	if _, err := client.Exec(context.Background(), devServer, "noop", nil); err == nil {
+		t.Fatal("expected an unknown-method error from the fake agent (sanity check that the session is live)")
+	}
+
+	eventsA, unsubA, err := client.StreamPty(context.Background(), devServer, "pty-a")
+	if err != nil {
+		t.Fatalf("StreamPty(pty-a): %v", err)
+	}
+	defer unsubA()
+	eventsB, unsubB, err := client.StreamPty(context.Background(), devServer, "pty-b")
+	if err != nil {
+		t.Fatalf("StreamPty(pty-b): %v", err)
+	}
+	defer unsubB()
+
+	var gotAExit, gotBExit bool
+	deadline := time.After(2 * time.Second)
+	for !gotAExit || !gotBExit {
+		select {
+		case ev, ok := <-eventsA:
+			if !ok {
+				t.Fatal("pty-a events channel closed before its exit event arrived")
+			}
+			if ev.PtyID != "pty-a" {
+				t.Fatalf("pty-a subscription leaked a foreign event: %+v", ev)
+			}
+			if ev.Exited {
+				gotAExit = true
+			}
+		case ev, ok := <-eventsB:
+			if !ok {
+				t.Fatal("pty-b events channel closed before its exit event arrived")
+			}
+			if ev.PtyID != "pty-b" {
+				t.Fatalf("pty-b subscription leaked a foreign event: %+v", ev)
+			}
+			if ev.Exited {
+				gotBExit = true
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for both subscriptions' exit events (gotAExit=%v gotBExit=%v)", gotAExit, gotBExit)
+		}
+	}
+}
+
+// TestClientStreamPty_ContextCancellationClosesOutputChannel verifies the
+// forwarding goroutine started by StreamPty exits and closes its output
+// channel when ctx is cancelled, even if the caller never calls unsubscribe
+// — so a cancelled-context caller isn't left blocked reading from a channel
+// that will never close or receive again.
+func TestClientStreamPty_ContextCancellationClosesOutputChannel(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-6", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	events, unsubscribe, err := client.StreamPty(ctx, devServer, "pty-cancel")
+	if err != nil {
+		t.Fatalf("StreamPty: %v", err)
+	}
+	t.Cleanup(unsubscribe)
+
+	cancel()
+
+	select {
+	case _, ok := <-events:
+		if ok {
+			t.Fatal("expected the events channel to close (no events were ever pushed), got a value instead")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for events channel to close after ctx cancellation")
 	}
 }

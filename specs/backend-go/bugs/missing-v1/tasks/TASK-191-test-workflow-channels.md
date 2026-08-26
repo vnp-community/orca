@@ -5,7 +5,7 @@
 **Service:** `workflow-service` + `api-gateway`
 **File:** `internal/usecase/update_template_test.go` (new), `internal/adapter/postgres/repository_test.go` (extend), `services/api-gateway/internal/adapter/wscompat/channels_workflow_test.go` (new)
 **Depends on:** TASK-188, TASK-189, TASK-190
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — wscompat `workflow.*` channel tests complete and verified (5/5 pass, all TASK-191 cases including the tenant-spoofing and FAILED_PRECONDITION-passthrough guards); `update_template_test.go` usecase tests spot-checked and already adequate (5/5 pass, all listed cases covered); no REST-vs-wscompat parity harness exists in this package yet (follow-up, not built here); postgres `repository_test.go` integration tests (`TestRepository_Update_CorrectVersion_Succeeds` / `_StaleVersion_ReturnsConflict`) already exist behind the `integration` build tag but were not executed in this pass per task scope.
 
 ---
 

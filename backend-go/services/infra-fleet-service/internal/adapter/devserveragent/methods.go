@@ -59,6 +59,12 @@ func (c *Client) SpawnPty(ctx context.Context, devServer domain.DevServer, in us
 			return usecase.SpawnPtyResult{}, fmt.Errorf("devserveragent: decoding pty.create result: %w", err)
 		}
 	}
+	if out.ID == "" {
+		// A silently empty PtyID would surface as a hard-to-diagnose failure
+		// several layers up (usecase code keying off PtyID) — fail loudly here
+		// instead, at the one place that knows the response was malformed.
+		return usecase.SpawnPtyResult{}, fmt.Errorf("devserveragent: pty.create response missing id")
+	}
 	return usecase.SpawnPtyResult{PtyID: out.ID, Cols: out.Cols, Rows: out.Rows, Cwd: out.Cwd, Shell: out.Shell}, nil
 }
 
