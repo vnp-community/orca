@@ -210,16 +210,209 @@ func (r *RelayExecutor) ForkSync(ctx context.Context, repoPath, expectedUpstream
 // UpstreamStatus: still needs TASK-227 (unlike this group's other 3
 // shippable-now methods) — no confirmed agent handler is reachable from
 // backend-go's transport until then. Param key renamed to worktreePath and
-// an optional pushTarget added per the real contract (placeholder type —
-// see SOL-032 §0 open question #1). Wired now; if no agent handler exists
-// at all even post-TASK-227, this becomes a FailedPrecondition at runtime
-// (relay() returns the agent's "unknown method" error) rather than a
-// compile-time gap.
-func (r *RelayExecutor) UpstreamStatus(ctx context.Context, repoPath, pushTarget string) (domain.UpstreamStatus, error) {
+// pushTarget is now the real, structured PushTargetInput (TASK-207's type,
+// SOL-032 §0 open question #1 resolved) instead of TASK-209's original
+// placeholder string. Wired now; if no agent handler exists at all even
+// post-TASK-227, this becomes a FailedPrecondition at runtime (relay()
+// returns the agent's "unknown method" error) rather than a compile-time
+// gap.
+func (r *RelayExecutor) UpstreamStatus(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.UpstreamStatus, error) {
 	var result domain.UpstreamStatus
-	err := r.relay(ctx, repoPath, "git.upstreamStatus", map[string]any{
-		"worktreePath": repoPath, "pushTarget": pushTarget,
+	params := map[string]any{"worktreePath": repoPath}
+	if pt := pushTargetParam(pushTarget); pt != nil {
+		params["pushTarget"] = pt
+	}
+	err := r.relay(ctx, repoPath, "git.upstreamStatus", params, &result)
+	return result, err
+}
+
+// Fetch relays to the real agent's git.fetch
+// (specs/agent/api/agent-rpc-catalog-git-fs.md:155): always prunes
+// (`git fetch --prune [remote]`), no separate prune flag — needed TASK-227
+// (reachability) and PushTargetInput (both now resolved) per TASK-210's own
+// Contract correction.
+func (r *RelayExecutor) Fetch(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.SimpleResult, error) {
+	var result domain.SimpleResult
+	params := map[string]any{"worktreePath": repoPath}
+	if pt := pushTargetParam(pushTarget); pt != nil {
+		params["pushTarget"] = pt
+	}
+	err := r.relay(ctx, repoPath, "git.fetch", params, &result)
+	return result, err
+}
+
+// gitChangeEntryWire mirrors parseBranchDiff's {path, status, oldPath?,
+// added?, removed?} entry shape on the wire
+// (agent/src/relay/git-handler-utils.ts:107-134) — shared by
+// CommitCompare/BranchCompare below.
+type gitChangeEntryWire struct {
+	Path    string `json:"path"`
+	Status  string `json:"status"`
+	OldPath string `json:"oldPath"`
+	Added   int    `json:"added"`
+	Removed int    `json:"removed"`
+}
+
+func toDomainChangeEntries(entries []gitChangeEntryWire) []domain.GitChangeEntry {
+	out := make([]domain.GitChangeEntry, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, domain.GitChangeEntry{
+			Path: e.Path, Status: e.Status, OldPath: e.OldPath, Added: e.Added, Removed: e.Removed,
+		})
+	}
+	return out
+}
+
+// CommitCompare relays to the real agent's git.commitCompare exactly:
+// worktreePath + commitId, response {summary{...}, entries[]} — matches
+// commitCompareOp's real shape (agent/src/relay/git-handler-commit-diff-ops.ts:15-122,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:50/144), NOT TASK-209's
+// original two-arbitrary-commits (baseSha/headSha) design.
+func (r *RelayExecutor) CommitCompare(ctx context.Context, repoPath, commitID string) (domain.CommitCompareResult, error) {
+	var result struct {
+		Summary struct {
+			CommitOID    string `json:"commitOid"`
+			ParentOID    string `json:"parentOid"`
+			CompareRef   string `json:"compareRef"`
+			BaseRef      string `json:"baseRef"`
+			ChangedFiles int    `json:"changedFiles"`
+			Status       string `json:"status"`
+			ErrorMessage string `json:"errorMessage"`
+		} `json:"summary"`
+		Entries []gitChangeEntryWire `json:"entries"`
+	}
+	err := r.relay(ctx, repoPath, "git.commitCompare", map[string]any{
+		"worktreePath": repoPath, "commitId": commitID,
 	}, &result)
+	if err != nil {
+		return domain.CommitCompareResult{}, err
+	}
+	return domain.CommitCompareResult{
+		CommitOID: result.Summary.CommitOID, ParentOID: result.Summary.ParentOID,
+		CompareRef: result.Summary.CompareRef, BaseRef: result.Summary.BaseRef,
+		ChangedFiles: result.Summary.ChangedFiles, Status: result.Summary.Status,
+		ErrorMessage: result.Summary.ErrorMessage, Entries: toDomainChangeEntries(result.Entries),
+	}, nil
+}
+
+// BranchCompare relays to the real agent's git.branchCompare exactly:
+// worktreePath + baseRef, response {summary{...}, entries[]} — matches
+// branchCompareOp's real shape (agent/src/relay/git-handler-ops.ts:124-214,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:49/143), NOT TASK-209's
+// original two-arbitrary-branches (baseBranch/headBranch) design.
+func (r *RelayExecutor) BranchCompare(ctx context.Context, repoPath, baseRef string) (domain.BranchCompareResult, error) {
+	var result struct {
+		Summary struct {
+			BaseRef      string `json:"baseRef"`
+			BaseOID      string `json:"baseOid"`
+			CompareRef   string `json:"compareRef"`
+			HeadOID      string `json:"headOid"`
+			MergeBase    string `json:"mergeBase"`
+			ChangedFiles int    `json:"changedFiles"`
+			CommitsAhead int    `json:"commitsAhead"`
+			Status       string `json:"status"`
+			ErrorMessage string `json:"errorMessage"`
+		} `json:"summary"`
+		Entries []gitChangeEntryWire `json:"entries"`
+	}
+	err := r.relay(ctx, repoPath, "git.branchCompare", map[string]any{
+		"worktreePath": repoPath, "baseRef": baseRef,
+	}, &result)
+	if err != nil {
+		return domain.BranchCompareResult{}, err
+	}
+	return domain.BranchCompareResult{
+		BaseRef: result.Summary.BaseRef, BaseOID: result.Summary.BaseOID,
+		CompareRef: result.Summary.CompareRef, HeadOID: result.Summary.HeadOID,
+		MergeBase: result.Summary.MergeBase, ChangedFiles: result.Summary.ChangedFiles,
+		CommitsAhead: result.Summary.CommitsAhead, Status: result.Summary.Status,
+		ErrorMessage: result.Summary.ErrorMessage, Entries: toDomainChangeEntries(result.Entries),
+	}, nil
+}
+
+// fileDiffResultWire mirrors buildDiffResult's response shape
+// (agent/src/relay/git-diff-result.ts:5-38) — shared by CommitDiff/
+// BranchDiff below. Binary content is intentionally not decoded here even
+// when the agent sends a base64 preview payload — see
+// localgit.buildFileDiffResult's doc comment for why (raw binary can't
+// round-trip through this service's proto string fields).
+type fileDiffResultWire struct {
+	Kind             string `json:"kind"`
+	OriginalContent  string `json:"originalContent"`
+	ModifiedContent  string `json:"modifiedContent"`
+	OriginalIsBinary bool   `json:"originalIsBinary"`
+	ModifiedIsBinary bool   `json:"modifiedIsBinary"`
+}
+
+func toDomainFileDiff(w fileDiffResultWire) domain.FileDiffResult {
+	if w.OriginalIsBinary || w.ModifiedIsBinary {
+		return domain.FileDiffResult{Kind: "binary", OriginalIsBinary: w.OriginalIsBinary, ModifiedIsBinary: w.ModifiedIsBinary}
+	}
+	return domain.FileDiffResult{Kind: w.Kind, OriginalContent: w.OriginalContent, ModifiedContent: w.ModifiedContent}
+}
+
+// CommitDiff relays to the real agent's git.commitDiff exactly: worktreePath
+// + commitOid + optional parentOid + REQUIRED filePath + optional oldPath,
+// response a single diff-result object — matches commitDiffEntry's real
+// shape (agent/src/relay/git-handler-commit-diff-ops.ts:124-160,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:52/146). Same class of
+// per-file fix as GetDiff's own TASK-228 correction — TASK-209's original
+// design had no filePath at all and assumed a whole-commit diff.
+func (r *RelayExecutor) CommitDiff(ctx context.Context, repoPath, commitOID, parentOID, filePath, oldPath string) (domain.FileDiffResult, error) {
+	params := map[string]any{"worktreePath": repoPath, "commitOid": commitOID, "filePath": filePath}
+	if parentOID != "" {
+		params["parentOid"] = parentOID
+	}
+	if oldPath != "" {
+		params["oldPath"] = oldPath
+	}
+	var result fileDiffResultWire
+	err := r.relay(ctx, repoPath, "git.commitDiff", params, &result)
+	if err != nil {
+		return domain.FileDiffResult{}, err
+	}
+	return toDomainFileDiff(result), nil
+}
+
+// BranchDiff relays to the real agent's git.branchDiff exactly: worktreePath
+// + baseRef + REQUIRED filePath + optional oldPath, response a diff-result
+// object — matches branchDiffEntries' real shape
+// (agent/src/relay/git-handler-ops.ts:218-288,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:51/145). Same per-file fix as
+// CommitDiff, plus the same base-ref-only-vs-two-sided fix as BranchCompare.
+// includePatch is always sent true — without it the real agent returns
+// empty-content placeholder entries (agent-git-handler-ops.ts:259-267),
+// which this per-file RPC has no use for.
+func (r *RelayExecutor) BranchDiff(ctx context.Context, repoPath, baseRef, filePath, oldPath string) (domain.FileDiffResult, error) {
+	params := map[string]any{
+		"worktreePath": repoPath, "baseRef": baseRef, "filePath": filePath, "includePatch": true,
+	}
+	if oldPath != "" {
+		params["oldPath"] = oldPath
+	}
+	var result fileDiffResultWire
+	err := r.relay(ctx, repoPath, "git.branchDiff", params, &result)
+	if err != nil {
+		return domain.FileDiffResult{}, err
+	}
+	return toDomainFileDiff(result), nil
+}
+
+// SubmoduleStatus relays to the real agent's git.submoduleStatus exactly:
+// worktreePath + submodulePath + optional area, response a GitStatus-shaped
+// object — matches handleGitSubmoduleStatus's real per-submodule shape
+// (agent/src/relay/agent-git-handler-extended.ts:196-230,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:55/123), NOT TASK-209's
+// original "list every submodule" design (SOL-032 §0 open question #3,
+// resolved — see GitExecutor.SubmoduleStatus's doc comment for the
+// frontend-caller citation that closes this question).
+func (r *RelayExecutor) SubmoduleStatus(ctx context.Context, repoPath, submodulePath, area string) (domain.GitStatus, error) {
+	params := map[string]any{"worktreePath": repoPath, "submodulePath": submodulePath}
+	if area != "" {
+		params["area"] = area
+	}
+	var result domain.GitStatus
+	err := r.relay(ctx, repoPath, "git.submoduleStatus", params, &result)
 	return result, err
 }
 

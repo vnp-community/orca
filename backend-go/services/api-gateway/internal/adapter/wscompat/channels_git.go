@@ -31,18 +31,18 @@ import (
 )
 
 // registerGitDeepChannels wires every git.* channel this scope's tasks
-// (TASK-206/207/208/209-shippable/210-shippable/211/212/213-shippable) back
-// with a real git-gateway-service RPC. TASK-207's Group A (branch/ref
-// operations) is now implemented and wired below — 4 of its 9 original
-// methods (checkout/localBranches/fastForward/conflictOperation) use a
-// redesigned request/response shape against the real agent contract rather
-// than TASK-212's own stale pre-correction sketch; see TASK-207's own doc
-// comments for citations, and this section's inline notes for exactly how
-// each channel's args differ from that stale sketch.
-// commitCompare/branchCompare/commitDiff/branchDiff/submoduleStatus/fetch —
-// all flagged BLOCKED in their own task files — are still NOT registered
-// here; they keep falling through to notImplementedHandler until a future
-// pass resolves their open design questions (see SOL-032 §0).
+// (TASK-206/207/208/209/210/211/212/213) back with a real git-gateway-service
+// RPC. TASK-207's Group A (branch/ref operations) is implemented and wired
+// below — 4 of its 9 original methods (checkout/localBranches/fastForward/
+// conflictOperation) use a redesigned request/response shape against the
+// real agent contract rather than TASK-212's own stale pre-correction
+// sketch; see TASK-207's own doc comments for citations, and this section's
+// inline notes for exactly how each channel's args differ from that stale
+// sketch. commitCompare/branchCompare/commitDiff/branchDiff/submoduleStatus/
+// fetch were flagged BLOCKED in their own task files (TASK-209/210) — now
+// implemented for real against the confirmed agent contract
+// (specs/agent/api/agent-rpc-catalog-git-fs.md:49-55/143-147/155) and wired
+// below; see gitgateway.proto's matching message doc comments for citations.
 func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceClient) {
 	// ── TASK-206: commit/push/pull/generateCommitMessage ────────────────
 
@@ -428,17 +428,55 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		return resp, nil
 	})
 
+	// UpstreamStatus's pushTarget is now the real, structured GitPushTarget
+	// shape (agent/src/shared/types.ts:551-557) — replaces TASK-213's
+	// original placeholder string field now that TASK-207's PushTargetInput
+	// exists for real (same decode shape as git.fastForward above).
 	r.Register("git.upstreamStatus", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type pushTargetArgs struct {
+			RemoteName    string `json:"remoteName"`
+			BranchName    string `json:"branchName"`
+			RemoteURL     string `json:"remoteUrl"`
+			RemoteCreated bool   `json:"remoteCreated"`
+		}
 		type upstreamStatusArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			PushTarget string `json:"pushTarget"`
+			WorktreeID string          `json:"worktreeId"`
+			PushTarget *pushTargetArgs `json:"pushTarget"`
 		}
 		in, err := decodeArg[upstreamStatusArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.UpstreamStatus(ctx, &gitgatewayv1.UpstreamStatusRequest{
-			WorktreeId: in.WorktreeID, PushTarget: in.PushTarget,
+		req := &gitgatewayv1.UpstreamStatusRequest{WorktreeId: in.WorktreeID}
+		if in.PushTarget != nil {
+			req.PushTarget = &gitgatewayv1.PushTargetInput{
+				RemoteName: in.PushTarget.RemoteName, BranchName: in.PushTarget.BranchName,
+				RemoteUrl: in.PushTarget.RemoteURL, RemoteCreated: in.PushTarget.RemoteCreated,
+			}
+		}
+		resp, err := client.UpstreamStatus(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// ── TASK-209 real shape redesign: commitCompare/branchCompare/
+	// commitDiff/branchDiff/submoduleStatus — see gitgateway.proto's
+	// matching message doc comments for the real agent contract citations
+	// that unblocked these (specs/agent/api/agent-rpc-catalog-git-fs.md:49-55/143-147). ──
+
+	r.Register("git.commitCompare", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type commitCompareArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			CommitID   string `json:"commitId"`
+		}
+		in, err := decodeArg[commitCompareArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.CommitCompare(ctx, &gitgatewayv1.CommitCompareRequest{
+			WorktreeId: in.WorktreeID, CommitId: in.CommitID,
 		})
 		if err != nil {
 			return nil, err
@@ -446,8 +484,126 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		return resp, nil
 	})
 
-	// ── TASK-210/TASK-213 (shippable-now subset: remoteCommitUrl/
-	// remoteFileUrl — fetch is BLOCKED, not implemented, not wired). ────
+	r.Register("git.branchCompare", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type branchCompareArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			BaseRef    string `json:"baseRef"`
+		}
+		in, err := decodeArg[branchCompareArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.BranchCompare(ctx, &gitgatewayv1.BranchCompareRequest{
+			WorktreeId: in.WorktreeID, BaseRef: in.BaseRef,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// CommitDiff/BranchDiff are per-file (filePath REQUIRED) — same class of
+	// fix as git.diff's own TASK-228 correction, not the whole-commit/
+	// two-sided shapes TASK-213's original sketch had.
+	r.Register("git.commitDiff", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type commitDiffArgs struct {
+			WorktreeID string  `json:"worktreeId"`
+			CommitOID  string  `json:"commitOid"`
+			ParentOID  *string `json:"parentOid"`
+			FilePath   string  `json:"filePath"`
+			OldPath    string  `json:"oldPath"`
+		}
+		in, err := decodeArg[commitDiffArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		req := &gitgatewayv1.CommitDiffRequest{
+			WorktreeId: in.WorktreeID, CommitOid: in.CommitOID, FilePath: in.FilePath, OldPath: in.OldPath,
+		}
+		if in.ParentOID != nil {
+			req.ParentOid = *in.ParentOID
+		}
+		resp, err := client.CommitDiff(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.branchDiff", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type branchDiffArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			BaseRef    string `json:"baseRef"`
+			FilePath   string `json:"filePath"`
+			OldPath    string `json:"oldPath"`
+		}
+		in, err := decodeArg[branchDiffArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.BranchDiff(ctx, &gitgatewayv1.BranchDiffRequest{
+			WorktreeId: in.WorktreeID, BaseRef: in.BaseRef, FilePath: in.FilePath, OldPath: in.OldPath,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// SubmoduleStatus is per-SINGLE-submodule (submodulePath REQUIRED) — the
+	// real frontend caller (frontend/src/renderer/src/runtime/runtime-git-client.ts:152-176)
+	// already knows every dirty submodule's path from the parent git.status
+	// response, so there is no "list every submodule" call to support here.
+	r.Register("git.submoduleStatus", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type submoduleStatusArgs struct {
+			WorktreeID    string `json:"worktreeId"`
+			SubmodulePath string `json:"submodulePath"`
+			Area          string `json:"area"`
+		}
+		in, err := decodeArg[submoduleStatusArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.SubmoduleStatus(ctx, &gitgatewayv1.SubmoduleStatusRequest{
+			WorktreeId: in.WorktreeID, SubmodulePath: in.SubmodulePath, Area: in.Area,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// ── TASK-210/TASK-213 remote (fetch: TASK-227 reachability +
+	// PushTargetInput are both now resolved, unblocking this channel). ────
+
+	r.Register("git.fetch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type pushTargetArgs struct {
+			RemoteName    string `json:"remoteName"`
+			BranchName    string `json:"branchName"`
+			RemoteURL     string `json:"remoteUrl"`
+			RemoteCreated bool   `json:"remoteCreated"`
+		}
+		type fetchArgs struct {
+			WorktreeID string          `json:"worktreeId"`
+			PushTarget *pushTargetArgs `json:"pushTarget"`
+		}
+		in, err := decodeArg[fetchArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		req := &gitgatewayv1.FetchRequest{WorktreeId: in.WorktreeID}
+		if in.PushTarget != nil {
+			req.PushTarget = &gitgatewayv1.PushTargetInput{
+				RemoteName: in.PushTarget.RemoteName, BranchName: in.PushTarget.BranchName,
+				RemoteUrl: in.PushTarget.RemoteURL, RemoteCreated: in.PushTarget.RemoteCreated,
+			}
+		}
+		resp, err := client.Fetch(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
 
 	r.Register("git.remoteCommitUrl", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type remoteCommitURLArgs struct {

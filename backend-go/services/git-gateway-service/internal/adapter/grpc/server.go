@@ -38,9 +38,15 @@ type Server struct {
 	checkIgnored   *usecase.CheckIgnored
 	forkSync       *usecase.ForkSync
 	upstreamStatus *usecase.UpstreamStatus
+	commitCompare  *usecase.CommitCompare
+	branchCompare  *usecase.BranchCompare
+	commitDiff     *usecase.CommitDiff
+	branchDiff     *usecase.BranchDiff
+	submoduleStatus *usecase.SubmoduleStatus
 
 	remoteCommitURL *usecase.RemoteCommitURL
 	remoteFileURL   *usecase.RemoteFileURL
+	fetch           *usecase.Fetch
 
 	generatePullRequestFields   *usecase.GeneratePullRequestFields
 	discoverCommitMessageModels *usecase.DiscoverCommitMessageModels
@@ -107,8 +113,14 @@ func New(
 	checkIgnored *usecase.CheckIgnored,
 	forkSync *usecase.ForkSync,
 	upstreamStatus *usecase.UpstreamStatus,
+	commitCompare *usecase.CommitCompare,
+	branchCompare *usecase.BranchCompare,
+	commitDiff *usecase.CommitDiff,
+	branchDiff *usecase.BranchDiff,
+	submoduleStatus *usecase.SubmoduleStatus,
 	remoteCommitURL *usecase.RemoteCommitURL,
 	remoteFileURL *usecase.RemoteFileURL,
+	fetch *usecase.Fetch,
 	generatePullRequestFields *usecase.GeneratePullRequestFields,
 	discoverCommitMessageModels *usecase.DiscoverCommitMessageModels,
 	readFile *usecase.ReadFileUseCase,
@@ -164,8 +176,14 @@ func New(
 		checkIgnored:                checkIgnored,
 		forkSync:                    forkSync,
 		upstreamStatus:              upstreamStatus,
+		commitCompare:               commitCompare,
+		branchCompare:               branchCompare,
+		commitDiff:                  commitDiff,
+		branchDiff:                  branchDiff,
+		submoduleStatus:             submoduleStatus,
 		remoteCommitURL:             remoteCommitURL,
 		remoteFileURL:               remoteFileURL,
+		fetch:                       fetch,
 		generatePullRequestFields:   generatePullRequestFields,
 		discoverCommitMessageModels: discoverCommitMessageModels,
 		readFile:                    readFile,
@@ -352,12 +370,86 @@ func (s *Server) InitRepo(ctx context.Context, req *gitgatewayv1.InitRepoRequest
 
 func (s *Server) UpstreamStatus(ctx context.Context, req *gitgatewayv1.UpstreamStatusRequest) (*gitgatewayv1.UpstreamStatusResponse, error) {
 	result, err := s.upstreamStatus.Execute(ctx, usecase.UpstreamStatusInput{
-		WorktreeID: req.GetWorktreeId(), PushTarget: req.GetPushTarget(),
+		WorktreeID: req.GetWorktreeId(), PushTarget: fromProtoPushTarget(req.GetPushTarget()),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.UpstreamStatusResponse{HasUpstream: result.HasUpstream, Ahead: int32(result.Ahead), Behind: int32(result.Behind)}, nil
+}
+
+// CommitCompare/BranchCompare/CommitDiff/BranchDiff/SubmoduleStatus below
+// implement TASK-209's real shape redesign (see each usecase/proto message's
+// own doc comment for citations) — no longer BLOCKED.
+
+func (s *Server) CommitCompare(ctx context.Context, req *gitgatewayv1.CommitCompareRequest) (*gitgatewayv1.CommitCompareResponse, error) {
+	result, err := s.commitCompare.Execute(ctx, usecase.CommitCompareInput{
+		WorktreeID: req.GetWorktreeId(), CommitID: req.GetCommitId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CommitCompareResponse{
+		CommitOid: result.CommitOID, ParentOid: result.ParentOID, CompareRef: result.CompareRef,
+		BaseRef: result.BaseRef, ChangedFiles: int32(result.ChangedFiles), Status: result.Status,
+		ErrorMessage: result.ErrorMessage, Entries: toProtoChangeEntries(result.Entries),
+	}, nil
+}
+
+func (s *Server) BranchCompare(ctx context.Context, req *gitgatewayv1.BranchCompareRequest) (*gitgatewayv1.BranchCompareResponse, error) {
+	result, err := s.branchCompare.Execute(ctx, usecase.BranchCompareInput{
+		WorktreeID: req.GetWorktreeId(), BaseRef: req.GetBaseRef(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.BranchCompareResponse{
+		BaseRef: result.BaseRef, BaseOid: result.BaseOID, CompareRef: result.CompareRef,
+		HeadOid: result.HeadOID, MergeBase: result.MergeBase, ChangedFiles: int32(result.ChangedFiles),
+		CommitsAhead: int32(result.CommitsAhead), Status: result.Status, ErrorMessage: result.ErrorMessage,
+		Entries: toProtoChangeEntries(result.Entries),
+	}, nil
+}
+
+func (s *Server) CommitDiff(ctx context.Context, req *gitgatewayv1.CommitDiffRequest) (*gitgatewayv1.FileDiffResponse, error) {
+	result, err := s.commitDiff.Execute(ctx, usecase.CommitDiffInput{
+		WorktreeID: req.GetWorktreeId(), CommitOID: req.GetCommitOid(), ParentOID: req.GetParentOid(),
+		FilePath: req.GetFilePath(), OldPath: req.GetOldPath(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoFileDiff(result), nil
+}
+
+func (s *Server) BranchDiff(ctx context.Context, req *gitgatewayv1.BranchDiffRequest) (*gitgatewayv1.FileDiffResponse, error) {
+	result, err := s.branchDiff.Execute(ctx, usecase.BranchDiffInput{
+		WorktreeID: req.GetWorktreeId(), BaseRef: req.GetBaseRef(), FilePath: req.GetFilePath(), OldPath: req.GetOldPath(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoFileDiff(result), nil
+}
+
+func (s *Server) SubmoduleStatus(ctx context.Context, req *gitgatewayv1.SubmoduleStatusRequest) (*gitgatewayv1.GetStatusResponse, error) {
+	result, err := s.submoduleStatus.Execute(ctx, usecase.SubmoduleStatusInput{
+		WorktreeID: req.GetWorktreeId(), SubmodulePath: req.GetSubmodulePath(), Area: req.GetArea(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.GetStatusResponse{Branch: result.Branch, Files: toProtoFileStatuses(result.Files)}, nil
+}
+
+func (s *Server) Fetch(ctx context.Context, req *gitgatewayv1.FetchRequest) (*gitgatewayv1.FetchResponse, error) {
+	result, err := s.fetch.Execute(ctx, usecase.FetchInput{
+		WorktreeID: req.GetWorktreeId(), PushTarget: fromProtoPushTarget(req.GetPushTarget()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.FetchResponse{Success: result.Success}, nil
 }
 
 // ── Group D — remote (TASK-210, shippable-now subset) ────────────────────
@@ -776,6 +868,28 @@ func toProtoCommitRefs(commits []domain.CommitRef) []*gitgatewayv1.CommitRef {
 		})
 	}
 	return out
+}
+
+// toProtoChangeEntries translates domain.GitChangeEntry (CommitCompare/
+// BranchCompare's real per-file shape) to its proto message-slice
+// equivalent — mirrors toProtoFileStatuses.
+func toProtoChangeEntries(entries []domain.GitChangeEntry) []*gitgatewayv1.GitChangeEntry {
+	out := make([]*gitgatewayv1.GitChangeEntry, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, &gitgatewayv1.GitChangeEntry{
+			Path: e.Path, Status: e.Status, OldPath: e.OldPath, Added: int32(e.Added), Removed: int32(e.Removed),
+		})
+	}
+	return out
+}
+
+// toProtoFileDiff translates domain.FileDiffResult (CommitDiff/BranchDiff's
+// real per-file diff shape) to its proto message equivalent.
+func toProtoFileDiff(result domain.FileDiffResult) *gitgatewayv1.FileDiffResponse {
+	return &gitgatewayv1.FileDiffResponse{
+		Kind: result.Kind, OriginalContent: result.OriginalContent, ModifiedContent: result.ModifiedContent,
+		OriginalIsBinary: result.OriginalIsBinary, ModifiedIsBinary: result.ModifiedIsBinary,
+	}
 }
 
 // toFileGRPCStatus maps file-I/O usecase errors to a gRPC status. The

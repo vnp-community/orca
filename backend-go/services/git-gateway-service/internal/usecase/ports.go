@@ -82,16 +82,76 @@ type GitExecutor interface {
 	// ForkSync (TASK-209, shippable-now) — expectedUpstream is required,
 	// the real agent rejects calls without it.
 	ForkSync(ctx context.Context, repoPath, expectedUpstream string) (domain.ForkSyncStatus, error)
-	// UpstreamStatus (TASK-209) — pushTarget is a placeholder string field,
-	// see SOL-032 §0 open question #1. Still needs TASK-227 for relay
-	// reachability, unlike this group's other 3 shippable-now methods.
-	UpstreamStatus(ctx context.Context, repoPath, pushTarget string) (domain.UpstreamStatus, error)
+	// UpstreamStatus (TASK-209) — pushTarget is now the real, structured
+	// domain.PushTargetInput (nil = let the agent resolve the worktree's
+	// configured push target) instead of the original placeholder string
+	// field, now that TASK-207 built PushTargetInput for real (SOL-032 §0
+	// open question #1 resolved for this method the same way FastForward's
+	// already was). Still needs TASK-227 for relay reachability, unlike
+	// this group's other 3 shippable-now methods.
+	UpstreamStatus(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.UpstreamStatus, error)
 
 	// RemoteCommitURL/RemoteFileURL (TASK-210, shippable-now) — pure local
 	// string construction from the worktree's configured remote URL, no
 	// agent method on either side. See TASK-210's contract correction.
 	RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error)
 	RemoteFileURL(ctx context.Context, repoPath, path, ref string) (string, error)
+	// Fetch (TASK-210) runs `git fetch --prune [remote]` — the real agent
+	// always prunes and has no separate prune flag; pushTarget is optional
+	// and only its RemoteName is consulted for which remote to fetch (see
+	// localgit.Executor.Fetch and RelayExecutor.Fetch doc comments). Needed
+	// TASK-227 for relay reachability and PushTargetInput for real (both
+	// now resolved, unblocking this method per TASK-210's own contract
+	// correction).
+	Fetch(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.SimpleResult, error)
+
+	// ── Group C — real compare/diff/submodule shapes (TASK-209's Contract
+	// correction section resolved via specs/agent/api/agent-rpc-catalog-git-fs.md
+	// lines 49-55/143-147 and the real handler source cited on each method
+	// below — not the two-arbitrary-refs / whole-commit / list-every-submodule
+	// shapes TASK-209's original design incorrectly sketched). ─────────────
+
+	// CommitCompare diffs ONE commit against its own parent (or the empty
+	// tree for a root commit) — matches git.commitCompare exactly
+	// (agent/src/relay/git-handler-commit-diff-ops.ts:15-122,
+	// agent/src/relay/git-handler.ts:915-919). commitID must be a full
+	// 40/64-hex object id (assertFullGitObjectId).
+	CommitCompare(ctx context.Context, repoPath, commitID string) (domain.CommitCompareResult, error)
+	// BranchCompare diffs current HEAD against ONE baseRef's merge-base —
+	// matches git.branchCompare exactly (agent/src/relay/git-handler-ops.ts:124-214,
+	// agent/src/relay/git-handler.ts:891-913). baseRef must not start with
+	// "-" (the real agent rejects that to avoid flag injection).
+	BranchCompare(ctx context.Context, repoPath, baseRef string) (domain.BranchCompareResult, error)
+	// CommitDiff is a single required file's before/after content at one
+	// commit vs. its (optional) parent — matches git.commitDiff exactly
+	// (agent/src/relay/git-handler-commit-diff-ops.ts:124-160,
+	// agent/src/relay/git-handler.ts:1245-1265). Same class of per-file fix
+	// as GetDiff's own TASK-228 correction: the original TASK-209 design had
+	// no filePath at all and assumed a whole-commit diff. parentOID empty =
+	// root commit (diffed against the empty tree via oldPath/filePath at
+	// the empty blob).
+	CommitDiff(ctx context.Context, repoPath, commitOID, parentOID, filePath, oldPath string) (domain.FileDiffResult, error)
+	// BranchDiff is a single required file's before/after content vs. one
+	// baseRef's merge-base — matches git.branchDiff exactly
+	// (agent/src/relay/git-handler-ops.ts:218-288,
+	// agent/src/relay/git-handler.ts:1213-1243). Same per-file-required fix
+	// as CommitDiff, plus the same base-ref-only-vs-two-sided fix as
+	// BranchCompare.
+	BranchDiff(ctx context.Context, repoPath, baseRef, filePath, oldPath string) (domain.FileDiffResult, error)
+	// SubmoduleStatus operates on ONE submodule per call — matches
+	// git.submoduleStatus exactly (agent/src/relay/agent-git-handler-extended.ts:196-230,
+	// specs/agent/api/agent-rpc-catalog-git-fs.md:55/123). SOL-032 §0 open
+	// question #3 resolved by reading the real frontend caller
+	// (frontend/src/renderer/src/runtime/runtime-git-client.ts:152-176,
+	// frontend/src/renderer/src/components/right-sidebar/useSourceControlSubmoduleStatus.ts):
+	// the frontend already knows every dirty submodule's path from the
+	// parent git.status response and only ever fetches one submodule's
+	// status on lazy expansion — there is no "list every submodule" caller
+	// to build an aggregation for, so the original TASK-209 repeated-response
+	// design was solving a problem the real frontend doesn't have. area is
+	// "staged" | "untracked" | "unstaged" (default), matching the real
+	// agent's own default.
+	SubmoduleStatus(ctx context.Context, repoPath, submodulePath, area string) (domain.GitStatus, error)
 
 	// Clone and InitRepo create a worktree that doesn't exist yet — unlike
 	// every other GitExecutor method, they are not called with a repoPath

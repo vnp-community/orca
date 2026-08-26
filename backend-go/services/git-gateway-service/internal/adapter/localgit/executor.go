@@ -20,6 +20,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
@@ -220,10 +222,11 @@ func (e *Executor) ForkSync(ctx context.Context, repoPath, expectedUpstream stri
 
 // UpstreamStatus reads the current branch's configured @{upstream}.
 // pushTarget is accepted for signature parity with the relay path (real
-// git.upstreamStatus takes an optional pushTarget) but unused locally —
-// local execution reads the branch's actual git config directly rather
-// than resolving a push target.
-func (e *Executor) UpstreamStatus(ctx context.Context, repoPath, pushTarget string) (domain.UpstreamStatus, error) {
+// git.upstreamStatus takes an optional, now-structured pushTarget per
+// TASK-209/210's contract correction) but unused locally — local execution
+// reads the branch's actual git config directly rather than resolving a
+// push target.
+func (e *Executor) UpstreamStatus(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.UpstreamStatus, error) {
 	upstream, err := e.run(ctx, repoPath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
 	if err != nil {
 		// No upstream configured is a domain outcome, not a Go error.
@@ -836,4 +839,382 @@ func fileStateFromPorcelainCode(code string) domain.FileState {
 	default:
 		return domain.FileStateModified
 	}
+}
+
+// ── Group C — real compare/diff/submodule shapes (TASK-209's Contract
+// correction section, resolved against specs/agent/api/agent-rpc-catalog-git-fs.md
+// and the real handler source cited on each method below) ─────────────────
+
+// fullGitObjectIDPattern matches a full 40 (SHA-1) or 64 (SHA-256) hex
+// object id — mirrors assertFullGitObjectId
+// (agent/src/relay/git-handler-commit-diff-ops.ts:7-13).
+var fullGitObjectIDPattern = regexp.MustCompile(`^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`)
+
+// gitChangeStats holds one path's added/removed line counts, parsed from
+// `git diff --numstat` — mirrors parseNumstat
+// (agent/src/shared/git-uncommitted-line-stats.ts:56-76).
+type gitChangeStats struct {
+	added   int
+	removed int
+}
+
+// parseNumstatOutput parses `git diff --numstat`/`git diff-tree --numstat`
+// output into a per-path lookup.
+func parseNumstatOutput(out string) map[string]gitChangeStats {
+	stats := make(map[string]gitChangeStats)
+	for _, line := range strings.Split(out, "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		added, _ := strconv.Atoi(parts[0])
+		removed, _ := strconv.Atoi(parts[1])
+		stats[parts[2]] = gitChangeStats{added: added, removed: removed}
+	}
+	return stats
+}
+
+// parseChangeStatusChar mirrors parseBranchStatusChar
+// (agent/src/relay/git-handler-utils.ts:15-30).
+func parseChangeStatusChar(c byte) string {
+	switch c {
+	case 'M':
+		return "modified"
+	case 'A':
+		return "added"
+	case 'D':
+		return "deleted"
+	case 'R':
+		return "renamed"
+	case 'C':
+		return "copied"
+	default:
+		return "modified"
+	}
+}
+
+// parseChangeEntries parses `git diff --name-status`/`git diff-tree
+// --name-status` output and joins each path's numstat added/removed counts
+// — mirrors parseBranchDiff (agent/src/relay/git-handler-utils.ts:107-134),
+// shared by CommitCompare and BranchCompare below.
+func parseChangeEntries(nameStatusOut string, stats map[string]gitChangeStats) []domain.GitChangeEntry {
+	var entries []domain.GitChangeEntry
+	for _, line := range strings.Split(nameStatusOut, "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		rawStatus := parts[0]
+		statusChar := byte('M')
+		if len(rawStatus) > 0 {
+			statusChar = rawStatus[0]
+		}
+		status := parseChangeStatusChar(statusChar)
+		var entry domain.GitChangeEntry
+		if strings.HasPrefix(rawStatus, "R") || strings.HasPrefix(rawStatus, "C") {
+			if len(parts) < 3 || parts[2] == "" {
+				continue
+			}
+			entry = domain.GitChangeEntry{Path: parts[2], OldPath: parts[1], Status: status}
+		} else {
+			if len(parts) < 2 || parts[1] == "" {
+				continue
+			}
+			entry = domain.GitChangeEntry{Path: parts[1], Status: status}
+		}
+		if s, ok := stats[entry.Path]; ok {
+			entry.Added = s.added
+			entry.Removed = s.removed
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+// shortSHA truncates sha to git's conventional 7-char abbreviation.
+func shortSHA(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+// firstParentOID parses `git rev-list --parents -n 1 <oid>`'s single-line
+// "<oid> [parent1] [parent2...]" output, returning the first parent (empty
+// for a root commit) — mirrors parseGitRevListFirstParentOid
+// (agent/src/shared/git-rev-list-output.ts).
+func firstParentOID(out string) string {
+	fields := strings.Fields(strings.TrimSpace(out))
+	if len(fields) < 2 {
+		return ""
+	}
+	return fields[1]
+}
+
+// CommitCompare diffs commitID against its own parent (or the empty tree
+// for a root commit) — matches the real agent's git.commitCompare exactly
+// (agent/src/relay/git-handler-commit-diff-ops.ts:15-122,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:50/144), NOT two arbitrary
+// commits as TASK-209's original design assumed. commitID must be a full
+// 40/64-hex object id.
+func (e *Executor) CommitCompare(ctx context.Context, repoPath, commitID string) (domain.CommitCompareResult, error) {
+	if !fullGitObjectIDPattern.MatchString(commitID) {
+		return domain.CommitCompareResult{}, fmt.Errorf("localgit: commitId must be a full git object id")
+	}
+	commitOut, err := e.run(ctx, repoPath, "rev-parse", "--verify", "--end-of-options", commitID+"^{commit}")
+	if err != nil {
+		return domain.CommitCompareResult{
+			CompareRef: commitID, BaseRef: "parent", Status: "invalid-commit",
+			ErrorMessage: fmt.Sprintf("Commit %s could not be resolved in this repository.", commitID),
+		}, nil
+	}
+	commitOID := strings.TrimSpace(commitOut)
+	result := domain.CommitCompareResult{
+		CommitOID: commitOID, CompareRef: shortSHA(commitOID), BaseRef: "empty tree", Status: "ready",
+	}
+	parentsOut, err := e.run(ctx, repoPath, "rev-list", "--parents", "-n", "1", commitOID)
+	if err != nil {
+		result.Status, result.ErrorMessage = "error", err.Error()
+		return result, nil
+	}
+	parentOID := firstParentOID(parentsOut)
+	result.ParentOID = parentOID
+	if parentOID != "" {
+		result.BaseRef = shortSHA(parentOID)
+	}
+	var nameStatusArgs, numstatArgs []string
+	// Why: root commits have no parent tree; diff-tree --root asks git to
+	// compare against the repository's empty tree without hardcoding hash format.
+	if parentOID != "" {
+		nameStatusArgs = []string{"-c", "core.quotePath=false", "diff", "--name-status", "-M", "-C", parentOID, commitOID}
+		numstatArgs = []string{"-c", "core.quotePath=false", "diff", "--numstat", "-M", "-C", parentOID, commitOID}
+	} else {
+		nameStatusArgs = []string{"-c", "core.quotePath=false", "diff-tree", "--root", "--no-commit-id", "--name-status", "-r", "-M", "-C", commitOID}
+		numstatArgs = []string{"-c", "core.quotePath=false", "diff-tree", "--root", "--no-commit-id", "--numstat", "-r", "-M", "-C", commitOID}
+	}
+	nameStatusOut, err := e.run(ctx, repoPath, nameStatusArgs...)
+	if err != nil {
+		result.Status, result.ErrorMessage = "error", err.Error()
+		return result, nil
+	}
+	numstatOut, err := e.run(ctx, repoPath, numstatArgs...)
+	if err != nil {
+		result.Status, result.ErrorMessage = "error", err.Error()
+		return result, nil
+	}
+	result.Entries = parseChangeEntries(nameStatusOut, parseNumstatOutput(numstatOut))
+	result.ChangedFiles = len(result.Entries)
+	return result, nil
+}
+
+// BranchCompare diffs current HEAD against ONE baseRef's merge-base —
+// matches the real agent's git.branchCompare exactly
+// (agent/src/relay/git-handler-ops.ts:124-214,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:49/143), NOT two arbitrary
+// branches as TASK-209's original design assumed. baseRef must not start
+// with "-" (flag-injection guard, matching git-handler.ts:894-898).
+func (e *Executor) BranchCompare(ctx context.Context, repoPath, baseRef string) (domain.BranchCompareResult, error) {
+	if strings.HasPrefix(baseRef, "-") {
+		return domain.BranchCompareResult{}, fmt.Errorf(`localgit: base ref must not start with "-"`)
+	}
+	result := domain.BranchCompareResult{BaseRef: baseRef, CompareRef: "HEAD", Status: "loading"}
+	if branchOut, err := e.run(ctx, repoPath, "branch", "--show-current"); err == nil {
+		if branch := strings.TrimSpace(branchOut); branch != "" {
+			result.CompareRef = branch
+		}
+	}
+	headOut, headErr := e.run(ctx, repoPath, "rev-parse", "--verify", "HEAD")
+	if headErr != nil {
+		// Why: new remote worktrees can be on an unborn branch until the first
+		// commit — resolving baseRef alone (no committed branch changes yet)
+		// avoids surfacing this as a compare error.
+		if baseOut, err := e.run(ctx, repoPath, "rev-parse", "--verify", baseRef); err == nil {
+			result.BaseOID = strings.TrimSpace(baseOut)
+			result.Status = "ready"
+			return result, nil
+		}
+		result.Status = "unborn-head"
+		result.ErrorMessage = "This branch does not have a committed HEAD yet, so compare-to-base is unavailable."
+		return result, nil
+	}
+	result.HeadOID = strings.TrimSpace(headOut)
+	baseOut, err := e.run(ctx, repoPath, "rev-parse", "--verify", baseRef)
+	if err != nil {
+		result.Status = "invalid-base"
+		result.ErrorMessage = fmt.Sprintf("Base ref %s could not be resolved in this repository.", baseRef)
+		return result, nil
+	}
+	result.BaseOID = strings.TrimSpace(baseOut)
+	mergeBaseOut, err := e.run(ctx, repoPath, "merge-base", result.BaseOID, result.HeadOID)
+	if err != nil {
+		result.Status = "no-merge-base"
+		result.ErrorMessage = fmt.Sprintf("This branch and %s do not share a merge base, so compare-to-base is unavailable.", baseRef)
+		return result, nil
+	}
+	result.MergeBase = strings.TrimSpace(mergeBaseOut)
+	nameStatusOut, err := e.run(ctx, repoPath, "-c", "core.quotePath=false", "diff", "--name-status", "-M", "-C", result.MergeBase, result.HeadOID)
+	if err != nil {
+		result.Status, result.ErrorMessage = "error", err.Error()
+		return result, nil
+	}
+	numstatOut, err := e.run(ctx, repoPath, "-c", "core.quotePath=false", "diff", "--numstat", "-M", "-C", result.MergeBase, result.HeadOID)
+	if err != nil {
+		result.Status, result.ErrorMessage = "error", err.Error()
+		return result, nil
+	}
+	result.Entries = parseChangeEntries(nameStatusOut, parseNumstatOutput(numstatOut))
+	result.ChangedFiles = len(result.Entries)
+	if countOut, err := e.run(ctx, repoPath, "rev-list", "--count", result.BaseOID+".."+result.HeadOID); err == nil {
+		if n, convErr := strconv.Atoi(strings.TrimSpace(countOut)); convErr == nil {
+			result.CommitsAhead = n
+		}
+	}
+	result.Status = "ready"
+	return result, nil
+}
+
+// binarySniffBytes matches the real agent's isBinaryBuffer heuristic
+// (agent/src/shared/binary-buffer.ts:4-12): a NUL byte within the first
+// 8192 bytes marks content as binary.
+const binarySniffBytes = 8192
+
+func isBinaryContent(content string) bool {
+	n := len(content)
+	if n > binarySniffBytes {
+		n = binarySniffBytes
+	}
+	return strings.IndexByte(content[:n], 0) >= 0
+}
+
+// readBlobAtRef runs `git show <ref>:<path>` and classifies the result as
+// binary/text — mirrors readBlobAtOid (agent/src/relay/git-handler-ops.ts:26-43).
+// A failed lookup (path doesn't exist at ref, e.g. a newly-added file with
+// no parent-side blob) returns empty, non-binary content, matching the real
+// agent's own catch-and-default-empty behavior.
+func (e *Executor) readBlobAtRef(ctx context.Context, repoPath, ref, path string) (content string, isBinary bool) {
+	gitPath := strings.ReplaceAll(path, "\\", "/")
+	out, err := e.run(ctx, repoPath, "show", "--end-of-options", ref+":"+gitPath)
+	if err != nil {
+		return "", false
+	}
+	return out, isBinaryContent(out)
+}
+
+// buildFileDiffResult mirrors buildDiffResult
+// (agent/src/relay/git-diff-result.ts:5-38). Binary content is left empty
+// even for a previewable image/PDF extension — a deliberate simplification
+// vs. the real agent's base64-encoded preview payload, since a raw binary
+// blob cannot round-trip through a protobuf string field; consistent with
+// this service's existing not-full-parity precedent (see domain.GitStatus's
+// doc comment).
+func buildFileDiffResult(originalContent, modifiedContent string, originalIsBinary, modifiedIsBinary bool) domain.FileDiffResult {
+	if originalIsBinary || modifiedIsBinary {
+		return domain.FileDiffResult{Kind: "binary", OriginalIsBinary: originalIsBinary, ModifiedIsBinary: modifiedIsBinary}
+	}
+	return domain.FileDiffResult{Kind: "text", OriginalContent: originalContent, ModifiedContent: modifiedContent}
+}
+
+// CommitDiff returns one required file's before/after content at commitOID
+// vs. its (optional) parentOID — matches the real agent's git.commitDiff
+// exactly (agent/src/relay/git-handler-commit-diff-ops.ts:124-160,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:52/146). Same class of
+// per-file-required fix as GetDiff's own TASK-228 correction — the original
+// TASK-209 design had no filePath at all and assumed a whole-commit diff.
+// parentOID == "" means a root commit: the "before" side is empty (diffed
+// against the empty tree), matching commitDiffEntry's own
+// undefined-parentOid branch. commitOID/parentOID must be full 40/64-hex
+// object ids.
+func (e *Executor) CommitDiff(ctx context.Context, repoPath, commitOID, parentOID, filePath, oldPath string) (domain.FileDiffResult, error) {
+	if !fullGitObjectIDPattern.MatchString(commitOID) {
+		return domain.FileDiffResult{}, fmt.Errorf("localgit: commitOid must be a full git object id")
+	}
+	if parentOID != "" && !fullGitObjectIDPattern.MatchString(parentOID) {
+		return domain.FileDiffResult{}, fmt.Errorf("localgit: parentOid must be a full git object id")
+	}
+	left := oldPath
+	if left == "" {
+		left = filePath
+	}
+	var originalContent string
+	var originalIsBinary bool
+	if parentOID != "" {
+		originalContent, originalIsBinary = e.readBlobAtRef(ctx, repoPath, parentOID, left)
+	}
+	modifiedContent, modifiedIsBinary := e.readBlobAtRef(ctx, repoPath, commitOID, filePath)
+	return buildFileDiffResult(originalContent, modifiedContent, originalIsBinary, modifiedIsBinary), nil
+}
+
+// BranchDiff returns one required file's before/after content between HEAD
+// and baseRef's merge-base — matches the real agent's git.branchDiff
+// exactly (agent/src/relay/git-handler-ops.ts:218-288,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:51/145). Same
+// per-file-required fix as CommitDiff, plus the same base-ref-only-vs-two-sided
+// fix as BranchCompare. baseRef must not start with "-" (same
+// flag-injection guard as BranchCompare).
+func (e *Executor) BranchDiff(ctx context.Context, repoPath, baseRef, filePath, oldPath string) (domain.FileDiffResult, error) {
+	if strings.HasPrefix(baseRef, "-") {
+		return domain.FileDiffResult{}, fmt.Errorf(`localgit: base ref must not start with "-"`)
+	}
+	headOut, err := e.run(ctx, repoPath, "rev-parse", "--verify", "HEAD")
+	if err != nil {
+		return domain.FileDiffResult{}, err
+	}
+	headOID := strings.TrimSpace(headOut)
+	baseOut, err := e.run(ctx, repoPath, "rev-parse", "--verify", baseRef)
+	if err != nil {
+		return domain.FileDiffResult{}, err
+	}
+	mergeBaseOut, err := e.run(ctx, repoPath, "merge-base", strings.TrimSpace(baseOut), headOID)
+	if err != nil {
+		return domain.FileDiffResult{}, err
+	}
+	mergeBase := strings.TrimSpace(mergeBaseOut)
+	left := oldPath
+	if left == "" {
+		left = filePath
+	}
+	originalContent, originalIsBinary := e.readBlobAtRef(ctx, repoPath, mergeBase, left)
+	modifiedContent, modifiedIsBinary := e.readBlobAtRef(ctx, repoPath, headOID, filePath)
+	return buildFileDiffResult(originalContent, modifiedContent, originalIsBinary, modifiedIsBinary), nil
+}
+
+// SubmoduleStatus runs `git status --porcelain=v1 -b` inside the resolved
+// submodule directory — matches the real agent's per-submodule
+// git.submoduleStatus exactly (agent/src/relay/agent-git-handler-extended.ts:196-230,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:55/123), reusing GetStatus's
+// own porcelain parser the same way the real agent's getStatusOp is reused
+// for both the top-level worktree and a submodule. area is accepted for
+// signature parity with the real contract but doesn't change the porcelain
+// call locally, and the real agent's own commit-range-diff enrichment for a
+// moved submodule pointer isn't replicated here — a deliberate
+// simplification, consistent with GetStatus's own not-full-parity
+// precedent (see domain.GitStatus's doc comment).
+func (e *Executor) SubmoduleStatus(ctx context.Context, repoPath, submodulePath, area string) (domain.GitStatus, error) {
+	submoduleDir := filepath.Join(repoPath, submodulePath)
+	out, err := e.run(ctx, submoduleDir, "status", "--porcelain=v1", "-b")
+	if err != nil {
+		return domain.GitStatus{}, err
+	}
+	return parsePorcelainStatus(out), nil
+}
+
+// Fetch runs `git fetch --prune [remote]` — matches the real agent's
+// git.fetch exactly (specs/agent/api/agent-rpc-catalog-git-fs.md:155): it
+// always prunes, with no separate prune flag. pushTarget's RemoteName (if
+// any) is the only field consulted — pushTarget == nil or an empty
+// RemoteName lets `git fetch --prune` use the worktree's default remote,
+// mirroring the real agent's own undefined-pushTarget fallback
+// (agent/src/relay/git-handler-push-target.ts:164-166).
+func (e *Executor) Fetch(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.SimpleResult, error) {
+	args := []string{"fetch", "--prune"}
+	if pushTarget != nil && pushTarget.RemoteName != "" {
+		args = append(args, pushTarget.RemoteName)
+	}
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
 }

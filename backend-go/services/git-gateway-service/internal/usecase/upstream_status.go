@@ -7,11 +7,14 @@ import (
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
+// UpstreamStatusInput's PushTarget is optional (nil = let the executor
+// resolve the worktree's configured push target) — now the real, structured
+// domain.PushTargetInput (TASK-207's type), replacing TASK-209's original
+// placeholder string field per SOL-032 §0 open question #1's resolution.
+// See domain.PushTargetInput's doc comment.
 type UpstreamStatusInput struct {
 	WorktreeID string
-	// PushTarget is a placeholder string field — see SOL-032 §0 open
-	// question #1. Optional.
-	PushTarget string
+	PushTarget *domain.PushTargetInput
 }
 
 // UpstreamStatus is the one method in TASK-209's history/compare group
