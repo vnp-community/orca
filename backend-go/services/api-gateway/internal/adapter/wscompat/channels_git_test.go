@@ -47,6 +47,17 @@ type fakeGitGatewayClient struct {
 	listAllFilesFunc                   func(ctx context.Context, in *gitgatewayv1.ListAllFilesRequest) (*gitgatewayv1.ListAllFilesResponse, error)
 	listMarkdownDocumentsFunc          func(ctx context.Context, in *gitgatewayv1.ListMarkdownDocumentsRequest) (*gitgatewayv1.ListMarkdownDocumentsResponse, error)
 	copyFileFunc                       func(ctx context.Context, in *gitgatewayv1.CopyFileRequest) (*gitgatewayv1.CopyFileResponse, error)
+
+	checkoutFunc          func(ctx context.Context, in *gitgatewayv1.CheckoutRequest) (*gitgatewayv1.CheckoutResponse, error)
+	listLocalBranchesFunc func(ctx context.Context, in *gitgatewayv1.ListLocalBranchesRequest) (*gitgatewayv1.ListLocalBranchesResponse, error)
+	fastForwardFunc       func(ctx context.Context, in *gitgatewayv1.FastForwardRequest) (*gitgatewayv1.FastForwardResponse, error)
+	rebaseFromBaseFunc    func(ctx context.Context, in *gitgatewayv1.RebaseFromBaseRequest) (*gitgatewayv1.RebaseFromBaseResponse, error)
+	abortRebaseFunc       func(ctx context.Context, in *gitgatewayv1.AbortRebaseRequest) (*gitgatewayv1.AbortRebaseResponse, error)
+	abortMergeFunc        func(ctx context.Context, in *gitgatewayv1.AbortMergeRequest) (*gitgatewayv1.AbortMergeResponse, error)
+	conflictOperationFunc func(ctx context.Context, in *gitgatewayv1.ConflictOperationRequest) (*gitgatewayv1.ConflictOperationResponse, error)
+	resolveConflictFunc   func(ctx context.Context, in *gitgatewayv1.ResolveConflictRequest) (*gitgatewayv1.ResolveConflictResponse, error)
+	discardFunc           func(ctx context.Context, in *gitgatewayv1.DiscardRequest) (*gitgatewayv1.DiscardResponse, error)
+	bulkDiscardFunc       func(ctx context.Context, in *gitgatewayv1.BulkDiscardRequest) (*gitgatewayv1.BulkDiscardResponse, error)
 }
 
 func (f *fakeGitGatewayClient) GetDiff(ctx context.Context, in *gitgatewayv1.GetDiffRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetDiffResponse, error) {
@@ -136,6 +147,36 @@ func (f *fakeGitGatewayClient) ListMarkdownDocuments(ctx context.Context, in *gi
 func (f *fakeGitGatewayClient) CopyFile(ctx context.Context, in *gitgatewayv1.CopyFileRequest, _ ...grpc.CallOption) (*gitgatewayv1.CopyFileResponse, error) {
 	return f.copyFileFunc(ctx, in)
 }
+func (f *fakeGitGatewayClient) Checkout(ctx context.Context, in *gitgatewayv1.CheckoutRequest, _ ...grpc.CallOption) (*gitgatewayv1.CheckoutResponse, error) {
+	return f.checkoutFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) ListLocalBranches(ctx context.Context, in *gitgatewayv1.ListLocalBranchesRequest, _ ...grpc.CallOption) (*gitgatewayv1.ListLocalBranchesResponse, error) {
+	return f.listLocalBranchesFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) FastForward(ctx context.Context, in *gitgatewayv1.FastForwardRequest, _ ...grpc.CallOption) (*gitgatewayv1.FastForwardResponse, error) {
+	return f.fastForwardFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) RebaseFromBase(ctx context.Context, in *gitgatewayv1.RebaseFromBaseRequest, _ ...grpc.CallOption) (*gitgatewayv1.RebaseFromBaseResponse, error) {
+	return f.rebaseFromBaseFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) AbortRebase(ctx context.Context, in *gitgatewayv1.AbortRebaseRequest, _ ...grpc.CallOption) (*gitgatewayv1.AbortRebaseResponse, error) {
+	return f.abortRebaseFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) AbortMerge(ctx context.Context, in *gitgatewayv1.AbortMergeRequest, _ ...grpc.CallOption) (*gitgatewayv1.AbortMergeResponse, error) {
+	return f.abortMergeFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) ConflictOperation(ctx context.Context, in *gitgatewayv1.ConflictOperationRequest, _ ...grpc.CallOption) (*gitgatewayv1.ConflictOperationResponse, error) {
+	return f.conflictOperationFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) ResolveConflict(ctx context.Context, in *gitgatewayv1.ResolveConflictRequest, _ ...grpc.CallOption) (*gitgatewayv1.ResolveConflictResponse, error) {
+	return f.resolveConflictFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) Discard(ctx context.Context, in *gitgatewayv1.DiscardRequest, _ ...grpc.CallOption) (*gitgatewayv1.DiscardResponse, error) {
+	return f.discardFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) BulkDiscard(ctx context.Context, in *gitgatewayv1.BulkDiscardRequest, _ ...grpc.CallOption) (*gitgatewayv1.BulkDiscardResponse, error) {
+	return f.bulkDiscardFunc(ctx, in)
+}
 
 func TestGitDiffChannel_ThreadsFilePathThrough(t *testing.T) {
 	var got *gitgatewayv1.GetDiffRequest
@@ -175,6 +216,225 @@ func TestGitCommitChannel_Success(t *testing.T) {
 	resp, ok := result.(*gitgatewayv1.CommitResponse)
 	if !ok || resp.GetCommitSha() != "abc123" {
 		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+// ── TASK-207/TASK-212: Group A — branch/ref operations ─────────────────────
+
+func TestGitCheckoutChannel_NoCreateField(t *testing.T) {
+	var got *gitgatewayv1.CheckoutRequest
+	fake := &fakeGitGatewayClient{
+		checkoutFunc: func(ctx context.Context, in *gitgatewayv1.CheckoutRequest) (*gitgatewayv1.CheckoutResponse, error) {
+			got = in
+			return &gitgatewayv1.CheckoutResponse{Success: true, Branch: "feature"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	// Sending a "create" field (the stale TASK-212 sketch's shape) must be
+	// harmlessly ignored — the redesigned args struct has no such field.
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.checkout",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature", "create": true}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetBranch() != "feature" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestGitLocalBranchesChannel_ReturnsUnwrappedBranches(t *testing.T) {
+	fake := &fakeGitGatewayClient{
+		listLocalBranchesFunc: func(ctx context.Context, in *gitgatewayv1.ListLocalBranchesRequest) (*gitgatewayv1.ListLocalBranchesResponse, error) {
+			return &gitgatewayv1.ListLocalBranchesResponse{
+				Branches: []*gitgatewayv1.BranchInfo{{Name: "main", IsCurrent: true}},
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.localBranches",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	branches, ok := result.([]*gitgatewayv1.BranchInfo)
+	if !ok || len(branches) != 1 || branches[0].GetName() != "main" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitFastForwardChannel_ThreadsStructuredPushTarget(t *testing.T) {
+	var got *gitgatewayv1.FastForwardRequest
+	fake := &fakeGitGatewayClient{
+		fastForwardFunc: func(ctx context.Context, in *gitgatewayv1.FastForwardRequest) (*gitgatewayv1.FastForwardResponse, error) {
+			got = in
+			return &gitgatewayv1.FastForwardResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.fastForward",
+		argsJSON(t, map[string]any{
+			"worktreeId": "wt-1",
+			"pushTarget": map[string]any{"remoteName": "origin", "branchName": "main"},
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetPushTarget().GetRemoteName() != "origin" || got.GetPushTarget().GetBranchName() != "main" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestGitFastForwardChannel_NilPushTarget_Allowed(t *testing.T) {
+	var got *gitgatewayv1.FastForwardRequest
+	fake := &fakeGitGatewayClient{
+		fastForwardFunc: func(ctx context.Context, in *gitgatewayv1.FastForwardRequest) (*gitgatewayv1.FastForwardResponse, error) {
+			got = in
+			return &gitgatewayv1.FastForwardResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.fastForward",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetPushTarget() != nil {
+		t.Errorf("expected nil push target, got %+v", got.GetPushTarget())
+	}
+}
+
+func TestGitRebaseFromBaseChannel_Success(t *testing.T) {
+	fake := &fakeGitGatewayClient{
+		rebaseFromBaseFunc: func(ctx context.Context, in *gitgatewayv1.RebaseFromBaseRequest) (*gitgatewayv1.RebaseFromBaseResponse, error) {
+			if in.GetBaseBranch() != "main" {
+				t.Errorf("expected baseBranch=main, got %q", in.GetBaseBranch())
+			}
+			return &gitgatewayv1.RebaseFromBaseResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.rebaseFromBase",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseBranch": "main"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGitAbortRebaseAndAbortMergeChannels_Success(t *testing.T) {
+	fake := &fakeGitGatewayClient{
+		abortRebaseFunc: func(ctx context.Context, in *gitgatewayv1.AbortRebaseRequest) (*gitgatewayv1.AbortRebaseResponse, error) {
+			return &gitgatewayv1.AbortRebaseResponse{Success: true}, nil
+		},
+		abortMergeFunc: func(ctx context.Context, in *gitgatewayv1.AbortMergeRequest) (*gitgatewayv1.AbortMergeResponse, error) {
+			return &gitgatewayv1.AbortMergeResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	for _, channel := range []string{"git.abortRebase", "git.abortMerge"} {
+		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, channel,
+			argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", channel, err)
+		}
+	}
+}
+
+func TestGitConflictOperationChannel_IsDetectorOnly(t *testing.T) {
+	var got *gitgatewayv1.ConflictOperationRequest
+	fake := &fakeGitGatewayClient{
+		conflictOperationFunc: func(ctx context.Context, in *gitgatewayv1.ConflictOperationRequest) (*gitgatewayv1.ConflictOperationResponse, error) {
+			got = in
+			return &gitgatewayv1.ConflictOperationResponse{Operation: "rebase"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	// Sending path/operation (the stale TASK-212 sketch's shape) must be
+	// harmlessly ignored — the redesigned args struct has no such fields.
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.conflictOperation",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt", "operation": "ours"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.ConflictOperationResponse)
+	if !ok || resp.GetOperation() != "rebase" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitResolveConflictChannel_Success(t *testing.T) {
+	var got *gitgatewayv1.ResolveConflictRequest
+	fake := &fakeGitGatewayClient{
+		resolveConflictFunc: func(ctx context.Context, in *gitgatewayv1.ResolveConflictRequest) (*gitgatewayv1.ResolveConflictResponse, error) {
+			got = in
+			return &gitgatewayv1.ResolveConflictResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.resolveConflict",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt", "operation": "ours"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetPath() != "a.txt" || got.GetOperation() != "ours" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestGitResolveConflictChannel_UnsupportedOverRelay_ErrorPassesThrough(t *testing.T) {
+	wantErr := errors.New("failed_precondition: relay target does not support per-file conflict resolution")
+	fake := &fakeGitGatewayClient{
+		resolveConflictFunc: func(ctx context.Context, in *gitgatewayv1.ResolveConflictRequest) (*gitgatewayv1.ResolveConflictResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.resolveConflict",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt", "operation": "ours"}))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected the FAILED_PRECONDITION error to pass through, got %v", err)
+	}
+}
+
+func TestGitDiscardAndBulkDiscardChannels_Success(t *testing.T) {
+	fake := &fakeGitGatewayClient{
+		discardFunc: func(ctx context.Context, in *gitgatewayv1.DiscardRequest) (*gitgatewayv1.DiscardResponse, error) {
+			return &gitgatewayv1.DiscardResponse{Success: true}, nil
+		},
+		bulkDiscardFunc: func(ctx context.Context, in *gitgatewayv1.BulkDiscardRequest) (*gitgatewayv1.BulkDiscardResponse, error) {
+			return &gitgatewayv1.BulkDiscardResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.discard",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt"})); err != nil {
+		t.Fatalf("git.discard: unexpected error: %v", err)
+	}
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.bulkDiscard",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "paths": []string{"a.txt", "b.txt"}})); err != nil {
+		t.Fatalf("git.bulkDiscard: unexpected error: %v", err)
 	}
 }
 

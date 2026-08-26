@@ -55,6 +55,31 @@ type fakeGitExecutor struct {
 	calledListWorktreePaths      bool
 	calledForceDeleteBranch      bool
 
+	// Group A — branch/ref operations (TASK-207)
+	calledCheckout           bool
+	calledListLocalBranches  bool
+	calledFastForward        bool
+	calledRebaseFromBase     bool
+	calledAbortRebase        bool
+	calledAbortMerge         bool
+	calledConflictOperation  bool
+	calledResolveConflict    bool
+	calledDiscard            bool
+	calledBulkDiscard        bool
+	gotFastForwardPushTarget *domain.PushTargetInput
+	gotBaseRef               string
+	checkoutResult           domain.CheckoutResult
+	checkoutErr              error
+	branchInfos              []domain.BranchInfo
+	listLocalBranchesErr     error
+	fastForwardErr           error
+	rebaseFromBaseErr        error
+	conflictOperationResult  string
+	conflictOperationErr     error
+	resolveConflictErr       error
+	discardErr               error
+	bulkDiscardErr           error
+
 	gotRepoPath string
 	gotFilePath string
 
@@ -321,6 +346,103 @@ func (f *fakeGitExecutor) ForceDeleteBranch(ctx context.Context, repoPath, branc
 	f.calledForceDeleteBranch = true
 	f.gotRepoPath = repoPath
 	return f.forceDeleteBranchErr
+}
+
+// ── Group A — branch/ref operations (TASK-207) ─────────────────────────────
+
+func (f *fakeGitExecutor) Checkout(ctx context.Context, repoPath, branch string) (domain.CheckoutResult, error) {
+	f.calledCheckout = true
+	f.gotRepoPath = repoPath
+	if f.checkoutErr != nil {
+		return domain.CheckoutResult{}, f.checkoutErr
+	}
+	if f.checkoutResult != (domain.CheckoutResult{}) {
+		return f.checkoutResult, nil
+	}
+	return domain.CheckoutResult{Success: true, Branch: branch}, nil
+}
+
+func (f *fakeGitExecutor) ListLocalBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error) {
+	f.calledListLocalBranches = true
+	f.gotRepoPath = repoPath
+	if f.listLocalBranchesErr != nil {
+		return nil, f.listLocalBranchesErr
+	}
+	if f.branchInfos != nil {
+		return f.branchInfos, nil
+	}
+	return []domain.BranchInfo{{Name: "main", IsCurrent: true}}, nil
+}
+
+func (f *fakeGitExecutor) FastForward(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.FastForwardResult, error) {
+	f.calledFastForward = true
+	f.gotRepoPath = repoPath
+	f.gotFastForwardPushTarget = pushTarget
+	if f.fastForwardErr != nil {
+		return domain.FastForwardResult{}, f.fastForwardErr
+	}
+	return domain.FastForwardResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) RebaseFromBase(ctx context.Context, repoPath, baseRef string) (domain.RebaseResult, error) {
+	f.calledRebaseFromBase = true
+	f.gotRepoPath = repoPath
+	f.gotBaseRef = baseRef
+	if f.rebaseFromBaseErr != nil {
+		return domain.RebaseResult{}, f.rebaseFromBaseErr
+	}
+	return domain.RebaseResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) AbortRebase(ctx context.Context, repoPath string) (domain.SimpleResult, error) {
+	f.calledAbortRebase = true
+	f.gotRepoPath = repoPath
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) AbortMerge(ctx context.Context, repoPath string) (domain.SimpleResult, error) {
+	f.calledAbortMerge = true
+	f.gotRepoPath = repoPath
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) ConflictOperation(ctx context.Context, repoPath string) (string, error) {
+	f.calledConflictOperation = true
+	f.gotRepoPath = repoPath
+	if f.conflictOperationErr != nil {
+		return "", f.conflictOperationErr
+	}
+	if f.conflictOperationResult != "" {
+		return f.conflictOperationResult, nil
+	}
+	return "unknown", nil
+}
+
+func (f *fakeGitExecutor) ResolveConflict(ctx context.Context, repoPath, path, operation string) (domain.SimpleResult, error) {
+	f.calledResolveConflict = true
+	f.gotRepoPath = repoPath
+	if f.resolveConflictErr != nil {
+		return domain.SimpleResult{}, f.resolveConflictErr
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) Discard(ctx context.Context, repoPath, path string) (domain.SimpleResult, error) {
+	f.calledDiscard = true
+	f.gotRepoPath = repoPath
+	if f.discardErr != nil {
+		return domain.SimpleResult{}, f.discardErr
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) BulkDiscard(ctx context.Context, repoPath string, paths []string) (domain.BulkDiscardResult, error) {
+	f.calledBulkDiscard = true
+	f.gotRepoPath = repoPath
+	if f.bulkDiscardErr != nil {
+		return domain.BulkDiscardResult{}, f.bulkDiscardErr
+	}
+	return domain.BulkDiscardResult{Success: true}, nil
 }
 
 func TestGetStatus_NotConnected_RoutesToLocalExecutor(t *testing.T) {
@@ -827,5 +949,266 @@ func TestDiscoverCommitMessageModels_MissingTenantID_ReturnsError(t *testing.T) 
 	_, err := uc.Execute(context.Background(), DiscoverCommitMessageModelsInput{})
 	if err == nil {
 		t.Fatal("expected error for missing tenant_id")
+	}
+}
+
+// ── TASK-207: Group A — branch/ref operations ───────────────────────────────
+
+func TestCheckout_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewCheckout(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), CheckoutInput{WorktreeID: "wt1", Branch: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledCheckout || local.calledCheckout {
+		t.Error("expected Checkout to route to relay when Connected=true")
+	}
+	if !got.Success || got.Branch != "main" {
+		t.Errorf("unexpected checkout result: %+v", got)
+	}
+}
+
+func TestCheckout_MissingBranch_ReturnsError(t *testing.T) {
+	uc := NewCheckout(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), CheckoutInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing branch")
+	}
+}
+
+func TestListLocalBranches_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{branchInfos: []domain.BranchInfo{{Name: "main", IsCurrent: true}, {Name: "feature/x"}}}
+	uc := NewListLocalBranches(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), ListLocalBranchesInput{WorktreeID: "wt1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledListLocalBranches || local.calledListLocalBranches {
+		t.Error("expected ListLocalBranches to route to relay when Connected=true")
+	}
+	if len(got) != 2 {
+		t.Errorf("unexpected branches: %+v", got)
+	}
+}
+
+func TestListLocalBranches_MissingWorktreeID_ReturnsError(t *testing.T) {
+	uc := NewListLocalBranches(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), ListLocalBranchesInput{})
+	if err == nil {
+		t.Fatal("expected error for missing worktree_id")
+	}
+}
+
+func TestFastForward_RoutesByConnectionState_AndThreadsPushTarget(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewFastForward(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	pushTarget := &domain.PushTargetInput{RemoteName: "origin", BranchName: "main"}
+	got, err := uc.Execute(context.Background(), FastForwardInput{WorktreeID: "wt1", PushTarget: pushTarget})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledFastForward || local.calledFastForward {
+		t.Error("expected FastForward to route to relay when Connected=true")
+	}
+	if relay.gotFastForwardPushTarget != pushTarget {
+		t.Errorf("expected pushTarget to be threaded through, got %+v", relay.gotFastForwardPushTarget)
+	}
+	if !got.Success {
+		t.Errorf("unexpected fast-forward result: %+v", got)
+	}
+}
+
+func TestFastForward_NilPushTarget_Allowed(t *testing.T) {
+	local := &fakeGitExecutor{}
+	uc := NewFastForward(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, &fakeGitExecutor{})
+
+	_, err := uc.Execute(context.Background(), FastForwardInput{WorktreeID: "wt1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.gotFastForwardPushTarget != nil {
+		t.Errorf("expected nil pushTarget to pass through as nil, got %+v", local.gotFastForwardPushTarget)
+	}
+}
+
+func TestRebaseFromBase_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewRebaseFromBase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), RebaseFromBaseInput{WorktreeID: "wt1", BaseRef: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledRebaseFromBase || relay.calledRebaseFromBase {
+		t.Error("expected RebaseFromBase to route to local when Connected=false")
+	}
+	if local.gotBaseRef != "main" {
+		t.Errorf("expected base_ref to be threaded through, got %q", local.gotBaseRef)
+	}
+	if !got.Success {
+		t.Errorf("unexpected rebase result: %+v", got)
+	}
+}
+
+func TestRebaseFromBase_MissingBaseRef_ReturnsError(t *testing.T) {
+	uc := NewRebaseFromBase(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), RebaseFromBaseInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing base_ref")
+	}
+}
+
+func TestAbortRebase_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewAbortRebase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), AbortRebaseInput{WorktreeID: "wt1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledAbortRebase || local.calledAbortRebase {
+		t.Error("expected AbortRebase to route to relay when Connected=true")
+	}
+	if !got.Success {
+		t.Errorf("unexpected abort-rebase result: %+v", got)
+	}
+}
+
+func TestAbortMerge_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewAbortMerge(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), AbortMergeInput{WorktreeID: "wt1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledAbortMerge || relay.calledAbortMerge {
+		t.Error("expected AbortMerge to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected abort-merge result: %+v", got)
+	}
+}
+
+func TestConflictOperation_RoutesByConnectionState_AndReturnsDetectorResult(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{conflictOperationResult: "rebase"}
+	uc := NewConflictOperation(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), ConflictOperationInput{WorktreeID: "wt1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledConflictOperation || local.calledConflictOperation {
+		t.Error("expected ConflictOperation to route to relay when Connected=true")
+	}
+	if got != "rebase" {
+		t.Errorf("expected detector result to pass through, got %q", got)
+	}
+}
+
+func TestConflictOperation_MissingWorktreeID_ReturnsError(t *testing.T) {
+	uc := NewConflictOperation(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), ConflictOperationInput{})
+	if err == nil {
+		t.Fatal("expected error for missing worktree_id")
+	}
+}
+
+func TestResolveConflict_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewResolveConflict(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), ResolveConflictInput{WorktreeID: "wt1", Path: "a.txt", Operation: "ours"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledResolveConflict || relay.calledResolveConflict {
+		t.Error("expected ResolveConflict to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected resolve-conflict result: %+v", got)
+	}
+}
+
+func TestResolveConflict_MissingFields_ReturnsError(t *testing.T) {
+	uc := NewResolveConflict(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	if _, err := uc.Execute(context.Background(), ResolveConflictInput{WorktreeID: "wt1"}); err == nil {
+		t.Fatal("expected error for missing path")
+	}
+	if _, err := uc.Execute(context.Background(), ResolveConflictInput{WorktreeID: "wt1", Path: "a.txt"}); err == nil {
+		t.Fatal("expected error for missing operation")
+	}
+}
+
+func TestResolveConflict_UnsupportedOverRelay_ReturnsFailedPrecondition(t *testing.T) {
+	relay := &fakeGitExecutor{resolveConflictErr: domain.ErrConflictResolveUnsupportedOverRelay}
+	uc := NewResolveConflict(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, &fakeGitExecutor{}, relay)
+
+	_, err := uc.Execute(context.Background(), ResolveConflictInput{WorktreeID: "wt1", Path: "a.txt", Operation: "ours"})
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Kind != apperrors.KindFailedPrecondition {
+		t.Fatalf("expected KindFailedPrecondition AppError, got %v", err)
+	}
+}
+
+func TestDiscard_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewDiscard(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), DiscardInput{WorktreeID: "wt1", Path: "a.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledDiscard || local.calledDiscard {
+		t.Error("expected Discard to route to relay when Connected=true")
+	}
+	if !got.Success {
+		t.Errorf("unexpected discard result: %+v", got)
+	}
+}
+
+func TestDiscard_MissingPath_ReturnsError(t *testing.T) {
+	uc := NewDiscard(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), DiscardInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing path")
+	}
+}
+
+func TestBulkDiscard_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewBulkDiscard(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), BulkDiscardInput{WorktreeID: "wt1", Paths: []string{"a.txt", "b.txt"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledBulkDiscard || relay.calledBulkDiscard {
+		t.Error("expected BulkDiscard to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected bulk-discard result: %+v", got)
+	}
+}
+
+func TestBulkDiscard_MissingPaths_ReturnsError(t *testing.T) {
+	uc := NewBulkDiscard(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), BulkDiscardInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing paths")
 	}
 }

@@ -94,6 +94,26 @@ service GitGatewayService {
   rpc PrefetchCreateBase(PrefetchCreateBaseRequest) returns (PrefetchCreateBaseResponse);
   rpc ResolvePrBase(ResolvePrBaseRequest) returns (ResolveBaseResponse);
   rpc ResolveMrBase(ResolveMrBaseRequest) returns (ResolveBaseResponse);
+
+  // ── Group A — branch/ref operations (TASK-207) ───────────────────────────
+  // 4 of these methods (Checkout/ListLocalBranches/FastForward/
+  // ConflictOperation) needed a genuine shape redesign against the
+  // confirmed real agent contract (specs/agent/api/agent-rpc-catalog-git-fs.md)
+  // rather than the mechanical param rename the other 5 got — see each
+  // message's own doc comment below for citations. ConflictOperation's
+  // original single-RPC design is replaced by two RPCs: ConflictOperation
+  // (a pure detector, matching the real agent) and ResolveConflict (the
+  // per-file resolve op the real agent does not implement).
+  rpc Checkout(CheckoutRequest) returns (CheckoutResponse);
+  rpc ListLocalBranches(ListLocalBranchesRequest) returns (ListLocalBranchesResponse);
+  rpc FastForward(FastForwardRequest) returns (FastForwardResponse);
+  rpc RebaseFromBase(RebaseFromBaseRequest) returns (RebaseFromBaseResponse);
+  rpc AbortRebase(AbortRebaseRequest) returns (AbortRebaseResponse);
+  rpc AbortMerge(AbortMergeRequest) returns (AbortMergeResponse);
+  rpc ConflictOperation(ConflictOperationRequest) returns (ConflictOperationResponse);
+  rpc ResolveConflict(ResolveConflictRequest) returns (ResolveConflictResponse);
+  rpc Discard(DiscardRequest) returns (DiscardResponse);
+  rpc BulkDiscard(BulkDiscardRequest) returns (BulkDiscardResponse);
 }
 
 message GetStatusRequest {
@@ -475,3 +495,157 @@ message PrefetchCreateBaseResponse { string resolved_sha = 1; } // ensures base_
 message ResolvePrBaseRequest { string repo_id = 1; int32 pr_number = 2; }
 message ResolveMrBaseRequest { string repo_id = 1; int32 mr_number = 2; }
 message ResolveBaseResponse  { string base_branch = 1; string base_sha = 2; }
+
+// ── Group A — branch/ref operations (TASK-207) ──────────────────────────────
+
+// Checkout switches to an existing ref. The original design's `create`
+// (git checkout -b) field was dropped: the real agent's git.checkout has no
+// create-branch semantics at all — `git checkout <branch> --` only
+// (specs/agent/api/agent-rpc-catalog-git-fs.md:132,
+// agent/src/relay/git-handler.ts:702-719). A caller that wants
+// checkout-with-create composes it as a separate branch-creation step
+// (e.g. `git.exec` with the `branch` subcommand, whitelisted on both Part A
+// and Part B per that same spec) followed by this RPC — not this RPC's
+// scope.
+message CheckoutRequest {
+  string worktree_id = 1;
+  string branch = 2; // ref to switch to; field named to match the real agent's own param name
+}
+message CheckoutResponse {
+  bool success = 1;
+  string branch = 2; // resolved current branch after the operation
+}
+
+// BranchInfo is one local branch's tracking state. The real agent's own
+// git.localBranches RPC only returns {current, branches[]} (names only,
+// agent-rpc-catalog-git-fs.md:133, agent/src/relay/git-handler.ts:721-744) —
+// this richer per-branch shape is instead composed by RelayExecutor via
+// git.exec's for-each-ref subcommand, confirmed whitelisted with no extra
+// restriction on Part B's stricter exec whitelist — the whitelist
+// RelayExecutor's SSH-relay calls actually reach
+// (agent-rpc-catalog-git-fs.md:203-206). is_remote is always false today:
+// this RPC only lists refs/heads/ (local branches); kept for proto
+// forward-compat with a possible future refs/remotes/ listing.
+message BranchInfo {
+  string name = 1;
+  string upstream = 2; // empty = no upstream configured
+  int32 ahead = 3;
+  int32 behind = 4;
+  bool is_current = 5;
+  bool is_remote = 6;
+}
+message ListLocalBranchesRequest {
+  string worktree_id = 1;
+}
+message ListLocalBranchesResponse {
+  repeated BranchInfo branches = 1;
+}
+
+// PushTargetInput mirrors the real agent's GitPushTarget wire shape
+// (agent/src/shared/types.ts:551-557, validated by
+// agent/src/shared/git-push-target-validation.ts) — the same structured
+// shape push/pull/fetch/fastForward all take on the real contract instead
+// of a bare remote/branch string pair (SOL-032 §0 open question #1).
+// Unset (nil) means "let the agent resolve the worktree's configured push
+// target", matching resolveRelayPushTarget's undefined-pushTarget branch
+// (agent/src/relay/git-handler-push-target.ts:159-166).
+message PushTargetInput {
+  string remote_name = 1;
+  string branch_name = 2;
+  string remote_url = 3;    // optional; validated against a github.com https/ssh clone URL pattern when present
+  bool remote_created = 4;  // true when Orca added this remote while preparing a fork-PR worktree
+}
+
+// FastForward runs a fast-forward-only pull. push_target is optional — see
+// PushTargetInput's doc comment; the real agent's git.fastForward is
+// `pullWithArgs(['--ff-only'])` (agent-rpc-catalog-git-fs.md:160,
+// agent/src/relay/git-handler.ts:1190-1192), taking the same optional
+// pushTarget as push/pull/fetch, not a plain branch string.
+message FastForwardRequest {
+  string worktree_id = 1;
+  PushTargetInput push_target = 2;
+}
+message FastForwardResponse {
+  bool success = 1;
+}
+
+message RebaseFromBaseRequest {
+  string worktree_id = 1;
+  string base_branch = 2;
+}
+message RebaseFromBaseResponse {
+  bool success = 1;
+  bool had_conflicts = 2;
+}
+
+message AbortRebaseRequest {
+  string worktree_id = 1;
+}
+message AbortRebaseResponse {
+  bool success = 1;
+}
+
+// AbortMerge matches git-gateway-service.md §3's own AbortMerge name exactly.
+message AbortMergeRequest {
+  string worktree_id = 1;
+}
+message AbortMergeResponse {
+  bool success = 1;
+}
+
+// ConflictOperation is a DETECTOR ONLY, matching the real agent exactly:
+// worktree_id -> which operation (if any) left the worktree in a
+// conflicted state. The original design conflated this with a per-file
+// resolver — the real git.conflictOperation takes only worktreePath and
+// returns 'merge'|'rebase'|'cherry-pick'|'unknown'
+// (agent-rpc-catalog-git-fs.md:136, agent/src/relay/git-handler.ts:886-889,
+// agent/src/relay/git-handler-status-ops.ts:38-57). See ResolveConflict
+// below for the per-file resolve operation, which the real agent does not
+// implement as one RPC.
+message ConflictOperationRequest {
+  string worktree_id = 1;
+}
+message ConflictOperationResponse {
+  string operation = 1; // "merge" | "rebase" | "cherry-pick" | "unknown"
+}
+
+// ResolveConflict is a git-gateway-service-only composition (ours/theirs/
+// markResolved for one conflicted path) with no real agent RPC backing it
+// — git.exec's Part B whitelist explicitly excludes both `checkout` and
+// `add` (agent-rpc-catalog-git-fs.md:203-227's "Not allowed at all" list),
+// so a relay-connected (SSH) worktree cannot support this operation at all;
+// RelayExecutor returns a typed FailedPrecondition
+// (domain.ErrConflictResolveUnsupportedOverRelay) rather than guessing an
+// unsupported RPC call. Local (unconnected) worktrees run this directly
+// against the host git binary. No confirmed live caller was found in
+// today's frontend (backend/src/main/providers/*.ts has no ours/theirs/
+// markResolved call site) — this exists for the source-control UI to grow
+// into, following the field names (path/operation) the original design
+// sketch used.
+message ResolveConflictRequest {
+  string worktree_id = 1;
+  string path = 2;
+  string operation = 3; // "ours" | "theirs" | "markResolved"
+}
+message ResolveConflictResponse {
+  bool success = 1;
+}
+
+message DiscardRequest {
+  string worktree_id = 1;
+  string path = 2;
+}
+message DiscardResponse {
+  bool success = 1;
+}
+
+// BulkDiscard reports partial failure rather than all-or-nothing, since a
+// mixed batch (some tracked, some already-clean) is a real case.
+message BulkDiscardRequest {
+  string worktree_id = 1;
+  repeated string paths = 2;
+}
+message BulkDiscardResponse {
+  bool success = 1;
+  repeated string failed_paths = 2;
+}

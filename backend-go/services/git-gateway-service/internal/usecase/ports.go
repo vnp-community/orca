@@ -133,6 +133,49 @@ type GitExecutor interface {
 	// domain.ErrForceDeleteBranchUnsupported), independent of this
 	// compile-time guarantee.
 	ForceDeleteBranch(ctx context.Context, repoPath, branch string) error
+
+	// ── Group A — branch/ref operations (TASK-207) ───────────────────────
+	//
+	// Checkout/ListLocalBranches/FastForward/ConflictOperation's shapes
+	// below were redesigned against the real agent contract
+	// (specs/agent/api/agent-rpc-catalog-git-fs.md), not implemented as
+	// TASK-207's own original sketch — see each method's doc comment and
+	// gitgateway.proto's matching message for citations. The other 5
+	// (RebaseFromBase/AbortRebase/AbortMerge/Discard/BulkDiscard) are the
+	// mechanical param-rename-only subset that sketch got right.
+
+	// Checkout switches to an existing ref — the real agent has no
+	// create-branch (-b) semantics, so unlike TASK-207's original sketch
+	// there is no `create` param here. See CheckoutRequest's proto doc
+	// comment.
+	Checkout(ctx context.Context, repoPath, branch string) (domain.CheckoutResult, error)
+	// ListLocalBranches returns richer per-branch data than the real
+	// agent's own git.localBranches RPC — RelayExecutor composes it via
+	// git.exec's for-each-ref subcommand instead of calling
+	// git.localBranches directly. See BranchInfo's proto doc comment.
+	ListLocalBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error)
+	// FastForward takes an optional structured pushTarget (nil = agent
+	// resolves the worktree's configured push target), matching the real
+	// git.fastForward/git.pull/git.push contract instead of TASK-207's
+	// original plain branch-string sketch. See PushTargetInput's proto doc
+	// comment.
+	FastForward(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.FastForwardResult, error)
+	RebaseFromBase(ctx context.Context, repoPath, baseRef string) (domain.RebaseResult, error)
+	AbortRebase(ctx context.Context, repoPath string) (domain.SimpleResult, error)
+	AbortMerge(ctx context.Context, repoPath string) (domain.SimpleResult, error)
+	// ConflictOperation is a DETECTOR ONLY, matching the real agent exactly
+	// — returns which operation (if any) left repoPath conflicted
+	// ("merge"/"rebase"/"cherry-pick"/"unknown"). See ResolveConflict below
+	// for the per-file resolve op TASK-207's original sketch conflated with
+	// this one.
+	ConflictOperation(ctx context.Context, repoPath string) (operation string, err error)
+	// ResolveConflict has no real agent RPC backing it — see its proto doc
+	// comment. RelayExecutor's implementation always returns
+	// domain.ErrConflictResolveUnsupportedOverRelay; only localgit.Executor
+	// does real work.
+	ResolveConflict(ctx context.Context, repoPath, path, operation string) (domain.SimpleResult, error)
+	Discard(ctx context.Context, repoPath, path string) (domain.SimpleResult, error)
+	BulkDiscard(ctx context.Context, repoPath string, paths []string) (domain.BulkDiscardResult, error)
 }
 
 // DevServerReachability resolves whether devServerID is a live,

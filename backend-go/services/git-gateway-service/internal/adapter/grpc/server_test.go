@@ -180,6 +180,48 @@ func (fakeExecutor) ForceDeleteBranch(context.Context, string, string) error {
 	return nil
 }
 
+// ── Group A — branch/ref operations (TASK-207) ─────────────────────────────
+
+func (fakeExecutor) Checkout(context.Context, string, string) (domain.CheckoutResult, error) {
+	return domain.CheckoutResult{Success: true, Branch: "main"}, nil
+}
+
+func (fakeExecutor) ListLocalBranches(context.Context, string) ([]domain.BranchInfo, error) {
+	return []domain.BranchInfo{{Name: "main", IsCurrent: true}}, nil
+}
+
+func (fakeExecutor) FastForward(context.Context, string, *domain.PushTargetInput) (domain.FastForwardResult, error) {
+	return domain.FastForwardResult{Success: true}, nil
+}
+
+func (fakeExecutor) RebaseFromBase(context.Context, string, string) (domain.RebaseResult, error) {
+	return domain.RebaseResult{Success: true}, nil
+}
+
+func (fakeExecutor) AbortRebase(context.Context, string) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) AbortMerge(context.Context, string) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) ConflictOperation(context.Context, string) (string, error) {
+	return "unknown", nil
+}
+
+func (fakeExecutor) ResolveConflict(context.Context, string, string, string) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) Discard(context.Context, string, string) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) BulkDiscard(context.Context, string, []string) (domain.BulkDiscardResult, error) {
+	return domain.BulkDiscardResult{Success: true}, nil
+}
+
 // fakeProjectClient/fakeSCMClient are minimal stubs for exercising the
 // worktree usecases' wire<->usecase translation — none of this file's
 // tests exercise the saga/compensation logic itself (that's
@@ -279,6 +321,16 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewPrefetchCreateBase(resolver, projects, exec, exec),
 		usecase.NewResolvePrBase(scm, resolver, projects, exec, exec),
 		usecase.NewResolveMrBase(scm, resolver, projects, exec, exec),
+		usecase.NewCheckout(resolver, exec, exec),
+		usecase.NewListLocalBranches(resolver, exec, exec),
+		usecase.NewFastForward(resolver, exec, exec),
+		usecase.NewRebaseFromBase(resolver, exec, exec),
+		usecase.NewAbortRebase(resolver, exec, exec),
+		usecase.NewAbortMerge(resolver, exec, exec),
+		usecase.NewConflictOperation(resolver, exec, exec),
+		usecase.NewResolveConflict(resolver, exec, exec),
+		usecase.NewDiscard(resolver, exec, exec),
+		usecase.NewBulkDiscard(resolver, exec, exec),
 	)
 }
 
@@ -577,5 +629,139 @@ func TestServer_ReadFileChunk_Connected_ReturnsFailedPrecondition(t *testing.T) 
 	_, err := s.ReadFileChunk(context.Background(), &gitgatewayv1.ReadFileChunkRequest{WorktreeId: "wt-1", Path: "a.txt"})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("expected FailedPrecondition (known gap, BUG-009), got %v", err)
+	}
+}
+
+// ── Group A — branch/ref operations (TASK-207) ─────────────────────────────
+
+func TestServer_Checkout_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.Checkout(context.Background(), &gitgatewayv1.CheckoutRequest{WorktreeId: "wt-1", Branch: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() || resp.GetBranch() != "main" {
+		t.Errorf("unexpected checkout response: %+v", resp)
+	}
+}
+
+func TestServer_Checkout_MissingBranch_ReturnsInvalidArgument(t *testing.T) {
+	s := newTestServer()
+	_, err := s.Checkout(context.Background(), &gitgatewayv1.CheckoutRequest{WorktreeId: "wt-1"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestServer_ListLocalBranches_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ListLocalBranches(context.Background(), &gitgatewayv1.ListLocalBranchesRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetBranches()) != 1 || resp.GetBranches()[0].GetName() != "main" {
+		t.Errorf("unexpected branches: %+v", resp.GetBranches())
+	}
+}
+
+func TestServer_FastForward_TranslatesResult_WithPushTarget(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.FastForward(context.Background(), &gitgatewayv1.FastForwardRequest{
+		WorktreeId: "wt-1",
+		PushTarget: &gitgatewayv1.PushTargetInput{RemoteName: "origin", BranchName: "main"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected fast-forward response: %+v", resp)
+	}
+}
+
+func TestServer_FastForward_NilPushTarget_Allowed(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.FastForward(context.Background(), &gitgatewayv1.FastForwardRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected fast-forward response: %+v", resp)
+	}
+}
+
+func TestServer_RebaseFromBase_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.RebaseFromBase(context.Background(), &gitgatewayv1.RebaseFromBaseRequest{WorktreeId: "wt-1", BaseBranch: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected rebase-from-base response: %+v", resp)
+	}
+}
+
+func TestServer_AbortRebase_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.AbortRebase(context.Background(), &gitgatewayv1.AbortRebaseRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected abort-rebase response: %+v", resp)
+	}
+}
+
+func TestServer_AbortMerge_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.AbortMerge(context.Background(), &gitgatewayv1.AbortMergeRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected abort-merge response: %+v", resp)
+	}
+}
+
+func TestServer_ConflictOperation_TranslatesDetectorResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ConflictOperation(context.Background(), &gitgatewayv1.ConflictOperationRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetOperation() != "unknown" {
+		t.Errorf("unexpected conflict-operation response: %+v", resp)
+	}
+}
+
+func TestServer_ResolveConflict_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ResolveConflict(context.Background(), &gitgatewayv1.ResolveConflictRequest{WorktreeId: "wt-1", Path: "a.txt", Operation: "ours"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected resolve-conflict response: %+v", resp)
+	}
+}
+
+func TestServer_Discard_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.Discard(context.Background(), &gitgatewayv1.DiscardRequest{WorktreeId: "wt-1", Path: "a.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected discard response: %+v", resp)
+	}
+}
+
+func TestServer_BulkDiscard_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.BulkDiscard(context.Background(), &gitgatewayv1.BulkDiscardRequest{WorktreeId: "wt-1", Paths: []string{"a.txt"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected bulk-discard response: %+v", resp)
 	}
 }

@@ -77,6 +77,18 @@ type Server struct {
 	prefetchCreateBase *usecase.PrefetchCreateBase
 	resolvePrBase      *usecase.ResolvePrBase
 	resolveMrBase      *usecase.ResolveMrBase
+
+	// Group A — branch/ref operations (TASK-207)
+	checkout           *usecase.Checkout
+	listLocalBranches  *usecase.ListLocalBranches
+	fastForward        *usecase.FastForward
+	rebaseFromBase     *usecase.RebaseFromBase
+	abortRebase        *usecase.AbortRebase
+	abortMerge         *usecase.AbortMerge
+	conflictOperation  *usecase.ConflictOperation
+	resolveConflict    *usecase.ResolveConflict
+	discard            *usecase.Discard
+	bulkDiscard        *usecase.BulkDiscard
 }
 
 // New wires every usecase this server dispatches to. Parameter order
@@ -128,6 +140,16 @@ func New(
 	prefetchCreateBase *usecase.PrefetchCreateBase,
 	resolvePrBase *usecase.ResolvePrBase,
 	resolveMrBase *usecase.ResolveMrBase,
+	checkout *usecase.Checkout,
+	listLocalBranches *usecase.ListLocalBranches,
+	fastForward *usecase.FastForward,
+	rebaseFromBase *usecase.RebaseFromBase,
+	abortRebase *usecase.AbortRebase,
+	abortMerge *usecase.AbortMerge,
+	conflictOperation *usecase.ConflictOperation,
+	resolveConflict *usecase.ResolveConflict,
+	discard *usecase.Discard,
+	bulkDiscard *usecase.BulkDiscard,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -177,6 +199,17 @@ func New(
 		prefetchCreateBase: prefetchCreateBase,
 		resolvePrBase:      resolvePrBase,
 		resolveMrBase:      resolveMrBase,
+
+		checkout:          checkout,
+		listLocalBranches: listLocalBranches,
+		fastForward:       fastForward,
+		rebaseFromBase:    rebaseFromBase,
+		abortRebase:       abortRebase,
+		abortMerge:        abortMerge,
+		conflictOperation: conflictOperation,
+		resolveConflict:   resolveConflict,
+		discard:           discard,
+		bulkDiscard:       bulkDiscard,
 	}
 }
 
@@ -604,6 +637,126 @@ func (s *Server) ResolveMrBase(ctx context.Context, req *gitgatewayv1.ResolveMrB
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.ResolveBaseResponse{BaseBranch: resolved.Branch, BaseSha: resolved.SHA}, nil
+}
+
+// ── Group A — branch/ref operations (TASK-207) ─────────────────────────────
+
+func (s *Server) Checkout(ctx context.Context, req *gitgatewayv1.CheckoutRequest) (*gitgatewayv1.CheckoutResponse, error) {
+	result, err := s.checkout.Execute(ctx, usecase.CheckoutInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CheckoutResponse{Success: result.Success, Branch: result.Branch}, nil
+}
+
+func (s *Server) ListLocalBranches(ctx context.Context, req *gitgatewayv1.ListLocalBranchesRequest) (*gitgatewayv1.ListLocalBranchesResponse, error) {
+	branches, err := s.listLocalBranches.Execute(ctx, usecase.ListLocalBranchesInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ListLocalBranchesResponse{Branches: toProtoBranches(branches)}, nil
+}
+
+func (s *Server) FastForward(ctx context.Context, req *gitgatewayv1.FastForwardRequest) (*gitgatewayv1.FastForwardResponse, error) {
+	result, err := s.fastForward.Execute(ctx, usecase.FastForwardInput{
+		WorktreeID: req.GetWorktreeId(), PushTarget: fromProtoPushTarget(req.GetPushTarget()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.FastForwardResponse{Success: result.Success}, nil
+}
+
+func (s *Server) RebaseFromBase(ctx context.Context, req *gitgatewayv1.RebaseFromBaseRequest) (*gitgatewayv1.RebaseFromBaseResponse, error) {
+	result, err := s.rebaseFromBase.Execute(ctx, usecase.RebaseFromBaseInput{
+		WorktreeID: req.GetWorktreeId(), BaseRef: req.GetBaseBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.RebaseFromBaseResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+func (s *Server) AbortRebase(ctx context.Context, req *gitgatewayv1.AbortRebaseRequest) (*gitgatewayv1.AbortRebaseResponse, error) {
+	result, err := s.abortRebase.Execute(ctx, usecase.AbortRebaseInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.AbortRebaseResponse{Success: result.Success}, nil
+}
+
+func (s *Server) AbortMerge(ctx context.Context, req *gitgatewayv1.AbortMergeRequest) (*gitgatewayv1.AbortMergeResponse, error) {
+	result, err := s.abortMerge.Execute(ctx, usecase.AbortMergeInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.AbortMergeResponse{Success: result.Success}, nil
+}
+
+// ConflictOperation is a DETECTOR ONLY — see ConflictOperationRequest's
+// proto doc comment. ResolveConflict below is the separate per-file
+// resolve op.
+func (s *Server) ConflictOperation(ctx context.Context, req *gitgatewayv1.ConflictOperationRequest) (*gitgatewayv1.ConflictOperationResponse, error) {
+	operation, err := s.conflictOperation.Execute(ctx, usecase.ConflictOperationInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ConflictOperationResponse{Operation: operation}, nil
+}
+
+func (s *Server) ResolveConflict(ctx context.Context, req *gitgatewayv1.ResolveConflictRequest) (*gitgatewayv1.ResolveConflictResponse, error) {
+	result, err := s.resolveConflict.Execute(ctx, usecase.ResolveConflictInput{
+		WorktreeID: req.GetWorktreeId(), Path: req.GetPath(), Operation: req.GetOperation(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ResolveConflictResponse{Success: result.Success}, nil
+}
+
+func (s *Server) Discard(ctx context.Context, req *gitgatewayv1.DiscardRequest) (*gitgatewayv1.DiscardResponse, error) {
+	result, err := s.discard.Execute(ctx, usecase.DiscardInput{WorktreeID: req.GetWorktreeId(), Path: req.GetPath()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.DiscardResponse{Success: result.Success}, nil
+}
+
+func (s *Server) BulkDiscard(ctx context.Context, req *gitgatewayv1.BulkDiscardRequest) (*gitgatewayv1.BulkDiscardResponse, error) {
+	result, err := s.bulkDiscard.Execute(ctx, usecase.BulkDiscardInput{WorktreeID: req.GetWorktreeId(), Paths: req.GetPaths()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.BulkDiscardResponse{Success: result.Success, FailedPaths: result.FailedPaths}, nil
+}
+
+func toProtoBranches(branches []domain.BranchInfo) []*gitgatewayv1.BranchInfo {
+	out := make([]*gitgatewayv1.BranchInfo, 0, len(branches))
+	for _, b := range branches {
+		out = append(out, &gitgatewayv1.BranchInfo{
+			Name: b.Name, Upstream: b.Upstream, Ahead: int32(b.Ahead), Behind: int32(b.Behind),
+			IsCurrent: b.IsCurrent, IsRemote: b.IsRemote,
+		})
+	}
+	return out
+}
+
+// fromProtoPushTarget translates the wire PushTargetInput to
+// domain.PushTargetInput — nil in either direction means "no push target
+// given", matching the real agent's undefined-pushTarget behavior (see
+// PushTargetInput's proto doc comment).
+func fromProtoPushTarget(pt *gitgatewayv1.PushTargetInput) *domain.PushTargetInput {
+	if pt == nil {
+		return nil
+	}
+	return &domain.PushTargetInput{
+		RemoteName:    pt.GetRemoteName(),
+		BranchName:    pt.GetBranchName(),
+		RemoteURL:     pt.GetRemoteUrl(),
+		RemoteCreated: pt.GetRemoteCreated(),
+	}
 }
 
 func toProtoFileStatuses(files []domain.FileStatus) []*gitgatewayv1.FileStatus {
