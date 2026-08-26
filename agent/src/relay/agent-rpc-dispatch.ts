@@ -1454,6 +1454,52 @@ async function route(
       }
     }
 
+    // ── accounts.selectClaude / accounts.selectCodex / accounts.removeClaude /
+    //    accounts.removeCodex ──────────────────────────────────────────────
+    // TASK-023: backs infra-fleet-service's Relay RPC and api-gateway's
+    // wscompat channels_accounts.go, which forward {accountId} params
+    // straight through to these methods (see accounts-handler.ts's module
+    // doc comment for the single-pseudo-account design this implements).
+    case 'accounts.selectClaude': {
+      try {
+        const { handleAccountsSelectClaude } = await import('./accounts-handler')
+        return (await handleAccountsSelectClaude(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.selectClaude unavailable: ${msg}`)
+      }
+    }
+
+    case 'accounts.selectCodex': {
+      try {
+        const { handleAccountsSelectCodex } = await import('./accounts-handler')
+        return (await handleAccountsSelectCodex(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.selectCodex unavailable: ${msg}`)
+      }
+    }
+
+    case 'accounts.removeClaude': {
+      try {
+        const { handleAccountsRemoveClaude } = await import('./accounts-handler')
+        return (await handleAccountsRemoveClaude(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.removeClaude unavailable: ${msg}`)
+      }
+    }
+
+    case 'accounts.removeCodex': {
+      try {
+        const { handleAccountsRemoveCodex } = await import('./accounts-handler')
+        return (await handleAccountsRemoveCodex(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.removeCodex unavailable: ${msg}`)
+      }
+    }
+
     // ── Unknown method ───────────────────────────────────────────────────────
     default:
       return makeError(rpc.id, AgentErrorCode.MethodNotFound, `Method not found: ${rpc.method}`)
