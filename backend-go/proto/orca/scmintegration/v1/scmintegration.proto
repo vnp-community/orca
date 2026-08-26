@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package orca.scmintegration.v1;
 
+import "google/protobuf/empty.proto";
+
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1;scmintegrationv1";
 
 // ScmIntegrationService: GitHub/GitLab/Bitbucket/Azure DevOps/Gitea via direct
@@ -24,6 +26,58 @@ service ScmIntegrationService {
   rpc StartOAuthFlow(StartOAuthFlowRequest) returns (StartOAuthFlowResponse);
   rpc CompleteOAuthFlow(CompleteOAuthFlowRequest) returns (CompleteOAuthFlowResponse);
   rpc RevokeAuth(RevokeAuthRequest) returns (RevokeAuthResponse);
+
+  // GitHub PR/issue mutations — github.mergePR / github.requestPRReviewers /
+  // github.removePRReviewers / github.setPRAutoMerge / github.updateIssue.
+  // See SOL-012 "Design — Proto additions, shape 1".
+  rpc MergePullRequest(MergePullRequestRequest) returns (MergePullRequestResponse);
+  rpc RequestPullRequestReviewers(RequestPullRequestReviewersRequest) returns (PullRequest);
+  rpc RemovePullRequestReviewers(RemovePullRequestReviewersRequest) returns (PullRequest);
+  rpc SetPullRequestAutoMerge(SetPullRequestAutoMergeRequest) returns (PullRequest);
+  rpc UpdateIssue(UpdateIssueRequest) returns (Issue);
+
+  // GetPullRequestForBranch — github.prForBranch AND hostedReview.forBranch's
+  // branch-filtered case (SOL-014). Provider-generic: parameterized by
+  // ScmProvider like every other RPC here, not a GitHub-only addition.
+  rpc GetPullRequestForBranch(GetPullRequestForBranchRequest) returns (GetPullRequestForBranchResponse);
+
+  // ResolveRepoSlug — github.repoSlug. Resolves a repo identifier (local git
+  // remote URL, partial name, etc.) to the canonical "owner/name" slug.
+  rpc ResolveRepoSlug(ResolveRepoSlugRequest) returns (ResolveRepoSlugResponse);
+
+  // GitHub Projects v2 (GraphQL-only, GitHub-specific — no other provider
+  // has an equivalent). tenant_id resolves the same per-tenant GitHub OAuth
+  // token as every other RPC on this service; there is no separate
+  // Projects-v2 auth. See SOL-012 "Design — Proto additions, shape 3".
+  rpc ListAccessibleProjects(ListAccessibleProjectsRequest) returns (ListAccessibleProjectsResponse);
+  rpc ResolveProjectRef(ResolveProjectRefRequest) returns (ResolveProjectRefResponse);
+  rpc ListProjectViews(ListProjectViewsRequest) returns (ListProjectViewsResponse);
+  rpc ViewProjectTable(ViewProjectTableRequest) returns (ViewProjectTableResponse);
+  rpc UpdateProjectItemField(UpdateProjectItemFieldRequest) returns (ProjectItem);
+  rpc ClearProjectItemField(ClearProjectItemFieldRequest) returns (ProjectItem);
+  rpc GetWorkItemDetailsBySlug(GetWorkItemDetailsBySlugRequest) returns (WorkItemDetails);
+  rpc UpdateIssueBySlug(UpdateIssueBySlugRequest) returns (WorkItemDetails);
+  rpc UpdatePullRequestBySlug(UpdatePullRequestBySlugRequest) returns (WorkItemDetails);
+  rpc UpdateIssueTypeBySlug(UpdateIssueTypeBySlugRequest) returns (WorkItemDetails);
+  rpc ListIssueTypesBySlug(ListIssueTypesBySlugRequest) returns (ListIssueTypesBySlugResponse);
+  rpc ListAssignableUsersBySlug(ListAssignableUsersBySlugRequest) returns (ListAssignableUsersBySlugResponse);
+  rpc ListLabelsBySlug(ListLabelsBySlugRequest) returns (ListLabelsBySlugResponse);
+  rpc AddIssueCommentBySlug(AddIssueCommentBySlugRequest) returns (ProjectComment);
+  rpc UpdateIssueCommentBySlug(UpdateIssueCommentBySlugRequest) returns (ProjectComment);
+  rpc DeleteIssueCommentBySlug(DeleteIssueCommentBySlugRequest) returns (google.protobuf.Empty);
+
+  // GitLab-specific RPCs — gitlab.listMRs / gitlab.resolveMRDiscussion /
+  // gitlab.workItemDetails. Deliberately NOT parameterized by ScmProvider —
+  // these model GitLab-only concepts (iid, discussions). See SOL-013.
+  rpc ListMergeRequests(ListMergeRequestsRequest) returns (ListMergeRequestsResponse);
+  rpc ResolveMergeRequestDiscussion(ResolveMergeRequestDiscussionRequest) returns (MergeRequestDiscussion);
+  rpc GetWorkItemDetails(GetWorkItemDetailsRequest) returns (WorkItemDetailsGitLab);
+
+  // CheckHostedReviewEligibility — hostedReview.getCreationEligibility.
+  // Already named in scm-integration-service.md §3. A pre-flight check, not
+  // a mutation: does CreatePullRequest have a reasonable chance of
+  // succeeding for this repo+branch right now. See SOL-014.
+  rpc CheckHostedReviewEligibility(CheckHostedReviewEligibilityRequest) returns (HostedReviewEligibility);
 }
 
 enum ScmProvider {
@@ -40,6 +94,10 @@ message Issue {
   string title = 2;
   string state = 3;
   string url = 4;
+  // number is GitHub's repo-scoped issue number (e.g. #42) — every REST
+  // mutation below addresses issues/PRs by number, not the opaque id above.
+  // Additive field; existing ListIssues callers are unaffected.
+  int32 number = 5;
 }
 
 message ListIssuesRequest {
@@ -67,6 +125,9 @@ message PullRequest {
   string id = 1;
   string url = 2;
   string state = 3;
+  // number is GitHub's repo-scoped PR number — see Issue.number's doc
+  // comment for why this is additive, not a breaking rename.
+  int32 number = 4;
 }
 
 message CreatePullRequestResponse {
@@ -157,3 +218,357 @@ message RevokeAuthRequest {
 }
 
 message RevokeAuthResponse {}
+
+// ── GitHub PR/issue mutations + repo/branch resolution ──────────────────
+
+message MergePullRequestRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  int32 number = 4;
+  string merge_method = 5; // "merge" | "squash" | "rebase"
+  string commit_title = 6;
+  string commit_message = 7;
+}
+message MergePullRequestResponse {
+  PullRequest pull_request = 1;
+  bool merged = 2;
+  string sha = 3;
+}
+
+message RequestPullRequestReviewersRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  int32 number = 4;
+  repeated string reviewer_logins = 5;
+  repeated string team_slugs = 6;
+}
+message RemovePullRequestReviewersRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  int32 number = 4;
+  repeated string reviewer_logins = 5;
+}
+
+message SetPullRequestAutoMergeRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  int32 number = 4;
+  bool enabled = 5;
+  string merge_method = 6;
+}
+
+message UpdateIssueRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  int32 number = 4;
+  optional string title = 5;
+  optional string body = 6;
+  optional string state = 7;
+  repeated string add_labels = 8;
+  repeated string remove_labels = 9;
+  repeated string assignees = 10;
+}
+
+message GetPullRequestForBranchRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  string head_branch = 4;
+}
+message GetPullRequestForBranchResponse {
+  PullRequest pull_request = 1; // unset (zero-value) if no open PR for the branch
+  bool found = 2;
+}
+
+message ResolveRepoSlugRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string candidate = 3; // remote URL, "owner/name", or bare name
+}
+message ResolveRepoSlugResponse {
+  string owner = 1;
+  string name = 2;
+  string slug = 3; // "owner/name", canonical
+}
+
+// ── GitHub Projects v2 ──────────────────────────────────────────────────
+
+// ProjectFieldValue is a generic key/value field write — Projects v2 fields
+// are per-project-defined (text/number/date/single-select/iteration); the
+// GraphQL mutation itself (updateProjectV2ItemFieldValue) takes a typed
+// union, so the adapter (not this proto) picks the right GraphQL input
+// shape from this string+kind pair.
+message ProjectFieldValue {
+  string field_id = 1;
+  string kind = 2;  // "text" | "number" | "date" | "single_select" | "iteration"
+  string value = 3; // string-encoded; adapter parses per kind
+}
+
+message ProjectItem {
+  string id = 1;
+  string title = 2;
+  string content_type = 3; // "issue" | "pull_request" | "draft_issue"
+  string content_url = 4;
+  repeated ProjectFieldValue fields = 5;
+}
+
+message Project {
+  string id = 1;
+  string slug = 2;   // "owner/number", canonical addressing form
+  string title = 3;
+  int32 number = 4;
+  string owner = 5;
+  string url = 6;
+}
+
+message ProjectView {
+  string id = 1;
+  string name = 2;
+  string layout = 3; // "table" | "board" | "roadmap"
+}
+
+message IssueType {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message AssignableUser {
+  string login = 1;
+  string name = 2;
+  string avatar_url = 3;
+}
+
+message Label {
+  string name = 1;
+  string color = 2;
+  string description = 3;
+}
+
+message ProjectComment {
+  string id = 1;
+  string body = 2;
+  string author = 3;
+  string url = 4;
+}
+
+// "BySlug" methods all take an item_slug ("owner/repo#number") + tenant_id —
+// mirrors the frontend's own by-slug addressing scheme (BUG-012's finding:
+// no by-slug addressing scheme existed server-side; this is where it's
+// added). tenant_id resolves credentials the same way as every other RPC.
+message WorkItemDetails {
+  string slug = 1;
+  string title = 2;
+  string body = 3;
+  string state = 4;
+  string url = 5;
+  repeated ProjectFieldValue fields = 6;
+}
+
+message ListAccessibleProjectsRequest {
+  string tenant_id = 1;
+}
+message ListAccessibleProjectsResponse {
+  repeated Project projects = 1;
+}
+
+message ResolveProjectRefRequest {
+  string tenant_id = 1;
+  string owner = 2;
+  int32 number = 3;
+}
+message ResolveProjectRefResponse {
+  string slug = 1;
+  Project project = 2;
+}
+
+message ListProjectViewsRequest {
+  string tenant_id = 1;
+  string project_slug = 2;
+}
+message ListProjectViewsResponse {
+  repeated ProjectView views = 1;
+}
+
+message ViewProjectTableRequest {
+  string tenant_id = 1;
+  string project_slug = 2;
+  string view_id = 3;    // empty = the project's default view
+  string page_token = 4;
+  int32 page_size = 5;
+}
+message ViewProjectTableResponse {
+  repeated ProjectItem items = 1;
+  string next_page_token = 2;
+}
+
+message UpdateProjectItemFieldRequest {
+  string tenant_id = 1;
+  string project_slug = 2;
+  string item_id = 3;
+  ProjectFieldValue field = 4;
+}
+
+message ClearProjectItemFieldRequest {
+  string tenant_id = 1;
+  string project_slug = 2;
+  string item_id = 3;
+  string field_id = 4;
+}
+
+message GetWorkItemDetailsBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+}
+
+message UpdateIssueBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+  optional string title = 3;
+  optional string body = 4;
+  optional string state = 5;
+  repeated string add_labels = 6;
+  repeated string remove_labels = 7;
+}
+
+message UpdatePullRequestBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+  optional string title = 3;
+  optional string body = 4;
+  optional string state = 5;
+}
+
+message UpdateIssueTypeBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+  string issue_type = 3;
+}
+
+message ListIssueTypesBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+}
+message ListIssueTypesBySlugResponse {
+  repeated IssueType issue_types = 1;
+}
+
+message ListAssignableUsersBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+}
+message ListAssignableUsersBySlugResponse {
+  repeated AssignableUser users = 1;
+}
+
+message ListLabelsBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+}
+message ListLabelsBySlugResponse {
+  repeated Label labels = 1;
+}
+
+message AddIssueCommentBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+  string body = 3;
+}
+
+message UpdateIssueCommentBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+  string comment_id = 3;
+  string body = 4;
+}
+
+message DeleteIssueCommentBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2;
+  string comment_id = 3;
+}
+
+// ── GitLab-specific ─────────────────────────────────────────────────────
+
+message MergeRequest {
+  string id = 1;
+  string url = 2;
+  string state = 3;              // "opened" | "closed" | "merged" | "locked"
+  int32 iid = 4;                 // project-scoped internal ID, what the UI/URLs use
+  string title = 5;
+  string source_branch = 6;
+  string target_branch = 7;
+  bool draft = 8;
+  int32 discussion_count = 9;
+  int32 unresolved_discussion_count = 10;
+  string merge_status = 11;      // GitLab's can_be_merged / mergeable / etc.
+}
+
+message ListMergeRequestsRequest {
+  string tenant_id = 1;
+  string repo = 2;               // GitLab project path ("group/project")
+  string state = 3;               // "opened" | "closed" | "merged" | "all"; empty = "opened"
+  string source_branch = 4;       // optional filter
+}
+message ListMergeRequestsResponse {
+  repeated MergeRequest merge_requests = 1;
+}
+
+message MergeRequestDiscussion {
+  string id = 1;
+  bool resolved = 2;
+  string resolved_by = 3;
+}
+message ResolveMergeRequestDiscussionRequest {
+  string tenant_id = 1;
+  string repo = 2;
+  int32 merge_request_iid = 3;
+  string discussion_id = 4;
+  bool resolved = 5;
+}
+
+message GetWorkItemDetailsRequest {
+  string tenant_id = 1;
+  string repo = 2;
+  int32 iid = 3;
+  string item_type = 4;          // "merge_request" | "issue"
+}
+message WorkItemDetailsGitLab {
+  string id = 1;
+  int32 iid = 2;
+  string item_type = 3;
+  string title = 4;
+  string body = 5;
+  string state = 6;
+  string url = 7;
+  repeated string labels = 8;
+}
+
+// ── hostedReview.getCreationEligibility ─────────────────────────────────
+
+message CheckHostedReviewEligibilityRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  string head_branch = 4;
+  string base_branch = 5;
+}
+
+message HostedReviewEligibility {
+  bool eligible = 1;
+  // ineligible_reason is set (and eligible=false) for exactly one of these,
+  // in priority order — auth comes first since every other check is
+  // meaningless without a usable credential:
+  //   "NOT_CONNECTED"         - GetAuthStatus.connected == false
+  //   "BRANCH_NOT_FOUND"      - head_branch doesn't exist on the provider yet
+  //   "REVIEW_ALREADY_EXISTS" - GetPullRequestForBranch already found one
+  string ineligible_reason = 2;
+  // existing_pull_request is set only when ineligible_reason ==
+  // "REVIEW_ALREADY_EXISTS" — lets the frontend link straight to it.
+  PullRequest existing_pull_request = 3;
+}

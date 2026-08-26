@@ -58,6 +58,7 @@ type Issue struct {
 	Title    string
 	State    string
 	URL      string
+	Number   int32
 }
 
 // NewIssue constructs an Issue, enforcing the invariants a record must
@@ -87,6 +88,7 @@ type PullRequest struct {
 	URL        string
 	HeadBranch string
 	BaseBranch string
+	Number     int32
 }
 
 // NewPullRequest constructs a PullRequest, enforcing the same non-empty
@@ -116,4 +118,45 @@ type RateLimitStatus struct {
 	Remaining int
 	Limit     int
 	ResetAt   time.Time
+}
+
+// MergeRequest is GitLab's pull-request-equivalent concept — kept as its
+// own domain type (not folded into PullRequest) because it carries fields
+// PullRequest doesn't (source/target branch by GitLab's own names,
+// discussion counts, GitLab's own merge_status vocabulary), matching
+// SOL-013's proto-level MergeRequest message 1:1.
+type MergeRequest struct {
+	ID                        string
+	Repo                      string
+	State                     string
+	IID                       int32
+	Title                     string
+	URL                       string
+	SourceBranch              string
+	TargetBranch              string
+	Draft                     bool
+	DiscussionCount           int32
+	UnresolvedDiscussionCount int32
+	MergeStatus               string
+}
+
+// MergeRequestDiscussion mirrors scmintegrationv1.MergeRequestDiscussion.
+type MergeRequestDiscussion struct {
+	ID         string
+	Resolved   bool
+	ResolvedBy string
+}
+
+// WorkItemDetailsGitLab mirrors scmintegrationv1.WorkItemDetailsGitLab —
+// named with the GitLab suffix to avoid colliding with SOL-012's
+// provider-agnostic WorkItemDetails (usecase package, GitHub Projects v2).
+type WorkItemDetailsGitLab struct {
+	ID       string
+	IID      int32
+	ItemType string
+	Title    string
+	Body     string
+	State    string
+	URL      string
+	Labels   []string
 }

@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,14 +20,41 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ScmIntegrationService_ListIssues_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/ListIssues"
-	ScmIntegrationService_CreatePullRequest_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
-	ScmIntegrationService_ListPullRequests_FullMethodName   = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
-	ScmIntegrationService_GetRateLimitStatus_FullMethodName = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
-	ScmIntegrationService_GetAuthStatus_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
-	ScmIntegrationService_StartOAuthFlow_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/StartOAuthFlow"
-	ScmIntegrationService_CompleteOAuthFlow_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/CompleteOAuthFlow"
-	ScmIntegrationService_RevokeAuth_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/RevokeAuth"
+	ScmIntegrationService_ListIssues_FullMethodName                    = "/orca.scmintegration.v1.ScmIntegrationService/ListIssues"
+	ScmIntegrationService_CreatePullRequest_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
+	ScmIntegrationService_ListPullRequests_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
+	ScmIntegrationService_GetRateLimitStatus_FullMethodName            = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
+	ScmIntegrationService_GetAuthStatus_FullMethodName                 = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
+	ScmIntegrationService_StartOAuthFlow_FullMethodName                = "/orca.scmintegration.v1.ScmIntegrationService/StartOAuthFlow"
+	ScmIntegrationService_CompleteOAuthFlow_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/CompleteOAuthFlow"
+	ScmIntegrationService_RevokeAuth_FullMethodName                    = "/orca.scmintegration.v1.ScmIntegrationService/RevokeAuth"
+	ScmIntegrationService_MergePullRequest_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/MergePullRequest"
+	ScmIntegrationService_RequestPullRequestReviewers_FullMethodName   = "/orca.scmintegration.v1.ScmIntegrationService/RequestPullRequestReviewers"
+	ScmIntegrationService_RemovePullRequestReviewers_FullMethodName    = "/orca.scmintegration.v1.ScmIntegrationService/RemovePullRequestReviewers"
+	ScmIntegrationService_SetPullRequestAutoMerge_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/SetPullRequestAutoMerge"
+	ScmIntegrationService_UpdateIssue_FullMethodName                   = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssue"
+	ScmIntegrationService_GetPullRequestForBranch_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/GetPullRequestForBranch"
+	ScmIntegrationService_ResolveRepoSlug_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ResolveRepoSlug"
+	ScmIntegrationService_ListAccessibleProjects_FullMethodName        = "/orca.scmintegration.v1.ScmIntegrationService/ListAccessibleProjects"
+	ScmIntegrationService_ResolveProjectRef_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/ResolveProjectRef"
+	ScmIntegrationService_ListProjectViews_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ListProjectViews"
+	ScmIntegrationService_ViewProjectTable_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ViewProjectTable"
+	ScmIntegrationService_UpdateProjectItemField_FullMethodName        = "/orca.scmintegration.v1.ScmIntegrationService/UpdateProjectItemField"
+	ScmIntegrationService_ClearProjectItemField_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/ClearProjectItemField"
+	ScmIntegrationService_GetWorkItemDetailsBySlug_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/GetWorkItemDetailsBySlug"
+	ScmIntegrationService_UpdateIssueBySlug_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueBySlug"
+	ScmIntegrationService_UpdatePullRequestBySlug_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/UpdatePullRequestBySlug"
+	ScmIntegrationService_UpdateIssueTypeBySlug_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueTypeBySlug"
+	ScmIntegrationService_ListIssueTypesBySlug_FullMethodName          = "/orca.scmintegration.v1.ScmIntegrationService/ListIssueTypesBySlug"
+	ScmIntegrationService_ListAssignableUsersBySlug_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/ListAssignableUsersBySlug"
+	ScmIntegrationService_ListLabelsBySlug_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/ListLabelsBySlug"
+	ScmIntegrationService_AddIssueCommentBySlug_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/AddIssueCommentBySlug"
+	ScmIntegrationService_UpdateIssueCommentBySlug_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/UpdateIssueCommentBySlug"
+	ScmIntegrationService_DeleteIssueCommentBySlug_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/DeleteIssueCommentBySlug"
+	ScmIntegrationService_ListMergeRequests_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/ListMergeRequests"
+	ScmIntegrationService_ResolveMergeRequestDiscussion_FullMethodName = "/orca.scmintegration.v1.ScmIntegrationService/ResolveMergeRequestDiscussion"
+	ScmIntegrationService_GetWorkItemDetails_FullMethodName            = "/orca.scmintegration.v1.ScmIntegrationService/GetWorkItemDetails"
+	ScmIntegrationService_CheckHostedReviewEligibility_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/CheckHostedReviewEligibility"
 )
 
 // ScmIntegrationServiceClient is the client API for ScmIntegrationService service.
@@ -52,6 +80,52 @@ type ScmIntegrationServiceClient interface {
 	StartOAuthFlow(ctx context.Context, in *StartOAuthFlowRequest, opts ...grpc.CallOption) (*StartOAuthFlowResponse, error)
 	CompleteOAuthFlow(ctx context.Context, in *CompleteOAuthFlowRequest, opts ...grpc.CallOption) (*CompleteOAuthFlowResponse, error)
 	RevokeAuth(ctx context.Context, in *RevokeAuthRequest, opts ...grpc.CallOption) (*RevokeAuthResponse, error)
+	// GitHub PR/issue mutations — github.mergePR / github.requestPRReviewers /
+	// github.removePRReviewers / github.setPRAutoMerge / github.updateIssue.
+	// See SOL-012 "Design — Proto additions, shape 1".
+	MergePullRequest(ctx context.Context, in *MergePullRequestRequest, opts ...grpc.CallOption) (*MergePullRequestResponse, error)
+	RequestPullRequestReviewers(ctx context.Context, in *RequestPullRequestReviewersRequest, opts ...grpc.CallOption) (*PullRequest, error)
+	RemovePullRequestReviewers(ctx context.Context, in *RemovePullRequestReviewersRequest, opts ...grpc.CallOption) (*PullRequest, error)
+	SetPullRequestAutoMerge(ctx context.Context, in *SetPullRequestAutoMergeRequest, opts ...grpc.CallOption) (*PullRequest, error)
+	UpdateIssue(ctx context.Context, in *UpdateIssueRequest, opts ...grpc.CallOption) (*Issue, error)
+	// GetPullRequestForBranch — github.prForBranch AND hostedReview.forBranch's
+	// branch-filtered case (SOL-014). Provider-generic: parameterized by
+	// ScmProvider like every other RPC here, not a GitHub-only addition.
+	GetPullRequestForBranch(ctx context.Context, in *GetPullRequestForBranchRequest, opts ...grpc.CallOption) (*GetPullRequestForBranchResponse, error)
+	// ResolveRepoSlug — github.repoSlug. Resolves a repo identifier (local git
+	// remote URL, partial name, etc.) to the canonical "owner/name" slug.
+	ResolveRepoSlug(ctx context.Context, in *ResolveRepoSlugRequest, opts ...grpc.CallOption) (*ResolveRepoSlugResponse, error)
+	// GitHub Projects v2 (GraphQL-only, GitHub-specific — no other provider
+	// has an equivalent). tenant_id resolves the same per-tenant GitHub OAuth
+	// token as every other RPC on this service; there is no separate
+	// Projects-v2 auth. See SOL-012 "Design — Proto additions, shape 3".
+	ListAccessibleProjects(ctx context.Context, in *ListAccessibleProjectsRequest, opts ...grpc.CallOption) (*ListAccessibleProjectsResponse, error)
+	ResolveProjectRef(ctx context.Context, in *ResolveProjectRefRequest, opts ...grpc.CallOption) (*ResolveProjectRefResponse, error)
+	ListProjectViews(ctx context.Context, in *ListProjectViewsRequest, opts ...grpc.CallOption) (*ListProjectViewsResponse, error)
+	ViewProjectTable(ctx context.Context, in *ViewProjectTableRequest, opts ...grpc.CallOption) (*ViewProjectTableResponse, error)
+	UpdateProjectItemField(ctx context.Context, in *UpdateProjectItemFieldRequest, opts ...grpc.CallOption) (*ProjectItem, error)
+	ClearProjectItemField(ctx context.Context, in *ClearProjectItemFieldRequest, opts ...grpc.CallOption) (*ProjectItem, error)
+	GetWorkItemDetailsBySlug(ctx context.Context, in *GetWorkItemDetailsBySlugRequest, opts ...grpc.CallOption) (*WorkItemDetails, error)
+	UpdateIssueBySlug(ctx context.Context, in *UpdateIssueBySlugRequest, opts ...grpc.CallOption) (*WorkItemDetails, error)
+	UpdatePullRequestBySlug(ctx context.Context, in *UpdatePullRequestBySlugRequest, opts ...grpc.CallOption) (*WorkItemDetails, error)
+	UpdateIssueTypeBySlug(ctx context.Context, in *UpdateIssueTypeBySlugRequest, opts ...grpc.CallOption) (*WorkItemDetails, error)
+	ListIssueTypesBySlug(ctx context.Context, in *ListIssueTypesBySlugRequest, opts ...grpc.CallOption) (*ListIssueTypesBySlugResponse, error)
+	ListAssignableUsersBySlug(ctx context.Context, in *ListAssignableUsersBySlugRequest, opts ...grpc.CallOption) (*ListAssignableUsersBySlugResponse, error)
+	ListLabelsBySlug(ctx context.Context, in *ListLabelsBySlugRequest, opts ...grpc.CallOption) (*ListLabelsBySlugResponse, error)
+	AddIssueCommentBySlug(ctx context.Context, in *AddIssueCommentBySlugRequest, opts ...grpc.CallOption) (*ProjectComment, error)
+	UpdateIssueCommentBySlug(ctx context.Context, in *UpdateIssueCommentBySlugRequest, opts ...grpc.CallOption) (*ProjectComment, error)
+	DeleteIssueCommentBySlug(ctx context.Context, in *DeleteIssueCommentBySlugRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GitLab-specific RPCs — gitlab.listMRs / gitlab.resolveMRDiscussion /
+	// gitlab.workItemDetails. Deliberately NOT parameterized by ScmProvider —
+	// these model GitLab-only concepts (iid, discussions). See SOL-013.
+	ListMergeRequests(ctx context.Context, in *ListMergeRequestsRequest, opts ...grpc.CallOption) (*ListMergeRequestsResponse, error)
+	ResolveMergeRequestDiscussion(ctx context.Context, in *ResolveMergeRequestDiscussionRequest, opts ...grpc.CallOption) (*MergeRequestDiscussion, error)
+	GetWorkItemDetails(ctx context.Context, in *GetWorkItemDetailsRequest, opts ...grpc.CallOption) (*WorkItemDetailsGitLab, error)
+	// CheckHostedReviewEligibility — hostedReview.getCreationEligibility.
+	// Already named in scm-integration-service.md §3. A pre-flight check, not
+	// a mutation: does CreatePullRequest have a reasonable chance of
+	// succeeding for this repo+branch right now. See SOL-014.
+	CheckHostedReviewEligibility(ctx context.Context, in *CheckHostedReviewEligibilityRequest, opts ...grpc.CallOption) (*HostedReviewEligibility, error)
 }
 
 type scmIntegrationServiceClient struct {
@@ -142,6 +216,276 @@ func (c *scmIntegrationServiceClient) RevokeAuth(ctx context.Context, in *Revoke
 	return out, nil
 }
 
+func (c *scmIntegrationServiceClient) MergePullRequest(ctx context.Context, in *MergePullRequestRequest, opts ...grpc.CallOption) (*MergePullRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MergePullRequestResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_MergePullRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) RequestPullRequestReviewers(ctx context.Context, in *RequestPullRequestReviewersRequest, opts ...grpc.CallOption) (*PullRequest, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PullRequest)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_RequestPullRequestReviewers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) RemovePullRequestReviewers(ctx context.Context, in *RemovePullRequestReviewersRequest, opts ...grpc.CallOption) (*PullRequest, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PullRequest)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_RemovePullRequestReviewers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) SetPullRequestAutoMerge(ctx context.Context, in *SetPullRequestAutoMergeRequest, opts ...grpc.CallOption) (*PullRequest, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PullRequest)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_SetPullRequestAutoMerge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) UpdateIssue(ctx context.Context, in *UpdateIssueRequest, opts ...grpc.CallOption) (*Issue, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Issue)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_UpdateIssue_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) GetPullRequestForBranch(ctx context.Context, in *GetPullRequestForBranchRequest, opts ...grpc.CallOption) (*GetPullRequestForBranchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPullRequestForBranchResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_GetPullRequestForBranch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ResolveRepoSlug(ctx context.Context, in *ResolveRepoSlugRequest, opts ...grpc.CallOption) (*ResolveRepoSlugResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveRepoSlugResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ResolveRepoSlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListAccessibleProjects(ctx context.Context, in *ListAccessibleProjectsRequest, opts ...grpc.CallOption) (*ListAccessibleProjectsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAccessibleProjectsResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListAccessibleProjects_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ResolveProjectRef(ctx context.Context, in *ResolveProjectRefRequest, opts ...grpc.CallOption) (*ResolveProjectRefResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveProjectRefResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ResolveProjectRef_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListProjectViews(ctx context.Context, in *ListProjectViewsRequest, opts ...grpc.CallOption) (*ListProjectViewsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProjectViewsResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListProjectViews_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ViewProjectTable(ctx context.Context, in *ViewProjectTableRequest, opts ...grpc.CallOption) (*ViewProjectTableResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ViewProjectTableResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ViewProjectTable_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) UpdateProjectItemField(ctx context.Context, in *UpdateProjectItemFieldRequest, opts ...grpc.CallOption) (*ProjectItem, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProjectItem)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_UpdateProjectItemField_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ClearProjectItemField(ctx context.Context, in *ClearProjectItemFieldRequest, opts ...grpc.CallOption) (*ProjectItem, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProjectItem)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ClearProjectItemField_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) GetWorkItemDetailsBySlug(ctx context.Context, in *GetWorkItemDetailsBySlugRequest, opts ...grpc.CallOption) (*WorkItemDetails, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkItemDetails)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_GetWorkItemDetailsBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) UpdateIssueBySlug(ctx context.Context, in *UpdateIssueBySlugRequest, opts ...grpc.CallOption) (*WorkItemDetails, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkItemDetails)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_UpdateIssueBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) UpdatePullRequestBySlug(ctx context.Context, in *UpdatePullRequestBySlugRequest, opts ...grpc.CallOption) (*WorkItemDetails, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkItemDetails)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_UpdatePullRequestBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) UpdateIssueTypeBySlug(ctx context.Context, in *UpdateIssueTypeBySlugRequest, opts ...grpc.CallOption) (*WorkItemDetails, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkItemDetails)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_UpdateIssueTypeBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListIssueTypesBySlug(ctx context.Context, in *ListIssueTypesBySlugRequest, opts ...grpc.CallOption) (*ListIssueTypesBySlugResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIssueTypesBySlugResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListIssueTypesBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListAssignableUsersBySlug(ctx context.Context, in *ListAssignableUsersBySlugRequest, opts ...grpc.CallOption) (*ListAssignableUsersBySlugResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAssignableUsersBySlugResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListAssignableUsersBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListLabelsBySlug(ctx context.Context, in *ListLabelsBySlugRequest, opts ...grpc.CallOption) (*ListLabelsBySlugResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListLabelsBySlugResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListLabelsBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) AddIssueCommentBySlug(ctx context.Context, in *AddIssueCommentBySlugRequest, opts ...grpc.CallOption) (*ProjectComment, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProjectComment)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_AddIssueCommentBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) UpdateIssueCommentBySlug(ctx context.Context, in *UpdateIssueCommentBySlugRequest, opts ...grpc.CallOption) (*ProjectComment, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProjectComment)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_UpdateIssueCommentBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) DeleteIssueCommentBySlug(ctx context.Context, in *DeleteIssueCommentBySlugRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_DeleteIssueCommentBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListMergeRequests(ctx context.Context, in *ListMergeRequestsRequest, opts ...grpc.CallOption) (*ListMergeRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMergeRequestsResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListMergeRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ResolveMergeRequestDiscussion(ctx context.Context, in *ResolveMergeRequestDiscussionRequest, opts ...grpc.CallOption) (*MergeRequestDiscussion, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MergeRequestDiscussion)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ResolveMergeRequestDiscussion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) GetWorkItemDetails(ctx context.Context, in *GetWorkItemDetailsRequest, opts ...grpc.CallOption) (*WorkItemDetailsGitLab, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkItemDetailsGitLab)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_GetWorkItemDetails_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) CheckHostedReviewEligibility(ctx context.Context, in *CheckHostedReviewEligibilityRequest, opts ...grpc.CallOption) (*HostedReviewEligibility, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HostedReviewEligibility)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_CheckHostedReviewEligibility_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScmIntegrationServiceServer is the server API for ScmIntegrationService service.
 // All implementations must embed UnimplementedScmIntegrationServiceServer
 // for forward compatibility.
@@ -165,6 +509,52 @@ type ScmIntegrationServiceServer interface {
 	StartOAuthFlow(context.Context, *StartOAuthFlowRequest) (*StartOAuthFlowResponse, error)
 	CompleteOAuthFlow(context.Context, *CompleteOAuthFlowRequest) (*CompleteOAuthFlowResponse, error)
 	RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error)
+	// GitHub PR/issue mutations — github.mergePR / github.requestPRReviewers /
+	// github.removePRReviewers / github.setPRAutoMerge / github.updateIssue.
+	// See SOL-012 "Design — Proto additions, shape 1".
+	MergePullRequest(context.Context, *MergePullRequestRequest) (*MergePullRequestResponse, error)
+	RequestPullRequestReviewers(context.Context, *RequestPullRequestReviewersRequest) (*PullRequest, error)
+	RemovePullRequestReviewers(context.Context, *RemovePullRequestReviewersRequest) (*PullRequest, error)
+	SetPullRequestAutoMerge(context.Context, *SetPullRequestAutoMergeRequest) (*PullRequest, error)
+	UpdateIssue(context.Context, *UpdateIssueRequest) (*Issue, error)
+	// GetPullRequestForBranch — github.prForBranch AND hostedReview.forBranch's
+	// branch-filtered case (SOL-014). Provider-generic: parameterized by
+	// ScmProvider like every other RPC here, not a GitHub-only addition.
+	GetPullRequestForBranch(context.Context, *GetPullRequestForBranchRequest) (*GetPullRequestForBranchResponse, error)
+	// ResolveRepoSlug — github.repoSlug. Resolves a repo identifier (local git
+	// remote URL, partial name, etc.) to the canonical "owner/name" slug.
+	ResolveRepoSlug(context.Context, *ResolveRepoSlugRequest) (*ResolveRepoSlugResponse, error)
+	// GitHub Projects v2 (GraphQL-only, GitHub-specific — no other provider
+	// has an equivalent). tenant_id resolves the same per-tenant GitHub OAuth
+	// token as every other RPC on this service; there is no separate
+	// Projects-v2 auth. See SOL-012 "Design — Proto additions, shape 3".
+	ListAccessibleProjects(context.Context, *ListAccessibleProjectsRequest) (*ListAccessibleProjectsResponse, error)
+	ResolveProjectRef(context.Context, *ResolveProjectRefRequest) (*ResolveProjectRefResponse, error)
+	ListProjectViews(context.Context, *ListProjectViewsRequest) (*ListProjectViewsResponse, error)
+	ViewProjectTable(context.Context, *ViewProjectTableRequest) (*ViewProjectTableResponse, error)
+	UpdateProjectItemField(context.Context, *UpdateProjectItemFieldRequest) (*ProjectItem, error)
+	ClearProjectItemField(context.Context, *ClearProjectItemFieldRequest) (*ProjectItem, error)
+	GetWorkItemDetailsBySlug(context.Context, *GetWorkItemDetailsBySlugRequest) (*WorkItemDetails, error)
+	UpdateIssueBySlug(context.Context, *UpdateIssueBySlugRequest) (*WorkItemDetails, error)
+	UpdatePullRequestBySlug(context.Context, *UpdatePullRequestBySlugRequest) (*WorkItemDetails, error)
+	UpdateIssueTypeBySlug(context.Context, *UpdateIssueTypeBySlugRequest) (*WorkItemDetails, error)
+	ListIssueTypesBySlug(context.Context, *ListIssueTypesBySlugRequest) (*ListIssueTypesBySlugResponse, error)
+	ListAssignableUsersBySlug(context.Context, *ListAssignableUsersBySlugRequest) (*ListAssignableUsersBySlugResponse, error)
+	ListLabelsBySlug(context.Context, *ListLabelsBySlugRequest) (*ListLabelsBySlugResponse, error)
+	AddIssueCommentBySlug(context.Context, *AddIssueCommentBySlugRequest) (*ProjectComment, error)
+	UpdateIssueCommentBySlug(context.Context, *UpdateIssueCommentBySlugRequest) (*ProjectComment, error)
+	DeleteIssueCommentBySlug(context.Context, *DeleteIssueCommentBySlugRequest) (*emptypb.Empty, error)
+	// GitLab-specific RPCs — gitlab.listMRs / gitlab.resolveMRDiscussion /
+	// gitlab.workItemDetails. Deliberately NOT parameterized by ScmProvider —
+	// these model GitLab-only concepts (iid, discussions). See SOL-013.
+	ListMergeRequests(context.Context, *ListMergeRequestsRequest) (*ListMergeRequestsResponse, error)
+	ResolveMergeRequestDiscussion(context.Context, *ResolveMergeRequestDiscussionRequest) (*MergeRequestDiscussion, error)
+	GetWorkItemDetails(context.Context, *GetWorkItemDetailsRequest) (*WorkItemDetailsGitLab, error)
+	// CheckHostedReviewEligibility — hostedReview.getCreationEligibility.
+	// Already named in scm-integration-service.md §3. A pre-flight check, not
+	// a mutation: does CreatePullRequest have a reasonable chance of
+	// succeeding for this repo+branch right now. See SOL-014.
+	CheckHostedReviewEligibility(context.Context, *CheckHostedReviewEligibilityRequest) (*HostedReviewEligibility, error)
 	mustEmbedUnimplementedScmIntegrationServiceServer()
 }
 
@@ -198,6 +588,87 @@ func (UnimplementedScmIntegrationServiceServer) CompleteOAuthFlow(context.Contex
 }
 func (UnimplementedScmIntegrationServiceServer) RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeAuth not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) MergePullRequest(context.Context, *MergePullRequestRequest) (*MergePullRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MergePullRequest not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) RequestPullRequestReviewers(context.Context, *RequestPullRequestReviewersRequest) (*PullRequest, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestPullRequestReviewers not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) RemovePullRequestReviewers(context.Context, *RemovePullRequestReviewersRequest) (*PullRequest, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemovePullRequestReviewers not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) SetPullRequestAutoMerge(context.Context, *SetPullRequestAutoMergeRequest) (*PullRequest, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetPullRequestAutoMerge not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) UpdateIssue(context.Context, *UpdateIssueRequest) (*Issue, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateIssue not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) GetPullRequestForBranch(context.Context, *GetPullRequestForBranchRequest) (*GetPullRequestForBranchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPullRequestForBranch not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ResolveRepoSlug(context.Context, *ResolveRepoSlugRequest) (*ResolveRepoSlugResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveRepoSlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListAccessibleProjects(context.Context, *ListAccessibleProjectsRequest) (*ListAccessibleProjectsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAccessibleProjects not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ResolveProjectRef(context.Context, *ResolveProjectRefRequest) (*ResolveProjectRefResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveProjectRef not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListProjectViews(context.Context, *ListProjectViewsRequest) (*ListProjectViewsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListProjectViews not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ViewProjectTable(context.Context, *ViewProjectTableRequest) (*ViewProjectTableResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ViewProjectTable not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) UpdateProjectItemField(context.Context, *UpdateProjectItemFieldRequest) (*ProjectItem, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateProjectItemField not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ClearProjectItemField(context.Context, *ClearProjectItemFieldRequest) (*ProjectItem, error) {
+	return nil, status.Error(codes.Unimplemented, "method ClearProjectItemField not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) GetWorkItemDetailsBySlug(context.Context, *GetWorkItemDetailsBySlugRequest) (*WorkItemDetails, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorkItemDetailsBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) UpdateIssueBySlug(context.Context, *UpdateIssueBySlugRequest) (*WorkItemDetails, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateIssueBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) UpdatePullRequestBySlug(context.Context, *UpdatePullRequestBySlugRequest) (*WorkItemDetails, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdatePullRequestBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) UpdateIssueTypeBySlug(context.Context, *UpdateIssueTypeBySlugRequest) (*WorkItemDetails, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateIssueTypeBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListIssueTypesBySlug(context.Context, *ListIssueTypesBySlugRequest) (*ListIssueTypesBySlugResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIssueTypesBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListAssignableUsersBySlug(context.Context, *ListAssignableUsersBySlugRequest) (*ListAssignableUsersBySlugResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAssignableUsersBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListLabelsBySlug(context.Context, *ListLabelsBySlugRequest) (*ListLabelsBySlugResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListLabelsBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) AddIssueCommentBySlug(context.Context, *AddIssueCommentBySlugRequest) (*ProjectComment, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddIssueCommentBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) UpdateIssueCommentBySlug(context.Context, *UpdateIssueCommentBySlugRequest) (*ProjectComment, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateIssueCommentBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) DeleteIssueCommentBySlug(context.Context, *DeleteIssueCommentBySlugRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteIssueCommentBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListMergeRequests(context.Context, *ListMergeRequestsRequest) (*ListMergeRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMergeRequests not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ResolveMergeRequestDiscussion(context.Context, *ResolveMergeRequestDiscussionRequest) (*MergeRequestDiscussion, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveMergeRequestDiscussion not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) GetWorkItemDetails(context.Context, *GetWorkItemDetailsRequest) (*WorkItemDetailsGitLab, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorkItemDetails not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) CheckHostedReviewEligibility(context.Context, *CheckHostedReviewEligibilityRequest) (*HostedReviewEligibility, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckHostedReviewEligibility not implemented")
 }
 func (UnimplementedScmIntegrationServiceServer) mustEmbedUnimplementedScmIntegrationServiceServer() {}
 func (UnimplementedScmIntegrationServiceServer) testEmbeddedByValue()                               {}
@@ -364,6 +835,492 @@ func _ScmIntegrationService_RevokeAuth_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScmIntegrationService_MergePullRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MergePullRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).MergePullRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_MergePullRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).MergePullRequest(ctx, req.(*MergePullRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_RequestPullRequestReviewers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestPullRequestReviewersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).RequestPullRequestReviewers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_RequestPullRequestReviewers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).RequestPullRequestReviewers(ctx, req.(*RequestPullRequestReviewersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_RemovePullRequestReviewers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemovePullRequestReviewersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).RemovePullRequestReviewers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_RemovePullRequestReviewers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).RemovePullRequestReviewers(ctx, req.(*RemovePullRequestReviewersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_SetPullRequestAutoMerge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetPullRequestAutoMergeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).SetPullRequestAutoMerge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_SetPullRequestAutoMerge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).SetPullRequestAutoMerge(ctx, req.(*SetPullRequestAutoMergeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_UpdateIssue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateIssueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).UpdateIssue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_UpdateIssue_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).UpdateIssue(ctx, req.(*UpdateIssueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_GetPullRequestForBranch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPullRequestForBranchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).GetPullRequestForBranch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_GetPullRequestForBranch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).GetPullRequestForBranch(ctx, req.(*GetPullRequestForBranchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ResolveRepoSlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveRepoSlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ResolveRepoSlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ResolveRepoSlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ResolveRepoSlug(ctx, req.(*ResolveRepoSlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListAccessibleProjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAccessibleProjectsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListAccessibleProjects(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListAccessibleProjects_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListAccessibleProjects(ctx, req.(*ListAccessibleProjectsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ResolveProjectRef_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveProjectRefRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ResolveProjectRef(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ResolveProjectRef_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ResolveProjectRef(ctx, req.(*ResolveProjectRefRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListProjectViews_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProjectViewsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListProjectViews(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListProjectViews_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListProjectViews(ctx, req.(*ListProjectViewsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ViewProjectTable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ViewProjectTableRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ViewProjectTable(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ViewProjectTable_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ViewProjectTable(ctx, req.(*ViewProjectTableRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_UpdateProjectItemField_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateProjectItemFieldRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).UpdateProjectItemField(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_UpdateProjectItemField_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).UpdateProjectItemField(ctx, req.(*UpdateProjectItemFieldRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ClearProjectItemField_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClearProjectItemFieldRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ClearProjectItemField(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ClearProjectItemField_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ClearProjectItemField(ctx, req.(*ClearProjectItemFieldRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_GetWorkItemDetailsBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorkItemDetailsBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).GetWorkItemDetailsBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_GetWorkItemDetailsBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).GetWorkItemDetailsBySlug(ctx, req.(*GetWorkItemDetailsBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_UpdateIssueBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateIssueBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).UpdateIssueBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_UpdateIssueBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).UpdateIssueBySlug(ctx, req.(*UpdateIssueBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_UpdatePullRequestBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePullRequestBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).UpdatePullRequestBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_UpdatePullRequestBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).UpdatePullRequestBySlug(ctx, req.(*UpdatePullRequestBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_UpdateIssueTypeBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateIssueTypeBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).UpdateIssueTypeBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_UpdateIssueTypeBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).UpdateIssueTypeBySlug(ctx, req.(*UpdateIssueTypeBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListIssueTypesBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIssueTypesBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListIssueTypesBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListIssueTypesBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListIssueTypesBySlug(ctx, req.(*ListIssueTypesBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListAssignableUsersBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAssignableUsersBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListAssignableUsersBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListAssignableUsersBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListAssignableUsersBySlug(ctx, req.(*ListAssignableUsersBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListLabelsBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListLabelsBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListLabelsBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListLabelsBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListLabelsBySlug(ctx, req.(*ListLabelsBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_AddIssueCommentBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddIssueCommentBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).AddIssueCommentBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_AddIssueCommentBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).AddIssueCommentBySlug(ctx, req.(*AddIssueCommentBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_UpdateIssueCommentBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateIssueCommentBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).UpdateIssueCommentBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_UpdateIssueCommentBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).UpdateIssueCommentBySlug(ctx, req.(*UpdateIssueCommentBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_DeleteIssueCommentBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteIssueCommentBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).DeleteIssueCommentBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_DeleteIssueCommentBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).DeleteIssueCommentBySlug(ctx, req.(*DeleteIssueCommentBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListMergeRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMergeRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListMergeRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListMergeRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListMergeRequests(ctx, req.(*ListMergeRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ResolveMergeRequestDiscussion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveMergeRequestDiscussionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ResolveMergeRequestDiscussion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ResolveMergeRequestDiscussion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ResolveMergeRequestDiscussion(ctx, req.(*ResolveMergeRequestDiscussionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_GetWorkItemDetails_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorkItemDetailsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).GetWorkItemDetails(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_GetWorkItemDetails_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).GetWorkItemDetails(ctx, req.(*GetWorkItemDetailsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_CheckHostedReviewEligibility_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckHostedReviewEligibilityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).CheckHostedReviewEligibility(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_CheckHostedReviewEligibility_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).CheckHostedReviewEligibility(ctx, req.(*CheckHostedReviewEligibilityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScmIntegrationService_ServiceDesc is the grpc.ServiceDesc for ScmIntegrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -402,6 +1359,114 @@ var ScmIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeAuth",
 			Handler:    _ScmIntegrationService_RevokeAuth_Handler,
+		},
+		{
+			MethodName: "MergePullRequest",
+			Handler:    _ScmIntegrationService_MergePullRequest_Handler,
+		},
+		{
+			MethodName: "RequestPullRequestReviewers",
+			Handler:    _ScmIntegrationService_RequestPullRequestReviewers_Handler,
+		},
+		{
+			MethodName: "RemovePullRequestReviewers",
+			Handler:    _ScmIntegrationService_RemovePullRequestReviewers_Handler,
+		},
+		{
+			MethodName: "SetPullRequestAutoMerge",
+			Handler:    _ScmIntegrationService_SetPullRequestAutoMerge_Handler,
+		},
+		{
+			MethodName: "UpdateIssue",
+			Handler:    _ScmIntegrationService_UpdateIssue_Handler,
+		},
+		{
+			MethodName: "GetPullRequestForBranch",
+			Handler:    _ScmIntegrationService_GetPullRequestForBranch_Handler,
+		},
+		{
+			MethodName: "ResolveRepoSlug",
+			Handler:    _ScmIntegrationService_ResolveRepoSlug_Handler,
+		},
+		{
+			MethodName: "ListAccessibleProjects",
+			Handler:    _ScmIntegrationService_ListAccessibleProjects_Handler,
+		},
+		{
+			MethodName: "ResolveProjectRef",
+			Handler:    _ScmIntegrationService_ResolveProjectRef_Handler,
+		},
+		{
+			MethodName: "ListProjectViews",
+			Handler:    _ScmIntegrationService_ListProjectViews_Handler,
+		},
+		{
+			MethodName: "ViewProjectTable",
+			Handler:    _ScmIntegrationService_ViewProjectTable_Handler,
+		},
+		{
+			MethodName: "UpdateProjectItemField",
+			Handler:    _ScmIntegrationService_UpdateProjectItemField_Handler,
+		},
+		{
+			MethodName: "ClearProjectItemField",
+			Handler:    _ScmIntegrationService_ClearProjectItemField_Handler,
+		},
+		{
+			MethodName: "GetWorkItemDetailsBySlug",
+			Handler:    _ScmIntegrationService_GetWorkItemDetailsBySlug_Handler,
+		},
+		{
+			MethodName: "UpdateIssueBySlug",
+			Handler:    _ScmIntegrationService_UpdateIssueBySlug_Handler,
+		},
+		{
+			MethodName: "UpdatePullRequestBySlug",
+			Handler:    _ScmIntegrationService_UpdatePullRequestBySlug_Handler,
+		},
+		{
+			MethodName: "UpdateIssueTypeBySlug",
+			Handler:    _ScmIntegrationService_UpdateIssueTypeBySlug_Handler,
+		},
+		{
+			MethodName: "ListIssueTypesBySlug",
+			Handler:    _ScmIntegrationService_ListIssueTypesBySlug_Handler,
+		},
+		{
+			MethodName: "ListAssignableUsersBySlug",
+			Handler:    _ScmIntegrationService_ListAssignableUsersBySlug_Handler,
+		},
+		{
+			MethodName: "ListLabelsBySlug",
+			Handler:    _ScmIntegrationService_ListLabelsBySlug_Handler,
+		},
+		{
+			MethodName: "AddIssueCommentBySlug",
+			Handler:    _ScmIntegrationService_AddIssueCommentBySlug_Handler,
+		},
+		{
+			MethodName: "UpdateIssueCommentBySlug",
+			Handler:    _ScmIntegrationService_UpdateIssueCommentBySlug_Handler,
+		},
+		{
+			MethodName: "DeleteIssueCommentBySlug",
+			Handler:    _ScmIntegrationService_DeleteIssueCommentBySlug_Handler,
+		},
+		{
+			MethodName: "ListMergeRequests",
+			Handler:    _ScmIntegrationService_ListMergeRequests_Handler,
+		},
+		{
+			MethodName: "ResolveMergeRequestDiscussion",
+			Handler:    _ScmIntegrationService_ResolveMergeRequestDiscussion_Handler,
+		},
+		{
+			MethodName: "GetWorkItemDetails",
+			Handler:    _ScmIntegrationService_GetWorkItemDetails_Handler,
+		},
+		{
+			MethodName: "CheckHostedReviewEligibility",
+			Handler:    _ScmIntegrationService_CheckHostedReviewEligibility_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -20,8 +20,14 @@ import (
 
 // fakeScmIntegrationServiceClient implements
 // scmintegrationv1.ScmIntegrationServiceClient with per-method canned
-// responses/errors, configurable per test.
+// responses/errors, configurable per test. Embeds the real client interface
+// (nil) so new RPCs added to ScmIntegrationServiceClient (TASK-071..090)
+// don't need a hand-written override here unless this file's REST routes
+// actually exercise them — same embed-and-override convention
+// channels_test.go's wscompat fakes use.
 type fakeScmIntegrationServiceClient struct {
+	scmintegrationv1.ScmIntegrationServiceClient
+
 	listIssuesResp *scmintegrationv1.ListIssuesResponse
 	listIssuesErr  error
 
