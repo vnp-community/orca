@@ -5,7 +5,7 @@
 **Service:** `api-gateway` only — no other backend-go service involved
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`, `services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc`, **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

@@ -30,6 +30,7 @@ service ProjectService {
   rpc ListRepos(ListReposRequest) returns (ListReposResponse);
   rpc ReorderRepos(ReorderReposRequest) returns (ReorderReposResponse);
   rpc RemoveRepo(RemoveRepoRequest) returns (RemoveRepoResponse);
+  rpc UpdateRepo(UpdateRepoRequest) returns (UpdateRepoResponse);
 
   // Worktree surface — metadata only, never authoritative for on-disk
   // existence (git-gateway-service reconciles on demand, per
@@ -230,6 +231,16 @@ message RemoveRepoRequest {
 }
 
 message RemoveRepoResponse {}
+
+message UpdateRepoRequest {
+  string repo_id = 1;
+  string url = 2;          // empty = no change
+  string display_name = 3; // empty = no change
+}
+
+message UpdateRepoResponse {
+  Repo repo = 1;
+}
 
 message Worktree {
   string id = 1;

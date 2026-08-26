@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `services/infra-fleet-service/internal/usecase/kill_workspace_port.go` (new), `services/infra-fleet-service/internal/adapter/grpc/server.go`, `services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-170 (needs generated `KillWorkspacePortRequest`/`KillWorkspacePortResponse` stubs)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc`, **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

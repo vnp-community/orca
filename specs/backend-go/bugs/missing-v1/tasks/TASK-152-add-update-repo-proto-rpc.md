@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/proto/orca/project/v1/project.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc` (branch `worktree-agent-a5714e047dcaed0fc`), **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

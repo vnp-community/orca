@@ -92,6 +92,32 @@ type GitExecutor interface {
 	// agent method on either side. See TASK-210's contract correction.
 	RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error)
 	RemoteFileURL(ctx context.Context, repoPath, path, ref string) (string, error)
+
+	// Clone and InitRepo create a worktree that doesn't exist yet — unlike
+	// every other GitExecutor method, they are not called with a repoPath
+	// resolved from an existing worktreeId/connectionId. See DevServerReachability.
+	Clone(ctx context.Context, url, destPath string) (worktreePath, defaultBranch string, err error)
+	InitRepo(ctx context.Context, destPath, defaultBranch string) (path, resolvedDefaultBranch string, err error)
+
+	BaseRefDefault(ctx context.Context, repoPath string) (ref string, err error)
+	SearchRefs(ctx context.Context, repoPath, query string) (refs []string, err error)
+	CheckHooks(ctx context.Context, repoPath string) (installedHooks []string, orcaHooksCurrent bool, err error)
+	ReadIssueCommand(ctx context.Context, repoPath string) (content string, exists bool, err error)
+	WriteIssueCommand(ctx context.Context, repoPath, content string) error
+	ScanSetupScriptImports(ctx context.Context, repoPath string) (importedPaths []string, err error)
+}
+
+
+// DevServerReachability resolves whether devServerID is a live,
+// agent-reachable remote host (relay branch) or this service should
+// operate on its own filesystem (local branch) — used only by Clone/
+// InitRepo, which have no worktree/connectionId yet to resolve through
+// ConnectionResolver (a repo doesn't exist until one of these two calls
+// creates it). Backed by infra-fleet-service's GetFleetHealth (per-dev-server
+// reachability) — the closest existing read to "is this host up" without
+// inventing a new infra-fleet-service RPC.
+type DevServerReachability interface {
+	IsReachable(ctx context.Context, devServerID string) (bool, error)
 }
 
 // AICompleter calls the Dev Server Agent's ai.complete method for

@@ -50,6 +50,14 @@ const (
 	GitGatewayService_ListMarkdownDocuments_FullMethodName       = "/orca.gitgateway.v1.GitGatewayService/ListMarkdownDocuments"
 	GitGatewayService_RenameFile_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/RenameFile"
 	GitGatewayService_CopyFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/CopyFile"
+	GitGatewayService_Clone_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Clone"
+	GitGatewayService_BaseRefDefault_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/BaseRefDefault"
+	GitGatewayService_SearchRefs_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/SearchRefs"
+	GitGatewayService_InitRepo_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/InitRepo"
+	GitGatewayService_CheckHooks_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/CheckHooks"
+	GitGatewayService_ReadIssueCommand_FullMethodName            = "/orca.gitgateway.v1.GitGatewayService/ReadIssueCommand"
+	GitGatewayService_WriteIssueCommand_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/WriteIssueCommand"
+	GitGatewayService_ScanSetupScriptImports_FullMethodName      = "/orca.gitgateway.v1.GitGatewayService/ScanSetupScriptImports"
 )
 
 // GitGatewayServiceClient is the client API for GitGatewayService service.
@@ -104,6 +112,17 @@ type GitGatewayServiceClient interface {
 	// dispatch resolves to a relay target, never a silent no-op.
 	RenameFile(ctx context.Context, in *RenameFileRequest, opts ...grpc.CallOption) (*RenameFileResponse, error)
 	CopyFile(ctx context.Context, in *CopyFileRequest, opts ...grpc.CallOption) (*CopyFileResponse, error)
+	// repo.*-owned RPCs (TASK-156) — file/host operations against a repo's
+	// working tree, not the repos Postgres table (that's project-service's
+	// UpdateRepo). See SOL-023 Bucket 3.
+	Clone(ctx context.Context, in *CloneRequest, opts ...grpc.CallOption) (*CloneResponse, error)
+	BaseRefDefault(ctx context.Context, in *BaseRefDefaultRequest, opts ...grpc.CallOption) (*BaseRefDefaultResponse, error)
+	SearchRefs(ctx context.Context, in *SearchRefsRequest, opts ...grpc.CallOption) (*SearchRefsResponse, error)
+	InitRepo(ctx context.Context, in *InitRepoRequest, opts ...grpc.CallOption) (*InitRepoResponse, error)
+	CheckHooks(ctx context.Context, in *CheckHooksRequest, opts ...grpc.CallOption) (*CheckHooksResponse, error)
+	ReadIssueCommand(ctx context.Context, in *ReadIssueCommandRequest, opts ...grpc.CallOption) (*ReadIssueCommandResponse, error)
+	WriteIssueCommand(ctx context.Context, in *WriteIssueCommandRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ScanSetupScriptImports(ctx context.Context, in *ScanSetupScriptImportsRequest, opts ...grpc.CallOption) (*ScanSetupScriptImportsResponse, error)
 }
 
 type gitGatewayServiceClient struct {
@@ -414,6 +433,86 @@ func (c *gitGatewayServiceClient) CopyFile(ctx context.Context, in *CopyFileRequ
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) Clone(ctx context.Context, in *CloneRequest, opts ...grpc.CallOption) (*CloneResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CloneResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_Clone_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) BaseRefDefault(ctx context.Context, in *BaseRefDefaultRequest, opts ...grpc.CallOption) (*BaseRefDefaultResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BaseRefDefaultResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_BaseRefDefault_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) SearchRefs(ctx context.Context, in *SearchRefsRequest, opts ...grpc.CallOption) (*SearchRefsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchRefsResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_SearchRefs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) InitRepo(ctx context.Context, in *InitRepoRequest, opts ...grpc.CallOption) (*InitRepoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitRepoResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_InitRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CheckHooks(ctx context.Context, in *CheckHooksRequest, opts ...grpc.CallOption) (*CheckHooksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckHooksResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CheckHooks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ReadIssueCommand(ctx context.Context, in *ReadIssueCommandRequest, opts ...grpc.CallOption) (*ReadIssueCommandResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadIssueCommandResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ReadIssueCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) WriteIssueCommand(ctx context.Context, in *WriteIssueCommandRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, GitGatewayService_WriteIssueCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ScanSetupScriptImports(ctx context.Context, in *ScanSetupScriptImportsRequest, opts ...grpc.CallOption) (*ScanSetupScriptImportsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ScanSetupScriptImportsResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ScanSetupScriptImports_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GitGatewayServiceServer is the server API for GitGatewayService service.
 // All implementations must embed UnimplementedGitGatewayServiceServer
 // for forward compatibility.
@@ -466,6 +565,17 @@ type GitGatewayServiceServer interface {
 	// dispatch resolves to a relay target, never a silent no-op.
 	RenameFile(context.Context, *RenameFileRequest) (*RenameFileResponse, error)
 	CopyFile(context.Context, *CopyFileRequest) (*CopyFileResponse, error)
+	// repo.*-owned RPCs (TASK-156) — file/host operations against a repo's
+	// working tree, not the repos Postgres table (that's project-service's
+	// UpdateRepo). See SOL-023 Bucket 3.
+	Clone(context.Context, *CloneRequest) (*CloneResponse, error)
+	BaseRefDefault(context.Context, *BaseRefDefaultRequest) (*BaseRefDefaultResponse, error)
+	SearchRefs(context.Context, *SearchRefsRequest) (*SearchRefsResponse, error)
+	InitRepo(context.Context, *InitRepoRequest) (*InitRepoResponse, error)
+	CheckHooks(context.Context, *CheckHooksRequest) (*CheckHooksResponse, error)
+	ReadIssueCommand(context.Context, *ReadIssueCommandRequest) (*ReadIssueCommandResponse, error)
+	WriteIssueCommand(context.Context, *WriteIssueCommandRequest) (*emptypb.Empty, error)
+	ScanSetupScriptImports(context.Context, *ScanSetupScriptImportsRequest) (*ScanSetupScriptImportsResponse, error)
 	mustEmbedUnimplementedGitGatewayServiceServer()
 }
 
@@ -565,6 +675,30 @@ func (UnimplementedGitGatewayServiceServer) RenameFile(context.Context, *RenameF
 }
 func (UnimplementedGitGatewayServiceServer) CopyFile(context.Context, *CopyFileRequest) (*CopyFileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CopyFile not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) Clone(context.Context, *CloneRequest) (*CloneResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Clone not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) BaseRefDefault(context.Context, *BaseRefDefaultRequest) (*BaseRefDefaultResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BaseRefDefault not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) SearchRefs(context.Context, *SearchRefsRequest) (*SearchRefsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchRefs not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) InitRepo(context.Context, *InitRepoRequest) (*InitRepoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InitRepo not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CheckHooks(context.Context, *CheckHooksRequest) (*CheckHooksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckHooks not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ReadIssueCommand(context.Context, *ReadIssueCommandRequest) (*ReadIssueCommandResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadIssueCommand not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) WriteIssueCommand(context.Context, *WriteIssueCommandRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteIssueCommand not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ScanSetupScriptImports(context.Context, *ScanSetupScriptImportsRequest) (*ScanSetupScriptImportsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ScanSetupScriptImports not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) mustEmbedUnimplementedGitGatewayServiceServer() {}
 func (UnimplementedGitGatewayServiceServer) testEmbeddedByValue()                           {}
@@ -1127,6 +1261,150 @@ func _GitGatewayService_CopyFile_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_Clone_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloneRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).Clone(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_Clone_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).Clone(ctx, req.(*CloneRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_BaseRefDefault_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BaseRefDefaultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).BaseRefDefault(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_BaseRefDefault_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).BaseRefDefault(ctx, req.(*BaseRefDefaultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_SearchRefs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRefsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).SearchRefs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_SearchRefs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).SearchRefs(ctx, req.(*SearchRefsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_InitRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).InitRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_InitRepo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).InitRepo(ctx, req.(*InitRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CheckHooks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckHooksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CheckHooks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CheckHooks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CheckHooks(ctx, req.(*CheckHooksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ReadIssueCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadIssueCommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ReadIssueCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ReadIssueCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ReadIssueCommand(ctx, req.(*ReadIssueCommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_WriteIssueCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteIssueCommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).WriteIssueCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_WriteIssueCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).WriteIssueCommand(ctx, req.(*WriteIssueCommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ScanSetupScriptImports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ScanSetupScriptImportsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ScanSetupScriptImports(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ScanSetupScriptImports_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ScanSetupScriptImports(ctx, req.(*ScanSetupScriptImportsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GitGatewayService_ServiceDesc is the grpc.ServiceDesc for GitGatewayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1253,6 +1531,38 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CopyFile",
 			Handler:    _GitGatewayService_CopyFile_Handler,
+		},
+		{
+			MethodName: "Clone",
+			Handler:    _GitGatewayService_Clone_Handler,
+		},
+		{
+			MethodName: "BaseRefDefault",
+			Handler:    _GitGatewayService_BaseRefDefault_Handler,
+		},
+		{
+			MethodName: "SearchRefs",
+			Handler:    _GitGatewayService_SearchRefs_Handler,
+		},
+		{
+			MethodName: "InitRepo",
+			Handler:    _GitGatewayService_InitRepo_Handler,
+		},
+		{
+			MethodName: "CheckHooks",
+			Handler:    _GitGatewayService_CheckHooks_Handler,
+		},
+		{
+			MethodName: "ReadIssueCommand",
+			Handler:    _GitGatewayService_ReadIssueCommand_Handler,
+		},
+		{
+			MethodName: "WriteIssueCommand",
+			Handler:    _GitGatewayService_WriteIssueCommand_Handler,
+		},
+		{
+			MethodName: "ScanSetupScriptImports",
+			Handler:    _GitGatewayService_ScanSetupScriptImports_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

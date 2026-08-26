@@ -5,7 +5,7 @@
 **Service:** `project-service` + `api-gateway`
 **File:** `services/project-service/internal/usecase/update_repo_test.go` (new), `services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-151, TASK-152, TASK-153, TASK-154
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc` (branch `worktree-agent-a5714e047dcaed0fc`), **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

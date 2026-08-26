@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `services/project-service/internal/usecase/update_repo.go` (new), `services/project-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-152 (needs generated `UpdateRepoRequest`/`UpdateRepoResponse` stubs)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc` (branch `worktree-agent-a5714e047dcaed0fc`), **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

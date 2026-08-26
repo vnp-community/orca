@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` + `api-gateway`
 **File:** `services/infra-fleet-service/internal/usecase/{list_ssh_targets,get_ssh_state,establish_connection}_test.go` (new), `services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-162, TASK-163, TASK-164, TASK-165
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc`, **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

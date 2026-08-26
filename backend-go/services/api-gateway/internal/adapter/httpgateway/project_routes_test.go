@@ -55,6 +55,10 @@ type fakeProjectServiceClient struct {
 	addRepoResp    *projectv1.AddRepoResponse
 	addRepoErr     error
 
+	lastUpdateRepoReq *projectv1.UpdateRepoRequest
+	updateRepoResp    *projectv1.UpdateRepoResponse
+	updateRepoErr     error
+
 	lastListReposReq *projectv1.ListReposRequest
 	listReposResp    *projectv1.ListReposResponse
 	listReposErr     error
@@ -258,6 +262,14 @@ func (f *fakeProjectServiceClient) RemoveRepo(_ context.Context, in *projectv1.R
 		return nil, f.removeRepoErr
 	}
 	return f.removeRepoResp, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateRepo(_ context.Context, in *projectv1.UpdateRepoRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoResponse, error) {
+	f.lastUpdateRepoReq = in
+	if f.updateRepoErr != nil {
+		return nil, f.updateRepoErr
+	}
+	return f.updateRepoResp, nil
 }
 
 func (f *fakeProjectServiceClient) RecordWorktreeCreated(_ context.Context, in *projectv1.RecordWorktreeCreatedRequest, _ ...grpc.CallOption) (*projectv1.RecordWorktreeCreatedResponse, error) {

@@ -1058,6 +1058,498 @@ func (x *ScanWorkspacePortsResponse) GetOpenPorts() []int32 {
 	return nil
 }
 
+type KillWorkspacePortRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	WorktreeId    string                 `protobuf:"bytes,2,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Pid           int32                  `protobuf:"varint,3,opt,name=pid,proto3" json:"pid,omitempty"`
+	Port          int32                  `protobuf:"varint,4,opt,name=port,proto3" json:"port,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KillWorkspacePortRequest) Reset() {
+	*x = KillWorkspacePortRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KillWorkspacePortRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KillWorkspacePortRequest) ProtoMessage() {}
+
+func (x *KillWorkspacePortRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KillWorkspacePortRequest.ProtoReflect.Descriptor instead.
+func (*KillWorkspacePortRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *KillWorkspacePortRequest) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *KillWorkspacePortRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *KillWorkspacePortRequest) GetPid() int32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *KillWorkspacePortRequest) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+type KillWorkspacePortResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"` // populated only when ok is false
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KillWorkspacePortResponse) Reset() {
+	*x = KillWorkspacePortResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KillWorkspacePortResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KillWorkspacePortResponse) ProtoMessage() {}
+
+func (x *KillWorkspacePortResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KillWorkspacePortResponse.ProtoReflect.Descriptor instead.
+func (*KillWorkspacePortResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *KillWorkspacePortResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *KillWorkspacePortResponse) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type SshTarget struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Host          string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	User          string                 `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
+	VaultSshRole  string                 `protobuf:"bytes,5,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"` // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SshTarget) Reset() {
+	*x = SshTarget{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SshTarget) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SshTarget) ProtoMessage() {}
+
+func (x *SshTarget) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SshTarget.ProtoReflect.Descriptor instead.
+func (*SshTarget) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SshTarget) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SshTarget) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *SshTarget) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *SshTarget) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *SshTarget) GetVaultSshRole() string {
+	if x != nil {
+		return x.VaultSshRole
+	}
+	return ""
+}
+
+type ListSshTargetsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSshTargetsRequest) Reset() {
+	*x = ListSshTargetsRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSshTargetsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSshTargetsRequest) ProtoMessage() {}
+
+func (x *ListSshTargetsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSshTargetsRequest.ProtoReflect.Descriptor instead.
+func (*ListSshTargetsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{21}
+}
+
+type ListSshTargetsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SshTargets    []*SshTarget           `protobuf:"bytes,1,rep,name=ssh_targets,json=sshTargets,proto3" json:"ssh_targets,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSshTargetsResponse) Reset() {
+	*x = ListSshTargetsResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSshTargetsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSshTargetsResponse) ProtoMessage() {}
+
+func (x *ListSshTargetsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSshTargetsResponse.ProtoReflect.Descriptor instead.
+func (*ListSshTargetsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ListSshTargetsResponse) GetSshTargets() []*SshTarget {
+	if x != nil {
+		return x.SshTargets
+	}
+	return nil
+}
+
+type GetSshStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SshTargetId   string                 `protobuf:"bytes,1,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSshStateRequest) Reset() {
+	*x = GetSshStateRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSshStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSshStateRequest) ProtoMessage() {}
+
+func (x *GetSshStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSshStateRequest.ProtoReflect.Descriptor instead.
+func (*GetSshStateRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetSshStateRequest) GetSshTargetId() string {
+	if x != nil {
+		return x.SshTargetId
+	}
+	return ""
+}
+
+type GetSshStateResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Connected          bool                   `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"`
+	ConnectionId       string                 `protobuf:"bytes,2,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`                        // empty when not connected
+	LastActivityUnixMs int64                  `protobuf:"varint,3,opt,name=last_activity_unix_ms,json=lastActivityUnixMs,proto3" json:"last_activity_unix_ms,omitempty"` // 0 when not connected or never active
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *GetSshStateResponse) Reset() {
+	*x = GetSshStateResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSshStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSshStateResponse) ProtoMessage() {}
+
+func (x *GetSshStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSshStateResponse.ProtoReflect.Descriptor instead.
+func (*GetSshStateResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetSshStateResponse) GetConnected() bool {
+	if x != nil {
+		return x.Connected
+	}
+	return false
+}
+
+func (x *GetSshStateResponse) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *GetSshStateResponse) GetLastActivityUnixMs() int64 {
+	if x != nil {
+		return x.LastActivityUnixMs
+	}
+	return 0
+}
+
+type EstablishConnectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SshTargetId   string                 `protobuf:"bytes,1,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EstablishConnectionRequest) Reset() {
+	*x = EstablishConnectionRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EstablishConnectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EstablishConnectionRequest) ProtoMessage() {}
+
+func (x *EstablishConnectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EstablishConnectionRequest.ProtoReflect.Descriptor instead.
+func (*EstablishConnectionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *EstablishConnectionRequest) GetSshTargetId() string {
+	if x != nil {
+		return x.SshTargetId
+	}
+	return ""
+}
+
+type Connection struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // the connectionId every other RPC keys on
+	DevServerId         string                 `protobuf:"bytes,2,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	Status              string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"` // "established" | "degraded" | "closed"
+	EstablishedAtUnixMs int64                  `protobuf:"varint,4,opt,name=established_at_unix_ms,json=establishedAtUnixMs,proto3" json:"established_at_unix_ms,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *Connection) Reset() {
+	*x = Connection{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Connection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Connection) ProtoMessage() {}
+
+func (x *Connection) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Connection.ProtoReflect.Descriptor instead.
+func (*Connection) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *Connection) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Connection) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *Connection) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *Connection) GetEstablishedAtUnixMs() int64 {
+	if x != nil {
+		return x.EstablishedAtUnixMs
+	}
+	return 0
+}
+
 var File_orca_infrafleet_v1_infrafleet_proto protoreflect.FileDescriptor
 
 const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
@@ -1132,12 +1624,46 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"worktreeId\";\n" +
 	"\x1aScanWorkspacePortsResponse\x12\x1d\n" +
 	"\n" +
-	"open_ports\x18\x01 \x03(\x05R\topenPorts*\x9b\x01\n" +
+	"open_ports\x18\x01 \x03(\x05R\topenPorts\"\x86\x01\n" +
+	"\x18KillWorkspacePortRequest\x12#\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
+	"\vworktree_id\x18\x02 \x01(\tR\n" +
+	"worktreeId\x12\x10\n" +
+	"\x03pid\x18\x03 \x01(\x05R\x03pid\x12\x12\n" +
+	"\x04port\x18\x04 \x01(\x05R\x04port\"C\n" +
+	"\x19KillWorkspacePortResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x86\x01\n" +
+	"\tSshTarget\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
+	"\x04host\x18\x03 \x01(\tR\x04host\x12\x12\n" +
+	"\x04user\x18\x04 \x01(\tR\x04user\x12$\n" +
+	"\x0evault_ssh_role\x18\x05 \x01(\tR\fvaultSshRole\"\x17\n" +
+	"\x15ListSshTargetsRequest\"X\n" +
+	"\x16ListSshTargetsResponse\x12>\n" +
+	"\vssh_targets\x18\x01 \x03(\v2\x1d.orca.infrafleet.v1.SshTargetR\n" +
+	"sshTargets\"8\n" +
+	"\x12GetSshStateRequest\x12\"\n" +
+	"\rssh_target_id\x18\x01 \x01(\tR\vsshTargetId\"\x8b\x01\n" +
+	"\x13GetSshStateResponse\x12\x1c\n" +
+	"\tconnected\x18\x01 \x01(\bR\tconnected\x12#\n" +
+	"\rconnection_id\x18\x02 \x01(\tR\fconnectionId\x121\n" +
+	"\x15last_activity_unix_ms\x18\x03 \x01(\x03R\x12lastActivityUnixMs\"@\n" +
+	"\x1aEstablishConnectionRequest\x12\"\n" +
+	"\rssh_target_id\x18\x01 \x01(\tR\vsshTargetId\"\x8d\x01\n" +
+	"\n" +
+	"Connection\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
+	"\rdev_server_id\x18\x02 \x01(\tR\vdevServerId\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x123\n" +
+	"\x16established_at_unix_ms\x18\x04 \x01(\x03R\x13establishedAtUnixMs*\x9b\x01\n" +
 	"\x0eConnectionMode\x12\x1f\n" +
 	"\x1bCONNECTION_MODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CONNECTION_MODE_RELAY_SSH\x10\x01\x12#\n" +
 	"\x1fCONNECTION_MODE_RELAY_WEBSOCKET\x10\x02\x12$\n" +
-	" CONNECTION_MODE_DIRECT_WEBSOCKET\x10\x032\xe7\x06\n" +
+	" CONNECTION_MODE_DIRECT_WEBSOCKET\x10\x032\x89\n" +
+	"\n" +
 	"\x11InfraFleetService\x12p\n" +
 	"\x11RegisterDevServer\x12,.orca.infrafleet.v1.RegisterDevServerRequest\x1a-.orca.infrafleet.v1.RegisterDevServerResponse\x12p\n" +
 	"\x11ResolveConnection\x12,.orca.infrafleet.v1.ResolveConnectionRequest\x1a-.orca.infrafleet.v1.ResolveConnectionResponse\x12j\n" +
@@ -1146,7 +1672,11 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x12ScanWorkspacePorts\x12-.orca.infrafleet.v1.ScanWorkspacePortsRequest\x1a..orca.infrafleet.v1.ScanWorkspacePortsResponse\x12g\n" +
 	"\x0eListDevServers\x12).orca.infrafleet.v1.ListDevServersRequest\x1a*.orca.infrafleet.v1.ListDevServersResponse\x12m\n" +
 	"\x10CreateConnection\x12+.orca.infrafleet.v1.CreateConnectionRequest\x1a,.orca.infrafleet.v1.CreateConnectionResponse\x12L\n" +
-	"\x05Relay\x12 .orca.infrafleet.v1.RelayRequest\x1a!.orca.infrafleet.v1.RelayResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1b\x06proto3"
+	"\x05Relay\x12 .orca.infrafleet.v1.RelayRequest\x1a!.orca.infrafleet.v1.RelayResponse\x12g\n" +
+	"\x0eListSshTargets\x12).orca.infrafleet.v1.ListSshTargetsRequest\x1a*.orca.infrafleet.v1.ListSshTargetsResponse\x12^\n" +
+	"\vGetSshState\x12&.orca.infrafleet.v1.GetSshStateRequest\x1a'.orca.infrafleet.v1.GetSshStateResponse\x12e\n" +
+	"\x13EstablishConnection\x12..orca.infrafleet.v1.EstablishConnectionRequest\x1a\x1e.orca.infrafleet.v1.Connection\x12p\n" +
+	"\x11KillWorkspacePort\x12,.orca.infrafleet.v1.KillWorkspacePortRequest\x1a-.orca.infrafleet.v1.KillWorkspacePortResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1b\x06proto3"
 
 var (
 	file_orca_infrafleet_v1_infrafleet_proto_rawDescOnce sync.Once
@@ -1161,7 +1691,7 @@ func file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_infrafleet_v1_infrafleet_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_infrafleet_v1_infrafleet_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_orca_infrafleet_v1_infrafleet_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_orca_infrafleet_v1_infrafleet_proto_goTypes = []any{
 	(ConnectionMode)(0),                // 0: orca.infrafleet.v1.ConnectionMode
 	(*DevServer)(nil),                  // 1: orca.infrafleet.v1.DevServer
@@ -1182,6 +1712,15 @@ var file_orca_infrafleet_v1_infrafleet_proto_goTypes = []any{
 	(*GetFleetHealthResponse)(nil),     // 16: orca.infrafleet.v1.GetFleetHealthResponse
 	(*ScanWorkspacePortsRequest)(nil),  // 17: orca.infrafleet.v1.ScanWorkspacePortsRequest
 	(*ScanWorkspacePortsResponse)(nil), // 18: orca.infrafleet.v1.ScanWorkspacePortsResponse
+	(*KillWorkspacePortRequest)(nil),   // 19: orca.infrafleet.v1.KillWorkspacePortRequest
+	(*KillWorkspacePortResponse)(nil),  // 20: orca.infrafleet.v1.KillWorkspacePortResponse
+	(*SshTarget)(nil),                  // 21: orca.infrafleet.v1.SshTarget
+	(*ListSshTargetsRequest)(nil),      // 22: orca.infrafleet.v1.ListSshTargetsRequest
+	(*ListSshTargetsResponse)(nil),     // 23: orca.infrafleet.v1.ListSshTargetsResponse
+	(*GetSshStateRequest)(nil),         // 24: orca.infrafleet.v1.GetSshStateRequest
+	(*GetSshStateResponse)(nil),        // 25: orca.infrafleet.v1.GetSshStateResponse
+	(*EstablishConnectionRequest)(nil), // 26: orca.infrafleet.v1.EstablishConnectionRequest
+	(*Connection)(nil),                 // 27: orca.infrafleet.v1.Connection
 }
 var file_orca_infrafleet_v1_infrafleet_proto_depIdxs = []int32{
 	0,  // 0: orca.infrafleet.v1.DevServer.mode:type_name -> orca.infrafleet.v1.ConnectionMode
@@ -1190,27 +1729,36 @@ var file_orca_infrafleet_v1_infrafleet_proto_depIdxs = []int32{
 	1,  // 3: orca.infrafleet.v1.ResolveConnectionResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
 	1,  // 4: orca.infrafleet.v1.ListDevServersResponse.dev_servers:type_name -> orca.infrafleet.v1.DevServer
 	15, // 5: orca.infrafleet.v1.GetFleetHealthResponse.statuses:type_name -> orca.infrafleet.v1.DevServerHealth
-	2,  // 6: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:input_type -> orca.infrafleet.v1.RegisterDevServerRequest
-	4,  // 7: orca.infrafleet.v1.InfraFleetService.ResolveConnection:input_type -> orca.infrafleet.v1.ResolveConnectionRequest
-	12, // 8: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:input_type -> orca.infrafleet.v1.CreateSshTargetRequest
-	14, // 9: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:input_type -> orca.infrafleet.v1.GetFleetHealthRequest
-	17, // 10: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:input_type -> orca.infrafleet.v1.ScanWorkspacePortsRequest
-	6,  // 11: orca.infrafleet.v1.InfraFleetService.ListDevServers:input_type -> orca.infrafleet.v1.ListDevServersRequest
-	8,  // 12: orca.infrafleet.v1.InfraFleetService.CreateConnection:input_type -> orca.infrafleet.v1.CreateConnectionRequest
-	10, // 13: orca.infrafleet.v1.InfraFleetService.Relay:input_type -> orca.infrafleet.v1.RelayRequest
-	3,  // 14: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:output_type -> orca.infrafleet.v1.RegisterDevServerResponse
-	5,  // 15: orca.infrafleet.v1.InfraFleetService.ResolveConnection:output_type -> orca.infrafleet.v1.ResolveConnectionResponse
-	13, // 16: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:output_type -> orca.infrafleet.v1.CreateSshTargetResponse
-	16, // 17: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:output_type -> orca.infrafleet.v1.GetFleetHealthResponse
-	18, // 18: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:output_type -> orca.infrafleet.v1.ScanWorkspacePortsResponse
-	7,  // 19: orca.infrafleet.v1.InfraFleetService.ListDevServers:output_type -> orca.infrafleet.v1.ListDevServersResponse
-	9,  // 20: orca.infrafleet.v1.InfraFleetService.CreateConnection:output_type -> orca.infrafleet.v1.CreateConnectionResponse
-	11, // 21: orca.infrafleet.v1.InfraFleetService.Relay:output_type -> orca.infrafleet.v1.RelayResponse
-	14, // [14:22] is the sub-list for method output_type
-	6,  // [6:14] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	21, // 6: orca.infrafleet.v1.ListSshTargetsResponse.ssh_targets:type_name -> orca.infrafleet.v1.SshTarget
+	2,  // 7: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:input_type -> orca.infrafleet.v1.RegisterDevServerRequest
+	4,  // 8: orca.infrafleet.v1.InfraFleetService.ResolveConnection:input_type -> orca.infrafleet.v1.ResolveConnectionRequest
+	12, // 9: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:input_type -> orca.infrafleet.v1.CreateSshTargetRequest
+	14, // 10: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:input_type -> orca.infrafleet.v1.GetFleetHealthRequest
+	17, // 11: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:input_type -> orca.infrafleet.v1.ScanWorkspacePortsRequest
+	6,  // 12: orca.infrafleet.v1.InfraFleetService.ListDevServers:input_type -> orca.infrafleet.v1.ListDevServersRequest
+	8,  // 13: orca.infrafleet.v1.InfraFleetService.CreateConnection:input_type -> orca.infrafleet.v1.CreateConnectionRequest
+	10, // 14: orca.infrafleet.v1.InfraFleetService.Relay:input_type -> orca.infrafleet.v1.RelayRequest
+	22, // 15: orca.infrafleet.v1.InfraFleetService.ListSshTargets:input_type -> orca.infrafleet.v1.ListSshTargetsRequest
+	24, // 16: orca.infrafleet.v1.InfraFleetService.GetSshState:input_type -> orca.infrafleet.v1.GetSshStateRequest
+	26, // 17: orca.infrafleet.v1.InfraFleetService.EstablishConnection:input_type -> orca.infrafleet.v1.EstablishConnectionRequest
+	19, // 18: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:input_type -> orca.infrafleet.v1.KillWorkspacePortRequest
+	3,  // 19: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:output_type -> orca.infrafleet.v1.RegisterDevServerResponse
+	5,  // 20: orca.infrafleet.v1.InfraFleetService.ResolveConnection:output_type -> orca.infrafleet.v1.ResolveConnectionResponse
+	13, // 21: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:output_type -> orca.infrafleet.v1.CreateSshTargetResponse
+	16, // 22: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:output_type -> orca.infrafleet.v1.GetFleetHealthResponse
+	18, // 23: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:output_type -> orca.infrafleet.v1.ScanWorkspacePortsResponse
+	7,  // 24: orca.infrafleet.v1.InfraFleetService.ListDevServers:output_type -> orca.infrafleet.v1.ListDevServersResponse
+	9,  // 25: orca.infrafleet.v1.InfraFleetService.CreateConnection:output_type -> orca.infrafleet.v1.CreateConnectionResponse
+	11, // 26: orca.infrafleet.v1.InfraFleetService.Relay:output_type -> orca.infrafleet.v1.RelayResponse
+	23, // 27: orca.infrafleet.v1.InfraFleetService.ListSshTargets:output_type -> orca.infrafleet.v1.ListSshTargetsResponse
+	25, // 28: orca.infrafleet.v1.InfraFleetService.GetSshState:output_type -> orca.infrafleet.v1.GetSshStateResponse
+	27, // 29: orca.infrafleet.v1.InfraFleetService.EstablishConnection:output_type -> orca.infrafleet.v1.Connection
+	20, // 30: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:output_type -> orca.infrafleet.v1.KillWorkspacePortResponse
+	19, // [19:31] is the sub-list for method output_type
+	7,  // [7:19] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_orca_infrafleet_v1_infrafleet_proto_init() }
@@ -1224,7 +1772,7 @@ func file_orca_infrafleet_v1_infrafleet_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_infrafleet_v1_infrafleet_proto_rawDesc), len(file_orca_infrafleet_v1_infrafleet_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   18,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

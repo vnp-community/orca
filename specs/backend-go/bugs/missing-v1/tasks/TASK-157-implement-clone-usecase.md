@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `services/git-gateway-service/internal/usecase/ports.go`, `services/git-gateway-service/internal/usecase/clone.go` (new), `services/git-gateway-service/internal/usecase/init_repo.go` (new), `services/git-gateway-service/internal/adapter/localgit/executor.go`, `services/git-gateway-service/internal/adapter/grpcclient/relay_executor.go`, `services/git-gateway-service/internal/adapter/grpcclient/resolver.go`
 **Depends on:** TASK-156 (needs generated `CloneRequest`/`InitRepoRequest` stubs)
-**Status:** `[ ]` TODO
+**Status:** `[needs merge with git.*/files.* group]` — implemented in worktree `agent-a5714e047dcaed0fc`, committed as `56c5fbeff`, builds/tests green in isolation. Touches the same `gitgateway.proto`/`server.go`/`main.go` as the concurrent git.*/files.*/worktree.* work — needs manual reconciliation at merge. Found `DevServerReachability` bug: the task doc's placeholder `GetDevServers()` was wrong, real fix uses `GetFleetHealth`'s `resp.GetStatuses()`.
 
 ---
 

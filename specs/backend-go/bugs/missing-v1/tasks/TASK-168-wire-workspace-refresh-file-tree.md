@@ -5,7 +5,7 @@
 **Service:** `api-gateway` only — wraps whichever service ends up owning `files.*`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** SOL-009's `files.*` directory-listing RPC (informational — SOL-009 is a different bug/solution outside this task range; that RPC does not exist yet and this task cannot be started until it does. Do not treat this as a TASK-1xx number — no such number is known from here.)
-**Status:** `[ ]` TODO — BLOCKED
+**Status:** `[blocked]` — confirmed no `files.*` RPC exists anywhere in this worktree, per instructions. **Caveat:** a concurrent group (git.*/files.* work, worktree `agent-a2c23166bb1914586`) DID implement `files.*` in its own isolated worktree — re-check this task once that work merges, it may become unblocked. — BLOCKED
 
 ---
 

@@ -12,6 +12,12 @@ import (
 type fakeConnectionRepository struct {
 	created []domain.Connection
 	err     error
+
+	// found/activeConn/activeErr drive GetActiveByDevServer's fake answer —
+	// used by get_ssh_state_test.go.
+	found      bool
+	activeConn domain.Connection
+	activeErr  error
 }
 
 func (f *fakeConnectionRepository) CreateConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error) {
@@ -20,6 +26,17 @@ func (f *fakeConnectionRepository) CreateConnection(ctx context.Context, conn do
 	}
 	f.created = append(f.created, conn)
 	return conn, nil
+}
+
+// GetActiveByDevServer implements usecase.ConnectionRepository.GetActiveByDevServer.
+func (f *fakeConnectionRepository) GetActiveByDevServer(ctx context.Context, tenantID, devServerID string) (domain.Connection, bool, error) {
+	if f.activeErr != nil {
+		return domain.Connection{}, false, f.activeErr
+	}
+	if !f.found {
+		return domain.Connection{}, false, nil
+	}
+	return f.activeConn, true, nil
 }
 
 func TestCreateConnection_RequiresTenantContext(t *testing.T) {

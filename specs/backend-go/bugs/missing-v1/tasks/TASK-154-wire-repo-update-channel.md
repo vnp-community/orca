@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-151 (`registerRepoChannels` must exist), TASK-153 (`UpdateRepo` RPC must exist)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc` (branch `worktree-agent-a5714e047dcaed0fc`), **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

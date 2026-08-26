@@ -33,6 +33,7 @@ const (
 	ProjectService_ListRepos_FullMethodName                    = "/orca.project.v1.ProjectService/ListRepos"
 	ProjectService_ReorderRepos_FullMethodName                 = "/orca.project.v1.ProjectService/ReorderRepos"
 	ProjectService_RemoveRepo_FullMethodName                   = "/orca.project.v1.ProjectService/RemoveRepo"
+	ProjectService_UpdateRepo_FullMethodName                   = "/orca.project.v1.ProjectService/UpdateRepo"
 	ProjectService_RecordWorktreeCreated_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
 	ProjectService_RecordWorktreeRemoved_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
 	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
@@ -83,6 +84,7 @@ type ProjectServiceClient interface {
 	ListRepos(ctx context.Context, in *ListReposRequest, opts ...grpc.CallOption) (*ListReposResponse, error)
 	ReorderRepos(ctx context.Context, in *ReorderReposRequest, opts ...grpc.CallOption) (*ReorderReposResponse, error)
 	RemoveRepo(ctx context.Context, in *RemoveRepoRequest, opts ...grpc.CallOption) (*RemoveRepoResponse, error)
+	UpdateRepo(ctx context.Context, in *UpdateRepoRequest, opts ...grpc.CallOption) (*UpdateRepoResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -264,6 +266,16 @@ func (c *projectServiceClient) RemoveRepo(ctx context.Context, in *RemoveRepoReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RemoveRepoResponse)
 	err := c.cc.Invoke(ctx, ProjectService_RemoveRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateRepo(ctx context.Context, in *UpdateRepoRequest, opts ...grpc.CallOption) (*UpdateRepoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateRepoResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateRepo_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -516,6 +528,7 @@ type ProjectServiceServer interface {
 	ListRepos(context.Context, *ListReposRequest) (*ListReposResponse, error)
 	ReorderRepos(context.Context, *ReorderReposRequest) (*ReorderReposResponse, error)
 	RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error)
+	UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -604,6 +617,9 @@ func (UnimplementedProjectServiceServer) ReorderRepos(context.Context, *ReorderR
 }
 func (UnimplementedProjectServiceServer) RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveRepo not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateRepo not implemented")
 }
 func (UnimplementedProjectServiceServer) RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecordWorktreeCreated not implemented")
@@ -940,6 +956,24 @@ func _ProjectService_RemoveRepo_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).RemoveRepo(ctx, req.(*RemoveRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateRepo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateRepo(ctx, req.(*UpdateRepoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1402,6 +1436,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveRepo",
 			Handler:    _ProjectService_RemoveRepo_Handler,
+		},
+		{
+			MethodName: "UpdateRepo",
+			Handler:    _ProjectService_UpdateRepo_Handler,
 		},
 		{
 			MethodName: "RecordWorktreeCreated",

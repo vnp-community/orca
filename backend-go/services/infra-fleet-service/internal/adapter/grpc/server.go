@@ -28,6 +28,11 @@ type Server struct {
 	listDevServers     *usecase.ListDevServers
 	createConnection   *usecase.CreateConnection
 	relay              *usecase.Relay
+
+	listSshTargets      *usecase.ListSshTargets
+	getSshState         *usecase.GetSshState
+	establishConnection *usecase.EstablishConnection
+	killWorkspacePort   *usecase.KillWorkspacePort
 }
 
 func New(
@@ -39,6 +44,10 @@ func New(
 	listDevServers *usecase.ListDevServers,
 	createConnection *usecase.CreateConnection,
 	relay *usecase.Relay,
+	listSshTargets *usecase.ListSshTargets,
+	getSshState *usecase.GetSshState,
+	establishConnection *usecase.EstablishConnection,
+	killWorkspacePort *usecase.KillWorkspacePort,
 ) *Server {
 	return &Server{
 		registerDevServer:  registerDevServer,
@@ -49,6 +58,11 @@ func New(
 		listDevServers:     listDevServers,
 		createConnection:   createConnection,
 		relay:              relay,
+
+		listSshTargets:      listSshTargets,
+		getSshState:         getSshState,
+		establishConnection: establishConnection,
+		killWorkspacePort:   killWorkspacePort,
 	}
 }
 
@@ -168,6 +182,57 @@ func (s *Server) ScanWorkspacePorts(ctx context.Context, req *infrafleetv1.ScanW
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &infrafleetv1.ScanWorkspacePortsResponse{OpenPorts: ports}, nil
+}
+
+func (s *Server) ListSshTargets(ctx context.Context, req *infrafleetv1.ListSshTargetsRequest) (*infrafleetv1.ListSshTargetsResponse, error) {
+	targets, err := s.listSshTargets.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.SshTarget, 0, len(targets))
+	for _, t := range targets {
+		out = append(out, &infrafleetv1.SshTarget{
+			Id: t.ID, TenantId: t.TenantID, Host: t.Host, User: t.UserName, VaultSshRole: t.VaultSSHRole,
+		})
+	}
+	return &infrafleetv1.ListSshTargetsResponse{SshTargets: out}, nil
+}
+
+func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error) {
+	state, err := s.getSshState.Execute(ctx, usecase.SshStateInput{SshTargetID: req.GetSshTargetId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.GetSshStateResponse{Connected: state.Connected, ConnectionId: state.ConnectionID}
+	if state.LastActivity != nil {
+		resp.LastActivityUnixMs = state.LastActivity.UnixMilli()
+	}
+	return resp, nil
+}
+
+func (s *Server) EstablishConnection(ctx context.Context, req *infrafleetv1.EstablishConnectionRequest) (*infrafleetv1.Connection, error) {
+	conn, err := s.establishConnection.Execute(ctx, usecase.EstablishConnectionInput{SshTargetID: req.GetSshTargetId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.Connection{Id: conn.ID, DevServerId: conn.DevServerID, Status: conn.Status}
+	if conn.LastActivityAt != nil {
+		resp.EstablishedAtUnixMs = conn.LastActivityAt.UnixMilli()
+	}
+	return resp, nil
+}
+
+func (s *Server) KillWorkspacePort(ctx context.Context, req *infrafleetv1.KillWorkspacePortRequest) (*infrafleetv1.KillWorkspacePortResponse, error) {
+	ok, reason, err := s.killWorkspacePort.Execute(ctx, usecase.KillWorkspacePortInput{
+		ConnectionID: req.GetConnectionId(),
+		WorktreeID:   req.GetWorktreeId(),
+		PID:          req.GetPid(),
+		Port:         req.GetPort(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.KillWorkspacePortResponse{Ok: ok, Reason: reason}, nil
 }
 
 func toDomainConnectionMode(m infrafleetv1.ConnectionMode) domain.ConnectionMode {

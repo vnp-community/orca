@@ -59,6 +59,14 @@ type Server struct {
 	listMarkdownDocuments *usecase.ListMarkdownDocumentsUseCase
 	renameFile            *usecase.RenameFileUseCase
 	copyFile              *usecase.CopyFileUseCase
+	clone                  *usecase.Clone
+	initRepo               *usecase.InitRepo
+	baseRefDefault         *usecase.BaseRefDefault
+	searchRefs             *usecase.SearchRefs
+	checkHooks             *usecase.CheckHooks
+	readIssueCommand       *usecase.ReadIssueCommand
+	writeIssueCommand      *usecase.WriteIssueCommand
+	scanSetupScriptImports *usecase.ScanSetupScriptImports
 }
 
 // New wires every usecase this server dispatches to. Parameter order
@@ -95,6 +103,14 @@ func New(
 	listMarkdownDocuments *usecase.ListMarkdownDocumentsUseCase,
 	renameFile *usecase.RenameFileUseCase,
 	copyFile *usecase.CopyFileUseCase,
+	clone *usecase.Clone,
+	initRepo *usecase.InitRepo,
+	baseRefDefault *usecase.BaseRefDefault,
+	searchRefs *usecase.SearchRefs,
+	checkHooks *usecase.CheckHooks,
+	readIssueCommand *usecase.ReadIssueCommand,
+	writeIssueCommand *usecase.WriteIssueCommand,
+	scanSetupScriptImports *usecase.ScanSetupScriptImports,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -127,6 +143,15 @@ func New(
 		listMarkdownDocuments:       listMarkdownDocuments,
 		renameFile:                  renameFile,
 		copyFile:                    copyFile,
+
+		clone:                  clone,
+		initRepo:               initRepo,
+		baseRefDefault:         baseRefDefault,
+		searchRefs:             searchRefs,
+		checkHooks:             checkHooks,
+		readIssueCommand:       readIssueCommand,
+		writeIssueCommand:      writeIssueCommand,
+		scanSetupScriptImports: scanSetupScriptImports,
 	}
 }
 
@@ -243,6 +268,28 @@ func (s *Server) ForkSync(ctx context.Context, req *gitgatewayv1.ForkSyncRequest
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.ForkSyncResponse{Ahead: int32(result.Ahead), Behind: int32(result.Behind), Diverged: result.Diverged}, nil
+}
+
+// ── repo.* (TASK-156) ─────────────────────────────────────────────────────
+
+func (s *Server) Clone(ctx context.Context, req *gitgatewayv1.CloneRequest) (*gitgatewayv1.CloneResponse, error) {
+	result, err := s.clone.Execute(ctx, usecase.CloneInput{
+		DevServerID: req.GetDevServerId(), URL: req.GetUrl(), DestPath: req.GetDestPath(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CloneResponse{WorktreePath: result.WorktreePath, DefaultBranch: result.DefaultBranch}, nil
+}
+
+func (s *Server) InitRepo(ctx context.Context, req *gitgatewayv1.InitRepoRequest) (*gitgatewayv1.InitRepoResponse, error) {
+	result, err := s.initRepo.Execute(ctx, usecase.InitRepoInput{
+		DevServerID: req.GetDevServerId(), DestPath: req.GetDestPath(), DefaultBranch: req.GetDefaultBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.InitRepoResponse{Path: result.Path, DefaultBranch: result.DefaultBranch}, nil
 }
 
 func (s *Server) UpstreamStatus(ctx context.Context, req *gitgatewayv1.UpstreamStatusRequest) (*gitgatewayv1.UpstreamStatusResponse, error) {
@@ -426,6 +473,54 @@ func (s *Server) CopyFile(ctx context.Context, req *gitgatewayv1.CopyFileRequest
 		return nil, toFileGRPCStatus(err)
 	}
 	return &gitgatewayv1.CopyFileResponse{}, nil
+}
+
+func (s *Server) BaseRefDefault(ctx context.Context, req *gitgatewayv1.BaseRefDefaultRequest) (*gitgatewayv1.BaseRefDefaultResponse, error) {
+	ref, err := s.baseRefDefault.Execute(ctx, usecase.BaseRefDefaultInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.BaseRefDefaultResponse{Ref: ref}, nil
+}
+
+func (s *Server) SearchRefs(ctx context.Context, req *gitgatewayv1.SearchRefsRequest) (*gitgatewayv1.SearchRefsResponse, error) {
+	refs, err := s.searchRefs.Execute(ctx, usecase.SearchRefsInput{WorktreeID: req.GetWorktreeId(), Query: req.GetQuery()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.SearchRefsResponse{Refs: refs}, nil
+}
+
+func (s *Server) CheckHooks(ctx context.Context, req *gitgatewayv1.CheckHooksRequest) (*gitgatewayv1.CheckHooksResponse, error) {
+	result, err := s.checkHooks.Execute(ctx, usecase.CheckHooksInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CheckHooksResponse{InstalledHooks: result.InstalledHooks, OrcaHooksCurrent: result.OrcaHooksCurrent}, nil
+}
+
+func (s *Server) ReadIssueCommand(ctx context.Context, req *gitgatewayv1.ReadIssueCommandRequest) (*gitgatewayv1.ReadIssueCommandResponse, error) {
+	result, err := s.readIssueCommand.Execute(ctx, usecase.ReadIssueCommandInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ReadIssueCommandResponse{Content: result.Content, Exists: result.Exists}, nil
+}
+
+func (s *Server) WriteIssueCommand(ctx context.Context, req *gitgatewayv1.WriteIssueCommandRequest) (*emptypb.Empty, error) {
+	err := s.writeIssueCommand.Execute(ctx, usecase.WriteIssueCommandInput{WorktreeID: req.GetWorktreeId(), Content: req.GetContent()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.ScanSetupScriptImportsRequest) (*gitgatewayv1.ScanSetupScriptImportsResponse, error) {
+	paths, err := s.scanSetupScriptImports.Execute(ctx, usecase.ScanSetupScriptImportsInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ScanSetupScriptImportsResponse{ImportedPaths: paths}, nil
 }
 
 func toProtoFileStatuses(files []domain.FileStatus) []*gitgatewayv1.FileStatus {

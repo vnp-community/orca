@@ -120,6 +120,46 @@ func (fakeExecutor) Glob(context.Context, string, string, int) ([]string, error)
 func (fakeExecutor) Rename(context.Context, string, string, string) error { return nil }
 func (fakeExecutor) Copy(context.Context, string, string, string) error   { return nil }
 
+func (fakeExecutor) Clone(context.Context, string, string) (string, string, error) {
+	return "/repo/cloned", "main", nil
+}
+
+func (fakeExecutor) InitRepo(context.Context, string, string) (string, string, error) {
+	return "/repo/init", "main", nil
+}
+
+func (fakeExecutor) BaseRefDefault(context.Context, string) (string, error) {
+	return "main", nil
+}
+
+func (fakeExecutor) SearchRefs(context.Context, string, string) ([]string, error) {
+	return []string{"main", "feature/x"}, nil
+}
+
+func (fakeExecutor) CheckHooks(context.Context, string) ([]string, bool, error) {
+	return []string{"pre-commit", "post-checkout"}, true, nil
+}
+
+func (fakeExecutor) ReadIssueCommand(context.Context, string) (string, bool, error) {
+	return `{"command":"gh issue view"}`, true, nil
+}
+
+func (fakeExecutor) WriteIssueCommand(context.Context, string, string) error {
+	return nil
+}
+
+func (fakeExecutor) ScanSetupScriptImports(context.Context, string) ([]string, error) {
+	return []string{"source ./lib.sh"}, nil
+}
+
+// fakeReachability is a usecase.DevServerReachability stub for exercising
+// Clone/InitRepo's wire<->usecase translation.
+type fakeReachability struct{ reachable bool }
+
+func (f fakeReachability) IsReachable(context.Context, string) (bool, error) {
+	return f.reachable, nil
+}
+
 // fakeAICompleter is a usecase.AICompleter stub for exercising
 // GenerateCommitMessage's wire<->usecase translation.
 type fakeAICompleter struct{ message string }
@@ -139,6 +179,7 @@ func (fakeAIProviderResolver) ResolveProvider(context.Context, string, string) (
 func newTestServerWithResolver(resolver *fakeResolver) *Server {
 	exec := fakeExecutor{}
 	getStatusUC := usecase.NewGetStatus(resolver, exec, exec)
+	reachability := fakeReachability{reachable: false}
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	completer := fakeAICompleter{message: "generated message"}
 	return New(
@@ -172,6 +213,14 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewListMarkdownDocumentsUseCase(resolver, exec, exec),
 		usecase.NewRenameFileUseCase(resolver, exec),
 		usecase.NewCopyFileUseCase(resolver, exec),
+		usecase.NewClone(reachability, exec, exec),
+		usecase.NewInitRepo(reachability, exec, exec),
+		usecase.NewBaseRefDefault(resolver, exec, exec),
+		usecase.NewSearchRefs(resolver, exec, exec),
+		usecase.NewCheckHooks(resolver, exec, exec),
+		usecase.NewReadIssueCommand(resolver, exec, exec),
+		usecase.NewWriteIssueCommand(resolver, exec, exec),
+		usecase.NewScanSetupScriptImports(resolver, exec, exec),
 	)
 }
 

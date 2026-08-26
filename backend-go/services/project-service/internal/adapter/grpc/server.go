@@ -38,6 +38,7 @@ type Server struct {
 	listRepos    *usecase.ListRepos
 	reorderRepos *usecase.ReorderRepos
 	removeRepo   *usecase.RemoveRepo
+	updateRepo   *usecase.UpdateRepo
 
 	recordWorktreeCreated *usecase.RecordWorktreeCreated
 	recordWorktreeRemoved *usecase.RecordWorktreeRemoved
@@ -82,6 +83,7 @@ type Deps struct {
 	ListRepos    *usecase.ListRepos
 	ReorderRepos *usecase.ReorderRepos
 	RemoveRepo   *usecase.RemoveRepo
+	UpdateRepo   *usecase.UpdateRepo
 
 	RecordWorktreeCreated *usecase.RecordWorktreeCreated
 	RecordWorktreeRemoved *usecase.RecordWorktreeRemoved
@@ -124,6 +126,7 @@ func New(deps Deps) *Server {
 		listRepos:    deps.ListRepos,
 		reorderRepos: deps.ReorderRepos,
 		removeRepo:   deps.RemoveRepo,
+		updateRepo:   deps.UpdateRepo,
 
 		recordWorktreeCreated: deps.RecordWorktreeCreated,
 		recordWorktreeRemoved: deps.RecordWorktreeRemoved,
@@ -308,6 +311,18 @@ func (s *Server) RemoveRepo(ctx context.Context, req *projectv1.RemoveRepoReques
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.RemoveRepoResponse{}, nil
+}
+
+func (s *Server) UpdateRepo(ctx context.Context, req *projectv1.UpdateRepoRequest) (*projectv1.UpdateRepoResponse, error) {
+	repo, err := s.updateRepo.Execute(ctx, usecase.UpdateRepoInput{
+		RepoID:      req.GetRepoId(),
+		URL:         req.GetUrl(),
+		DisplayName: req.GetDisplayName(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateRepoResponse{Repo: toProtoRepo(repo)}, nil
 }
 
 func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.RecordWorktreeCreatedRequest) (*projectv1.RecordWorktreeCreatedResponse, error) {

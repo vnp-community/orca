@@ -29,6 +29,17 @@ service InfraFleetService {
   // shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
   // all go through this one).
   rpc Relay(RelayRequest) returns (RelayResponse);
+  // ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
+  // latter derives from this same read — see wscompat's registerSshChannels).
+  rpc ListSshTargets(ListSshTargetsRequest) returns (ListSshTargetsResponse);
+  // GetSshState is a local read (no dial) of whichever connection (if any)
+  // currently binds this SSH target's dev server.
+  rpc GetSshState(GetSshStateRequest) returns (GetSshStateResponse);
+  // EstablishConnection performs the actual SSH + Dev Server Agent
+  // handshake synchronously — it IS the connection-establishment act, not
+  // a record of one requested. See usecase.EstablishConnection's doc comment.
+  rpc EstablishConnection(EstablishConnectionRequest) returns (Connection);
+  rpc KillWorkspacePort(KillWorkspacePortRequest) returns (KillWorkspacePortResponse);
 }
 
 enum ConnectionMode {
@@ -150,4 +161,54 @@ message ScanWorkspacePortsRequest {
 
 message ScanWorkspacePortsResponse {
   repeated int32 open_ports = 1;
+}
+
+message KillWorkspacePortRequest {
+  string connection_id = 1;
+  string worktree_id = 2;
+  int32 pid = 3;
+  int32 port = 4;
+}
+
+message KillWorkspacePortResponse {
+  bool ok = 1;
+  string reason = 2; // populated only when ok is false
+}
+
+message SshTarget {
+  string id = 1;
+  string tenant_id = 2;
+  string host = 3;
+  string user = 4;
+  string vault_ssh_role = 5; // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+}
+
+message ListSshTargetsRequest {
+  // tenant_id intentionally absent — pulled from context, same convention
+  // as ListDevServersRequest.
+}
+
+message ListSshTargetsResponse {
+  repeated SshTarget ssh_targets = 1;
+}
+
+message GetSshStateRequest {
+  string ssh_target_id = 1;
+}
+
+message GetSshStateResponse {
+  bool connected = 1;
+  string connection_id = 2;       // empty when not connected
+  int64 last_activity_unix_ms = 3; // 0 when not connected or never active
+}
+
+message EstablishConnectionRequest {
+  string ssh_target_id = 1;
+}
+
+message Connection {
+  string id = 1;                 // the connectionId every other RPC keys on
+  string dev_server_id = 2;
+  string status = 3;             // "established" | "degraded" | "closed"
+  int64 established_at_unix_ms = 4;
 }

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `services/infra-fleet-service/internal/usecase/ports.go`, `services/infra-fleet-service/internal/domain/{connection,dev_server}.go`, `services/infra-fleet-service/internal/adapter/postgres/repository.go`, `services/infra-fleet-service/migrations/0004_connection_status.up.sql` (new)
 **Depends on:** TASK-162 (grounds this task's message shapes)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc`, **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

@@ -97,6 +97,7 @@ func run() error {
 	defer func() { _ = aiProviderConn.Close() }()
 	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
 	aiProviderResolver := grpcclient.NewAIProviderResolver(aiProviderClient)
+	devServerReachability := grpcclient.NewDevServerReachability(infraFleetClient)
 
 	getStatusUC := usecase.NewGetStatus(resolver, local, relay)
 	getDiffUC := usecase.NewGetDiff(resolver, local, relay)
@@ -142,6 +143,14 @@ func run() error {
 	listMarkdownDocumentsUC := usecase.NewListMarkdownDocumentsUseCase(resolver, localFS, relayFS)
 	renameFileUC := usecase.NewRenameFileUseCase(resolver, localFS)
 	copyFileUC := usecase.NewCopyFileUseCase(resolver, localFS)
+	cloneUC := usecase.NewClone(devServerReachability, local, relay)
+	initRepoUC := usecase.NewInitRepo(devServerReachability, local, relay)
+	baseRefDefaultUC := usecase.NewBaseRefDefault(resolver, local, relay)
+	searchRefsUC := usecase.NewSearchRefs(resolver, local, relay)
+	checkHooksUC := usecase.NewCheckHooks(resolver, local, relay)
+	readIssueCommandUC := usecase.NewReadIssueCommand(resolver, local, relay)
+	writeIssueCommandUC := usecase.NewWriteIssueCommand(resolver, local, relay)
+	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(resolver, local, relay)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
@@ -153,6 +162,8 @@ func run() error {
 		readFileUC, readFileChunkUC, readFilePreviewUC, readDirUC, writeFileUC, writeFileChunkUC,
 		createDirUC, deleteFileUC, statFileUC, searchFilesUC, listAllFilesUC, listMarkdownDocumentsUC,
 		renameFileUC, copyFileUC,
+		cloneUC, initRepoUC, baseRefDefaultUC, searchRefsUC, checkHooksUC,
+		readIssueCommandUC, writeIssueCommandUC, scanSetupScriptImportsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

@@ -32,6 +32,11 @@ type fakeInfraFleetServiceClient struct {
 	listDevServersFn     func(*infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
 	createConnectionFn   func(*infrafleetv1.CreateConnectionRequest) (*infrafleetv1.CreateConnectionResponse, error)
 	relayFn              func(*infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+
+	listSshTargetsFn      func(*infrafleetv1.ListSshTargetsRequest) (*infrafleetv1.ListSshTargetsResponse, error)
+	getSshStateFn         func(*infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error)
+	establishConnectionFn func(*infrafleetv1.EstablishConnectionRequest) (*infrafleetv1.Connection, error)
+	killWorkspacePortFn   func(*infrafleetv1.KillWorkspacePortRequest) (*infrafleetv1.KillWorkspacePortResponse, error)
 }
 
 func (f *fakeInfraFleetServiceClient) RegisterDevServer(_ context.Context, in *infrafleetv1.RegisterDevServerRequest, _ ...grpc.CallOption) (*infrafleetv1.RegisterDevServerResponse, error) {
@@ -64,6 +69,22 @@ func (f *fakeInfraFleetServiceClient) CreateConnection(_ context.Context, in *in
 
 func (f *fakeInfraFleetServiceClient) Relay(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
 	return f.relayFn(in)
+}
+
+func (f *fakeInfraFleetServiceClient) ListSshTargets(_ context.Context, in *infrafleetv1.ListSshTargetsRequest, _ ...grpc.CallOption) (*infrafleetv1.ListSshTargetsResponse, error) {
+	return f.listSshTargetsFn(in)
+}
+
+func (f *fakeInfraFleetServiceClient) GetSshState(_ context.Context, in *infrafleetv1.GetSshStateRequest, _ ...grpc.CallOption) (*infrafleetv1.GetSshStateResponse, error) {
+	return f.getSshStateFn(in)
+}
+
+func (f *fakeInfraFleetServiceClient) EstablishConnection(_ context.Context, in *infrafleetv1.EstablishConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.Connection, error) {
+	return f.establishConnectionFn(in)
+}
+
+func (f *fakeInfraFleetServiceClient) KillWorkspacePort(_ context.Context, in *infrafleetv1.KillWorkspacePortRequest, _ ...grpc.CallOption) (*infrafleetv1.KillWorkspacePortResponse, error) {
+	return f.killWorkspacePortFn(in)
 }
 
 // testInfraRouter mounts mountInfraRoutes alone on a fresh chi router — no

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `services/infra-fleet-service/internal/usecase/{list_ssh_targets,get_ssh_state,establish_connection}.go` (new), `services/infra-fleet-service/internal/adapter/grpc/server.go`, `services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-162, TASK-163
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in worktree `agent-a5714e047dcaed0fc`, **committed** as `56c5fbeff`. Build/vet/test clean. Pending merge.
 
 ---
 

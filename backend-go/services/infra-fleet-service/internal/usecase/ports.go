@@ -25,6 +25,16 @@ type DevServerRepository interface {
 	Register(ctx context.Context, devServer domain.DevServer) (domain.DevServer, error)
 	Get(ctx context.Context, tenantID, id string) (domain.DevServer, error)
 	List(ctx context.Context, tenantID string) ([]domain.DevServer, error)
+	// FindBySshTarget returns the DevServer whose ssh_target_id matches
+	// sshTargetID, if one has been registered yet. found=false, err=nil
+	// means "no dev server bound to this SSH target yet" — the caller
+	// (usecase.EstablishConnection) is responsible for constructing and
+	// Register()-ing a new relay-ssh-mode DevServer in that case,
+	// generating its ID with uuid.NewString() the same way
+	// register_dev_server.go's usecase already does — ID generation stays
+	// in the usecase layer, not this adapter, matching every other `New*`
+	// call site in this service.
+	FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (ds domain.DevServer, found bool, err error)
 }
 
 // SshTargetRepository is the persistence port for SSH target registration.
@@ -34,6 +44,9 @@ type SshTargetRepository interface {
 	// requirement as DevServerRepository.Get, see
 	// specs/backend-go/services/infra-fleet-service.md §9.
 	Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error)
+	// List returns every SSH target registered for tenantID — backs
+	// ssh.listTargets/ssh.getUserAccount.
+	List(ctx context.Context, tenantID string) ([]domain.SshTarget, error)
 }
 
 // SshTargetResolver is the narrow read port adapter/devserveragent.Client
@@ -55,6 +68,10 @@ type SshTargetResolver interface {
 // ConnectionResolver already are two narrow ports over one Repository.
 type ConnectionRepository interface {
 	CreateConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error)
+	// GetActiveByDevServer returns the most recent non-closed connection
+	// bound to devServerID, if any — backs ssh.getState's local read.
+	// found=false, err=nil means "no active connection", not an error.
+	GetActiveByDevServer(ctx context.Context, tenantID, devServerID string) (conn domain.Connection, found bool, err error)
 }
 
 // ConnectionResolver is THE core coordination/execution dispatch primitive
