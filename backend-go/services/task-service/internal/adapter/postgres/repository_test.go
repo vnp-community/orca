@@ -19,6 +19,7 @@ import (
 
 	"github.com/stablyai/orca-go/common/testutil"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
+	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 )
 
 func setupRepository(t *testing.T) *Repository {
@@ -248,5 +249,110 @@ func TestRepository_Delete_NotFound_Fails(t *testing.T) {
 
 	if err := repo.Delete(ctx, uuid.NewString(), uuid.NewString()); err == nil {
 		t.Fatal("expected an error deleting a nonexistent task")
+	}
+}
+
+// TestRepository_RunInTx_CommitsAllWritesTogether proves RunInTx's happy
+// path against a REAL Postgres transaction (not the usecase package's
+// fakeTxRunner, which only models rollback in-memory) — closes TASK-224
+// Gap 2 alongside internal/usecase/ai_apply_test.go's
+// TestAIApply_MidLoopFailure_RollsBackEntireSubtree.
+func TestRepository_RunInTx_CommitsAllWritesTogether(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	parent, _ := domain.NewTask(uuid.NewString(), tenantID, "parent", domain.StatusOpen, "", "")
+	if _, err := repo.Create(ctx, parent); err != nil {
+		t.Fatalf("creating parent: %v", err)
+	}
+
+	sub1ID, sub2ID := uuid.NewString(), uuid.NewString()
+	err := repo.RunInTx(ctx, func(ctx context.Context, tasks usecase.TaskRepository, edges usecase.EdgeRepository) error {
+		sub1, _ := domain.NewTask(sub1ID, tenantID, "sub1", domain.StatusOpen, parent.ID, "")
+		if _, err := tasks.Create(ctx, sub1); err != nil {
+			return err
+		}
+		edge1, _ := domain.NewTaskEdge(parent.ID, sub1ID, domain.EdgeKindParentChild)
+		if err := edges.Add(ctx, tenantID, edge1); err != nil {
+			return err
+		}
+		sub2, _ := domain.NewTask(sub2ID, tenantID, "sub2", domain.StatusOpen, parent.ID, "")
+		if _, err := tasks.Create(ctx, sub2); err != nil {
+			return err
+		}
+		edge2, _ := domain.NewTaskEdge(parent.ID, sub2ID, domain.EdgeKindParentChild)
+		return edges.Add(ctx, tenantID, edge2)
+	})
+	if err != nil {
+		t.Fatalf("RunInTx: %v", err)
+	}
+
+	if _, err := repo.Get(ctx, tenantID, sub1ID); err != nil {
+		t.Errorf("expected sub1 to be committed: %v", err)
+	}
+	if _, err := repo.Get(ctx, tenantID, sub2ID); err != nil {
+		t.Errorf("expected sub2 to be committed: %v", err)
+	}
+	parentEdges, err := repo.ListFrom(ctx, tenantID, parent.ID, domain.EdgeKindParentChild)
+	if err != nil {
+		t.Fatalf("listing edges: %v", err)
+	}
+	if len(parentEdges) != 2 {
+		t.Errorf("expected 2 committed parent_child edges, got %d: %+v", len(parentEdges), parentEdges)
+	}
+}
+
+// TestRepository_RunInTx_RollsBackAllWritesOnError proves the transaction
+// actually rolls back against a REAL Postgres database (not the usecase
+// package's in-memory fakeTxRunner simulation) when a later write in the
+// same fn fails: sub1's task+edge insert succeeds, but sub2's edge insert
+// violates task_edges_single_parent (migrations/0001_init.up.sql's unique
+// index on to_task_id WHERE edge_type='parent_child') because it reuses
+// sub1's to_task_id — a real, naturally-occurring constraint violation, not
+// a manufactured error. Asserts NEITHER subtask nor either edge survives —
+// the "leaves NO partial subtree" bar this task's instructions set, proven
+// against a real database engine's actual ROLLBACK, not just a fake.
+func TestRepository_RunInTx_RollsBackAllWritesOnError(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	parent, _ := domain.NewTask(uuid.NewString(), tenantID, "parent", domain.StatusOpen, "", "")
+	if _, err := repo.Create(ctx, parent); err != nil {
+		t.Fatalf("creating parent: %v", err)
+	}
+
+	sub1ID := uuid.NewString()
+	err := repo.RunInTx(ctx, func(ctx context.Context, tasks usecase.TaskRepository, edges usecase.EdgeRepository) error {
+		sub1, _ := domain.NewTask(sub1ID, tenantID, "sub1", domain.StatusOpen, parent.ID, "")
+		if _, err := tasks.Create(ctx, sub1); err != nil {
+			return err
+		}
+		edge1, _ := domain.NewTaskEdge(parent.ID, sub1ID, domain.EdgeKindParentChild)
+		if err := edges.Add(ctx, tenantID, edge1); err != nil {
+			return err
+		}
+		// Deliberately violates task_edges_single_parent: a second
+		// parent_child edge targeting the SAME to_task_id (sub1ID) as
+		// edge1 above — a real Postgres constraint failure standing in for
+		// AIApply's "a later proposal fails" case.
+		dupEdge, _ := domain.NewTaskEdge(parent.ID, sub1ID, domain.EdgeKindParentChild)
+		dupEdge.Kind = domain.EdgeKindParentChild
+		return edges.Add(ctx, tenantID, dupEdge)
+	})
+	if err == nil {
+		t.Fatal("expected RunInTx to surface the unique-constraint violation")
+	}
+
+	if _, getErr := repo.Get(ctx, tenantID, sub1ID); getErr == nil {
+		t.Error("expected sub1 to be rolled back (not found), but it was retrievable")
+	}
+	parentEdges, listErr := repo.ListFrom(ctx, tenantID, parent.ID, domain.EdgeKindParentChild)
+	if listErr != nil {
+		t.Fatalf("listing edges: %v", listErr)
+	}
+	if len(parentEdges) != 0 {
+		t.Errorf("expected no parent_child edges to survive the rollback, got %+v", parentEdges)
 	}
 }

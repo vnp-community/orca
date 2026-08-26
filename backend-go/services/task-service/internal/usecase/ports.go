@@ -107,14 +107,15 @@ type OPAClient interface {
 }
 
 // SimpleExecutor relays Execute's simple-path dispatch to
-// infra-fleet-service (-> Dev Server Agent agent.exec), per
+// infra-fleet-service (-> Dev Server Agent agent.execPrompt), per
 // task-service.md §3.1.
 //
-// internal/adapter/grpcclient's implementation is real (TASK-224):
-// resolves the task's project_id to a connectionId via
+// internal/adapter/grpcclient's implementation is real (TASK-224): resolves
+// the task's project_id to a connectionId + worktreePath via
 // ProjectExecutionResolver and relays through infra-fleet-service's Relay
-// RPC — see that file's doc comment for the honest limits carried over
-// unchanged (still dispatch-only, no completion callback).
+// RPC, method "agent.execPrompt" (not "agent.exec" — see that file's doc
+// comment for the full agent-rpc-catalog citation trail behind that
+// choice).
 type SimpleExecutor interface {
 	Execute(ctx context.Context, tenantID, taskID, requestID string) (executionRef string, err error)
 }
@@ -135,8 +136,16 @@ type ComplexExecutor interface {
 // from this port's consumers (SimpleExecutor, AIDecompose); the resolution
 // itself lives in internal/adapter/grpcclient, mirroring
 // git-gateway-service's ConnectionResolver split.
+//
+// worktreePath is infra-fleet-service's ResolveConnectionResponse.repo_path
+// echoed straight through — the same field git-gateway-service's
+// ConnectionResolver folds into ResolvedConnection.RepoPath
+// (git-gateway-service/internal/usecase/ports.go:26-37) for its GitExecutor
+// to operate against. SimpleExecutor (TASK-224 Gap 1) needs this same value
+// as agent.execPrompt's required worktreePath field — see
+// simple_executor.go's doc comment for the full citation trail.
 type ProjectExecutionResolver interface {
-	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID string, connected bool, err error)
+	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID, worktreePath string, connected bool, err error)
 }
 
 // AIProviderContextResolver resolves AI provider/account context for a
@@ -153,4 +162,23 @@ type AIProviderContextResolver interface {
 // infra-fleet-service's Relay RPC rather than duplicated per-service.
 type AICompleter interface {
 	Complete(ctx context.Context, connectionID, prompt string) (string, error)
+}
+
+// TxRunner wraps a set of subtask creates + parent-link edges in one
+// Postgres transaction — closes TASK-224 Gap 2 (AIApply's create-subtask +
+// add-edge loop was not atomic: a mid-loop failure could leave a partial
+// subtree). A real precedent for this shape now exists in this repo (it did
+// not when ai_apply.go was first written) —
+// credential-broker-service/internal/usecase/ports.go's TxRunner
+// (RunInTx(ctx, fn func(ctx, metadataRepo, auditRepo) error) error),
+// implemented via pgx.BeginFunc in that service's postgres.Repository. This
+// port mirrors that shape exactly: RunInTx hands fn a TaskRepository/
+// EdgeRepository pair already scoped to the open transaction, reusing the
+// exact port shapes AIApply's CreateTask/AddEdge sub-usecases already know,
+// rather than inventing transaction-specific interfaces or a generic
+// UnitOfWork abstraction. If fn returns a non-nil error, every write fn made
+// through either repo rolls back together. Implemented by
+// internal/adapter/postgres.Repository.
+type TxRunner interface {
+	RunInTx(ctx context.Context, fn func(ctx context.Context, tasks TaskRepository, edges EdgeRepository) error) error
 }

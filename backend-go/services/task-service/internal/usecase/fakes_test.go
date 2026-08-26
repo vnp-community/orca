@@ -279,6 +279,44 @@ func (f *fakeOPAClient) Decision(ctx context.Context, level domain.GrantLevel, a
 	return f.allow, nil
 }
 
+// fakeTxRunner is an in-memory TxRunner mirroring
+// credential-broker-service/internal/usecase/fakes_test.go's fakeTxRunner
+// exactly: it runs fn against the same fakeTaskRepository/fakeEdgeRepository
+// instances the test already holds a handle to, but snapshots their state
+// first and restores it if fn returns an error. This models real Postgres
+// ROLLBACK semantics (internal/adapter/postgres.Repository.RunInTx, via
+// pgx.BeginFunc) closely enough to prove atomicity in tests without a real
+// database — see ai_apply_test.go's rollback assertion, the reason this
+// fake exists rather than a bare pass-through.
+type fakeTxRunner struct {
+	tasks *fakeTaskRepository
+	edges *fakeEdgeRepository
+}
+
+func newFakeTxRunner(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *fakeTxRunner {
+	return &fakeTxRunner{tasks: tasks, edges: edges}
+}
+
+func (f *fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context, tasks TaskRepository, edges EdgeRepository) error) error {
+	savedTasks := make(map[string]domain.Task, len(f.tasks.tasks))
+	for k, v := range f.tasks.tasks {
+		savedTasks[k] = v
+	}
+	savedEdges := append([]domain.TaskEdge(nil), f.edges.edges...)
+	savedAddCalls := f.edges.addCalls
+
+	if err := fn(ctx, f.tasks, f.edges); err != nil {
+		// Rollback: undo whatever fn did to either fake before returning its
+		// error, exactly like a real ROLLBACK undoes every statement in the
+		// transaction.
+		f.tasks.tasks = savedTasks
+		f.edges.edges = savedEdges
+		f.edges.addCalls = savedAddCalls
+		return err
+	}
+	return nil
+}
+
 type fakeExecutor struct {
 	ref    string
 	err    error

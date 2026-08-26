@@ -41,7 +41,7 @@ func TestProjectExecutionResolver_NotConnected(t *testing.T) {
 	fake := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false}}
 	r := NewProjectExecutionResolver(fake)
 
-	connID, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+	connID, worktreePath, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -51,21 +51,27 @@ func TestProjectExecutionResolver_NotConnected(t *testing.T) {
 	if connID != "" {
 		t.Errorf("expected empty connectionID when not connected, got %q", connID)
 	}
+	if worktreePath != "" {
+		t.Errorf("expected empty worktreePath when not connected, got %q", worktreePath)
+	}
 	if fake.gotResolveConnection.GetConnectionId() != "p1" {
 		t.Errorf("expected project_id to pass through verbatim as connection_id, got %q", fake.gotResolveConnection.GetConnectionId())
 	}
 }
 
 func TestProjectExecutionResolver_Connected(t *testing.T) {
-	fake := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: true}}
+	fake := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: true, RepoPath: "/srv/worktrees/p1"}}
 	r := NewProjectExecutionResolver(fake)
 
-	connID, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+	connID, worktreePath, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !connected || connID != "p1" {
 		t.Errorf("expected connected=true, connectionID=p1, got connected=%v connID=%q", connected, connID)
+	}
+	if worktreePath != "/srv/worktrees/p1" {
+		t.Errorf("expected worktreePath to pass through from repo_path, got %q", worktreePath)
 	}
 }
 
@@ -73,7 +79,7 @@ func TestProjectExecutionResolver_NoTenantInContext(t *testing.T) {
 	fake := &fakeInfraFleetServiceClient{}
 	r := NewProjectExecutionResolver(fake)
 
-	if _, _, err := r.ResolveConnection(context.Background(), "", "p1"); !errors.Is(err, tenant.ErrNoTenant) {
+	if _, _, _, err := r.ResolveConnection(context.Background(), "", "p1"); !errors.Is(err, tenant.ErrNoTenant) {
 		t.Errorf("expected tenant.ErrNoTenant, got %v", err)
 	}
 	if fake.gotResolveConnection != nil {
