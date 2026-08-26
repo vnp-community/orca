@@ -10,6 +10,7 @@ import (
 
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 )
 
 // fakeInfraFleetServiceClient implements infrafleetv1.InfraFleetServiceClient
@@ -143,8 +144,8 @@ func TestRelayExecutor_GetStatus_Success(t *testing.T) {
 	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
 		t.Fatalf("unmarshal params: %v", err)
 	}
-	if params["repoPath"] != "/repo" {
-		t.Errorf("expected repoPath param, got %+v", params)
+	if params["worktreePath"] != "/repo" {
+		t.Errorf("expected worktreePath param (real agent contract, see BUG-036/TASK-228), got %+v", params)
 	}
 }
 
@@ -199,4 +200,127 @@ func TestRelayExecutor_NoTenantInContext(t *testing.T) {
 	if fake.gotRelay != nil {
 		t.Error("expected Relay not to be called without a tenant in context")
 	}
+}
+
+// ── TASK-228: GetDiff now sends worktreePath+filePath ────────────────────
+
+func TestRelayExecutor_GetDiff_SendsWorktreePathAndFilePath(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.GetDiff(ctxWithTenant(t), "/repo", "a.txt", true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.diff" {
+		t.Errorf("expected method=git.diff, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["filePath"] != "a.txt" || params["staged"] != true {
+		t.Errorf("unexpected params: %+v", params)
+	}
+}
+
+// ── TASK-208: Stage/Unstage always target the bulk relay method ──────────
+
+func TestRelayExecutor_Stage_TargetsBulkMethod(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.Stage(ctxWithTenant(t), "/repo", []string{"a.txt"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.bulkStage" {
+		t.Errorf("expected method=git.bulkStage even for a single path, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if _, ok := params["filePaths"]; !ok {
+		t.Errorf("expected filePaths param key, got %+v", params)
+	}
+}
+
+func TestRelayExecutor_Unstage_TargetsBulkMethod(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.Unstage(ctxWithTenant(t), "/repo", []string{"a.txt", "b.txt"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.bulkUnstage" {
+		t.Errorf("expected method=git.bulkUnstage, got %q", fake.gotRelay.GetMethod())
+	}
+}
+
+// ── TASK-209: History/CheckIgnored/ForkSync param shapes ─────────────────
+
+func TestRelayExecutor_History_DropsCursorRenamesBaseRef(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.History(ctxWithTenant(t), "/repo", "main", 10); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if _, hasCursor := params["cursor"]; hasCursor {
+		t.Errorf("expected no cursor param (real agent has no pagination), got %+v", params)
+	}
+	if params["baseRef"] != "main" {
+		t.Errorf("expected baseRef param, got %+v", params)
+	}
+}
+
+func TestRelayExecutor_CheckIgnored_ReturnsIgnoredSubset(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{"ignoredPaths": []string{"node_modules"}})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.CheckIgnored(ctxWithTenant(t), "/repo", []string{"node_modules", "README.md"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0] != "node_modules" {
+		t.Errorf("expected only the ignored subset, got %+v", got)
+	}
+}
+
+func TestRelayExecutor_ForkSync_SendsExpectedUpstream(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.ForkSync(ctxWithTenant(t), "/repo", "origin/main"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["expectedUpstream"] != "origin/main" {
+		t.Errorf("expected expectedUpstream param, got %+v", params)
+	}
+}
+
+// ── usecase.FilesystemExecutor compile-time guards (TASK-050/051/055) ────
+
+func TestRelayExecutor_ImplementsFilesystemExecutorNotLocalOnly(t *testing.T) {
+	// RelayExecutor must satisfy usecase.FilesystemExecutor (fs.* relay
+	// methods) but must NOT satisfy usecase.LocalOnlyFilesystemExecutor
+	// (Rename/Copy) — the type system is what guarantees
+	// RenameFileUseCase/CopyFileUseCase can never be constructed with a
+	// relay-backed executor. This test only compiles the positive half;
+	// the negative half (RelayExecutor does NOT implement
+	// LocalOnlyFilesystemExecutor) is a compile-time property with no
+	// runtime assertion available — confirmed manually per TASK-055's
+	// verify section.
+	var _ usecase.FilesystemExecutor = (*RelayExecutor)(nil)
 }

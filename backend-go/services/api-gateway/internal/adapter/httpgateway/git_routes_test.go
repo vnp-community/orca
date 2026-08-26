@@ -20,10 +20,18 @@ import (
 )
 
 // fakeGitGatewayServiceClient implements gitgatewayv1.GitGatewayServiceClient
-// (6 methods, per the generated _grpc.pb.go) over per-method hook
-// functions — tests set only the hooks they exercise; any unset hook fails
-// the test loudly instead of nil-panicking.
+// over per-method hook functions for the 6 methods this REST-route layer's
+// tests exercise — tests set only the hooks they exercise; any unset hook
+// fails the test loudly instead of nil-panicking. The embedded (nil)
+// interface satisfies every OTHER GitGatewayServiceClient method added
+// since this fake was written (staging/history/remote/AI-assist/files.*,
+// TASK-208..211/049) without this REST-route test file needing a hook for
+// each — those RPCs aren't exercised by git_routes.go's REST handlers, so
+// a panic-on-call default is correct: it would mean this file started
+// calling one of them and needs a real hook added.
 type fakeGitGatewayServiceClient struct {
+	gitgatewayv1.GitGatewayServiceClient
+
 	t *testing.T
 
 	getStatusFunc             func(ctx context.Context, in *gitgatewayv1.GetStatusRequest) (*gitgatewayv1.GetStatusResponse, error)

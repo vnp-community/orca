@@ -132,3 +132,121 @@ func TestRepository_Grant_And_ListGrantsForAncestors(t *testing.T) {
 		t.Errorf("unexpected grants: %+v", got)
 	}
 }
+
+func TestRepository_List_FiltersByTenantAndProject(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+	otherTenantID := uuid.NewString()
+	projectID := uuid.NewString()
+
+	a, _ := domain.NewTask(uuid.NewString(), tenantID, "a", domain.StatusOpen, "", projectID)
+	b, _ := domain.NewTask(uuid.NewString(), tenantID, "b", domain.StatusOpen, "", "")
+	c, _ := domain.NewTask(uuid.NewString(), otherTenantID, "c", domain.StatusOpen, "", projectID)
+	for _, task := range []domain.Task{a, b, c} {
+		if _, err := repo.Create(ctx, task); err != nil {
+			t.Fatalf("creating task: %v", err)
+		}
+	}
+
+	got, _, err := repo.List(ctx, tenantID, projectID, "", 0)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != a.ID {
+		t.Fatalf("expected only task a (tenant+project match), got %+v", got)
+	}
+
+	all, _, err := repo.List(ctx, tenantID, "", "", 0)
+	if err != nil {
+		t.Fatalf("list (no project filter): %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("expected both tenant-1 tasks, got %+v", all)
+	}
+}
+
+func TestRepository_Update_PersistsTitleAndStatus(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "old title", domain.StatusOpen, "", "")
+	if _, err := repo.Create(ctx, task); err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	task.Title = "new title"
+	task.Status = domain.StatusDone
+	if err := repo.Update(ctx, tenantID, task); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	got, err := repo.Get(ctx, tenantID, task.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Title != "new title" || got.Status != domain.StatusDone {
+		t.Errorf("unexpected task after update: %+v", got)
+	}
+}
+
+func TestRepository_Update_WrongTenant_Fails(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "title", domain.StatusOpen, "", "")
+	if _, err := repo.Create(ctx, task); err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	if err := repo.Update(ctx, uuid.NewString(), task); err == nil {
+		t.Fatal("expected an error updating a task under the wrong tenant")
+	}
+}
+
+// TestRepository_Delete_CascadesToTaskEdges confirms task_edges' ON DELETE
+// CASCADE (migrations/0001_init.up.sql) actually fires: deleting a task
+// that has an edge referencing it leaves no orphaned edge row.
+func TestRepository_Delete_CascadesToTaskEdges(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	parent, _ := domain.NewTask(uuid.NewString(), tenantID, "parent", domain.StatusOpen, "", "")
+	child, _ := domain.NewTask(uuid.NewString(), tenantID, "child", domain.StatusOpen, "", "")
+	if _, err := repo.Create(ctx, parent); err != nil {
+		t.Fatalf("creating parent: %v", err)
+	}
+	if _, err := repo.Create(ctx, child); err != nil {
+		t.Fatalf("creating child: %v", err)
+	}
+	edge, _ := domain.NewTaskEdge(parent.ID, child.ID, domain.EdgeKindParentChild)
+	if err := repo.Add(ctx, tenantID, edge); err != nil {
+		t.Fatalf("adding edge: %v", err)
+	}
+
+	if err := repo.Delete(ctx, tenantID, parent.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	edges, err := repo.ListByKind(ctx, tenantID, domain.EdgeKindParentChild)
+	if err != nil {
+		t.Fatalf("list by kind: %v", err)
+	}
+	for _, e := range edges {
+		if e.FromTaskID == parent.ID {
+			t.Errorf("expected the edge referencing the deleted parent to be gone via cascade, found %+v", e)
+		}
+	}
+}
+
+func TestRepository_Delete_NotFound_Fails(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	if err := repo.Delete(ctx, uuid.NewString(), uuid.NewString()); err == nil {
+		t.Fatal("expected an error deleting a nonexistent task")
+	}
+}

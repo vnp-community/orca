@@ -9,6 +9,7 @@ package gitgatewayv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -172,7 +173,8 @@ func (x *GetStatusResponse) GetBranch() string {
 type GetDiffRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
-	Staged        bool                   `protobuf:"varint,2,opt,name=staged,proto3" json:"staged,omitempty"`
+	FilePath      string                 `protobuf:"bytes,2,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"` // required — real git.diff is a per-file operation, see TASK-228
+	Staged        bool                   `protobuf:"varint,3,opt,name=staged,proto3" json:"staged,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -210,6 +212,13 @@ func (*GetDiffRequest) Descriptor() ([]byte, []int) {
 func (x *GetDiffRequest) GetWorktreeId() string {
 	if x != nil {
 		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *GetDiffRequest) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
 	}
 	return ""
 }
@@ -659,11 +668,2716 @@ func (x *GenerateCommitMessageResponse) GetMessage() string {
 	return ""
 }
 
+type StageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Paths         []string               `protobuf:"bytes,2,rep,name=paths,proto3" json:"paths,omitempty"` // single-element for git.stage, full selection for git.bulkStage
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StageRequest) Reset() {
+	*x = StageRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StageRequest) ProtoMessage() {}
+
+func (x *StageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StageRequest.ProtoReflect.Descriptor instead.
+func (*StageRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *StageRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *StageRequest) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+type StageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StageResponse) Reset() {
+	*x = StageResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StageResponse) ProtoMessage() {}
+
+func (x *StageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StageResponse.ProtoReflect.Descriptor instead.
+func (*StageResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *StageResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type UnstageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Paths         []string               `protobuf:"bytes,2,rep,name=paths,proto3" json:"paths,omitempty"` // single-element for git.unstage, full selection for git.bulkUnstage
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnstageRequest) Reset() {
+	*x = UnstageRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnstageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnstageRequest) ProtoMessage() {}
+
+func (x *UnstageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnstageRequest.ProtoReflect.Descriptor instead.
+func (*UnstageRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UnstageRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *UnstageRequest) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+type UnstageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnstageResponse) Reset() {
+	*x = UnstageResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnstageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnstageResponse) ProtoMessage() {}
+
+func (x *UnstageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnstageResponse.ProtoReflect.Descriptor instead.
+func (*UnstageResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UnstageResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type CommitRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sha           string                 `protobuf:"bytes,1,opt,name=sha,proto3" json:"sha,omitempty"`
+	Author        string                 `protobuf:"bytes,2,opt,name=author,proto3" json:"author,omitempty"`
+	Committer     string                 `protobuf:"bytes,3,opt,name=committer,proto3" json:"committer,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // unix seconds
+	ParentShas    []string               `protobuf:"bytes,6,rep,name=parent_shas,json=parentShas,proto3" json:"parent_shas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommitRef) Reset() {
+	*x = CommitRef{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitRef) ProtoMessage() {}
+
+func (x *CommitRef) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitRef.ProtoReflect.Descriptor instead.
+func (*CommitRef) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *CommitRef) GetSha() string {
+	if x != nil {
+		return x.Sha
+	}
+	return ""
+}
+
+func (x *CommitRef) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *CommitRef) GetCommitter() string {
+	if x != nil {
+		return x.Committer
+	}
+	return ""
+}
+
+func (x *CommitRef) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *CommitRef) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *CommitRef) GetParentShas() []string {
+	if x != nil {
+		return x.ParentShas
+	}
+	return nil
+}
+
+// cursor/pagination dropped — the real agent has no pagination concept.
+// ref renamed to base_ref to match the field name the real agent reads.
+type HistoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	BaseRef       string                 `protobuf:"bytes,2,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"` // empty = current branch
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryRequest) Reset() {
+	*x = HistoryRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryRequest) ProtoMessage() {}
+
+func (x *HistoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryRequest.ProtoReflect.Descriptor instead.
+func (*HistoryRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *HistoryRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *HistoryRequest) GetBaseRef() string {
+	if x != nil {
+		return x.BaseRef
+	}
+	return ""
+}
+
+func (x *HistoryRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type HistoryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Commits       []*CommitRef           `protobuf:"bytes,1,rep,name=commits,proto3" json:"commits,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryResponse) Reset() {
+	*x = HistoryResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryResponse) ProtoMessage() {}
+
+func (x *HistoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryResponse.ProtoReflect.Descriptor instead.
+func (*HistoryResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *HistoryResponse) GetCommits() []*CommitRef {
+	if x != nil {
+		return x.Commits
+	}
+	return nil
+}
+
+// Response shape matches the real agent: only the ignored subset, not a
+// {path, ignored} pair for every input path.
+type CheckIgnoredRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Paths         []string               `protobuf:"bytes,2,rep,name=paths,proto3" json:"paths,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckIgnoredRequest) Reset() {
+	*x = CheckIgnoredRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckIgnoredRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckIgnoredRequest) ProtoMessage() {}
+
+func (x *CheckIgnoredRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckIgnoredRequest.ProtoReflect.Descriptor instead.
+func (*CheckIgnoredRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *CheckIgnoredRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *CheckIgnoredRequest) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+type CheckIgnoredResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IgnoredPaths  []string               `protobuf:"bytes,1,rep,name=ignored_paths,json=ignoredPaths,proto3" json:"ignored_paths,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckIgnoredResponse) Reset() {
+	*x = CheckIgnoredResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckIgnoredResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckIgnoredResponse) ProtoMessage() {}
+
+func (x *CheckIgnoredResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckIgnoredResponse.ProtoReflect.Descriptor instead.
+func (*CheckIgnoredResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *CheckIgnoredResponse) GetIgnoredPaths() []string {
+	if x != nil {
+		return x.IgnoredPaths
+	}
+	return nil
+}
+
+// expected_upstream is required — the real git.forkSync rejects calls
+// without it.
+type ForkSyncRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId       string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	ExpectedUpstream string                 `protobuf:"bytes,2,opt,name=expected_upstream,json=expectedUpstream,proto3" json:"expected_upstream,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ForkSyncRequest) Reset() {
+	*x = ForkSyncRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForkSyncRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForkSyncRequest) ProtoMessage() {}
+
+func (x *ForkSyncRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForkSyncRequest.ProtoReflect.Descriptor instead.
+func (*ForkSyncRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ForkSyncRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ForkSyncRequest) GetExpectedUpstream() string {
+	if x != nil {
+		return x.ExpectedUpstream
+	}
+	return ""
+}
+
+type ForkSyncResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ahead         int32                  `protobuf:"varint,1,opt,name=ahead,proto3" json:"ahead,omitempty"`
+	Behind        int32                  `protobuf:"varint,2,opt,name=behind,proto3" json:"behind,omitempty"`
+	Diverged      bool                   `protobuf:"varint,3,opt,name=diverged,proto3" json:"diverged,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForkSyncResponse) Reset() {
+	*x = ForkSyncResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForkSyncResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForkSyncResponse) ProtoMessage() {}
+
+func (x *ForkSyncResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForkSyncResponse.ProtoReflect.Descriptor instead.
+func (*ForkSyncResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ForkSyncResponse) GetAhead() int32 {
+	if x != nil {
+		return x.Ahead
+	}
+	return 0
+}
+
+func (x *ForkSyncResponse) GetBehind() int32 {
+	if x != nil {
+		return x.Behind
+	}
+	return 0
+}
+
+func (x *ForkSyncResponse) GetDiverged() bool {
+	if x != nil {
+		return x.Diverged
+	}
+	return false
+}
+
+// push_target is a placeholder string field — the real PushTargetInput
+// shape is SOL-032 §0 open question #1, still unresolved. Replace with the
+// real structured type once that question closes.
+type UpstreamStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	PushTarget    string                 `protobuf:"bytes,2,opt,name=push_target,json=pushTarget,proto3" json:"push_target,omitempty"` // placeholder — see SOL-032 §0 open question #1
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpstreamStatusRequest) Reset() {
+	*x = UpstreamStatusRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpstreamStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpstreamStatusRequest) ProtoMessage() {}
+
+func (x *UpstreamStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpstreamStatusRequest.ProtoReflect.Descriptor instead.
+func (*UpstreamStatusRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *UpstreamStatusRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *UpstreamStatusRequest) GetPushTarget() string {
+	if x != nil {
+		return x.PushTarget
+	}
+	return ""
+}
+
+type UpstreamStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HasUpstream   bool                   `protobuf:"varint,1,opt,name=has_upstream,json=hasUpstream,proto3" json:"has_upstream,omitempty"`
+	Ahead         int32                  `protobuf:"varint,2,opt,name=ahead,proto3" json:"ahead,omitempty"`
+	Behind        int32                  `protobuf:"varint,3,opt,name=behind,proto3" json:"behind,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpstreamStatusResponse) Reset() {
+	*x = UpstreamStatusResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpstreamStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpstreamStatusResponse) ProtoMessage() {}
+
+func (x *UpstreamStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpstreamStatusResponse.ProtoReflect.Descriptor instead.
+func (*UpstreamStatusResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *UpstreamStatusResponse) GetHasUpstream() bool {
+	if x != nil {
+		return x.HasUpstream
+	}
+	return false
+}
+
+func (x *UpstreamStatusResponse) GetAhead() int32 {
+	if x != nil {
+		return x.Ahead
+	}
+	return 0
+}
+
+func (x *UpstreamStatusResponse) GetBehind() int32 {
+	if x != nil {
+		return x.Behind
+	}
+	return 0
+}
+
+type RemoteCommitUrlRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Sha           string                 `protobuf:"bytes,2,opt,name=sha,proto3" json:"sha,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoteCommitUrlRequest) Reset() {
+	*x = RemoteCommitUrlRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoteCommitUrlRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteCommitUrlRequest) ProtoMessage() {}
+
+func (x *RemoteCommitUrlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteCommitUrlRequest.ProtoReflect.Descriptor instead.
+func (*RemoteCommitUrlRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *RemoteCommitUrlRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *RemoteCommitUrlRequest) GetSha() string {
+	if x != nil {
+		return x.Sha
+	}
+	return ""
+}
+
+type RemoteFileUrlRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Ref           string                 `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoteFileUrlRequest) Reset() {
+	*x = RemoteFileUrlRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoteFileUrlRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteFileUrlRequest) ProtoMessage() {}
+
+func (x *RemoteFileUrlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteFileUrlRequest.ProtoReflect.Descriptor instead.
+func (*RemoteFileUrlRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RemoteFileUrlRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *RemoteFileUrlRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *RemoteFileUrlRequest) GetRef() string {
+	if x != nil {
+		return x.Ref
+	}
+	return ""
+}
+
+type RemoteUrlResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoteUrlResponse) Reset() {
+	*x = RemoteUrlResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoteUrlResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteUrlResponse) ProtoMessage() {}
+
+func (x *RemoteUrlResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteUrlResponse.ProtoReflect.Descriptor instead.
+func (*RemoteUrlResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *RemoteUrlResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+type GeneratePullRequestFieldsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	BaseBranch    string                 `protobuf:"bytes,2,opt,name=base_branch,json=baseBranch,proto3" json:"base_branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GeneratePullRequestFieldsRequest) Reset() {
+	*x = GeneratePullRequestFieldsRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GeneratePullRequestFieldsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GeneratePullRequestFieldsRequest) ProtoMessage() {}
+
+func (x *GeneratePullRequestFieldsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GeneratePullRequestFieldsRequest.ProtoReflect.Descriptor instead.
+func (*GeneratePullRequestFieldsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *GeneratePullRequestFieldsRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *GeneratePullRequestFieldsRequest) GetBaseBranch() string {
+	if x != nil {
+		return x.BaseBranch
+	}
+	return ""
+}
+
+type GeneratePullRequestFieldsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GeneratePullRequestFieldsResponse) Reset() {
+	*x = GeneratePullRequestFieldsResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GeneratePullRequestFieldsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GeneratePullRequestFieldsResponse) ProtoMessage() {}
+
+func (x *GeneratePullRequestFieldsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GeneratePullRequestFieldsResponse.ProtoReflect.Descriptor instead.
+func (*GeneratePullRequestFieldsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *GeneratePullRequestFieldsResponse) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *GeneratePullRequestFieldsResponse) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+type ModelInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProviderType  string                 `protobuf:"bytes,1,opt,name=provider_type,json=providerType,proto3" json:"provider_type,omitempty"` // mirrors orca.aiprovider.v1.ProviderType's string name
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"` // active | rotating | revoked
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModelInfo) Reset() {
+	*x = ModelInfo{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelInfo) ProtoMessage() {}
+
+func (x *ModelInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelInfo.ProtoReflect.Descriptor instead.
+func (*ModelInfo) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ModelInfo) GetProviderType() string {
+	if x != nil {
+		return x.ProviderType
+	}
+	return ""
+}
+
+func (x *ModelInfo) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ModelInfo) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type DiscoverCommitMessageModelsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscoverCommitMessageModelsRequest) Reset() {
+	*x = DiscoverCommitMessageModelsRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscoverCommitMessageModelsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoverCommitMessageModelsRequest) ProtoMessage() {}
+
+func (x *DiscoverCommitMessageModelsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoverCommitMessageModelsRequest.ProtoReflect.Descriptor instead.
+func (*DiscoverCommitMessageModelsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *DiscoverCommitMessageModelsRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *DiscoverCommitMessageModelsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type DiscoverCommitMessageModelsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Models        []*ModelInfo           `protobuf:"bytes,1,rep,name=models,proto3" json:"models,omitempty"` // 0 or 1 entries today — see DiscoverCommitMessageModels usecase doc comment
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscoverCommitMessageModelsResponse) Reset() {
+	*x = DiscoverCommitMessageModelsResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscoverCommitMessageModelsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoverCommitMessageModelsResponse) ProtoMessage() {}
+
+func (x *DiscoverCommitMessageModelsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoverCommitMessageModelsResponse.ProtoReflect.Descriptor instead.
+func (*DiscoverCommitMessageModelsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *DiscoverCommitMessageModelsResponse) GetModels() []*ModelInfo {
+	if x != nil {
+		return x.Models
+	}
+	return nil
+}
+
+type ReadFileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"` // worktree-relative
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFileRequest) Reset() {
+	*x = ReadFileRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFileRequest) ProtoMessage() {}
+
+func (x *ReadFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFileRequest.ProtoReflect.Descriptor instead.
+func (*ReadFileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ReadFileRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ReadFileRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type ReadFileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Content       []byte                 `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	Encoding      string                 `protobuf:"bytes,2,opt,name=encoding,proto3" json:"encoding,omitempty"` // "utf8" | "base64" — binary files come back base64
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFileResponse) Reset() {
+	*x = ReadFileResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFileResponse) ProtoMessage() {}
+
+func (x *ReadFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFileResponse.ProtoReflect.Descriptor instead.
+func (*ReadFileResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ReadFileResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *ReadFileResponse) GetEncoding() string {
+	if x != nil {
+		return x.Encoding
+	}
+	return ""
+}
+
+type ReadFileChunkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	OffsetBytes   int64                  `protobuf:"varint,3,opt,name=offset_bytes,json=offsetBytes,proto3" json:"offset_bytes,omitempty"`
+	LengthBytes   int64                  `protobuf:"varint,4,opt,name=length_bytes,json=lengthBytes,proto3" json:"length_bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFileChunkRequest) Reset() {
+	*x = ReadFileChunkRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFileChunkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFileChunkRequest) ProtoMessage() {}
+
+func (x *ReadFileChunkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFileChunkRequest.ProtoReflect.Descriptor instead.
+func (*ReadFileChunkRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ReadFileChunkRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ReadFileChunkRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ReadFileChunkRequest) GetOffsetBytes() int64 {
+	if x != nil {
+		return x.OffsetBytes
+	}
+	return 0
+}
+
+func (x *ReadFileChunkRequest) GetLengthBytes() int64 {
+	if x != nil {
+		return x.LengthBytes
+	}
+	return 0
+}
+
+type ReadFileChunkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Content       []byte                 `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	Eof           bool                   `protobuf:"varint,2,opt,name=eof,proto3" json:"eof,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFileChunkResponse) Reset() {
+	*x = ReadFileChunkResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFileChunkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFileChunkResponse) ProtoMessage() {}
+
+func (x *ReadFileChunkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFileChunkResponse.ProtoReflect.Descriptor instead.
+func (*ReadFileChunkResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ReadFileChunkResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *ReadFileChunkResponse) GetEof() bool {
+	if x != nil {
+		return x.Eof
+	}
+	return false
+}
+
+type ReadFilePreviewRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	MaxBytes      int64                  `protobuf:"varint,3,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFilePreviewRequest) Reset() {
+	*x = ReadFilePreviewRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFilePreviewRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFilePreviewRequest) ProtoMessage() {}
+
+func (x *ReadFilePreviewRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFilePreviewRequest.ProtoReflect.Descriptor instead.
+func (*ReadFilePreviewRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ReadFilePreviewRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ReadFilePreviewRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ReadFilePreviewRequest) GetMaxBytes() int64 {
+	if x != nil {
+		return x.MaxBytes
+	}
+	return 0
+}
+
+type ReadFilePreviewResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Content       []byte                 `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	Truncated     bool                   `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadFilePreviewResponse) Reset() {
+	*x = ReadFilePreviewResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadFilePreviewResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadFilePreviewResponse) ProtoMessage() {}
+
+func (x *ReadFilePreviewResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadFilePreviewResponse.ProtoReflect.Descriptor instead.
+func (*ReadFilePreviewResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ReadFilePreviewResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *ReadFilePreviewResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+type ReadDirRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadDirRequest) Reset() {
+	*x = ReadDirRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadDirRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadDirRequest) ProtoMessage() {}
+
+func (x *ReadDirRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadDirRequest.ProtoReflect.Descriptor instead.
+func (*ReadDirRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *ReadDirRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ReadDirRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type DirEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	IsDirectory   bool                   `protobuf:"varint,2,opt,name=is_directory,json=isDirectory,proto3" json:"is_directory,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DirEntry) Reset() {
+	*x = DirEntry{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DirEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DirEntry) ProtoMessage() {}
+
+func (x *DirEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DirEntry.ProtoReflect.Descriptor instead.
+func (*DirEntry) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *DirEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DirEntry) GetIsDirectory() bool {
+	if x != nil {
+		return x.IsDirectory
+	}
+	return false
+}
+
+type ReadDirResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entries       []*DirEntry            `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadDirResponse) Reset() {
+	*x = ReadDirResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadDirResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadDirResponse) ProtoMessage() {}
+
+func (x *ReadDirResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadDirResponse.ProtoReflect.Descriptor instead.
+func (*ReadDirResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ReadDirResponse) GetEntries() []*DirEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+type WriteFileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Content       []byte                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+	Encoding      string                 `protobuf:"bytes,4,opt,name=encoding,proto3" json:"encoding,omitempty"` // mirrors ReadFileResponse.encoding
+	CreateParents bool                   `protobuf:"varint,5,opt,name=create_parents,json=createParents,proto3" json:"create_parents,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteFileRequest) Reset() {
+	*x = WriteFileRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteFileRequest) ProtoMessage() {}
+
+func (x *WriteFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteFileRequest.ProtoReflect.Descriptor instead.
+func (*WriteFileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *WriteFileRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *WriteFileRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WriteFileRequest) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *WriteFileRequest) GetEncoding() string {
+	if x != nil {
+		return x.Encoding
+	}
+	return ""
+}
+
+func (x *WriteFileRequest) GetCreateParents() bool {
+	if x != nil {
+		return x.CreateParents
+	}
+	return false
+}
+
+type WriteFileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BytesWritten  int64                  `protobuf:"varint,1,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteFileResponse) Reset() {
+	*x = WriteFileResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteFileResponse) ProtoMessage() {}
+
+func (x *WriteFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteFileResponse.ProtoReflect.Descriptor instead.
+func (*WriteFileResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *WriteFileResponse) GetBytesWritten() int64 {
+	if x != nil {
+		return x.BytesWritten
+	}
+	return 0
+}
+
+type WriteFileChunkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	OffsetBytes   int64                  `protobuf:"varint,3,opt,name=offset_bytes,json=offsetBytes,proto3" json:"offset_bytes,omitempty"`
+	Content       []byte                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"` // base64-decoded before this RPC is called
+	IsFinal       bool                   `protobuf:"varint,5,opt,name=is_final,json=isFinal,proto3" json:"is_final,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteFileChunkRequest) Reset() {
+	*x = WriteFileChunkRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteFileChunkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteFileChunkRequest) ProtoMessage() {}
+
+func (x *WriteFileChunkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteFileChunkRequest.ProtoReflect.Descriptor instead.
+func (*WriteFileChunkRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *WriteFileChunkRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *WriteFileChunkRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *WriteFileChunkRequest) GetOffsetBytes() int64 {
+	if x != nil {
+		return x.OffsetBytes
+	}
+	return 0
+}
+
+func (x *WriteFileChunkRequest) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *WriteFileChunkRequest) GetIsFinal() bool {
+	if x != nil {
+		return x.IsFinal
+	}
+	return false
+}
+
+type WriteFileChunkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BytesWritten  int64                  `protobuf:"varint,1,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WriteFileChunkResponse) Reset() {
+	*x = WriteFileChunkResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WriteFileChunkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WriteFileChunkResponse) ProtoMessage() {}
+
+func (x *WriteFileChunkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WriteFileChunkResponse.ProtoReflect.Descriptor instead.
+func (*WriteFileChunkResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *WriteFileChunkResponse) GetBytesWritten() int64 {
+	if x != nil {
+		return x.BytesWritten
+	}
+	return 0
+}
+
+type CreateDirRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Recursive     bool                   `protobuf:"varint,3,opt,name=recursive,proto3" json:"recursive,omitempty"`
+	NoClobber     bool                   `protobuf:"varint,4,opt,name=no_clobber,json=noClobber,proto3" json:"no_clobber,omitempty"` // files.createDirNoClobber collapses onto this field
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateDirRequest) Reset() {
+	*x = CreateDirRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateDirRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateDirRequest) ProtoMessage() {}
+
+func (x *CreateDirRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateDirRequest.ProtoReflect.Descriptor instead.
+func (*CreateDirRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *CreateDirRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *CreateDirRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *CreateDirRequest) GetRecursive() bool {
+	if x != nil {
+		return x.Recursive
+	}
+	return false
+}
+
+func (x *CreateDirRequest) GetNoClobber() bool {
+	if x != nil {
+		return x.NoClobber
+	}
+	return false
+}
+
+type CreateDirResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateDirResponse) Reset() {
+	*x = CreateDirResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateDirResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateDirResponse) ProtoMessage() {}
+
+func (x *CreateDirResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateDirResponse.ProtoReflect.Descriptor instead.
+func (*CreateDirResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{48}
+}
+
+type DeleteFileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Recursive     bool                   `protobuf:"varint,3,opt,name=recursive,proto3" json:"recursive,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteFileRequest) Reset() {
+	*x = DeleteFileRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteFileRequest) ProtoMessage() {}
+
+func (x *DeleteFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteFileRequest.ProtoReflect.Descriptor instead.
+func (*DeleteFileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *DeleteFileRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *DeleteFileRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *DeleteFileRequest) GetRecursive() bool {
+	if x != nil {
+		return x.Recursive
+	}
+	return false
+}
+
+type StatFileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StatFileRequest) Reset() {
+	*x = StatFileRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StatFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StatFileRequest) ProtoMessage() {}
+
+func (x *StatFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StatFileRequest.ProtoReflect.Descriptor instead.
+func (*StatFileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *StatFileRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *StatFileRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type StatFileResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Exists           bool                   `protobuf:"varint,1,opt,name=exists,proto3" json:"exists,omitempty"`
+	IsDirectory      bool                   `protobuf:"varint,2,opt,name=is_directory,json=isDirectory,proto3" json:"is_directory,omitempty"`
+	SizeBytes        int64                  `protobuf:"varint,3,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	ModifiedAtUnixMs int64                  `protobuf:"varint,4,opt,name=modified_at_unix_ms,json=modifiedAtUnixMs,proto3" json:"modified_at_unix_ms,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *StatFileResponse) Reset() {
+	*x = StatFileResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StatFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StatFileResponse) ProtoMessage() {}
+
+func (x *StatFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StatFileResponse.ProtoReflect.Descriptor instead.
+func (*StatFileResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *StatFileResponse) GetExists() bool {
+	if x != nil {
+		return x.Exists
+	}
+	return false
+}
+
+func (x *StatFileResponse) GetIsDirectory() bool {
+	if x != nil {
+		return x.IsDirectory
+	}
+	return false
+}
+
+func (x *StatFileResponse) GetSizeBytes() int64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *StatFileResponse) GetModifiedAtUnixMs() int64 {
+	if x != nil {
+		return x.ModifiedAtUnixMs
+	}
+	return 0
+}
+
+type SearchFilesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	Pattern       string                 `protobuf:"bytes,2,opt,name=pattern,proto3" json:"pattern,omitempty"`
+	IsRegex       bool                   `protobuf:"varint,3,opt,name=is_regex,json=isRegex,proto3" json:"is_regex,omitempty"`
+	PathGlob      string                 `protobuf:"bytes,4,opt,name=path_glob,json=pathGlob,proto3" json:"path_glob,omitempty"`
+	MaxResults    int32                  `protobuf:"varint,5,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchFilesRequest) Reset() {
+	*x = SearchFilesRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchFilesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchFilesRequest) ProtoMessage() {}
+
+func (x *SearchFilesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchFilesRequest.ProtoReflect.Descriptor instead.
+func (*SearchFilesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *SearchFilesRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *SearchFilesRequest) GetPattern() string {
+	if x != nil {
+		return x.Pattern
+	}
+	return ""
+}
+
+func (x *SearchFilesRequest) GetIsRegex() bool {
+	if x != nil {
+		return x.IsRegex
+	}
+	return false
+}
+
+func (x *SearchFilesRequest) GetPathGlob() string {
+	if x != nil {
+		return x.PathGlob
+	}
+	return ""
+}
+
+func (x *SearchFilesRequest) GetMaxResults() int32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type SearchMatch struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Line          int32                  `protobuf:"varint,2,opt,name=line,proto3" json:"line,omitempty"`
+	LineText      string                 `protobuf:"bytes,3,opt,name=line_text,json=lineText,proto3" json:"line_text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchMatch) Reset() {
+	*x = SearchMatch{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchMatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchMatch) ProtoMessage() {}
+
+func (x *SearchMatch) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchMatch.ProtoReflect.Descriptor instead.
+func (*SearchMatch) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *SearchMatch) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *SearchMatch) GetLine() int32 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
+}
+
+func (x *SearchMatch) GetLineText() string {
+	if x != nil {
+		return x.LineText
+	}
+	return ""
+}
+
+type SearchFilesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Matches       []*SearchMatch         `protobuf:"bytes,1,rep,name=matches,proto3" json:"matches,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchFilesResponse) Reset() {
+	*x = SearchFilesResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchFilesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchFilesResponse) ProtoMessage() {}
+
+func (x *SearchFilesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchFilesResponse.ProtoReflect.Descriptor instead.
+func (*SearchFilesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *SearchFilesResponse) GetMatches() []*SearchMatch {
+	if x != nil {
+		return x.Matches
+	}
+	return nil
+}
+
+type ListAllFilesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	PathGlob      string                 `protobuf:"bytes,2,opt,name=path_glob,json=pathGlob,proto3" json:"path_glob,omitempty"`
+	MaxResults    int32                  `protobuf:"varint,3,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAllFilesRequest) Reset() {
+	*x = ListAllFilesRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAllFilesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAllFilesRequest) ProtoMessage() {}
+
+func (x *ListAllFilesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAllFilesRequest.ProtoReflect.Descriptor instead.
+func (*ListAllFilesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *ListAllFilesRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ListAllFilesRequest) GetPathGlob() string {
+	if x != nil {
+		return x.PathGlob
+	}
+	return ""
+}
+
+func (x *ListAllFilesRequest) GetMaxResults() int32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type ListAllFilesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Paths         []string               `protobuf:"bytes,1,rep,name=paths,proto3" json:"paths,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAllFilesResponse) Reset() {
+	*x = ListAllFilesResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAllFilesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAllFilesResponse) ProtoMessage() {}
+
+func (x *ListAllFilesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAllFilesResponse.ProtoReflect.Descriptor instead.
+func (*ListAllFilesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *ListAllFilesResponse) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+type ListMarkdownDocumentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	MaxResults    int32                  `protobuf:"varint,2,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMarkdownDocumentsRequest) Reset() {
+	*x = ListMarkdownDocumentsRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMarkdownDocumentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMarkdownDocumentsRequest) ProtoMessage() {}
+
+func (x *ListMarkdownDocumentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMarkdownDocumentsRequest.ProtoReflect.Descriptor instead.
+func (*ListMarkdownDocumentsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *ListMarkdownDocumentsRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ListMarkdownDocumentsRequest) GetMaxResults() int32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type ListMarkdownDocumentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Paths         []string               `protobuf:"bytes,1,rep,name=paths,proto3" json:"paths,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMarkdownDocumentsResponse) Reset() {
+	*x = ListMarkdownDocumentsResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMarkdownDocumentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMarkdownDocumentsResponse) ProtoMessage() {}
+
+func (x *ListMarkdownDocumentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMarkdownDocumentsResponse.ProtoReflect.Descriptor instead.
+func (*ListMarkdownDocumentsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *ListMarkdownDocumentsResponse) GetPaths() []string {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+type RenameFileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	FromPath      string                 `protobuf:"bytes,2,opt,name=from_path,json=fromPath,proto3" json:"from_path,omitempty"`
+	ToPath        string                 `protobuf:"bytes,3,opt,name=to_path,json=toPath,proto3" json:"to_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenameFileRequest) Reset() {
+	*x = RenameFileRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenameFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenameFileRequest) ProtoMessage() {}
+
+func (x *RenameFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenameFileRequest.ProtoReflect.Descriptor instead.
+func (*RenameFileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *RenameFileRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *RenameFileRequest) GetFromPath() string {
+	if x != nil {
+		return x.FromPath
+	}
+	return ""
+}
+
+func (x *RenameFileRequest) GetToPath() string {
+	if x != nil {
+		return x.ToPath
+	}
+	return ""
+}
+
+type RenameFileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenameFileResponse) Reset() {
+	*x = RenameFileResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenameFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenameFileResponse) ProtoMessage() {}
+
+func (x *RenameFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenameFileResponse.ProtoReflect.Descriptor instead.
+func (*RenameFileResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{60}
+}
+
+type CopyFileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	FromPath      string                 `protobuf:"bytes,2,opt,name=from_path,json=fromPath,proto3" json:"from_path,omitempty"`
+	ToPath        string                 `protobuf:"bytes,3,opt,name=to_path,json=toPath,proto3" json:"to_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CopyFileRequest) Reset() {
+	*x = CopyFileRequest{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CopyFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CopyFileRequest) ProtoMessage() {}
+
+func (x *CopyFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CopyFileRequest.ProtoReflect.Descriptor instead.
+func (*CopyFileRequest) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *CopyFileRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *CopyFileRequest) GetFromPath() string {
+	if x != nil {
+		return x.FromPath
+	}
+	return ""
+}
+
+func (x *CopyFileRequest) GetToPath() string {
+	if x != nil {
+		return x.ToPath
+	}
+	return ""
+}
+
+type CopyFileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CopyFileResponse) Reset() {
+	*x = CopyFileResponse{}
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CopyFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CopyFileResponse) ProtoMessage() {}
+
+func (x *CopyFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_gitgateway_v1_gitgateway_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CopyFileResponse.ProtoReflect.Descriptor instead.
+func (*CopyFileResponse) Descriptor() ([]byte, []int) {
+	return file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP(), []int{62}
+}
+
 var File_orca_gitgateway_v1_gitgateway_proto protoreflect.FileDescriptor
 
 const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\n" +
-	"#orca/gitgateway/v1/gitgateway.proto\x12\x12orca.gitgateway.v1\"3\n" +
+	"#orca/gitgateway/v1/gitgateway.proto\x12\x12orca.gitgateway.v1\x1a\x1bgoogle/protobuf/empty.proto\"3\n" +
 	"\x10GetStatusRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\"6\n" +
@@ -673,11 +3387,12 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\x05state\x18\x02 \x01(\tR\x05state\"a\n" +
 	"\x11GetStatusResponse\x124\n" +
 	"\x05files\x18\x01 \x03(\v2\x1e.orca.gitgateway.v1.FileStatusR\x05files\x12\x16\n" +
-	"\x06branch\x18\x02 \x01(\tR\x06branch\"I\n" +
+	"\x06branch\x18\x02 \x01(\tR\x06branch\"f\n" +
 	"\x0eGetDiffRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
-	"worktreeId\x12\x16\n" +
-	"\x06staged\x18\x02 \x01(\bR\x06staged\"4\n" +
+	"worktreeId\x12\x1b\n" +
+	"\tfile_path\x18\x02 \x01(\tR\bfilePath\x12\x16\n" +
+	"\x06staged\x18\x03 \x01(\bR\x06staged\"4\n" +
 	"\x0fGetDiffResponse\x12!\n" +
 	"\funified_diff\x18\x01 \x01(\tR\vunifiedDiff\"`\n" +
 	"\rCommitRequest\x12\x1f\n" +
@@ -705,14 +3420,234 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\"9\n" +
 	"\x1dGenerateCommitMessageResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2\xa6\x04\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"E\n" +
+	"\fStageRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x14\n" +
+	"\x05paths\x18\x02 \x03(\tR\x05paths\")\n" +
+	"\rStageResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"G\n" +
+	"\x0eUnstageRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x14\n" +
+	"\x05paths\x18\x02 \x03(\tR\x05paths\"+\n" +
+	"\x0fUnstageResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xac\x01\n" +
+	"\tCommitRef\x12\x10\n" +
+	"\x03sha\x18\x01 \x01(\tR\x03sha\x12\x16\n" +
+	"\x06author\x18\x02 \x01(\tR\x06author\x12\x1c\n" +
+	"\tcommitter\x18\x03 \x01(\tR\tcommitter\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x1c\n" +
+	"\ttimestamp\x18\x05 \x01(\x03R\ttimestamp\x12\x1f\n" +
+	"\vparent_shas\x18\x06 \x03(\tR\n" +
+	"parentShas\"b\n" +
+	"\x0eHistoryRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x19\n" +
+	"\bbase_ref\x18\x02 \x01(\tR\abaseRef\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"J\n" +
+	"\x0fHistoryResponse\x127\n" +
+	"\acommits\x18\x01 \x03(\v2\x1d.orca.gitgateway.v1.CommitRefR\acommits\"L\n" +
+	"\x13CheckIgnoredRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x14\n" +
+	"\x05paths\x18\x02 \x03(\tR\x05paths\";\n" +
+	"\x14CheckIgnoredResponse\x12#\n" +
+	"\rignored_paths\x18\x01 \x03(\tR\fignoredPaths\"_\n" +
+	"\x0fForkSyncRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12+\n" +
+	"\x11expected_upstream\x18\x02 \x01(\tR\x10expectedUpstream\"\\\n" +
+	"\x10ForkSyncResponse\x12\x14\n" +
+	"\x05ahead\x18\x01 \x01(\x05R\x05ahead\x12\x16\n" +
+	"\x06behind\x18\x02 \x01(\x05R\x06behind\x12\x1a\n" +
+	"\bdiverged\x18\x03 \x01(\bR\bdiverged\"Y\n" +
+	"\x15UpstreamStatusRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x1f\n" +
+	"\vpush_target\x18\x02 \x01(\tR\n" +
+	"pushTarget\"i\n" +
+	"\x16UpstreamStatusResponse\x12!\n" +
+	"\fhas_upstream\x18\x01 \x01(\bR\vhasUpstream\x12\x14\n" +
+	"\x05ahead\x18\x02 \x01(\x05R\x05ahead\x12\x16\n" +
+	"\x06behind\x18\x03 \x01(\x05R\x06behind\"K\n" +
+	"\x16RemoteCommitUrlRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x10\n" +
+	"\x03sha\x18\x02 \x01(\tR\x03sha\"]\n" +
+	"\x14RemoteFileUrlRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x10\n" +
+	"\x03ref\x18\x03 \x01(\tR\x03ref\"%\n" +
+	"\x11RemoteUrlResponse\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"d\n" +
+	" GeneratePullRequestFieldsRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x1f\n" +
+	"\vbase_branch\x18\x02 \x01(\tR\n" +
+	"baseBranch\"[\n" +
+	"!GeneratePullRequestFieldsResponse\x12\x14\n" +
+	"\x05title\x18\x01 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\"g\n" +
+	"\tModelInfo\x12#\n" +
+	"\rprovider_type\x18\x01 \x01(\tR\fproviderType\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\"Z\n" +
+	"\"DiscoverCommitMessageModelsRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\"\\\n" +
+	"#DiscoverCommitMessageModelsResponse\x125\n" +
+	"\x06models\x18\x01 \x03(\v2\x1d.orca.gitgateway.v1.ModelInfoR\x06models\"F\n" +
+	"\x0fReadFileRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"H\n" +
+	"\x10ReadFileResponse\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\fR\acontent\x12\x1a\n" +
+	"\bencoding\x18\x02 \x01(\tR\bencoding\"\x91\x01\n" +
+	"\x14ReadFileChunkRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12!\n" +
+	"\foffset_bytes\x18\x03 \x01(\x03R\voffsetBytes\x12!\n" +
+	"\flength_bytes\x18\x04 \x01(\x03R\vlengthBytes\"C\n" +
+	"\x15ReadFileChunkResponse\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\fR\acontent\x12\x10\n" +
+	"\x03eof\x18\x02 \x01(\bR\x03eof\"j\n" +
+	"\x16ReadFilePreviewRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1b\n" +
+	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes\"Q\n" +
+	"\x17ReadFilePreviewResponse\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\fR\acontent\x12\x1c\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"E\n" +
+	"\x0eReadDirRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"A\n" +
+	"\bDirEntry\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
+	"\fis_directory\x18\x02 \x01(\bR\visDirectory\"I\n" +
+	"\x0fReadDirResponse\x126\n" +
+	"\aentries\x18\x01 \x03(\v2\x1c.orca.gitgateway.v1.DirEntryR\aentries\"\xa4\x01\n" +
+	"\x10WriteFileRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\fR\acontent\x12\x1a\n" +
+	"\bencoding\x18\x04 \x01(\tR\bencoding\x12%\n" +
+	"\x0ecreate_parents\x18\x05 \x01(\bR\rcreateParents\"8\n" +
+	"\x11WriteFileResponse\x12#\n" +
+	"\rbytes_written\x18\x01 \x01(\x03R\fbytesWritten\"\xa4\x01\n" +
+	"\x15WriteFileChunkRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12!\n" +
+	"\foffset_bytes\x18\x03 \x01(\x03R\voffsetBytes\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\fR\acontent\x12\x19\n" +
+	"\bis_final\x18\x05 \x01(\bR\aisFinal\"=\n" +
+	"\x16WriteFileChunkResponse\x12#\n" +
+	"\rbytes_written\x18\x01 \x01(\x03R\fbytesWritten\"\x84\x01\n" +
+	"\x10CreateDirRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1c\n" +
+	"\trecursive\x18\x03 \x01(\bR\trecursive\x12\x1d\n" +
+	"\n" +
+	"no_clobber\x18\x04 \x01(\bR\tnoClobber\"\x13\n" +
+	"\x11CreateDirResponse\"f\n" +
+	"\x11DeleteFileRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1c\n" +
+	"\trecursive\x18\x03 \x01(\bR\trecursive\"F\n" +
+	"\x0fStatFileRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"\x9b\x01\n" +
+	"\x10StatFileResponse\x12\x16\n" +
+	"\x06exists\x18\x01 \x01(\bR\x06exists\x12!\n" +
+	"\fis_directory\x18\x02 \x01(\bR\visDirectory\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x03 \x01(\x03R\tsizeBytes\x12-\n" +
+	"\x13modified_at_unix_ms\x18\x04 \x01(\x03R\x10modifiedAtUnixMs\"\xa8\x01\n" +
+	"\x12SearchFilesRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x18\n" +
+	"\apattern\x18\x02 \x01(\tR\apattern\x12\x19\n" +
+	"\bis_regex\x18\x03 \x01(\bR\aisRegex\x12\x1b\n" +
+	"\tpath_glob\x18\x04 \x01(\tR\bpathGlob\x12\x1f\n" +
+	"\vmax_results\x18\x05 \x01(\x05R\n" +
+	"maxResults\"R\n" +
+	"\vSearchMatch\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
+	"\x04line\x18\x02 \x01(\x05R\x04line\x12\x1b\n" +
+	"\tline_text\x18\x03 \x01(\tR\blineText\"P\n" +
+	"\x13SearchFilesResponse\x129\n" +
+	"\amatches\x18\x01 \x03(\v2\x1f.orca.gitgateway.v1.SearchMatchR\amatches\"t\n" +
+	"\x13ListAllFilesRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x1b\n" +
+	"\tpath_glob\x18\x02 \x01(\tR\bpathGlob\x12\x1f\n" +
+	"\vmax_results\x18\x03 \x01(\x05R\n" +
+	"maxResults\",\n" +
+	"\x14ListAllFilesResponse\x12\x14\n" +
+	"\x05paths\x18\x01 \x03(\tR\x05paths\"`\n" +
+	"\x1cListMarkdownDocumentsRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x1f\n" +
+	"\vmax_results\x18\x02 \x01(\x05R\n" +
+	"maxResults\"5\n" +
+	"\x1dListMarkdownDocumentsResponse\x12\x14\n" +
+	"\x05paths\x18\x01 \x03(\tR\x05paths\"j\n" +
+	"\x11RenameFileRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x1b\n" +
+	"\tfrom_path\x18\x02 \x01(\tR\bfromPath\x12\x17\n" +
+	"\ato_path\x18\x03 \x01(\tR\x06toPath\"\x14\n" +
+	"\x12RenameFileResponse\"h\n" +
+	"\x0fCopyFileRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x1b\n" +
+	"\tfrom_path\x18\x02 \x01(\tR\bfromPath\x12\x17\n" +
+	"\ato_path\x18\x03 \x01(\tR\x06toPath\"\x12\n" +
+	"\x10CopyFileResponse2\xd6\x16\n" +
 	"\x11GitGatewayService\x12X\n" +
 	"\tGetStatus\x12$.orca.gitgateway.v1.GetStatusRequest\x1a%.orca.gitgateway.v1.GetStatusResponse\x12R\n" +
 	"\aGetDiff\x12\".orca.gitgateway.v1.GetDiffRequest\x1a#.orca.gitgateway.v1.GetDiffResponse\x12O\n" +
 	"\x06Commit\x12!.orca.gitgateway.v1.CommitRequest\x1a\".orca.gitgateway.v1.CommitResponse\x12I\n" +
 	"\x04Push\x12\x1f.orca.gitgateway.v1.PushRequest\x1a .orca.gitgateway.v1.PushResponse\x12I\n" +
 	"\x04Pull\x12\x1f.orca.gitgateway.v1.PullRequest\x1a .orca.gitgateway.v1.PullResponse\x12|\n" +
-	"\x15GenerateCommitMessage\x120.orca.gitgateway.v1.GenerateCommitMessageRequest\x1a1.orca.gitgateway.v1.GenerateCommitMessageResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1;gitgatewayv1b\x06proto3"
+	"\x15GenerateCommitMessage\x120.orca.gitgateway.v1.GenerateCommitMessageRequest\x1a1.orca.gitgateway.v1.GenerateCommitMessageResponse\x12L\n" +
+	"\x05Stage\x12 .orca.gitgateway.v1.StageRequest\x1a!.orca.gitgateway.v1.StageResponse\x12R\n" +
+	"\aUnstage\x12\".orca.gitgateway.v1.UnstageRequest\x1a#.orca.gitgateway.v1.UnstageResponse\x12R\n" +
+	"\aHistory\x12\".orca.gitgateway.v1.HistoryRequest\x1a#.orca.gitgateway.v1.HistoryResponse\x12a\n" +
+	"\fCheckIgnored\x12'.orca.gitgateway.v1.CheckIgnoredRequest\x1a(.orca.gitgateway.v1.CheckIgnoredResponse\x12U\n" +
+	"\bForkSync\x12#.orca.gitgateway.v1.ForkSyncRequest\x1a$.orca.gitgateway.v1.ForkSyncResponse\x12g\n" +
+	"\x0eUpstreamStatus\x12).orca.gitgateway.v1.UpstreamStatusRequest\x1a*.orca.gitgateway.v1.UpstreamStatusResponse\x12d\n" +
+	"\x0fRemoteCommitUrl\x12*.orca.gitgateway.v1.RemoteCommitUrlRequest\x1a%.orca.gitgateway.v1.RemoteUrlResponse\x12`\n" +
+	"\rRemoteFileUrl\x12(.orca.gitgateway.v1.RemoteFileUrlRequest\x1a%.orca.gitgateway.v1.RemoteUrlResponse\x12\x88\x01\n" +
+	"\x19GeneratePullRequestFields\x124.orca.gitgateway.v1.GeneratePullRequestFieldsRequest\x1a5.orca.gitgateway.v1.GeneratePullRequestFieldsResponse\x12\x8e\x01\n" +
+	"\x1bDiscoverCommitMessageModels\x126.orca.gitgateway.v1.DiscoverCommitMessageModelsRequest\x1a7.orca.gitgateway.v1.DiscoverCommitMessageModelsResponse\x12U\n" +
+	"\bReadFile\x12#.orca.gitgateway.v1.ReadFileRequest\x1a$.orca.gitgateway.v1.ReadFileResponse\x12d\n" +
+	"\rReadFileChunk\x12(.orca.gitgateway.v1.ReadFileChunkRequest\x1a).orca.gitgateway.v1.ReadFileChunkResponse\x12j\n" +
+	"\x0fReadFilePreview\x12*.orca.gitgateway.v1.ReadFilePreviewRequest\x1a+.orca.gitgateway.v1.ReadFilePreviewResponse\x12R\n" +
+	"\aReadDir\x12\".orca.gitgateway.v1.ReadDirRequest\x1a#.orca.gitgateway.v1.ReadDirResponse\x12X\n" +
+	"\tWriteFile\x12$.orca.gitgateway.v1.WriteFileRequest\x1a%.orca.gitgateway.v1.WriteFileResponse\x12g\n" +
+	"\x0eWriteFileChunk\x12).orca.gitgateway.v1.WriteFileChunkRequest\x1a*.orca.gitgateway.v1.WriteFileChunkResponse\x12X\n" +
+	"\tCreateDir\x12$.orca.gitgateway.v1.CreateDirRequest\x1a%.orca.gitgateway.v1.CreateDirResponse\x12K\n" +
+	"\n" +
+	"DeleteFile\x12%.orca.gitgateway.v1.DeleteFileRequest\x1a\x16.google.protobuf.Empty\x12U\n" +
+	"\bStatFile\x12#.orca.gitgateway.v1.StatFileRequest\x1a$.orca.gitgateway.v1.StatFileResponse\x12^\n" +
+	"\vSearchFiles\x12&.orca.gitgateway.v1.SearchFilesRequest\x1a'.orca.gitgateway.v1.SearchFilesResponse\x12a\n" +
+	"\fListAllFiles\x12'.orca.gitgateway.v1.ListAllFilesRequest\x1a(.orca.gitgateway.v1.ListAllFilesResponse\x12|\n" +
+	"\x15ListMarkdownDocuments\x120.orca.gitgateway.v1.ListMarkdownDocumentsRequest\x1a1.orca.gitgateway.v1.ListMarkdownDocumentsResponse\x12[\n" +
+	"\n" +
+	"RenameFile\x12%.orca.gitgateway.v1.RenameFileRequest\x1a&.orca.gitgateway.v1.RenameFileResponse\x12U\n" +
+	"\bCopyFile\x12#.orca.gitgateway.v1.CopyFileRequest\x1a$.orca.gitgateway.v1.CopyFileResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1;gitgatewayv1b\x06proto3"
 
 var (
 	file_orca_gitgateway_v1_gitgateway_proto_rawDescOnce sync.Once
@@ -726,41 +3661,144 @@ func file_orca_gitgateway_v1_gitgateway_proto_rawDescGZIP() []byte {
 	return file_orca_gitgateway_v1_gitgateway_proto_rawDescData
 }
 
-var file_orca_gitgateway_v1_gitgateway_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_orca_gitgateway_v1_gitgateway_proto_msgTypes = make([]protoimpl.MessageInfo, 63)
 var file_orca_gitgateway_v1_gitgateway_proto_goTypes = []any{
-	(*GetStatusRequest)(nil),              // 0: orca.gitgateway.v1.GetStatusRequest
-	(*FileStatus)(nil),                    // 1: orca.gitgateway.v1.FileStatus
-	(*GetStatusResponse)(nil),             // 2: orca.gitgateway.v1.GetStatusResponse
-	(*GetDiffRequest)(nil),                // 3: orca.gitgateway.v1.GetDiffRequest
-	(*GetDiffResponse)(nil),               // 4: orca.gitgateway.v1.GetDiffResponse
-	(*CommitRequest)(nil),                 // 5: orca.gitgateway.v1.CommitRequest
-	(*CommitResponse)(nil),                // 6: orca.gitgateway.v1.CommitResponse
-	(*PushRequest)(nil),                   // 7: orca.gitgateway.v1.PushRequest
-	(*PushResponse)(nil),                  // 8: orca.gitgateway.v1.PushResponse
-	(*PullRequest)(nil),                   // 9: orca.gitgateway.v1.PullRequest
-	(*PullResponse)(nil),                  // 10: orca.gitgateway.v1.PullResponse
-	(*GenerateCommitMessageRequest)(nil),  // 11: orca.gitgateway.v1.GenerateCommitMessageRequest
-	(*GenerateCommitMessageResponse)(nil), // 12: orca.gitgateway.v1.GenerateCommitMessageResponse
+	(*GetStatusRequest)(nil),                    // 0: orca.gitgateway.v1.GetStatusRequest
+	(*FileStatus)(nil),                          // 1: orca.gitgateway.v1.FileStatus
+	(*GetStatusResponse)(nil),                   // 2: orca.gitgateway.v1.GetStatusResponse
+	(*GetDiffRequest)(nil),                      // 3: orca.gitgateway.v1.GetDiffRequest
+	(*GetDiffResponse)(nil),                     // 4: orca.gitgateway.v1.GetDiffResponse
+	(*CommitRequest)(nil),                       // 5: orca.gitgateway.v1.CommitRequest
+	(*CommitResponse)(nil),                      // 6: orca.gitgateway.v1.CommitResponse
+	(*PushRequest)(nil),                         // 7: orca.gitgateway.v1.PushRequest
+	(*PushResponse)(nil),                        // 8: orca.gitgateway.v1.PushResponse
+	(*PullRequest)(nil),                         // 9: orca.gitgateway.v1.PullRequest
+	(*PullResponse)(nil),                        // 10: orca.gitgateway.v1.PullResponse
+	(*GenerateCommitMessageRequest)(nil),        // 11: orca.gitgateway.v1.GenerateCommitMessageRequest
+	(*GenerateCommitMessageResponse)(nil),       // 12: orca.gitgateway.v1.GenerateCommitMessageResponse
+	(*StageRequest)(nil),                        // 13: orca.gitgateway.v1.StageRequest
+	(*StageResponse)(nil),                       // 14: orca.gitgateway.v1.StageResponse
+	(*UnstageRequest)(nil),                      // 15: orca.gitgateway.v1.UnstageRequest
+	(*UnstageResponse)(nil),                     // 16: orca.gitgateway.v1.UnstageResponse
+	(*CommitRef)(nil),                           // 17: orca.gitgateway.v1.CommitRef
+	(*HistoryRequest)(nil),                      // 18: orca.gitgateway.v1.HistoryRequest
+	(*HistoryResponse)(nil),                     // 19: orca.gitgateway.v1.HistoryResponse
+	(*CheckIgnoredRequest)(nil),                 // 20: orca.gitgateway.v1.CheckIgnoredRequest
+	(*CheckIgnoredResponse)(nil),                // 21: orca.gitgateway.v1.CheckIgnoredResponse
+	(*ForkSyncRequest)(nil),                     // 22: orca.gitgateway.v1.ForkSyncRequest
+	(*ForkSyncResponse)(nil),                    // 23: orca.gitgateway.v1.ForkSyncResponse
+	(*UpstreamStatusRequest)(nil),               // 24: orca.gitgateway.v1.UpstreamStatusRequest
+	(*UpstreamStatusResponse)(nil),              // 25: orca.gitgateway.v1.UpstreamStatusResponse
+	(*RemoteCommitUrlRequest)(nil),              // 26: orca.gitgateway.v1.RemoteCommitUrlRequest
+	(*RemoteFileUrlRequest)(nil),                // 27: orca.gitgateway.v1.RemoteFileUrlRequest
+	(*RemoteUrlResponse)(nil),                   // 28: orca.gitgateway.v1.RemoteUrlResponse
+	(*GeneratePullRequestFieldsRequest)(nil),    // 29: orca.gitgateway.v1.GeneratePullRequestFieldsRequest
+	(*GeneratePullRequestFieldsResponse)(nil),   // 30: orca.gitgateway.v1.GeneratePullRequestFieldsResponse
+	(*ModelInfo)(nil),                           // 31: orca.gitgateway.v1.ModelInfo
+	(*DiscoverCommitMessageModelsRequest)(nil),  // 32: orca.gitgateway.v1.DiscoverCommitMessageModelsRequest
+	(*DiscoverCommitMessageModelsResponse)(nil), // 33: orca.gitgateway.v1.DiscoverCommitMessageModelsResponse
+	(*ReadFileRequest)(nil),                     // 34: orca.gitgateway.v1.ReadFileRequest
+	(*ReadFileResponse)(nil),                    // 35: orca.gitgateway.v1.ReadFileResponse
+	(*ReadFileChunkRequest)(nil),                // 36: orca.gitgateway.v1.ReadFileChunkRequest
+	(*ReadFileChunkResponse)(nil),               // 37: orca.gitgateway.v1.ReadFileChunkResponse
+	(*ReadFilePreviewRequest)(nil),              // 38: orca.gitgateway.v1.ReadFilePreviewRequest
+	(*ReadFilePreviewResponse)(nil),             // 39: orca.gitgateway.v1.ReadFilePreviewResponse
+	(*ReadDirRequest)(nil),                      // 40: orca.gitgateway.v1.ReadDirRequest
+	(*DirEntry)(nil),                            // 41: orca.gitgateway.v1.DirEntry
+	(*ReadDirResponse)(nil),                     // 42: orca.gitgateway.v1.ReadDirResponse
+	(*WriteFileRequest)(nil),                    // 43: orca.gitgateway.v1.WriteFileRequest
+	(*WriteFileResponse)(nil),                   // 44: orca.gitgateway.v1.WriteFileResponse
+	(*WriteFileChunkRequest)(nil),               // 45: orca.gitgateway.v1.WriteFileChunkRequest
+	(*WriteFileChunkResponse)(nil),              // 46: orca.gitgateway.v1.WriteFileChunkResponse
+	(*CreateDirRequest)(nil),                    // 47: orca.gitgateway.v1.CreateDirRequest
+	(*CreateDirResponse)(nil),                   // 48: orca.gitgateway.v1.CreateDirResponse
+	(*DeleteFileRequest)(nil),                   // 49: orca.gitgateway.v1.DeleteFileRequest
+	(*StatFileRequest)(nil),                     // 50: orca.gitgateway.v1.StatFileRequest
+	(*StatFileResponse)(nil),                    // 51: orca.gitgateway.v1.StatFileResponse
+	(*SearchFilesRequest)(nil),                  // 52: orca.gitgateway.v1.SearchFilesRequest
+	(*SearchMatch)(nil),                         // 53: orca.gitgateway.v1.SearchMatch
+	(*SearchFilesResponse)(nil),                 // 54: orca.gitgateway.v1.SearchFilesResponse
+	(*ListAllFilesRequest)(nil),                 // 55: orca.gitgateway.v1.ListAllFilesRequest
+	(*ListAllFilesResponse)(nil),                // 56: orca.gitgateway.v1.ListAllFilesResponse
+	(*ListMarkdownDocumentsRequest)(nil),        // 57: orca.gitgateway.v1.ListMarkdownDocumentsRequest
+	(*ListMarkdownDocumentsResponse)(nil),       // 58: orca.gitgateway.v1.ListMarkdownDocumentsResponse
+	(*RenameFileRequest)(nil),                   // 59: orca.gitgateway.v1.RenameFileRequest
+	(*RenameFileResponse)(nil),                  // 60: orca.gitgateway.v1.RenameFileResponse
+	(*CopyFileRequest)(nil),                     // 61: orca.gitgateway.v1.CopyFileRequest
+	(*CopyFileResponse)(nil),                    // 62: orca.gitgateway.v1.CopyFileResponse
+	(*emptypb.Empty)(nil),                       // 63: google.protobuf.Empty
 }
 var file_orca_gitgateway_v1_gitgateway_proto_depIdxs = []int32{
 	1,  // 0: orca.gitgateway.v1.GetStatusResponse.files:type_name -> orca.gitgateway.v1.FileStatus
-	0,  // 1: orca.gitgateway.v1.GitGatewayService.GetStatus:input_type -> orca.gitgateway.v1.GetStatusRequest
-	3,  // 2: orca.gitgateway.v1.GitGatewayService.GetDiff:input_type -> orca.gitgateway.v1.GetDiffRequest
-	5,  // 3: orca.gitgateway.v1.GitGatewayService.Commit:input_type -> orca.gitgateway.v1.CommitRequest
-	7,  // 4: orca.gitgateway.v1.GitGatewayService.Push:input_type -> orca.gitgateway.v1.PushRequest
-	9,  // 5: orca.gitgateway.v1.GitGatewayService.Pull:input_type -> orca.gitgateway.v1.PullRequest
-	11, // 6: orca.gitgateway.v1.GitGatewayService.GenerateCommitMessage:input_type -> orca.gitgateway.v1.GenerateCommitMessageRequest
-	2,  // 7: orca.gitgateway.v1.GitGatewayService.GetStatus:output_type -> orca.gitgateway.v1.GetStatusResponse
-	4,  // 8: orca.gitgateway.v1.GitGatewayService.GetDiff:output_type -> orca.gitgateway.v1.GetDiffResponse
-	6,  // 9: orca.gitgateway.v1.GitGatewayService.Commit:output_type -> orca.gitgateway.v1.CommitResponse
-	8,  // 10: orca.gitgateway.v1.GitGatewayService.Push:output_type -> orca.gitgateway.v1.PushResponse
-	10, // 11: orca.gitgateway.v1.GitGatewayService.Pull:output_type -> orca.gitgateway.v1.PullResponse
-	12, // 12: orca.gitgateway.v1.GitGatewayService.GenerateCommitMessage:output_type -> orca.gitgateway.v1.GenerateCommitMessageResponse
-	7,  // [7:13] is the sub-list for method output_type
-	1,  // [1:7] is the sub-list for method input_type
-	1,  // [1:1] is the sub-list for extension type_name
-	1,  // [1:1] is the sub-list for extension extendee
-	0,  // [0:1] is the sub-list for field type_name
+	17, // 1: orca.gitgateway.v1.HistoryResponse.commits:type_name -> orca.gitgateway.v1.CommitRef
+	31, // 2: orca.gitgateway.v1.DiscoverCommitMessageModelsResponse.models:type_name -> orca.gitgateway.v1.ModelInfo
+	41, // 3: orca.gitgateway.v1.ReadDirResponse.entries:type_name -> orca.gitgateway.v1.DirEntry
+	53, // 4: orca.gitgateway.v1.SearchFilesResponse.matches:type_name -> orca.gitgateway.v1.SearchMatch
+	0,  // 5: orca.gitgateway.v1.GitGatewayService.GetStatus:input_type -> orca.gitgateway.v1.GetStatusRequest
+	3,  // 6: orca.gitgateway.v1.GitGatewayService.GetDiff:input_type -> orca.gitgateway.v1.GetDiffRequest
+	5,  // 7: orca.gitgateway.v1.GitGatewayService.Commit:input_type -> orca.gitgateway.v1.CommitRequest
+	7,  // 8: orca.gitgateway.v1.GitGatewayService.Push:input_type -> orca.gitgateway.v1.PushRequest
+	9,  // 9: orca.gitgateway.v1.GitGatewayService.Pull:input_type -> orca.gitgateway.v1.PullRequest
+	11, // 10: orca.gitgateway.v1.GitGatewayService.GenerateCommitMessage:input_type -> orca.gitgateway.v1.GenerateCommitMessageRequest
+	13, // 11: orca.gitgateway.v1.GitGatewayService.Stage:input_type -> orca.gitgateway.v1.StageRequest
+	15, // 12: orca.gitgateway.v1.GitGatewayService.Unstage:input_type -> orca.gitgateway.v1.UnstageRequest
+	18, // 13: orca.gitgateway.v1.GitGatewayService.History:input_type -> orca.gitgateway.v1.HistoryRequest
+	20, // 14: orca.gitgateway.v1.GitGatewayService.CheckIgnored:input_type -> orca.gitgateway.v1.CheckIgnoredRequest
+	22, // 15: orca.gitgateway.v1.GitGatewayService.ForkSync:input_type -> orca.gitgateway.v1.ForkSyncRequest
+	24, // 16: orca.gitgateway.v1.GitGatewayService.UpstreamStatus:input_type -> orca.gitgateway.v1.UpstreamStatusRequest
+	26, // 17: orca.gitgateway.v1.GitGatewayService.RemoteCommitUrl:input_type -> orca.gitgateway.v1.RemoteCommitUrlRequest
+	27, // 18: orca.gitgateway.v1.GitGatewayService.RemoteFileUrl:input_type -> orca.gitgateway.v1.RemoteFileUrlRequest
+	29, // 19: orca.gitgateway.v1.GitGatewayService.GeneratePullRequestFields:input_type -> orca.gitgateway.v1.GeneratePullRequestFieldsRequest
+	32, // 20: orca.gitgateway.v1.GitGatewayService.DiscoverCommitMessageModels:input_type -> orca.gitgateway.v1.DiscoverCommitMessageModelsRequest
+	34, // 21: orca.gitgateway.v1.GitGatewayService.ReadFile:input_type -> orca.gitgateway.v1.ReadFileRequest
+	36, // 22: orca.gitgateway.v1.GitGatewayService.ReadFileChunk:input_type -> orca.gitgateway.v1.ReadFileChunkRequest
+	38, // 23: orca.gitgateway.v1.GitGatewayService.ReadFilePreview:input_type -> orca.gitgateway.v1.ReadFilePreviewRequest
+	40, // 24: orca.gitgateway.v1.GitGatewayService.ReadDir:input_type -> orca.gitgateway.v1.ReadDirRequest
+	43, // 25: orca.gitgateway.v1.GitGatewayService.WriteFile:input_type -> orca.gitgateway.v1.WriteFileRequest
+	45, // 26: orca.gitgateway.v1.GitGatewayService.WriteFileChunk:input_type -> orca.gitgateway.v1.WriteFileChunkRequest
+	47, // 27: orca.gitgateway.v1.GitGatewayService.CreateDir:input_type -> orca.gitgateway.v1.CreateDirRequest
+	49, // 28: orca.gitgateway.v1.GitGatewayService.DeleteFile:input_type -> orca.gitgateway.v1.DeleteFileRequest
+	50, // 29: orca.gitgateway.v1.GitGatewayService.StatFile:input_type -> orca.gitgateway.v1.StatFileRequest
+	52, // 30: orca.gitgateway.v1.GitGatewayService.SearchFiles:input_type -> orca.gitgateway.v1.SearchFilesRequest
+	55, // 31: orca.gitgateway.v1.GitGatewayService.ListAllFiles:input_type -> orca.gitgateway.v1.ListAllFilesRequest
+	57, // 32: orca.gitgateway.v1.GitGatewayService.ListMarkdownDocuments:input_type -> orca.gitgateway.v1.ListMarkdownDocumentsRequest
+	59, // 33: orca.gitgateway.v1.GitGatewayService.RenameFile:input_type -> orca.gitgateway.v1.RenameFileRequest
+	61, // 34: orca.gitgateway.v1.GitGatewayService.CopyFile:input_type -> orca.gitgateway.v1.CopyFileRequest
+	2,  // 35: orca.gitgateway.v1.GitGatewayService.GetStatus:output_type -> orca.gitgateway.v1.GetStatusResponse
+	4,  // 36: orca.gitgateway.v1.GitGatewayService.GetDiff:output_type -> orca.gitgateway.v1.GetDiffResponse
+	6,  // 37: orca.gitgateway.v1.GitGatewayService.Commit:output_type -> orca.gitgateway.v1.CommitResponse
+	8,  // 38: orca.gitgateway.v1.GitGatewayService.Push:output_type -> orca.gitgateway.v1.PushResponse
+	10, // 39: orca.gitgateway.v1.GitGatewayService.Pull:output_type -> orca.gitgateway.v1.PullResponse
+	12, // 40: orca.gitgateway.v1.GitGatewayService.GenerateCommitMessage:output_type -> orca.gitgateway.v1.GenerateCommitMessageResponse
+	14, // 41: orca.gitgateway.v1.GitGatewayService.Stage:output_type -> orca.gitgateway.v1.StageResponse
+	16, // 42: orca.gitgateway.v1.GitGatewayService.Unstage:output_type -> orca.gitgateway.v1.UnstageResponse
+	19, // 43: orca.gitgateway.v1.GitGatewayService.History:output_type -> orca.gitgateway.v1.HistoryResponse
+	21, // 44: orca.gitgateway.v1.GitGatewayService.CheckIgnored:output_type -> orca.gitgateway.v1.CheckIgnoredResponse
+	23, // 45: orca.gitgateway.v1.GitGatewayService.ForkSync:output_type -> orca.gitgateway.v1.ForkSyncResponse
+	25, // 46: orca.gitgateway.v1.GitGatewayService.UpstreamStatus:output_type -> orca.gitgateway.v1.UpstreamStatusResponse
+	28, // 47: orca.gitgateway.v1.GitGatewayService.RemoteCommitUrl:output_type -> orca.gitgateway.v1.RemoteUrlResponse
+	28, // 48: orca.gitgateway.v1.GitGatewayService.RemoteFileUrl:output_type -> orca.gitgateway.v1.RemoteUrlResponse
+	30, // 49: orca.gitgateway.v1.GitGatewayService.GeneratePullRequestFields:output_type -> orca.gitgateway.v1.GeneratePullRequestFieldsResponse
+	33, // 50: orca.gitgateway.v1.GitGatewayService.DiscoverCommitMessageModels:output_type -> orca.gitgateway.v1.DiscoverCommitMessageModelsResponse
+	35, // 51: orca.gitgateway.v1.GitGatewayService.ReadFile:output_type -> orca.gitgateway.v1.ReadFileResponse
+	37, // 52: orca.gitgateway.v1.GitGatewayService.ReadFileChunk:output_type -> orca.gitgateway.v1.ReadFileChunkResponse
+	39, // 53: orca.gitgateway.v1.GitGatewayService.ReadFilePreview:output_type -> orca.gitgateway.v1.ReadFilePreviewResponse
+	42, // 54: orca.gitgateway.v1.GitGatewayService.ReadDir:output_type -> orca.gitgateway.v1.ReadDirResponse
+	44, // 55: orca.gitgateway.v1.GitGatewayService.WriteFile:output_type -> orca.gitgateway.v1.WriteFileResponse
+	46, // 56: orca.gitgateway.v1.GitGatewayService.WriteFileChunk:output_type -> orca.gitgateway.v1.WriteFileChunkResponse
+	48, // 57: orca.gitgateway.v1.GitGatewayService.CreateDir:output_type -> orca.gitgateway.v1.CreateDirResponse
+	63, // 58: orca.gitgateway.v1.GitGatewayService.DeleteFile:output_type -> google.protobuf.Empty
+	51, // 59: orca.gitgateway.v1.GitGatewayService.StatFile:output_type -> orca.gitgateway.v1.StatFileResponse
+	54, // 60: orca.gitgateway.v1.GitGatewayService.SearchFiles:output_type -> orca.gitgateway.v1.SearchFilesResponse
+	56, // 61: orca.gitgateway.v1.GitGatewayService.ListAllFiles:output_type -> orca.gitgateway.v1.ListAllFilesResponse
+	58, // 62: orca.gitgateway.v1.GitGatewayService.ListMarkdownDocuments:output_type -> orca.gitgateway.v1.ListMarkdownDocumentsResponse
+	60, // 63: orca.gitgateway.v1.GitGatewayService.RenameFile:output_type -> orca.gitgateway.v1.RenameFileResponse
+	62, // 64: orca.gitgateway.v1.GitGatewayService.CopyFile:output_type -> orca.gitgateway.v1.CopyFileResponse
+	35, // [35:65] is the sub-list for method output_type
+	5,  // [5:35] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_orca_gitgateway_v1_gitgateway_proto_init() }
@@ -774,7 +3812,7 @@ func file_orca_gitgateway_v1_gitgateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_gitgateway_v1_gitgateway_proto_rawDesc), len(file_orca_gitgateway_v1_gitgateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   63,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

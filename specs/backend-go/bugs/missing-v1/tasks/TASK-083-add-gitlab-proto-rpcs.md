@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/proto/orca/scmintegration/v1/scmintegration.proto`
 **Depends on:** TASK-077 (same file; apply after to avoid a service-block merge conflict)
-**Status:** `[x]` DONE (verified — `buf generate`/`buf breaking` clean, `go build ./proto/...` clean; also added a `url` field to `MergeRequest` that this task's own message definition already had but `domain.MergeRequest`'s TASK-084 doc-comment code omitted — see TASK-084's status note)
+**Status:** `[x]` DONE — implemented in worktree `agent-aac2382028c6ce920` (branch `worktree-agent-aac2382028c6ce920`), **committed** as `ce750c490`. `go build`/`go vet`/`gofmt -l` clean, `buf generate`/`buf breaking` clean (additive-only). Pending merge to main + one-line RegisterRealChannels/main.go wiring.
 
 ---
 

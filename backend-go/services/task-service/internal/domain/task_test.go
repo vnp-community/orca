@@ -56,11 +56,27 @@ func TestTask_SetStatus_AllowsNonTerminalTransition(t *testing.T) {
 		t.Fatalf("unexpected error building task: %v", err)
 	}
 
-	inProgress, err := open.SetStatus(StatusInProgress)
+	done, err := open.SetStatus(StatusDone)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if inProgress.Status != StatusInProgress {
-		t.Errorf("expected status %q, got %q", StatusInProgress, inProgress.Status)
+	if done.Status != StatusDone {
+		t.Errorf("expected status %q, got %q", StatusDone, done.Status)
+	}
+}
+
+// TestTask_SetStatus_RejectsTransitionIntoInProgress locks in TASK-223's
+// guard: SetStatus (the method UpdateTask calls) must never be able to mark
+// a task in_progress — only ExecuteTask's direct
+// TaskRepository.UpdateStatus call may do that. See ErrCannotSetInProgress's
+// doc comment.
+func TestTask_SetStatus_RejectsTransitionIntoInProgress(t *testing.T) {
+	open, err := NewTask("t1", "tenant-1", "Title", StatusOpen, "", "")
+	if err != nil {
+		t.Fatalf("unexpected error building task: %v", err)
+	}
+
+	if _, err := open.SetStatus(StatusInProgress); err != ErrCannotSetInProgress {
+		t.Fatalf("expected ErrCannotSetInProgress, got %v", err)
 	}
 }

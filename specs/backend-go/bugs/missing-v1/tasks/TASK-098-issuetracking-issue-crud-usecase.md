@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `services/issue-tracking-service/internal/{domain,usecase,adapter/jira,adapter/grpc}/*.go`
 **Depends on:** TASK-096, TASK-097
-**Status:** `[x]` DONE (verified) — domain.Issue extended, IssueTrackerProvider extended, ListIssues/CreateIssue updated + SearchIssues/GetIssue/UpdateIssue/AddIssueComment/ListIssueComments added, jira/client.go fully extended, grpc/server.go handlers wired. `go build`/`go vet`/`go test` clean.
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

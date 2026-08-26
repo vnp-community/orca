@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `internal/domain/company.go`, `internal/domain/department.go`, `internal/usecase/ports.go`, `internal/usecase/get_user_profile.go` (new), `internal/usecase/list_departments.go` (new), `internal/usecase/update_company.go` (new), `internal/usecase/update_department.go` (new), `internal/usecase/update_user_profile.go` (new), `internal/adapter/postgres/company_repository.go`, `internal/adapter/postgres/department_repository.go`, `internal/adapter/postgres/user_profile_repository.go`, `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-127
-**Status:** `[x]` DONE (verified) — domain/usecase/repository/grpc/main.go layers implemented in tenant-service. `go build`/`go vet ./...` clean; `go test ./internal/usecase/... ./internal/domain/...` green.
+**Status:** `[x]` DONE — implemented; `get_user_profile.go` fixed to use real `tenant.RequireTenantID(ctx)` (the task sketch left this as a placeholder). Worktree `agent-a9271c5b2d89347e7`, uncommitted, pending merge.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `migrations/0007_project_host_setups.up.sql`/`.down.sql` (new; `0006` is TASK-138's — bump to `0007` if that task hasn't landed yet, otherwise use the next free number), `internal/domain/host_setup.go` (new)
 **Depends on:** none (independent of TASK-141; both can land in either order — TASK-143 depends on both)
-**Status:** `[x]` DONE (verified) — migration `0007_project_host_setups` (up/down) + `internal/domain/host_setup.go` implemented. `go build`/`go vet ./internal/domain/...` clean. Migration not applied against a live Postgres (none available in this environment) — SQL written and reviewed only.
+**Status:** `[x]` DONE — migration `0007_project_host_setups.{up,down}.sql` + `domain.HostSetup` implemented. Worktree `agent-a9271c5b2d89347e7`, uncommitted.
 
 ---
 

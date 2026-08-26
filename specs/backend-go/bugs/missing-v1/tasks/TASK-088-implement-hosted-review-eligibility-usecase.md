@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `services/scm-integration-service/internal/usecase/ports.go`, `check_hosted_review_eligibility.go` (new), `internal/adapter/{github,gitlab,bitbucket,azuredevops,gitea}/client.go`, `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-072, TASK-073, TASK-074, TASK-084, TASK-087
-**Status:** `[x]` DONE (verified — `go build`/`go vet`/`go test ./...` clean; `BranchExists` implemented for real on all 5 provider adapters — github/gitlab/bitbucket/azuredevops/gitea — per this task's own Step 3 table, including Azure DevOps' len(value)>0 existence convention instead of status-code)
+**Status:** `[x]` DONE — implemented in worktree `agent-aac2382028c6ce920` (branch `worktree-agent-aac2382028c6ce920`), **committed** as `ce750c490`. `go build`/`go vet`/`gofmt -l` clean, `buf generate`/`buf breaking` clean (additive-only). Pending merge to main + one-line RegisterRealChannels/main.go wiring.
 
 ---
 

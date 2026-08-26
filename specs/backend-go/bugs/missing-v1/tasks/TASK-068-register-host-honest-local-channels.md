@@ -5,11 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** none
-**Status:** `[x]` DONE (verified) — implemented in the same new file as
-TASK-046/TASK-066 (`channels_emulator_folderworkspace_host.go`), called
-from `registerEmulatorFolderWorkspaceHostChannels`. `go build`/`go vet`
-clean. Not yet wired into `RegisterRealChannels` — see TASK-066's note;
-same one-line integration step covers all three namespaces in this file.
+**Status:** `[x]` DONE — 4 channels return honest `false`/`[]` local answers, implemented in `channels_emulator_folderworkspace_host.go`. Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. Pending merge + integration wiring.
 
 ---
 

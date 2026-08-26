@@ -5,22 +5,7 @@
 **Service:** `project-service`, `api-gateway`
 **File:** `backend-go/services/project-service/internal/usecase/create_folder_workspace_test.go`, `get_folder_workspace_path_status_test.go`, `update_folder_workspace_test.go`, `delete_folder_workspace_test.go`, `backend-go/services/project-service/internal/adapter/postgres/folder_workspace_repository_test.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-064, TASK-065, TASK-066
-**Status:** `[x]` DONE (verified) — usecase tests in
-`internal/usecase/folder_workspace_test.go` (13 tests, one file instead of
-4, matching TASK-064's one-file usecase layout) plus a
-`fakeFolderWorkspaceRepository` added to `fakes_test.go`; all pass
-(`go test ./internal/usecase/...`). Postgres integration tests in
-`internal/adapter/postgres/folder_workspace_repository_test.go`
-(`-tags integration`) — ran for real against Docker/testcontainers-go
-(Postgres 16-alpine), all 4 pass, including the create-then-get round
-trip and the real unique-violation -> `ErrPathAlreadyRegistered` mapping.
-wscompat channel tests (5, one per channel + 1 error-propagation case) in
-api-gateway's new `channels_emulator_folderworkspace_host_test.go`, using
-a `fakeProjectClient`; all pass. Also had to add the 5 new
-`ProjectServiceClient` methods to api-gateway's pre-existing
-`fakeProjectServiceClient` in `httpgateway/project_routes_test.go` — that
-fake asserts full interface satisfaction and broke once the proto grew
-these methods; fixed so the rest of that package still builds/vets.
+**Status:** `[x]` DONE — 13 usecase unit tests + 4 REAL Postgres integration tests (testcontainers-go, Postgres 16, Docker available in this worktree — including the unique-violation → `ErrPathAlreadyRegistered` mapping firing for real) + 6 wscompat channel tests, all passing. Also patched api-gateway's pre-existing `fakeProjectServiceClient` with the 5 new interface methods. Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. Pending merge.
 
 ---
 

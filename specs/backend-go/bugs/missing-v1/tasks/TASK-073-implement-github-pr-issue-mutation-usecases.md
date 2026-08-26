@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `services/scm-integration-service/internal/usecase/ports.go`, `merge_pull_request.go` (new), `request_pull_request_reviewers.go` (new), `remove_pull_request_reviewers.go` (new), `set_pull_request_auto_merge.go` (new), `update_issue.go` (new)
 **Depends on:** TASK-071
-**Status:** `[x]` DONE (verified — `go build`/`go vet`/`go test` clean. NOTE: added GitLab stub methods (ErrCapabilityUnsupported) for the 5 new ScmProvider methods in this same pass, not deferred to TASK-084 as this file's Verify section literally suggested — TASK-084 never actually re-touches these methods, so deferring would have left GitLab's *Client failing the ScmProvider interface.)
+**Status:** `[x]` DONE — implemented in worktree `agent-aac2382028c6ce920` (branch `worktree-agent-aac2382028c6ce920`), **committed** as `ce750c490`. `go build`/`go vet`/`gofmt -l` clean, `buf generate`/`buf breaking` clean (additive-only). Pending merge to main + one-line RegisterRealChannels/main.go wiring.
 
 ---
 

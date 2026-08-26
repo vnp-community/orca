@@ -5,10 +5,7 @@
 **Service:** `infra-fleet-service` (target) — **out of scope today**
 **File:** none to modify now; target files listed below for whoever picks this up once unblocked
 **Depends on:** blocked on an `agent/` capability (ADB/`xcrun simctl` device-driving RPC surface) that does not exist in this repo today and is out of scope for this rewrite. Not blocked on any other TASK-0XX in this set.
-**Status:** `[blocked]` Confirmed blocked on an `agent/` `device.*` RPC surface
-that does not exist in this repo — per this task's own instructions, no
-code was implemented; this file's target-design documentation is the only
-deliverable, and it is unchanged from the version reviewed in this pass.
+**Status:** `[blocked]` — re-confirmed still blocked (worktree `agent-abbc42cb9786d6743`): `agent/` has no `device.*` RPC surface. No code implemented, per this task's own instructions. **DO NOT START** until `agent/` gains this capability.
 
 ---
 

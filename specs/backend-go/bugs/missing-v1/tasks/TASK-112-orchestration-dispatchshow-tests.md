@@ -5,7 +5,7 @@
 **Service:** `orchestration-service`, `api-gateway`
 **File:** `services/orchestration-service/internal/usecase/get_dispatch_context_for_task_test.go` (new), `services/orchestration-service/internal/adapter/postgres/repository_test.go` (extend), `services/api-gateway/internal/adapter/wscompat/channels_orchestration_test.go` (new)
 **Depends on:** TASK-110, TASK-111
-**Status:** `[partial]` — get_dispatch_context_for_task_test.go (usecase, 4 tests) and channels_orchestration_test.go (3 tests) all written and pass. `internal/adapter/postgres/repository_test.go` extended with `TestRepository_GetLatestForTask_ReturnsMostRecentAfterRetry`/`_NoRows_ReturnsErrDispatchContextNotFound`, type-checks under `-tags=integration` but NOT executed — no live Postgres/Docker in this environment.
+**Status:** `[partial]` — usecase/adapter/wscompat tests written and passing (30 new wscompat tests total across the group). Postgres integration test halves written, compile under `-tags=integration`, but not executed — no Docker/Postgres in this environment. Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`.
 
 ---
 

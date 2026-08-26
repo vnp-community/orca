@@ -5,10 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-046
-**Status:** `[x]` DONE (verified) — test added in a new file
-`channels_emulator_folderworkspace_host_test.go` (not `channels_test.go` —
-same isolation reason as TASK-046). `go test ./internal/adapter/wscompat/...
--run TestRegisterEmulatorChannels -v` — all 8 subtests pass.
+**Status:** `[x]` DONE — 8/8 tests pass. Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. Pending merge.
 
 ---
 

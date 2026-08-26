@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package orca.task.v1;
 
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv1";
 
 // TaskService owns the task DAG, edges, grants, comments. Does NOT own team
@@ -24,6 +27,23 @@ service TaskService {
   // what this can currently answer — task-service has no completion
   // callback yet, so "in_progress" is one-way until that's built.
   rpc HasActiveExecutions(HasActiveExecutionsRequest) returns (HasActiveExecutionsResponse);
+
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse);
+  rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
+  rpc GetDependencies(GetDependenciesRequest) returns (GetDependenciesResponse);
+
+  // AIDecompose relays to the Dev Server Agent's ai.complete method (via
+  // infra-fleet-service's Relay RPC) to propose a subtask breakdown for
+  // task_id — review-before-commit: proposals are not written to
+  // task_edges until a subsequent AIApply call. See TASK-224's Context
+  // note for why task-service goes through infra-fleet-service rather
+  // than calling the Dev Server Agent directly.
+  rpc AIDecompose(AIDecomposeRequest) returns (AIDecomposeResponse);
+  // AIApply commits a (possibly user-edited) proposal set from a prior
+  // AIDecompose call, creating one subtask + parent_child edge per
+  // proposal.
+  rpc AIApply(AIApplyRequest) returns (AIApplyResponse);
 }
 
 message Task {
@@ -116,4 +136,63 @@ message HasActiveExecutionsRequest {
 
 message HasActiveExecutionsResponse {
   bool has_active = 1;
+}
+
+message ListTasksRequest {
+  string project_id = 1; // optional filter, empty = no filter
+  string page_token = 2;
+  int32 page_size = 3;
+}
+message ListTasksResponse {
+  repeated Task tasks = 1;
+  string next_page_token = 2;
+}
+
+// UpdateTask uses optional (wrapper-typed) fields, same field-mask shape as
+// UpdateAutomationRequest — a status-only edit (the common case, e.g.
+// marking done) shouldn't require resending title. Status transitions into
+// "in_progress" are rejected at the domain layer (domain.Task.SetStatus) —
+// that transition is ExecuteTask's job only.
+message UpdateTaskRequest {
+  string id = 1;
+  google.protobuf.StringValue title = 2;
+  google.protobuf.StringValue status = 3;
+}
+message UpdateTaskResponse {
+  Task task = 1;
+}
+
+message DeleteTaskRequest {
+  string id = 1;
+}
+
+// GetDependencies walks depends_on edges FROM task_id — distinct from
+// AddEdge (write) and from the parent_child ancestor walk GetAncestors
+// does internally (not on this proto's surface yet).
+message GetDependenciesRequest {
+  string task_id = 1;
+}
+message GetDependenciesResponse {
+  repeated Task dependencies = 1;
+}
+
+message AIDecomposeRequest {
+  string task_id = 1;
+}
+message SubtaskProposal {
+  string title = 1;
+  string description = 2;
+}
+message AIDecomposeResponse {
+  repeated SubtaskProposal proposals = 1; // review-before-commit — not yet written to task_edges
+}
+
+// AIApply commits a (possibly user-edited) proposal set from a prior
+// AIDecompose call — the two-step review-before-commit shape.
+message AIApplyRequest {
+  string task_id = 1;
+  repeated SubtaskProposal proposals = 2;
+}
+message AIApplyResponse {
+  repeated Task created_subtasks = 1;
 }

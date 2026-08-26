@@ -5,7 +5,7 @@
 **Service:** `orchestration-service`
 **File:** `backend-go/proto/orca/orchestration/v1/orchestration.proto`, `services/orchestration-service/internal/{usecase,adapter/postgres,adapter/grpc}/*.go`
 **Depends on:** none
-**Status:** `[x]` DONE (verified) — `GetDispatchContextForTask` RPC + messages added to orchestration.proto (buf breaking clean), `DispatchContextRepository.GetLatestForTask` port + postgres implementation (ORDER BY created_at DESC LIMIT 1), usecase, grpc/server.go wiring, main.go wiring. `go build`/`go vet`/`go test` clean.
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

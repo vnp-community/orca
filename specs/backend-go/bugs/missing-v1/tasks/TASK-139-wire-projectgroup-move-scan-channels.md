@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-136 (creates `registerProjectGroupChannels`), TASK-138 (generated `projectv1` stubs for the new RPCs)
-**Status:** `[x]` DONE (verified) — all 3 channels added to `registerProjectGroupChannels` in `channels_tenant_project.go`, `scanNested` using the explicit 30s deadline. `ImportNestedRequest` confirmed to carry `dev_server_id` in the generated stub (per this task's own note) — mapping is correct as written. `go build`/`go vet` green; `TestProjectGroupScanNestedChannel_UsesLongerTimeout` and `TestProjectGroupImportNestedChannel_Success` pass.
+**Status:** `[x]` DONE — implemented in worktree `agent-a9271c5b2d89347e7`, **committed** as `19b216531`. Build/vet/test clean. Pending merge + one-line RegisterRealChannels/main.go wiring for `channels_tenant_project.go`.
 
 ---
 

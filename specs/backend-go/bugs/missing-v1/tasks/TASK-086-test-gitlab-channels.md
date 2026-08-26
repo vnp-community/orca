@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service` + `api-gateway`
 **File:** `services/scm-integration-service/internal/usecase/list_merge_requests_test.go` (new), `services/scm-integration-service/internal/adapter/gitlab/discussions_test.go` (new), `services/api-gateway/internal/adapter/wscompat/channels_gitlab_test.go` (new)
 **Depends on:** TASK-083, TASK-084, TASK-085
-**Status:** `[x]` DONE — usecase tests (`fakeGitLabMergeRequestProvider` + `list_merge_requests_test.go`/`resolve_merge_request_discussion_test.go`/`get_work_item_details_test.go`) and adapter tests (`discussions_test.go`: resolve-discussion query param, list-MRs state/source_branch filter, get-work-item-details endpoint selection by item_type, `BranchExists`) all implemented and green. wscompat tests live in `channels_scm_test.go` (TASK-080/081's file-location deviation) — `TestGitLabListMRsChannel_Success`, `TestGitLabResolveMRDiscussionChannel_Success`, `TestGitLabWorkItemDetailsChannel_Success`, and `TestGitLabRateLimitChannelMatchesRESTContract` (Step 4's contract test) all present and green. `go test ./internal/usecase/... ./internal/adapter/gitlab/...` and `go test ./internal/adapter/wscompat/...` both pass; `buf breaking` clean.
+**Status:** `[x]` DONE — all tests pass. Worktree `agent-aac2382028c6ce920`, committed as `ce750c490`.
 
 ---
 

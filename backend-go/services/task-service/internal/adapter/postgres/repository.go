@@ -138,6 +138,76 @@ func (r *Repository) HasActiveExecutions(ctx context.Context, tenantID, projectI
 	return exists, nil
 }
 
+// List returns tasks for tenantID, optionally filtered by projectID (empty
+// = no filter), ordered and cursor-paginated by id — same shape as
+// GetAncestors's plain SELECT (no recursive CTE needed here).
+func (r *Repository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, '')
+		FROM task.tasks
+		WHERE tenant_id = $1
+		  AND ($2 = '' OR project_id::text = $2)
+		  AND ($3 = '' OR id::text > $3)
+		ORDER BY id
+		LIMIT $4
+	`, tenantID, projectID, pageToken, pageSize)
+	if err != nil {
+		return nil, "", fmt.Errorf("postgres: query tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Task
+	for rows.Next() {
+		var t domain.Task
+		if err := rows.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID); err != nil {
+			return nil, "", fmt.Errorf("postgres: scan task row: %w", err)
+		}
+		out = append(out, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("postgres: iterate task rows: %w", err)
+	}
+	nextToken := ""
+	if len(out) == int(pageSize) {
+		nextToken = out[len(out)-1].ID
+	}
+	return out, nextToken, nil
+}
+
+// Update persists a partial (title/status) field update — the status guard
+// itself runs at the domain layer (domain.Task.SetStatus) before this is
+// ever called; this is a plain UPDATE of both columns unconditionally.
+func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE task.tasks SET title = $3, status = $4, updated_at = now()
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, t.ID, t.Title, t.Status)
+	if err != nil {
+		return fmt.Errorf("postgres: update task: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: task %s not found for tenant %s", t.ID, tenantID)
+	}
+	return nil
+}
+
+// Delete removes a task row. task_edges/task_grants reference tasks(id)
+// with ON DELETE CASCADE (migrations/0001_init.up.sql) — no explicit
+// edge/grant cleanup needed here.
+func (r *Repository) Delete(ctx context.Context, tenantID, id string) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM task.tasks WHERE tenant_id = $1 AND id = $2`, tenantID, id)
+	if err != nil {
+		return fmt.Errorf("postgres: delete task: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: task %s not found for tenant %s", id, tenantID)
+	}
+	return nil
+}
+
 func nullableUUID(id string) any {
 	if id == "" {
 		return nil

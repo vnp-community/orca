@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `internal/domain/membership.go`, `internal/usecase/ports.go`, `internal/usecase/list_members.go` (new), `internal/usecase/remove_member.go` (new), `internal/usecase/update_member_role.go` (new), `internal/adapter/postgres/repository.go`, `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-132
-**Status:** `[x]` DONE (verified) — domain/usecase/repository/grpc/main.go layers implemented in project-service. `go build`/`go vet ./...` clean; `go test ./internal/domain/... ./internal/usecase/...` green.
+**Status:** `[x]` DONE — `go build`/`go vet` clean, domain+usecase tests pass (incl. `-race`). Worktree `agent-a9271c5b2d89347e7` (project-service sub-scope), uncommitted.
 
 ---
 

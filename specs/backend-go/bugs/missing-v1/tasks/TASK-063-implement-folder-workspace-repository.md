@@ -5,16 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/adapter/postgres/folder_workspace_repository.go` (new)
 **Depends on:** TASK-062
-**Status:** `[x]` DONE (verified) — implemented against `*pgxpool.Pool`
-directly (this package's actual pool type — no separate `PgxPool`
-interface exists here) and `project.folder_workspaces`. `RepoPathExists`
-deviates from the sketch: `project.repos` has no filesystem-path column
-(only `url`, a git remote) per `migrations/0003_repos.up.sql`, so it
-queries `project.worktrees.path` (joined through `project.projects`)
-instead — the only column in this service actually holding an on-disk
-checkout path. `go build`/`go vet` clean; 4 real-Postgres integration
-tests pass (see TASK-067), including the unique-violation ->
-`ErrPathAlreadyRegistered` mapping firing against real Postgres.
+**Status:** `[x]` DONE — implemented, including the `GetPathStatus` conflict check corrected to query `project.worktrees.path` (joined via `project.projects`) rather than `project.repos` (which has no filesystem-path column in the real schema — a real deviation from the task's original sketch). Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. Pending merge.
 
 ---
 

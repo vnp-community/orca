@@ -33,6 +33,14 @@ var (
 	// Done or Cancelled — those are terminal states in this scaffold's
 	// status machine.
 	ErrTerminalStatus = errors.New("domain: cannot transition out of a terminal task status")
+	// ErrCannotSetInProgress is returned by SetStatus for a transition into
+	// StatusInProgress — that transition is ExecuteTask's job only (it goes
+	// through TaskRepository.UpdateStatus directly, not through this
+	// method). Letting SetStatus's caller (UpdateTask) double as a
+	// completion-callback surface would let a client mark a still-running
+	// task done early or fake a dispatch it never made — see TASK-223's
+	// Context note.
+	ErrCannotSetInProgress = errors.New("domain: cannot set status to in_progress via UpdateTask — only ExecuteTask may transition a task into in_progress")
 )
 
 // Task is task-service's central entity — see
@@ -97,15 +105,26 @@ func NewTask(id, tenantID, title, status, parentID, projectID string) (Task, err
 // SetStatus enforces the (small, currently permissive-by-design) set of
 // valid status transitions. Per §4's note that "status transitions [are]
 // enforced in methods" — kept simple in this scaffold (any known status to
-// any other known status is allowed except leaving a terminal state), since
-// the TS source's exact workflow-status graph isn't part of this build
-// task's scope; extend here as more of the state machine is ported.
+// any other known status is allowed except leaving a terminal state or
+// entering in_progress), since the TS source's exact workflow-status graph
+// isn't part of this build task's scope; extend here as more of the state
+// machine is ported.
+//
+// StatusInProgress is deliberately excluded from what this method accepts
+// (see ErrCannotSetInProgress) — TASK-223 wires this into UpdateTask, the
+// one client-facing status-edit RPC, and a client-driven write must never
+// be able to fake or clear a dispatch. ExecuteTask still transitions a task
+// into StatusInProgress the way it always has, directly via
+// TaskRepository.UpdateStatus, bypassing this method entirely.
 func (t Task) SetStatus(status string) (Task, error) {
 	if !validStatus(status) {
 		return t, ErrInvalidStatus
 	}
 	if t.Status == StatusDone || t.Status == StatusCancelled {
 		return t, ErrTerminalStatus
+	}
+	if status == StatusInProgress {
+		return t, ErrCannotSetInProgress
 	}
 	t.Status = status
 	return t, nil

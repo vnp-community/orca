@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `migrations/0006_project_groups_project_id.up.sql`/`.down.sql` (new), `internal/domain/project_group.go`, `internal/usecase/ports.go`, `internal/usecase/move_project.go` (new), `internal/usecase/scan_nested.go` (new), `internal/usecase/import_nested.go` (new), `internal/adapter/postgres/project_group_repository.go`, `internal/adapter/grpcclient/dev_server_relay.go` (new), `internal/adapter/grpc/server.go`, `internal/config/config.go`, `cmd/server/main.go`
 **Depends on:** TASK-137
-**Status:** `[x]` DONE (verified) — migration `0006_project_groups_project_id`, domain additions, `DevServerRelay` port + `grpcclient.DevServerRelay` adapter, usecases, repository, grpc handlers, config, main.go wiring all implemented in project-service. `go build`/`go vet ./...` clean; `go test ./internal/domain/... ./internal/usecase/...` green. Migration SQL written but not applied against a live Postgres (none available in this environment).
+**Status:** `[x]` DONE — implemented, incl. `ImportNested` gaining a `DevServerID` param the task sketch omitted (the real generated proto has `dev_server_id`). Worktree `agent-a9271c5b2d89347e7`, uncommitted.
 
 ---
 

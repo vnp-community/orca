@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `services/scm-integration-service/internal/adapter/github/client.go`
 **Depends on:** TASK-073, TASK-074
-**Status:** `[x]` DONE (verified — `go build`/`go vet`/`go test ./internal/adapter/github/...` clean; `var _ usecase.ScmProvider = (*Client)(nil)` compiles)
+**Status:** `[x]` DONE — implemented in worktree `agent-aac2382028c6ce920` (branch `worktree-agent-aac2382028c6ce920`), **committed** as `ce750c490`. `go build`/`go vet`/`gofmt -l` clean, `buf generate`/`buf breaking` clean (additive-only). Pending merge to main + one-line RegisterRealChannels/main.go wiring.
 
 ---
 

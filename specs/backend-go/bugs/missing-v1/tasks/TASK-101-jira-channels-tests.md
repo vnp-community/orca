@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`, `api-gateway`
 **File:** `services/issue-tracking-service/internal/usecase/connect_test.go`, `create_issue_test.go` (extend), `services/issue-tracking-service/internal/adapter/postgres/connections_test.go`, `services/api-gateway/internal/adapter/wscompat/channels_jira_test.go`
 **Depends on:** TASK-096, TASK-097, TASK-098, TASK-099, TASK-100
-**Status:** `[partial]` — connect_test.go (Connect/Disconnect/GetConnectionStatus/TestConnection usecase tests), create_issue_test.go extensions, and channels_jira_test.go (11 tests) all written and passing. `internal/adapter/postgres/connections_test.go` (TASK-097) is written and type-checks under `-tags=integration` but was NOT executed — no live Postgres/Docker in this environment.
+**Status:** `[partial]` — usecase/adapter/wscompat tests written and passing (30 new wscompat tests total across the group). Postgres integration test halves written, compile under `-tags=integration`, but not executed — no Docker/Postgres in this environment. Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`.
 
 ---
 

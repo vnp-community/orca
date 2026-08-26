@@ -15,6 +15,8 @@ import (
 
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
+
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Server implements automationv1.UnimplementedAutomationServiceServer.
@@ -25,14 +27,28 @@ type Server struct {
 	runNow                *usecase.RunNow
 	listRuns              *usecase.ListRuns
 	handleExternalTrigger *usecase.HandleExternalTrigger
+	listAutomations       *usecase.ListAutomations
+	updateAutomation      *usecase.UpdateAutomation
+	deleteAutomation      *usecase.DeleteAutomation
 }
 
-func New(create *usecase.CreateAutomation, runNow *usecase.RunNow, list *usecase.ListRuns, handleExternalTrigger *usecase.HandleExternalTrigger) *Server {
+func New(
+	create *usecase.CreateAutomation,
+	runNow *usecase.RunNow,
+	list *usecase.ListRuns,
+	handleExternalTrigger *usecase.HandleExternalTrigger,
+	listAutomations *usecase.ListAutomations,
+	updateAutomation *usecase.UpdateAutomation,
+	deleteAutomation *usecase.DeleteAutomation,
+) *Server {
 	return &Server{
 		createAutomation:      create,
 		runNow:                runNow,
 		listRuns:              list,
 		handleExternalTrigger: handleExternalTrigger,
+		listAutomations:       listAutomations,
+		updateAutomation:      updateAutomation,
+		deleteAutomation:      deleteAutomation,
 	}
 }
 
@@ -94,6 +110,69 @@ func (s *Server) HandleExternalTrigger(ctx context.Context, req *automationv1.Ha
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &automationv1.HandleExternalTriggerResponse{Run: toProtoRun(run)}, nil
+}
+
+func (s *Server) ListAutomations(ctx context.Context, req *automationv1.ListAutomationsRequest) (*automationv1.ListAutomationsResponse, error) {
+	result, err := s.listAutomations.Execute(ctx, usecase.ListAutomationsInput{
+		TenantID:  req.GetTenantId(),
+		PageToken: req.GetPageToken(),
+		PageSize:  req.GetPageSize(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*automationv1.Automation, 0, len(result.Automations))
+	for _, a := range result.Automations {
+		out = append(out, toProtoAutomation(a))
+	}
+	return &automationv1.ListAutomationsResponse{Automations: out, NextPageToken: result.NextPageToken}, nil
+}
+
+func (s *Server) UpdateAutomation(ctx context.Context, req *automationv1.UpdateAutomationRequest) (*automationv1.UpdateAutomationResponse, error) {
+	in := usecase.UpdateAutomationInput{TenantID: req.GetTenantId(), ID: req.GetId()}
+	if req.GetName() != nil {
+		v := req.GetName().GetValue()
+		in.Name = &v
+	}
+	if req.GetRrule() != nil {
+		v := req.GetRrule().GetValue()
+		in.RRule = &v
+	}
+	if req.GetStepConfigJson() != nil {
+		v := req.GetStepConfigJson().GetValue()
+		in.StepConfigJSON = &v
+	}
+	if req.GetStepType() != workflowv1.StepType_STEP_TYPE_UNSPECIFIED {
+		v := fromProtoStepType(req.GetStepType())
+		in.StepType = &v
+	}
+	if req.GetEnabled() != nil {
+		v := req.GetEnabled().GetValue()
+		in.Enabled = &v
+	}
+	if req.GetDtstart() != nil {
+		parsed, err := time.Parse(time.RFC3339, req.GetDtstart().GetValue())
+		if err != nil {
+			return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID_DTSTART", "dtstart must be RFC3339", err))
+		}
+		in.Dtstart = &parsed
+	}
+	if req.GetTimezone() != nil {
+		v := req.GetTimezone().GetValue()
+		in.Timezone = &v
+	}
+	automation, err := s.updateAutomation.Execute(ctx, in)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &automationv1.UpdateAutomationResponse{Automation: toProtoAutomation(automation)}, nil
+}
+
+func (s *Server) DeleteAutomation(ctx context.Context, req *automationv1.DeleteAutomationRequest) (*emptypb.Empty, error) {
+	if err := s.deleteAutomation.Execute(ctx, usecase.DeleteAutomationInput{TenantID: req.GetTenantId(), ID: req.GetId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func toProtoAutomation(a domain.Automation) *automationv1.Automation {

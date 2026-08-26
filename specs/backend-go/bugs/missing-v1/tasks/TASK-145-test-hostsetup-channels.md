@@ -5,7 +5,7 @@
 **Service:** `project-service`, `api-gateway`
 **File:** `internal/domain/host_setup_test.go`, `internal/usecase/create_host_setup_test.go`, `setup_existing_folder_test.go` (all new, `project-service`); `internal/adapter/postgres/host_setup_repository_test.go` (new); `services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-141, TASK-142, TASK-143, TASK-144
-**Status:** `[partial]` — project-service domain/usecase tests (`host_setup_test.go`, `create_host_setup_test.go`, `setup_existing_folder_test.go`, incl. `TestSetupExistingFolder_NeverStatsLocalFilesystem`) and all 6 api-gateway `channels_tenant_project_test.go` projectHostSetup.* tests (incl. `TestProjectHostSetupSetupExistingFolderChannel_UsesLongerTimeout` and `..._ReturnsProjectOnlyOnSuccess` asserting raw passthrough) are implemented and green. `internal/adapter/postgres/host_setup_repository_test.go` (testcontainers-go) was NOT written/run — no Postgres available in this environment.
+**Status:** `[partial]` — usecase/wscompat tests written and passing. Postgres integration tests (testcontainers) not written/run — no live Postgres in this environment; migration SQL written but unapplied. Worktree `agent-a9271c5b2d89347e7`, committed as `19b216531`.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `backend-go/proto/orca/issuetracking/v1/issuetracking.proto`
 **Depends on:** TASK-096
-**Status:** `[x]` DONE (verified) — CreateProject/GetProject/ListTeams/ListTeamLabels/ListTeamMembers/GetCustomView/ListWorkflowStates RPCs + messages + CreateIssueRequest.team_id/state_id fields added. `buf breaking` clean, `go build ./proto/...` clean.
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

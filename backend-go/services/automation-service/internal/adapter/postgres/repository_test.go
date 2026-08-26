@@ -206,3 +206,148 @@ func TestAutomationRunRepository_FindByRequestID_IsIdempotencyBackstop(t *testin
 		t.Errorf("expected to find run r1, got found=%v ok=%v", found, ok)
 	}
 }
+
+func TestAutomationRepository_List_ScopesToTenant(t *testing.T) {
+	automations, _ := setupRepositories(t)
+	ctx := context.Background()
+
+	tenantA := "11111111-1111-1111-1111-111111111111"
+	tenantB := "22222222-2222-2222-2222-222222222222"
+	mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000a1", tenantA)
+	mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000a2", tenantA)
+	mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000b1", tenantB)
+
+	got, _, err := automations.List(ctx, tenantA, "", 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 automations for tenant A, got %d", len(got))
+	}
+	for _, a := range got {
+		if a.TenantID != tenantA {
+			t.Errorf("expected only tenant A rows, got tenant_id=%q", a.TenantID)
+		}
+	}
+}
+
+func TestAutomationRepository_List_PaginatesWithoutDuplicatesOrGaps(t *testing.T) {
+	automations, _ := setupRepositories(t)
+	ctx := context.Background()
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	ids := []string{
+		"00000000-0000-0000-0000-000000000001",
+		"00000000-0000-0000-0000-000000000002",
+		"00000000-0000-0000-0000-000000000003",
+		"00000000-0000-0000-0000-000000000004",
+		"00000000-0000-0000-0000-000000000005",
+	}
+	for _, id := range ids {
+		mustCreateAutomation(t, automations, id, tenantID)
+	}
+
+	seen := map[string]bool{}
+	pageToken := ""
+	for i := 0; i < 10; i++ { // bounded loop guards against an infinite-pagination bug
+		page, next, err := automations.List(ctx, tenantID, pageToken, 2)
+		if err != nil {
+			t.Fatalf("list page: %v", err)
+		}
+		for _, a := range page {
+			if seen[a.ID] {
+				t.Fatalf("duplicate id %s returned across pages", a.ID)
+			}
+			seen[a.ID] = true
+		}
+		if next == "" {
+			break
+		}
+		pageToken = next
+	}
+	if len(seen) != len(ids) {
+		t.Fatalf("expected all %d automations covered across pages, got %d", len(ids), len(seen))
+	}
+}
+
+func TestAutomationRepository_Update_PersistsFieldsAndFailsForWrongTenant(t *testing.T) {
+	automations, _ := setupRepositories(t)
+	ctx := context.Background()
+	tenantA := "11111111-1111-1111-1111-111111111111"
+	tenantB := "22222222-2222-2222-2222-222222222222"
+
+	a := mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000c1", tenantA)
+	a.Name = "renamed"
+	a.Enabled = false
+	if err := automations.Update(ctx, tenantA, a); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	got, err := automations.Get(ctx, tenantA, a.ID)
+	if err != nil {
+		t.Fatalf("get after update: %v", err)
+	}
+	if got.Name != "renamed" || got.Enabled {
+		t.Errorf("expected the update to persist, got %+v", got)
+	}
+
+	// Updating tenant A's row while scoped to tenant B must affect 0 rows
+	// and surface as an error — the tenant-isolation guarantee.
+	a.Name = "should-not-persist"
+	if err := automations.Update(ctx, tenantB, a); err == nil {
+		t.Error("expected an error when updating another tenant's automation")
+	}
+}
+
+func TestAutomationRepository_Delete_CascadesToRunsAndFailsForWrongTenant(t *testing.T) {
+	automations, runs := setupRepositories(t)
+	ctx := context.Background()
+	tenantA := "11111111-1111-1111-1111-111111111111"
+	tenantB := "22222222-2222-2222-2222-222222222222"
+
+	a := mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000d2", tenantA)
+	now := time.Now().UTC().Truncate(time.Second)
+	run, err := domain.NewPendingRun("00000000-0000-0000-0000-000000000d1a", a.ID, tenantA, "req-cascade", domain.StepTypeAgent, domain.RunTriggerManual, a.StepConfigJSON, now)
+	if err != nil {
+		t.Fatalf("building run: %v", err)
+	}
+	if err := runs.Create(ctx, run); err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+
+	// Deleting tenant A's automation while scoped to tenant B must fail
+	// (0 rows affected) and leave the row + its run intact.
+	if err := automations.Delete(ctx, tenantB, a.ID); err == nil {
+		t.Error("expected an error when deleting another tenant's automation")
+	}
+
+	if err := automations.Delete(ctx, tenantA, a.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, err := automations.Get(ctx, tenantA, a.ID); err == nil {
+		t.Error("expected the automation to be gone after delete")
+	}
+
+	// ON DELETE CASCADE (migrations/0001_init.up.sql) must have removed the
+	// automation_runs row too — checked with a direct SELECT against the
+	// table, not through the repository API.
+	var count int
+	if err := automations.pool.QueryRow(ctx, `SELECT count(*) FROM automation.automation_runs WHERE id = $1`, run.ID).Scan(&count); err != nil {
+		t.Fatalf("querying automation_runs directly: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected the run row to be cascade-deleted, found %d matching rows", count)
+	}
+}
+
+func mustCreateAutomation(t *testing.T, repo *AutomationRepository, id, tenantID string) domain.Automation {
+	t.Helper()
+	now := time.Now().UTC().Truncate(time.Second)
+	a, err := domain.NewAutomation(id, tenantID, "nightly-report", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{"prompt":"summarize"}`, now, "UTC", true, now)
+	if err != nil {
+		t.Fatalf("building automation: %v", err)
+	}
+	if err := repo.Create(context.Background(), a); err != nil {
+		t.Fatalf("create automation %s: %v", id, err)
+	}
+	return a
+}

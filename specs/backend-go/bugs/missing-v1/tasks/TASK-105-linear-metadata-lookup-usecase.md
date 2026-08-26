@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `services/issue-tracking-service/internal/{domain,usecase,adapter/linear,adapter/jira,adapter/grpc}/*.go`
 **Depends on:** TASK-099, TASK-102, TASK-104
-**Status:** `[x]` DONE (verified) — list_teams/list_team_labels/list_team_members/get_custom_view/list_workflow_states usecases, linear/client.go implementations, jira/client.go unimplemented stubs, grpc wiring. `go build`/`go vet`/`go test` clean; both `jira.New(nil)`/`linear.New(nil)` compile as `usecase.IssueTrackerProvider` (verified via `go build`, the interface is asserted at package scope via `var _ usecase.IssueTrackerProvider = (*Client)(nil)` in both adapter packages rather than the task's suggested throwaway `/tmp` program).
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

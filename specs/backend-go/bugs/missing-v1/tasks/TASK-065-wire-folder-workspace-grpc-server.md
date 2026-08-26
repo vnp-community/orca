@@ -5,10 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/adapter/grpc/server.go`, `backend-go/services/project-service/cmd/server/main.go`
 **Depends on:** TASK-061, TASK-064
-**Status:** `[x]` DONE (verified) — `Server`/`Deps`/`New` extended,
-5 translation methods + `toProtoFolderWorkspace` added, composition root
-in `cmd/server/main.go` wired (`folderWorkspaceRepo`/`folderWorkspaceUC`).
-`go build ./...` and `go vet ./...` clean across the whole service.
+**Status:** `[x]` DONE — wired into `grpc/server.go` and `cmd/server/main.go`'s composition root. Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. Pending merge.
 
 ---
 

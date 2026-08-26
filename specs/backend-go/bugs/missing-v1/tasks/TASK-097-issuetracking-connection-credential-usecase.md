@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `services/issue-tracking-service/internal/{domain,usecase,adapter/postgres,adapter/credential,adapter/jira,adapter/grpc}/*.go`, `migrations/0002_connections.{up,down}.sql`
 **Depends on:** TASK-096
-**Status:** `[x]` DONE (verified) — domain/connection.go, ports.go, connect/disconnect/select_workspace/get_connection_status/test_connection usecases, postgres/connections.go, migrations/0002_connections.{up,down}.sql, credential/client.go rewrite, jira Whoami, grpc/server.go wiring, main.go wiring all implemented. `go build`/`go vet`/`go test` clean for issue-tracking-service. Postgres integration test (connections_test.go, `-tags=integration`) written and type-checks but NOT executed — no live Postgres/Docker in this environment.
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

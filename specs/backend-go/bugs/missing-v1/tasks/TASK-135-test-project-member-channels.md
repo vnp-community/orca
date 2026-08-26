@@ -5,7 +5,7 @@
 **Service:** `project-service`, `api-gateway`
 **File:** `internal/domain/membership_test.go`, `internal/usecase/list_members_test.go`, `remove_member_test.go`, `update_member_role_test.go` (all new, `project-service`); `internal/adapter/postgres/repository_test.go`; `services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-131, TASK-132, TASK-133, TASK-134
-**Status:** `[partial]` — project-service domain/usecase tests (`membership_test.go`, `remove_member_test.go`, `update_member_role_test.go`, `list_members_test.go`) and all 7 api-gateway `channels_tenant_project_test.go` project.* tests (incl. `TestProjectCreateChannel_Success` asserting TenantId, `TestProjectListChannel_Success` asserting empty-args safety, `TestProjectGetMembersChannel_Success`, `TestProjectUpdateMemberRoleChannel_Success`, `TestProjectChannels_PropagateErrors`) are implemented and green. `internal/adapter/postgres/repository_test.go` (testcontainers-go) was NOT written/run — no Postgres available in this environment.
+**Status:** `[partial]` — usecase/wscompat tests written and passing. Postgres integration tests (testcontainers) not written/run — no live Postgres in this environment; migration SQL written but unapplied. Worktree `agent-a9271c5b2d89347e7`, committed as `19b216531`.
 
 ---
 

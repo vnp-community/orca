@@ -372,6 +372,10 @@ services:
     depends_on:
       infra-fleet-service: { condition: service_started }
       project-service: { condition: service_started }
+      # ai-provider-service: DiscoverCommitMessageModels (TASK-211) dials it
+      # directly. grpc.NewClient is lazy (non-blocking), so this is
+      # startup-ordering hygiene, not a hard requirement.
+      ai-provider-service: { condition: service_started }
 
   scm-integration-service:
     <<: *go-defaults

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_jira.go` (new), `channels.go`, `cmd/server/main.go`
 **Depends on:** TASK-096, TASK-097, TASK-098, TASK-099
-**Status:** `[partial]` — all 19 `jira.*` channel handlers implemented in new file `channels_jira.go`, `go build`/`go vet`/`go test` clean. NOT wired into `channels.go`'s `RegisterRealChannels` — this assignment explicitly forbids editing `channels.go` directly (other task groups edit it in parallel worktrees); instead registered via a new `registerIssueTrackingOrchestrationChannels` in `channels_issuetracking_orchestration.go`. The final integration pass needs one line added to `RegisterRealChannels` — see the parent task's final report for the exact call.
+**Status:** `[partial]` — implemented as a standalone file registering into `channels_issuetracking_orchestration.go` (per cross-group convention, `channels.go` untouched). Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`. **Integration note:** needs `registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)` added to `RegisterRealChannels`/`main.go` — all 3 clients already dialed there.
 
 ---
 

@@ -5,19 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/create_folder_workspace.go`, `update_folder_workspace.go`, `delete_folder_workspace.go`, `list_folder_workspaces.go`, `get_folder_workspace_path_status.go` (all new)
 **Depends on:** TASK-062, TASK-063
-**Status:** `[x]` DONE (verified) — implemented as one file
-(`internal/usecase/folder_workspace.go`, all 5 operations on
-`FolderWorkspaceUseCase`) rather than 5 separate files, and using this
-service's real `tenant.RequireTenantID(ctx)`/`tenant.UserID(ctx)` +
-`apperrors.New(...)` convention instead of the sketch's `Identity`
-parameter/`ErrForbidden` sentinel (neither exists in this codebase — see
-`create_project.go`/`authorization.go` for the actual pattern followed).
-Global-admin override intentionally NOT implemented: `callerGlobalRole` is
-a documented always-`""` known gap until claim propagation lands (see
-`authorization.go`), so a second unreachable admin path here would be
-dead code, not a real capability — only added_by-based ownership is
-enforced. `go build`/`go vet` clean; 13 unit tests pass against an
-in-memory fake (see TASK-067).
+**Status:** `[x]` DONE — `FolderWorkspaceUseCase` (create/update/delete/list/getPathStatus, owner-only mutation guard) implemented. Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. Pending merge.
 
 ---
 

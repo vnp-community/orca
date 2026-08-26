@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_hostedreview.go` (new), `channels.go`
 **Depends on:** TASK-080, TASK-085, TASK-088
-**Status:** `[x]` DONE — same `channels_scm.go`/`registerSCMChannels` deviation as TASK-080/085 (orchestrator override; `channels.go` not touched). `parseWSProvider` and `attachSCMIdentity` (renamed from this file's suggested `attachGitHubIdentity`/kept the rename TASK-085's note flagged as optional) both implemented in `channels_scm.go`. Verified: `go build`/`go vet`/`go test ./internal/adapter/wscompat/...` clean.
+**Status:** `[x]` DONE — implemented in worktree `agent-aac2382028c6ce920` (branch `worktree-agent-aac2382028c6ce920`), **committed** as `ce750c490`. `go build`/`go vet`/`gofmt -l` clean, `buf generate`/`buf breaking` clean (additive-only). Pending merge to main + one-line RegisterRealChannels/main.go wiring.
 
 ---
 

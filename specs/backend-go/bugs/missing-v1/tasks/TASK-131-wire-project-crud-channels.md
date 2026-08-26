@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`, `services/api-gateway/cmd/server/main.go`
 **Depends on:** none
-**Status:** `[x]` DONE (verified) — implemented as `registerProjectChannels` in the new `channels_tenant_project.go` file (not `channels.go`), called from `registerTenantProjectChannels`. Not yet spliced into `RegisterRealChannels`/`main.go` — see integration-pass note at the bottom of that file. `go build`/`go vet`/`go test` green.
+**Status:** `[x]` DONE — implemented in worktree `agent-a9271c5b2d89347e7`, **committed** as `19b216531`. Build/vet/test clean. Pending merge + one-line RegisterRealChannels/main.go wiring for `channels_tenant_project.go`.
 
 ---
 

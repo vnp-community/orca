@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `internal/usecase/ports.go`, `internal/usecase/create_host_setup.go` (new), `list_host_setups.go` (new), `update_host_setup.go` (new), `delete_host_setup.go` (new), `setup_existing_folder.go` (new), `internal/adapter/postgres/host_setup_repository.go` (new), `internal/adapter/grpc/server.go`, `internal/adapter/grpcclient/infra_fleet_dev_server_lister.go` (new), `cmd/server/main.go`
 **Depends on:** TASK-141, TASK-142, TASK-138 (reuses its `DevServerRelay` port/`grpcclient.DevServerRelay`/`InfraFleetServiceAddr` config)
-**Status:** `[x]` DONE (verified) — usecase/repository/grpc/grpcclient/main.go layers implemented in project-service, reusing TASK-138's `DevServerRelay`. `go build`/`go vet ./...` clean; `go test ./internal/usecase/...` green.
+**Status:** `[x]` DONE — full usecase/repository/grpc/config wiring implemented and building clean. Worktree `agent-a9271c5b2d89347e7`, uncommitted. Postgres integration tests (`host_setup_repository_test.go` etc.) not written — no live Postgres in this environment; SQL verified consistent with schema conventions.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`, `api-gateway`
 **File:** `services/issue-tracking-service/internal/usecase/list_teams_test.go`, `get_custom_view_test.go`, `services/issue-tracking-service/internal/adapter/linear/client_test.go` (extend), `services/api-gateway/internal/adapter/wscompat/channels_linear_test.go`
 **Depends on:** TASK-102, TASK-103, TASK-104, TASK-105, TASK-106
-**Status:** `[x]` DONE (verified) — list_teams_test.go/get_custom_view_test.go usecase tests, linear/client_test.go (new, 7 tests covering Whoami/ListTeams/ListTeamLabels/ListTeamMembers/GetCustomView/ListWorkflowStates), channels_linear_test.go (5 tests including the envelope-shape and "no false unification" regression guards). All pass.
+**Status:** `[partial]` — usecase/adapter/wscompat tests written and passing (30 new wscompat tests total across the group). Postgres integration test halves written, compile under `-tags=integration`, but not executed — no Docker/Postgres in this environment. Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`.
 
 ---
 

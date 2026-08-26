@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `services/issue-tracking-service/internal/adapter/linear/client.go`, `cmd/server/main.go`
 **Depends on:** TASK-097, TASK-102
-**Status:** `[x]` DONE (verified) — `linear/client.go`'s `Whoami` implemented; confirmed the connection/credential usecase group needed zero Linear-specific changes (already provider-agnostic, per this task's own note). `go build` clean.
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

@@ -5,14 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/migrations/NNNN_create_folder_workspaces.sql` (new), `backend-go/services/project-service/internal/domain/folder_workspace.go` (new), `backend-go/services/project-service/internal/usecase/ports.go`
 **Depends on:** TASK-061
-**Status:** `[x]` DONE (verified) — migration
-`migrations/0006_folder_workspaces.up.sql`/`.down.sql` (table under the
-`project.` schema, matching this service's real convention, not the
-sketch's bare-name table), `domain/folder_workspace.go`, and
-`usecase/ports.go`'s `FolderWorkspaceRepository` port. `go build`/`go vet`
-clean. Migration applied and exercised for real by TASK-067's
-testcontainers-go integration tests (Postgres 16, all passing) — see that
-task's evidence.
+**Status:** `[x]` DONE — migration `0006_folder_workspaces.{up,down}.sql` (`project.folder_workspaces` + RLS), domain model, and `FolderWorkspaceRepository` port added. Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. Pending merge.
 
 ---
 

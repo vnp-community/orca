@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `services/issue-tracking-service/internal/{usecase,adapter/linear,adapter/jira,adapter/grpc}/*.go`
 **Depends on:** TASK-098, TASK-102, TASK-103
-**Status:** `[x]` DONE (verified) — create_project.go/get_project.go usecases, full linear/client.go issue-CRUD + CreateProject/GetProject implementation, jira/client.go CreateProject/GetProject unsupported-error stubs, grpc wiring. `go build`/`go vet`/`go test` clean.
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

@@ -5,19 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-065
-**Status:** `[x]` DONE (verified) — `registerFolderWorkspaceChannels`
-implemented in a new file `channels_emulator_folderworkspace_host.go`
-(not `channels.go` — off-limits this pass, see TASK-046's note), called
-from that file's `registerEmulatorFolderWorkspaceHostChannels(r,
-projectClient)` entry point. Confirmed project-service's RPCs pull
-tenant/user from `common/tenant` context (populated by the gRPC
-interceptor), not from explicit metadata — so, unlike
-`registerDevServerChannels`'s infra-fleet-service calls, no
-`gatewaygrpc.AttachIdentity` is needed here; the bare inbound ctx is
-correct. `go build`/`go vet` clean. `RegisterRealChannels` itself is
-NOT yet updated to take/pass `projectClient` or call this function —
-that's the integration pass's one remaining step, see this task's parent
-report for the exact line.
+**Status:** `[x]` DONE — implemented as `registerFolderWorkspaceChannels` in `channels_emulator_folderworkspace_host.go` (new file, per this pass's cross-group convention). Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. **Integration note:** needs `projectClient projectv1.ProjectServiceClient` threaded into `RegisterRealChannels`/`main.go` — see the group's final report for the exact one-line change.
 
 ---
 

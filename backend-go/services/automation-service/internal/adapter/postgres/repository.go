@@ -61,6 +61,75 @@ func (r *AutomationRepository) Get(ctx context.Context, tenantID, id string) (do
 	return a, nil
 }
 
+// List returns tenantID's automations, cursor-paginated by id.
+func (r *AutomationRepository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Automation, string, error) {
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at
+		FROM automation.automations
+		WHERE tenant_id = $1 AND ($2 = '' OR id > $2::uuid)
+		ORDER BY id
+		LIMIT $3
+	`, tenantID, pageToken, pageSize)
+	if err != nil {
+		return nil, "", fmt.Errorf("postgres: query automations: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Automation
+	for rows.Next() {
+		a, err := scanAutomation(rows)
+		if err != nil {
+			return nil, "", fmt.Errorf("postgres: scan automation row: %w", err)
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("postgres: iterate automation rows: %w", err)
+	}
+	nextToken := ""
+	if int32(len(out)) == pageSize {
+		nextToken = out[len(out)-1].ID
+	}
+	return out, nextToken, nil
+}
+
+// Update persists a full row replace of the caller-merged Automation
+// (usecase.UpdateAutomation already merged unset fields from the current
+// row before calling this) — scheduling fields (next_run_at) are
+// deliberately left untouched by this statement.
+func (r *AutomationRepository) Update(ctx context.Context, tenantID string, a domain.Automation) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE automation.automations
+		SET name = $3, rrule = $4, step_type = $5, step_config_json = $6,
+		    enabled = $7, timezone = $8, dtstart = $9, updated_at = now()
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, a.ID, a.Name, a.RRule, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, a.DTStart)
+	if err != nil {
+		return fmt.Errorf("postgres: update automation: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: automation %s not found for tenant %s", a.ID, tenantID)
+	}
+	return nil
+}
+
+// Delete removes an automation. automation_runs.automation_id has
+// ON DELETE CASCADE (migrations/0001_init.up.sql), so run rows referencing
+// this automation are removed by Postgres itself — no separate cleanup step.
+func (r *AutomationRepository) Delete(ctx context.Context, tenantID, id string) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM automation.automations WHERE tenant_id = $1 AND id = $2`, tenantID, id)
+	if err != nil {
+		return fmt.Errorf("postgres: delete automation: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: automation %s not found for tenant %s", id, tenantID)
+	}
+	return nil
+}
+
 // ClaimDue implements usecase.DueAutomationClaimer — see that port's doc
 // comment for why the returned batch's transaction stays open across
 // dispatch. The query intentionally has no tenant filter: the scheduler

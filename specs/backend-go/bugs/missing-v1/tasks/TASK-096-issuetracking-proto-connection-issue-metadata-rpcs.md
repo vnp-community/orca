@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `backend-go/proto/orca/issuetracking/v1/issuetracking.proto`
 **Depends on:** none
-**Status:** `[x]` DONE (verified) — implemented with a field-numbering fix beyond the task's own sketch: the given `Issue` message text put new fields at numbers 2-4 (colliding with the baseline's `title`/`state`/`url`); renumbered so `id/title/state/url` keep 1-4 and all new fields append at 5+. `buf breaking --against` this worktree's base commit is clean; `go build ./proto/...` clean.
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

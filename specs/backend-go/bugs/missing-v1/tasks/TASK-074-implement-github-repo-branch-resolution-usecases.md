@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `services/scm-integration-service/internal/usecase/ports.go`, `get_pull_request_for_branch.go` (new), `resolve_repo_slug.go` (new)
 **Depends on:** TASK-072, TASK-073
-**Status:** `[x]` DONE (verified — `go build ./internal/usecase/...` clean)
+**Status:** `[x]` DONE — implemented in worktree `agent-aac2382028c6ce920` (branch `worktree-agent-aac2382028c6ce920`), **committed** as `ce750c490`. `go build`/`go vet`/`gofmt -l` clean, `buf generate`/`buf breaking` clean (additive-only). Pending merge to main + one-line RegisterRealChannels/main.go wiring.
 
 ---
 

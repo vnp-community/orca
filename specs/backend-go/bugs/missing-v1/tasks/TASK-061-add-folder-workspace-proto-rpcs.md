@@ -5,13 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/proto/orca/project/v1/project.proto`
 **Depends on:** none
-**Status:** `[x]` DONE (verified) — RPCs/messages added, following this
-file's existing `XxxResponse` wrapper convention (not the sketch's bare
-`google.protobuf.Empty` for Delete, to match every other RPC in this
-file). `buf generate proto` regenerated stubs; `go build ./proto/...`
-clean. `buf breaking` not run — `backend-go` doesn't exist on `main`
-yet (this whole tree is pre-merge), so there's no baseline to diff
-against.
+**Status:** `[x]` DONE — 5 RPCs + messages added to `project.proto`, regenerated via `buf generate proto`. Worktree `agent-abbc42cb9786d6743`, commit `a329ce7d9`. Pending merge.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `tenant-service`, `api-gateway`
 **File:** `internal/usecase/get_user_profile_test.go`, `list_departments_test.go`, `update_company_test.go`, `update_department_test.go`, `update_user_profile_test.go` (all new, `tenant-service`); `internal/adapter/postgres/*_test.go` (`tenant-service`); `services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-126, TASK-127, TASK-128, TASK-129
-**Status:** `[partial]` — tenant-service usecase tests (`get_user_profile_test.go`, `list_departments_test.go`, `update_company_test.go`, `update_department_test.go`, `update_user_profile_test.go`) and all 8 api-gateway `channels_tenant_project_test.go` profile.* tests (6 per-channel + PropagateErrors + AttachIdentity) are implemented and green. `internal/adapter/postgres/*_test.go` (testcontainers-go, needs live Postgres) were NOT written/run — no Postgres available in this environment, per task instructions.
+**Status:** `[partial]` — tenant-service usecase tests: 40/40 pass (20 new). Postgres integration tests and `wscompat/channels_test.go` step not done — no live Postgres in this environment; wscompat portion owned by a different concurrent scope. Worktree `agent-a9271c5b2d89347e7`, uncommitted.
 
 ---
 

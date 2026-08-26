@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/proto/orca/tenant/v1/tenant.proto`
 **Depends on:** none
-**Status:** `[x]` DONE (verified) — 5 RPCs + messages added to `tenant.proto`; `buf generate` (via `proto/buf.gen.yaml`) regenerated Go stubs cleanly; `go build ./proto/...` green. `buf breaking --against main` is not meaningful here: `backend-go/` doesn't exist on `main` at all yet (whole tree is new), so there is no baseline to diff against — confirmed via `git ls-tree main` before skipping.
+**Status:** `[x]` DONE — implemented in worktree `agent-a9271c5b2d89347e7`, **committed** as `19b216531`. Build/vet/test clean. Pending merge + one-line RegisterRealChannels/main.go wiring for `channels_tenant_project.go`.
 
 ---
 

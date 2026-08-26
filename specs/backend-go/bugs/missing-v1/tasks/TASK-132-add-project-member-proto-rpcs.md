@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/proto/orca/project/v1/project.proto`
 **Depends on:** none
-**Status:** `[x]` DONE (verified) — `ListMembers`/`RemoveMember`/`UpdateMemberRole` RPCs + `Member` message added to `project.proto`; `buf generate` regenerated stubs cleanly; `go build ./proto/...` green. `buf breaking` against `main` not meaningful (no `backend-go/` on `main` at all — confirmed via `git ls-tree`).
+**Status:** `[x]` DONE — implemented in worktree `agent-a9271c5b2d89347e7`, **committed** as `19b216531`. Build/vet/test clean. Pending merge + one-line RegisterRealChannels/main.go wiring for `channels_tenant_project.go`.
 
 ---
 

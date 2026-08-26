@@ -5,7 +5,7 @@
 **Service:** `project-service`, `api-gateway`
 **File:** `internal/domain/project_group_test.go`, `internal/usecase/move_project_test.go`, `scan_nested_test.go`, `import_nested_test.go` (all new, `project-service`); `internal/adapter/postgres/project_group_repository_test.go`; `services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-136, TASK-137, TASK-138, TASK-139
-**Status:** `[partial]` — project-service domain/usecase tests (`project_group_test.go`, `move_project_test.go`, `scan_nested_test.go`, `import_nested_test.go`) and all 7 api-gateway `channels_tenant_project_test.go` projectGroup.* tests (incl. `TestProjectGroupScanNestedChannel_UsesLongerTimeout` asserting deadline > rpcTimeout, `TestProjectGroupImportNestedChannel_Success` asserting field-for-field candidate mapping) are implemented and green. `internal/adapter/postgres/project_group_repository_test.go` (testcontainers-go) was NOT written/run — no Postgres available in this environment.
+**Status:** `[partial]` — usecase/wscompat tests written and passing. Postgres integration tests (testcontainers) not written/run — no live Postgres in this environment; migration SQL written but unapplied. Worktree `agent-a9271c5b2d89347e7`, committed as `19b216531`.
 
 ---
 

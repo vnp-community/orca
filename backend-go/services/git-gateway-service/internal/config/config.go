@@ -32,6 +32,12 @@ type Config struct {
 	// doc comment for why that resolution is currently folded into the
 	// ConnectionResolver stub instead.
 	ProjectServiceAddr string
+
+	// AIProviderServiceAddr is where DiscoverCommitMessageModels
+	// (TASK-211) dials ai-provider-service's ResolveProvider RPC directly —
+	// distinct from infra-fleet-service's Relay RPC used for the actual
+	// ai.complete execution-plane call.
+	AIProviderServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -43,5 +49,6 @@ func Load() (Config, error) {
 		Base:                  base,
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
+		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 	}, nil
 }

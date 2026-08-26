@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_github.go`
 **Depends on:** TASK-079, TASK-080
-**Status:** `[x]` DONE — same `channels_scm.go`/`registerSCMChannels` deviation as TASK-080 (orchestrator override, `channels.go` not touched). All 15 `github.project.*` handlers implemented (TASK-077's own note: 16 RPCs minus `resolveRef`'s folded-in item-read = 15 channels). Verified: `go build`/`go vet`/`go test ./internal/adapter/wscompat/...` clean.
+**Status:** `[x]` DONE — implemented in worktree `agent-aac2382028c6ce920` (branch `worktree-agent-aac2382028c6ce920`), **committed** as `ce750c490`. `go build`/`go vet`/`gofmt -l` clean, `buf generate`/`buf breaking` clean (additive-only). Pending merge to main + one-line RegisterRealChannels/main.go wiring.
 
 ---
 

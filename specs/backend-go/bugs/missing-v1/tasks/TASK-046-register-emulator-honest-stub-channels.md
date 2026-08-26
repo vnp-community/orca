@@ -5,14 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** none
-**Status:** `[x]` DONE (verified) — implemented in a new file
-`channels_emulator_folderworkspace_host.go` (not `channels.go` directly —
-see this pass's worktree brief: `channels.go` is off-limits while parallel
-groups add channels there too), with `registerEmulatorChannels` called
-from the new file's `registerEmulatorFolderWorkspaceHostChannels` entry
-point. `go build`/`go vet` clean; not yet wired into `RegisterRealChannels`
-— see TASK-047's test run and the integration-pass wiring note in the new
-file's package doc comment.
+**Status:** `[x]` DONE — implemented in `channels_emulator_folderworkspace_host.go` (new file), worktree `agent-abbc42cb9786d6743` (branch `worktree-agent-abbc42cb9786d6743`, commit `a329ce7d9`). 8/8 channels return typed `errEmulatorNotSupported`. Verified via `go build`/`go vet`. Pending merge + integration wiring into `RegisterRealChannels`.
 
 ---
 

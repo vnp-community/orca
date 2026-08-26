@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `services/issue-tracking-service/internal/{domain,usecase,adapter/jira,adapter/grpc}/*.go`
 **Depends on:** TASK-096, TASK-097, TASK-098
-**Status:** `[x]` DONE (verified) — all 7 usecases (list_projects/list_issue_types/list_create_fields/list_assignable_users/list_priorities/list_transitions/get_project_status_order) + jira/client.go implementations + grpc handlers wired. `go build`/`go vet`/`go test` clean. `GetProjectStatusOrder` intentionally returns a documented "not yet implemented" error (no live Jira Cloud site available to confirm the Agile-API response shape) — matches the task's own sketch.
+**Status:** `[x]` DONE — implemented in worktree `agent-a412325f0d1276bb5` (branch `worktree-agent-a412325f0d1276bb5`), **committed** as `c29ca9e6a`. `go build`/`go vet`/`buf generate`/`buf breaking` clean. Pending merge.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_nativechat.go` (new), `channels.go`, `cmd/server/main.go`
 **Depends on:** none
-**Status:** `[partial]` — `channels_nativechat.go` implemented exactly per spec (fail-closed on missing `connectionId`, relays via `infraFleetClient.Relay`). `go build`/`go vet`/`go test` clean. NOT wired into `channels.go`'s `RegisterRealChannels` — same "do not edit channels.go" constraint; registered via `registerIssueTrackingOrchestrationChannels` instead. Agent-side `nativeChat.readSession` JSON-RPC handler remains unimplemented on the Dev Server Agent, as this task's own "Agent-side dependency" section already flags (out of `backend-go` scope).
+**Status:** `[partial]` — implemented as a standalone file registering into `channels_issuetracking_orchestration.go` (per cross-group convention, `channels.go` untouched). Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`. **Integration note:** needs `registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)` added to `RegisterRealChannels`/`main.go` — all 3 clients already dialed there.
 
 ---
 

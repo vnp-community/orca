@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-131 (creates `registerProjectChannels`), TASK-133 (generated `projectv1` stubs for the new RPCs)
-**Status:** `[x]` DONE (verified) — all 3 channels added to `registerProjectChannels` in `channels_tenant_project.go` (new file). `toProjectRoleArg` helper added. `go build`/`go vet` green; dedicated tests pass.
+**Status:** `[x]` DONE — implemented in worktree `agent-a9271c5b2d89347e7`, **committed** as `19b216531`. Build/vet/test clean. Pending merge + one-line RegisterRealChannels/main.go wiring for `channels_tenant_project.go`.
 
 ---
 

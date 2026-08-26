@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_linear.go` (new), `channels.go`, `cmd/server/main.go`
 **Depends on:** TASK-100, TASK-104, TASK-105
-**Status:** `[partial]` — all 19 `linear.*` channel handlers implemented in new file `channels_linear.go`, reusing the same `issueTrackingClient`. `go build`/`go vet`/`go test` clean. NOT wired into `channels.go`'s `RegisterRealChannels` — same "do not edit channels.go" constraint as TASK-100; registered via `registerIssueTrackingOrchestrationChannels` in `channels_issuetracking_orchestration.go` instead. Regression grep guard from this task's Verify step confirmed by inspection: `linear.listTeams` calls `client.ListTeams`, `jira.listProjects` calls `client.ListProjects` — no cross-wiring.
+**Status:** `[partial]` — implemented as a standalone file registering into `channels_issuetracking_orchestration.go` (per cross-group convention, `channels.go` untouched). Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`. **Integration note:** needs `registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)` added to `RegisterRealChannels`/`main.go` — all 3 clients already dialed there.
 
 ---
 

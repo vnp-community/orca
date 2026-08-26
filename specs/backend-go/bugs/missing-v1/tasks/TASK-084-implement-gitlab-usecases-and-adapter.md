@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `services/scm-integration-service/internal/usecase/ports.go`, `list_merge_requests.go` (new), `resolve_merge_request_discussion.go` (new), `get_work_item_details.go` (new), `internal/adapter/gitlab/client.go`, `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-083
-**Status:** `[x]` DONE (verified — `go build`/`go vet`/`go test ./...` clean. NOTE: added a `URL string` field to `domain.MergeRequest` — this task's own spec code omitted it even though `gitlabMergeRequestFull.WebURL` was decoded and the proto `MergeRequest.url` field exists; fixed so the URL isn't silently dropped end-to-end.)
+**Status:** `[x]` DONE — implemented in worktree `agent-aac2382028c6ce920` (branch `worktree-agent-aac2382028c6ce920`), **committed** as `ce750c490`. `go build`/`go vet`/`gofmt -l` clean, `buf generate`/`buf breaking` clean (additive-only). Pending merge to main + one-line RegisterRealChannels/main.go wiring.
 
 ---
 

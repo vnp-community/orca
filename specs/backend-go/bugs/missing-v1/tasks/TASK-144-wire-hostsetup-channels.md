@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-131 (adds the `projectClient` param this task reuses), TASK-143 (generated `projectv1` stubs for the new RPCs)
-**Status:** `[x]` DONE (verified) — implemented as `registerProjectHostSetupChannels` in `channels_tenant_project.go` (new file), called from `registerTenantProjectChannels`. `setupExistingFolder` uses the explicit 30s deadline. `go build`/`go vet`/`go test` green.
+**Status:** `[x]` DONE — implemented in worktree `agent-a9271c5b2d89347e7`, **committed** as `19b216531`. Build/vet/test clean. Pending merge + one-line RegisterRealChannels/main.go wiring for `channels_tenant_project.go`.
 
 ---
 
