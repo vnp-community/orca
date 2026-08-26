@@ -220,3 +220,220 @@ func TestHandleSubscribe_InterleavesWithConcurrentInvoke(t *testing.T) {
 		t.Fatalf("missing frame(s): subAck=%v invokeResult=%v push=%v", seenSubAck, seenInvokeResult, seenPush)
 	}
 }
+
+// ── Session-client dialect tests (BUG-005 / SOL-005) ────────────────────
+//
+// WebSessionClient (frontend/src/renderer/src/web/web-session-client.ts)
+// sends {"id","authToken","method","params"} with NO "type" key — writeRaw
+// below sends exactly that shape as raw bytes, since InboundMessage's Type
+// field lacks `omitempty` and would always marshal a `"type":""` key,
+// which is not what the real client sends.
+
+func writeRaw(ctx context.Context, conn *websocket.Conn, raw string) error {
+	return conn.Write(ctx, websocket.MessageText, []byte(raw))
+}
+
+// sessionClientWireMessage decodes a RuntimeRpcResponse-shaped frame
+// (frontend/src/shared/runtime-rpc-envelope.ts) — the wire shape
+// session-client-dialect responses must match byte-for-byte.
+type sessionClientWireMessage struct {
+	ID     string          `json:"id"`
+	OK     bool            `json:"ok"`
+	Result json.RawMessage `json:"result"`
+	Error  *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+	Meta struct {
+		RuntimeID *string `json:"runtimeId"`
+	} `json:"_meta"`
+}
+
+// TestNativeInvokeDialect_UnchangedByDialectBridge is a regression guard:
+// an ordinary {"type":"invoke",...} message must still get today's
+// ResultMessage shape ({"type":"result",...}, no "_meta") after wiring in
+// normalizeInboundMessage/writeDialectResult.
+func TestNativeInvokeDialect_UnchangedByDialectBridge(t *testing.T) {
+	registry := NewRegistry()
+	registry.Register("test.echo", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		return map[string]string{"hello": "world"}, nil
+	})
+
+	ts := newTestHandlerServer(t, registry)
+	client := dialTestClient(t, ts)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := writeJSONFrame(ctx, client, InboundMessage{ID: "native-1", Type: "invoke", Channel: "test.echo"}); err != nil {
+		t.Fatalf("writing native invoke: %v", err)
+	}
+
+	raw := readRawFrame(t, ctx, client)
+	if !strings.Contains(raw, `"type":"result"`) {
+		t.Fatalf("native invoke response = %s, want a ResultMessage (type=result)", raw)
+	}
+	if strings.Contains(raw, "_meta") {
+		t.Fatalf("native invoke response = %s, must NOT contain _meta (that's the session-client dialect only)", raw)
+	}
+}
+
+// TestSessionClientDialect_RoundTripsThroughRegisteredChannel verifies a
+// WebSessionClient-shaped {"id","authToken","method","params"} message (no
+// "type" key) is bridged onto Registry.Dispatch and comes back as
+// {"id","ok":true,"result","_meta":{"runtimeId":"backend-go"}} — the exact
+// RuntimeRpcSuccess shape frontend/'s WebSessionClient expects.
+func TestSessionClientDialect_RoundTripsThroughRegisteredChannel(t *testing.T) {
+	registry := NewRegistry()
+	registry.Register("git.status", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		var params map[string]string
+		if err := json.Unmarshal(args[0], &params); err != nil {
+			return nil, err
+		}
+		return map[string]string{"repoPath": params["repoPath"], "branch": "main"}, nil
+	})
+
+	ts := newTestHandlerServer(t, registry)
+	client := dialTestClient(t, ts)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := writeRaw(ctx, client, `{"id":"web-session-rpc-1","authToken":"cookie-auth","method":"git.status","params":{"repoPath":"/repo"}}`); err != nil {
+		t.Fatalf("writing session-client invoke: %v", err)
+	}
+
+	got := readSessionClientWireMessage(t, ctx, client)
+	if got.ID != "web-session-rpc-1" {
+		t.Fatalf("id = %q, want %q", got.ID, "web-session-rpc-1")
+	}
+	if !got.OK {
+		t.Fatalf("ok = false, want true (error=%+v)", got.Error)
+	}
+	if got.Meta.RuntimeID == nil || *got.Meta.RuntimeID != "backend-go" {
+		t.Fatalf("_meta.runtimeId = %v, want \"backend-go\"", got.Meta.RuntimeID)
+	}
+	var result map[string]string
+	if err := json.Unmarshal(got.Result, &result); err != nil {
+		t.Fatalf("decoding result: %v", err)
+	}
+	if result["repoPath"] != "/repo" || result["branch"] != "main" {
+		t.Fatalf("result = %+v, want repoPath=/repo branch=main", result)
+	}
+}
+
+// TestSessionClientDialect_ErrorPathReturnsOkFalse verifies a failed
+// dispatch comes back as {"id","ok":false,"error":{"code","message"},
+// "_meta":{"runtimeId":null}} — RuntimeRpcFailure's shape.
+func TestSessionClientDialect_ErrorPathReturnsOkFalse(t *testing.T) {
+	registry := NewRegistry() // "git.status" unregistered -> notImplementedHandler
+
+	ts := newTestHandlerServer(t, registry)
+	client := dialTestClient(t, ts)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := writeRaw(ctx, client, `{"id":"web-session-rpc-2","authToken":"cookie-auth","method":"git.status","params":{}}`); err != nil {
+		t.Fatalf("writing session-client invoke: %v", err)
+	}
+
+	got := readSessionClientWireMessage(t, ctx, client)
+	if got.ID != "web-session-rpc-2" {
+		t.Fatalf("id = %q, want %q", got.ID, "web-session-rpc-2")
+	}
+	if got.OK {
+		t.Fatal("ok = true, want false for an unregistered channel")
+	}
+	if got.Error == nil || got.Error.Code == "" || got.Error.Message == "" {
+		t.Fatalf("error = %+v, want a populated {code,message}", got.Error)
+	}
+	if !strings.Contains(got.Error.Message, "git.status") {
+		t.Errorf("error.message = %q, want it to name the channel", got.Error.Message)
+	}
+	if got.Meta.RuntimeID != nil {
+		t.Errorf("_meta.runtimeId = %v, want nil on failure", *got.Meta.RuntimeID)
+	}
+}
+
+// TestGarbageMessage_NeitherTypeNorMethod_HandledGracefully verifies a
+// message with neither "type" nor "method" is still handled the same way it
+// was before this dialect bridge existed: logged, connection stays open, no
+// panic, no response written for that specific message.
+func TestGarbageMessage_NeitherTypeNorMethod_HandledGracefully(t *testing.T) {
+	registry := NewRegistry()
+	registry.Register("test.echo", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		return "ok", nil
+	})
+
+	ts := newTestHandlerServer(t, registry)
+	client := dialTestClient(t, ts)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := writeRaw(ctx, client, `{"id":"garbage-1","foo":"bar"}`); err != nil {
+		t.Fatalf("writing garbage message: %v", err)
+	}
+
+	// The connection must survive the garbage message: a subsequent
+	// ordinary invoke on the SAME connection must still get a response.
+	if err := writeJSONFrame(ctx, client, InboundMessage{ID: "after-garbage", Type: "invoke", Channel: "test.echo"}); err != nil {
+		t.Fatalf("writing invoke after garbage message: %v", err)
+	}
+	ack := readWireMessage(t, ctx, client)
+	if ack.Type != "result" || ack.ID != "after-garbage" {
+		t.Fatalf("post-garbage invoke response = %+v, want type=result id=after-garbage", ack)
+	}
+}
+
+// TestSessionClientDialect_SubscribeChannelAcksWithoutCrashing verifies
+// Phase 2's explicitly-scoped-out gap (see handleSubscribe's doc comment):
+// a session-client-dialect request landing on a StreamHandler-registered
+// channel gets a well-formed, dialect-correct ack instead of a timeout, and
+// pushing a follow-up event on that subscription does not panic or hang the
+// connection — even though the event itself won't reach WebSessionClient in
+// a shape it understands (native push, not id-correlated).
+func TestSessionClientDialect_SubscribeChannelAcksWithoutCrashing(t *testing.T) {
+	registry := NewRegistry()
+	events := make(chan PushEvent, 1)
+	registry.RegisterStream("test.subscribe", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
+		return events, nil
+	})
+
+	ts := newTestHandlerServer(t, registry)
+	client := dialTestClient(t, ts)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := writeRaw(ctx, client, `{"id":"web-session-rpc-3","authToken":"cookie-auth","method":"test.subscribe","params":{}}`); err != nil {
+		t.Fatalf("writing session-client subscribe: %v", err)
+	}
+
+	ack := readSessionClientWireMessage(t, ctx, client)
+	if ack.ID != "web-session-rpc-3" || !ack.OK {
+		t.Fatalf("ack = %+v, want ok=true id=web-session-rpc-3", ack)
+	}
+
+	// A follow-up push must not panic/hang the connection — read it as a
+	// raw frame since it's still native {"type":"push",...} (Phase 2 gap).
+	events <- PushEvent{Channel: "test.event", Args: []any{"payload"}}
+	raw := readRawFrame(t, ctx, client)
+	if !strings.Contains(raw, `"type":"push"`) {
+		t.Fatalf("follow-up push frame = %s, want native type=push (Phase 2 not implemented)", raw)
+	}
+}
+
+func readRawFrame(t *testing.T, ctx context.Context, conn *websocket.Conn) string {
+	t.Helper()
+	_, data, err := conn.Read(ctx)
+	if err != nil {
+		t.Fatalf("reading raw frame: %v", err)
+	}
+	return string(data)
+}
+
+func readSessionClientWireMessage(t *testing.T, ctx context.Context, conn *websocket.Conn) sessionClientWireMessage {
+	t.Helper()
+	var msg sessionClientWireMessage
+	if err := wsjson.Read(ctx, conn, &msg); err != nil {
+		t.Fatalf("reading session-client frame: %v", err)
+	}
+	return msg
+}
