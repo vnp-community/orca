@@ -33,6 +33,19 @@ type Config struct {
 	UsageServiceAddr        string
 	NotificationServiceAddr string
 
+	// InfraFleetHTTPAddr is infra-fleet-service's own HTTP listener
+	// (common/config's HTTPPort — normally /healthz/readyz/metrics only,
+	// but infra-fleet-service additionally mounts "/agent" and
+	// "/api/agent-token" on it for the Dev Server Agent, see that
+	// service's cmd/server/main.go). Distinct from
+	// OtherServiceAddrs["infra-fleet-service"], which is its gRPC address
+	// (port 9090) used for the REST->gRPC routes in
+	// internal/adapter/httpgateway/infra_routes.go. Empty disables the
+	// /agent + /api/agent-token proxy routes (main.go degrades the same
+	// way every other optional downstream does) rather than proxying to
+	// an empty host.
+	InfraFleetHTTPAddr string
+
 	// RateLimitRPS/RateLimitBurst configure the per-tenant in-memory
 	// token-bucket rate limiter (internal/usecase/rate_limit.go).
 	RateLimitRPS   float64
@@ -67,6 +80,7 @@ func Load() (Config, error) {
 		PublicPort:              publicPort,
 		UsageServiceAddr:        commonconfig.StringEnv("USAGE_SERVICE_ADDR", "localhost:9101"),
 		NotificationServiceAddr: commonconfig.StringEnv("NOTIFICATION_SERVICE_ADDR", "localhost:9102"),
+		InfraFleetHTTPAddr:      commonconfig.StringEnv("INFRA_FLEET_SERVICE_HTTP_ADDR", ""),
 		RateLimitRPS:            50,
 		RateLimitBurst:          100,
 		OtherServiceAddrs: map[string]string{

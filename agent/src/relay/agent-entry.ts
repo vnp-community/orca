@@ -8,12 +8,16 @@
 // Modes:
 //   direct-websocket  — Agent connects outbound to Orca Server (default)
 //   relay-websocket   — Orca Server connects inbound to Agent (behind NAT/firewall)
+//   stdio             — stdin/stdout wired directly to an SSH exec channel by
+//                        infra-fleet-service (the Go backend); no WS dial or
+//                        listen at all, SSH is the transport & trust boundary
 
 import { loadAgentConfig } from './agent-config'
 import { createAgentLogger } from './agent-logger'
 import { discoverTools } from './agent-tool-registry'
 import { connectDirect } from './agent-connection-direct'
 import { listenRelay } from './agent-connection-relay'
+import { connectStdio } from './agent-connection-stdio'
 
 // TEMP DIAG BUG-FE-PTY-001: the agent's own outbound WS to Orca sends a raw
 // TCP FIN (code 1005, no close frame) within ~6ms of processing 2 concurrent
@@ -42,6 +46,24 @@ async function main(): Promise<void> {
     const daemonLog = createAgentLogger(process.env['ORCA_LOG_LEVEL'] ?? 'info')
     const { runPtyDaemon } = await import('./pty-daemon-server')
     await runPtyDaemon(daemonSocketPath, daemonLog)
+    return
+  }
+
+  // Why this branch also runs before the normal path: infra-fleet-service
+  // (the Go backend) SSH-deploys this same agent.js bundle to a remote host
+  // and launches it as `node agent.js --stdio`, wiring stdin/stdout directly
+  // to an SSH exec channel — no WebSocket dial/listen, no token; the SSH
+  // connection itself is the transport and the trust boundary. See
+  // agent-connection-stdio.ts.
+  if (process.argv.includes('--stdio')) {
+    const config = loadAgentConfig({ stdio: true })
+    const log = createAgentLogger(config.logLevel)
+    log.info('Orca Dev Agent v2.1.0 (stdio mode)')
+    log.info(`DevServerId: ${config.devServerId}  |  WorkDir: ${config.workDir}`)
+    log.info('Discovering tools...')
+    const tools = await discoverTools(config)
+    log.info(`Tools ready: ${tools.length} (${tools.map(t => t.name).join(', ')})`)
+    await connectStdio(config, tools, log)
     return
   }
 

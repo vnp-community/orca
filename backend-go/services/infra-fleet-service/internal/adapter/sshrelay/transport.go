@@ -23,7 +23,6 @@ type sshExecTransport struct {
 
 	decoder devserveragent.IncrementalDecoder
 	pending []devserveragent.DecodedFrame
-	readBuf []byte
 }
 
 // sshWriter/sshReader narrow *ssh.Session's StdinPipe()/StdoutPipe() return
@@ -39,18 +38,14 @@ type (
 )
 
 func newSSHExecTransport(conn *sshconn.Connection, session *ssh.Session, stdin sshWriter, stdout sshReader) *sshExecTransport {
-	return &sshExecTransport{
-		conn:    conn,
-		session: session,
-		stdin:   stdin,
-		stdout:  stdout,
-		readBuf: make([]byte, 32*1024),
-	}
+	return &sshExecTransport{conn: conn, session: session, stdin: stdin, stdout: stdout}
 }
 
-// readResult carries one stdout.Read outcome across the goroutine ReadFrame
-// spawns to make an otherwise non-cancelable blocking Read respect ctx.
+// readResult carries one stdout.Read outcome (plus the buffer it read into)
+// across the goroutine ReadFrame spawns to make an otherwise
+// non-cancelable blocking Read respect ctx.
 type readResult struct {
+	buf []byte
 	n   int
 	err error
 }
@@ -58,16 +53,23 @@ type readResult struct {
 // ReadFrame returns the next complete frame, feeding the incremental
 // decoder from stdout as needed. io.Reader has no native context-cancellation
 // support, so each underlying Read runs in its own goroutine — a standard,
-// accepted trade-off for wrapping blocking I/O with ctx (the goroutine
+// accepted trade-off for wrapping blocking I/O with ctx: the goroutine
 // outlives ReadFrame if ctx cancels mid-read and the pipe never unblocks on
-// its own, but the process/session teardown that follows a cancellation
-// closes the pipe and unblocks it in practice).
+// its own (the process/session teardown that follows a cancellation closes
+// the pipe and unblocks it in practice). Each goroutine gets its OWN
+// buffer, allocated fresh per call rather than reused across calls — a
+// shared buffer would let an abandoned (ctx-cancelled) read's eventual,
+// late completion race with a subsequent call's own Read into the same
+// backing array; a fresh allocation per call costs little for this
+// interactive, low-throughput JSON-RPC-over-SSH use case and removes the
+// hazard outright instead of documenting around it.
 func (t *sshExecTransport) ReadFrame(ctx context.Context) (devserveragent.DecodedFrame, error) {
 	for len(t.pending) == 0 {
 		resultCh := make(chan readResult, 1)
 		go func() {
-			n, err := t.stdout.Read(t.readBuf)
-			resultCh <- readResult{n: n, err: err}
+			buf := make([]byte, 32*1024)
+			n, err := t.stdout.Read(buf)
+			resultCh <- readResult{buf: buf, n: n, err: err}
 		}()
 
 		select {
@@ -77,7 +79,7 @@ func (t *sshExecTransport) ReadFrame(ctx context.Context) (devserveragent.Decode
 			if res.err != nil {
 				return devserveragent.DecodedFrame{}, res.err
 			}
-			t.pending = t.decoder.Feed(t.readBuf[:res.n])
+			t.pending = t.decoder.Feed(res.buf[:res.n])
 		}
 	}
 

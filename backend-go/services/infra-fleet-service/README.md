@@ -30,16 +30,25 @@ ops, port scans) reduces to the same call.
   all four usecase ports off one `Repository` type (mirrors usage-service's
   single-`Repository` shape). Hand-written SQL, same rationale as
   usage-service (`sqlc` codegen is the eventual target, not wired yet).
-- `internal/adapter/devserveragent/` — **real for relay-websocket
-  (outbound dial) and direct-websocket (inbound accept) modes**; `relay-ssh`
-  still returns `ErrConnectionModeNotImplemented`. See "Known gaps" below.
+- `internal/adapter/devserveragent/` — **real for all three connection
+  modes**: relay-websocket (outbound dial), direct-websocket (inbound
+  accept), and relay-ssh (deploy+launch over SSH, via `WithRelaySSH`). A
+  `Transport` interface generalizes the WS-specific and SSH-exec-specific
+  transports behind one `session`/`Client` — `Exec`/`Health` have no
+  relay-ssh-specific code left, see "Known gaps" below.
 - `internal/adapter/agentwsserver/` — direct-websocket's inbound WS server
   (`/agent`) and token-issuance HTTP endpoint (`POST/GET /api/agent-token`),
   the Go port of `AgentWebSocketServer`/`agent-token-routes.ts` (Epic A,
   third pass, 2026-08-17).
 - `internal/adapter/sshconn/` — a real, tested SSH connection layer
-  (Vault-cert-authenticated, via `golang.org/x/crypto/ssh`) for `relay-ssh`
-  mode's eventual use — **not wired into anything yet**, see "Known gaps".
+  (Vault-cert-authenticated, via `golang.org/x/crypto/ssh`), the transport
+  `internal/adapter/sshrelay/` builds its deploy/launch steps on.
+- `internal/adapter/sshrelay/` — relay-ssh's deploy+launch+handshake
+  pipeline: SFTP-uploads `agent/out/agent.js` to the resolved `SshTarget`,
+  launches it as `node agent.js --stdio` over the SSH exec channel, and
+  completes the receiver-side `agent.handshake` exchange — see "Known gaps"
+  for the full writeup, including `agent/`'s new third connection mode this
+  depends on.
 - `internal/adapter/grpc/` — implements the generated
   `infrafleetv1.InfraFleetServiceServer`, pure wire<->usecase translation.
 - `migrations/0001_init.{up,down}.sql` — real DDL: `infra.dev_servers`,
@@ -79,37 +88,42 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
-- **The Dev Server Agent relay protocol client is real for relay-websocket
-  and direct-websocket modes** (Epic A, third pass, 2026-08-17 — see
-  [`docs/execution-plan.md`](../../docs/execution-plan.md) §13 for the full
-  writeup; §8/§11 for the earlier two passes). `internal/adapter/devserveragent/`
-  ports Stack B (`relay-protocol.ts`): 13-byte-framed JSON-RPC, shared by
-  both modes — relay-websocket dials out with `Authorization: Bearer
+- **The Dev Server Agent relay protocol client is real for all three
+  connection modes** (Epic A, four passes, 2026-08-17/18 — see
+  [`docs/execution-plan.md`](../../docs/execution-plan.md) §18 for the
+  relay-ssh writeup; §8/§11/§13 for the earlier three). `internal/adapter/devserveragent/`
+  ports Stack B (`relay-protocol.ts`): 13-byte-framed JSON-RPC. All three
+  modes now funnel through the same `session`/`Client.Exec`/`Client.Health` —
+  a `Transport` interface (`ReadFrame`/`WriteFrame`/`Close`) abstracts *how*
+  bytes move: relay-websocket dials out with `Authorization: Bearer
   <ORCA_AGENT_TOKEN>`; direct-websocket accepts an inbound connection via
-  `internal/adapter/agentwsserver/` (below) and hands it to
-  `Client.AttachInboundSession`, after which both modes share identical
-  read/keepalive/call machinery. `relay-ssh` is the one mode still returning
-  `ErrConnectionModeNotImplemented` — see the next bullet for why, and what
-  IS real underneath it. Unit- and fake-agent-integration-tested throughout
-  (relay-websocket: `frame_test.go`/`jsonrpc_test.go`/`client_test.go`/`session_test.go`;
-  direct-websocket: `agentwsserver`'s own suite plus `devserveragent/inbound_test.go`)
-  but **not yet verified against a real `agent/` binary** — no live agent
-  was available in this environment, unlike every other fix verified live
-  earlier in this session; flag this explicitly before relying on it in
-  production. `Port`/`Token` are service-level `Config` (env vars:
-  `AGENT_PORT`, `ORCA_AGENT_TOKEN`), not per-`DevServer` fields — matches how
-  the real system models relay-websocket auth (a deployment-wide shared
-  secret, not per-device), see `config.go`'s doc comment; direct-websocket's
-  own token model is per-connection and ephemeral instead (see
-  `agentwsserver`'s bullet below). Reconnect after a relay-websocket drop
-  retries in the background with `backoffDelay`-paced attempts; a dropped
-  direct-websocket session does NOT auto-reconnect this way (there's nothing
-  to dial — the agent must dial in again on its own, matching how the TS
-  reference's own agent-side reconnect loop works for this mode). Because
-  `relay-ssh` is still not implemented, `ScanWorkspacePorts` correctly
-  *routes* (always relays when a `connectionId` resolves — closing TS Gap 7)
-  but the relay call itself only succeeds for relay-websocket/direct-websocket
-  dev servers today.
+  `internal/adapter/agentwsserver/` and hands it to
+  `Client.AttachInboundSession`; relay-ssh deploys+launches over SSH via
+  `internal/adapter/sshrelay/` and hands the result to
+  `Client.WithRelaySSH(provisioner)`'s `getOrProvisionSession`. No
+  mode-specific branch exists in `Exec`/`Health` — the generic passthrough
+  contract ("method/params verbatim, no per-method translation") is uniform
+  across all three. Unit- and fake-agent/fake-SSH-server-integration-tested
+  throughout (relay-websocket: `frame_test.go`/`jsonrpc_test.go`/`client_test.go`/`session_test.go`;
+  direct-websocket: `agentwsserver`'s own suite plus `devserveragent/inbound_test.go`;
+  relay-ssh: `devserveragent/ssh_provisioner_test.go` (in-memory transport,
+  dispatch/reuse logic) + `sshrelay`'s own suite (a real fake SSH+SFTP
+  server, deploy→launch→handshake end to end, including a checksum-mismatch
+  case)) but **not yet verified against a real deployed `agent/` binary or
+  real SSH host** — no live infrastructure was available in this
+  environment; flag this explicitly before relying on it in production.
+  `Port`/`Token` are service-level `Config` (env vars: `AGENT_PORT`,
+  `ORCA_AGENT_TOKEN`), not per-`DevServer` fields — matches how the real
+  system models relay-websocket auth (a deployment-wide shared secret, not
+  per-device); direct-websocket's own token model is per-connection and
+  ephemeral instead (see `agentwsserver`'s bullet below); relay-ssh has no
+  token at all — the SSH connection itself is the trust boundary. Reconnect
+  after a relay-websocket drop retries in the background with
+  `backoffDelay`-paced attempts; direct-websocket and relay-ssh sessions do
+  NOT auto-reconnect this way — direct-websocket because there's nothing to
+  dial (the agent must dial in again), relay-ssh because "reconnecting"
+  means a fresh deploy+launch, not redialing the same transport, so the next
+  `Exec`/`Health` call re-provisions from scratch instead.
 - **`internal/adapter/agentwsserver/` (direct-websocket's inbound server)**
   is real: `/agent` WS handler running the receiver-side `agent.handshake`
   exchange, SHA-256-hashed single-use token slots with 60s connect-timeout
@@ -117,57 +131,61 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
   `ORCA_AGENT_API_SECRET` is unset — never a bypass). Shares this service's
   existing HTTP port, no new listener. Not yet verified against a real
   `agent/` binary, same caveat as above.
-- **SSH credential handling via Vault's SSH secrets engine — connection
-  layer real, now wired into `devserveragent.Client` for a probe + one exec
-  method (Epic A, fourth pass, 2026-08-17).** `internal/adapter/sshconn/`
-  genuinely dials an SSH target, authenticating with a short-lived
-  certificate issued via `common/secrets.Client.SSHSignPublicKey` against
-  `ssh_targets.vault_ssh_role` (never raw key material, per the design doc
-  §9 invariant). `DevServer` now carries `SSHTargetID` (proto field 5 /
-  `migrations/0003_dev_server_ssh_target`, nullable FK →
-  `infra.ssh_targets`), required by `domain.NewDevServer` whenever
-  `mode == relay-ssh` (`ErrMissingSSHTargetForRelaySSH`), and
-  `postgres.SshTargetStore.Get` resolves it into a full `domain.SshTarget`
-  (implements both `usecase.SshTargetRepository` and the new
-  `usecase.SshTargetResolver` — a separate Go type from `Repository`
-  because Go doesn't allow two differently-typed `Get` methods on one
-  receiver, see `repository.go`'s doc comment).
-  `devserveragent.Client.WithRelaySSH(connector, resolver)` turns this on:
-  **`Health`** dials the resolved target and runs a trivial command as a
-  point-in-time liveness probe, reporting `(false, nil)` on any failure —
-  closes the connection after (no session reuse, unlike the WS modes).
-  **`Exec`** supports ONLY `method == "shell.exec"` — params are decoded
-  into the same `{"script", "env"}` shape `infrafleetclient.shellExecParams`
-  (workflow-service's real Relay caller) actually sends, env vars are
-  exported as quoted POSIX `export` lines ahead of the script, and the
-  result is shaped as `{"exitCode","stdout","stderr","error"}` — the same
-  keys `infrafleetclient.execResult` decodes regardless of transport. Every
-  OTHER relay-ssh method returns `ErrRelaySSHMethodNotSupported`, a clear
-  typed error, never a silent success or empty result — there is still no
-  JSON-RPC agent listening on a relay-ssh connection.
-  Fake-SSH-server-tested (`devserveragent/relay_ssh_test.go`, reusing
-  `sshconn/connector_test.go`'s fake-CA/fake-server philosophy): success,
-  wrong-method-returns-typed-error, and connection-failure-returns-false
-  cases all covered.
-  **Still not implemented, exactly as before:** `relay-ssh` mode's actual
-  point — SFTP-deploy + launch `relay.js`, then JSON-RPC over the exec
-  channel — needs a `relay.js` build artifact with no path reachable from
-  backend-go's build at all (it's `agent/`'s Electron-packaged output); see
-  `sshconn`'s package doc comment. **Not wired into `cmd/server/main.go`
-  either** — `WithRelaySSH` needs a `sshconn.SSHCertIssuer` (production:
-  `common/secrets.Client`), and `common/secrets`/Vault has no config or
-  client construction in `main.go` at all yet (see the next bullet — an
-  already-tracked, separate gap). `GetFleetHealth`'s SSH-exec-based poll
-  also does not use this. Two further gaps `sshconn` itself still carries,
-  documented not silently matched: no host-key verification
-  (`ssh.InsecureIgnoreHostKey()`, matching the TS reference's own posture)
-  and no per-target SSH port (defaults to 22, `SshTarget` has no port
-  field).
-- **`common/secrets` (Vault) is not wired into `main.go` at all** —
-  `DATABASE_DSN` is read directly from the environment for local dev, same
-  as usage-service's equivalent gap. Wire
-  `secrets.DatabaseCredentialsFromFile` before this service is deployed
-  anywhere Vault is actually running.
+- **`relay-ssh` mode is fully real** (Epic A, fourth pass, 2026-08-18 —
+  closes the gap the third pass left open). The blocker was never really
+  "no build artifact" — it was that `relay-ssh`'s originally-spec'd deploy
+  target (`relay.js`, a separately-built Unix-socket-daemon binary) has no
+  buildable counterpart in this repo at all. The fix: `agent/` (this repo's
+  actual, buildable Dev Server Agent, already used for
+  direct-websocket/relay-websocket) grew a third connection mode, `stdio`
+  (`agent/src/relay/agent-connection-stdio.ts`) — the exact same
+  `agent/out/agent.js` bundle, launched as `node agent.js --stdio` with its
+  stdin/stdout wired to an SSH exec channel instead of a WebSocket. No
+  token needed — the SSH connection is the trust boundary, matching the
+  design doc's relay-ssh auth model exactly.
+  `internal/adapter/sshconn/` genuinely dials the resolved `SshTarget`,
+  authenticating with a short-lived certificate issued via
+  `common/secrets.Client.SSHSignPublicKey` against `ssh_targets.vault_ssh_role`
+  (never raw key material, per the design doc §9 invariant). `DevServer`
+  carries `SSHTargetID` (proto field 5 / `migrations/0003_dev_server_ssh_target`,
+  nullable FK → `infra.ssh_targets`), required by `domain.NewDevServer`
+  whenever `mode == relay-ssh` (`ErrMissingSSHTargetForRelaySSH`), resolved
+  by `postgres.SshTargetStore.Get` (implements both
+  `usecase.SshTargetRepository` and `sshrelay.SshTargetResolver` — a
+  structurally-identical interface that package declares for itself, per
+  this codebase's "port defined where consumed" convention).
+  `internal/adapter/sshrelay/` (new) ties it together: SFTP-uploads
+  `agent/out/agent.js` (new `github.com/pkg/sftp` dependency), SHA-256
+  checksum-verifies via the same portable `node -e` one-liner the original
+  TS reference uses, launches it over a fresh SSH exec session, and runs
+  the receiver-side `agent.handshake` exchange — the resulting `Transport`
+  and `HandshakeInfo` are what `Client.getOrProvisionSession` attaches,
+  after which `Exec`/`Health` work identically to the other two modes: any
+  method, not just a hardcoded subset. `cmd/server/main.go` wires it via a
+  Vault client constructed for SSH cert issuance only — construction
+  failing (malformed `VAULT_ADDR`) logs a warning and leaves relay-ssh
+  unavailable rather than crash-looping the whole service over one optional
+  mode's dependency; `ORCA_RELAY_BUNDLE_PATH` unset behaves the same way,
+  checked lazily at deploy time.
+  **Known, deliberate gaps carried forward, not silently fixed:** no
+  process detachment/reattach across a dropped SSH connection (TS's
+  Unix-socket-daemon model) — one exec channel per session, foreground; a
+  dropped connection ends the session, the next call re-provisions from
+  scratch. No multi-platform bundle resolution — `ORCA_RELAY_BUNDLE_PATH`
+  is one local path, this scaffold runs one platform. `sshconn`'s two
+  pre-existing gaps (`sshconn`'s package doc comment): no host-key
+  verification (`ssh.InsecureIgnoreHostKey()`, matching the TS reference's
+  own posture) and no per-target SSH port (defaults to 22, `SshTarget` has
+  no port field). `GetFleetHealth`'s SSH-exec-based poll still does not use
+  any of this. **No live SSH host, Vault SSH secrets engine, or deployed
+  `agent.js --stdio` process was available to verify against** — every new
+  path here is fake-server-tested, not live-verified.
+- **`common/secrets` (Vault) is now wired into `main.go`, but only for
+  relay-ssh's SSH cert issuance** — `DATABASE_DSN` is still read directly
+  from the environment for local dev, same as usage-service's equivalent
+  gap. Wire `secrets.DatabaseCredentialsFromFile` before this service is
+  deployed anywhere Vault is actually running for real DB-credential
+  management too.
 - **`infra.connections` is now real (Epic A's second pass,
   `migrations/0002_connections`)** — `ResolveConnection` joins
   `connections`→`dev_servers` within the caller's tenant scope instead of

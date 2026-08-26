@@ -38,6 +38,14 @@ x-go-common-env: &go-common-env
   TENANT_SERVICE_ADDR: tenant-service:9090
   PROJECT_SERVICE_ADDR: project-service:9090
   INFRA_FLEET_SERVICE_ADDR: infra-fleet-service:9090
+  # infra-fleet-service's own HTTP listener, NOT the gRPC one above — only
+  # api-gateway reads this (Config.InfraFleetHTTPAddr), to raw-proxy the Dev
+  # Server Agent's /agent (WS) + /api/agent-token routes there (see
+  # api-gateway/internal/adapter/httpgateway/agent_proxy_routes.go). Those
+  # two routes are mounted on infra-fleet-service's HTTP_PORT alongside its
+  # usual /healthz/readyz/metrics (infra-fleet-service/cmd/server/main.go),
+  # so this is deliberately a second address distinct from the 9090 one.
+  INFRA_FLEET_SERVICE_HTTP_ADDR: infra-fleet-service:8080
   GIT_GATEWAY_SERVICE_ADDR: git-gateway-service:9090
   SCM_INTEGRATION_SERVICE_ADDR: scm-integration-service:9090
   ISSUE_TRACKING_SERVICE_ADDR: issue-tracking-service:9090
@@ -248,6 +256,12 @@ services:
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/infra?sslmode=disable
+      # Gates POST/GET /api/agent-token (proxied in from api-gateway, see
+      # INFRA_FLEET_SERVICE_HTTP_ADDR above) — must match deploy/agent/.env's
+      # ORCA_AGENT_API_SECRET on every Dev Server Agent, or token issuance
+      # fail-secure-rejects every request (agentwsserver's own startup log
+      # warns loudly when this is empty).
+      ORCA_AGENT_API_SECRET: ${ORCA_AGENT_API_SECRET:-}
     depends_on:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }

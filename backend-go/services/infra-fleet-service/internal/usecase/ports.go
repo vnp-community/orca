@@ -50,18 +50,6 @@ type SshTargetRepository interface {
 	List(ctx context.Context, tenantID string) ([]domain.SshTarget, error)
 }
 
-// SshTargetResolver is the narrow read port adapter/devserveragent.Client
-// needs to resolve a DevServer.SSHTargetID into a full domain.SshTarget
-// before dialing via sshconn.Connector for relay-ssh mode. Same method as
-// SshTargetRepository.Get, declared as its own interface rather than reused
-// directly — this codebase's convention is that a port is defined where it
-// is consumed (see this file's own doc comment), and devserveragent is a
-// different consumer than the usecases that hold SshTargetRepository.
-// Implemented by postgres.SshTargetStore, same as SshTargetRepository.
-type SshTargetResolver interface {
-	Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error)
-}
-
 // ConnectionRepository is the persistence port for the write side of
 // infra.connections (migrations/0002_connections) — the real routing model
 // that replaced the connectionId==dev_server.id equation. Kept separate from

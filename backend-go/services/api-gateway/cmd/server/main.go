@@ -256,6 +256,17 @@ func run() error {
 	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus)
 	wsCompatHandler := wscompat.New(logger, sessionValidator, wsCompatRegistry)
 
+	// agentProxyHandler raw-proxies the Dev Server Agent's /agent (WS) and
+	// /api/agent-token (HTTP) traffic straight to infra-fleet-service — see
+	// httpgateway.NewAgentProxyHandler's doc comment for why this is a
+	// proxy rather than a gRPC translation like every other route here.
+	// Left nil (routes not mounted) when unconfigured, same degrade-not-
+	// panic shape as every optional downstream client above.
+	var agentProxyHandler http.Handler
+	if cfg.InfraFleetHTTPAddr != "" {
+		agentProxyHandler = httpgateway.NewAgentProxyHandler(cfg.InfraFleetHTTPAddr)
+	}
+
 	router := httpgateway.NewRouter(httpgateway.Deps{
 		Logger:              logger,
 		Registry:            registry,
@@ -279,6 +290,7 @@ func run() error {
 		WorkflowClient:      workflowClient,
 		WSHandler:           wsHandler.ServeHTTP,
 		WSCompatHandler:     wsCompatHandler.ServeHTTP,
+		AgentProxyHandler:   agentProxyHandler,
 	})
 
 	healthSrv := health.New()

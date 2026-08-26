@@ -1,8 +1,10 @@
 // Package postgres implements infra-fleet-service's DevServerRepository,
-// SshTargetRepository, SshTargetResolver, ConnectionRepository,
-// ConnectionResolver, and FleetHealthPort ports (defined in internal/usecase)
-// against this service's own PostgreSQL database — see
-// specs/backend-go/architecture/05-data-architecture.md's
+// SshTargetRepository, ConnectionRepository, ConnectionResolver, and
+// FleetHealthPort ports (defined in internal/usecase), plus
+// adapter/sshrelay.SshTargetResolver (a structurally-identical interface
+// that package declares for itself, per this codebase's Dependency
+// Inversion convention), against this service's own PostgreSQL database —
+// see specs/backend-go/architecture/05-data-architecture.md's
 // database-per-service rule: this is the ONLY package in infra-fleet-service
 // that knows SQL exists.
 package postgres
@@ -113,10 +115,10 @@ func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevSer
 }
 
 // SshTargetStore implements usecase.SshTargetRepository and
-// usecase.SshTargetResolver against the same infra.ssh_targets table
-// Repository's ResolveConnection/GetFleetHealth etc. read from — split into
-// its own type rather than a method on Repository, see Repository's doc
-// comment for why (the Get method-name collision with
+// adapter/sshrelay.SshTargetResolver against the same infra.ssh_targets
+// table Repository's ResolveConnection/GetFleetHealth etc. read from — split
+// into its own type rather than a method on Repository, see Repository's
+// doc comment for why (the Get method-name collision with
 // DevServerRepository.Get).
 type SshTargetStore struct {
 	pool *pgxpool.Pool
@@ -170,8 +172,8 @@ func (s *SshTargetStore) List(ctx context.Context, tenantID string) ([]domain.Ss
 }
 
 // Get fetches an SSH target scoped to tenantID — implements both
-// usecase.SshTargetRepository and usecase.SshTargetResolver (the latter
-// consumed by adapter/devserveragent.Client to resolve DevServer.SSHTargetID
+// usecase.SshTargetRepository and adapter/sshrelay.SshTargetResolver (the
+// latter consumed by sshrelay.Provisioner to resolve DevServer.SSHTargetID
 // before dialing via sshconn.Connector for relay-ssh mode).
 func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error) {
 	row := s.pool.QueryRow(ctx, `
