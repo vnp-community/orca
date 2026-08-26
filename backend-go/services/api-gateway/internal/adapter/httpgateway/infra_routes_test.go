@@ -133,6 +133,22 @@ func (f *fakeInfraFleetServiceClient) AttachPty(context.Context, ...grpc.CallOpt
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+// ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile: no
+// httpgateway route exercises these (they're wired through wscompat's
+// channels_browser.go instead) — same unconditional Unimplemented-stub
+// convention as this file's terminal RPCs above.
+func (f *fakeInfraFleetServiceClient) ListBrowserProfiles(context.Context, *infrafleetv1.ListBrowserProfilesRequest, ...grpc.CallOption) (*infrafleetv1.ListBrowserProfilesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) CreateBrowserProfile(context.Context, *infrafleetv1.CreateBrowserProfileRequest, ...grpc.CallOption) (*infrafleetv1.CreateBrowserProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) DeleteBrowserProfile(context.Context, *infrafleetv1.DeleteBrowserProfileRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // testInfraRouter mounts mountInfraRoutes alone on a fresh chi router — no
 // authMiddleware, since these tests inject identity into the request
 // context directly the way authMiddleware would (withIdentity), mirroring

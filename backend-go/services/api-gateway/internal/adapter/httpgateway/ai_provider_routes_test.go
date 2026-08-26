@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -76,6 +77,30 @@ func (f *fakeAIProviderServiceClient) GetUsageToday(ctx context.Context, in *aip
 		return nil, f.getUsageTodayErr
 	}
 	return f.getUsageTodayResp, nil
+}
+
+// ListAccounts/UpdateAccount/DeleteAccount/WriteCredential/TestConnection:
+// none of this file's tests exercise these — same unconditional
+// Unimplemented-stub convention as infra_routes_test.go's terminal RPCs —
+// they exist only to satisfy aiproviderv1.AiProviderServiceClient in full.
+func (f *fakeAIProviderServiceClient) ListAccounts(context.Context, *aiproviderv1.ListAccountsRequest, ...grpc.CallOption) (*aiproviderv1.ListAccountsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
+}
+
+func (f *fakeAIProviderServiceClient) UpdateAccount(context.Context, *aiproviderv1.UpdateAccountRequest, ...grpc.CallOption) (*aiproviderv1.UpdateAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
+}
+
+func (f *fakeAIProviderServiceClient) DeleteAccount(context.Context, *aiproviderv1.DeleteAccountRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
+}
+
+func (f *fakeAIProviderServiceClient) WriteCredential(context.Context, *aiproviderv1.WriteCredentialRequest, ...grpc.CallOption) (*aiproviderv1.WriteCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
+}
+
+func (f *fakeAIProviderServiceClient) TestConnection(context.Context, *aiproviderv1.TestConnectionRequest, ...grpc.CallOption) (*aiproviderv1.TestConnectionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
 }
 
 // testAIProviderRouter mounts mountAIProviderRoutes alone on a fresh chi
