@@ -540,6 +540,241 @@ func sanitizeBranchForPath(branch string) string {
 	return strings.ReplaceAll(branch, "/", "-")
 }
 
+// ── Group A — branch/ref operations (TASK-207) ─────────────────────────────
+
+// Checkout runs `git checkout <branch> --`, matching the real agent's own
+// git.checkout exactly (specs/agent/api/agent-rpc-catalog-git-fs.md:132,
+// agent/src/relay/git-handler.ts:702-719) — no create-branch (-b) semantics.
+// See CheckoutRequest's proto doc comment for why TASK-207's original
+// `create` param was dropped rather than kept as a no-op.
+func (e *Executor) Checkout(ctx context.Context, repoPath, branch string) (domain.CheckoutResult, error) {
+	if _, err := e.run(ctx, repoPath, "checkout", branch, "--"); err != nil {
+		return domain.CheckoutResult{}, err
+	}
+	current, err := e.run(ctx, repoPath, "branch", "--show-current")
+	if err != nil {
+		return domain.CheckoutResult{}, err
+	}
+	return domain.CheckoutResult{Success: true, Branch: strings.TrimSpace(current)}, nil
+}
+
+// ListLocalBranches runs `git for-each-ref` against refs/heads with a
+// machine-parseable format — ahead/behind and upstream come from
+// %(upstream:short)/%(upstream:track) tokens. Richer than the real agent's
+// own git.localBranches response (names only); see BranchInfo's proto doc
+// comment for why RelayExecutor composes the same richer shape via
+// git.exec's for-each-ref instead of calling git.localBranches directly —
+// this local implementation stays consistent with that choice rather than
+// mirroring the narrower real agent response.
+func (e *Executor) ListLocalBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error) {
+	out, err := e.run(ctx, repoPath,
+		"for-each-ref", "--format=%(refname:short)\t%(upstream:short)\t%(upstream:track)\t%(HEAD)",
+		"refs/heads/")
+	if err != nil {
+		return nil, err
+	}
+	var branches []domain.BranchInfo
+	// Split raw output (not TrimSpace(out)) before trimming each line — the
+	// %(HEAD) column is intentionally empty for every non-current branch,
+	// so TrimSpace on the whole blob would eat a legitimate trailing empty
+	// field whenever the alphabetically-last ref isn't the current branch,
+	// silently dropping it.
+	for _, rawLine := range strings.Split(out, "\n") {
+		line := strings.TrimRight(rawLine, "\r")
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 4 {
+			continue
+		}
+		ahead, behind := parseAheadBehind(fields[2])
+		branches = append(branches, domain.BranchInfo{
+			Name:      fields[0],
+			Upstream:  fields[1],
+			Ahead:     ahead,
+			Behind:    behind,
+			IsCurrent: fields[3] == "*",
+		})
+	}
+	return branches, nil
+}
+
+// FastForward runs `git pull --ff-only [<remote> <branch>]` — matches the
+// real agent's git.fastForward (`pullWithArgs(['--ff-only'])`,
+// agent-rpc-catalog-git-fs.md:160, agent/src/relay/git-handler.ts:1190-1192)
+// instead of TASK-207's original `git merge --ff-only <branch>` sketch,
+// which assumed a bare local-branch merge rather than a pull against a
+// resolved push target. pushTarget == nil lets `git pull` use the branch's
+// configured upstream, mirroring the real agent's own undefined-pushTarget
+// fallback (agent/src/relay/git-handler-push-target.ts:164-166).
+func (e *Executor) FastForward(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.FastForwardResult, error) {
+	args := []string{"pull", "--ff-only"}
+	if pushTarget != nil {
+		args = append(args, pushTarget.RemoteName, pushTarget.BranchName)
+	}
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
+		return domain.FastForwardResult{}, err
+	}
+	return domain.FastForwardResult{Success: true}, nil
+}
+
+// RebaseFromBase runs `git rebase <baseRef>`. A conflict (nonzero exit with
+// rebase state left behind) is a domain outcome, not a Go error — same
+// posture as Pull's conflict handling above.
+func (e *Executor) RebaseFromBase(ctx context.Context, repoPath, baseRef string) (domain.RebaseResult, error) {
+	out, err := e.run(ctx, repoPath, "rebase", baseRef)
+	if err != nil {
+		if strings.Contains(out, "CONFLICT") || strings.Contains(err.Error(), "CONFLICT") {
+			return domain.RebaseResult{Success: false, HadConflicts: true}, nil
+		}
+		return domain.RebaseResult{}, err
+	}
+	return domain.RebaseResult{Success: true}, nil
+}
+
+// AbortRebase runs `git rebase --abort`.
+func (e *Executor) AbortRebase(ctx context.Context, repoPath string) (domain.SimpleResult, error) {
+	if _, err := e.run(ctx, repoPath, "rebase", "--abort"); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// AbortMerge runs `git merge --abort`.
+func (e *Executor) AbortMerge(ctx context.Context, repoPath string) (domain.SimpleResult, error) {
+	if _, err := e.run(ctx, repoPath, "merge", "--abort"); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// resolveGitDir resolves repoPath's actual .git directory, following a
+// linked worktree's "gitdir: <path>" pointer file — mirrors the real
+// agent's own resolveGitDir exactly
+// (agent/src/relay/git-handler-status-ops.ts:24-36), which ConflictOperation
+// below needs to check the same MERGE_HEAD/rebase-merge/CHERRY_PICK_HEAD
+// marker files the real agent checks.
+func resolveGitDir(repoPath string) string {
+	dotGitPath := filepath.Join(repoPath, ".git")
+	data, err := os.ReadFile(dotGitPath)
+	if err != nil {
+		return dotGitPath // ".git" is a directory, not a file — the normal (non-worktree) case
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if target, ok := strings.CutPrefix(strings.TrimSpace(line), "gitdir:"); ok {
+			target = strings.TrimSpace(target)
+			if filepath.IsAbs(target) {
+				return target
+			}
+			return filepath.Join(repoPath, target)
+		}
+	}
+	return dotGitPath
+}
+
+// ConflictOperation is a DETECTOR ONLY, matching the real agent's
+// detectConflictOperation exactly
+// (agent/src/relay/git-handler-status-ops.ts:38-57,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:136): presence of MERGE_HEAD /
+// rebase-merge|rebase-apply / CHERRY_PICK_HEAD inside the resolved .git dir
+// determines the in-progress operation. See GitExecutor.ConflictOperation's
+// doc comment for why this takes no path/operation params, unlike
+// TASK-207's original sketch (see ResolveConflict for that op).
+func (e *Executor) ConflictOperation(ctx context.Context, repoPath string) (string, error) {
+	gitDir := resolveGitDir(repoPath)
+	if _, err := os.Stat(filepath.Join(gitDir, "MERGE_HEAD")); err == nil {
+		return "merge", nil
+	}
+	if _, err := os.Stat(filepath.Join(gitDir, "rebase-merge")); err == nil {
+		return "rebase", nil
+	}
+	if _, err := os.Stat(filepath.Join(gitDir, "rebase-apply")); err == nil {
+		return "rebase", nil
+	}
+	if _, err := os.Stat(filepath.Join(gitDir, "CHERRY_PICK_HEAD")); err == nil {
+		return "cherry-pick", nil
+	}
+	return "unknown", nil
+}
+
+// ResolveConflict resolves one conflicted path: "ours"/"theirs" runs
+// `git checkout --ours|--theirs -- <path>` then re-stages it (the checkout
+// alone only updates the worktree copy); "markResolved" just stages the
+// path as-is (the caller already edited it by hand). No real agent RPC
+// backs this over relay — see ResolveConflictRequest's proto doc comment;
+// this local implementation is the only one that does real work.
+func (e *Executor) ResolveConflict(ctx context.Context, repoPath, path, operation string) (domain.SimpleResult, error) {
+	switch operation {
+	case "ours":
+		if _, err := e.run(ctx, repoPath, "checkout", "--ours", "--", path); err != nil {
+			return domain.SimpleResult{}, err
+		}
+	case "theirs":
+		if _, err := e.run(ctx, repoPath, "checkout", "--theirs", "--", path); err != nil {
+			return domain.SimpleResult{}, err
+		}
+	case "markResolved":
+		// no worktree change — the caller already resolved the content.
+	default:
+		return domain.SimpleResult{}, fmt.Errorf("localgit: unknown conflict operation %q", operation)
+	}
+	if _, err := e.run(ctx, repoPath, "add", "--", path); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// Discard restores a tracked path (`git checkout -- <path>`) or removes an
+// untracked one (`git clean -f -- <path>`), mirroring TS git.discard's
+// untracked-file handling. Which case applies is determined by asking `git
+// status --porcelain` for that single path first.
+func (e *Executor) Discard(ctx context.Context, repoPath, path string) (domain.SimpleResult, error) {
+	out, err := e.run(ctx, repoPath, "status", "--porcelain=v1", "--", path)
+	if err != nil {
+		return domain.SimpleResult{}, err
+	}
+	if strings.HasPrefix(strings.TrimSpace(out), "??") {
+		if _, err := e.run(ctx, repoPath, "clean", "-f", "--", path); err != nil {
+			return domain.SimpleResult{}, err
+		}
+		return domain.SimpleResult{Success: true}, nil
+	}
+	if _, err := e.run(ctx, repoPath, "checkout", "--", path); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// BulkDiscard calls Discard per path, collecting failures rather than
+// stopping at the first one — see BulkDiscardResult's doc comment.
+func (e *Executor) BulkDiscard(ctx context.Context, repoPath string, paths []string) (domain.BulkDiscardResult, error) {
+	var failed []string
+	for _, p := range paths {
+		if _, err := e.Discard(ctx, repoPath, p); err != nil {
+			failed = append(failed, p)
+		}
+	}
+	return domain.BulkDiscardResult{Success: len(failed) == 0, FailedPaths: failed}, nil
+}
+
+// parseAheadBehind parses %(upstream:track)'s "[ahead N, behind M]" (or
+// "[ahead N]" / "[behind M]" / "") format.
+func parseAheadBehind(track string) (ahead, behind int) {
+	track = strings.Trim(track, "[]")
+	for _, part := range strings.Split(track, ",") {
+		part = strings.TrimSpace(part)
+		var n int
+		if _, err := fmt.Sscanf(part, "ahead %d", &n); err == nil {
+			ahead = n
+		}
+		if _, err := fmt.Sscanf(part, "behind %d", &n); err == nil {
+			behind = n
+		}
+	}
+	return ahead, behind
+}
+
 // parsePorcelainStatus parses `git status --porcelain=v1 -b` output. The
 // first line is "## <branch>[...tracking info]"; subsequent lines are two
 // status-code characters (index, worktree), a space, and the path.

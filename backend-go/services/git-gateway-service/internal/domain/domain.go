@@ -28,6 +28,18 @@ import "errors"
 // error) and usecase (which checks it) can import domain safely.
 var ErrForceDeleteBranchUnsupported = errors.New("git-gateway-service: relay target does not support force-delete-branch")
 
+// ErrConflictResolveUnsupportedOverRelay is returned when ResolveConflict is
+// called against a relay-connected (SSH) worktree — the real agent's
+// git.exec whitelist for Part B (the surface RelayExecutor's SSH-relay
+// calls reach) explicitly excludes both `checkout` and `add`
+// (specs/agent/api/agent-rpc-catalog-git-fs.md:203-227's "Not allowed at
+// all" list), so there is no whitelisted way to compose ours/theirs/
+// markResolved remotely. Same operational-fallback shape as
+// ErrForceDeleteBranchUnsupported above — lives in domain so both
+// grpcclient (which returns it) and usecase (which checks it via
+// errors.Is) can import it without an import cycle.
+var ErrConflictResolveUnsupportedOverRelay = errors.New("git-gateway-service: relay target does not support per-file conflict resolution")
+
 // FileState enumerates the file-status values git-gateway-service's wire
 // protocol carries (mirrors the generated proto's FileStatus.state string
 // per gitgateway.proto's comment: "modified/added/deleted/untracked/conflicted").
@@ -179,4 +191,60 @@ type WorktreeRecord struct {
 type ResolvedBase struct {
 	Branch string
 	SHA    string
+}
+
+// ── Group A — branch/ref operations (TASK-207) ─────────────────────────────
+
+// BranchInfo is one local branch's tracking state, returned by
+// ListLocalBranches. Mirrors gitgateway.proto's BranchInfo message 1:1 —
+// see that message's doc comment for why this is richer than the real
+// agent's own git.localBranches response.
+type BranchInfo struct {
+	Name      string
+	Upstream  string
+	Ahead     int
+	Behind    int
+	IsCurrent bool
+	IsRemote  bool
+}
+
+// CheckoutResult reflects a Checkout operation's outcome.
+type CheckoutResult struct {
+	Success bool
+	Branch  string
+}
+
+// PushTargetInput mirrors the real agent's GitPushTarget wire shape
+// (agent/src/shared/types.ts:551-557) — see gitgateway.proto's
+// PushTargetInput message doc comment for the full citation. Shared by
+// FastForward today; the same shape is the open redesign Push/Pull/Fetch
+// still need (see grpcclient.RelayExecutor's Push/Pull "KNOWN LIMITATION"
+// comments) but this task only wires it into FastForward.
+type PushTargetInput struct {
+	RemoteName    string
+	BranchName    string
+	RemoteURL     string
+	RemoteCreated bool
+}
+
+// FastForwardResult reflects whether a FastForward operation succeeded.
+type FastForwardResult struct {
+	Success bool
+}
+
+// RebaseResult reflects whether a RebaseFromBase operation succeeded, and
+// whether it left the worktree with unresolved conflicts — mirrors
+// PullResult's Success/HadConflicts shape for the same reason (a conflict
+// is a real domain outcome, not a Go error).
+type RebaseResult struct {
+	Success      bool
+	HadConflicts bool
+}
+
+// BulkDiscardResult reports partial failure across a multi-path discard —
+// see BulkDiscardRequest's proto doc comment for why this isn't
+// all-or-nothing.
+type BulkDiscardResult struct {
+	Success     bool
+	FailedPaths []string
 }

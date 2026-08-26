@@ -369,3 +369,445 @@ func TestRemoteFileURL_Bitbucket(t *testing.T) {
 		t.Errorf("expected %q, got %q", want, got)
 	}
 }
+
+// ── Group A — branch/ref operations (TASK-207) ─────────────────────────────
+
+// runGit runs `git <args...>` in dir, failing the test on error — shared
+// setup helper for the tests below (initRepo's own inline `run` closure
+// stays local to that function; this is the equivalent for the tests that
+// follow).
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, out)
+	}
+	return string(out)
+}
+
+func TestCheckout_SwitchesToExistingBranch(t *testing.T) {
+	dir := initRepo(t)
+	runGit(t, dir, "branch", "feature")
+	e := New()
+
+	result, err := e.Checkout(context.Background(), dir, "feature")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success || result.Branch != "feature" {
+		t.Errorf("unexpected checkout result: %+v", result)
+	}
+}
+
+func TestCheckout_NonexistentBranch_ReturnsError(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	if _, err := e.Checkout(context.Background(), dir, "does-not-exist"); err == nil {
+		t.Fatal("expected error checking out a nonexistent branch")
+	}
+}
+
+func TestListLocalBranches_ListsAllWithCurrentMarked(t *testing.T) {
+	dir := initRepo(t)
+	runGit(t, dir, "branch", "feature")
+	e := New()
+
+	branches, err := e.ListLocalBranches(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	byName := map[string]domain.BranchInfo{}
+	for _, b := range branches {
+		byName[b.Name] = b
+	}
+	if len(branches) != 2 {
+		t.Fatalf("expected 2 branches, got %+v", branches)
+	}
+	if !byName["main"].IsCurrent {
+		t.Errorf("expected main to be marked current, got %+v", byName["main"])
+	}
+	if byName["feature"].IsCurrent {
+		t.Errorf("expected feature NOT to be marked current, got %+v", byName["feature"])
+	}
+}
+
+func TestFastForward_NilPushTarget_UsesConfiguredUpstream(t *testing.T) {
+	remoteDir := initRepo(t)
+	e := New()
+
+	cloneDir := t.TempDir()
+	if out, err := exec.Command("git", "clone", remoteDir, cloneDir).CombinedOutput(); err != nil {
+		t.Fatalf("clone failed: %v\n%s", err, out)
+	}
+
+	if err := os.WriteFile(filepath.Join(remoteDir, "upstream.txt"), []byte("upstream\n"), 0o644); err != nil {
+		t.Fatalf("writing file in remote: %v", err)
+	}
+	if _, err := e.Commit(context.Background(), remoteDir, "upstream commit", nil); err != nil {
+		t.Fatalf("committing in remote: %v", err)
+	}
+
+	result, err := e.FastForward(context.Background(), cloneDir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected a successful fast-forward, got %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(cloneDir, "upstream.txt")); err != nil {
+		t.Errorf("expected upstream.txt to exist after fast-forward: %v", err)
+	}
+}
+
+func TestFastForward_ExplicitPushTarget(t *testing.T) {
+	remoteDir := initRepo(t)
+	e := New()
+
+	cloneDir := t.TempDir()
+	if out, err := exec.Command("git", "clone", remoteDir, cloneDir).CombinedOutput(); err != nil {
+		t.Fatalf("clone failed: %v\n%s", err, out)
+	}
+
+	if err := os.WriteFile(filepath.Join(remoteDir, "upstream2.txt"), []byte("upstream2\n"), 0o644); err != nil {
+		t.Fatalf("writing file in remote: %v", err)
+	}
+	if _, err := e.Commit(context.Background(), remoteDir, "second upstream commit", nil); err != nil {
+		t.Fatalf("committing in remote: %v", err)
+	}
+
+	result, err := e.FastForward(context.Background(), cloneDir, &domain.PushTargetInput{RemoteName: "origin", BranchName: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected a successful fast-forward, got %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(cloneDir, "upstream2.txt")); err != nil {
+		t.Errorf("expected upstream2.txt to exist after fast-forward: %v", err)
+	}
+}
+
+// createDivergentBranches sets up a repo with "main" and "feature" branches
+// that each add a distinct file — a clean rebase (no conflict) scenario.
+func createDivergentBranches(t *testing.T) string {
+	t.Helper()
+	dir := initRepo(t)
+	runGit(t, dir, "checkout", "-b", "feature")
+	if err := os.WriteFile(filepath.Join(dir, "feature.txt"), []byte("feature\n"), 0o644); err != nil {
+		t.Fatalf("writing feature.txt: %v", err)
+	}
+	runGit(t, dir, "add", "feature.txt")
+	runGit(t, dir, "commit", "-m", "add feature.txt")
+	runGit(t, dir, "checkout", "main")
+	if err := os.WriteFile(filepath.Join(dir, "main.txt"), []byte("main\n"), 0o644); err != nil {
+		t.Fatalf("writing main.txt: %v", err)
+	}
+	runGit(t, dir, "add", "main.txt")
+	runGit(t, dir, "commit", "-m", "add main.txt")
+	runGit(t, dir, "checkout", "feature")
+	return dir
+}
+
+func TestRebaseFromBase_CleanRebase_Succeeds(t *testing.T) {
+	dir := createDivergentBranches(t)
+	e := New()
+
+	result, err := e.RebaseFromBase(context.Background(), dir, "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success || result.HadConflicts {
+		t.Errorf("expected a clean rebase, got %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "main.txt")); err != nil {
+		t.Errorf("expected main.txt to be present after rebase: %v", err)
+	}
+}
+
+// createConflictingBranches sets up a repo with "main" and "feature"
+// branches that both modify README.md, on "feature" currently checked out —
+// rebasing/merging one into the other conflicts.
+func createConflictingBranches(t *testing.T) string {
+	t.Helper()
+	dir := initRepo(t)
+	runGit(t, dir, "checkout", "-b", "feature")
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("feature change\n"), 0o644); err != nil {
+		t.Fatalf("writing README.md: %v", err)
+	}
+	runGit(t, dir, "add", "README.md")
+	runGit(t, dir, "commit", "-m", "feature change")
+	runGit(t, dir, "checkout", "main")
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("main change\n"), 0o644); err != nil {
+		t.Fatalf("writing README.md: %v", err)
+	}
+	runGit(t, dir, "add", "README.md")
+	runGit(t, dir, "commit", "-m", "main change")
+	runGit(t, dir, "checkout", "feature")
+	return dir
+}
+
+func TestRebaseFromBase_Conflict_ThenAbortRebase(t *testing.T) {
+	dir := createConflictingBranches(t)
+	e := New()
+
+	result, err := e.RebaseFromBase(context.Background(), dir, "main")
+	if err != nil {
+		t.Fatalf("unexpected error (a conflict is a domain outcome, not a Go error): %v", err)
+	}
+	if result.Success || !result.HadConflicts {
+		t.Errorf("expected a conflicted rebase, got %+v", result)
+	}
+
+	op, err := e.ConflictOperation(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if op != "rebase" {
+		t.Errorf("expected detector to report \"rebase\" mid-conflict, got %q", op)
+	}
+
+	abortResult, err := e.AbortRebase(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !abortResult.Success {
+		t.Errorf("expected a successful abort, got %+v", abortResult)
+	}
+
+	op, err = e.ConflictOperation(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if op != "unknown" {
+		t.Errorf("expected detector to report \"unknown\" after abort, got %q", op)
+	}
+}
+
+func TestConflictOperation_DetectsMergeInProgress_ThenAbortMerge(t *testing.T) {
+	dir := createConflictingBranches(t)
+	runGit(t, dir, "checkout", "main")
+	// Merge (not rebase) conflicts — exits nonzero, which is expected here.
+	cmd := exec.Command("git", "merge", "feature")
+	cmd.Dir = dir
+	_ = cmd.Run() // expected to fail with a conflict; asserted via the detector below
+
+	e := New()
+	op, err := e.ConflictOperation(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if op != "merge" {
+		t.Errorf("expected detector to report \"merge\" mid-conflict, got %q", op)
+	}
+
+	abortResult, err := e.AbortMerge(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !abortResult.Success {
+		t.Errorf("expected a successful abort, got %+v", abortResult)
+	}
+
+	op, err = e.ConflictOperation(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if op != "unknown" {
+		t.Errorf("expected detector to report \"unknown\" after abort, got %q", op)
+	}
+}
+
+func TestConflictOperation_CleanRepo_ReturnsUnknown(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	op, err := e.ConflictOperation(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if op != "unknown" {
+		t.Errorf("expected \"unknown\" for a clean repo, got %q", op)
+	}
+}
+
+func TestResolveConflict_Ours_KeepsCurrentBranchVersion(t *testing.T) {
+	dir := createConflictingBranches(t)
+	runGit(t, dir, "checkout", "main")
+	cmd := exec.Command("git", "merge", "feature")
+	cmd.Dir = dir
+	_ = cmd.Run() // expected to conflict
+
+	e := New()
+	result, err := e.ResolveConflict(context.Background(), dir, "README.md", "ours")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got %+v", result)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatalf("reading README.md: %v", err)
+	}
+	if string(content) != "main change\n" {
+		t.Errorf("expected \"ours\" (main change) to win, got %q", content)
+	}
+	if strings.Contains(runGit(t, dir, "status", "--porcelain"), "UU") {
+		t.Error("expected README.md to no longer be unmerged after resolving")
+	}
+}
+
+func TestResolveConflict_Theirs_KeepsIncomingVersion(t *testing.T) {
+	dir := createConflictingBranches(t)
+	runGit(t, dir, "checkout", "main")
+	cmd := exec.Command("git", "merge", "feature")
+	cmd.Dir = dir
+	_ = cmd.Run() // expected to conflict
+
+	e := New()
+	result, err := e.ResolveConflict(context.Background(), dir, "README.md", "theirs")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got %+v", result)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatalf("reading README.md: %v", err)
+	}
+	if string(content) != "feature change\n" {
+		t.Errorf("expected \"theirs\" (feature change) to win, got %q", content)
+	}
+}
+
+func TestResolveConflict_MarkResolved_StagesWithoutChangingWorktree(t *testing.T) {
+	dir := createConflictingBranches(t)
+	runGit(t, dir, "checkout", "main")
+	cmd := exec.Command("git", "merge", "feature")
+	cmd.Dir = dir
+	_ = cmd.Run() // expected to conflict
+
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("resolved by hand\n"), 0o644); err != nil {
+		t.Fatalf("writing README.md: %v", err)
+	}
+
+	e := New()
+	result, err := e.ResolveConflict(context.Background(), dir, "README.md", "markResolved")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got %+v", result)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatalf("reading README.md: %v", err)
+	}
+	if string(content) != "resolved by hand\n" {
+		t.Errorf("expected the hand-edited content to survive markResolved, got %q", content)
+	}
+	if strings.Contains(runGit(t, dir, "status", "--porcelain"), "UU") {
+		t.Error("expected README.md to no longer be unmerged after markResolved")
+	}
+}
+
+func TestResolveConflict_UnknownOperation_ReturnsError(t *testing.T) {
+	dir := createConflictingBranches(t)
+	runGit(t, dir, "checkout", "main")
+	cmd := exec.Command("git", "merge", "feature")
+	cmd.Dir = dir
+	_ = cmd.Run() // expected to conflict
+
+	e := New()
+	if _, err := e.ResolveConflict(context.Background(), dir, "README.md", "bogus"); err == nil {
+		t.Fatal("expected error for an unknown conflict operation")
+	}
+}
+
+func TestDiscard_TrackedFile_RestoresFromHEAD(t *testing.T) {
+	dir := initRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatalf("modifying README.md: %v", err)
+	}
+	e := New()
+
+	result, err := e.Discard(context.Background(), dir, "README.md")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got %+v", result)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatalf("reading README.md: %v", err)
+	}
+	if string(content) != "hello\n" {
+		t.Errorf("expected README.md to be restored to its committed content, got %q", content)
+	}
+}
+
+func TestDiscard_UntrackedFile_RemovesIt(t *testing.T) {
+	dir := initRepo(t)
+	untrackedPath := filepath.Join(dir, "untracked.txt")
+	if err := os.WriteFile(untrackedPath, []byte("new\n"), 0o644); err != nil {
+		t.Fatalf("writing untracked.txt: %v", err)
+	}
+	e := New()
+
+	result, err := e.Discard(context.Background(), dir, "untracked.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got %+v", result)
+	}
+	if _, err := os.Stat(untrackedPath); !os.IsNotExist(err) {
+		t.Errorf("expected untracked.txt to be removed, stat err = %v", err)
+	}
+}
+
+func TestBulkDiscard_MixedTrackedAndUntracked_AllSucceed(t *testing.T) {
+	dir := initRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatalf("modifying README.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "untracked.txt"), []byte("new\n"), 0o644); err != nil {
+		t.Fatalf("writing untracked.txt: %v", err)
+	}
+	e := New()
+
+	result, err := e.BulkDiscard(context.Background(), dir, []string{"README.md", "untracked.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success || len(result.FailedPaths) != 0 {
+		t.Errorf("expected all paths to succeed, got %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "untracked.txt")); !os.IsNotExist(err) {
+		t.Errorf("expected untracked.txt to be removed, stat err = %v", err)
+	}
+}
+
+func TestBulkDiscard_NonexistentPath_ReportsPartialFailure(t *testing.T) {
+	dir := initRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatalf("modifying README.md: %v", err)
+	}
+	e := New()
+
+	result, err := e.BulkDiscard(context.Background(), dir, []string{"README.md", "does/not/exist.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Errorf("expected partial failure (Success=false), got %+v", result)
+	}
+	if len(result.FailedPaths) != 1 || result.FailedPaths[0] != "does/not/exist.txt" {
+		t.Errorf("expected does/not/exist.txt to be reported as failed, got %+v", result.FailedPaths)
+	}
+}

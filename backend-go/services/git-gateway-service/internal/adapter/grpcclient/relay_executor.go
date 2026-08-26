@@ -354,6 +354,209 @@ func (r *RelayExecutor) ForceDeleteBranch(ctx context.Context, repoPath, branch 
 	return err
 }
 
+// ── Group A — branch/ref operations (TASK-207) ─────────────────────────────
+//
+// Checkout/ListLocalBranches/FastForward/ConflictOperation below were
+// redesigned against the real agent contract
+// (specs/agent/api/agent-rpc-catalog-git-fs.md) rather than implemented as
+// TASK-207's original sketch — see each method's own doc comment for
+// citations. RebaseFromBase/AbortRebase/AbortMerge/Discard/BulkDiscard are
+// the mechanical param-rename-only subset that sketch got right.
+
+// Checkout relays to the real agent's git.checkout exactly: worktreePath +
+// branch only, no create-branch semantics (agent-rpc-catalog-git-fs.md:132,
+// agent/src/relay/git-handler.ts:702-719).
+func (r *RelayExecutor) Checkout(ctx context.Context, repoPath, branch string) (domain.CheckoutResult, error) {
+	var result domain.CheckoutResult
+	err := r.relay(ctx, repoPath, "git.checkout", map[string]any{
+		"worktreePath": repoPath, "branch": branch,
+	}, &result)
+	return result, err
+}
+
+// gitExecResult mirrors the real agent's git.exec response shape
+// (agent-rpc-catalog-git-fs.md:180: "{stdout,stderr}") — used by
+// ListLocalBranches below to compose a richer branch listing than the real
+// agent's own git.localBranches RPC provides.
+type gitExecResult struct {
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+}
+
+// ListLocalBranches composes a richer per-branch listing (upstream/ahead/
+// behind, not just names) than the real agent's own git.localBranches RPC
+// returns ({current, branches[]} — names only, agent-rpc-catalog-git-fs.md:133,
+// agent/src/relay/git-handler.ts:721-744). It does this via git.exec's
+// for-each-ref subcommand instead: confirmed whitelisted with no extra
+// restriction on Part B's exec whitelist
+// (agent-rpc-catalog-git-fs.md:203-206) — the whitelist RelayExecutor's
+// SSH-relay calls actually reach (Part B, not Part A's separate, broader
+// git.exec surface). Same --format string as localgit.Executor's
+// ListLocalBranches for parser parity between the two implementations.
+func (r *RelayExecutor) ListLocalBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error) {
+	var result gitExecResult
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
+		"args": []string{
+			"for-each-ref", "--format=%(refname:short)\t%(upstream:short)\t%(upstream:track)\t%(HEAD)",
+			"refs/heads/",
+		},
+		"cwd": repoPath,
+	}, &result)
+	if err != nil {
+		return nil, err
+	}
+	return parseForEachRefBranches(result.Stdout), nil
+}
+
+// parseForEachRefBranches parses ListLocalBranches' for-each-ref --format
+// output — same field layout as localgit.Executor.ListLocalBranches, kept
+// as a separate copy in this package (not shared) since the two
+// implementations sit in different packages and this parsing is small.
+func parseForEachRefBranches(out string) []domain.BranchInfo {
+	var branches []domain.BranchInfo
+	// Split raw output (not TrimSpace(out)) before trimming each line — see
+	// localgit.Executor.ListLocalBranches' identical comment: TrimSpace on
+	// the whole blob would eat a legitimate trailing empty %(HEAD) field
+	// whenever the alphabetically-last ref isn't the current branch.
+	for _, rawLine := range strings.Split(out, "\n") {
+		line := strings.TrimRight(rawLine, "\r")
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 4 {
+			continue
+		}
+		ahead, behind := parseAheadBehindTrack(fields[2])
+		branches = append(branches, domain.BranchInfo{
+			Name:      fields[0],
+			Upstream:  fields[1],
+			Ahead:     ahead,
+			Behind:    behind,
+			IsCurrent: fields[3] == "*",
+		})
+	}
+	return branches
+}
+
+// parseAheadBehindTrack parses %(upstream:track)'s "[ahead N, behind M]"
+// (or "[ahead N]" / "[behind M]" / "") format.
+func parseAheadBehindTrack(track string) (ahead, behind int) {
+	track = strings.Trim(track, "[]")
+	for _, part := range strings.Split(track, ",") {
+		part = strings.TrimSpace(part)
+		var n int
+		if _, err := fmt.Sscanf(part, "ahead %d", &n); err == nil {
+			ahead = n
+		}
+		if _, err := fmt.Sscanf(part, "behind %d", &n); err == nil {
+			behind = n
+		}
+	}
+	return ahead, behind
+}
+
+// pushTargetParam converts an optional domain.PushTargetInput to the wire
+// map the real agent's GitPushTarget shape expects
+// (agent/src/shared/types.ts:551-557) — nil means omit the field entirely,
+// matching resolveRelayPushTarget's undefined-pushTarget branch
+// (agent/src/relay/git-handler-push-target.ts:164-166).
+func pushTargetParam(pushTarget *domain.PushTargetInput) any {
+	if pushTarget == nil {
+		return nil
+	}
+	m := map[string]any{
+		"remoteName": pushTarget.RemoteName,
+		"branchName": pushTarget.BranchName,
+	}
+	if pushTarget.RemoteURL != "" {
+		m["remoteUrl"] = pushTarget.RemoteURL
+	}
+	if pushTarget.RemoteCreated {
+		m["remoteCreated"] = pushTarget.RemoteCreated
+	}
+	return m
+}
+
+// FastForward relays to the real agent's git.fastForward
+// (`pullWithArgs(['--ff-only'])`, agent-rpc-catalog-git-fs.md:160,
+// agent/src/relay/git-handler.ts:1190-1192), which takes the same optional
+// structured pushTarget as push/pull/fetch (SOL-032 §0 open question #1) —
+// not TASK-207's original plain branch-string sketch. pushTarget == nil
+// omits the field so the agent resolves the worktree's configured push
+// target itself.
+func (r *RelayExecutor) FastForward(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.FastForwardResult, error) {
+	var result domain.FastForwardResult
+	params := map[string]any{"worktreePath": repoPath}
+	if pt := pushTargetParam(pushTarget); pt != nil {
+		params["pushTarget"] = pt
+	}
+	err := r.relay(ctx, repoPath, "git.fastForward", params, &result)
+	return result, err
+}
+
+func (r *RelayExecutor) RebaseFromBase(ctx context.Context, repoPath, baseRef string) (domain.RebaseResult, error) {
+	var result domain.RebaseResult
+	err := r.relay(ctx, repoPath, "git.rebaseFromBase", map[string]any{
+		"worktreePath": repoPath, "baseRef": baseRef,
+	}, &result)
+	return result, err
+}
+
+func (r *RelayExecutor) AbortRebase(ctx context.Context, repoPath string) (domain.SimpleResult, error) {
+	var result domain.SimpleResult
+	err := r.relay(ctx, repoPath, "git.abortRebase", map[string]any{"worktreePath": repoPath}, &result)
+	return result, err
+}
+
+func (r *RelayExecutor) AbortMerge(ctx context.Context, repoPath string) (domain.SimpleResult, error) {
+	var result domain.SimpleResult
+	err := r.relay(ctx, repoPath, "git.abortMerge", map[string]any{"worktreePath": repoPath}, &result)
+	return result, err
+}
+
+// ConflictOperation relays to the real agent's git.conflictOperation
+// exactly: worktreePath only, response is the bare operation string
+// ("merge"/"rebase"/"cherry-pick"/"unknown" —
+// agent-rpc-catalog-git-fs.md:136, agent/src/relay/git-handler.ts:886-889).
+// See ResolveConflict below for the per-file resolve op TASK-207's
+// original sketch conflated with this one.
+func (r *RelayExecutor) ConflictOperation(ctx context.Context, repoPath string) (string, error) {
+	var result string
+	err := r.relay(ctx, repoPath, "git.conflictOperation", map[string]any{"worktreePath": repoPath}, &result)
+	return result, err
+}
+
+// ResolveConflict has no real agent RPC to relay to: Part B's git.exec
+// whitelist — the whitelist this relay-connected (SSH) path actually
+// reaches — explicitly excludes both `checkout` and `add`
+// (agent-rpc-catalog-git-fs.md:203-227's "Not allowed at all" list), so
+// there is no whitelisted way to compose ours/theirs/markResolved
+// remotely. Returns domain.ErrConflictResolveUnsupportedOverRelay directly
+// (no RPC round-trip attempted — this is a known, static limitation, not a
+// runtime failure to probe for) — same operational-fallback shape as
+// ForceDeleteBranch's domain.ErrForceDeleteBranchUnsupported. Only
+// localgit.Executor.ResolveConflict does real work.
+func (r *RelayExecutor) ResolveConflict(ctx context.Context, repoPath, path, operation string) (domain.SimpleResult, error) {
+	return domain.SimpleResult{}, domain.ErrConflictResolveUnsupportedOverRelay
+}
+
+func (r *RelayExecutor) Discard(ctx context.Context, repoPath, filePath string) (domain.SimpleResult, error) {
+	var result domain.SimpleResult
+	err := r.relay(ctx, repoPath, "git.discard", map[string]any{
+		"worktreePath": repoPath, "filePath": filePath,
+	}, &result)
+	return result, err
+}
+
+func (r *RelayExecutor) BulkDiscard(ctx context.Context, repoPath string, filePaths []string) (domain.BulkDiscardResult, error) {
+	var result domain.BulkDiscardResult
+	err := r.relay(ctx, repoPath, "git.bulkDiscard", map[string]any{
+		"worktreePath": repoPath, "filePaths": filePaths,
+	}, &result)
+	return result, err
+}
+
 // isMethodNotFoundError is a placeholder heuristic for detecting an
 // agent's "unknown method" response through the Relay RPC's error path —
 // FLAGGED: confirm the real error shape RelayResponse/infra-fleet-service's

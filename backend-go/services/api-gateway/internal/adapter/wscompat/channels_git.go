@@ -1,5 +1,5 @@
 // New wscompat channel registrations for the git-gateway-service RPCs added
-// by TASK-206/TASK-208/TASK-209(shippable subset)/TASK-210(shippable
+// by TASK-206/TASK-207/TASK-208/TASK-209(shippable subset)/TASK-210(shippable
 // subset)/TASK-211/TASK-049..060. Kept in its own file rather than
 // channels.go: other agents are wiring other namespaces in parallel in
 // their own worktrees and will also want to add registrations to
@@ -31,13 +31,18 @@ import (
 )
 
 // registerGitDeepChannels wires every git.* channel this scope's tasks
-// (TASK-206/208/209-shippable/210-shippable/211/212-Group-B/213-shippable)
-// back with a real git-gateway-service RPC. Channels for RPCs this scope
-// deliberately did NOT implement (TASK-207's branch/ref group;
+// (TASK-206/207/208/209-shippable/210-shippable/211/212/213-shippable) back
+// with a real git-gateway-service RPC. TASK-207's Group A (branch/ref
+// operations) is now implemented and wired below — 4 of its 9 original
+// methods (checkout/localBranches/fastForward/conflictOperation) use a
+// redesigned request/response shape against the real agent contract rather
+// than TASK-212's own stale pre-correction sketch; see TASK-207's own doc
+// comments for citations, and this section's inline notes for exactly how
+// each channel's args differ from that stale sketch.
 // commitCompare/branchCompare/commitDiff/branchDiff/submoduleStatus/fetch —
-// all flagged BLOCKED in their own task files) are NOT registered here —
-// they keep falling through to notImplementedHandler until a future pass
-// resolves their open design questions (see SOL-032 §0).
+// all flagged BLOCKED in their own task files — are still NOT registered
+// here; they keep falling through to notImplementedHandler until a future
+// pass resolves their open design questions (see SOL-032 §0).
 func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceClient) {
 	// ── TASK-206: commit/push/pull/generateCommitMessage ────────────────
 
@@ -132,11 +137,198 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		return resp, nil
 	})
 
-	// ── TASK-208/TASK-212 (Group B only — Group A/TASK-207 was
-	// deliberately not implemented in this scope, see this repo's
-	// git-gateway-service TASK-207 file's own Status line). git.stage/
-	// git.bulkStage share one handler (both call the same
-	// StageRequest.Paths-typed RPC); same for unstage. ──────────────────
+	// ── TASK-207/TASK-212 (Group A — branch/ref operations). checkout/
+	// localBranches/fastForward/conflictOperation's args below use
+	// TASK-207's redesigned shape, NOT TASK-212's own stale pre-correction
+	// sketch (dropped `create`, renamed `ref`->`branch` for checkout;
+	// structured `pushTarget` instead of a bare `branch` string for
+	// fastForward; `conflictOperation` is worktree-only now — a DETECTOR,
+	// see the new `git.resolveConflict` channel below for the per-file
+	// resolve op TASK-212's sketch conflated with it). rebaseFromBase/
+	// abortRebase/abortMerge/discard/bulkDiscard match TASK-212's sketch
+	// exactly (mechanical param rename only). ──────────────────────────
+
+	r.Register("git.checkout", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type checkoutArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			Branch     string `json:"branch"`
+		}
+		in, err := decodeArg[checkoutArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.Checkout(ctx, &gitgatewayv1.CheckoutRequest{WorktreeId: in.WorktreeID, Branch: in.Branch})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.localBranches", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type localBranchesArgs struct {
+			WorktreeID string `json:"worktreeId"`
+		}
+		in, err := decodeArg[localBranchesArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.ListLocalBranches(ctx, &gitgatewayv1.ListLocalBranchesRequest{WorktreeId: in.WorktreeID})
+		if err != nil {
+			return nil, err
+		}
+		return resp.GetBranches(), nil
+	})
+
+	r.Register("git.fastForward", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type pushTargetArgs struct {
+			RemoteName    string `json:"remoteName"`
+			BranchName    string `json:"branchName"`
+			RemoteURL     string `json:"remoteUrl"`
+			RemoteCreated bool   `json:"remoteCreated"`
+		}
+		type fastForwardArgs struct {
+			WorktreeID string          `json:"worktreeId"`
+			PushTarget *pushTargetArgs `json:"pushTarget"`
+		}
+		in, err := decodeArg[fastForwardArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		req := &gitgatewayv1.FastForwardRequest{WorktreeId: in.WorktreeID}
+		if in.PushTarget != nil {
+			req.PushTarget = &gitgatewayv1.PushTargetInput{
+				RemoteName: in.PushTarget.RemoteName, BranchName: in.PushTarget.BranchName,
+				RemoteUrl: in.PushTarget.RemoteURL, RemoteCreated: in.PushTarget.RemoteCreated,
+			}
+		}
+		resp, err := client.FastForward(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.rebaseFromBase", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type rebaseArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			BaseBranch string `json:"baseBranch"`
+		}
+		in, err := decodeArg[rebaseArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.RebaseFromBase(ctx, &gitgatewayv1.RebaseFromBaseRequest{WorktreeId: in.WorktreeID, BaseBranch: in.BaseBranch})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.abortRebase", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type abortRebaseArgs struct {
+			WorktreeID string `json:"worktreeId"`
+		}
+		in, err := decodeArg[abortRebaseArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.AbortRebase(ctx, &gitgatewayv1.AbortRebaseRequest{WorktreeId: in.WorktreeID})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.abortMerge", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type abortMergeArgs struct {
+			WorktreeID string `json:"worktreeId"`
+		}
+		in, err := decodeArg[abortMergeArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.AbortMerge(ctx, &gitgatewayv1.AbortMergeRequest{WorktreeId: in.WorktreeID})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// git.conflictOperation is a DETECTOR ONLY (worktreeId -> operation
+	// string) — matches the real agent exactly, see TASK-207's Contract
+	// correction section. git.resolveConflict below is a new channel (not
+	// part of the original frontend catalog) for the per-file ours/theirs/
+	// markResolved op TASK-212's stale sketch conflated with this one; no
+	// confirmed live caller was found in today's frontend for that op.
+	r.Register("git.conflictOperation", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type conflictOpArgs struct {
+			WorktreeID string `json:"worktreeId"`
+		}
+		in, err := decodeArg[conflictOpArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.ConflictOperation(ctx, &gitgatewayv1.ConflictOperationRequest{WorktreeId: in.WorktreeID})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.resolveConflict", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type resolveConflictArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			Path       string `json:"path"`
+			Operation  string `json:"operation"`
+		}
+		in, err := decodeArg[resolveConflictArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.ResolveConflict(ctx, &gitgatewayv1.ResolveConflictRequest{
+			WorktreeId: in.WorktreeID, Path: in.Path, Operation: in.Operation,
+		})
+		if err != nil {
+			return nil, err // FAILED_PRECONDITION over relay surfaces as-is (domain.ErrConflictResolveUnsupportedOverRelay)
+		}
+		return resp, nil
+	})
+
+	r.Register("git.discard", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type discardArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			Path       string `json:"path"`
+		}
+		in, err := decodeArg[discardArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.Discard(ctx, &gitgatewayv1.DiscardRequest{WorktreeId: in.WorktreeID, Path: in.Path})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.bulkDiscard", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type bulkDiscardArgs struct {
+			WorktreeID string   `json:"worktreeId"`
+			Paths      []string `json:"paths"`
+		}
+		in, err := decodeArg[bulkDiscardArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.BulkDiscard(ctx, &gitgatewayv1.BulkDiscardRequest{WorktreeId: in.WorktreeID, Paths: in.Paths})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// ── TASK-208/TASK-212 (Group B — staging). git.stage/git.bulkStage
+	// share one handler (both call the same StageRequest.Paths-typed RPC);
+	// same for unstage. ──────────────────────────────────────────────
 
 	stageHandler := func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type stageArgs struct {

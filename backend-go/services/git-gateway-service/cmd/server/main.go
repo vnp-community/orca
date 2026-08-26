@@ -184,6 +184,20 @@ func run() error {
 	resolvePrBaseUC := usecase.NewResolvePrBase(scmClient, resolver, projectClient, local, relay)
 	resolveMrBaseUC := usecase.NewResolveMrBase(scmClient, resolver, projectClient, local, relay)
 
+	// Group A — branch/ref operations (TASK-207). Checkout/ListLocalBranches/
+	// FastForward/ConflictOperation's shapes were redesigned against the real
+	// agent contract; see their usecase/proto doc comments for citations.
+	checkoutUC := usecase.NewCheckout(resolver, local, relay)
+	listLocalBranchesUC := usecase.NewListLocalBranches(resolver, local, relay)
+	fastForwardUC := usecase.NewFastForward(resolver, local, relay)
+	rebaseFromBaseUC := usecase.NewRebaseFromBase(resolver, local, relay)
+	abortRebaseUC := usecase.NewAbortRebase(resolver, local, relay)
+	abortMergeUC := usecase.NewAbortMerge(resolver, local, relay)
+	conflictOperationUC := usecase.NewConflictOperation(resolver, local, relay)
+	resolveConflictUC := usecase.NewResolveConflict(resolver, local, relay)
+	discardUC := usecase.NewDiscard(resolver, local, relay)
+	bulkDiscardUC := usecase.NewBulkDiscard(resolver, local, relay)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
 		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
@@ -198,6 +212,9 @@ func run() error {
 		readIssueCommandUC, writeIssueCommandUC, scanSetupScriptImportsUC,
 		createWorktreeUC, removeWorktreeUC, forceDeleteBranchUC, detectWorktreesUC,
 		prefetchCreateBaseUC, resolvePrBaseUC, resolveMrBaseUC,
+		checkoutUC, listLocalBranchesUC, fastForwardUC, rebaseFromBaseUC,
+		abortRebaseUC, abortMergeUC, conflictOperationUC, resolveConflictUC,
+		discardUC, bulkDiscardUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
