@@ -35,12 +35,13 @@ func (r *callRecorder) snapshot() []string {
 
 // fakeMetadataRepo is an in-memory CredentialMetadataRepository.
 type fakeMetadataRepo struct {
-	recorder    *callRecorder
-	rows        map[string]domain.CredentialMetadata
-	createErr   error
-	getErr      error
-	updateErr   error
-	getByOwnErr error
+	recorder          *callRecorder
+	rows              map[string]domain.CredentialMetadata
+	createErr         error
+	getErr            error
+	updateErr         error
+	getByOwnErr       error
+	listByCategoryErr error
 }
 
 func newFakeMetadataRepo(r *callRecorder) *fakeMetadataRepo {
@@ -82,6 +83,20 @@ func (f *fakeMetadataRepo) GetByOwner(ctx context.Context, tenantID string, cate
 		}
 	}
 	return domain.CredentialMetadata{}, domain.ErrCredentialNotFound
+}
+
+func (f *fakeMetadataRepo) ListByCategory(ctx context.Context, tenantID string, category domain.Category) ([]domain.CredentialMetadata, error) {
+	f.recorder.record("metadata.ListByCategory")
+	if f.listByCategoryErr != nil {
+		return nil, f.listByCategoryErr
+	}
+	var out []domain.CredentialMetadata
+	for _, m := range f.rows {
+		if m.TenantID == tenantID && m.Category == category && m.Status != domain.StatusRevoked {
+			out = append(out, m)
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeMetadataRepo) UpdateStatus(ctx context.Context, id string, status domain.Status, now time.Time) error {

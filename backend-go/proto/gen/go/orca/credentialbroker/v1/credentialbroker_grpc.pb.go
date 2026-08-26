@@ -19,14 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CredentialBrokerService_WriteCredential_FullMethodName          = "/orca.credentialbroker.v1.CredentialBrokerService/WriteCredential"
-	CredentialBrokerService_ResolveCredential_FullMethodName        = "/orca.credentialbroker.v1.CredentialBrokerService/ResolveCredential"
-	CredentialBrokerService_RotateCredential_FullMethodName         = "/orca.credentialbroker.v1.CredentialBrokerService/RotateCredential"
-	CredentialBrokerService_RevokeCredential_FullMethodName         = "/orca.credentialbroker.v1.CredentialBrokerService/RevokeCredential"
-	CredentialBrokerService_GetCredentialMetadata_FullMethodName    = "/orca.credentialbroker.v1.CredentialBrokerService/GetCredentialMetadata"
-	CredentialBrokerService_ResolveCredentialByOwner_FullMethodName = "/orca.credentialbroker.v1.CredentialBrokerService/ResolveCredentialByOwner"
-	CredentialBrokerService_RevokeCredentialByOwner_FullMethodName  = "/orca.credentialbroker.v1.CredentialBrokerService/RevokeCredentialByOwner"
-	CredentialBrokerService_SignVapidPayload_FullMethodName         = "/orca.credentialbroker.v1.CredentialBrokerService/SignVapidPayload"
+	CredentialBrokerService_WriteCredential_FullMethodName              = "/orca.credentialbroker.v1.CredentialBrokerService/WriteCredential"
+	CredentialBrokerService_ResolveCredential_FullMethodName            = "/orca.credentialbroker.v1.CredentialBrokerService/ResolveCredential"
+	CredentialBrokerService_RotateCredential_FullMethodName             = "/orca.credentialbroker.v1.CredentialBrokerService/RotateCredential"
+	CredentialBrokerService_RevokeCredential_FullMethodName             = "/orca.credentialbroker.v1.CredentialBrokerService/RevokeCredential"
+	CredentialBrokerService_GetCredentialMetadata_FullMethodName        = "/orca.credentialbroker.v1.CredentialBrokerService/GetCredentialMetadata"
+	CredentialBrokerService_ResolveCredentialByOwner_FullMethodName     = "/orca.credentialbroker.v1.CredentialBrokerService/ResolveCredentialByOwner"
+	CredentialBrokerService_RevokeCredentialByOwner_FullMethodName      = "/orca.credentialbroker.v1.CredentialBrokerService/RevokeCredentialByOwner"
+	CredentialBrokerService_SignVapidPayload_FullMethodName             = "/orca.credentialbroker.v1.CredentialBrokerService/SignVapidPayload"
+	CredentialBrokerService_GetCredentialMetadataByOwner_FullMethodName = "/orca.credentialbroker.v1.CredentialBrokerService/GetCredentialMetadataByOwner"
+	CredentialBrokerService_ListCredentialsByCategory_FullMethodName    = "/orca.credentialbroker.v1.CredentialBrokerService/ListCredentialsByCategory"
 )
 
 // CredentialBrokerServiceClient is the client API for CredentialBrokerService service.
@@ -87,6 +89,15 @@ type CredentialBrokerServiceClient interface {
 	// updated "credential-broker-service's role" section for why this is
 	// documented as the fix, not an accepted deviation.
 	SignVapidPayload(ctx context.Context, in *SignVapidPayloadRequest, opts ...grpc.CallOption) (*SignVapidPayloadResponse, error)
+	// GetCredentialMetadataByOwner is GetCredentialMetadata's lookup-by-owner
+	// counterpart — for callers that know (tenant_id, category, owner_id) but
+	// were never handed an opaque credential_id, mirroring
+	// ResolveCredentialByOwner's existing by-owner convention but for a
+	// metadata-only read instead of a plaintext resolve.
+	GetCredentialMetadataByOwner(ctx context.Context, in *GetCredentialMetadataByOwnerRequest, opts ...grpc.CallOption) (*GetCredentialMetadataByOwnerResponse, error)
+	// ListCredentialsByCategory answers "which owner_ids have a credential in
+	// this category for this tenant" — backs credentials.list.
+	ListCredentialsByCategory(ctx context.Context, in *ListCredentialsByCategoryRequest, opts ...grpc.CallOption) (*ListCredentialsByCategoryResponse, error)
 }
 
 type credentialBrokerServiceClient struct {
@@ -177,6 +188,26 @@ func (c *credentialBrokerServiceClient) SignVapidPayload(ctx context.Context, in
 	return out, nil
 }
 
+func (c *credentialBrokerServiceClient) GetCredentialMetadataByOwner(ctx context.Context, in *GetCredentialMetadataByOwnerRequest, opts ...grpc.CallOption) (*GetCredentialMetadataByOwnerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCredentialMetadataByOwnerResponse)
+	err := c.cc.Invoke(ctx, CredentialBrokerService_GetCredentialMetadataByOwner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *credentialBrokerServiceClient) ListCredentialsByCategory(ctx context.Context, in *ListCredentialsByCategoryRequest, opts ...grpc.CallOption) (*ListCredentialsByCategoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCredentialsByCategoryResponse)
+	err := c.cc.Invoke(ctx, CredentialBrokerService_ListCredentialsByCategory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CredentialBrokerServiceServer is the server API for CredentialBrokerService service.
 // All implementations must embed UnimplementedCredentialBrokerServiceServer
 // for forward compatibility.
@@ -235,6 +266,15 @@ type CredentialBrokerServiceServer interface {
 	// updated "credential-broker-service's role" section for why this is
 	// documented as the fix, not an accepted deviation.
 	SignVapidPayload(context.Context, *SignVapidPayloadRequest) (*SignVapidPayloadResponse, error)
+	// GetCredentialMetadataByOwner is GetCredentialMetadata's lookup-by-owner
+	// counterpart — for callers that know (tenant_id, category, owner_id) but
+	// were never handed an opaque credential_id, mirroring
+	// ResolveCredentialByOwner's existing by-owner convention but for a
+	// metadata-only read instead of a plaintext resolve.
+	GetCredentialMetadataByOwner(context.Context, *GetCredentialMetadataByOwnerRequest) (*GetCredentialMetadataByOwnerResponse, error)
+	// ListCredentialsByCategory answers "which owner_ids have a credential in
+	// this category for this tenant" — backs credentials.list.
+	ListCredentialsByCategory(context.Context, *ListCredentialsByCategoryRequest) (*ListCredentialsByCategoryResponse, error)
 	mustEmbedUnimplementedCredentialBrokerServiceServer()
 }
 
@@ -268,6 +308,12 @@ func (UnimplementedCredentialBrokerServiceServer) RevokeCredentialByOwner(contex
 }
 func (UnimplementedCredentialBrokerServiceServer) SignVapidPayload(context.Context, *SignVapidPayloadRequest) (*SignVapidPayloadResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SignVapidPayload not implemented")
+}
+func (UnimplementedCredentialBrokerServiceServer) GetCredentialMetadataByOwner(context.Context, *GetCredentialMetadataByOwnerRequest) (*GetCredentialMetadataByOwnerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCredentialMetadataByOwner not implemented")
+}
+func (UnimplementedCredentialBrokerServiceServer) ListCredentialsByCategory(context.Context, *ListCredentialsByCategoryRequest) (*ListCredentialsByCategoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCredentialsByCategory not implemented")
 }
 func (UnimplementedCredentialBrokerServiceServer) mustEmbedUnimplementedCredentialBrokerServiceServer() {
 }
@@ -435,6 +481,42 @@ func _CredentialBrokerService_SignVapidPayload_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CredentialBrokerService_GetCredentialMetadataByOwner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCredentialMetadataByOwnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CredentialBrokerServiceServer).GetCredentialMetadataByOwner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CredentialBrokerService_GetCredentialMetadataByOwner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CredentialBrokerServiceServer).GetCredentialMetadataByOwner(ctx, req.(*GetCredentialMetadataByOwnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CredentialBrokerService_ListCredentialsByCategory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCredentialsByCategoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CredentialBrokerServiceServer).ListCredentialsByCategory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CredentialBrokerService_ListCredentialsByCategory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CredentialBrokerServiceServer).ListCredentialsByCategory(ctx, req.(*ListCredentialsByCategoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CredentialBrokerService_ServiceDesc is the grpc.ServiceDesc for CredentialBrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -473,6 +555,14 @@ var CredentialBrokerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SignVapidPayload",
 			Handler:    _CredentialBrokerService_SignVapidPayload_Handler,
+		},
+		{
+			MethodName: "GetCredentialMetadataByOwner",
+			Handler:    _CredentialBrokerService_GetCredentialMetadataByOwner_Handler,
+		},
+		{
+			MethodName: "ListCredentialsByCategory",
+			Handler:    _CredentialBrokerService_ListCredentialsByCategory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

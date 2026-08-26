@@ -80,6 +80,17 @@ type ConnectionResolver interface {
 	// WorktreeID) callers like git-gateway-service's RelayExecutor need
 	// alongside devServer — zero-value when connected is false.
 	ResolveConnection(ctx context.Context, tenantID, connectionID string) (connected bool, devServer domain.DevServer, conn domain.Connection, err error)
+
+	// ResolveConnectionByDevServer finds the most recently created
+	// connection row bound to devServerID within tenantID's scope — the
+	// reverse lookup direction from ResolveConnection. Same
+	// connected=false/nil-error "nothing bound yet" convention.
+	ResolveConnectionByDevServer(ctx context.Context, tenantID, devServerID string) (connected bool, devServer domain.DevServer, conn domain.Connection, err error)
+
+	// ResolveConnectionByWorktree finds the connection row currently bound
+	// to worktreeID within tenantID's scope. Same
+	// connected=false/nil-error convention.
+	ResolveConnectionByWorktree(ctx context.Context, tenantID, worktreeID string) (connected bool, devServer domain.DevServer, conn domain.Connection, err error)
 }
 
 // FleetHealthPort is the read port over fleet health samples. The
@@ -88,6 +99,17 @@ type ConnectionResolver interface {
 // this scaffold — see this service's README "Known gaps".
 type FleetHealthPort interface {
 	GetFleetHealth(ctx context.Context, tenantID string) ([]domain.DevServerHealth, error)
+}
+
+// BrowserProfileRepository is the persistence port for browser profile
+// metadata (infra.browser_profiles, TASK-032) — Postgres-only; the 3
+// live-agent profile operations (profileClearDefaultCookies/
+// profileDetectBrowsers/profileImportFromBrowser) do NOT go through this
+// port, they relay via DevServerAgentClient/Relay instead (see TASK-034).
+type BrowserProfileRepository interface {
+	List(ctx context.Context, tenantID, devServerID string) ([]domain.BrowserProfile, error)
+	Create(ctx context.Context, profile domain.BrowserProfile) (domain.BrowserProfile, error)
+	Delete(ctx context.Context, tenantID, id string) error
 }
 
 // DevServerAgentClient is the port to the Dev Server Agent execution plane —

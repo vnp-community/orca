@@ -19,14 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ScmIntegrationService_ListIssues_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/ListIssues"
-	ScmIntegrationService_CreatePullRequest_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
-	ScmIntegrationService_ListPullRequests_FullMethodName   = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
-	ScmIntegrationService_GetRateLimitStatus_FullMethodName = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
-	ScmIntegrationService_GetAuthStatus_FullMethodName      = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
-	ScmIntegrationService_StartOAuthFlow_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/StartOAuthFlow"
-	ScmIntegrationService_CompleteOAuthFlow_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/CompleteOAuthFlow"
-	ScmIntegrationService_RevokeAuth_FullMethodName         = "/orca.scmintegration.v1.ScmIntegrationService/RevokeAuth"
+	ScmIntegrationService_ListIssues_FullMethodName                     = "/orca.scmintegration.v1.ScmIntegrationService/ListIssues"
+	ScmIntegrationService_CreatePullRequest_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
+	ScmIntegrationService_ListPullRequests_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
+	ScmIntegrationService_GetRateLimitStatus_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
+	ScmIntegrationService_GetAuthStatus_FullMethodName                  = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
+	ScmIntegrationService_StartOAuthFlow_FullMethodName                 = "/orca.scmintegration.v1.ScmIntegrationService/StartOAuthFlow"
+	ScmIntegrationService_CompleteOAuthFlow_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/CompleteOAuthFlow"
+	ScmIntegrationService_RevokeAuth_FullMethodName                     = "/orca.scmintegration.v1.ScmIntegrationService/RevokeAuth"
+	ScmIntegrationService_SetIntegrationCredential_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/SetIntegrationCredential"
+	ScmIntegrationService_GetIntegrationCredentialStatus_FullMethodName = "/orca.scmintegration.v1.ScmIntegrationService/GetIntegrationCredentialStatus"
+	ScmIntegrationService_ListIntegrationCredentials_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/ListIntegrationCredentials"
 )
 
 // ScmIntegrationServiceClient is the client API for ScmIntegrationService service.
@@ -52,6 +55,15 @@ type ScmIntegrationServiceClient interface {
 	StartOAuthFlow(ctx context.Context, in *StartOAuthFlowRequest, opts ...grpc.CallOption) (*StartOAuthFlowResponse, error)
 	CompleteOAuthFlow(ctx context.Context, in *CompleteOAuthFlowRequest, opts ...grpc.CallOption) (*CompleteOAuthFlowResponse, error)
 	RevokeAuth(ctx context.Context, in *RevokeAuthRequest, opts ...grpc.CallOption) (*RevokeAuthResponse, error)
+	// SetIntegrationCredential/GetIntegrationCredentialStatus/
+	// ListIntegrationCredentials back api-gateway's credentials.set/status/
+	// list channels for bitbucket/azure-devops/gitea (SOL-007). Reuses the
+	// same CREDENTIAL_CATEGORY_SCM_OAUTH / owner_id=provider-name convention
+	// CompleteOAuthFlow already established — see complete_oauth_flow.go's
+	// doc comment.
+	SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error)
+	GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error)
+	ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error)
 }
 
 type scmIntegrationServiceClient struct {
@@ -142,6 +154,36 @@ func (c *scmIntegrationServiceClient) RevokeAuth(ctx context.Context, in *Revoke
 	return out, nil
 }
 
+func (c *scmIntegrationServiceClient) SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetIntegrationCredentialResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_SetIntegrationCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIntegrationCredentialStatusResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_GetIntegrationCredentialStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIntegrationCredentialsResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListIntegrationCredentials_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScmIntegrationServiceServer is the server API for ScmIntegrationService service.
 // All implementations must embed UnimplementedScmIntegrationServiceServer
 // for forward compatibility.
@@ -165,6 +207,15 @@ type ScmIntegrationServiceServer interface {
 	StartOAuthFlow(context.Context, *StartOAuthFlowRequest) (*StartOAuthFlowResponse, error)
 	CompleteOAuthFlow(context.Context, *CompleteOAuthFlowRequest) (*CompleteOAuthFlowResponse, error)
 	RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error)
+	// SetIntegrationCredential/GetIntegrationCredentialStatus/
+	// ListIntegrationCredentials back api-gateway's credentials.set/status/
+	// list channels for bitbucket/azure-devops/gitea (SOL-007). Reuses the
+	// same CREDENTIAL_CATEGORY_SCM_OAUTH / owner_id=provider-name convention
+	// CompleteOAuthFlow already established — see complete_oauth_flow.go's
+	// doc comment.
+	SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error)
+	GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error)
+	ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error)
 	mustEmbedUnimplementedScmIntegrationServiceServer()
 }
 
@@ -198,6 +249,15 @@ func (UnimplementedScmIntegrationServiceServer) CompleteOAuthFlow(context.Contex
 }
 func (UnimplementedScmIntegrationServiceServer) RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeAuth not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetIntegrationCredential not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIntegrationCredentialStatus not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIntegrationCredentials not implemented")
 }
 func (UnimplementedScmIntegrationServiceServer) mustEmbedUnimplementedScmIntegrationServiceServer() {}
 func (UnimplementedScmIntegrationServiceServer) testEmbeddedByValue()                               {}
@@ -364,6 +424,60 @@ func _ScmIntegrationService_RevokeAuth_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScmIntegrationService_SetIntegrationCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetIntegrationCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).SetIntegrationCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_SetIntegrationCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).SetIntegrationCredential(ctx, req.(*SetIntegrationCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_GetIntegrationCredentialStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIntegrationCredentialStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).GetIntegrationCredentialStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_GetIntegrationCredentialStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).GetIntegrationCredentialStatus(ctx, req.(*GetIntegrationCredentialStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListIntegrationCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIntegrationCredentialsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListIntegrationCredentials(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListIntegrationCredentials_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListIntegrationCredentials(ctx, req.(*ListIntegrationCredentialsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScmIntegrationService_ServiceDesc is the grpc.ServiceDesc for ScmIntegrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -402,6 +516,18 @@ var ScmIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeAuth",
 			Handler:    _ScmIntegrationService_RevokeAuth_Handler,
+		},
+		{
+			MethodName: "SetIntegrationCredential",
+			Handler:    _ScmIntegrationService_SetIntegrationCredential_Handler,
+		},
+		{
+			MethodName: "GetIntegrationCredentialStatus",
+			Handler:    _ScmIntegrationService_GetIntegrationCredentialStatus_Handler,
+		},
+		{
+			MethodName: "ListIntegrationCredentials",
+			Handler:    _ScmIntegrationService_ListIntegrationCredentials_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

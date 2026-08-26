@@ -19,9 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IssueTrackingService_ListIssues_FullMethodName  = "/orca.issuetracking.v1.IssueTrackingService/ListIssues"
-	IssueTrackingService_CreateIssue_FullMethodName = "/orca.issuetracking.v1.IssueTrackingService/CreateIssue"
-	IssueTrackingService_LinkIssue_FullMethodName   = "/orca.issuetracking.v1.IssueTrackingService/LinkIssue"
+	IssueTrackingService_ListIssues_FullMethodName                     = "/orca.issuetracking.v1.IssueTrackingService/ListIssues"
+	IssueTrackingService_CreateIssue_FullMethodName                    = "/orca.issuetracking.v1.IssueTrackingService/CreateIssue"
+	IssueTrackingService_LinkIssue_FullMethodName                      = "/orca.issuetracking.v1.IssueTrackingService/LinkIssue"
+	IssueTrackingService_SetIntegrationCredential_FullMethodName       = "/orca.issuetracking.v1.IssueTrackingService/SetIntegrationCredential"
+	IssueTrackingService_GetIntegrationCredentialStatus_FullMethodName = "/orca.issuetracking.v1.IssueTrackingService/GetIntegrationCredentialStatus"
+	IssueTrackingService_ListIntegrationCredentials_FullMethodName     = "/orca.issuetracking.v1.IssueTrackingService/ListIntegrationCredentials"
+	IssueTrackingService_RevokeAuth_FullMethodName                     = "/orca.issuetracking.v1.IssueTrackingService/RevokeAuth"
 )
 
 // IssueTrackingServiceClient is the client API for IssueTrackingService service.
@@ -34,6 +38,15 @@ type IssueTrackingServiceClient interface {
 	ListIssues(ctx context.Context, in *ListIssuesRequest, opts ...grpc.CallOption) (*ListIssuesResponse, error)
 	CreateIssue(ctx context.Context, in *CreateIssueRequest, opts ...grpc.CallOption) (*CreateIssueResponse, error)
 	LinkIssue(ctx context.Context, in *LinkIssueRequest, opts ...grpc.CallOption) (*LinkIssueResponse, error)
+	// SetIntegrationCredential/GetIntegrationCredentialStatus/
+	// ListIntegrationCredentials/RevokeAuth back api-gateway's
+	// credentials.set/status/list/revoke channels for jira/linear
+	// (SOL-007). Unlike scm-integration-service, this service has no prior
+	// OAuth-flow surface — RevokeAuth is new here too, not reused.
+	SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error)
+	GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error)
+	ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error)
+	RevokeAuth(ctx context.Context, in *RevokeAuthRequest, opts ...grpc.CallOption) (*RevokeAuthResponse, error)
 }
 
 type issueTrackingServiceClient struct {
@@ -74,6 +87,46 @@ func (c *issueTrackingServiceClient) LinkIssue(ctx context.Context, in *LinkIssu
 	return out, nil
 }
 
+func (c *issueTrackingServiceClient) SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetIntegrationCredentialResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_SetIntegrationCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIntegrationCredentialStatusResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_GetIntegrationCredentialStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIntegrationCredentialsResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListIntegrationCredentials_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) RevokeAuth(ctx context.Context, in *RevokeAuthRequest, opts ...grpc.CallOption) (*RevokeAuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeAuthResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_RevokeAuth_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IssueTrackingServiceServer is the server API for IssueTrackingService service.
 // All implementations must embed UnimplementedIssueTrackingServiceServer
 // for forward compatibility.
@@ -84,6 +137,15 @@ type IssueTrackingServiceServer interface {
 	ListIssues(context.Context, *ListIssuesRequest) (*ListIssuesResponse, error)
 	CreateIssue(context.Context, *CreateIssueRequest) (*CreateIssueResponse, error)
 	LinkIssue(context.Context, *LinkIssueRequest) (*LinkIssueResponse, error)
+	// SetIntegrationCredential/GetIntegrationCredentialStatus/
+	// ListIntegrationCredentials/RevokeAuth back api-gateway's
+	// credentials.set/status/list/revoke channels for jira/linear
+	// (SOL-007). Unlike scm-integration-service, this service has no prior
+	// OAuth-flow surface — RevokeAuth is new here too, not reused.
+	SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error)
+	GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error)
+	ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error)
+	RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error)
 	mustEmbedUnimplementedIssueTrackingServiceServer()
 }
 
@@ -102,6 +164,18 @@ func (UnimplementedIssueTrackingServiceServer) CreateIssue(context.Context, *Cre
 }
 func (UnimplementedIssueTrackingServiceServer) LinkIssue(context.Context, *LinkIssueRequest) (*LinkIssueResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LinkIssue not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetIntegrationCredential not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIntegrationCredentialStatus not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIntegrationCredentials not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeAuth not implemented")
 }
 func (UnimplementedIssueTrackingServiceServer) mustEmbedUnimplementedIssueTrackingServiceServer() {}
 func (UnimplementedIssueTrackingServiceServer) testEmbeddedByValue()                              {}
@@ -178,6 +252,78 @@ func _IssueTrackingService_LinkIssue_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IssueTrackingService_SetIntegrationCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetIntegrationCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).SetIntegrationCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_SetIntegrationCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).SetIntegrationCredential(ctx, req.(*SetIntegrationCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_GetIntegrationCredentialStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIntegrationCredentialStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).GetIntegrationCredentialStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_GetIntegrationCredentialStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).GetIntegrationCredentialStatus(ctx, req.(*GetIntegrationCredentialStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListIntegrationCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIntegrationCredentialsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListIntegrationCredentials(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListIntegrationCredentials_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListIntegrationCredentials(ctx, req.(*ListIntegrationCredentialsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_RevokeAuth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeAuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).RevokeAuth(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_RevokeAuth_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).RevokeAuth(ctx, req.(*RevokeAuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IssueTrackingService_ServiceDesc is the grpc.ServiceDesc for IssueTrackingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -196,6 +342,22 @@ var IssueTrackingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LinkIssue",
 			Handler:    _IssueTrackingService_LinkIssue_Handler,
+		},
+		{
+			MethodName: "SetIntegrationCredential",
+			Handler:    _IssueTrackingService_SetIntegrationCredential_Handler,
+		},
+		{
+			MethodName: "GetIntegrationCredentialStatus",
+			Handler:    _IssueTrackingService_GetIntegrationCredentialStatus_Handler,
+		},
+		{
+			MethodName: "ListIntegrationCredentials",
+			Handler:    _IssueTrackingService_ListIntegrationCredentials_Handler,
+		},
+		{
+			MethodName: "RevokeAuth",
+			Handler:    _IssueTrackingService_RevokeAuth_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

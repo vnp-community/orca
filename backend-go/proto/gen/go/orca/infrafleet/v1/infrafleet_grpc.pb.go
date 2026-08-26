@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,14 +20,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InfraFleetService_RegisterDevServer_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
-	InfraFleetService_ResolveConnection_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
-	InfraFleetService_CreateSshTarget_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
-	InfraFleetService_GetFleetHealth_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
-	InfraFleetService_ScanWorkspacePorts_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
-	InfraFleetService_ListDevServers_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
-	InfraFleetService_CreateConnection_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
-	InfraFleetService_Relay_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_RegisterDevServer_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
+	InfraFleetService_ResolveConnection_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
+	InfraFleetService_CreateSshTarget_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
+	InfraFleetService_GetFleetHealth_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
+	InfraFleetService_ScanWorkspacePorts_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
+	InfraFleetService_ListDevServers_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
+	InfraFleetService_CreateConnection_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
+	InfraFleetService_Relay_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_ListBrowserProfiles_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
+	InfraFleetService_CreateBrowserProfile_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
+	InfraFleetService_DeleteBrowserProfile_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/DeleteBrowserProfile"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -58,6 +62,16 @@ type InfraFleetServiceClient interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(ctx context.Context, in *RelayRequest, opts ...grpc.CallOption) (*RelayResponse, error)
+	// ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile back
+	// api-gateway's browser.profileList/profileCreate/profileDelete channels
+	// (SOL-006 Group C) — Postgres-backed metadata CRUD, mirroring
+	// CreateSshTarget's shape. NOT the same as the 3 live-agent profile
+	// operations (profileClearDefaultCookies/profileDetectBrowsers/
+	// profileImportFromBrowser), which relay via Relay instead — see
+	// specs/backend-go/bugs/missing-v1/solutions/SOL-006-browser-channels.md.
+	ListBrowserProfiles(ctx context.Context, in *ListBrowserProfilesRequest, opts ...grpc.CallOption) (*ListBrowserProfilesResponse, error)
+	CreateBrowserProfile(ctx context.Context, in *CreateBrowserProfileRequest, opts ...grpc.CallOption) (*CreateBrowserProfileResponse, error)
+	DeleteBrowserProfile(ctx context.Context, in *DeleteBrowserProfileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type infraFleetServiceClient struct {
@@ -148,6 +162,36 @@ func (c *infraFleetServiceClient) Relay(ctx context.Context, in *RelayRequest, o
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) ListBrowserProfiles(ctx context.Context, in *ListBrowserProfilesRequest, opts ...grpc.CallOption) (*ListBrowserProfilesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListBrowserProfilesResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListBrowserProfiles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) CreateBrowserProfile(ctx context.Context, in *CreateBrowserProfileRequest, opts ...grpc.CallOption) (*CreateBrowserProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateBrowserProfileResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_CreateBrowserProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DeleteBrowserProfile(ctx context.Context, in *DeleteBrowserProfileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_DeleteBrowserProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -177,6 +221,16 @@ type InfraFleetServiceServer interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(context.Context, *RelayRequest) (*RelayResponse, error)
+	// ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile back
+	// api-gateway's browser.profileList/profileCreate/profileDelete channels
+	// (SOL-006 Group C) — Postgres-backed metadata CRUD, mirroring
+	// CreateSshTarget's shape. NOT the same as the 3 live-agent profile
+	// operations (profileClearDefaultCookies/profileDetectBrowsers/
+	// profileImportFromBrowser), which relay via Relay instead — see
+	// specs/backend-go/bugs/missing-v1/solutions/SOL-006-browser-channels.md.
+	ListBrowserProfiles(context.Context, *ListBrowserProfilesRequest) (*ListBrowserProfilesResponse, error)
+	CreateBrowserProfile(context.Context, *CreateBrowserProfileRequest) (*CreateBrowserProfileResponse, error)
+	DeleteBrowserProfile(context.Context, *DeleteBrowserProfileRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -210,6 +264,15 @@ func (UnimplementedInfraFleetServiceServer) CreateConnection(context.Context, *C
 }
 func (UnimplementedInfraFleetServiceServer) Relay(context.Context, *RelayRequest) (*RelayResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Relay not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListBrowserProfiles(context.Context, *ListBrowserProfilesRequest) (*ListBrowserProfilesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListBrowserProfiles not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CreateBrowserProfile(context.Context, *CreateBrowserProfileRequest) (*CreateBrowserProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateBrowserProfile not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DeleteBrowserProfile(context.Context, *DeleteBrowserProfileRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteBrowserProfile not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -376,6 +439,60 @@ func _InfraFleetService_Relay_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_ListBrowserProfiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBrowserProfilesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListBrowserProfiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListBrowserProfiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListBrowserProfiles(ctx, req.(*ListBrowserProfilesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_CreateBrowserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateBrowserProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CreateBrowserProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CreateBrowserProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CreateBrowserProfile(ctx, req.(*CreateBrowserProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DeleteBrowserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteBrowserProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DeleteBrowserProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DeleteBrowserProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DeleteBrowserProfile(ctx, req.(*DeleteBrowserProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -414,6 +531,18 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Relay",
 			Handler:    _InfraFleetService_Relay_Handler,
+		},
+		{
+			MethodName: "ListBrowserProfiles",
+			Handler:    _InfraFleetService_ListBrowserProfiles_Handler,
+		},
+		{
+			MethodName: "CreateBrowserProfile",
+			Handler:    _InfraFleetService_CreateBrowserProfile_Handler,
+		},
+		{
+			MethodName: "DeleteBrowserProfile",
+			Handler:    _InfraFleetService_DeleteBrowserProfile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

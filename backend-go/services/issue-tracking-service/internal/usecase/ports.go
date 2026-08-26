@@ -71,6 +71,38 @@ type CredentialResolver interface {
 // side effect, so publish failure must fail the RPC with nothing durable
 // to retry against" gap — a transient NATS outage no longer needs the
 // caller to retry LinkIssue itself, only the outbox relay retries.
+// CredentialWriter is this service's write path into
+// credential-broker-service, backing SetIntegrationCredential -- mirrors
+// scm-integration-service's port of the same name/shape.
+type CredentialWriter interface {
+	// WriteRaw writes a manually pasted token (+ optional non-secret
+	// config) as this tenant's credential for provider. See this file's
+	// package doc comment (TASK-041) for the JSON envelope shape this must
+	// produce to match Resolve's existing decode convention.
+	WriteRaw(ctx context.Context, tenantID string, provider domain.Provider, token, configJSON string) error
+}
+
+// CredentialStatusReader backs GetIntegrationCredentialStatus -- metadata
+// only, via credential-broker-service's GetCredentialMetadataByOwner RPC
+// (TASK-038), never ResolveCredentialByOwner (which would leak plaintext
+// for a status check).
+type CredentialStatusReader interface {
+	GetStatus(ctx context.Context, tenantID string, provider domain.Provider) (configured bool, configJSON string, err error)
+}
+
+// CredentialLister backs ListIntegrationCredentials via
+// credential-broker-service's ListCredentialsByCategory RPC (TASK-038).
+type CredentialLister interface {
+	ListConfiguredProviders(ctx context.Context, tenantID string) ([]domain.Provider, error)
+}
+
+// CredentialRevoker backs RevokeAuth -- this service's disconnect path into
+// credential-broker-service, new here (unlike scm-integration-service,
+// which already had RevokeAuth to reuse -- see TASK-041's context note).
+type CredentialRevoker interface {
+	RevokeByOwner(ctx context.Context, tenantID string, provider domain.Provider) error
+}
+
 type OutboxEnqueuer interface {
 	Enqueue(ctx context.Context, tenantID string, event domain.OutboxEvent) error
 }

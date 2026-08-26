@@ -4,6 +4,9 @@ package orca.infrafleet.v1;
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1;infrafleetv1";
 
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
 // InfraFleetService owns SSH targets, dev server registry, connection lifecycle,
 // the provider registry (connectionId -> host dispatch), and fleet health.
 // See specs/backend-go/services/infra-fleet-service.md.
@@ -29,6 +32,17 @@ service InfraFleetService {
   // shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
   // all go through this one).
   rpc Relay(RelayRequest) returns (RelayResponse);
+
+  // ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile back
+  // api-gateway's browser.profileList/profileCreate/profileDelete channels
+  // (SOL-006 Group C) — Postgres-backed metadata CRUD, mirroring
+  // CreateSshTarget's shape. NOT the same as the 3 live-agent profile
+  // operations (profileClearDefaultCookies/profileDetectBrowsers/
+  // profileImportFromBrowser), which relay via Relay instead — see
+  // specs/backend-go/bugs/missing-v1/solutions/SOL-006-browser-channels.md.
+  rpc ListBrowserProfiles(ListBrowserProfilesRequest) returns (ListBrowserProfilesResponse);
+  rpc CreateBrowserProfile(CreateBrowserProfileRequest) returns (CreateBrowserProfileResponse);
+  rpc DeleteBrowserProfile(DeleteBrowserProfileRequest) returns (google.protobuf.Empty);
 }
 
 enum ConnectionMode {
@@ -66,7 +80,22 @@ message RegisterDevServerResponse {
 // (git-gateway-service, project-service, task-service) calls to answer
 // "which host owns this connectionId, and how do I reach it".
 message ResolveConnectionRequest {
+  // Exactly one of connection_id, dev_server_id, worktree_id is set. Empty
+  // connection_id with both alternates also empty resolves nothing
+  // (ResolveConnectionOutput{Connected: false}), matching today's
+  // empty-connectionId short-circuit.
   string connection_id = 1;
+  // dev_server_id resolves the dev server's current active connectionId,
+  // the reverse of connection_id's lookup direction — used by
+  // ai-provider-service's TestConnection (see
+  // specs/backend-go/bugs/missing-v1/tasks/TASK-028-implement-aiprovider-test-connection-usecase.md).
+  string dev_server_id = 2;
+  // worktree_id resolves the connectionId currently bound to a worktree —
+  // used by api-gateway's browser.* relay channels (see
+  // specs/backend-go/bugs/missing-v1/tasks/TASK-034-add-browser-pane-relay-wscompat-channels.md).
+  // Mirrors CreateConnectionRequest's (dev_server_id, repo_path,
+  // worktree_id) tuple in reverse.
+  string worktree_id = 3;
 }
 
 message ResolveConnectionResponse {
@@ -78,6 +107,13 @@ message ResolveConnectionResponse {
   // repo_path alongside dev_server to know which path to operate on.
   string repo_path = 3;
   string worktree_id = 4;
+  // connection_id is the resolved infra.connections.id — the value Relay's
+  // RelayRequest.connection_id expects. Populated regardless of which
+  // ResolveConnectionRequest key resolved this row, so a dev_server_id- or
+  // worktree_id-keyed caller (TestConnection, browser.* channels) has a
+  // valid Relay connection_id without re-deriving it from DevServer.id,
+  // which is a different id space (dev_servers.id, not connections.id).
+  string connection_id = 5;
 }
 
 message ListDevServersRequest {
@@ -150,4 +186,35 @@ message ScanWorkspacePortsRequest {
 
 message ScanWorkspacePortsResponse {
   repeated int32 open_ports = 1;
+}
+
+message BrowserProfile {
+  string id = 1;
+  string tenant_id = 2;
+  string dev_server_id = 3;
+  string name = 4;
+  string source_browser = 5; // e.g. "chrome", "firefox" — set by profileImportFromBrowser; empty if manually created
+  bool is_default = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ListBrowserProfilesRequest {
+  string dev_server_id = 1; // required — a profile is dev-server-scoped, not tenant-wide
+}
+message ListBrowserProfilesResponse {
+  repeated BrowserProfile profiles = 1;
+}
+
+message CreateBrowserProfileRequest {
+  string dev_server_id = 1;
+  string name = 2;
+  string source_browser = 3; // optional
+  bool is_default = 4;
+}
+message CreateBrowserProfileResponse {
+  BrowserProfile profile = 1;
+}
+
+message DeleteBrowserProfileRequest {
+  string id = 1;
 }

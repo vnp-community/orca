@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -23,6 +24,11 @@ const (
 	AiProviderService_ResolveProvider_FullMethodName = "/orca.aiprovider.v1.AiProviderService/ResolveProvider"
 	AiProviderService_RotateKey_FullMethodName       = "/orca.aiprovider.v1.AiProviderService/RotateKey"
 	AiProviderService_GetUsageToday_FullMethodName   = "/orca.aiprovider.v1.AiProviderService/GetUsageToday"
+	AiProviderService_ListAccounts_FullMethodName    = "/orca.aiprovider.v1.AiProviderService/ListAccounts"
+	AiProviderService_UpdateAccount_FullMethodName   = "/orca.aiprovider.v1.AiProviderService/UpdateAccount"
+	AiProviderService_DeleteAccount_FullMethodName   = "/orca.aiprovider.v1.AiProviderService/DeleteAccount"
+	AiProviderService_WriteCredential_FullMethodName = "/orca.aiprovider.v1.AiProviderService/WriteCredential"
+	AiProviderService_TestConnection_FullMethodName  = "/orca.aiprovider.v1.AiProviderService/TestConnection"
 )
 
 // AiProviderServiceClient is the client API for AiProviderService service.
@@ -37,6 +43,20 @@ type AiProviderServiceClient interface {
 	ResolveProvider(ctx context.Context, in *ResolveProviderRequest, opts ...grpc.CallOption) (*ResolveProviderResponse, error)
 	RotateKey(ctx context.Context, in *RotateKeyRequest, opts ...grpc.CallOption) (*RotateKeyResponse, error)
 	GetUsageToday(ctx context.Context, in *GetUsageTodayRequest, opts ...grpc.CallOption) (*GetUsageTodayResponse, error)
+	// ListAccounts/UpdateAccount/DeleteAccount back aiProvider.list/update/
+	// delete (SOL-005 Group B) — metadata-only CRUD, no credential-broker
+	// involvement.
+	ListAccounts(ctx context.Context, in *ListAccountsRequest, opts ...grpc.CallOption) (*ListAccountsResponse, error)
+	UpdateAccount(ctx context.Context, in *UpdateAccountRequest, opts ...grpc.CallOption) (*UpdateAccountResponse, error)
+	DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// WriteCredential backs aiProvider.writeCredential (SOL-005 Group C) —
+	// writes a credential onto an EXISTING account, distinct from
+	// CreateAccount's create-time credential write.
+	WriteCredential(ctx context.Context, in *WriteCredentialRequest, opts ...grpc.CallOption) (*WriteCredentialResponse, error)
+	// TestConnection backs aiProvider.testConnection (SOL-005 Group D) —
+	// relays to the account's dev server via infra-fleet-service; see
+	// TASK-028. Never returns plaintext key material.
+	TestConnection(ctx context.Context, in *TestConnectionRequest, opts ...grpc.CallOption) (*TestConnectionResponse, error)
 }
 
 type aiProviderServiceClient struct {
@@ -87,6 +107,56 @@ func (c *aiProviderServiceClient) GetUsageToday(ctx context.Context, in *GetUsag
 	return out, nil
 }
 
+func (c *aiProviderServiceClient) ListAccounts(ctx context.Context, in *ListAccountsRequest, opts ...grpc.CallOption) (*ListAccountsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAccountsResponse)
+	err := c.cc.Invoke(ctx, AiProviderService_ListAccounts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aiProviderServiceClient) UpdateAccount(ctx context.Context, in *UpdateAccountRequest, opts ...grpc.CallOption) (*UpdateAccountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateAccountResponse)
+	err := c.cc.Invoke(ctx, AiProviderService_UpdateAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aiProviderServiceClient) DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AiProviderService_DeleteAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aiProviderServiceClient) WriteCredential(ctx context.Context, in *WriteCredentialRequest, opts ...grpc.CallOption) (*WriteCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WriteCredentialResponse)
+	err := c.cc.Invoke(ctx, AiProviderService_WriteCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aiProviderServiceClient) TestConnection(ctx context.Context, in *TestConnectionRequest, opts ...grpc.CallOption) (*TestConnectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TestConnectionResponse)
+	err := c.cc.Invoke(ctx, AiProviderService_TestConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AiProviderServiceServer is the server API for AiProviderService service.
 // All implementations must embed UnimplementedAiProviderServiceServer
 // for forward compatibility.
@@ -99,6 +169,20 @@ type AiProviderServiceServer interface {
 	ResolveProvider(context.Context, *ResolveProviderRequest) (*ResolveProviderResponse, error)
 	RotateKey(context.Context, *RotateKeyRequest) (*RotateKeyResponse, error)
 	GetUsageToday(context.Context, *GetUsageTodayRequest) (*GetUsageTodayResponse, error)
+	// ListAccounts/UpdateAccount/DeleteAccount back aiProvider.list/update/
+	// delete (SOL-005 Group B) — metadata-only CRUD, no credential-broker
+	// involvement.
+	ListAccounts(context.Context, *ListAccountsRequest) (*ListAccountsResponse, error)
+	UpdateAccount(context.Context, *UpdateAccountRequest) (*UpdateAccountResponse, error)
+	DeleteAccount(context.Context, *DeleteAccountRequest) (*emptypb.Empty, error)
+	// WriteCredential backs aiProvider.writeCredential (SOL-005 Group C) —
+	// writes a credential onto an EXISTING account, distinct from
+	// CreateAccount's create-time credential write.
+	WriteCredential(context.Context, *WriteCredentialRequest) (*WriteCredentialResponse, error)
+	// TestConnection backs aiProvider.testConnection (SOL-005 Group D) —
+	// relays to the account's dev server via infra-fleet-service; see
+	// TASK-028. Never returns plaintext key material.
+	TestConnection(context.Context, *TestConnectionRequest) (*TestConnectionResponse, error)
 	mustEmbedUnimplementedAiProviderServiceServer()
 }
 
@@ -120,6 +204,21 @@ func (UnimplementedAiProviderServiceServer) RotateKey(context.Context, *RotateKe
 }
 func (UnimplementedAiProviderServiceServer) GetUsageToday(context.Context, *GetUsageTodayRequest) (*GetUsageTodayResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUsageToday not implemented")
+}
+func (UnimplementedAiProviderServiceServer) ListAccounts(context.Context, *ListAccountsRequest) (*ListAccountsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAccounts not implemented")
+}
+func (UnimplementedAiProviderServiceServer) UpdateAccount(context.Context, *UpdateAccountRequest) (*UpdateAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAccount not implemented")
+}
+func (UnimplementedAiProviderServiceServer) DeleteAccount(context.Context, *DeleteAccountRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAccount not implemented")
+}
+func (UnimplementedAiProviderServiceServer) WriteCredential(context.Context, *WriteCredentialRequest) (*WriteCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteCredential not implemented")
+}
+func (UnimplementedAiProviderServiceServer) TestConnection(context.Context, *TestConnectionRequest) (*TestConnectionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestConnection not implemented")
 }
 func (UnimplementedAiProviderServiceServer) mustEmbedUnimplementedAiProviderServiceServer() {}
 func (UnimplementedAiProviderServiceServer) testEmbeddedByValue()                           {}
@@ -214,6 +313,96 @@ func _AiProviderService_GetUsageToday_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AiProviderService_ListAccounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAccountsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiProviderServiceServer).ListAccounts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiProviderService_ListAccounts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiProviderServiceServer).ListAccounts(ctx, req.(*ListAccountsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AiProviderService_UpdateAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiProviderServiceServer).UpdateAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiProviderService_UpdateAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiProviderServiceServer).UpdateAccount(ctx, req.(*UpdateAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AiProviderService_DeleteAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiProviderServiceServer).DeleteAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiProviderService_DeleteAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiProviderServiceServer).DeleteAccount(ctx, req.(*DeleteAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AiProviderService_WriteCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiProviderServiceServer).WriteCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiProviderService_WriteCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiProviderServiceServer).WriteCredential(ctx, req.(*WriteCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AiProviderService_TestConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TestConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiProviderServiceServer).TestConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiProviderService_TestConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiProviderServiceServer).TestConnection(ctx, req.(*TestConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AiProviderService_ServiceDesc is the grpc.ServiceDesc for AiProviderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -236,6 +425,26 @@ var AiProviderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUsageToday",
 			Handler:    _AiProviderService_GetUsageToday_Handler,
+		},
+		{
+			MethodName: "ListAccounts",
+			Handler:    _AiProviderService_ListAccounts_Handler,
+		},
+		{
+			MethodName: "UpdateAccount",
+			Handler:    _AiProviderService_UpdateAccount_Handler,
+		},
+		{
+			MethodName: "DeleteAccount",
+			Handler:    _AiProviderService_DeleteAccount_Handler,
+		},
+		{
+			MethodName: "WriteCredential",
+			Handler:    _AiProviderService_WriteCredential_Handler,
+		},
+		{
+			MethodName: "TestConnection",
+			Handler:    _AiProviderService_TestConnection_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

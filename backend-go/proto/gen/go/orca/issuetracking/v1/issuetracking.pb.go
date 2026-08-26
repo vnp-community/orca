@@ -453,6 +453,390 @@ func (*LinkIssueResponse) Descriptor() ([]byte, []int) {
 	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{6}
 }
 
+type SetIntegrationCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
+	ConfigJson    string                 `protobuf:"bytes,4,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"` // optional, non-secret — e.g. Jira's baseUrl/email
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetIntegrationCredentialRequest) Reset() {
+	*x = SetIntegrationCredentialRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetIntegrationCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetIntegrationCredentialRequest) ProtoMessage() {}
+
+func (x *SetIntegrationCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetIntegrationCredentialRequest.ProtoReflect.Descriptor instead.
+func (*SetIntegrationCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SetIntegrationCredentialRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *SetIntegrationCredentialRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+func (x *SetIntegrationCredentialRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *SetIntegrationCredentialRequest) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type SetIntegrationCredentialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetIntegrationCredentialResponse) Reset() {
+	*x = SetIntegrationCredentialResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetIntegrationCredentialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetIntegrationCredentialResponse) ProtoMessage() {}
+
+func (x *SetIntegrationCredentialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetIntegrationCredentialResponse.ProtoReflect.Descriptor instead.
+func (*SetIntegrationCredentialResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{8}
+}
+
+type GetIntegrationCredentialStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIntegrationCredentialStatusRequest) Reset() {
+	*x = GetIntegrationCredentialStatusRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIntegrationCredentialStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIntegrationCredentialStatusRequest) ProtoMessage() {}
+
+func (x *GetIntegrationCredentialStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIntegrationCredentialStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetIntegrationCredentialStatusRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetIntegrationCredentialStatusRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *GetIntegrationCredentialStatusRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+type GetIntegrationCredentialStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Configured    bool                   `protobuf:"varint,1,opt,name=configured,proto3" json:"configured,omitempty"`
+	ConfigJson    string                 `protobuf:"bytes,2,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIntegrationCredentialStatusResponse) Reset() {
+	*x = GetIntegrationCredentialStatusResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIntegrationCredentialStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIntegrationCredentialStatusResponse) ProtoMessage() {}
+
+func (x *GetIntegrationCredentialStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIntegrationCredentialStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetIntegrationCredentialStatusResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetIntegrationCredentialStatusResponse) GetConfigured() bool {
+	if x != nil {
+		return x.Configured
+	}
+	return false
+}
+
+func (x *GetIntegrationCredentialStatusResponse) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type ListIntegrationCredentialsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIntegrationCredentialsRequest) Reset() {
+	*x = ListIntegrationCredentialsRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIntegrationCredentialsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIntegrationCredentialsRequest) ProtoMessage() {}
+
+func (x *ListIntegrationCredentialsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIntegrationCredentialsRequest.ProtoReflect.Descriptor instead.
+func (*ListIntegrationCredentialsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListIntegrationCredentialsRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+type ListIntegrationCredentialsResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	ConfiguredProviders []IssueProvider        `protobuf:"varint,1,rep,packed,name=configured_providers,json=configuredProviders,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"configured_providers,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ListIntegrationCredentialsResponse) Reset() {
+	*x = ListIntegrationCredentialsResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIntegrationCredentialsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIntegrationCredentialsResponse) ProtoMessage() {}
+
+func (x *ListIntegrationCredentialsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIntegrationCredentialsResponse.ProtoReflect.Descriptor instead.
+func (*ListIntegrationCredentialsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ListIntegrationCredentialsResponse) GetConfiguredProviders() []IssueProvider {
+	if x != nil {
+		return x.ConfiguredProviders
+	}
+	return nil
+}
+
+type RevokeAuthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      IssueProvider          `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.issuetracking.v1.IssueProvider" json:"provider,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAuthRequest) Reset() {
+	*x = RevokeAuthRequest{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAuthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAuthRequest) ProtoMessage() {}
+
+func (x *RevokeAuthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAuthRequest.ProtoReflect.Descriptor instead.
+func (*RevokeAuthRequest) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RevokeAuthRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RevokeAuthRequest) GetProvider() IssueProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return IssueProvider_ISSUE_PROVIDER_UNSPECIFIED
+}
+
+type RevokeAuthResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAuthResponse) Reset() {
+	*x = RevokeAuthResponse{}
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAuthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAuthResponse) ProtoMessage() {}
+
+func (x *RevokeAuthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_issuetracking_v1_issuetracking_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAuthResponse.ProtoReflect.Descriptor instead.
+func (*RevokeAuthResponse) Descriptor() ([]byte, []int) {
+	return file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP(), []int{14}
+}
+
 var File_orca_issuetracking_v1_issuetracking_proto protoreflect.FileDescriptor
 
 const file_orca_issuetracking_v1_issuetracking_proto_rawDesc = "" +
@@ -482,16 +866,45 @@ const file_orca_issuetracking_v1_issuetracking_proto_rawDesc = "" +
 	"\x10LinkIssueRequest\x12\x19\n" +
 	"\bissue_id\x18\x01 \x01(\tR\aissueId\x12\x17\n" +
 	"\atask_id\x18\x02 \x01(\tR\x06taskId\"\x13\n" +
-	"\x11LinkIssueResponse*c\n" +
+	"\x11LinkIssueResponse\"\xb7\x01\n" +
+	"\x1fSetIntegrationCredentialRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\x12\x1f\n" +
+	"\vconfig_json\x18\x04 \x01(\tR\n" +
+	"configJson\"\"\n" +
+	" SetIntegrationCredentialResponse\"\x86\x01\n" +
+	"%GetIntegrationCredentialStatusRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\"i\n" +
+	"&GetIntegrationCredentialStatusResponse\x12\x1e\n" +
+	"\n" +
+	"configured\x18\x01 \x01(\bR\n" +
+	"configured\x12\x1f\n" +
+	"\vconfig_json\x18\x02 \x01(\tR\n" +
+	"configJson\"@\n" +
+	"!ListIntegrationCredentialsRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\"}\n" +
+	"\"ListIntegrationCredentialsResponse\x12W\n" +
+	"\x14configured_providers\x18\x01 \x03(\x0e2$.orca.issuetracking.v1.IssueProviderR\x13configuredProviders\"r\n" +
+	"\x11RevokeAuthRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12@\n" +
+	"\bprovider\x18\x02 \x01(\x0e2$.orca.issuetracking.v1.IssueProviderR\bprovider\"\x14\n" +
+	"\x12RevokeAuthResponse*c\n" +
 	"\rIssueProvider\x12\x1e\n" +
 	"\x1aISSUE_PROVIDER_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ISSUE_PROVIDER_JIRA\x10\x01\x12\x19\n" +
-	"\x15ISSUE_PROVIDER_LINEAR\x10\x022\xbf\x02\n" +
+	"\x15ISSUE_PROVIDER_LINEAR\x10\x022\xe4\x06\n" +
 	"\x14IssueTrackingService\x12a\n" +
 	"\n" +
 	"ListIssues\x12(.orca.issuetracking.v1.ListIssuesRequest\x1a).orca.issuetracking.v1.ListIssuesResponse\x12d\n" +
 	"\vCreateIssue\x12).orca.issuetracking.v1.CreateIssueRequest\x1a*.orca.issuetracking.v1.CreateIssueResponse\x12^\n" +
-	"\tLinkIssue\x12'.orca.issuetracking.v1.LinkIssueRequest\x1a(.orca.issuetracking.v1.LinkIssueResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1;issuetrackingv1b\x06proto3"
+	"\tLinkIssue\x12'.orca.issuetracking.v1.LinkIssueRequest\x1a(.orca.issuetracking.v1.LinkIssueResponse\x12\x8b\x01\n" +
+	"\x18SetIntegrationCredential\x126.orca.issuetracking.v1.SetIntegrationCredentialRequest\x1a7.orca.issuetracking.v1.SetIntegrationCredentialResponse\x12\x9d\x01\n" +
+	"\x1eGetIntegrationCredentialStatus\x12<.orca.issuetracking.v1.GetIntegrationCredentialStatusRequest\x1a=.orca.issuetracking.v1.GetIntegrationCredentialStatusResponse\x12\x91\x01\n" +
+	"\x1aListIntegrationCredentials\x128.orca.issuetracking.v1.ListIntegrationCredentialsRequest\x1a9.orca.issuetracking.v1.ListIntegrationCredentialsResponse\x12a\n" +
+	"\n" +
+	"RevokeAuth\x12(.orca.issuetracking.v1.RevokeAuthRequest\x1a).orca.issuetracking.v1.RevokeAuthResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1;issuetrackingv1b\x06proto3"
 
 var (
 	file_orca_issuetracking_v1_issuetracking_proto_rawDescOnce sync.Once
@@ -506,33 +919,53 @@ func file_orca_issuetracking_v1_issuetracking_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_issuetracking_v1_issuetracking_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_issuetracking_v1_issuetracking_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_orca_issuetracking_v1_issuetracking_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_orca_issuetracking_v1_issuetracking_proto_goTypes = []any{
-	(IssueProvider)(0),          // 0: orca.issuetracking.v1.IssueProvider
-	(*Issue)(nil),               // 1: orca.issuetracking.v1.Issue
-	(*ListIssuesRequest)(nil),   // 2: orca.issuetracking.v1.ListIssuesRequest
-	(*ListIssuesResponse)(nil),  // 3: orca.issuetracking.v1.ListIssuesResponse
-	(*CreateIssueRequest)(nil),  // 4: orca.issuetracking.v1.CreateIssueRequest
-	(*CreateIssueResponse)(nil), // 5: orca.issuetracking.v1.CreateIssueResponse
-	(*LinkIssueRequest)(nil),    // 6: orca.issuetracking.v1.LinkIssueRequest
-	(*LinkIssueResponse)(nil),   // 7: orca.issuetracking.v1.LinkIssueResponse
+	(IssueProvider)(0),                             // 0: orca.issuetracking.v1.IssueProvider
+	(*Issue)(nil),                                  // 1: orca.issuetracking.v1.Issue
+	(*ListIssuesRequest)(nil),                      // 2: orca.issuetracking.v1.ListIssuesRequest
+	(*ListIssuesResponse)(nil),                     // 3: orca.issuetracking.v1.ListIssuesResponse
+	(*CreateIssueRequest)(nil),                     // 4: orca.issuetracking.v1.CreateIssueRequest
+	(*CreateIssueResponse)(nil),                    // 5: orca.issuetracking.v1.CreateIssueResponse
+	(*LinkIssueRequest)(nil),                       // 6: orca.issuetracking.v1.LinkIssueRequest
+	(*LinkIssueResponse)(nil),                      // 7: orca.issuetracking.v1.LinkIssueResponse
+	(*SetIntegrationCredentialRequest)(nil),        // 8: orca.issuetracking.v1.SetIntegrationCredentialRequest
+	(*SetIntegrationCredentialResponse)(nil),       // 9: orca.issuetracking.v1.SetIntegrationCredentialResponse
+	(*GetIntegrationCredentialStatusRequest)(nil),  // 10: orca.issuetracking.v1.GetIntegrationCredentialStatusRequest
+	(*GetIntegrationCredentialStatusResponse)(nil), // 11: orca.issuetracking.v1.GetIntegrationCredentialStatusResponse
+	(*ListIntegrationCredentialsRequest)(nil),      // 12: orca.issuetracking.v1.ListIntegrationCredentialsRequest
+	(*ListIntegrationCredentialsResponse)(nil),     // 13: orca.issuetracking.v1.ListIntegrationCredentialsResponse
+	(*RevokeAuthRequest)(nil),                      // 14: orca.issuetracking.v1.RevokeAuthRequest
+	(*RevokeAuthResponse)(nil),                     // 15: orca.issuetracking.v1.RevokeAuthResponse
 }
 var file_orca_issuetracking_v1_issuetracking_proto_depIdxs = []int32{
-	0, // 0: orca.issuetracking.v1.ListIssuesRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
-	1, // 1: orca.issuetracking.v1.ListIssuesResponse.issues:type_name -> orca.issuetracking.v1.Issue
-	0, // 2: orca.issuetracking.v1.CreateIssueRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
-	1, // 3: orca.issuetracking.v1.CreateIssueResponse.issue:type_name -> orca.issuetracking.v1.Issue
-	2, // 4: orca.issuetracking.v1.IssueTrackingService.ListIssues:input_type -> orca.issuetracking.v1.ListIssuesRequest
-	4, // 5: orca.issuetracking.v1.IssueTrackingService.CreateIssue:input_type -> orca.issuetracking.v1.CreateIssueRequest
-	6, // 6: orca.issuetracking.v1.IssueTrackingService.LinkIssue:input_type -> orca.issuetracking.v1.LinkIssueRequest
-	3, // 7: orca.issuetracking.v1.IssueTrackingService.ListIssues:output_type -> orca.issuetracking.v1.ListIssuesResponse
-	5, // 8: orca.issuetracking.v1.IssueTrackingService.CreateIssue:output_type -> orca.issuetracking.v1.CreateIssueResponse
-	7, // 9: orca.issuetracking.v1.IssueTrackingService.LinkIssue:output_type -> orca.issuetracking.v1.LinkIssueResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0,  // 0: orca.issuetracking.v1.ListIssuesRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	1,  // 1: orca.issuetracking.v1.ListIssuesResponse.issues:type_name -> orca.issuetracking.v1.Issue
+	0,  // 2: orca.issuetracking.v1.CreateIssueRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	1,  // 3: orca.issuetracking.v1.CreateIssueResponse.issue:type_name -> orca.issuetracking.v1.Issue
+	0,  // 4: orca.issuetracking.v1.SetIntegrationCredentialRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 5: orca.issuetracking.v1.GetIntegrationCredentialStatusRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 6: orca.issuetracking.v1.ListIntegrationCredentialsResponse.configured_providers:type_name -> orca.issuetracking.v1.IssueProvider
+	0,  // 7: orca.issuetracking.v1.RevokeAuthRequest.provider:type_name -> orca.issuetracking.v1.IssueProvider
+	2,  // 8: orca.issuetracking.v1.IssueTrackingService.ListIssues:input_type -> orca.issuetracking.v1.ListIssuesRequest
+	4,  // 9: orca.issuetracking.v1.IssueTrackingService.CreateIssue:input_type -> orca.issuetracking.v1.CreateIssueRequest
+	6,  // 10: orca.issuetracking.v1.IssueTrackingService.LinkIssue:input_type -> orca.issuetracking.v1.LinkIssueRequest
+	8,  // 11: orca.issuetracking.v1.IssueTrackingService.SetIntegrationCredential:input_type -> orca.issuetracking.v1.SetIntegrationCredentialRequest
+	10, // 12: orca.issuetracking.v1.IssueTrackingService.GetIntegrationCredentialStatus:input_type -> orca.issuetracking.v1.GetIntegrationCredentialStatusRequest
+	12, // 13: orca.issuetracking.v1.IssueTrackingService.ListIntegrationCredentials:input_type -> orca.issuetracking.v1.ListIntegrationCredentialsRequest
+	14, // 14: orca.issuetracking.v1.IssueTrackingService.RevokeAuth:input_type -> orca.issuetracking.v1.RevokeAuthRequest
+	3,  // 15: orca.issuetracking.v1.IssueTrackingService.ListIssues:output_type -> orca.issuetracking.v1.ListIssuesResponse
+	5,  // 16: orca.issuetracking.v1.IssueTrackingService.CreateIssue:output_type -> orca.issuetracking.v1.CreateIssueResponse
+	7,  // 17: orca.issuetracking.v1.IssueTrackingService.LinkIssue:output_type -> orca.issuetracking.v1.LinkIssueResponse
+	9,  // 18: orca.issuetracking.v1.IssueTrackingService.SetIntegrationCredential:output_type -> orca.issuetracking.v1.SetIntegrationCredentialResponse
+	11, // 19: orca.issuetracking.v1.IssueTrackingService.GetIntegrationCredentialStatus:output_type -> orca.issuetracking.v1.GetIntegrationCredentialStatusResponse
+	13, // 20: orca.issuetracking.v1.IssueTrackingService.ListIntegrationCredentials:output_type -> orca.issuetracking.v1.ListIntegrationCredentialsResponse
+	15, // 21: orca.issuetracking.v1.IssueTrackingService.RevokeAuth:output_type -> orca.issuetracking.v1.RevokeAuthResponse
+	15, // [15:22] is the sub-list for method output_type
+	8,  // [8:15] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_orca_issuetracking_v1_issuetracking_proto_init() }
@@ -546,7 +979,7 @@ func file_orca_issuetracking_v1_issuetracking_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_issuetracking_v1_issuetracking_proto_rawDesc), len(file_orca_issuetracking_v1_issuetracking_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

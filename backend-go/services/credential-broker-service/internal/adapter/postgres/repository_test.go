@@ -54,7 +54,7 @@ func TestRepository_CreateGetUpdateStatus_RoundTrip(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	m, err := domain.NewCredentialMetadata(
 		uuid.NewString(), uuid.NewString(), uuid.NewString(),
-		domain.CategoryScmOAuth, "credential/tenant-1/cred-1", domain.StatusActive, now,
+		domain.CategoryScmOAuth, "credential/tenant-1/cred-1", domain.StatusActive, "", now,
 	)
 	if err != nil {
 		t.Fatalf("building metadata: %v", err)
@@ -102,7 +102,7 @@ func TestRepository_RunInTx_CommitsBothOnSuccess(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	m, err := domain.NewCredentialMetadata(
 		uuid.NewString(), uuid.NewString(), uuid.NewString(),
-		domain.CategoryScmOAuth, "credential/tenant-1/tx-commit", domain.StatusActive, now,
+		domain.CategoryScmOAuth, "credential/tenant-1/tx-commit", domain.StatusActive, "", now,
 	)
 	if err != nil {
 		t.Fatalf("building metadata: %v", err)
@@ -139,7 +139,7 @@ func TestRepository_RunInTx_RollsBackBothOnFailure(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	m, err := domain.NewCredentialMetadata(
 		uuid.NewString(), uuid.NewString(), uuid.NewString(),
-		domain.CategoryScmOAuth, "credential/tenant-1/tx-rollback", domain.StatusActive, now,
+		domain.CategoryScmOAuth, "credential/tenant-1/tx-rollback", domain.StatusActive, "", now,
 	)
 	if err != nil {
 		t.Fatalf("building metadata: %v", err)
@@ -173,7 +173,7 @@ func TestRepository_Append_RequiresExistingCredential(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	m, err := domain.NewCredentialMetadata(
 		uuid.NewString(), uuid.NewString(), uuid.NewString(),
-		domain.CategoryAiProviderKey, "credential/tenant-1/cred-2", domain.StatusActive, now,
+		domain.CategoryAiProviderKey, "credential/tenant-1/cred-2", domain.StatusActive, "", now,
 	)
 	if err != nil {
 		t.Fatalf("building metadata: %v", err)

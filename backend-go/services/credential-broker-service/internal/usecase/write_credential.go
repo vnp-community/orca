@@ -35,6 +35,7 @@ type WriteCredentialInput struct {
 	OwnerID           string
 	Category          domain.Category
 	EncryptedEnvelope []byte
+	ConfigJSON        string
 	RequestingService string
 }
 
@@ -80,7 +81,7 @@ func (uc *WriteCredential) Execute(ctx context.Context, in WriteCredentialInput)
 	now := uc.now()
 	// Only created after the Vault write above is confirmed — see this
 	// type's doc comment and credential-broker-service.md §10.
-	metadata, err := domain.NewCredentialMetadata(id, in.TenantID, in.OwnerID, in.Category, vaultPath, domain.StatusActive, now)
+	metadata, err := domain.NewCredentialMetadata(id, in.TenantID, in.OwnerID, in.Category, vaultPath, domain.StatusActive, in.ConfigJSON, now)
 	if err != nil {
 		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInvalidArgument, "CREDENTIAL_INVALID_METADATA", err.Error(), err)
 	}

@@ -112,14 +112,15 @@ var (
 // value. See the package doc comment above; this invariant is why this
 // struct has no field like "Value", "Ciphertext", or "Key".
 type CredentialMetadata struct {
-	ID        string
-	TenantID  string
-	OwnerID   string // user id or service name, per credentialbroker.proto
-	Category  Category
-	Status    Status
-	VaultPath string // Vault KV v2 path reference only, never a value
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID         string
+	TenantID   string
+	OwnerID    string // user id or service name, per credentialbroker.proto
+	Category   Category
+	Status     Status
+	VaultPath  string // Vault KV v2 path reference only, never a value
+	ConfigJSON string // non-secret sidecar config (TASK-037) — NEVER a secret value
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // NewCredentialMetadata constructs a CredentialMetadata, enforcing the
@@ -134,6 +135,7 @@ func NewCredentialMetadata(
 	category Category,
 	vaultPath string,
 	status Status,
+	configJSON string,
 	now time.Time,
 ) (CredentialMetadata, error) {
 	if id == "" {
@@ -158,14 +160,15 @@ func NewCredentialMetadata(
 		return CredentialMetadata{}, ErrInvalidStatus
 	}
 	return CredentialMetadata{
-		ID:        id,
-		TenantID:  tenantID,
-		OwnerID:   ownerID,
-		Category:  category,
-		Status:    status,
-		VaultPath: vaultPath,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:         id,
+		TenantID:   tenantID,
+		OwnerID:    ownerID,
+		Category:   category,
+		Status:     status,
+		VaultPath:  vaultPath,
+		ConfigJSON: configJSON,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}, nil
 }
 

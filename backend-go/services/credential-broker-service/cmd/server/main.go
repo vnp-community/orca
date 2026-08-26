@@ -103,10 +103,13 @@ func run() error {
 	resolveByOwnerUC := usecase.NewResolveCredentialByOwner(repo, repo, store)
 	revokeByOwnerUC := usecase.NewRevokeCredentialByOwner(repo, store, repo)
 	signVapidUC := usecase.NewSignVapidPayload(store)
+	getMetadataByOwnerUC := usecase.NewGetCredentialMetadataByOwner(repo)
+	listByCategoryUC := usecase.NewListCredentialsByCategory(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	credentialbrokerv1.RegisterCredentialBrokerServiceServer(grpcServer, credentialgrpc.New(
 		writeUC, resolveUC, rotateUC, revokeUC, getMetadataUC, resolveByOwnerUC, revokeByOwnerUC, signVapidUC,
+		getMetadataByOwnerUC, listByCategoryUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

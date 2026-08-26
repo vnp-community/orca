@@ -148,6 +148,26 @@ type OAuthStateCodec interface {
 // acquire write access by accident.
 type CredentialWriter interface {
 	Write(ctx context.Context, tenantID string, provider domain.ScmProvider, token OAuthToken) error
+	// WriteRaw is SetIntegrationCredential's entry point — a manually
+	// pasted token, never exchanged from an authorization code, so it
+	// carries no OAuthToken.Scope. Reuses the same
+	// CREDENTIAL_CATEGORY_SCM_OAUTH / owner_id=provider-name slot Write
+	// already writes to.
+	WriteRaw(ctx context.Context, tenantID string, provider domain.ScmProvider, token, configJSON string) error
+}
+
+// CredentialStatusReader backs GetIntegrationCredentialStatus — metadata
+// only, via credential-broker-service's GetCredentialMetadataByOwner RPC
+// (TASK-038), never ResolveCredentialByOwner (which would leak plaintext
+// for a status check).
+type CredentialStatusReader interface {
+	GetStatus(ctx context.Context, tenantID string, provider domain.ScmProvider) (configured bool, configJSON string, err error)
+}
+
+// CredentialLister backs ListIntegrationCredentials via
+// credential-broker-service's ListCredentialsByCategory RPC (TASK-038).
+type CredentialLister interface {
+	ListConfiguredProviders(ctx context.Context, tenantID string) ([]domain.ScmProvider, error)
 }
 
 // CredentialRevoker is this service's disconnect path into

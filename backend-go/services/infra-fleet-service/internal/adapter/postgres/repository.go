@@ -173,13 +173,52 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 // service's README "Known gaps" for what still isn't wired (port_forwards,
 // provider_registry_entries, terminal_sessions).
 func (r *Repository) ResolveConnection(ctx context.Context, tenantID, connectionID string) (bool, domain.DevServer, domain.Connection, error) {
-	row := r.pool.QueryRow(ctx, `
+	const q = `
 		SELECT c.id, c.tenant_id, c.dev_server_id, c.repo_path, c.worktree_id,
 		       ds.id, ds.tenant_id, ds.host, ds.connection_mode
 		FROM infra.connections c
 		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
-		WHERE c.tenant_id = $1 AND c.id = $2
-	`, tenantID, connectionID)
+		WHERE c.tenant_id = $1 AND c.id = $2`
+	return r.scanConnectionRow(ctx, q, tenantID, connectionID)
+}
+
+// ResolveConnectionByDevServer is ResolveConnection's reverse-lookup
+// counterpart — see usecase.ConnectionResolver's doc comment (TASK-025).
+// A dev server can have had multiple connection rows over time — resolves
+// the most recently created one.
+func (r *Repository) ResolveConnectionByDevServer(ctx context.Context, tenantID, devServerID string) (bool, domain.DevServer, domain.Connection, error) {
+	const q = `
+		SELECT c.id, c.tenant_id, c.dev_server_id, c.repo_path, c.worktree_id,
+		       ds.id, ds.tenant_id, ds.host, ds.connection_mode
+		FROM infra.connections c
+		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
+		WHERE c.tenant_id = $1 AND c.dev_server_id = $2
+		ORDER BY c.created_at DESC
+		LIMIT 1`
+	return r.scanConnectionRow(ctx, q, tenantID, devServerID)
+}
+
+// ResolveConnectionByWorktree is ResolveConnection's worktree-keyed
+// counterpart — see usecase.ConnectionResolver's doc comment (TASK-025).
+func (r *Repository) ResolveConnectionByWorktree(ctx context.Context, tenantID, worktreeID string) (bool, domain.DevServer, domain.Connection, error) {
+	const q = `
+		SELECT c.id, c.tenant_id, c.dev_server_id, c.repo_path, c.worktree_id,
+		       ds.id, ds.tenant_id, ds.host, ds.connection_mode
+		FROM infra.connections c
+		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
+		WHERE c.tenant_id = $1 AND c.worktree_id = $2
+		ORDER BY c.created_at DESC
+		LIMIT 1`
+	return r.scanConnectionRow(ctx, q, tenantID, worktreeID)
+}
+
+// scanConnectionRow factors out ResolveConnection/ResolveConnectionByDevServer/
+// ResolveConnectionByWorktree's shared row-scan + "no rows means
+// connected=false, not an error" handling (TASK-025) — same column order,
+// same pgx.ErrNoRows branch, so all three callers share it instead of
+// duplicating the scan 3 ways.
+func (r *Repository) scanConnectionRow(ctx context.Context, query string, args ...any) (bool, domain.DevServer, domain.Connection, error) {
+	row := r.pool.QueryRow(ctx, query, args...)
 
 	var conn domain.Connection
 	var ds domain.DevServer

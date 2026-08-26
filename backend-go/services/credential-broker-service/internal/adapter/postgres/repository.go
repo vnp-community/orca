@@ -28,6 +28,7 @@ import (
 type dbtx interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
 // Repository implements both usecase.CredentialMetadataRepository and
@@ -61,10 +62,10 @@ func (r *Repository) RunInTx(ctx context.Context, fn func(ctx context.Context, m
 func (r *Repository) Create(ctx context.Context, m domain.CredentialMetadata) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO credential.credential_metadata (
-			id, tenant_id, owner_id, category, status, vault_path, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+			id, tenant_id, owner_id, category, status, vault_path, config_json, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	`,
-		m.ID, m.TenantID, m.OwnerID, string(m.Category), string(m.Status), m.VaultPath, m.CreatedAt, m.UpdatedAt,
+		m.ID, m.TenantID, m.OwnerID, string(m.Category), string(m.Status), m.VaultPath, m.ConfigJSON, m.CreatedAt, m.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("postgres: insert credential metadata: %w", err)
@@ -74,14 +75,14 @@ func (r *Repository) Create(ctx context.Context, m domain.CredentialMetadata) er
 
 func (r *Repository) Get(ctx context.Context, id string) (domain.CredentialMetadata, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, owner_id, category, status, vault_path, created_at, updated_at
+		SELECT id, tenant_id, owner_id, category, status, vault_path, COALESCE(config_json, ''), created_at, updated_at
 		FROM credential.credential_metadata
 		WHERE id = $1
 	`, id)
 
 	var m domain.CredentialMetadata
 	var category, status string
-	err := row.Scan(&m.ID, &m.TenantID, &m.OwnerID, &category, &status, &m.VaultPath, &m.CreatedAt, &m.UpdatedAt)
+	err := row.Scan(&m.ID, &m.TenantID, &m.OwnerID, &category, &status, &m.VaultPath, &m.ConfigJSON, &m.CreatedAt, &m.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.CredentialMetadata{}, domain.ErrCredentialNotFound
 	}
@@ -103,7 +104,7 @@ func (r *Repository) Get(ctx context.Context, id string) (domain.CredentialMetad
 // this query picks the newest.
 func (r *Repository) GetByOwner(ctx context.Context, tenantID string, category domain.Category, ownerID string) (domain.CredentialMetadata, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, owner_id, category, status, vault_path, created_at, updated_at
+		SELECT id, tenant_id, owner_id, category, status, vault_path, COALESCE(config_json, ''), created_at, updated_at
 		FROM credential.credential_metadata
 		WHERE tenant_id = $1 AND category = $2 AND owner_id = $3 AND status != $4
 		ORDER BY created_at DESC
@@ -112,7 +113,7 @@ func (r *Repository) GetByOwner(ctx context.Context, tenantID string, category d
 
 	var m domain.CredentialMetadata
 	var cat, status string
-	err := row.Scan(&m.ID, &m.TenantID, &m.OwnerID, &cat, &status, &m.VaultPath, &m.CreatedAt, &m.UpdatedAt)
+	err := row.Scan(&m.ID, &m.TenantID, &m.OwnerID, &cat, &status, &m.VaultPath, &m.ConfigJSON, &m.CreatedAt, &m.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.CredentialMetadata{}, domain.ErrCredentialNotFound
 	}
@@ -122,6 +123,34 @@ func (r *Repository) GetByOwner(ctx context.Context, tenantID string, category d
 	m.Category = domain.Category(cat)
 	m.Status = domain.Status(status)
 	return m, nil
+}
+
+// ListByCategory implements usecase.CredentialMetadataRepository.ListByCategory
+// — see that interface method's doc comment.
+func (r *Repository) ListByCategory(ctx context.Context, tenantID string, category domain.Category) ([]domain.CredentialMetadata, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, tenant_id, owner_id, category, status, vault_path, COALESCE(config_json, ''), created_at, updated_at
+		FROM credential.credential_metadata
+		WHERE tenant_id = $1 AND category = $2 AND status != $3
+		ORDER BY created_at
+	`, tenantID, string(category), string(domain.StatusRevoked))
+	if err != nil {
+		return nil, fmt.Errorf("postgres: listing credentials by category: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.CredentialMetadata
+	for rows.Next() {
+		var m domain.CredentialMetadata
+		var cat, status string
+		if err := rows.Scan(&m.ID, &m.TenantID, &m.OwnerID, &cat, &status, &m.VaultPath, &m.ConfigJSON, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("postgres: scanning credential metadata: %w", err)
+		}
+		m.Category = domain.Category(cat)
+		m.Status = domain.Status(status)
+		out = append(out, m)
+	}
+	return out, rows.Err()
 }
 
 func (r *Repository) UpdateStatus(ctx context.Context, id string, status domain.Status, now time.Time) error {

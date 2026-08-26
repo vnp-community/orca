@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -82,6 +83,7 @@ func run() error {
 	// be the same Go value.
 	repo := infrapostgres.New(pool)
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
+	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
 	// wired below via agentwsserver) are both real. relay-ssh's connection
@@ -116,6 +118,9 @@ func run() error {
 	listDevServersUC := usecase.NewListDevServers(repo)
 	createConnectionUC := usecase.NewCreateConnection(repo)
 	relayUC := usecase.NewRelay(repo, agentClient)
+	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
+	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
+	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
@@ -127,6 +132,9 @@ func run() error {
 		listDevServersUC,
 		createConnectionUC,
 		relayUC,
+		listBrowserProfilesUC,
+		createBrowserProfileUC,
+		deleteBrowserProfileUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

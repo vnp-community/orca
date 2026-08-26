@@ -143,11 +143,15 @@ func run() error {
 	startOAuthFlowUC := usecase.NewStartOAuthFlow(oauthRegistry, stateCodec, nil)
 	completeOAuthFlowUC := usecase.NewCompleteOAuthFlow(oauthRegistry, stateCodec, credentials)
 	revokeAuthUC := usecase.NewRevokeAuth(credentials)
+	setIntegrationCredentialUC := usecase.NewSetIntegrationCredential(credentials)
+	getIntegrationCredentialStatusUC := usecase.NewGetIntegrationCredentialStatus(credentials)
+	listIntegrationCredentialsUC := usecase.NewListIntegrationCredentials(credentials)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
 		listIssuesUC, createPullRequestUC, listPullRequestsUC, getRateLimitStatusUC,
 		getAuthStatusUC, startOAuthFlowUC, completeOAuthFlowUC, revokeAuthUC,
+		setIntegrationCredentialUC, getIntegrationCredentialStatusUC, listIntegrationCredentialsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

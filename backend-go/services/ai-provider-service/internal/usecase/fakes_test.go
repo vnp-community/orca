@@ -16,6 +16,26 @@ type fakeAccountRepository struct {
 	accounts  map[string]domain.ProviderAccount
 	createErr error
 	listErr   error
+
+	// lastListFilter records the last List call's filter — asserted by
+	// list_accounts_test.go (TASK-030).
+	lastListFilter ListAccountsFilter
+
+	// getReturns, when non-nil, short-circuits Get to return this account
+	// instead of looking it up in the accounts map — write_credential_test.go/
+	// test_connection_test.go (TASK-030) use this to seed a Get result
+	// without needing a full Create round-trip first.
+	getReturns *domain.ProviderAccount
+
+	// updateErr/lastUpdateInput back update_account_test.go (TASK-030).
+	updateErr       error
+	lastUpdateInput UpdateFields
+
+	// deleteErr/lastDeleteTenantID/lastDeleteAccountID back
+	// delete_account_test.go (TASK-030).
+	deleteErr           error
+	lastDeleteTenantID  string
+	lastDeleteAccountID string
 }
 
 func newFakeAccountRepository() *fakeAccountRepository {
@@ -31,6 +51,9 @@ func (f *fakeAccountRepository) Create(ctx context.Context, account domain.Provi
 }
 
 func (f *fakeAccountRepository) Get(ctx context.Context, tenantID, id string) (domain.ProviderAccount, error) {
+	if f.getReturns != nil {
+		return *f.getReturns, nil
+	}
 	acc, ok := f.accounts[id]
 	if !ok || acc.TenantID != tenantID {
 		return domain.ProviderAccount{}, domain.ErrAccountNotFound
@@ -39,6 +62,7 @@ func (f *fakeAccountRepository) Get(ctx context.Context, tenantID, id string) (d
 }
 
 func (f *fakeAccountRepository) List(ctx context.Context, filter ListAccountsFilter) ([]domain.ProviderAccount, error) {
+	f.lastListFilter = filter
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
@@ -54,6 +78,9 @@ func (f *fakeAccountRepository) List(ctx context.Context, filter ListAccountsFil
 			continue
 		}
 		if filter.Scope == domain.ScopeProject && acc.ProjectID != filter.ScopeRefID {
+			continue
+		}
+		if filter.DevServerID != "" && acc.DevServerID != filter.DevServerID {
 			continue
 		}
 		out = append(out, acc)
@@ -77,6 +104,39 @@ func (f *fakeAccountRepository) UpdateStatus(ctx context.Context, in UpdateStatu
 	return acc, nil
 }
 
+// Update implements usecase.ProviderAccountRepository.Update — records the
+// input verbatim (lastUpdateInput) and, when the account is known, returns
+// it unmodified (Label/ModelHint/BaseURL aren't domain.ProviderAccount
+// fields — see ports.go's UpdateFields doc comment — so there is nothing on
+// the returned struct for them to change).
+func (f *fakeAccountRepository) Update(ctx context.Context, in UpdateFields) (domain.ProviderAccount, error) {
+	f.lastUpdateInput = in
+	if f.updateErr != nil {
+		return domain.ProviderAccount{}, f.updateErr
+	}
+	acc, ok := f.accounts[in.AccountID]
+	if !ok || acc.TenantID != in.TenantID {
+		return domain.ProviderAccount{}, domain.ErrAccountNotFound
+	}
+	return acc, nil
+}
+
+// Delete implements usecase.ProviderAccountRepository.Delete.
+func (f *fakeAccountRepository) Delete(ctx context.Context, tenantID, accountID string) error {
+	f.lastDeleteTenantID = tenantID
+	f.lastDeleteAccountID = accountID
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	acc, ok := f.accounts[accountID]
+	if !ok || acc.TenantID != tenantID {
+		return domain.ErrAccountNotFound
+	}
+	acc.Status = domain.AccountStatusRevoked
+	f.accounts[accountID] = acc
+	return nil
+}
+
 // fakeUsageRepository is an in-memory UsageRepository.
 type fakeUsageRepository struct {
 	states map[string]domain.QuotaState // keyed by accountID
@@ -96,9 +156,15 @@ type fakeCredentialBroker struct {
 	writeErr  error
 	rotateErr error
 	nextRefID string
+
+	// lastWriteOwnerID records WriteCredential's last OwnerID — asserted by
+	// write_credential_test.go (TASK-030) to verify the owner_id derivation
+	// mirrors CreateAccount's.
+	lastWriteOwnerID string
 }
 
 func (f *fakeCredentialBroker) WriteCredential(ctx context.Context, in WriteCredentialInput) (CredentialRef, error) {
+	f.lastWriteOwnerID = in.OwnerID
 	if f.writeErr != nil {
 		return CredentialRef{}, f.writeErr
 	}
