@@ -186,6 +186,27 @@ func (f *fakeCredentialBroker) ResolveCredential(ctx context.Context, credential
 	return CredentialRef{ID: credentialRef, Status: "active"}, nil
 }
 
+// fakeInfraFleetClient is an in-memory InfraFleetClient — backs
+// test_connection_test.go (TASK-030).
+type fakeInfraFleetClient struct {
+	relayResult map[string]any
+	relayErr    error
+
+	lastDevServerID string
+	lastMethod      string
+	lastParams      map[string]any
+}
+
+func (f *fakeInfraFleetClient) Relay(ctx context.Context, devServerID, method string, params map[string]any) (map[string]any, error) {
+	f.lastDevServerID = devServerID
+	f.lastMethod = method
+	f.lastParams = params
+	if f.relayErr != nil {
+		return nil, f.relayErr
+	}
+	return f.relayResult, nil
+}
+
 var errBoom = errors.New("boom")
 
 func withIdentity(ctx context.Context, tenantID, userID string) context.Context {
