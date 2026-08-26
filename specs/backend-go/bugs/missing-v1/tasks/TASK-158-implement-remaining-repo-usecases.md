@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `services/git-gateway-service/internal/usecase/ports.go`, `services/git-gateway-service/internal/usecase/{base_ref_default,search_refs,check_hooks,read_issue_command,write_issue_command,scan_setup_script_imports}.go` (new), `services/git-gateway-service/internal/adapter/localgit/executor.go`, `services/git-gateway-service/internal/adapter/grpcclient/relay_executor.go`
 **Depends on:** TASK-156 (needs generated request/response stubs), TASK-157 (extends the same `GitExecutor` interface)
-**Status:** `[needs merge with git.*/files.* group]` — implemented in worktree `agent-a5714e047dcaed0fc`, committed as `56c5fbeff`, builds/tests green in isolation. Touches the same `gitgateway.proto`/`server.go`/`main.go` as the concurrent git.*/files.*/worktree.* work — needs manual reconciliation at merge. Found `DevServerReachability` bug: the task doc's placeholder `GetDevServers()` was wrong, real fix uses `GetFleetHealth`'s `resp.GetStatuses()`.
+**Status:** `[x]` DONE — merge reconciliation completed (merged into `integration/missing-v1` across merges 6-10, git-gateway-service server.go/proto conflicts manually reconciled) — implemented in worktree `agent-a5714e047dcaed0fc`, committed as `56c5fbeff`, builds/tests green in isolation. Touches the same `gitgateway.proto`/`server.go`/`main.go` as the concurrent git.*/files.*/worktree.* work — needs manual reconciliation at merge. Found `DevServerReachability` bug: the task doc's placeholder `GetDevServers()` was wrong, real fix uses `GetFleetHealth`'s `resp.GetStatuses()`.
 
 ---
 
