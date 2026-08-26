@@ -5,7 +5,7 @@
 **Service:** `issue-tracking-service`
 **File:** `backend-go/proto/orca/issuetracking/v1/issuetracking.proto`, `internal/usecase/{ports.go,set_integration_credential.go,get_integration_credential_status.go,list_integration_credentials.go,revoke_auth.go}` (new), `internal/adapter/credential/client.go`, `internal/adapter/grpc/server.go`, `cmd/server/main.go`
 **Depends on:** TASK-037, TASK-038
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `issuetracking.proto`'s 4 RPCs/messages and generated stubs already existed on this branch; `usecase/ports.go`'s 4 credential ports (`CredentialWriter`/`CredentialStatusReader`/`CredentialLister`/`CredentialRevoker`) already existed too. What this task added: `internal/usecase/{set_integration_credential.go,get_integration_credential_status.go,list_integration_credentials.go,revoke_auth.go}` (all 4 new), 4 new `Resolver` methods in `internal/adapter/credential/client.go` (`WriteRaw`/`GetStatus`/`ListConfiguredProviders`/`RevokeByOwner`, keyed by a new provider-name-only `credentialsOwnerID` — deliberately distinct from `Resolve`/`Write`/`ExistingCredentialID`'s existing per-user `"<userID>:<provider>"` owner_id), 4 new gRPC methods + `toProtoProvider` in `internal/adapter/grpc/server.go`, and composition-root wiring in `cmd/server/main.go`. `go build ./... && go vet ./... && go test ./...` clean; new usecase tests in `internal/usecase/{set_integration_credential_test.go,get_integration_credential_status_test.go,list_integration_credentials_test.go,revoke_auth_test.go}`. No `grpc/server_test.go` added — this codebase has no existing convention of unit-testing the translation-only grpc adapter layer directly (neither does scm-integration-service's equivalent server.go), only through usecase-level tests.
 
 ---
 
