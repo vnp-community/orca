@@ -7,25 +7,18 @@ import (
 	"github.com/stablyai/orca-go/common/tenant"
 )
 
-// ctrlC is the interrupt byte (0x03, ETX) a terminal driver sends on Ctrl-C —
-// FLAGGED deviation: the task instructions for TASK-181 name exactly seven
-// DevServerAgentClient methods to add (SpawnPty/WritePty/ResizePty/KillPty/
-// StreamPty/AgentStatus/InspectProcess), with none of them a dedicated
-// "send signal" primitive — even though the real agent DOES expose one
-// (pty.sendSignal, confirmed in agent/src/relay/agent-rpc-dispatch.ts).
-// Rather than adding an eighth port method the task list didn't ask for,
-// StopTerminalProcess ("sends an interrupt signal to the pty's foreground
-// process", per StopTerminalProcessRequest's proto doc comment) is
-// implemented as WritePty(0x03) — a pragmatic equivalent for the common
-// SIGINT case, but NOT equivalent to a real signal delivery (SIGTERM/SIGKILL
-// aren't reachable this way, and 0x03 only works if the foreground process
-// has a functioning tty signal handler). See this service's final report for
-// this same flag.
-const ctrlC = 0x03
+// signalInterrupt is the POSIX signal StopTerminalProcess sends — a real
+// pty.sendSignal call (see DevServerAgentClient.SendSignal's doc comment),
+// not the former WritePty(0x03)-Ctrl-C-byte workaround this replaces.
+// SIGINT is the right default for "interrupt the foreground process without
+// tearing the session down" (StopTerminalProcessRequest's proto doc
+// comment); SIGTERM/SIGKILL are reachable through the same port method but
+// aren't exposed by this RPC, which is scoped to "stop", not "kill" (see
+// KillTerminalSession/KillPty for teardown).
+const signalInterrupt = "SIGINT"
 
-// StopTerminalProcess sends an interrupt to ptyID's foreground process
-// without tearing the session down — see ctrlC's doc comment above for the
-// FLAGGED implementation detail.
+// StopTerminalProcess sends SIGINT to ptyID's foreground process without
+// tearing the session down.
 type StopTerminalProcess struct {
 	sessions TerminalSessionRepository
 	resolver ConnectionResolver
@@ -47,7 +40,7 @@ func (uc *StopTerminalProcess) Execute(ctx context.Context, ptyID string) error 
 		return err
 	}
 
-	if err := uc.agent.WritePty(ctx, devServer, ptyID, []byte{ctrlC}); err != nil {
+	if err := uc.agent.SendSignal(ctx, devServer, ptyID, signalInterrupt); err != nil {
 		return apperrors.New(apperrors.KindInternal, "INFRA_AGENT_STOP_PROCESS_FAILED", "failed to send interrupt to pty's foreground process", err)
 	}
 	return nil

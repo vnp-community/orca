@@ -132,6 +132,11 @@ func registerTerminalChannels(r *Registry, client infrafleetv1.InfraFleetService
 	registerTerminalFocusChannel(r, client)
 	registerTerminalAgentStatusChannels(r, client)
 	registerTerminalInspectProcessChannel(r, client)
+	// terminal.multiplex (channels_terminal_multiplex.go): the real binary
+	// opcode-framed protocol the unmodified frontend speaks — supplements,
+	// does not replace, terminal.create's terminal.output/terminal.exited
+	// JSON push channels above.
+	registerTerminalMultiplexChannel(r, client)
 }
 
 // terminalSessionView is the wire shape terminal.create/terminal.list

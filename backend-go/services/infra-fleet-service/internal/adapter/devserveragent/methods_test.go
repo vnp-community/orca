@@ -131,11 +131,60 @@ func TestClientWriteResizeKillPty_CallExpectedMethods(t *testing.T) {
 	}
 }
 
+// TestClientSendSignal_SendsExpectedParams verifies pty.sendSignal's real
+// {id, signal} param shape (confirmed against
+// agent/src/relay/pty-agent-bridge.ts's handlePtySendSignal doc comment) —
+// the primitive that replaces the former WritePty(0x03) Ctrl-C workaround
+// for StopTerminalProcess (TASK-183 follow-up).
+func TestClientSendSignal_SendsExpectedParams(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
+		"pty.sendSignal": map[string]any{"ok": true},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-signal", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if err := client.SendSignal(context.Background(), devServer, "pty-9", "SIGINT"); err != nil {
+		t.Fatalf("SendSignal: %v", err)
+	}
+	params := agent.lastParams(t, "pty.sendSignal")
+	if params["id"] != "pty-9" || params["signal"] != "SIGINT" {
+		t.Errorf("pty.sendSignal params = %+v, want id=pty-9 signal=SIGINT", params)
+	}
+}
+
+// TestClientSendSignal_RejectsUnknownSignal_WithoutACall proves an
+// unsupported signal never reaches the wire — allowedSignals mirrors the
+// agent's own ALLOWED_SIGNALS set, so this fails fast client-side instead of
+// round-tripping to a -32602 from the agent.
+func TestClientSendSignal_RejectsUnknownSignal_WithoutACall(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-signal-bad", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if err := client.SendSignal(context.Background(), devServer, "pty-9", "SIGWHATEVER"); err == nil {
+		t.Fatal("expected an error for a signal outside the agent's allowed set")
+	}
+}
+
 func TestClientAgentStatusAndInspectProcess_FromListProcesses(t *testing.T) {
 	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
 		"pty.listProcesses": []any{
-			map[string]any{"id": "pty-1", "cwd": "/work", "title": "claude"},
-			map[string]any{"id": "pty-2", "cwd": "/other", "title": "bash"},
+			map[string]any{"id": "pty-1", "cwd": "/work", "title": "claude", "pid": 4242},
+			map[string]any{"id": "pty-2", "cwd": "/other", "title": "bash", "pid": 4243},
 		},
 	}}
 	host, port := startFakeAgent(t, agent)
@@ -168,7 +217,7 @@ func TestClientAgentStatusAndInspectProcess_FromListProcesses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InspectProcess: %v", err)
 	}
-	if !inspect.Known || inspect.Command != "claude" || inspect.Cwd != "/work" {
+	if !inspect.Known || inspect.Command != "claude" || inspect.Cwd != "/work" || inspect.Pid != 4242 {
 		t.Errorf("unexpected InspectProcessResult: %+v", inspect)
 	}
 

@@ -34,8 +34,25 @@ type fakeTerminalInfraFleetClient struct {
 	getTerminalStatusFunc  func(*infrafleetv1.GetTerminalAgentStatusRequest) (*infrafleetv1.GetTerminalAgentStatusResponse, error)
 	inspectProcessFunc     func(*infrafleetv1.InspectTerminalProcessRequest) (*infrafleetv1.InspectTerminalProcessResponse, error)
 	attachPtyErr           error
-	lastStream             *fakePtyStream
 	getTerminalStatusCalls int
+
+	// lastStreamMu guards lastStream — every pre-existing test in this file
+	// calls AttachPty and reads lastStream back on the SAME goroutine (via
+	// r.Dispatch), so this was never a real race before
+	// channels_terminal_multiplex_test.go's end-to-end test started
+	// reading it from a separate test goroutine while handler.go's binary
+	// frame dispatch (its own goroutine — see handler.go's ServeHTTP doc
+	// comment on why) writes it concurrently via AttachPty.
+	lastStreamMu sync.Mutex
+	lastStream   *fakePtyStream
+}
+
+// getLastStream is the race-safe way to read lastStream from a goroutine
+// other than the one that called AttachPty — see lastStreamMu's doc comment.
+func (f *fakeTerminalInfraFleetClient) getLastStream() *fakePtyStream {
+	f.lastStreamMu.Lock()
+	defer f.lastStreamMu.Unlock()
+	return f.lastStream
 }
 
 func (f *fakeTerminalInfraFleetClient) SpawnTerminalSession(_ context.Context, in *infrafleetv1.SpawnTerminalSessionRequest, _ ...grpc.CallOption) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
@@ -79,8 +96,11 @@ func (f *fakeTerminalInfraFleetClient) AttachPty(_ context.Context, _ ...grpc.Ca
 	if f.attachPtyErr != nil {
 		return nil, f.attachPtyErr
 	}
-	f.lastStream = newFakePtyStream()
-	return f.lastStream, nil
+	stream := newFakePtyStream()
+	f.lastStreamMu.Lock()
+	f.lastStream = stream
+	f.lastStreamMu.Unlock()
+	return stream, nil
 }
 
 // fakePtyStream implements grpc.BidiStreamingClient[PtyClientFrame,

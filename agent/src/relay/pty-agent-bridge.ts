@@ -551,11 +551,14 @@ export async function handlePtyListProcesses(
   _params: Record<string, unknown>,
   _log:   AgentLogger,
 ): Promise<object> {
-  const results: { id: string; cwd: string; title: string }[] = []
+  const results: { id: string; cwd: string; title: string; pid: number }[] = []
   for (const [ptyId, entry] of AGENT_PTY_MAP) {
     const title =
       (await getForegroundProcessName(entry.pty.pid, entry.pty.process || null)) || 'shell'
-    results.push({ id: ptyId, cwd: entry.cwd, title })
+    // pid is the PTY's own (shell) process id, not the foreground child's —
+    // added so backend-go's InspectProcess can report a real pid instead of
+    // always 0 (see infra-fleet-service's devserveragent/methods.go).
+    results.push({ id: ptyId, cwd: entry.cwd, title, pid: entry.pty.pid })
   }
   return { jsonrpc: '2.0', id, result: results }
 }
