@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   HOST_ACCOUNT_ID,
+  getAccountsSnapshot,
+  handleAccountsGetSnapshot,
   handleAccountsRemoveClaude,
   handleAccountsRemoveCodex,
   handleAccountsSelectClaude,
@@ -225,5 +227,35 @@ describe('JSON-RPC dispatch handlers', () => {
       error?: { message: string }
     }
     expect(resp.error?.message).toBe('That Codex rate limit account no longer exists.')
+  })
+
+  it('handleAccountsGetSnapshot resolves ok with a {claude, codex} result envelope', async () => {
+    const resp = (await handleAccountsGetSnapshot(1)) as {
+      error?: unknown
+      result?: { claude?: unknown; codex?: unknown }
+    }
+    expect(resp.error).toBeUndefined()
+    expect(resp.result?.claude).toBeDefined()
+    expect(resp.result?.codex).toBeDefined()
+  })
+})
+
+describe('accounts.getSnapshot', () => {
+  it('returns empty state for both providers when neither config file exists', async () => {
+    const snapshot = await getAccountsSnapshot(paths)
+    expect(snapshot.claude.accounts).toHaveLength(0)
+    expect(snapshot.codex.accounts).toHaveLength(0)
+  })
+
+  it('reflects both providers once their config files exist, without mutating either', async () => {
+    await mkdir(paths.claudeDir, { recursive: true })
+    await writeFile(join(paths.claudeDir, '.credentials.json'), '{}')
+    await writeFile(paths.claudeConfigFile, JSON.stringify({ oauthAccount: { emailAddress: 'a@b.com' } }))
+    await mkdir(paths.codexDir, { recursive: true })
+    await writeFile(join(paths.codexDir, 'auth.json'), JSON.stringify({ OPENAI_API_KEY: 'sk-test' }))
+
+    const snapshot = await getAccountsSnapshot(paths)
+    expect(snapshot.claude.accounts).toEqual([expect.objectContaining({ id: HOST_ACCOUNT_ID, email: 'a@b.com' })])
+    expect(snapshot.codex.accounts).toHaveLength(1)
   })
 })

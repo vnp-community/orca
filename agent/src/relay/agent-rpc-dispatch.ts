@@ -1500,6 +1500,20 @@ async function route(
       }
     }
 
+    // ── accounts.getSnapshot ─────────────────────────────────────────────────
+    // Backs api-gateway's accounts.subscribe poll loop (BUG-005/SOL-005's
+    // session-client push bridge) — read-only, no accountId param. See
+    // accounts-handler.ts's getAccountsSnapshot doc comment.
+    case 'accounts.getSnapshot': {
+      try {
+        const { handleAccountsGetSnapshot } = await import('./accounts-handler')
+        return (await handleAccountsGetSnapshot(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.getSnapshot unavailable: ${msg}`)
+      }
+    }
+
     // ── Unknown method ───────────────────────────────────────────────────────
     default:
       return makeError(rpc.id, AgentErrorCode.MethodNotFound, `Method not found: ${rpc.method}`)

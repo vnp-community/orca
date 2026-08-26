@@ -1,7 +1,8 @@
 // agent/src/relay/accounts-handler.ts
 // TASK-023 (specs/backend-go/bugs/missing-v1/tasks/TASK-023-document-accounts-agent-gap.md):
-// implements accounts.selectClaude/selectCodex/removeClaude/removeCodex as
-// real JSON-RPC methods on the Dev Server Agent's dispatcher
+// implements accounts.selectClaude/selectCodex/removeClaude/removeCodex, plus
+// the later read-only accounts.getSnapshot (see its own doc comment below),
+// as real JSON-RPC methods on the Dev Server Agent's dispatcher
 // (agent-rpc-dispatch.ts) — the surface backend-go's infra-fleet-service
 // `Relay` RPC and api-gateway's wscompat channels_accounts.go actually reach.
 //
@@ -399,6 +400,35 @@ export async function handleAccountsRemoveCodex(
   }
   try {
     const result = await removeCodexAccount(accountId)
+    return { jsonrpc: '2.0', id, result }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }
+  }
+}
+
+// ─── accounts.getSnapshot — backs api-gateway's accounts.subscribe poll ─────
+//
+// Why this exists (not part of TASK-023's original 4-method list): a
+// read-only snapshot with no side effect, so api-gateway's wscompat
+// accounts.subscribe channel (BUG-005/SOL-005's session-client push bridge)
+// can poll for external changes — e.g. the host owner running `claude
+// login`/`codex login` directly in a separate terminal, outside any
+// select/remove call this agent ever sees — without mutating state on every
+// poll tick the way calling selectClaudeAccount(activeId) again would risk
+// doing if activeId ever went stale. Mirrors the real desktop
+// OrcaRuntimeService.getAccountsSnapshot()'s {claude, codex} shape
+// (rateLimits omitted: a bare remote host has no RateLimitService to poll).
+export async function getAccountsSnapshot(
+  paths: AccountsHandlerPaths = defaultAccountsHandlerPaths()
+): Promise<{ claude: ClaudeRateLimitAccountsState; codex: CodexRateLimitAccountsState }> {
+  const [claude, codex] = await Promise.all([listClaudeAccounts(paths), listCodexAccounts(paths)])
+  return { claude, codex }
+}
+
+export async function handleAccountsGetSnapshot(id: string | number | null): Promise<object> {
+  try {
+    const result = await getAccountsSnapshot()
     return { jsonrpc: '2.0', id, result }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)

@@ -2,10 +2,10 @@
 
 **From Solution:** SOL-004
 **Priority:** P3 — tracking only, blocks nothing in this repo's `backend-go` build
-**Service:** `agent` (DONE this session) / `frontend` (still blocked — see below, now for a definitively-confirmed reason)
-**File:** `agent/src/relay/accounts-handler.ts` (new), `agent/src/relay/accounts-handler.test.ts` (new), `agent/src/relay/agent-rpc-dispatch.ts` (registers the 4 methods) — no `frontend/` diff, see "Frontend dispatch-model finding" below for why
+**Service:** `agent` (DONE this session) / `api-gateway` (DONE this session — `accounts.subscribe`) / `frontend` (still blocked — see below, narrower reason post-BUG-005)
+**File:** `agent/src/relay/accounts-handler.ts` (+`getAccountsSnapshot`/`handleAccountsGetSnapshot`), `agent/src/relay/accounts-handler.test.ts`, `agent/src/relay/agent-rpc-dispatch.ts` (registers `accounts.getSnapshot`), `backend-go/services/api-gateway/internal/adapter/wscompat/channels_accounts.go` (+`registerAccountsSubscribeChannel`), `channels_accounts_test.go` — no `frontend/` diff, see "Update (post-BUG-005)" below for why
 **Depends on:** TASK-021
-**Status:** `[partial]` — **agent-side gap is now genuinely CLOSED**: `accounts.selectClaude`/`selectCodex`/`removeClaude`/`removeCodex` are real, tested JSON-RPC methods on the Dev Server Agent's dispatcher (`agent-rpc-dispatch.ts`), so `infra-fleet-service`'s `Relay` RPC no longer hits "method not found" for these 4 methods. **Frontend-side is still blocked, but the original "just thread `connectionId` into `runtime-provider-accounts-client.ts`" framing is now known to be the WRONG fix** — see "Frontend dispatch-model finding" below for the traced evidence. No `frontend/` code was changed; fabricating a `connectionId` param would not connect anything real (see below), so per this session's honesty standard (same as TASK-036's resolution) the correct outcome is leaving `frontend/` unchanged and documenting the real blocker here instead of a cosmetic no-op edit.
+**Status:** `[partial]` — **agent-side gap is now genuinely CLOSED**: `accounts.selectClaude`/`selectCodex`/`removeClaude`/`removeCodex`/`getSnapshot` are real, tested JSON-RPC methods on the Dev Server Agent's dispatcher (`agent-rpc-dispatch.ts`), `accounts.subscribe` is now a real, registered `StreamHandler` in `wscompat` (`channels_accounts.go`, polling `accounts.getSnapshot`) — see "Update (post-BUG-005)" below. **Frontend-side is still blocked, but the blocker has narrowed**: BUG-005's dialect bridge means `wscompat` now has a real, working transport path for the `WebSessionClient` (session-cookie multi-user web) build target specifically — the original "just thread `connectionId`" framing is still not a complete fix on its own, but it is now the ONLY remaining piece for that one transport, not a fundamentally wrong direction. No `frontend/` code was changed — see below for why.
 
 ---
 
@@ -78,6 +78,62 @@ touched — see TASK-036's identical honesty standard for precedent.
 
 ---
 
+## Update (2026-08-27, post-BUG-005) — the "no client build ever reaches wscompat" premise is now partly outdated
+
+The "Frontend dispatch-model finding" above was traced BEFORE
+[BUG-005](../../api-v1/BUG-005-websessionclient-dialect-dropped.md) was
+found and fixed. That finding's option (a) — "a genuinely new `frontend/`
+code path that opens a tenant/JWT-authenticated connection to `api-gateway`'s
+`wscompat` WS endpoint... does not exist in `frontend/`, `desktop/`, or
+`mobile/` today, for ANY namespace" — is no longer accurate for one of the
+three transports it grouped together:
+
+- `frontend/src/renderer/src/web/web-session-client.ts`'s `WebSessionClient`
+  (used by `getClientForEnvironment` for `ORCA_MULTI_USER` session-cookie web
+  deployments) already opens exactly this connection — `ws(s)://<host>/ws`,
+  the same endpoint `wscompat`'s `Handler.ServeHTTP` answers, authenticated
+  via the `orca_session` cookie at WS-upgrade time. BUG-005 found it was
+  sending a message shape (`{id,authToken:'cookie-auth',method,params}`)
+  `wscompat` silently dropped, and fixed `wscompat` to recognize and bridge
+  it (Phase 1: plain calls; Phase 2: streaming/subscribe pushes, both now
+  merged). This was NOT a `frontend/` change — `WebSessionClient` was
+  already doing the right thing; `wscompat` was the side that couldn't
+  understand it.
+- `frontend/src/renderer/src/web/web-runtime-client.ts`'s `WebRuntimeClient`
+  (E2EE pair-code mode) and `desktop/`'s Electron-IPC pairing transport are
+  UNCHANGED by BUG-005 — those really are a structurally different protocol
+  (device-token + Curve25519-ECDH, no session cookie), and remain outside
+  `wscompat` entirely. The dispatch-model finding's grep evidence
+  (`deviceToken`/`PairingOffer` absent from `backend-go/`) still stands for
+  these two.
+
+**Net effect on this task:** for the `WebSessionClient` transport
+specifically, `wscompat`'s `accounts.*` channels (including the now-real
+`accounts.subscribe`, see below) are reachable end-to-end EXCEPT for the one
+piece SOL-004 originally flagged: `runtime-provider-accounts-client.ts`'s
+`environment`-target call sites still send `{accountId}` (or, for
+`accounts.subscribe`, no params object at all) — no `connectionId`. That
+frontend change is real, scoped, and no longer premised on a dead-end
+transport — but it is still a `frontend/` product/engineering decision
+(where does that `connectionId` come from — `getActiveRuntimeTarget`'s
+`environmentId` is NOT the same value as `infrafleetv1.RelayRequest`'s
+`connectionId`; resolving one to the other needs a real lookup this task
+does not have the authority or context to invent) — not fabricated here,
+per this session's standing honesty rule.
+
+`accounts.subscribe` is now implemented for real (not left for "a third,
+later item" as originally noted below): `channels_accounts.go` registers it
+as a `StreamHandler` that fetches an initial snapshot via the agent's new
+read-only `accounts.getSnapshot` method, then polls every
+`accountsSubscribePollInterval` (30s) and pushes a `{type:'snapshot',...}`
+update only when the snapshot actually changes — a poll-based bridge, per
+SOL-004's own "or a poll-based wscompat bridge" alternative, since a bare
+remote host has no change-notification/fs-watch infrastructure to drive a
+real push. `agents/src/relay/accounts-handler.ts`'s `getAccountsSnapshot`
+and `channels_accounts_test.go`'s 3 new tests cover this.
+
+---
+
 ## Context
 
 TASK-021 makes `accounts.*` relay correctly through
@@ -133,21 +189,25 @@ shipped" — it produces no `backend-go` diff.
    `~/.codex/auth.json` (JWT `id_token` claims) — no CLI subprocess spawn, no
    keychain access. Empty-config-file and remove-nonexistent-account cases are
    covered by `agent/src/relay/accounts-handler.test.ts` (21 tests).
-2. **frontend-side — still blocked, now for a proven reason (not a missing
-   param):** see "Frontend dispatch-model finding" above. File (or link) a
-   tracking issue titled "Give `accounts.*` (and `wscompat`'s other 261
-   namespaces) a real frontend caller" — the actual gap is that no Orca
-   client build (desktop, mobile, or web-pairing) opens a tenant/JWT WS
-   connection to `api-gateway`'s `wscompat` server at all today; `accounts.*`
-   is not a special case of this, it is the general case. This is a
-   product/architecture decision (build the `wscompat` caller, or bridge
-   `Relay` into the legacy pairing protocol), not an engineering task with an
-   obvious scope — do not silently pick one on a future pass.
+2. **frontend-side — still blocked, scope now narrower (see "Update
+   (post-BUG-005)" above):** for the `WebSessionClient` (session-cookie
+   multi-user web) build target, `wscompat` is now a real, reachable
+   backend — the remaining gap is exactly the `connectionId` SOL-004
+   originally identified, in `runtime-provider-accounts-client.ts`'s 5
+   `environment`-target call sites (4 mutations + `accounts.subscribe`).
+   File (or link) a tracking issue titled "Thread a real `connectionId`
+   into `accounts.*`'s `environment`-target call params" — scope: resolve
+   `getActiveRuntimeTarget`'s `environmentId` to the `connectionId`
+   `infrafleetv1.RelayRequest` needs (these are NOT the same value; the
+   resolution path doesn't exist yet and isn't obvious from this task's
+   context — a real design decision, not a mechanical rename). For
+   `WebRuntimeClient`/desktop's pairing transport, the original, broader
+   finding still holds unchanged: no bridge into `wscompat` exists for
+   those at all — that remains the bigger, separate architecture question,
+   track separately if/when it's picked up.
 
-Also note for whoever picks up either: SOL-004 separately flags
-`accounts.subscribe` (a streaming variant) as explicitly out of scope for
-its own 4-method list — track that as a third, later item if/when it's
-picked up, not part of either issue above.
+`accounts.subscribe` is DONE, not a future item — see "Update
+(post-BUG-005)" above.
 
 ---
 
