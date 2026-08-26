@@ -137,18 +137,20 @@ func run() error {
 	checkIgnoredUC := usecase.NewCheckIgnored(resolver, local, relay)
 	forkSyncUC := usecase.NewForkSync(resolver, local, relay)
 	upstreamStatusUC := usecase.NewUpstreamStatus(resolver, local, relay)
-	// ⚠️ BLOCKED — do not wire these 5 until TASK-209's Contract correction
-	// section shape redesigns land:
-	// commitCompareUC := usecase.NewCommitCompare(resolver, local, relay)
-	// branchCompareUC := usecase.NewBranchCompare(resolver, local, relay)
-	// commitDiffUC := usecase.NewCommitDiff(resolver, local, relay)
-	// branchDiffUC := usecase.NewBranchDiff(resolver, local, relay)
-	// submoduleStatusUC := usecase.NewSubmoduleStatus(resolver, local, relay)
+	// Real shape redesigns per TASK-209's Contract correction section — see
+	// each usecase's own doc comment for the confirmed real agent contract
+	// citations that unblocked these.
+	commitCompareUC := usecase.NewCommitCompare(resolver, local, relay)
+	branchCompareUC := usecase.NewBranchCompare(resolver, local, relay)
+	commitDiffUC := usecase.NewCommitDiff(resolver, local, relay)
+	branchDiffUC := usecase.NewBranchDiff(resolver, local, relay)
+	submoduleStatusUC := usecase.NewSubmoduleStatus(resolver, local, relay)
 
 	remoteCommitURLUC := usecase.NewRemoteCommitURL(resolver, local, relay)
 	remoteFileURLUC := usecase.NewRemoteFileURL(resolver, local, relay)
-	// ⚠️ BLOCKED — fetch needs TASK-227 + the pushTarget design question
-	// (SOL-032 §0 open question #1) resolved first. Not wired.
+	// Fetch: TASK-227 (relay reachability) and PushTargetInput (TASK-207)
+	// are both now real, unblocking this per TASK-210's Contract correction.
+	fetchUC := usecase.NewFetch(resolver, local, relay)
 
 	generatePullRequestFieldsUC := usecase.NewGeneratePullRequestFields(resolver, getStatusUC, getDiffUC, relay)
 	discoverCommitMessageModelsUC := usecase.NewDiscoverCommitMessageModels(aiProviderResolver)
@@ -203,7 +205,8 @@ func run() error {
 		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
 		stageUC, unstageUC,
 		historyUC, checkIgnoredUC, forkSyncUC, upstreamStatusUC,
-		remoteCommitURLUC, remoteFileURLUC,
+		commitCompareUC, branchCompareUC, commitDiffUC, branchDiffUC, submoduleStatusUC,
+		remoteCommitURLUC, remoteFileURLUC, fetchUC,
 		generatePullRequestFieldsUC, discoverCommitMessageModelsUC,
 		readFileUC, readFileChunkUC, readFilePreviewUC, readDirUC, writeFileUC, writeFileChunkUC,
 		createDirUC, deleteFileUC, statFileUC, searchFilesUC, listAllFilesUC, listMarkdownDocumentsUC,

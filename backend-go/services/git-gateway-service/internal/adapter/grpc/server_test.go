@@ -70,7 +70,7 @@ func (fakeExecutor) ForkSync(context.Context, string, string) (domain.ForkSyncSt
 	return domain.ForkSyncStatus{Ahead: 1, Behind: 2}, nil
 }
 
-func (fakeExecutor) UpstreamStatus(context.Context, string, string) (domain.UpstreamStatus, error) {
+func (fakeExecutor) UpstreamStatus(context.Context, string, *domain.PushTargetInput) (domain.UpstreamStatus, error) {
 	return domain.UpstreamStatus{HasUpstream: true, Ahead: 1}, nil
 }
 
@@ -80,6 +80,39 @@ func (fakeExecutor) RemoteCommitURL(context.Context, string, string) (string, er
 
 func (fakeExecutor) RemoteFileURL(context.Context, string, string, string) (string, error) {
 	return "https://example.com/blob/main/a.txt", nil
+}
+
+func (fakeExecutor) Fetch(context.Context, string, *domain.PushTargetInput) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) CommitCompare(context.Context, string, string) (domain.CommitCompareResult, error) {
+	return domain.CommitCompareResult{
+		CommitOID: "deadbeef", CompareRef: "deadbee", BaseRef: "empty tree", Status: "ready",
+		ChangedFiles: 1, Entries: []domain.GitChangeEntry{{Path: "a.txt", Status: "modified", Added: 1}},
+	}, nil
+}
+
+func (fakeExecutor) BranchCompare(context.Context, string, string) (domain.BranchCompareResult, error) {
+	return domain.BranchCompareResult{
+		BaseRef: "main", BaseOID: "base123", CompareRef: "feature", HeadOID: "head456",
+		MergeBase: "merge789", ChangedFiles: 1, CommitsAhead: 2, Status: "ready",
+		Entries: []domain.GitChangeEntry{{Path: "a.txt", Status: "modified", Added: 1}},
+	}, nil
+}
+
+func (fakeExecutor) CommitDiff(context.Context, string, string, string, string, string) (domain.FileDiffResult, error) {
+	return domain.FileDiffResult{Kind: "text", OriginalContent: "old", ModifiedContent: "new"}, nil
+}
+
+func (fakeExecutor) BranchDiff(context.Context, string, string, string, string) (domain.FileDiffResult, error) {
+	return domain.FileDiffResult{Kind: "text", OriginalContent: "old", ModifiedContent: "new"}, nil
+}
+
+func (fakeExecutor) SubmoduleStatus(context.Context, string, string, string) (domain.GitStatus, error) {
+	return domain.GitStatus{
+		Branch: "main", Files: []domain.FileStatus{{Path: "sub.txt", State: domain.FileStateModified}},
+	}, nil
 }
 
 func (fakeExecutor) ReadFile(context.Context, string, string) ([]byte, error) {
@@ -288,8 +321,14 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewCheckIgnored(resolver, exec, exec),
 		usecase.NewForkSync(resolver, exec, exec),
 		usecase.NewUpstreamStatus(resolver, exec, exec),
+		usecase.NewCommitCompare(resolver, exec, exec),
+		usecase.NewBranchCompare(resolver, exec, exec),
+		usecase.NewCommitDiff(resolver, exec, exec),
+		usecase.NewBranchDiff(resolver, exec, exec),
+		usecase.NewSubmoduleStatus(resolver, exec, exec),
 		usecase.NewRemoteCommitURL(resolver, exec, exec),
 		usecase.NewRemoteFileURL(resolver, exec, exec),
+		usecase.NewFetch(resolver, exec, exec),
 		usecase.NewGeneratePullRequestFields(resolver, getStatusUC, getDiffUC, completer),
 		usecase.NewDiscoverCommitMessageModels(fakeAIProviderResolver{}),
 		usecase.NewReadFileUseCase(resolver, exec, exec),
@@ -763,5 +802,114 @@ func TestServer_BulkDiscard_TranslatesResult(t *testing.T) {
 	}
 	if !resp.GetSuccess() {
 		t.Errorf("unexpected bulk-discard response: %+v", resp)
+	}
+}
+
+// ── TASK-209 real shape redesign: CommitCompare/BranchCompare/CommitDiff/
+// BranchDiff/SubmoduleStatus + TASK-210's Fetch ─────────────────────────────
+
+func TestServer_UpstreamStatus_TranslatesStructuredPushTarget(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.UpstreamStatus(context.Background(), &gitgatewayv1.UpstreamStatusRequest{
+		WorktreeId: "wt-1", PushTarget: &gitgatewayv1.PushTargetInput{RemoteName: "origin", BranchName: "main"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetHasUpstream() {
+		t.Errorf("unexpected upstream-status response: %+v", resp)
+	}
+}
+
+func TestServer_CommitCompare_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.CommitCompare(context.Background(), &gitgatewayv1.CommitCompareRequest{WorktreeId: "wt-1", CommitId: "deadbeef"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetCommitOid() != "deadbeef" || resp.GetStatus() != "ready" || len(resp.GetEntries()) != 1 {
+		t.Errorf("unexpected commit-compare response: %+v", resp)
+	}
+	if resp.GetEntries()[0].GetPath() != "a.txt" {
+		t.Errorf("unexpected entries: %+v", resp.GetEntries())
+	}
+}
+
+func TestServer_BranchCompare_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.BranchCompare(context.Background(), &gitgatewayv1.BranchCompareRequest{WorktreeId: "wt-1", BaseRef: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetCompareRef() != "feature" || resp.GetCommitsAhead() != 2 || len(resp.GetEntries()) != 1 {
+		t.Errorf("unexpected branch-compare response: %+v", resp)
+	}
+}
+
+func TestServer_CommitDiff_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.CommitDiff(context.Background(), &gitgatewayv1.CommitDiffRequest{
+		WorktreeId: "wt-1", CommitOid: "deadbeef", FilePath: "a.txt",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetKind() != "text" || resp.GetOriginalContent() != "old" || resp.GetModifiedContent() != "new" {
+		t.Errorf("unexpected commit-diff response: %+v", resp)
+	}
+}
+
+func TestServer_CommitDiff_MissingFilePath_ReturnsInvalidArgument(t *testing.T) {
+	s := newTestServer()
+	_, err := s.CommitDiff(context.Background(), &gitgatewayv1.CommitDiffRequest{WorktreeId: "wt-1", CommitOid: "deadbeef"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument for missing file_path, got %v", err)
+	}
+}
+
+func TestServer_BranchDiff_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.BranchDiff(context.Background(), &gitgatewayv1.BranchDiffRequest{
+		WorktreeId: "wt-1", BaseRef: "main", FilePath: "a.txt",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetKind() != "text" || resp.GetModifiedContent() != "new" {
+		t.Errorf("unexpected branch-diff response: %+v", resp)
+	}
+}
+
+func TestServer_SubmoduleStatus_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.SubmoduleStatus(context.Background(), &gitgatewayv1.SubmoduleStatusRequest{
+		WorktreeId: "wt-1", SubmodulePath: "vendor/lib",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetBranch() != "main" || len(resp.GetFiles()) != 1 || resp.GetFiles()[0].GetPath() != "sub.txt" {
+		t.Errorf("unexpected submodule-status response: %+v", resp)
+	}
+}
+
+func TestServer_SubmoduleStatus_MissingSubmodulePath_ReturnsInvalidArgument(t *testing.T) {
+	s := newTestServer()
+	_, err := s.SubmoduleStatus(context.Background(), &gitgatewayv1.SubmoduleStatusRequest{WorktreeId: "wt-1"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument for missing submodule_path, got %v", err)
+	}
+}
+
+func TestServer_Fetch_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.Fetch(context.Background(), &gitgatewayv1.FetchRequest{
+		WorktreeId: "wt-1", PushTarget: &gitgatewayv1.PushTargetInput{RemoteName: "origin"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected fetch response: %+v", resp)
 	}
 }

@@ -319,7 +319,7 @@ func TestRelayExecutor_UpstreamStatus_SendsWorktreePathAndPushTarget(t *testing.
 	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
 	r := NewRelayExecutor(fake)
 
-	got, err := r.UpstreamStatus(ctxWithTenant(t), "/repo", "origin")
+	got, err := r.UpstreamStatus(ctxWithTenant(t), "/repo", &domain.PushTargetInput{RemoteName: "origin", BranchName: "main"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -330,11 +330,31 @@ func TestRelayExecutor_UpstreamStatus_SendsWorktreePathAndPushTarget(t *testing.
 	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
 		t.Fatalf("unmarshal params: %v", err)
 	}
-	if params["worktreePath"] != "/repo" || params["pushTarget"] != "origin" {
+	pushTarget, ok := params["pushTarget"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected pushTarget param to be an object, got %+v", params)
+	}
+	if params["worktreePath"] != "/repo" || pushTarget["remoteName"] != "origin" || pushTarget["branchName"] != "main" {
 		t.Errorf("unexpected params: %+v", params)
 	}
 	if !got.HasUpstream || got.Ahead != 2 || got.Behind != 1 {
 		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestRelayExecutor_UpstreamStatus_NilPushTargetOmitsField(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{}`}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.UpstreamStatus(ctxWithTenant(t), "/repo", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if _, ok := params["pushTarget"]; ok {
+		t.Errorf("expected no pushTarget field when nil, got %+v", params)
 	}
 }
 
@@ -619,6 +639,220 @@ func TestRelayExecutor_BulkDiscard_SendsWorktreePathAndFilePaths(t *testing.T) {
 	filePaths, ok := params["filePaths"].([]any)
 	if !ok || len(filePaths) != 2 {
 		t.Errorf("unexpected filePaths: %+v", params["filePaths"])
+	}
+}
+
+// ── TASK-209 real shape redesign: CommitCompare/BranchCompare/CommitDiff/
+// BranchDiff/SubmoduleStatus + TASK-210's Fetch ─────────────────────────────
+
+func TestRelayExecutor_CommitCompare_SendsWorktreePathAndCommitID(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"summary": map[string]any{
+			"commitOid": "deadbeef", "parentOid": "parent123", "compareRef": "deadbee",
+			"baseRef": "parent1", "changedFiles": 1, "status": "ready",
+		},
+		"entries": []map[string]any{{"path": "a.txt", "status": "modified", "added": 1, "removed": 0}},
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.CommitCompare(ctxWithTenant(t), "/repo", "deadbeef")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.commitCompare" {
+		t.Errorf("expected method=git.commitCompare, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["commitId"] != "deadbeef" {
+		t.Errorf("unexpected params: %+v", params)
+	}
+	if got.CommitOID != "deadbeef" || got.ParentOID != "parent123" || len(got.Entries) != 1 || got.Entries[0].Path != "a.txt" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestRelayExecutor_BranchCompare_SendsWorktreePathAndBaseRef(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"summary": map[string]any{
+			"baseRef": "main", "baseOid": "base1", "compareRef": "feature", "headOid": "head1",
+			"mergeBase": "merge1", "changedFiles": 1, "commitsAhead": 1, "status": "ready",
+		},
+		"entries": []map[string]any{{"path": "a.txt", "status": "added"}},
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.BranchCompare(ctxWithTenant(t), "/repo", "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.branchCompare" {
+		t.Errorf("expected method=git.branchCompare, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["baseRef"] != "main" {
+		t.Errorf("unexpected params: %+v", params)
+	}
+	if got.CompareRef != "feature" || got.CommitsAhead != 1 || len(got.Entries) != 1 {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestRelayExecutor_CommitDiff_SendsRequiredFilePathAndOptionalParentOid(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"kind": "text", "originalContent": "old", "modifiedContent": "new",
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.CommitDiff(ctxWithTenant(t), "/repo", "commit1", "parent1", "a.txt", "old-a.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.commitDiff" {
+		t.Errorf("expected method=git.commitDiff, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["commitOid"] != "commit1" || params["parentOid"] != "parent1" ||
+		params["filePath"] != "a.txt" || params["oldPath"] != "old-a.txt" {
+		t.Errorf("unexpected params: %+v", params)
+	}
+	if got.Kind != "text" || got.OriginalContent != "old" || got.ModifiedContent != "new" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestRelayExecutor_CommitDiff_OmitsParentOidAndOldPathWhenEmpty(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"kind":"text"}`}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.CommitDiff(ctxWithTenant(t), "/repo", "commit1", "", "a.txt", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if _, ok := params["parentOid"]; ok {
+		t.Error("expected parentOid to be omitted when empty (root commit)")
+	}
+	if _, ok := params["oldPath"]; ok {
+		t.Error("expected oldPath to be omitted when empty")
+	}
+}
+
+func TestRelayExecutor_BranchDiff_SendsBaseRefAndRequiredFilePath(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"kind": "text", "originalContent": "", "modifiedContent": "new",
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.BranchDiff(ctxWithTenant(t), "/repo", "main", "a.txt", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.branchDiff" {
+		t.Errorf("expected method=git.branchDiff, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["baseRef"] != "main" || params["filePath"] != "a.txt" || params["includePatch"] != true {
+		t.Errorf("unexpected params: %+v", params)
+	}
+	if got.ModifiedContent != "new" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestRelayExecutor_SubmoduleStatus_SendsWorktreePathSubmodulePathAndArea(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{"branch": "main"})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.SubmoduleStatus(ctxWithTenant(t), "/repo", "vendor/lib", "staged")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.submoduleStatus" {
+		t.Errorf("expected method=git.submoduleStatus, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["submodulePath"] != "vendor/lib" || params["area"] != "staged" {
+		t.Errorf("unexpected params: %+v", params)
+	}
+	if got.Branch != "main" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestRelayExecutor_Fetch_SendsWorktreePathAndOptionalPushTarget(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"success":true}`}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.Fetch(ctxWithTenant(t), "/repo", &domain.PushTargetInput{RemoteName: "origin"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.fetch" {
+		t.Errorf("expected method=git.fetch, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	pt, ok := params["pushTarget"].(map[string]any)
+	if !ok || pt["remoteName"] != "origin" {
+		t.Errorf("unexpected pushTarget param: %+v", params)
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestRelayExecutor_Fetch_NilPushTargetOmitsField(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"success":true}`}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.Fetch(ctxWithTenant(t), "/repo", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if _, ok := params["pushTarget"]; ok {
+		t.Error("expected pushTarget to be omitted when nil")
 	}
 }
 

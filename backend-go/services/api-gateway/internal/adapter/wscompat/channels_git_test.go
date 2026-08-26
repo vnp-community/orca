@@ -58,6 +58,32 @@ type fakeGitGatewayClient struct {
 	resolveConflictFunc   func(ctx context.Context, in *gitgatewayv1.ResolveConflictRequest) (*gitgatewayv1.ResolveConflictResponse, error)
 	discardFunc           func(ctx context.Context, in *gitgatewayv1.DiscardRequest) (*gitgatewayv1.DiscardResponse, error)
 	bulkDiscardFunc       func(ctx context.Context, in *gitgatewayv1.BulkDiscardRequest) (*gitgatewayv1.BulkDiscardResponse, error)
+
+	commitCompareFunc   func(ctx context.Context, in *gitgatewayv1.CommitCompareRequest) (*gitgatewayv1.CommitCompareResponse, error)
+	branchCompareFunc   func(ctx context.Context, in *gitgatewayv1.BranchCompareRequest) (*gitgatewayv1.BranchCompareResponse, error)
+	commitDiffFunc      func(ctx context.Context, in *gitgatewayv1.CommitDiffRequest) (*gitgatewayv1.FileDiffResponse, error)
+	branchDiffFunc      func(ctx context.Context, in *gitgatewayv1.BranchDiffRequest) (*gitgatewayv1.FileDiffResponse, error)
+	submoduleStatusFunc func(ctx context.Context, in *gitgatewayv1.SubmoduleStatusRequest) (*gitgatewayv1.GetStatusResponse, error)
+	fetchFunc           func(ctx context.Context, in *gitgatewayv1.FetchRequest) (*gitgatewayv1.FetchResponse, error)
+}
+
+func (f *fakeGitGatewayClient) CommitCompare(ctx context.Context, in *gitgatewayv1.CommitCompareRequest, _ ...grpc.CallOption) (*gitgatewayv1.CommitCompareResponse, error) {
+	return f.commitCompareFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) BranchCompare(ctx context.Context, in *gitgatewayv1.BranchCompareRequest, _ ...grpc.CallOption) (*gitgatewayv1.BranchCompareResponse, error) {
+	return f.branchCompareFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) CommitDiff(ctx context.Context, in *gitgatewayv1.CommitDiffRequest, _ ...grpc.CallOption) (*gitgatewayv1.FileDiffResponse, error) {
+	return f.commitDiffFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) BranchDiff(ctx context.Context, in *gitgatewayv1.BranchDiffRequest, _ ...grpc.CallOption) (*gitgatewayv1.FileDiffResponse, error) {
+	return f.branchDiffFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) SubmoduleStatus(ctx context.Context, in *gitgatewayv1.SubmoduleStatusRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetStatusResponse, error) {
+	return f.submoduleStatusFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) Fetch(ctx context.Context, in *gitgatewayv1.FetchRequest, _ ...grpc.CallOption) (*gitgatewayv1.FetchResponse, error) {
+	return f.fetchFunc(ctx, in)
 }
 
 func (f *fakeGitGatewayClient) GetDiff(ctx context.Context, in *gitgatewayv1.GetDiffRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetDiffResponse, error) {
@@ -632,7 +658,7 @@ func TestGitForkSyncChannel_SendsExpectedUpstream(t *testing.T) {
 	}
 }
 
-func TestGitUpstreamStatusChannel_SendsPushTarget(t *testing.T) {
+func TestGitUpstreamStatusChannel_SendsStructuredPushTarget(t *testing.T) {
 	var got *gitgatewayv1.UpstreamStatusRequest
 	fake := &fakeGitGatewayClient{
 		upstreamStatusFunc: func(ctx context.Context, in *gitgatewayv1.UpstreamStatusRequest) (*gitgatewayv1.UpstreamStatusResponse, error) {
@@ -644,12 +670,36 @@ func TestGitUpstreamStatusChannel_SendsPushTarget(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.upstreamStatus",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "pushTarget": "origin"}))
+		argsJSON(t, map[string]any{
+			"worktreeId": "wt-1",
+			"pushTarget": map[string]any{"remoteName": "origin", "branchName": "main"},
+		}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.GetPushTarget() != "origin" {
+	if got.GetPushTarget().GetRemoteName() != "origin" || got.GetPushTarget().GetBranchName() != "main" {
 		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestGitUpstreamStatusChannel_NilPushTargetOmitsField(t *testing.T) {
+	var got *gitgatewayv1.UpstreamStatusRequest
+	fake := &fakeGitGatewayClient{
+		upstreamStatusFunc: func(ctx context.Context, in *gitgatewayv1.UpstreamStatusRequest) (*gitgatewayv1.UpstreamStatusResponse, error) {
+			got = in
+			return &gitgatewayv1.UpstreamStatusResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.upstreamStatus",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetPushTarget() != nil {
+		t.Errorf("expected nil PushTarget, got %+v", got.GetPushTarget())
 	}
 }
 
@@ -696,6 +746,192 @@ func TestGitRemoteFileUrlChannel_Success(t *testing.T) {
 	}
 	if got.GetPath() != "a.txt" || got.GetRef() != "main" {
 		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestGitCommitCompareChannel_SendsCommitID(t *testing.T) {
+	var got *gitgatewayv1.CommitCompareRequest
+	fake := &fakeGitGatewayClient{
+		commitCompareFunc: func(ctx context.Context, in *gitgatewayv1.CommitCompareRequest) (*gitgatewayv1.CommitCompareResponse, error) {
+			got = in
+			return &gitgatewayv1.CommitCompareResponse{CommitOid: "deadbeef", Status: "ready"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.commitCompare",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "commitId": "deadbeef"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetCommitId() != "deadbeef" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.CommitCompareResponse)
+	if !ok || resp.GetCommitOid() != "deadbeef" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitBranchCompareChannel_SendsBaseRef(t *testing.T) {
+	var got *gitgatewayv1.BranchCompareRequest
+	fake := &fakeGitGatewayClient{
+		branchCompareFunc: func(ctx context.Context, in *gitgatewayv1.BranchCompareRequest) (*gitgatewayv1.BranchCompareResponse, error) {
+			got = in
+			return &gitgatewayv1.BranchCompareResponse{Status: "ready"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branchCompare",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseRef": "main"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetBaseRef() != "main" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestGitCommitDiffChannel_SendsRequiredFilePathAndOptionalParentOid(t *testing.T) {
+	var got *gitgatewayv1.CommitDiffRequest
+	fake := &fakeGitGatewayClient{
+		commitDiffFunc: func(ctx context.Context, in *gitgatewayv1.CommitDiffRequest) (*gitgatewayv1.FileDiffResponse, error) {
+			got = in
+			return &gitgatewayv1.FileDiffResponse{Kind: "text", ModifiedContent: "new"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	parentOID := "parent1"
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.commitDiff",
+		argsJSON(t, map[string]any{
+			"worktreeId": "wt-1", "commitOid": "commit1", "parentOid": parentOID, "filePath": "a.txt",
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetCommitOid() != "commit1" || got.GetParentOid() != "parent1" || got.GetFilePath() != "a.txt" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.FileDiffResponse)
+	if !ok || resp.GetModifiedContent() != "new" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitCommitDiffChannel_OmitsParentOidWhenNil(t *testing.T) {
+	var got *gitgatewayv1.CommitDiffRequest
+	fake := &fakeGitGatewayClient{
+		commitDiffFunc: func(ctx context.Context, in *gitgatewayv1.CommitDiffRequest) (*gitgatewayv1.FileDiffResponse, error) {
+			got = in
+			return &gitgatewayv1.FileDiffResponse{Kind: "text"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.commitDiff",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "commitOid": "root-commit", "filePath": "a.txt"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetParentOid() != "" {
+		t.Errorf("expected empty parentOid for a root commit, got %q", got.GetParentOid())
+	}
+}
+
+func TestGitBranchDiffChannel_SendsBaseRefAndRequiredFilePath(t *testing.T) {
+	var got *gitgatewayv1.BranchDiffRequest
+	fake := &fakeGitGatewayClient{
+		branchDiffFunc: func(ctx context.Context, in *gitgatewayv1.BranchDiffRequest) (*gitgatewayv1.FileDiffResponse, error) {
+			got = in
+			return &gitgatewayv1.FileDiffResponse{Kind: "text", ModifiedContent: "new"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branchDiff",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseRef": "main", "filePath": "a.txt"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetBaseRef() != "main" || got.GetFilePath() != "a.txt" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestGitSubmoduleStatusChannel_SendsSubmodulePathAndArea(t *testing.T) {
+	var got *gitgatewayv1.SubmoduleStatusRequest
+	fake := &fakeGitGatewayClient{
+		submoduleStatusFunc: func(ctx context.Context, in *gitgatewayv1.SubmoduleStatusRequest) (*gitgatewayv1.GetStatusResponse, error) {
+			got = in
+			return &gitgatewayv1.GetStatusResponse{Branch: "main"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.submoduleStatus",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "submodulePath": "vendor/lib", "area": "staged"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetSubmodulePath() != "vendor/lib" || got.GetArea() != "staged" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.GetStatusResponse)
+	if !ok || resp.GetBranch() != "main" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitFetchChannel_SendsOptionalPushTarget(t *testing.T) {
+	var got *gitgatewayv1.FetchRequest
+	fake := &fakeGitGatewayClient{
+		fetchFunc: func(ctx context.Context, in *gitgatewayv1.FetchRequest) (*gitgatewayv1.FetchResponse, error) {
+			got = in
+			return &gitgatewayv1.FetchResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.fetch",
+		argsJSON(t, map[string]any{
+			"worktreeId": "wt-1",
+			"pushTarget": map[string]any{"remoteName": "origin"},
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetPushTarget().GetRemoteName() != "origin" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestGitFetchChannel_NilPushTargetOmitsField(t *testing.T) {
+	var got *gitgatewayv1.FetchRequest
+	fake := &fakeGitGatewayClient{
+		fetchFunc: func(ctx context.Context, in *gitgatewayv1.FetchRequest) (*gitgatewayv1.FetchResponse, error) {
+			got = in
+			return &gitgatewayv1.FetchResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.fetch",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetPushTarget() != nil {
+		t.Errorf("expected nil PushTarget, got %+v", got.GetPushTarget())
 	}
 }
 

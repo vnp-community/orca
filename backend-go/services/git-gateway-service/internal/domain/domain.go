@@ -129,6 +129,71 @@ type CommitRef struct {
 	ParentSHAs []string
 }
 
+// GitChangeEntry is one changed file's status within a CommitCompare/
+// BranchCompare result — mirrors parseBranchDiff's {path, status, oldPath?,
+// added?, removed?} entry shape (agent/src/relay/git-handler-utils.ts:107-134,
+// parseBranchStatusChar:15-30, agent/src/shared/git-uncommitted-line-stats.ts:56-76).
+type GitChangeEntry struct {
+	Path    string
+	Status  string // "modified" | "added" | "deleted" | "renamed" | "copied"
+	OldPath string
+	Added   int
+	Removed int
+}
+
+// CommitCompareResult mirrors the real agent's git.commitCompare response
+// (agent/src/relay/git-handler-commit-diff-ops.ts:15-122,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:50/144): a commit diffed
+// against its own parent (or the empty tree, for a root commit) — NOT two
+// arbitrary commits, which TASK-209's original design incorrectly assumed.
+// ParentOID is empty for a root commit (diffed against the empty tree).
+type CommitCompareResult struct {
+	CommitOID    string
+	ParentOID    string
+	CompareRef   string
+	BaseRef      string
+	ChangedFiles int
+	Status       string // "ready" | "invalid-commit" | "error"
+	ErrorMessage string
+	Entries      []GitChangeEntry
+}
+
+// BranchCompareResult mirrors the real agent's git.branchCompare response
+// (agent/src/relay/git-handler-ops.ts:124-214,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:49/143): current HEAD diffed
+// against ONE baseRef's merge-base — NOT two arbitrary branches, which
+// TASK-209's original design incorrectly assumed.
+type BranchCompareResult struct {
+	BaseRef      string
+	BaseOID      string
+	CompareRef   string
+	HeadOID      string
+	MergeBase    string
+	ChangedFiles int
+	CommitsAhead int
+	Status       string // "ready" | "invalid-base" | "unborn-head" | "no-merge-base" | "loading" | "error"
+	ErrorMessage string
+	Entries      []GitChangeEntry
+}
+
+// FileDiffResult is a single file's before/after content — the real agent's
+// git.commitDiff/git.branchDiff response shape (buildDiffResult,
+// agent/src/relay/git-diff-result.ts:5-38), NOT a unified-diff text blob
+// like DiffResult (GetDiff's shape, see that type's own doc comment) — the
+// real agent composes these two ops from raw blob reads at each ref, not
+// `git diff`'s textual output. See CommitDiff/BranchDiff's GitExecutor doc
+// comments in ports.go for why this needed a different domain type than
+// GetDiff's DiffResult.
+type FileDiffResult struct {
+	Kind             string // "text" | "binary"
+	OriginalContent  string
+	ModifiedContent  string
+	OriginalIsBinary bool
+	ModifiedIsBinary bool
+	IsImage          bool
+	MimeType         string
+}
+
 // ForkSyncStatus reflects a worktree's ahead/behind/diverged state relative
 // to its upstream fork's default branch.
 type ForkSyncStatus struct {
@@ -216,10 +281,11 @@ type CheckoutResult struct {
 
 // PushTargetInput mirrors the real agent's GitPushTarget wire shape
 // (agent/src/shared/types.ts:551-557) — see gitgateway.proto's
-// PushTargetInput message doc comment for the full citation. Shared by
-// FastForward today; the same shape is the open redesign Push/Pull/Fetch
-// still need (see grpcclient.RelayExecutor's Push/Pull "KNOWN LIMITATION"
-// comments) but this task only wires it into FastForward.
+// PushTargetInput message doc comment for the full citation. Used by
+// FastForward, UpstreamStatus, and Fetch (TASK-209/210's own contract
+// corrections) — Push/Pull still take the open pushTarget redesign as a
+// follow-up (see grpcclient.RelayExecutor's Push/Pull "KNOWN LIMITATION"
+// comments), not resolved by this pass.
 type PushTargetInput struct {
 	RemoteName    string
 	BranchName    string

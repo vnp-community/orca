@@ -278,7 +278,7 @@ func TestUpstreamStatus_NoUpstream_ReturnsHasUpstreamFalse(t *testing.T) {
 	dir := initRepo(t)
 	e := New()
 
-	got, err := e.UpstreamStatus(context.Background(), dir, "")
+	got, err := e.UpstreamStatus(context.Background(), dir, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -809,5 +809,260 @@ func TestBulkDiscard_NonexistentPath_ReportsPartialFailure(t *testing.T) {
 	}
 	if len(result.FailedPaths) != 1 || result.FailedPaths[0] != "does/not/exist.txt" {
 		t.Errorf("expected does/not/exist.txt to be reported as failed, got %+v", result.FailedPaths)
+	}
+}
+
+// ── TASK-209 real shape redesign: CommitCompare/BranchCompare/CommitDiff/
+// BranchDiff/SubmoduleStatus + TASK-210's Fetch, against a real git binary ─
+
+func revParse(t *testing.T, dir, ref string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", "--verify", ref)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("rev-parse %s failed: %v\n%s", ref, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func TestCommitCompare_DiffsAgainstParent(t *testing.T) {
+	dir := initRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "file2.txt"), []byte("new file\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	e := New()
+	if _, err := e.Commit(context.Background(), dir, "add file2", nil); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+	commitOID := revParse(t, dir, "HEAD")
+
+	got, err := e.CommitCompare(context.Background(), dir, commitOID)
+	if err != nil {
+		t.Fatalf("CommitCompare: %v", err)
+	}
+	if got.Status != "ready" {
+		t.Fatalf("expected status=ready, got %+v", got)
+	}
+	if got.ParentOID == "" {
+		t.Error("expected a non-empty parent OID for a non-root commit")
+	}
+	if got.ChangedFiles != 1 || len(got.Entries) != 1 || got.Entries[0].Path != "file2.txt" || got.Entries[0].Status != "added" {
+		t.Errorf("unexpected entries: %+v", got)
+	}
+}
+
+func TestCommitCompare_RootCommit_HasEmptyParentOID(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+	rootOID := revParse(t, dir, "HEAD")
+
+	got, err := e.CommitCompare(context.Background(), dir, rootOID)
+	if err != nil {
+		t.Fatalf("CommitCompare: %v", err)
+	}
+	if got.Status != "ready" || got.ParentOID != "" {
+		t.Errorf("expected a root commit with empty ParentOID, got %+v", got)
+	}
+	if got.ChangedFiles != 1 || len(got.Entries) != 1 || got.Entries[0].Path != "README.md" {
+		t.Errorf("expected README.md as the sole entry vs. the empty tree, got %+v", got)
+	}
+}
+
+func TestCommitCompare_InvalidCommitID_ReturnsInvalidCommitStatus(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+	bogus := strings.Repeat("a", 40)
+
+	got, err := e.CommitCompare(context.Background(), dir, bogus)
+	if err != nil {
+		t.Fatalf("unexpected Go error: %v", err)
+	}
+	if got.Status != "invalid-commit" {
+		t.Errorf("expected status=invalid-commit, got %+v", got)
+	}
+}
+
+func TestBranchCompare_ComparesCurrentHeadAgainstBaseRef(t *testing.T) {
+	dir := initRepo(t)
+	cmd := exec.Command("git", "checkout", "-b", "feature")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("checkout -b feature: %v\n%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "file2.txt"), []byte("new file\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	e := New()
+	if _, err := e.Commit(context.Background(), dir, "add file2", nil); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+
+	got, err := e.BranchCompare(context.Background(), dir, "main")
+	if err != nil {
+		t.Fatalf("BranchCompare: %v", err)
+	}
+	if got.Status != "ready" || got.CompareRef != "feature" || got.CommitsAhead != 1 {
+		t.Errorf("unexpected result: %+v", got)
+	}
+	if got.ChangedFiles != 1 || len(got.Entries) != 1 || got.Entries[0].Path != "file2.txt" {
+		t.Errorf("unexpected entries: %+v", got)
+	}
+}
+
+func TestBranchCompare_InvalidBaseRef_ReturnsInvalidBaseStatus(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	got, err := e.BranchCompare(context.Background(), dir, "does-not-exist")
+	if err != nil {
+		t.Fatalf("unexpected Go error: %v", err)
+	}
+	if got.Status != "invalid-base" {
+		t.Errorf("expected status=invalid-base, got %+v", got)
+	}
+}
+
+func TestBranchCompare_RejectsBaseRefStartingWithDash(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	if _, err := e.BranchCompare(context.Background(), dir, "--evil"); err == nil {
+		t.Fatal("expected an error for a baseRef starting with -")
+	}
+}
+
+func TestCommitDiff_ReturnsFileContentAgainstParent(t *testing.T) {
+	dir := initRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("hello again\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	e := New()
+	if _, err := e.Commit(context.Background(), dir, "update readme", nil); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+	commitOID := revParse(t, dir, "HEAD")
+	parentOID := revParse(t, dir, "HEAD^")
+
+	got, err := e.CommitDiff(context.Background(), dir, commitOID, parentOID, "README.md", "")
+	if err != nil {
+		t.Fatalf("CommitDiff: %v", err)
+	}
+	if got.Kind != "text" || got.OriginalContent != "hello\n" || got.ModifiedContent != "hello again\n" {
+		t.Errorf("unexpected diff result: %+v", got)
+	}
+}
+
+func TestCommitDiff_RootCommit_EmptyOriginalContent(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+	rootOID := revParse(t, dir, "HEAD")
+
+	got, err := e.CommitDiff(context.Background(), dir, rootOID, "", "README.md", "")
+	if err != nil {
+		t.Fatalf("CommitDiff: %v", err)
+	}
+	if got.Kind != "text" || got.OriginalContent != "" || got.ModifiedContent != "hello\n" {
+		t.Errorf("expected empty original content for a root commit, got %+v", got)
+	}
+}
+
+func TestCommitDiff_RejectsNonFullObjectID(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	if _, err := e.CommitDiff(context.Background(), dir, "short", "", "README.md", ""); err == nil {
+		t.Fatal("expected an error for a non-full-length commitOid")
+	}
+}
+
+func TestBranchDiff_ReturnsFileContentAgainstMergeBase(t *testing.T) {
+	dir := initRepo(t)
+	cmd := exec.Command("git", "checkout", "-b", "feature")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("checkout -b feature: %v\n%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "file2.txt"), []byte("new file\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	e := New()
+	if _, err := e.Commit(context.Background(), dir, "add file2", nil); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+
+	got, err := e.BranchDiff(context.Background(), dir, "main", "file2.txt", "")
+	if err != nil {
+		t.Fatalf("BranchDiff: %v", err)
+	}
+	if got.Kind != "text" || got.OriginalContent != "" || got.ModifiedContent != "new file\n" {
+		t.Errorf("unexpected diff result: %+v", got)
+	}
+}
+
+func TestSubmoduleStatus_RealSubmoduleFixture(t *testing.T) {
+	submoduleSrc := initRepo(t)
+	dir := initRepo(t)
+	cmd := exec.Command("git", "-c", "protocol.file.allow=always", "submodule", "add", submoduleSrc, "vendor/lib")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("submodule add: %v\n%s", err, out)
+	}
+	e := New()
+
+	got, err := e.SubmoduleStatus(context.Background(), dir, "vendor/lib", "")
+	if err != nil {
+		t.Fatalf("SubmoduleStatus: %v", err)
+	}
+	if len(got.Files) != 0 {
+		t.Errorf("expected a clean submodule to report no file changes, got %+v", got)
+	}
+}
+
+func TestFetch_UpdatesRemoteTrackingRef(t *testing.T) {
+	remoteDir := initRepo(t)
+	cloneDir := t.TempDir()
+	cmd := exec.Command("git", "clone", remoteDir, cloneDir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("clone failed: %v\n%s", err, out)
+	}
+	e := New()
+
+	// Advance the remote independently of the clone.
+	if err := os.WriteFile(filepath.Join(remoteDir, "upstream-only.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if _, err := e.Commit(context.Background(), remoteDir, "upstream-only commit", nil); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+	remoteHead := revParse(t, remoteDir, "HEAD")
+
+	got, err := e.Fetch(context.Background(), cloneDir, &domain.PushTargetInput{RemoteName: "origin"})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if !got.Success {
+		t.Errorf("expected Success=true, got %+v", got)
+	}
+	if trackingRef := revParse(t, cloneDir, "origin/main"); trackingRef != remoteHead {
+		t.Errorf("expected origin/main to advance to %s, got %s", remoteHead, trackingRef)
+	}
+}
+
+func TestFetch_NilPushTargetUsesDefaultRemote(t *testing.T) {
+	remoteDir := initRepo(t)
+	cloneDir := t.TempDir()
+	cmd := exec.Command("git", "clone", remoteDir, cloneDir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("clone failed: %v\n%s", err, out)
+	}
+	e := New()
+
+	got, err := e.Fetch(context.Background(), cloneDir, nil)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if !got.Success {
+		t.Errorf("expected Success=true, got %+v", got)
 	}
 }

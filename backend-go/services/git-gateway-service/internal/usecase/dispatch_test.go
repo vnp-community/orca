@@ -55,6 +55,28 @@ type fakeGitExecutor struct {
 	calledListWorktreePaths      bool
 	calledForceDeleteBranch      bool
 
+	// Group C — real compare/diff/submodule shapes (TASK-209) + Fetch (TASK-210)
+	calledCommitCompare   bool
+	calledBranchCompare   bool
+	calledCommitDiff      bool
+	calledBranchDiff      bool
+	calledSubmoduleStatus bool
+	calledFetch           bool
+	gotUpstreamPushTarget *domain.PushTargetInput
+	gotFetchPushTarget    *domain.PushTargetInput
+	commitCompareResult   domain.CommitCompareResult
+	commitCompareErr      error
+	branchCompareResult   domain.BranchCompareResult
+	branchCompareErr      error
+	commitDiffResult      domain.FileDiffResult
+	commitDiffErr         error
+	branchDiffResult      domain.FileDiffResult
+	branchDiffErr         error
+	submoduleStatusResult domain.GitStatus
+	submoduleStatusErr    error
+	fetchResult           domain.SimpleResult
+	fetchErr              error
+
 	// Group A — branch/ref operations (TASK-207)
 	calledCheckout           bool
 	calledListLocalBranches  bool
@@ -202,10 +224,70 @@ func (f *fakeGitExecutor) ForkSync(ctx context.Context, repoPath, expectedUpstre
 	return domain.ForkSyncStatus{}, nil
 }
 
-func (f *fakeGitExecutor) UpstreamStatus(ctx context.Context, repoPath, pushTarget string) (domain.UpstreamStatus, error) {
+func (f *fakeGitExecutor) UpstreamStatus(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.UpstreamStatus, error) {
 	f.calledUpstreamState = true
 	f.gotRepoPath = repoPath
+	f.gotUpstreamPushTarget = pushTarget
 	return domain.UpstreamStatus{}, nil
+}
+
+func (f *fakeGitExecutor) CommitCompare(ctx context.Context, repoPath, commitID string) (domain.CommitCompareResult, error) {
+	f.calledCommitCompare = true
+	f.gotRepoPath = repoPath
+	if f.commitCompareErr != nil {
+		return domain.CommitCompareResult{}, f.commitCompareErr
+	}
+	return f.commitCompareResult, nil
+}
+
+func (f *fakeGitExecutor) BranchCompare(ctx context.Context, repoPath, baseRef string) (domain.BranchCompareResult, error) {
+	f.calledBranchCompare = true
+	f.gotRepoPath = repoPath
+	f.gotBaseRef = baseRef
+	if f.branchCompareErr != nil {
+		return domain.BranchCompareResult{}, f.branchCompareErr
+	}
+	return f.branchCompareResult, nil
+}
+
+func (f *fakeGitExecutor) CommitDiff(ctx context.Context, repoPath, commitOID, parentOID, filePath, oldPath string) (domain.FileDiffResult, error) {
+	f.calledCommitDiff = true
+	f.gotRepoPath = repoPath
+	f.gotFilePath = filePath
+	if f.commitDiffErr != nil {
+		return domain.FileDiffResult{}, f.commitDiffErr
+	}
+	return f.commitDiffResult, nil
+}
+
+func (f *fakeGitExecutor) BranchDiff(ctx context.Context, repoPath, baseRef, filePath, oldPath string) (domain.FileDiffResult, error) {
+	f.calledBranchDiff = true
+	f.gotRepoPath = repoPath
+	f.gotBaseRef = baseRef
+	f.gotFilePath = filePath
+	if f.branchDiffErr != nil {
+		return domain.FileDiffResult{}, f.branchDiffErr
+	}
+	return f.branchDiffResult, nil
+}
+
+func (f *fakeGitExecutor) SubmoduleStatus(ctx context.Context, repoPath, submodulePath, area string) (domain.GitStatus, error) {
+	f.calledSubmoduleStatus = true
+	f.gotRepoPath = repoPath
+	if f.submoduleStatusErr != nil {
+		return domain.GitStatus{}, f.submoduleStatusErr
+	}
+	return f.submoduleStatusResult, nil
+}
+
+func (f *fakeGitExecutor) Fetch(ctx context.Context, repoPath string, pushTarget *domain.PushTargetInput) (domain.SimpleResult, error) {
+	f.calledFetch = true
+	f.gotRepoPath = repoPath
+	f.gotFetchPushTarget = pushTarget
+	if f.fetchErr != nil {
+		return domain.SimpleResult{}, f.fetchErr
+	}
+	return f.fetchResult, nil
 }
 
 func (f *fakeGitExecutor) RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error) {
@@ -1210,5 +1292,169 @@ func TestBulkDiscard_MissingPaths_ReturnsError(t *testing.T) {
 	_, err := uc.Execute(context.Background(), BulkDiscardInput{WorktreeID: "wt1"})
 	if err == nil {
 		t.Fatal("expected error for missing paths")
+	}
+}
+
+// ── TASK-209 real shape redesign: CommitCompare/BranchCompare/CommitDiff/
+// BranchDiff/SubmoduleStatus + TASK-210's Fetch ─────────────────────────────
+
+func TestCommitCompare_MissingCommitID_ReturnsError(t *testing.T) {
+	uc := NewCommitCompare(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), CommitCompareInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing commit_id")
+	}
+}
+
+func TestCommitCompare_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{commitCompareResult: domain.CommitCompareResult{CommitOID: "deadbeef", Status: "ready"}}
+	uc := NewCommitCompare(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), CommitCompareInput{WorktreeID: "wt1", CommitID: "deadbeef"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledCommitCompare || local.calledCommitCompare {
+		t.Error("expected CommitCompare to route to relay when Connected=true")
+	}
+	if got.CommitOID != "deadbeef" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestBranchCompare_MissingBaseRef_ReturnsError(t *testing.T) {
+	uc := NewBranchCompare(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), BranchCompareInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing base_ref")
+	}
+}
+
+func TestBranchCompare_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{branchCompareResult: domain.BranchCompareResult{Status: "ready"}}
+	relay := &fakeGitExecutor{}
+	uc := NewBranchCompare(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), BranchCompareInput{WorktreeID: "wt1", BaseRef: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledBranchCompare || relay.calledBranchCompare {
+		t.Error("expected BranchCompare to route to local when Connected=false")
+	}
+	if local.gotBaseRef != "main" {
+		t.Errorf("expected baseRef to be forwarded, got %q", local.gotBaseRef)
+	}
+}
+
+func TestCommitDiff_MissingFilePath_ReturnsError(t *testing.T) {
+	uc := NewCommitDiff(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), CommitDiffInput{WorktreeID: "wt1", CommitOID: "deadbeef"})
+	if err == nil {
+		t.Fatal("expected error for missing file_path")
+	}
+}
+
+func TestCommitDiff_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{commitDiffResult: domain.FileDiffResult{Kind: "text", ModifiedContent: "new"}}
+	uc := NewCommitDiff(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), CommitDiffInput{WorktreeID: "wt1", CommitOID: "deadbeef", FilePath: "a.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledCommitDiff || local.calledCommitDiff {
+		t.Error("expected CommitDiff to route to relay when Connected=true")
+	}
+	if got.ModifiedContent != "new" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestBranchDiff_MissingFilePath_ReturnsError(t *testing.T) {
+	uc := NewBranchDiff(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), BranchDiffInput{WorktreeID: "wt1", BaseRef: "main"})
+	if err == nil {
+		t.Fatal("expected error for missing file_path")
+	}
+}
+
+func TestBranchDiff_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewBranchDiff(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), BranchDiffInput{WorktreeID: "wt1", BaseRef: "main", FilePath: "a.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledBranchDiff || local.calledBranchDiff {
+		t.Error("expected BranchDiff to route to relay when Connected=true")
+	}
+	if relay.gotBaseRef != "main" || relay.gotFilePath != "a.txt" {
+		t.Errorf("expected baseRef/filePath to be forwarded, got baseRef=%q filePath=%q", relay.gotBaseRef, relay.gotFilePath)
+	}
+}
+
+func TestSubmoduleStatus_MissingSubmodulePath_ReturnsError(t *testing.T) {
+	uc := NewSubmoduleStatus(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), SubmoduleStatusInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing submodule_path")
+	}
+}
+
+func TestSubmoduleStatus_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{submoduleStatusResult: domain.GitStatus{Branch: "main"}}
+	relay := &fakeGitExecutor{}
+	uc := NewSubmoduleStatus(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), SubmoduleStatusInput{WorktreeID: "wt1", SubmodulePath: "vendor/lib"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledSubmoduleStatus || relay.calledSubmoduleStatus {
+		t.Error("expected SubmoduleStatus to route to local when Connected=false")
+	}
+	if got.Branch != "main" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestFetch_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{fetchResult: domain.SimpleResult{Success: true}}
+	uc := NewFetch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true}}, local, relay)
+	pushTarget := &domain.PushTargetInput{RemoteName: "origin"}
+
+	got, err := uc.Execute(context.Background(), FetchInput{WorktreeID: "wt1", PushTarget: pushTarget})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledFetch || local.calledFetch {
+		t.Error("expected Fetch to route to relay when Connected=true")
+	}
+	if relay.gotFetchPushTarget != pushTarget {
+		t.Errorf("expected pushTarget to be forwarded, got %+v", relay.gotFetchPushTarget)
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestUpstreamStatus_ForwardsPushTarget(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewUpstreamStatus(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+	pushTarget := &domain.PushTargetInput{RemoteName: "origin", BranchName: "main"}
+
+	_, err := uc.Execute(context.Background(), UpstreamStatusInput{WorktreeID: "wt1", PushTarget: pushTarget})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.gotUpstreamPushTarget != pushTarget {
+		t.Errorf("expected pushTarget to be forwarded, got %+v", local.gotUpstreamPushTarget)
 	}
 }

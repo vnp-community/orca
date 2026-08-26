@@ -32,8 +32,14 @@ const (
 	GitGatewayService_CheckIgnored_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/CheckIgnored"
 	GitGatewayService_ForkSync_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/ForkSync"
 	GitGatewayService_UpstreamStatus_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/UpstreamStatus"
+	GitGatewayService_CommitCompare_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/CommitCompare"
+	GitGatewayService_BranchCompare_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/BranchCompare"
+	GitGatewayService_CommitDiff_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/CommitDiff"
+	GitGatewayService_BranchDiff_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/BranchDiff"
+	GitGatewayService_SubmoduleStatus_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/SubmoduleStatus"
 	GitGatewayService_RemoteCommitUrl_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/RemoteCommitUrl"
 	GitGatewayService_RemoteFileUrl_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/RemoteFileUrl"
+	GitGatewayService_Fetch_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Fetch"
 	GitGatewayService_GeneratePullRequestFields_FullMethodName   = "/orca.gitgateway.v1.GitGatewayService/GeneratePullRequestFields"
 	GitGatewayService_DiscoverCommitMessageModels_FullMethodName = "/orca.gitgateway.v1.GitGatewayService/DiscoverCommitMessageModels"
 	GitGatewayService_ReadFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/ReadFile"
@@ -101,18 +107,25 @@ type GitGatewayServiceClient interface {
 	// variant regardless of path count — see RelayExecutor.Stage/Unstage. ──
 	Stage(ctx context.Context, in *StageRequest, opts ...grpc.CallOption) (*StageResponse, error)
 	Unstage(ctx context.Context, in *UnstageRequest, opts ...grpc.CallOption) (*UnstageResponse, error)
-	// ── Group C (TASK-209) — history/compare. Only the 4 methods confirmed
-	// shippable-now per SOL-032 §0's contract correction are exposed here;
-	// commitCompare/branchCompare/commitDiff/branchDiff/submoduleStatus stay
-	// BLOCKED pending a real shape redesign — see TASK-209. ──────────────────
+	// ── Group C (TASK-209) — history/compare. commitCompare/branchCompare/
+	// commitDiff/branchDiff/submoduleStatus were BLOCKED pending a real shape
+	// redesign; now implemented for real against the confirmed agent contract
+	// (specs/agent/api/agent-rpc-catalog-git-fs.md:49-55/143-147) — see each
+	// message's own doc comment for citations. ───────────────────────────────
 	History(ctx context.Context, in *HistoryRequest, opts ...grpc.CallOption) (*HistoryResponse, error)
 	CheckIgnored(ctx context.Context, in *CheckIgnoredRequest, opts ...grpc.CallOption) (*CheckIgnoredResponse, error)
 	ForkSync(ctx context.Context, in *ForkSyncRequest, opts ...grpc.CallOption) (*ForkSyncResponse, error)
 	UpstreamStatus(ctx context.Context, in *UpstreamStatusRequest, opts ...grpc.CallOption) (*UpstreamStatusResponse, error)
-	// ── Group D (TASK-210) — remote. Only remoteCommitUrl/remoteFileUrl are
-	// exposed; fetch stays BLOCKED on the pushTarget design question. ───────
+	CommitCompare(ctx context.Context, in *CommitCompareRequest, opts ...grpc.CallOption) (*CommitCompareResponse, error)
+	BranchCompare(ctx context.Context, in *BranchCompareRequest, opts ...grpc.CallOption) (*BranchCompareResponse, error)
+	CommitDiff(ctx context.Context, in *CommitDiffRequest, opts ...grpc.CallOption) (*FileDiffResponse, error)
+	BranchDiff(ctx context.Context, in *BranchDiffRequest, opts ...grpc.CallOption) (*FileDiffResponse, error)
+	SubmoduleStatus(ctx context.Context, in *SubmoduleStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
+	// ── Group D (TASK-210) — remote. fetch was BLOCKED on the pushTarget
+	// design question and TASK-227 reachability — both now resolved. ───────
 	RemoteCommitUrl(ctx context.Context, in *RemoteCommitUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error)
 	RemoteFileUrl(ctx context.Context, in *RemoteFileUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error)
+	Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error)
 	// ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
 	GeneratePullRequestFields(ctx context.Context, in *GeneratePullRequestFieldsRequest, opts ...grpc.CallOption) (*GeneratePullRequestFieldsResponse, error)
 	DiscoverCommitMessageModels(ctx context.Context, in *DiscoverCommitMessageModelsRequest, opts ...grpc.CallOption) (*DiscoverCommitMessageModelsResponse, error)
@@ -311,6 +324,56 @@ func (c *gitGatewayServiceClient) UpstreamStatus(ctx context.Context, in *Upstre
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) CommitCompare(ctx context.Context, in *CommitCompareRequest, opts ...grpc.CallOption) (*CommitCompareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommitCompareResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CommitCompare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) BranchCompare(ctx context.Context, in *BranchCompareRequest, opts ...grpc.CallOption) (*BranchCompareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BranchCompareResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_BranchCompare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CommitDiff(ctx context.Context, in *CommitDiffRequest, opts ...grpc.CallOption) (*FileDiffResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FileDiffResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CommitDiff_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) BranchDiff(ctx context.Context, in *BranchDiffRequest, opts ...grpc.CallOption) (*FileDiffResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FileDiffResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_BranchDiff_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) SubmoduleStatus(ctx context.Context, in *SubmoduleStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetStatusResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_SubmoduleStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gitGatewayServiceClient) RemoteCommitUrl(ctx context.Context, in *RemoteCommitUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RemoteUrlResponse)
@@ -325,6 +388,16 @@ func (c *gitGatewayServiceClient) RemoteFileUrl(ctx context.Context, in *RemoteF
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RemoteUrlResponse)
 	err := c.cc.Invoke(ctx, GitGatewayService_RemoteFileUrl_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_Fetch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -765,18 +838,25 @@ type GitGatewayServiceServer interface {
 	// variant regardless of path count — see RelayExecutor.Stage/Unstage. ──
 	Stage(context.Context, *StageRequest) (*StageResponse, error)
 	Unstage(context.Context, *UnstageRequest) (*UnstageResponse, error)
-	// ── Group C (TASK-209) — history/compare. Only the 4 methods confirmed
-	// shippable-now per SOL-032 §0's contract correction are exposed here;
-	// commitCompare/branchCompare/commitDiff/branchDiff/submoduleStatus stay
-	// BLOCKED pending a real shape redesign — see TASK-209. ──────────────────
+	// ── Group C (TASK-209) — history/compare. commitCompare/branchCompare/
+	// commitDiff/branchDiff/submoduleStatus were BLOCKED pending a real shape
+	// redesign; now implemented for real against the confirmed agent contract
+	// (specs/agent/api/agent-rpc-catalog-git-fs.md:49-55/143-147) — see each
+	// message's own doc comment for citations. ───────────────────────────────
 	History(context.Context, *HistoryRequest) (*HistoryResponse, error)
 	CheckIgnored(context.Context, *CheckIgnoredRequest) (*CheckIgnoredResponse, error)
 	ForkSync(context.Context, *ForkSyncRequest) (*ForkSyncResponse, error)
 	UpstreamStatus(context.Context, *UpstreamStatusRequest) (*UpstreamStatusResponse, error)
-	// ── Group D (TASK-210) — remote. Only remoteCommitUrl/remoteFileUrl are
-	// exposed; fetch stays BLOCKED on the pushTarget design question. ───────
+	CommitCompare(context.Context, *CommitCompareRequest) (*CommitCompareResponse, error)
+	BranchCompare(context.Context, *BranchCompareRequest) (*BranchCompareResponse, error)
+	CommitDiff(context.Context, *CommitDiffRequest) (*FileDiffResponse, error)
+	BranchDiff(context.Context, *BranchDiffRequest) (*FileDiffResponse, error)
+	SubmoduleStatus(context.Context, *SubmoduleStatusRequest) (*GetStatusResponse, error)
+	// ── Group D (TASK-210) — remote. fetch was BLOCKED on the pushTarget
+	// design question and TASK-227 reachability — both now resolved. ───────
 	RemoteCommitUrl(context.Context, *RemoteCommitUrlRequest) (*RemoteUrlResponse, error)
 	RemoteFileUrl(context.Context, *RemoteFileUrlRequest) (*RemoteUrlResponse, error)
+	Fetch(context.Context, *FetchRequest) (*FetchResponse, error)
 	// ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
 	GeneratePullRequestFields(context.Context, *GeneratePullRequestFieldsRequest) (*GeneratePullRequestFieldsResponse, error)
 	DiscoverCommitMessageModels(context.Context, *DiscoverCommitMessageModelsRequest) (*DiscoverCommitMessageModelsResponse, error)
@@ -891,11 +971,29 @@ func (UnimplementedGitGatewayServiceServer) ForkSync(context.Context, *ForkSyncR
 func (UnimplementedGitGatewayServiceServer) UpstreamStatus(context.Context, *UpstreamStatusRequest) (*UpstreamStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpstreamStatus not implemented")
 }
+func (UnimplementedGitGatewayServiceServer) CommitCompare(context.Context, *CommitCompareRequest) (*CommitCompareResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitCompare not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) BranchCompare(context.Context, *BranchCompareRequest) (*BranchCompareResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BranchCompare not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CommitDiff(context.Context, *CommitDiffRequest) (*FileDiffResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitDiff not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) BranchDiff(context.Context, *BranchDiffRequest) (*FileDiffResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BranchDiff not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) SubmoduleStatus(context.Context, *SubmoduleStatusRequest) (*GetStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SubmoduleStatus not implemented")
+}
 func (UnimplementedGitGatewayServiceServer) RemoteCommitUrl(context.Context, *RemoteCommitUrlRequest) (*RemoteUrlResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoteCommitUrl not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) RemoteFileUrl(context.Context, *RemoteFileUrlRequest) (*RemoteUrlResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoteFileUrl not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) Fetch(context.Context, *FetchRequest) (*FetchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Fetch not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) GeneratePullRequestFields(context.Context, *GeneratePullRequestFieldsRequest) (*GeneratePullRequestFieldsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GeneratePullRequestFields not implemented")
@@ -1257,6 +1355,96 @@ func _GitGatewayService_UpstreamStatus_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_CommitCompare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitCompareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CommitCompare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CommitCompare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CommitCompare(ctx, req.(*CommitCompareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_BranchCompare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BranchCompareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).BranchCompare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_BranchCompare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).BranchCompare(ctx, req.(*BranchCompareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CommitDiff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitDiffRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CommitDiff(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CommitDiff_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CommitDiff(ctx, req.(*CommitDiffRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_BranchDiff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BranchDiffRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).BranchDiff(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_BranchDiff_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).BranchDiff(ctx, req.(*BranchDiffRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_SubmoduleStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmoduleStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).SubmoduleStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_SubmoduleStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).SubmoduleStatus(ctx, req.(*SubmoduleStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GitGatewayService_RemoteCommitUrl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RemoteCommitUrlRequest)
 	if err := dec(in); err != nil {
@@ -1289,6 +1477,24 @@ func _GitGatewayService_RemoteFileUrl_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(GitGatewayServiceServer).RemoteFileUrl(ctx, req.(*RemoteFileUrlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_Fetch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).Fetch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_Fetch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).Fetch(ctx, req.(*FetchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2087,12 +2293,36 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GitGatewayService_UpstreamStatus_Handler,
 		},
 		{
+			MethodName: "CommitCompare",
+			Handler:    _GitGatewayService_CommitCompare_Handler,
+		},
+		{
+			MethodName: "BranchCompare",
+			Handler:    _GitGatewayService_BranchCompare_Handler,
+		},
+		{
+			MethodName: "CommitDiff",
+			Handler:    _GitGatewayService_CommitDiff_Handler,
+		},
+		{
+			MethodName: "BranchDiff",
+			Handler:    _GitGatewayService_BranchDiff_Handler,
+		},
+		{
+			MethodName: "SubmoduleStatus",
+			Handler:    _GitGatewayService_SubmoduleStatus_Handler,
+		},
+		{
 			MethodName: "RemoteCommitUrl",
 			Handler:    _GitGatewayService_RemoteCommitUrl_Handler,
 		},
 		{
 			MethodName: "RemoteFileUrl",
 			Handler:    _GitGatewayService_RemoteFileUrl_Handler,
+		},
+		{
+			MethodName: "Fetch",
+			Handler:    _GitGatewayService_Fetch_Handler,
 		},
 		{
 			MethodName: "GeneratePullRequestFields",
