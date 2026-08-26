@@ -97,12 +97,38 @@ const sessionClientRuntimeID = "backend-go"
 // dialect (id/ok/result/_meta) — the counterpart of ResultMessage for
 // requests that arrived in the session-client dialect (see InboundMessage's
 // doc comment and session_dialect.go).
+//
+// Streaming: set true on every FOLLOW-UP push frame of a subscription
+// (Phase 2, push_bridge.go's pipePushForDialect) — omitted (false) on a
+// plain call()/subscribe() ack. WebSessionClient.handleSocketMessage's
+// isSubscriptionResponse (web-session-client.ts) treats a response as
+// subscription data (routed to the subscriber's onResponse callback,
+// looked up by request id — never by channel name, unlike the native
+// dialect's PushMessage) only if Streaming is true OR Result looks like
+// {"type":"end"|"scrollback"} — an ack with neither would instead be
+// treated as a one-shot `call()` resolution and silently dropped, since
+// subscribe() never registers its request id in WebSessionClient's
+// `pending` map. This field's presence is therefore load-bearing, not
+// decorative: omitting it on a push frame reproduces the exact silent-drop
+// failure BUG-005 was filed for, just for streaming data instead of the
+// initial ack.
 type SessionClientResultMessage struct {
-	ID     string            `json:"id"`
-	OK     bool              `json:"ok"` // always true
-	Result any               `json:"result"`
-	Meta   sessionClientMeta `json:"_meta"`
+	ID        string            `json:"id"`
+	OK        bool              `json:"ok"` // always true
+	Result    any               `json:"result"`
+	Meta      sessionClientMeta `json:"_meta"`
+	Streaming bool              `json:"streaming,omitempty"`
 }
+
+// sessionClientStreamEnd is the Result payload pipePushForDialect sends in
+// the final frame of a subscription once its event channel closes —
+// WebSessionClient's isEndResult (web-session-client.ts) matches on this
+// exact {"type":"end"} shape to fire the subscriber's onClose callback and
+// stop tracking the request id, mirroring how a natively-dialected
+// subscription simply stops receiving PushMessage frames when the
+// connection or channel closes (which WebSessionClient has no equivalent
+// signal for — an explicit end frame is required in this dialect).
+var sessionClientStreamEnd = map[string]string{"type": "end"}
 
 // sessionClientErrorBody is RuntimeRpcFailure's "error" field shape.
 type sessionClientErrorBody struct {

@@ -2,18 +2,19 @@
 
 **Resolves:** BUG-005
 **Service:** `api-gateway`
-**Affected files:** `internal/adapter/wscompat/envelope.go`, `internal/adapter/wscompat/handler.go`, `internal/adapter/wscompat/session_dialect.go` (new)
+**Affected files:** `internal/adapter/wscompat/envelope.go`, `internal/adapter/wscompat/handler.go`, `internal/adapter/wscompat/session_dialect.go` (new), `internal/adapter/wscompat/push_bridge.go` (Phase 2)
 **Priority:** Critical — root cause of every real web-mode data call timing out
-**Status:** ✅ IMPLEMENTED (2026-08-26)
+**Status:** ✅ IMPLEMENTED — Phase 1 (2026-08-26), Phase 2 (2026-08-27)
 
 ---
 
-## Scope — Phase 1 only
+## Scope
 
-This fix bridges `WebSessionClient`'s plain `call()`/`subscribe()`-initiated
-request/response path onto `wscompat`'s existing invoke/result dispatch.
-**Phase 2 (streaming/subscribe push bridge) is explicitly NOT implemented**
-— see "Phase 2" section below.
+Phase 1 bridges `WebSessionClient`'s plain `call()`/`subscribe()`-initiated
+request/response (ack) path onto `wscompat`'s existing invoke/result
+dispatch. Phase 2 additionally bridges the FOLLOW-UP push events a
+subscription produces after its initial ack — see "Phase 2" section below
+for the full wire contract.
 
 ---
 
@@ -181,7 +182,8 @@ from `push_bridge_test.go`/this file:
 | `TestSessionClientDialect_RoundTripsThroughRegisteredChannel` | (b) `{"id","authToken","method","params"}` round-trips through a real registered channel, comes back `{"id","ok":true,"result","_meta":{"runtimeId":"backend-go"}}` |
 | `TestSessionClientDialect_ErrorPathReturnsOkFalse` | (c) unregistered channel via session-client dialect returns `{"id","ok":false,"error":{"code","message"},"_meta":{"runtimeId":null}}` |
 | `TestGarbageMessage_NeitherTypeNorMethod_HandledGracefully` | (d) a message with neither `type` nor `method` is logged, connection stays open, no panic — a subsequent ordinary invoke on the same connection still works |
-| `TestSessionClientDialect_SubscribeChannelAcksWithoutCrashing` | Point 6 — a session-client request on a `StreamHandler`-registered channel gets a correct ack and a follow-up push event doesn't panic/hang the connection (Phase 2 gap, not a regression) |
+| `TestSessionClientDialect_SubscribeChannelStreamsAndEnds` (Phase 2; replaces the original `...AcksWithoutCrashing`) | `StreamHandler` path: ack, a real `Streaming:true` update keyed by the request id, and a final `{"type":"end"}` frame on channel close — the original test only asserted a non-crashing native push frame; Phase 2 makes it a real, working bridge |
+| `TestSessionClientDialect_StreamChannelAckAndPushBothBridge` (Phase 2, new) | `StreamChannelHandler` path (ack+events from one call, e.g. `terminal.create`'s shape) — both the ack and its follow-up push go through the dialect bridge |
 
 `writeRaw`/`readRawFrame`/`readSessionClientWireMessage` were added as small
 test helpers — `InboundMessage.Type` lacks `omitempty`, so marshaling it via
@@ -200,32 +202,95 @@ go test ./...    # ok, all packages, including the 5 new + all pre-existing wsco
 
 ---
 
-## Phase 2 — explicitly NOT implemented here
+## Phase 2 — implemented (2026-08-27)
 
-`pipePush` (`push_bridge.go`) is untouched: follow-up push frames for
-`StreamHandler`-registered channels (e.g. `accounts.subscribe`,
-`notifications.subscribe`) always use the native
-`{"type":"push","channel","args"}` shape, regardless of which dialect the
-subscribing request arrived in.
+Originally scoped out of the initial fix; implemented as a follow-up once
+Phase 1 landed and was verified. `pipePush` (`push_bridge.go`) itself is
+UNCHANGED (still the native dialect's exact behavior) — a new sibling
+function, `pipePushForDialect`, wraps it:
 
-`WebSessionClient` has no channel-keyed push concept — its
-`handleSocketMessage` only correlates follow-up frames by the original
-request `id` via `isSubscriptionResponse()`'s `streaming`/`result.type ===
-'end'` checks. A session-client caller of a subscribe-shaped channel today
-gets:
+```go
+func pipePushForDialect(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, events <-chan PushEvent, d dialect, requestID string) {
+	if d != dialectSessionClient {
+		pipePush(ctx, conn, writeMu, events) // native dialect: delegate, unchanged
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return // connection going away — no point writing an end frame
+		case ev, ok := <-events:
+			if !ok {
+				// event channel closed: one final {"type":"end"} frame so
+				// WebSessionClient's isEndResult fires onClose.
+				write(SessionClientResultMessage{ID: requestID, OK: true, Result: sessionClientStreamEnd, ...})
+				return
+			}
+			// ongoing update: Streaming:true, keyed by requestID (never ev.Channel).
+			write(SessionClientResultMessage{ID: requestID, OK: true, Result: pushEventResult(ev), Streaming: true, ...})
+		}
+	}
+}
+```
 
-1. A correct, dialect-aware initial ack (this fix).
-2. Silence after that — the native push frames it can't parse into its
-   `pending`/`subscriptions` maps are simply frames it doesn't recognize
-   (see `handleSocketMessage`'s `if (!('id' in response) ...) return`
-   guard — a push frame has no top-level `id`, so it's dropped harmlessly,
-   not mis-delivered).
+`handler.go`'s two `pipePush(...)` call sites (`handleInvoke`'s
+`StreamChannelHandler` ack+events path, e.g. `terminal.create`, and
+`handleSubscribe`'s pure `StreamHandler` path, e.g.
+`notifications.subscribe`) both now call `pipePushForDialect(..., msgDialect,
+msg.ID)` instead — the native dialect's behavior is byte-for-byte identical
+to before (delegates straight to `pipePush`), confirmed by
+`TestNativeInvokeDialect_UnchangedByDialectBridge` still passing unchanged.
 
-This is strictly better than the pre-fix total 30s timeout (the initial
-call now resolves), but is NOT a working subscription bridge. Implementing
-that requires either (a) teaching `wscompat` to also emit an id-correlated
-streaming frame shape for session-client-dialect subscribers, or (b)
-teaching `WebSessionClient` to understand channel-keyed push — both out of
-scope for this fix. Tracked as future work, not filed as a separate BUG
-number since it's a known, deliberate scope boundary of this same fix
-rather than an independently-discovered gap.
+**Wire contract for session-client-dialect subscribers**, now real:
+
+1. Initial ack: `{"id","ok":true,"result":<ack value, or null for a pure
+   StreamHandler>,"_meta"}` — unchanged from Phase 1.
+2. Every event: `{"id"` (same id as the ack) `,"ok":true,"result":<value>,
+   "_meta","streaming":true}` — `WebSessionClient.isSubscriptionResponse`
+   requires `streaming===true` (or a `result.type` of `"end"`/`"scrollback"`)
+   to route a same-id frame to the subscriber's `onResponse` instead of
+   silently dropping it (see `handleSocketMessage`), so `Streaming` is
+   load-bearing, not decorative.
+3. Stream end: `{"id","ok":true,"result":{"type":"end"},"_meta"}` (no
+   `streaming` field) once the handler's event channel closes —
+   `WebSessionClient.isEndResult` matches this shape, deletes the
+   subscription, and fires `callbacks.onClose`.
+
+**`pushEventResult`'s single-arg unwrap:** `PushEvent.Args` is a slice
+because the native dialect spreads it as positional arguments
+(`handlers.forEach(h => h(...args))`, `rpc-client.ts`) — a concept
+`WebSessionClient` has no equivalent for (`onResponse` takes one
+`response.result` value). Every current real `StreamHandler`
+(`registerNotificationStreamChannel`, `registerClientEventsChannel`,
+`channels_push.go`) emits exactly one arg per event, so `pushEventResult`
+unwraps a single-element `Args` to its bare value rather than forcing every
+session-client consumer to index into a one-element array; a hypothetical
+future multi-arg emitter degrades safely to the raw slice instead of
+crashing or silently dropping data.
+
+**Remaining caveat, not a gap in this fix:** this bridges the WS-transport
+push mechanism generically — it does not, by itself, make any specific
+subscribe-shaped feature (e.g. `accounts.subscribe`, `nativeChat.subscribe`)
+work end-to-end, since most of those channels aren't registered in
+`wscompat`'s `Registry` at all yet (see TASK-023's finding for
+`accounts.subscribe` specifically). Today's only real, registered
+`StreamHandler`/`StreamChannelHandler` channels are
+`notifications.subscribe`, `runtime.clientEvents.subscribe`
+(`channels_push.go`), and `terminal.create` (`channels_terminal.go`) —
+those three now have a real, tested path to a session-client subscriber;
+any NEW subscribe-shaped channel registered in the future gets this bridge
+for free, with no per-channel work required.
+
+### Tests Added — Phase 2
+
+| Test | Verifies |
+|------|----------|
+| `TestSessionClientDialect_SubscribeChannelStreamsAndEnds` (replaces the old `...AcksWithoutCrashing`) | `StreamHandler` path: ack, one `Streaming:true` update keyed by the request id (not `ev.Channel`), and a final `{"type":"end"}` frame on channel close |
+| `TestSessionClientDialect_StreamChannelAckAndPushBothBridge` | `StreamChannelHandler` path (ack+events from one call, e.g. `terminal.create`'s shape): both the ack and its follow-up push go through the dialect bridge |
+
+```bash
+cd backend-go/services/api-gateway
+go build ./...   # clean
+go vet ./...     # clean
+go test ./...    # ok, all packages, including both new Phase 2 tests + all Phase 1/pre-existing wscompat tests
+```

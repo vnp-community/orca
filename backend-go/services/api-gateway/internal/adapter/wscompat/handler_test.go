@@ -247,6 +247,7 @@ type sessionClientWireMessage struct {
 	Meta struct {
 		RuntimeID *string `json:"runtimeId"`
 	} `json:"_meta"`
+	Streaming bool `json:"streaming"`
 }
 
 // TestNativeInvokeDialect_UnchangedByDialectBridge is a regression guard:
@@ -383,14 +384,13 @@ func TestGarbageMessage_NeitherTypeNorMethod_HandledGracefully(t *testing.T) {
 	}
 }
 
-// TestSessionClientDialect_SubscribeChannelAcksWithoutCrashing verifies
-// Phase 2's explicitly-scoped-out gap (see handleSubscribe's doc comment):
-// a session-client-dialect request landing on a StreamHandler-registered
-// channel gets a well-formed, dialect-correct ack instead of a timeout, and
-// pushing a follow-up event on that subscription does not panic or hang the
-// connection — even though the event itself won't reach WebSessionClient in
-// a shape it understands (native push, not id-correlated).
-func TestSessionClientDialect_SubscribeChannelAcksWithoutCrashing(t *testing.T) {
+// TestSessionClientDialect_SubscribeChannelStreamsAndEnds verifies Phase 2
+// (see handleSubscribe/pipePushForDialect's doc comments): a session-client
+// caller of a StreamHandler-registered channel gets a dialect-correct ack,
+// every follow-up event as a Streaming:true frame correlated by ITS OWN
+// request id (never ev.Channel — WebSessionClient has no channel-keyed push
+// concept), and a final {"type":"end"} frame once the event channel closes.
+func TestSessionClientDialect_SubscribeChannelStreamsAndEnds(t *testing.T) {
 	registry := NewRegistry()
 	events := make(chan PushEvent, 1)
 	registry.RegisterStream("test.subscribe", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
@@ -407,16 +407,34 @@ func TestSessionClientDialect_SubscribeChannelAcksWithoutCrashing(t *testing.T) 
 	}
 
 	ack := readSessionClientWireMessage(t, ctx, client)
-	if ack.ID != "web-session-rpc-3" || !ack.OK {
-		t.Fatalf("ack = %+v, want ok=true id=web-session-rpc-3", ack)
+	if ack.ID != "web-session-rpc-3" || !ack.OK || ack.Streaming {
+		t.Fatalf("ack = %+v, want ok=true id=web-session-rpc-3 streaming=false", ack)
 	}
 
-	// A follow-up push must not panic/hang the connection — read it as a
-	// raw frame since it's still native {"type":"push",...} (Phase 2 gap).
+	// A single-arg PushEvent unwraps to its bare value (pushEventResult),
+	// carries the SAME request id (never ev.Channel), and is marked
+	// Streaming so WebSessionClient's isSubscriptionResponse routes it to
+	// the subscriber instead of silently dropping it (see
+	// SessionClientResultMessage's doc comment).
 	events <- PushEvent{Channel: "test.event", Args: []any{"payload"}}
-	raw := readRawFrame(t, ctx, client)
-	if !strings.Contains(raw, `"type":"push"`) {
-		t.Fatalf("follow-up push frame = %s, want native type=push (Phase 2 not implemented)", raw)
+	update := readSessionClientWireMessage(t, ctx, client)
+	if update.ID != "web-session-rpc-3" || !update.OK || !update.Streaming {
+		t.Fatalf("update = %+v, want ok=true id=web-session-rpc-3 streaming=true", update)
+	}
+	if got := string(update.Result); got != `"payload"` {
+		t.Fatalf("update.Result = %s, want unwrapped bare value %q", got, `"payload"`)
+	}
+
+	// Closing the event channel must produce exactly one final {"type":"end"}
+	// frame (Streaming omitted/false — isEndResult keys off Result alone) so
+	// WebSessionClient's onClose fires and it stops tracking this request id.
+	close(events)
+	end := readSessionClientWireMessage(t, ctx, client)
+	if end.ID != "web-session-rpc-3" || !end.OK || end.Streaming {
+		t.Fatalf("end = %+v, want ok=true id=web-session-rpc-3 streaming=false", end)
+	}
+	if got := string(end.Result); got != `{"type":"end"}` {
+		t.Fatalf("end.Result = %s, want {\"type\":\"end\"}", got)
 	}
 }
 
@@ -436,4 +454,44 @@ func readSessionClientWireMessage(t *testing.T, ctx context.Context, conn *webso
 		t.Fatalf("reading session-client frame: %v", err)
 	}
 	return msg
+}
+
+// TestSessionClientDialect_StreamChannelAckAndPushBothBridge covers
+// handleInvoke's OTHER push path (registry.go's StreamChannelHandler, e.g.
+// terminal.create — an ack value AND an events channel from one call,
+// distinct from handleSubscribe's pure-subscribe StreamHandler path already
+// covered above) — both the ack and its follow-up push must go through the
+// same dialect bridge.
+func TestSessionClientDialect_StreamChannelAckAndPushBothBridge(t *testing.T) {
+	registry := NewRegistry()
+	events := make(chan PushEvent, 1)
+	registry.RegisterStreamChannel("test.streamChannel", func(ctx context.Context, id Identity, args []json.RawMessage) (any, <-chan PushEvent, error) {
+		return map[string]string{"sessionId": "abc"}, events, nil
+	})
+
+	ts := newTestHandlerServer(t, registry)
+	client := dialTestClient(t, ts)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := writeRaw(ctx, client, `{"id":"web-session-rpc-4","authToken":"cookie-auth","method":"test.streamChannel","params":{}}`); err != nil {
+		t.Fatalf("writing session-client invoke: %v", err)
+	}
+
+	ack := readSessionClientWireMessage(t, ctx, client)
+	if ack.ID != "web-session-rpc-4" || !ack.OK || ack.Streaming {
+		t.Fatalf("ack = %+v, want ok=true id=web-session-rpc-4 streaming=false", ack)
+	}
+	if got := string(ack.Result); got != `{"sessionId":"abc"}` {
+		t.Fatalf("ack.Result = %s, want the StreamChannelHandler's ack value verbatim", got)
+	}
+
+	events <- PushEvent{Channel: "test.streamEvent", Args: []any{"chunk"}}
+	update := readSessionClientWireMessage(t, ctx, client)
+	if update.ID != "web-session-rpc-4" || !update.OK || !update.Streaming {
+		t.Fatalf("update = %+v, want ok=true id=web-session-rpc-4 streaming=true", update)
+	}
+	if got := string(update.Result); got != `"chunk"` {
+		t.Fatalf("update.Result = %s, want unwrapped bare value %q", got, `"chunk"`)
+	}
 }

@@ -50,3 +50,64 @@ func pipePush(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, ev
 		}
 	}
 }
+
+// pipePushForDialect is pipePush's dialect-aware counterpart (BUG-005
+// Phase 2, specs/backend-go/bugs/api-v1/solutions/SOL-005). The native
+// dialect delegates straight to pipePush, unchanged. The session-client
+// dialect cannot reuse PushMessage's channel-keyed shape at all —
+// WebSessionClient has no `on(channel, handler)` concept, only per-request-id
+// correlation (see SessionClientResultMessage's doc comment) — so every
+// event is re-encoded as a Streaming:true SessionClientResultMessage
+// carrying requestID (the original subscribe/invoke call's id, NOT
+// ev.Channel), and the loop sends one final {"type":"end"} frame when the
+// event channel closes so WebSessionClient's onClose fires instead of the
+// subscription silently going quiet forever.
+func pipePushForDialect(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, events <-chan PushEvent, d dialect, requestID string) {
+	if d != dialectSessionClient {
+		pipePush(ctx, conn, writeMu, events)
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			// Connection is going away — no point writing an end frame the
+			// client will never receive, same reasoning pipePush's own
+			// ctx.Done() branch already applies.
+			return
+		case ev, ok := <-events:
+			runtimeID := sessionClientRuntimeID
+			if !ok {
+				writeMu.Lock()
+				_ = wsjson.Write(ctx, conn, SessionClientResultMessage{
+					ID: requestID, OK: true, Result: sessionClientStreamEnd,
+					Meta: sessionClientMeta{RuntimeID: &runtimeID},
+				})
+				writeMu.Unlock()
+				return
+			}
+			writeMu.Lock()
+			_ = wsjson.Write(ctx, conn, SessionClientResultMessage{
+				ID: requestID, OK: true, Result: pushEventResult(ev),
+				Meta: sessionClientMeta{RuntimeID: &runtimeID}, Streaming: true,
+			})
+			writeMu.Unlock()
+		}
+	}
+}
+
+// pushEventResult collapses a PushEvent's Args (a slice, designed for
+// rpc-client.ts's `handlers.forEach(h => h(...args))` spread — see
+// PushEvent's doc comment) into the single Result value
+// SessionClientResultMessage carries: every current StreamHandler
+// (registerNotificationStreamChannel, channels_push.go) emits exactly one
+// arg per event, so the common case unwraps to that value directly rather
+// than forcing every session-client consumer to index into a one-element
+// array. A future multi-arg emitter still degrades safely to the raw slice.
+func pushEventResult(ev PushEvent) any {
+	switch len(ev.Args) {
+	case 1:
+		return ev.Args[0]
+	default:
+		return ev.Args
+	}
+}

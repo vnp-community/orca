@@ -4,7 +4,7 @@
 **File:** `internal/adapter/wscompat/handler.go`, `internal/adapter/wscompat/envelope.go`
 **Severity:** Critical — every `git.*`/`repos.*`/`worktrees.*`/`accounts.*`/... call made by the deployed web frontend silently times out after 30s
 **Symptom:** Every RPC call from the shipped web frontend (any feature routed through `WebSessionClient`) hangs for exactly `REQUEST_TIMEOUT_MS` (30s) and then rejects with `Error: Request timed out: <method>` — no server-side error is ever logged, because the server never even recognizes the message.
-**Status:** ✅ Fixed (2026-08-26) — [SOL-005](./solutions/SOL-005-websessionclient-dialect-bridge.md)
+**Status:** ✅ Fixed (2026-08-26, Phase 1 — plain call/invoke path; 2026-08-27, Phase 2 — streaming/subscribe push bridge) — [SOL-005](./solutions/SOL-005-websessionclient-dialect-bridge.md)
 
 ---
 
@@ -118,13 +118,16 @@ detects the dialect once per message and normalizes it onto the existing
 `BinaryStreamHandlerFor` need no changes; the write-back side encodes the
 response in whichever dialect the request arrived in.
 
-**Explicitly out of scope for this fix (Phase 2):** `pipePush`'s follow-up
-push events for `StreamHandler`-registered channels (e.g.
-`accounts.subscribe`) still use the native `{"type":"push",...}` shape,
-which `WebSessionClient` cannot correlate to a request id. A session-client
-caller of a subscribe-shaped channel gets a correct initial ack and then no
-further updates — a real, deliberate, documented gap. See SOL-005's
-"Phase 2" section.
+**Phase 2 (2026-08-27, also fixed):** follow-up push events for
+`StreamHandler`-registered channels (e.g. `notifications.subscribe`) AND
+`StreamChannelHandler`-registered channels (e.g. `terminal.create`) are now
+also bridged — `push_bridge.go`'s new `pipePushForDialect` re-encodes every
+event as a `Streaming:true` `SessionClientResultMessage` keyed by the
+ORIGINAL request id (never `ev.Channel` — `WebSessionClient` has no
+channel-keyed push concept), and writes one final `{"type":"end"}` frame
+when the event channel closes so `WebSessionClient`'s `onClose` fires
+instead of the subscription going silently quiet forever. See SOL-005's
+"Phase 2" section for the exact wire contract and remaining caveats.
 
 ---
 
@@ -135,4 +138,7 @@ further updates — a real, deliberate, documented gap. See SOL-005's
 | `internal/adapter/wscompat/envelope.go` | Add `Method`/`Params` to `InboundMessage`; add `SessionClientResultMessage`/`SessionClientErrorMessage`/`sessionClientMeta` |
 | `internal/adapter/wscompat/session_dialect.go` (new) | `dialect` enum, `normalizeInboundMessage`, `writeDialectResult`/`writeDialectError` |
 | `internal/adapter/wscompat/handler.go` | `ServeHTTP` calls `normalizeInboundMessage` once; `handleInvoke`/`handleSubscribe` take a `dialect` param and use `writeDialectResult`/`writeDialectError` instead of a hardcoded `ResultMessage`/`ErrorMessage` |
-| `internal/adapter/wscompat/handler_test.go` | 5 new tests (native-dialect regression guard, session-client round-trip, session-client error path, garbage-message graceful handling, subscribe-channel ack-without-crash) |
+| `internal/adapter/wscompat/handler_test.go` | Phase 1: 5 tests (native-dialect regression guard, session-client round-trip, session-client error path, garbage-message graceful handling). Phase 2: `TestSessionClientDialect_SubscribeChannelAcksWithoutCrashing` rewritten as `TestSessionClientDialect_SubscribeChannelStreamsAndEnds` (asserts real streaming + end-frame behavior instead of the old documented gap); new `TestSessionClientDialect_StreamChannelAckAndPushBothBridge` covers the `StreamChannelHandler` (ack+events) path |
+| `internal/adapter/wscompat/push_bridge.go` (Phase 2) | New `pipePushForDialect` (dialect-aware push loop) and `pushEventResult` (collapses a single-arg `PushEvent` to its bare value) |
+| `internal/adapter/wscompat/envelope.go` (Phase 2) | `SessionClientResultMessage` gained a `Streaming` field; new `sessionClientStreamEnd` sentinel (`{"type":"end"}`) |
+| `internal/adapter/wscompat/handler.go` (Phase 2) | `handleInvoke`/`handleSubscribe` call `pipePushForDialect` instead of `pipePush` directly |

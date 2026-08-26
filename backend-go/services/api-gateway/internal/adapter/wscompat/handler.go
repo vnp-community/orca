@@ -255,7 +255,7 @@ func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeM
 	// dispatchCtx — dispatchCtx dies with invokeTimeout, but the push
 	// subscription must outlive this one invoke.
 	if isStreamChannel && err == nil && events != nil {
-		go pipePush(ctx, conn, writeMu, events)
+		go pipePushForDialect(ctx, conn, writeMu, events, msgDialect, msg.ID)
 	}
 }
 
@@ -293,18 +293,15 @@ func (h *Handler) binaryStreamIO(ctx context.Context, conn *websocket.Conn, writ
 // it in invokeTimeout would cancel that goroutine's context the instant
 // Open() returns, killing the subscription before its first event.
 //
-// Phase 2, NOT implemented here: the initial ack below is dialect-aware
-// (msgDialect), so a session-client caller of a subscribe-shaped channel
-// (e.g. accounts.subscribe) gets a well-formed ack instead of a timeout.
-// pipePush's FOLLOW-UP events, however, are deliberately left untouched —
-// always native {"type":"push","channel","args"} frames. WebSessionClient
-// has no concept of a channel-keyed push; it only understands frames keyed
-// by the request id it sent (see WebSessionClient.handleSocketMessage's
-// isSubscriptionResponse/isEndResult checks in web-session-client.ts), so a
-// session-client caller of a stream channel gets an ack and then silently
-// no further updates — an improvement over today's total timeout, but not a
-// working subscription. See specs/backend-go/bugs/api-v1/BUG-005's
-// solution doc for the full writeup of this scoped-out gap.
+// Both the initial ack AND every follow-up push event are dialect-aware
+// (BUG-005 Phase 2, specs/backend-go/bugs/api-v1/solutions/SOL-005): a
+// session-client caller of a subscribe-shaped channel (e.g.
+// notifications.subscribe) gets a well-formed ack, Streaming:true updates
+// keyed by ITS OWN request id (never ev.Channel — WebSessionClient has no
+// channel-keyed push concept, see SessionClientResultMessage's doc comment),
+// and a final {"type":"end"} frame when the subscription's event channel
+// closes so its onClose callback fires — see pipePushForDialect
+// (push_bridge.go).
 func (h *Handler) handleSubscribe(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, identity Identity, msg InboundMessage, sh StreamHandler, msgDialect dialect) {
 	events, err := sh(ctx, identity, msg.Args)
 
@@ -317,7 +314,7 @@ func (h *Handler) handleSubscribe(ctx context.Context, conn *websocket.Conn, wri
 	_ = writeDialectResult(ctx, conn, msgDialect, msg.ID, nil)
 	writeMu.Unlock()
 
-	pipePush(ctx, conn, writeMu, events)
+	pipePushForDialect(ctx, conn, writeMu, events, msgDialect, msg.ID)
 }
 
 // handleSend dispatches a fire-and-forget "send" message the same way as
