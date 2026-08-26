@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,16 +20,26 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_Login_FullMethodName             = "/orca.auth.v1.AuthService/Login"
-	AuthService_Logout_FullMethodName            = "/orca.auth.v1.AuthService/Logout"
-	AuthService_ValidateSession_FullMethodName   = "/orca.auth.v1.AuthService/ValidateSession"
-	AuthService_IssueServiceToken_FullMethodName = "/orca.auth.v1.AuthService/IssueServiceToken"
-	AuthService_GetJWKS_FullMethodName           = "/orca.auth.v1.AuthService/GetJWKS"
-	AuthService_CreateUser_FullMethodName        = "/orca.auth.v1.AuthService/CreateUser"
-	AuthService_ListUsers_FullMethodName         = "/orca.auth.v1.AuthService/ListUsers"
-	AuthService_UpdateUserRole_FullMethodName    = "/orca.auth.v1.AuthService/UpdateUserRole"
-	AuthService_RevokeSession_FullMethodName     = "/orca.auth.v1.AuthService/RevokeSession"
-	AuthService_QueryAuditLog_FullMethodName     = "/orca.auth.v1.AuthService/QueryAuditLog"
+	AuthService_Login_FullMethodName                         = "/orca.auth.v1.AuthService/Login"
+	AuthService_Logout_FullMethodName                        = "/orca.auth.v1.AuthService/Logout"
+	AuthService_ValidateSession_FullMethodName               = "/orca.auth.v1.AuthService/ValidateSession"
+	AuthService_IssueServiceToken_FullMethodName             = "/orca.auth.v1.AuthService/IssueServiceToken"
+	AuthService_GetJWKS_FullMethodName                       = "/orca.auth.v1.AuthService/GetJWKS"
+	AuthService_CreateUser_FullMethodName                    = "/orca.auth.v1.AuthService/CreateUser"
+	AuthService_ListUsers_FullMethodName                     = "/orca.auth.v1.AuthService/ListUsers"
+	AuthService_UpdateUserRole_FullMethodName                = "/orca.auth.v1.AuthService/UpdateUserRole"
+	AuthService_RevokeSession_FullMethodName                 = "/orca.auth.v1.AuthService/RevokeSession"
+	AuthService_QueryAuditLog_FullMethodName                 = "/orca.auth.v1.AuthService/QueryAuditLog"
+	AuthService_DeactivateUser_FullMethodName                = "/orca.auth.v1.AuthService/DeactivateUser"
+	AuthService_ReactivateUser_FullMethodName                = "/orca.auth.v1.AuthService/ReactivateUser"
+	AuthService_ListSessionsForUser_FullMethodName           = "/orca.auth.v1.AuthService/ListSessionsForUser"
+	AuthService_ForceRevokeAllSessionsForUser_FullMethodName = "/orca.auth.v1.AuthService/ForceRevokeAllSessionsForUser"
+	AuthService_CreateAccessPolicy_FullMethodName            = "/orca.auth.v1.AuthService/CreateAccessPolicy"
+	AuthService_GetAccessPolicy_FullMethodName               = "/orca.auth.v1.AuthService/GetAccessPolicy"
+	AuthService_ListAccessPolicies_FullMethodName            = "/orca.auth.v1.AuthService/ListAccessPolicies"
+	AuthService_UpdateAccessPolicy_FullMethodName            = "/orca.auth.v1.AuthService/UpdateAccessPolicy"
+	AuthService_DeleteAccessPolicy_FullMethodName            = "/orca.auth.v1.AuthService/DeleteAccessPolicy"
+	AuthService_GetAdminStats_FullMethodName                 = "/orca.auth.v1.AuthService/GetAdminStats"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -53,6 +64,16 @@ type AuthServiceClient interface {
 	UpdateUserRole(ctx context.Context, in *UpdateUserRoleRequest, opts ...grpc.CallOption) (*UpdateUserRoleResponse, error)
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
 	QueryAuditLog(ctx context.Context, in *QueryAuditLogRequest, opts ...grpc.CallOption) (*QueryAuditLogResponse, error)
+	DeactivateUser(ctx context.Context, in *DeactivateUserRequest, opts ...grpc.CallOption) (*DeactivateUserResponse, error)
+	ReactivateUser(ctx context.Context, in *ReactivateUserRequest, opts ...grpc.CallOption) (*ReactivateUserResponse, error)
+	ListSessionsForUser(ctx context.Context, in *ListSessionsForUserRequest, opts ...grpc.CallOption) (*ListSessionsForUserResponse, error)
+	ForceRevokeAllSessionsForUser(ctx context.Context, in *ForceRevokeAllSessionsForUserRequest, opts ...grpc.CallOption) (*ForceRevokeAllSessionsForUserResponse, error)
+	CreateAccessPolicy(ctx context.Context, in *CreateAccessPolicyRequest, opts ...grpc.CallOption) (*AccessPolicy, error)
+	GetAccessPolicy(ctx context.Context, in *GetAccessPolicyRequest, opts ...grpc.CallOption) (*AccessPolicy, error)
+	ListAccessPolicies(ctx context.Context, in *ListAccessPoliciesRequest, opts ...grpc.CallOption) (*ListAccessPoliciesResponse, error)
+	UpdateAccessPolicy(ctx context.Context, in *UpdateAccessPolicyRequest, opts ...grpc.CallOption) (*AccessPolicy, error)
+	DeleteAccessPolicy(ctx context.Context, in *DeleteAccessPolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetAdminStats(ctx context.Context, in *GetAdminStatsRequest, opts ...grpc.CallOption) (*GetAdminStatsResponse, error)
 }
 
 type authServiceClient struct {
@@ -163,6 +184,106 @@ func (c *authServiceClient) QueryAuditLog(ctx context.Context, in *QueryAuditLog
 	return out, nil
 }
 
+func (c *authServiceClient) DeactivateUser(ctx context.Context, in *DeactivateUserRequest, opts ...grpc.CallOption) (*DeactivateUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeactivateUserResponse)
+	err := c.cc.Invoke(ctx, AuthService_DeactivateUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ReactivateUser(ctx context.Context, in *ReactivateUserRequest, opts ...grpc.CallOption) (*ReactivateUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReactivateUserResponse)
+	err := c.cc.Invoke(ctx, AuthService_ReactivateUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListSessionsForUser(ctx context.Context, in *ListSessionsForUserRequest, opts ...grpc.CallOption) (*ListSessionsForUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSessionsForUserResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListSessionsForUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ForceRevokeAllSessionsForUser(ctx context.Context, in *ForceRevokeAllSessionsForUserRequest, opts ...grpc.CallOption) (*ForceRevokeAllSessionsForUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ForceRevokeAllSessionsForUserResponse)
+	err := c.cc.Invoke(ctx, AuthService_ForceRevokeAllSessionsForUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) CreateAccessPolicy(ctx context.Context, in *CreateAccessPolicyRequest, opts ...grpc.CallOption) (*AccessPolicy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AccessPolicy)
+	err := c.cc.Invoke(ctx, AuthService_CreateAccessPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GetAccessPolicy(ctx context.Context, in *GetAccessPolicyRequest, opts ...grpc.CallOption) (*AccessPolicy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AccessPolicy)
+	err := c.cc.Invoke(ctx, AuthService_GetAccessPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListAccessPolicies(ctx context.Context, in *ListAccessPoliciesRequest, opts ...grpc.CallOption) (*ListAccessPoliciesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAccessPoliciesResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListAccessPolicies_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) UpdateAccessPolicy(ctx context.Context, in *UpdateAccessPolicyRequest, opts ...grpc.CallOption) (*AccessPolicy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AccessPolicy)
+	err := c.cc.Invoke(ctx, AuthService_UpdateAccessPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) DeleteAccessPolicy(ctx context.Context, in *DeleteAccessPolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AuthService_DeleteAccessPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GetAdminStats(ctx context.Context, in *GetAdminStatsRequest, opts ...grpc.CallOption) (*GetAdminStatsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAdminStatsResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetAdminStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -185,6 +306,16 @@ type AuthServiceServer interface {
 	UpdateUserRole(context.Context, *UpdateUserRoleRequest) (*UpdateUserRoleResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
 	QueryAuditLog(context.Context, *QueryAuditLogRequest) (*QueryAuditLogResponse, error)
+	DeactivateUser(context.Context, *DeactivateUserRequest) (*DeactivateUserResponse, error)
+	ReactivateUser(context.Context, *ReactivateUserRequest) (*ReactivateUserResponse, error)
+	ListSessionsForUser(context.Context, *ListSessionsForUserRequest) (*ListSessionsForUserResponse, error)
+	ForceRevokeAllSessionsForUser(context.Context, *ForceRevokeAllSessionsForUserRequest) (*ForceRevokeAllSessionsForUserResponse, error)
+	CreateAccessPolicy(context.Context, *CreateAccessPolicyRequest) (*AccessPolicy, error)
+	GetAccessPolicy(context.Context, *GetAccessPolicyRequest) (*AccessPolicy, error)
+	ListAccessPolicies(context.Context, *ListAccessPoliciesRequest) (*ListAccessPoliciesResponse, error)
+	UpdateAccessPolicy(context.Context, *UpdateAccessPolicyRequest) (*AccessPolicy, error)
+	DeleteAccessPolicy(context.Context, *DeleteAccessPolicyRequest) (*emptypb.Empty, error)
+	GetAdminStats(context.Context, *GetAdminStatsRequest) (*GetAdminStatsResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -224,6 +355,36 @@ func (UnimplementedAuthServiceServer) RevokeSession(context.Context, *RevokeSess
 }
 func (UnimplementedAuthServiceServer) QueryAuditLog(context.Context, *QueryAuditLogRequest) (*QueryAuditLogResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryAuditLog not implemented")
+}
+func (UnimplementedAuthServiceServer) DeactivateUser(context.Context, *DeactivateUserRequest) (*DeactivateUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeactivateUser not implemented")
+}
+func (UnimplementedAuthServiceServer) ReactivateUser(context.Context, *ReactivateUserRequest) (*ReactivateUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReactivateUser not implemented")
+}
+func (UnimplementedAuthServiceServer) ListSessionsForUser(context.Context, *ListSessionsForUserRequest) (*ListSessionsForUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSessionsForUser not implemented")
+}
+func (UnimplementedAuthServiceServer) ForceRevokeAllSessionsForUser(context.Context, *ForceRevokeAllSessionsForUserRequest) (*ForceRevokeAllSessionsForUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ForceRevokeAllSessionsForUser not implemented")
+}
+func (UnimplementedAuthServiceServer) CreateAccessPolicy(context.Context, *CreateAccessPolicyRequest) (*AccessPolicy, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAccessPolicy not implemented")
+}
+func (UnimplementedAuthServiceServer) GetAccessPolicy(context.Context, *GetAccessPolicyRequest) (*AccessPolicy, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAccessPolicy not implemented")
+}
+func (UnimplementedAuthServiceServer) ListAccessPolicies(context.Context, *ListAccessPoliciesRequest) (*ListAccessPoliciesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAccessPolicies not implemented")
+}
+func (UnimplementedAuthServiceServer) UpdateAccessPolicy(context.Context, *UpdateAccessPolicyRequest) (*AccessPolicy, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAccessPolicy not implemented")
+}
+func (UnimplementedAuthServiceServer) DeleteAccessPolicy(context.Context, *DeleteAccessPolicyRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAccessPolicy not implemented")
+}
+func (UnimplementedAuthServiceServer) GetAdminStats(context.Context, *GetAdminStatsRequest) (*GetAdminStatsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAdminStats not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -426,6 +587,186 @@ func _AuthService_QueryAuditLog_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_DeactivateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeactivateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).DeactivateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_DeactivateUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).DeactivateUser(ctx, req.(*DeactivateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ReactivateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReactivateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ReactivateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ReactivateUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ReactivateUser(ctx, req.(*ReactivateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListSessionsForUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSessionsForUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListSessionsForUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListSessionsForUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListSessionsForUser(ctx, req.(*ListSessionsForUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ForceRevokeAllSessionsForUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForceRevokeAllSessionsForUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ForceRevokeAllSessionsForUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ForceRevokeAllSessionsForUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ForceRevokeAllSessionsForUser(ctx, req.(*ForceRevokeAllSessionsForUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_CreateAccessPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAccessPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).CreateAccessPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_CreateAccessPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).CreateAccessPolicy(ctx, req.(*CreateAccessPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GetAccessPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccessPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetAccessPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetAccessPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetAccessPolicy(ctx, req.(*GetAccessPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListAccessPolicies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAccessPoliciesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListAccessPolicies(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListAccessPolicies_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListAccessPolicies(ctx, req.(*ListAccessPoliciesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_UpdateAccessPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAccessPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).UpdateAccessPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_UpdateAccessPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).UpdateAccessPolicy(ctx, req.(*UpdateAccessPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_DeleteAccessPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAccessPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).DeleteAccessPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_DeleteAccessPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).DeleteAccessPolicy(ctx, req.(*DeleteAccessPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GetAdminStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAdminStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetAdminStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetAdminStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetAdminStats(ctx, req.(*GetAdminStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -472,6 +813,46 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryAuditLog",
 			Handler:    _AuthService_QueryAuditLog_Handler,
+		},
+		{
+			MethodName: "DeactivateUser",
+			Handler:    _AuthService_DeactivateUser_Handler,
+		},
+		{
+			MethodName: "ReactivateUser",
+			Handler:    _AuthService_ReactivateUser_Handler,
+		},
+		{
+			MethodName: "ListSessionsForUser",
+			Handler:    _AuthService_ListSessionsForUser_Handler,
+		},
+		{
+			MethodName: "ForceRevokeAllSessionsForUser",
+			Handler:    _AuthService_ForceRevokeAllSessionsForUser_Handler,
+		},
+		{
+			MethodName: "CreateAccessPolicy",
+			Handler:    _AuthService_CreateAccessPolicy_Handler,
+		},
+		{
+			MethodName: "GetAccessPolicy",
+			Handler:    _AuthService_GetAccessPolicy_Handler,
+		},
+		{
+			MethodName: "ListAccessPolicies",
+			Handler:    _AuthService_ListAccessPolicies_Handler,
+		},
+		{
+			MethodName: "UpdateAccessPolicy",
+			Handler:    _AuthService_UpdateAccessPolicy_Handler,
+		},
+		{
+			MethodName: "DeleteAccessPolicy",
+			Handler:    _AuthService_DeleteAccessPolicy_Handler,
+		},
+		{
+			MethodName: "GetAdminStats",
+			Handler:    _AuthService_GetAdminStats_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -31,6 +31,7 @@ import (
 	authbcrypt "github.com/stablyai/orca-go/services/auth-service/internal/adapter/bcrypt"
 	authgrpc "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpc"
 	authopaclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/opaclient"
+	authpolicypublisher "github.com/stablyai/orca-go/services/auth-service/internal/adapter/policypublisher"
 	authpostgres "github.com/stablyai/orca-go/services/auth-service/internal/adapter/postgres"
 	authvault "github.com/stablyai/orca-go/services/auth-service/internal/adapter/vault"
 	"github.com/stablyai/orca-go/services/auth-service/internal/usecase"
@@ -114,6 +115,22 @@ func run() error {
 	issueServiceTokenUC := usecase.NewIssueServiceToken(repo, tokenSigner, clock, cfg.ServiceTokenTTL)
 	getJWKSUC := usecase.NewGetJWKS(tokenSigner)
 
+	deactivateUserUC := usecase.NewDeactivateUser(repo, repo, clock, opaClient)
+	reactivateUserUC := usecase.NewReactivateUser(repo, repo, clock, opaClient)
+	listSessionsForUserUC := usecase.NewListSessionsForUser(repo, repo, opaClient)
+	forceRevokeAllSessionsForUserUC := usecase.NewForceRevokeAllSessionsForUser(repo, repo, repo, clock, opaClient)
+
+	// policyPublisher is a logging-only stub — no real OPA bundle-registry
+	// integration exists in this codebase yet. See
+	// internal/adapter/policypublisher's package doc comment.
+	policyPublisher := authpolicypublisher.New(logger)
+	createAccessPolicyUC := usecase.NewCreateAccessPolicy(repo, repo, clock, opaClient)
+	getAccessPolicyUC := usecase.NewGetAccessPolicy(repo, repo, opaClient)
+	listAccessPoliciesUC := usecase.NewListAccessPolicies(repo, repo, opaClient)
+	updateAccessPolicyUC := usecase.NewUpdateAccessPolicy(repo, repo, policyPublisher, clock, opaClient)
+	deleteAccessPolicyUC := usecase.NewDeleteAccessPolicy(repo, repo, opaClient)
+	getAdminStatsUC := usecase.NewGetAdminStats(repo, repo, repo, clock, opaClient)
+
 	// Runs once, before the server starts accepting traffic — see
 	// internal/usecase/bootstrap.go's doc comment for why this isn't an
 	// RPC. No-op unless BOOTSTRAP_TENANT_ID/BOOTSTRAP_ADMIN_EMAIL are set
@@ -140,6 +157,9 @@ func run() error {
 		loginUC, logoutUC, validateSessionUC,
 		createUserUC, listUsersUC, updateUserRoleUC, revokeSessionUC, queryAuditLogUC,
 		issueServiceTokenUC, getJWKSUC,
+		deactivateUserUC, reactivateUserUC, listSessionsForUserUC, forceRevokeAllSessionsForUserUC,
+		createAccessPolicyUC, getAccessPolicyUC, listAccessPoliciesUC, updateAccessPolicyUC, deleteAccessPolicyUC,
+		getAdminStatsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

@@ -107,6 +107,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		switch msg.Type {
 		case "invoke":
+			if sh, ok := h.Registry.StreamHandlerFor(msg.Channel); ok {
+				go h.handleSubscribe(ctx, conn, &writeMu, identity, msg, sh)
+				continue
+			}
 			go h.handleInvoke(ctx, conn, &writeMu, identity, msg)
 		case "send":
 			go h.handleSend(ctx, identity, msg)
@@ -162,6 +166,30 @@ func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeM
 		return
 	}
 	_ = wsjson.Write(writeCtx, conn, ResultMessage{Type: "result", ID: msg.ID, Result: result})
+}
+
+// handleSubscribe opens a StreamHandler's subscription, acks the subscribe
+// call itself with an ordinary ResultMessage (so the frontend's subscribe()
+// promise resolves), then pipes events until the connection closes. ctx is
+// NOT wrapped in a shorter timeout the way handleInvoke wraps dispatchCtx:
+// a StreamHandler (e.g. registerNotificationStreamChannel) captures ctx for
+// its own background forwarding goroutine, which must keep running for the
+// whole connection's lifetime, not just the moment sh() is called — wrapping
+// it in invokeTimeout would cancel that goroutine's context the instant
+// Open() returns, killing the subscription before its first event.
+func (h *Handler) handleSubscribe(ctx context.Context, conn *websocket.Conn, writeMu *sync.Mutex, identity Identity, msg InboundMessage, sh StreamHandler) {
+	events, err := sh(ctx, identity, msg.Args)
+
+	writeMu.Lock()
+	if err != nil {
+		_ = wsjson.Write(ctx, conn, ErrorMessage{Type: "error", ID: msg.ID, Message: err.Error()})
+		writeMu.Unlock()
+		return
+	}
+	_ = wsjson.Write(ctx, conn, ResultMessage{Type: "result", ID: msg.ID, Result: nil})
+	writeMu.Unlock()
+
+	pipePush(ctx, conn, writeMu, events)
 }
 
 // handleSend dispatches a fire-and-forget "send" message the same way as

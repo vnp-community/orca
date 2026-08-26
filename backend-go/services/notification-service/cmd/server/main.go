@@ -98,6 +98,7 @@ func run() error {
 	signer := notificationvaultsigner.New(brokerConn)
 
 	subscribeUC := usecase.NewSubscribe(repo)
+	unregisterPushSubscriptionUC := usecase.NewUnregisterPushSubscription(repo)
 	getVapidPublicKeyUC := usecase.NewGetVapidPublicKey(repo)
 	handleIncomingEventUC := usecase.NewHandleIncomingEvent(broadcast, repo, logger)
 
@@ -120,7 +121,7 @@ func run() error {
 	}
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	notificationv1.RegisterNotificationServiceServer(grpcServer, notificationgrpc.New(subscribeUC, getVapidPublicKeyUC, broadcast, signer))
+	notificationv1.RegisterNotificationServiceServer(grpcServer, notificationgrpc.New(subscribeUC, unregisterPushSubscriptionUC, getVapidPublicKeyUC, broadcast, signer))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	healthSrv := health.New()

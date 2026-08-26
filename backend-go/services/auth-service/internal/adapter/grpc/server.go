@@ -8,6 +8,7 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -31,6 +32,17 @@ type Server struct {
 	queryAuditLog     *usecase.QueryAuditLog
 	issueServiceToken *usecase.IssueServiceToken
 	getJWKS           *usecase.GetJWKS
+
+	deactivateUser                *usecase.DeactivateUser
+	reactivateUser                *usecase.ReactivateUser
+	listSessionsForUser           *usecase.ListSessionsForUser
+	forceRevokeAllSessionsForUser *usecase.ForceRevokeAllSessionsForUser
+	createAccessPolicy            *usecase.CreateAccessPolicy
+	getAccessPolicy               *usecase.GetAccessPolicy
+	listAccessPolicies            *usecase.ListAccessPolicies
+	updateAccessPolicy            *usecase.UpdateAccessPolicy
+	deleteAccessPolicy            *usecase.DeleteAccessPolicy
+	getAdminStats                 *usecase.GetAdminStats
 }
 
 func New(
@@ -44,6 +56,16 @@ func New(
 	queryAuditLog *usecase.QueryAuditLog,
 	issueServiceToken *usecase.IssueServiceToken,
 	getJWKS *usecase.GetJWKS,
+	deactivateUser *usecase.DeactivateUser,
+	reactivateUser *usecase.ReactivateUser,
+	listSessionsForUser *usecase.ListSessionsForUser,
+	forceRevokeAllSessionsForUser *usecase.ForceRevokeAllSessionsForUser,
+	createAccessPolicy *usecase.CreateAccessPolicy,
+	getAccessPolicy *usecase.GetAccessPolicy,
+	listAccessPolicies *usecase.ListAccessPolicies,
+	updateAccessPolicy *usecase.UpdateAccessPolicy,
+	deleteAccessPolicy *usecase.DeleteAccessPolicy,
+	getAdminStats *usecase.GetAdminStats,
 ) *Server {
 	return &Server{
 		login:             login,
@@ -56,6 +78,17 @@ func New(
 		queryAuditLog:     queryAuditLog,
 		issueServiceToken: issueServiceToken,
 		getJWKS:           getJWKS,
+
+		deactivateUser:                deactivateUser,
+		reactivateUser:                reactivateUser,
+		listSessionsForUser:           listSessionsForUser,
+		forceRevokeAllSessionsForUser: forceRevokeAllSessionsForUser,
+		createAccessPolicy:            createAccessPolicy,
+		getAccessPolicy:               getAccessPolicy,
+		listAccessPolicies:            listAccessPolicies,
+		updateAccessPolicy:            updateAccessPolicy,
+		deleteAccessPolicy:            deleteAccessPolicy,
+		getAdminStats:                 getAdminStats,
 	}
 }
 
@@ -175,6 +208,133 @@ func (s *Server) QueryAuditLog(ctx context.Context, req *authv1.QueryAuditLogReq
 		entries = append(entries, toProtoAuditEntry(e))
 	}
 	return &authv1.QueryAuditLogResponse{Entries: entries, NextPageToken: out.NextPageToken}, nil
+}
+
+func (s *Server) DeactivateUser(ctx context.Context, req *authv1.DeactivateUserRequest) (*authv1.DeactivateUserResponse, error) {
+	user, err := s.deactivateUser.Execute(ctx, req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.DeactivateUserResponse{User: toProtoUser(user)}, nil
+}
+
+func (s *Server) ReactivateUser(ctx context.Context, req *authv1.ReactivateUserRequest) (*authv1.ReactivateUserResponse, error) {
+	user, err := s.reactivateUser.Execute(ctx, req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.ReactivateUserResponse{User: toProtoUser(user)}, nil
+}
+
+func (s *Server) ListSessionsForUser(ctx context.Context, req *authv1.ListSessionsForUserRequest) (*authv1.ListSessionsForUserResponse, error) {
+	sessions, err := s.listSessionsForUser.Execute(ctx, req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*authv1.Session, 0, len(sessions))
+	for _, sess := range sessions {
+		out = append(out, toProtoSession(sess))
+	}
+	return &authv1.ListSessionsForUserResponse{Sessions: out}, nil
+}
+
+func (s *Server) ForceRevokeAllSessionsForUser(ctx context.Context, req *authv1.ForceRevokeAllSessionsForUserRequest) (*authv1.ForceRevokeAllSessionsForUserResponse, error) {
+	revoked, err := s.forceRevokeAllSessionsForUser.Execute(ctx, req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.ForceRevokeAllSessionsForUserResponse{RevokedCount: revoked}, nil
+}
+
+func (s *Server) CreateAccessPolicy(ctx context.Context, req *authv1.CreateAccessPolicyRequest) (*authv1.AccessPolicy, error) {
+	policy, err := s.createAccessPolicy.Execute(ctx, usecase.CreateAccessPolicyInput{
+		Name:         req.GetName(),
+		Kind:         req.GetKind(),
+		DocumentJSON: req.GetDocumentJson(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAccessPolicy(policy), nil
+}
+
+func (s *Server) GetAccessPolicy(ctx context.Context, req *authv1.GetAccessPolicyRequest) (*authv1.AccessPolicy, error) {
+	policy, err := s.getAccessPolicy.Execute(ctx, req.GetId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAccessPolicy(policy), nil
+}
+
+func (s *Server) ListAccessPolicies(ctx context.Context, req *authv1.ListAccessPoliciesRequest) (*authv1.ListAccessPoliciesResponse, error) {
+	out, err := s.listAccessPolicies.Execute(ctx, usecase.ListAccessPoliciesInput{
+		PageToken: req.GetPageToken(),
+		PageSize:  req.GetPageSize(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	policies := make([]*authv1.AccessPolicy, 0, len(out.Policies))
+	for _, p := range out.Policies {
+		policies = append(policies, toProtoAccessPolicy(p))
+	}
+	return &authv1.ListAccessPoliciesResponse{Policies: policies, NextPageToken: out.NextPageToken}, nil
+}
+
+func (s *Server) UpdateAccessPolicy(ctx context.Context, req *authv1.UpdateAccessPolicyRequest) (*authv1.AccessPolicy, error) {
+	policy, err := s.updateAccessPolicy.Execute(ctx, req.GetId(), req.GetDocumentJson(), req.GetExpectedVersion())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAccessPolicy(policy), nil
+}
+
+func (s *Server) DeleteAccessPolicy(ctx context.Context, req *authv1.DeleteAccessPolicyRequest) (*emptypb.Empty, error) {
+	if err := s.deleteAccessPolicy.Execute(ctx, req.GetId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetAdminStats(ctx context.Context, req *authv1.GetAdminStatsRequest) (*authv1.GetAdminStatsResponse, error) {
+	stats, err := s.getAdminStats.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.GetAdminStatsResponse{
+		TotalUsers:     stats.TotalUsers,
+		ActiveSessions: stats.ActiveSessions,
+		TotalPolicies:  stats.TotalPolicies,
+	}, nil
+}
+
+func toProtoSession(s domain.Session) *authv1.Session {
+	out := &authv1.Session{
+		Id:     s.TokenHash,
+		UserId: s.UserID,
+	}
+	if !s.CreatedAt.IsZero() {
+		out.CreatedAt = timestamppb.New(s.CreatedAt)
+	}
+	if !s.ExpiresAt.IsZero() {
+		out.ExpiresAt = timestamppb.New(s.ExpiresAt)
+	}
+	return out
+}
+
+func toProtoAccessPolicy(p domain.AccessPolicy) *authv1.AccessPolicy {
+	out := &authv1.AccessPolicy{
+		Id:           p.ID,
+		Name:         p.Name,
+		Kind:         p.Kind,
+		DocumentJson: p.DocumentJSON,
+		Version:      p.Version,
+		UpdatedBy:    p.UpdatedBy,
+	}
+	if !p.UpdatedAt.IsZero() {
+		out.UpdatedAt = timestamppb.New(p.UpdatedAt)
+	}
+	return out
 }
 
 func toDomainRole(r authv1.Role) domain.Role {

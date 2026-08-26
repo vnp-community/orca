@@ -32,11 +32,15 @@ type ChannelHandler func(ctx context.Context, id Identity, args []json.RawMessag
 // channel gets a real, protocol-correct response, even if that response is
 // "not implemented yet").
 type Registry struct {
-	handlers map[string]ChannelHandler
+	handlers       map[string]ChannelHandler
+	streamHandlers map[string]StreamHandler
 }
 
 func NewRegistry() *Registry {
-	return &Registry{handlers: make(map[string]ChannelHandler)}
+	return &Registry{
+		handlers:       make(map[string]ChannelHandler),
+		streamHandlers: make(map[string]StreamHandler),
+	}
 }
 
 // Register adds or replaces the handler for channel. Called from main.go's
@@ -44,6 +48,20 @@ func NewRegistry() *Registry {
 // channels_*.go for the ones with actual backend-go logic behind them.
 func (r *Registry) Register(channel string, h ChannelHandler) {
 	r.handlers[channel] = h
+}
+
+// RegisterStream adds a StreamHandler for a push-capable channel (e.g.
+// notifications.subscribe, see push_bridge.go's StreamHandler doc comment).
+// Distinct from Register — a channel is either request/response or
+// stream-registering, never both.
+func (r *Registry) RegisterStream(channel string, h StreamHandler) {
+	r.streamHandlers[channel] = h
+}
+
+// StreamHandlerFor resolves channel's registered StreamHandler, if any.
+func (r *Registry) StreamHandlerFor(channel string) (StreamHandler, bool) {
+	h, ok := r.streamHandlers[channel]
+	return h, ok
 }
 
 // Dispatch resolves and invokes the handler for channel, falling back to

@@ -48,8 +48,9 @@ type ErrorMessage struct {
 }
 
 // PushMessage is a server-initiated event on a channel the client has an
-// `on(channel, handler)` listener registered for. Not yet wired to any
-// backend-go event source in this pass — see registry.go's doc comment.
+// `on(channel, handler)` listener registered for — written by
+// push_bridge.go's pipePush for every StreamHandler-registered channel
+// (Registry.RegisterStream), e.g. notifications.subscribe.
 type PushMessage struct {
 	Type    string `json:"type"` // always "push"
 	Channel string `json:"channel"`
