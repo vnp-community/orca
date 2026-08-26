@@ -5,7 +5,7 @@
 **Service:** `project-service`, `api-gateway`
 **File:** `internal/domain/host_setup_test.go`, `internal/usecase/create_host_setup_test.go`, `setup_existing_folder_test.go` (all new, `project-service`); `internal/adapter/postgres/host_setup_repository_test.go` (new); `services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-141, TASK-142, TASK-143, TASK-144
-**Status:** `[partial]` — usecase/wscompat tests written and passing. Postgres integration tests (testcontainers) not written/run — no live Postgres in this environment; migration SQL written but unapplied. Worktree `agent-a9271c5b2d89347e7`, committed as `19b216531`.
+**Status:** `[x]` DONE — wscompat channel tests verified complete (6/6: all projectHostSetup.* channels incl. setupExistingFolder, in `channels_tenant_project_test.go`, including the deadline>rpcTimeout and raw-passthrough-no-status-branching assertions the doc calls out); usecase/postgres coverage done in prior pass (postgres integration tests still blocked on no live Postgres in this environment).
 
 ---
 

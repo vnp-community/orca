@@ -32,15 +32,44 @@ type ChannelHandler func(ctx context.Context, id Identity, args []json.RawMessag
 // channel gets a real, protocol-correct response, even if that response is
 // "not implemented yet").
 type Registry struct {
-	handlers       map[string]ChannelHandler
-	streamHandlers map[string]StreamHandler
+	handlers              map[string]ChannelHandler
+	streamHandlers        map[string]StreamHandler
+	streamChannelHandlers map[string]StreamChannelHandler
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
-		handlers:       make(map[string]ChannelHandler),
-		streamHandlers: make(map[string]StreamHandler),
+		handlers:              make(map[string]ChannelHandler),
+		streamHandlers:        make(map[string]StreamHandler),
+		streamChannelHandlers: make(map[string]StreamChannelHandler),
 	}
+}
+
+// StreamChannelHandler is a channel whose invoke ALSO opens a push
+// subscription — e.g. terminal.create both acks with the new session (so the
+// caller learns its ptyId) AND starts terminal.output/terminal.exited push
+// frames. Distinct from StreamHandler (push_bridge.go): that one has no ack
+// value and is used for pure-subscribe channels like notifications.subscribe,
+// whose invoke resolves with nothing meaningful. A channel registers as
+// EITHER a ChannelHandler, a StreamHandler, or a StreamChannelHandler, never
+// more than one of the three.
+type StreamChannelHandler func(ctx context.Context, id Identity, args []json.RawMessage) (ack any, events <-chan PushEvent, err error)
+
+// RegisterStreamChannel adds or replaces the StreamChannelHandler for channel.
+func (r *Registry) RegisterStreamChannel(channel string, h StreamChannelHandler) {
+	r.streamChannelHandlers[channel] = h
+}
+
+// DispatchStreamChannel resolves and invokes channel's StreamChannelHandler,
+// if one is registered. ok=false means channel has no StreamChannelHandler —
+// the caller should fall back to the ordinary Dispatch path.
+func (r *Registry) DispatchStreamChannel(ctx context.Context, id Identity, channel string, args []json.RawMessage) (ack any, events <-chan PushEvent, ok bool, err error) {
+	h, found := r.streamChannelHandlers[channel]
+	if !found {
+		return nil, nil, false, nil
+	}
+	ack, events, err = h(ctx, id, args)
+	return ack, events, true, err
 }
 
 // Register adds or replaces the handler for channel. Called from main.go's

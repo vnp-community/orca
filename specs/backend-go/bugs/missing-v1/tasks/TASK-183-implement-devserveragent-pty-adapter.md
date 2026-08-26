@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `internal/adapter/devserveragent/methods.go` (new), `internal/adapter/devserveragent/client.go`, `internal/adapter/devserveragent/session.go`
 **Depends on:** TASK-181
-**Status:** `[ ]` TODO
+**Status:** `[partial]` — PTY adapter implemented and tested (30/30 passing in `internal/adapter/devserveragent`, incl. new coverage for: SpawnPty failing loudly on a pty.create response missing `id`, WritePty/ResizePty/KillPty sending the exact `{id,...}` param shape over the wire, StreamPty's notification demux correctly isolating two concurrently-subscribed ptyIds from each other, StreamPty's forwarding goroutine closing its output channel on ctx cancellation, and session-level `routeNotification`/`subscribePty`/`unsubscribePty` unit tests — matching-ptyId-only routing, channel closed + map entry removed after unsubscribe, and non-blocking drop when a subscriber's channel is full). AgentStatus/InspectProcess remain a best-effort heuristic layered on the confirmed `pty.listProcesses` RPC (no dedicated per-pty status/inspect primitive exists in the confirmed catalog; `ReadyForInput` is naively `== AgentRunning`, `Pid` is always 0) and StopTerminalProcess-via-Ctrl-C-over-WritePty-style gaps remain unverified against the real agent RPC surface (`agent/src/relay/pty-agent-bridge.ts`, `pty-handler.ts`) — out of scope for this backend-go-only pass, `agent/` changes excluded per architecture docs.
 
 ---
 

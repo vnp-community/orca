@@ -108,6 +108,89 @@ func TestNotificationsSubscribe_OpenerErrorSurfacesAsErrorMessage(t *testing.T) 
 	}
 }
 
+// TestRegisterNotificationStreamChannel_RecvErrorClosesOutputChannel drives
+// registerNotificationStreamChannel's StreamHandler directly (bypassing the
+// WS transport, same shape as TestRegisterClientEventsChannel_* below) to
+// verify a non-EOF stream.Recv() error closes the returned channel cleanly
+// instead of leaving it open or panicking.
+func TestRegisterNotificationStreamChannel_RecvErrorClosesOutputChannel(t *testing.T) {
+	stream := &fakeNotificationStream{err: errors.New("stream closed")}
+	opener := NotificationStreamOpener(func(ctx context.Context, userID string) (notificationv1.NotificationService_StreamNotificationsClient, error) {
+		return stream, nil
+	})
+
+	registry := NewRegistry()
+	registerNotificationStreamChannel(registry, opener)
+
+	sh, ok := registry.StreamHandlerFor("notifications.subscribe")
+	if !ok {
+		t.Fatal("expected notifications.subscribe to be registered")
+	}
+
+	events, err := sh(context.Background(), Identity{UserID: "user-1"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case _, ok := <-events:
+		if ok {
+			t.Fatal("expected the events channel to be closed after a Recv error, got a delivered item")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected the events channel to close after a Recv error, but reading blocked")
+	}
+}
+
+// TestRegisterNotificationStreamChannel_ContextCancelClosesOutputChannel
+// verifies the forwarding goroutine's `case <-ctx.Done(): return` branch:
+// cancelling ctx while the goroutine is (or may be) blocked trying to send
+// on out must still close the channel, with no leaked goroutine or panic.
+func TestRegisterNotificationStreamChannel_ContextCancelClosesOutputChannel(t *testing.T) {
+	stream := &fakeNotificationStream{items: []*notificationv1.NotificationServiceStreamNotificationsResponse{
+		{Id: "evt-1", Type: "task.completed", PayloadJson: `{}`},
+	}}
+	opener := NotificationStreamOpener(func(ctx context.Context, userID string) (notificationv1.NotificationService_StreamNotificationsClient, error) {
+		return stream, nil
+	})
+
+	registry := NewRegistry()
+	registerNotificationStreamChannel(registry, opener)
+
+	sh, ok := registry.StreamHandlerFor("notifications.subscribe")
+	if !ok {
+		t.Fatal("expected notifications.subscribe to be registered")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	events, err := sh(ctx, Identity{UserID: "user-1"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Never drain events — the forwarding goroutine may be parked trying to
+	// send the one queued item. Cancelling must still unblock and close it.
+	cancel()
+
+	select {
+	case _, ok := <-events:
+		if ok {
+			// A single buffered item may legitimately win the send/ctx.Done
+			// race; drain once more and require closure on the next read.
+			select {
+			case _, ok := <-events:
+				if ok {
+					t.Fatal("expected the events channel to be closed after ctx cancel")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("expected the events channel to close after ctx cancel, but reading blocked")
+			}
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected the events channel to close after ctx cancel, but reading blocked")
+	}
+}
+
 func TestClientEventBus_PublishFansOutToEverySubscriber(t *testing.T) {
 	bus := NewClientEventBus()
 	ch1, unsub1 := bus.Subscribe()
@@ -144,6 +227,46 @@ func TestClientEventBus_UnsubscribeStopsDelivery(t *testing.T) {
 		// closed channel — expected.
 	case <-time.After(time.Second):
 		t.Fatal("expected the unsubscribed channel to be closed, but reading blocked")
+	}
+}
+
+// TestClientEventBus_PublishDropsWhenSubscriberBufferFull exercises
+// Publish's `select { case ch <- ev: default: }` branch: once a
+// subscriber's buffered channel (capacity 16) is full, further Publish
+// calls must drop the event and return immediately rather than block.
+func TestClientEventBus_PublishDropsWhenSubscriberBufferFull(t *testing.T) {
+	bus := NewClientEventBus()
+	ch, unsubscribe := bus.Subscribe()
+	defer unsubscribe()
+
+	const capacity = 16
+	for i := 0; i < capacity; i++ {
+		bus.Publish(PushEvent{Channel: "runtime.clientEvent", Args: []any{i}})
+	}
+	if n := len(ch); n != capacity {
+		t.Fatalf("buffered subscriber channel has %d items, want %d (full)", n, capacity)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		bus.Publish(PushEvent{Channel: "runtime.clientEvent", Args: []any{"overflow"}})
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Publish blocked on a full subscriber instead of dropping it (select default: branch)")
+	}
+
+	if n := len(ch); n != capacity {
+		t.Fatalf("buffered channel has %d items after the overflow publish, want unchanged %d (event dropped)", n, capacity)
+	}
+
+	// Drain and confirm the surviving items are the original ones (0..15),
+	// not the overflow event that should have been dropped.
+	first := <-ch
+	if len(first.Args) != 1 || first.Args[0] != 0 {
+		t.Fatalf("first drained event = %+v, want Args[0]=0 (the overflow event, not an existing one, should be dropped)", first)
 	}
 }
 

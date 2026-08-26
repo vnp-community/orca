@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-012, TASK-013
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `ClientEventBus` + `registerClientEventsChannel` are wired into `RegisterPushChannels`/`main.go`'s composition root, with tests covering fan-out to every subscriber, unsubscribe-on-`ctx.Done()` removing the entry and closing its channel, and `Publish`'s `select default:` branch dropping events for a full/slow subscriber instead of blocking; no publisher call site exists yet (correctly deferred as this task's own follow-up).
 
 ---
 

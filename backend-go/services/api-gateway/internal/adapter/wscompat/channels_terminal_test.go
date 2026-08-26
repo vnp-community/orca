@@ -2,7 +2,9 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -133,6 +135,34 @@ func awaitSentFrame(t *testing.T, s *fakePtyStream) *infrafleetv1.PtyClientFrame
 	}
 }
 
+// awaitPushEvent reads one PushEvent off events, failing the test if none
+// arrives in time — the standard timeout guard for every push-delivery
+// assertion in this file.
+func awaitPushEvent(t *testing.T, events <-chan PushEvent) PushEvent {
+	t.Helper()
+	select {
+	case ev, ok := <-events:
+		if !ok {
+			t.Fatal("events channel closed before delivering the expected push event")
+		}
+		return ev
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for a push event")
+		return PushEvent{}
+	}
+}
+
+// newTerminalTestCtx returns a context wrapped exactly like ServeHTTP wraps
+// one real WebSocket connection's ctx (handler.go) — a fresh, empty
+// terminalStreamRegistry attached via terminalStreamsContext. Two calls to
+// this helper simulate two DIFFERENT WS connections: each gets its own
+// registry, so a pty_id created on one is invisible from the other, the same
+// isolation guarantee production gets from ServeHTTP constructing a fresh
+// registry per accepted connection.
+func newTerminalTestCtx() context.Context {
+	return terminalStreamsContext(context.Background(), newTerminalStreamRegistry())
+}
+
 func TestTerminalCreateChannel_SpawnsAndOpensAttachPtyStream(t *testing.T) {
 	fake := &fakeTerminalInfraFleetClient{
 		spawnFunc: func(in *infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
@@ -147,14 +177,20 @@ func TestTerminalCreateChannel_SpawnsAndOpensAttachPtyStream(t *testing.T) {
 	r := NewRegistry()
 	registerTerminalChannels(r, fake)
 
-	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "terminal.create",
+	ack, events, isStream, err := r.DispatchStreamChannel(newTerminalTestCtx(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "terminal.create",
 		argsJSON(t, terminalCreateArgs{ConnectionID: "conn-1", Cwd: "/repo", Cols: 80, Rows: 24}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	view, ok := result.(terminalSessionView)
+	if !isStream {
+		t.Fatal("expected terminal.create to be registered as a StreamChannelHandler")
+	}
+	if events == nil {
+		t.Fatal("expected a non-nil push events channel")
+	}
+	view, ok := ack.(terminalSessionView)
 	if !ok || view.PtyID != "pty-1" || view.ConnectionID != "conn-1" {
-		t.Fatalf("unexpected result: %+v", result)
+		t.Fatalf("unexpected ack: %+v", ack)
 	}
 
 	if fake.lastStream == nil {
@@ -176,26 +212,140 @@ func TestTerminalCreateChannel_SpawnFailurePropagates(t *testing.T) {
 	r := NewRegistry()
 	registerTerminalChannels(r, fake)
 
-	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "terminal.create", argsJSON(t, terminalCreateArgs{ConnectionID: "unknown"}))
+	_, events, isStream, err := r.DispatchStreamChannel(newTerminalTestCtx(), Identity{TenantID: "tenant-1"}, "terminal.create", argsJSON(t, terminalCreateArgs{ConnectionID: "unknown"}))
+	if !isStream {
+		t.Fatal("expected terminal.create to be registered as a StreamChannelHandler")
+	}
 	if err == nil {
 		t.Fatal("expected the spawn error to propagate")
+	}
+	if events != nil {
+		t.Error("expected a nil events channel on spawn failure")
 	}
 	if fake.lastStream != nil {
 		t.Error("expected no AttachPty call when SpawnTerminalSession fails")
 	}
 }
 
+// TestTerminalCreateChannel_MissingStreamRegistryOnContext_ReturnsError
+// guards the defensive check in registerTerminalCreateChannel: if ctx was
+// never wrapped by terminalStreamsContext (a wiring bug — every real
+// connection gets this from ServeHTTP, see handler.go), terminal.create
+// must fail cleanly instead of nil-pointer-panicking on streams.put.
+func TestTerminalCreateChannel_MissingStreamRegistryOnContext_ReturnsError(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{
+		spawnFunc: func(*infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
+			t.Fatal("SpawnTerminalSession should not be called before the stream-registry check")
+			return nil, nil
+		},
+	}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+
+	_, events, isStream, err := r.DispatchStreamChannel(context.Background(), Identity{TenantID: "tenant-1"}, "terminal.create", argsJSON(t, terminalCreateArgs{ConnectionID: "conn-1"}))
+	if !isStream {
+		t.Fatal("expected terminal.create to be registered as a StreamChannelHandler")
+	}
+	if err == nil {
+		t.Fatal("expected an error when ctx has no per-connection terminal stream registry")
+	}
+	if events != nil {
+		t.Error("expected a nil events channel")
+	}
+}
+
 // createSession is the shared setup for tests that need a live
-// terminal.create'd session before exercising send/resize/close/etc.
-func createSession(t *testing.T, r *Registry, fake *fakeTerminalInfraFleetClient, ptyID string) {
+// terminal.create'd session before exercising send/resize/close/etc. — ctx
+// must be the SAME context used for every follow-up r.Dispatch call in the
+// test, since it carries the per-connection terminalStreamRegistry
+// terminal.send/close look up.
+func createSession(t *testing.T, ctx context.Context, r *Registry, fake *fakeTerminalInfraFleetClient, ptyID string) <-chan PushEvent {
 	t.Helper()
 	if fake.spawnFunc == nil {
 		fake.spawnFunc = func(*infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
 			return &infrafleetv1.SpawnTerminalSessionResponse{Session: &infrafleetv1.TerminalSession{PtyId: ptyID, ConnectionId: "conn-1"}}, nil
 		}
 	}
-	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "terminal.create", argsJSON(t, terminalCreateArgs{ConnectionID: "conn-1"})); err != nil {
+	_, events, isStream, err := r.DispatchStreamChannel(ctx, Identity{TenantID: "tenant-1"}, "terminal.create", argsJSON(t, terminalCreateArgs{ConnectionID: "conn-1"}))
+	if err != nil {
 		t.Fatalf("terminal.create setup failed: %v", err)
+	}
+	if !isStream {
+		t.Fatal("expected terminal.create to be registered as a StreamChannelHandler")
+	}
+	return events
+}
+
+// TestTerminalCreateChannel_ForwardsOutputAndExitPushEvents is the core
+// regression guard for TASK-186: a subscriber (the events channel
+// terminal.create's StreamChannelHandler returns) must actually receive
+// terminal.output for each PtyServerFrame the agent sends, and a final
+// terminal.exited carrying the real exit code — not have every frame
+// silently discarded.
+func TestTerminalCreateChannel_ForwardsOutputAndExitPushEvents(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+	events := createSession(t, newTerminalTestCtx(), r, fake, "pty-1")
+	awaitSentFrame(t, fake.lastStream) // drain the attach frame
+
+	fake.lastStream.recv <- &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Out{Out: &infrafleetv1.PtyOutput{Data: []byte("hello\n")}}}
+
+	outEv := awaitPushEvent(t, events)
+	if outEv.Channel != "terminal.output" {
+		t.Fatalf("expected channel=terminal.output, got %+v", outEv)
+	}
+	payload, ok := outEv.Args[0].(map[string]any)
+	if !ok || payload["ptyId"] != "pty-1" {
+		t.Fatalf("unexpected terminal.output payload: %+v", outEv.Args)
+	}
+	if data, ok := payload["data"].([]byte); !ok || string(data) != "hello\n" {
+		t.Fatalf("unexpected terminal.output data: %+v", payload["data"])
+	}
+
+	fake.lastStream.recv <- &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Exited{Exited: &infrafleetv1.PtyExited{ExitCode: 7}}}
+
+	exitEv := awaitPushEvent(t, events)
+	if exitEv.Channel != "terminal.exited" {
+		t.Fatalf("expected channel=terminal.exited, got %+v", exitEv)
+	}
+	exitPayload, ok := exitEv.Args[0].(map[string]any)
+	if !ok || exitPayload["ptyId"] != "pty-1" || exitPayload["exitCode"] != int32(7) {
+		t.Fatalf("unexpected terminal.exited payload: %+v", exitEv.Args)
+	}
+
+	// drainAttachPtyOutput must close events once it returns after the exit
+	// frame — pipePush relies on the closed channel to end its own loop.
+	select {
+	case _, ok := <-events:
+		if ok {
+			t.Fatal("expected the events channel to be closed after terminal.exited")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the events channel to close after terminal.exited")
+	}
+}
+
+// TestTerminalCreateChannel_StreamErrorClosesEventsWithoutHanging verifies
+// drainAttachPtyOutput's other exit path: the underlying AttachPty stream
+// erroring out (transport failure, unexpected close) must close events too,
+// instead of leaving pipePush's read loop parked forever.
+func TestTerminalCreateChannel_StreamErrorClosesEventsWithoutHanging(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+	events := createSession(t, newTerminalTestCtx(), r, fake, "pty-1")
+	awaitSentFrame(t, fake.lastStream) // drain the attach frame
+
+	fake.lastStream.err <- errors.New("transport: connection reset")
+
+	select {
+	case _, ok := <-events:
+		if ok {
+			t.Fatal("expected the events channel to be closed after a stream error")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the events channel to close after a stream error")
 	}
 }
 
@@ -203,10 +353,11 @@ func TestTerminalSendChannel_RelaysInputOnTheStream(t *testing.T) {
 	fake := &fakeTerminalInfraFleetClient{}
 	r := NewRegistry()
 	registerTerminalChannels(r, fake)
-	createSession(t, r, fake, "pty-1")
+	ctx := newTerminalTestCtx()
+	createSession(t, ctx, r, fake, "pty-1")
 	awaitSentFrame(t, fake.lastStream) // drain the attach frame
 
-	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "ls\n"}))
+	_, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "ls\n"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -222,7 +373,7 @@ func TestTerminalSendChannel_UnknownPtyID_ReturnsError(t *testing.T) {
 	r := NewRegistry()
 	registerTerminalChannels(r, fake)
 
-	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-unknown", Data: "x"}))
+	_, err := r.Dispatch(newTerminalTestCtx(), Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-unknown", Data: "x"}))
 	if err == nil {
 		t.Fatal("expected an error for a pty_id with no live stream")
 	}
@@ -252,10 +403,11 @@ func TestTerminalCloseChannel_KillsAndRemovesStream(t *testing.T) {
 	}
 	r := NewRegistry()
 	registerTerminalChannels(r, fake)
-	createSession(t, r, fake, "pty-1")
+	ctx := newTerminalTestCtx()
+	createSession(t, ctx, r, fake, "pty-1")
 	awaitSentFrame(t, fake.lastStream) // drain the attach frame
 
-	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "terminal.close", argsJSON(t, terminalPtyIDArg{PtyID: "pty-1"}))
+	_, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.close", argsJSON(t, terminalPtyIDArg{PtyID: "pty-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -264,7 +416,7 @@ func TestTerminalCloseChannel_KillsAndRemovesStream(t *testing.T) {
 	}
 
 	// The stream entry must be gone — a subsequent terminal.send must fail.
-	_, err = r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "x"}))
+	_, err = r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "x"}))
 	if err == nil {
 		t.Error("expected terminal.send to fail after terminal.close removed the stream")
 	}
@@ -396,5 +548,241 @@ func TestTerminalInspectProcessChannel_ReturnsProcessInfo(t *testing.T) {
 	view, ok := result.(terminalInspectProcessView)
 	if !ok || !view.Known || view.Command != "claude" {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+// TestTerminalSendChannel_ConcurrentSendsAreSerializedBySendMu guards
+// terminalStreamEntry.send's sendMu: grpc.ClientStream forbids concurrent
+// Send calls from multiple goroutines, and terminal.send's handler runs on a
+// fresh goroutine per invoke (handler.go's handleInvoke), so two panes typing
+// into the SAME pty concurrently is a realistic race, not a hypothetical
+// one. Run with -race — without sendMu this reliably trips the race
+// detector on fakePtyStream.sent (a buffered channel is still a data race
+// to send on concurrently without synchronization at the gRPC-stream layer
+// in the real implementation, and the fake mirrors that contract).
+func TestTerminalSendChannel_ConcurrentSendsAreSerializedBySendMu(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+	ctx := newTerminalTestCtx()
+	createSession(t, ctx, r, fake, "pty-1")
+	awaitSentFrame(t, fake.lastStream) // drain the attach frame
+
+	// concurrentSends deliberately exceeds fakePtyStream.sent's buffer
+	// (16, see newFakePtyStream) — a concurrent drainer goroutine below
+	// keeps it from filling up, since a full, unread channel would otherwise
+	// block a Send call while it still holds sendMu, wedging every other
+	// concurrent terminal.send behind it.
+	const concurrentSends = 32
+	got := make(chan *infrafleetv1.PtyClientFrame, concurrentSends)
+	drainDone := make(chan struct{})
+	go func() {
+		defer close(drainDone)
+		for i := 0; i < concurrentSends; i++ {
+			got <- <-fake.lastStream.sent
+		}
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(concurrentSends)
+	for i := 0; i < concurrentSends; i++ {
+		go func() {
+			defer wg.Done()
+			_, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "x"}))
+			if err != nil {
+				t.Errorf("unexpected error from concurrent terminal.send: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	select {
+	case <-drainDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out draining the stream — a send may have deadlocked while holding sendMu")
+	}
+	close(got)
+	count := 0
+	for frame := range got {
+		if frame.GetInput() == nil {
+			t.Fatalf("expected only input frames, got %+v", frame)
+		}
+		count++
+	}
+	if count != concurrentSends {
+		t.Fatalf("expected %d input frames on the stream, got %d", concurrentSends, count)
+	}
+}
+
+// TestTerminalStreamRegistry_IsolatesConnectionsWithTheSamePtyID replaces the
+// old TestTerminalStreamRegistry_IsSharedAcrossAllConnections characterization
+// test: now that terminalStreamRegistry is resolved per-connection from ctx
+// (terminalStreamsContext/terminalStreamsFromContext, wired once per
+// WebSocket connection in Handler.ServeHTTP), two different simulated
+// connections that happen to create/attach the SAME pty_id must NOT collide
+// — a terminal.send on one connection's ctx must only ever reach that same
+// connection's AttachPty stream.
+func TestTerminalStreamRegistry_IsolatesConnectionsWithTheSamePtyID(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake) // one process-wide Registry, exactly as main.go wires it
+
+	// "Connection A" creates a terminal and gets ptyId "pty-shared".
+	ctxA := newTerminalTestCtx()
+	fake.spawnFunc = func(*infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
+		return &infrafleetv1.SpawnTerminalSessionResponse{Session: &infrafleetv1.TerminalSession{PtyId: "pty-shared", ConnectionId: "conn-A"}}, nil
+	}
+	if _, _, _, err := r.DispatchStreamChannel(ctxA, Identity{TenantID: "tenant-A"}, "terminal.create", argsJSON(t, terminalCreateArgs{ConnectionID: "conn-A"})); err != nil {
+		t.Fatalf("connection A's terminal.create failed: %v", err)
+	}
+	streamA := fake.lastStream
+	awaitSentFrame(t, streamA) // drain A's attach frame
+
+	// "Connection B" (a different simulated WS connection — its own
+	// terminalStreamsContext, per this test's name) creates a terminal that
+	// happens to land on the SAME ptyId.
+	ctxB := newTerminalTestCtx()
+	if _, _, _, err := r.DispatchStreamChannel(ctxB, Identity{TenantID: "tenant-B"}, "terminal.create", argsJSON(t, terminalCreateArgs{ConnectionID: "conn-B"})); err != nil {
+		t.Fatalf("connection B's terminal.create failed: %v", err)
+	}
+	streamB := fake.lastStream // AttachPty was called again, replacing lastStream
+	awaitSentFrame(t, streamB) // drain B's attach frame
+	if streamA == streamB {
+		t.Fatal("test setup bug: expected two distinct AttachPty streams")
+	}
+
+	// terminal.send for "pty-shared" on connection B's ctx must reach ONLY
+	// B's stream.
+	if _, err := r.Dispatch(ctxB, Identity{TenantID: "tenant-B"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-shared", Data: "from-B"})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	select {
+	case frame := <-streamB.sent:
+		if string(frame.GetInput().GetData()) != "from-B" {
+			t.Errorf("expected B's input on B's stream, got %+v", frame)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for B's stream to receive the send")
+	}
+	select {
+	case frame := <-streamA.sent:
+		t.Errorf("isolation regression: connection A's stream must never receive traffic sent on connection B's ctx, but got %+v", frame)
+	case <-time.After(100 * time.Millisecond):
+		// expected: A's stream stays silent.
+	}
+
+	// And the reverse: terminal.send on connection A's ctx must reach ONLY
+	// A's stream, even though both registries hold an entry keyed
+	// "pty-shared".
+	if _, err := r.Dispatch(ctxA, Identity{TenantID: "tenant-A"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-shared", Data: "from-A"})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	select {
+	case frame := <-streamA.sent:
+		if string(frame.GetInput().GetData()) != "from-A" {
+			t.Errorf("expected A's input on A's stream, got %+v", frame)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for A's stream to receive the send")
+	}
+	select {
+	case frame := <-streamB.sent:
+		t.Errorf("isolation regression: connection B's stream must never receive traffic sent on connection A's ctx, but got %+v", frame)
+	case <-time.After(100 * time.Millisecond):
+		// expected: B's stream stays silent.
+	}
+
+	// terminal.close on A's ctx must remove only A's registry entry — B's
+	// "pty-shared" entry (a completely separate registry instance) must
+	// still be reachable afterward.
+	fake.killFunc = func(*infrafleetv1.KillTerminalSessionRequest) error { return nil }
+	if _, err := r.Dispatch(ctxA, Identity{TenantID: "tenant-A"}, "terminal.close", argsJSON(t, terminalPtyIDArg{PtyID: "pty-shared"})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := r.Dispatch(ctxA, Identity{TenantID: "tenant-A"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-shared", Data: "after-close"})); err == nil {
+		t.Error("expected terminal.send on A's ctx to fail after A's terminal.close")
+	}
+	if _, err := r.Dispatch(ctxB, Identity{TenantID: "tenant-B"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-shared", Data: "still-alive"})); err != nil {
+		t.Fatalf("expected B's stream to be unaffected by A's terminal.close, got error: %v", err)
+	}
+}
+
+// TestTerminalCreateChannel_EndToEndPushInterleavesWithConcurrentSend drives
+// the real Handler.ServeHTTP/pipePush/handleInvoke path (handler_test.go's
+// dialTestClient/newTestHandlerServer harness, same as
+// channels_push_test.go's notifications.subscribe integration test) to
+// prove a concurrent terminal.send invoke on the SAME connection completes
+// cleanly while terminal.create's push stream is actively delivering
+// terminal.output events — both writes go through the same writeMu
+// (handler.go), so neither frame corrupts the other.
+func TestTerminalCreateChannel_EndToEndPushInterleavesWithConcurrentSend(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{
+		spawnFunc: func(*infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
+			return &infrafleetv1.SpawnTerminalSessionResponse{Session: &infrafleetv1.TerminalSession{PtyId: "pty-1", ConnectionId: "conn-1"}}, nil
+		},
+	}
+	registry := NewRegistry()
+	registerTerminalChannels(registry, fake)
+
+	ts := newTestHandlerServer(t, registry)
+	client := dialTestClient(t, ts)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := writeJSONFrame(ctx, client, InboundMessage{ID: "create-1", Type: "invoke", Channel: "terminal.create", Args: argsJSON(t, terminalCreateArgs{ConnectionID: "conn-1"})}); err != nil {
+		t.Fatalf("writing terminal.create invoke: %v", err)
+	}
+
+	ack := readWireMessage(t, ctx, client)
+	if ack.Type != "result" || ack.ID != "create-1" {
+		t.Fatalf("first frame = %+v, want the terminal.create ack", ack)
+	}
+	var session terminalSessionView
+	if err := json.Unmarshal(ack.Result, &session); err != nil || session.PtyID != "pty-1" {
+		t.Fatalf("unexpected terminal.create ack result: %s (err=%v)", ack.Result, err)
+	}
+
+	stream := fake.lastStream
+	if stream == nil {
+		t.Fatal("expected AttachPty to have been called")
+	}
+	awaitSentFrame(t, stream) // drain the attach frame
+
+	if err := writeJSONFrame(ctx, client, InboundMessage{ID: "send-1", Type: "invoke", Channel: "terminal.send", Args: argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "ls\n"})}); err != nil {
+		t.Fatalf("writing terminal.send invoke: %v", err)
+	}
+	stream.recv <- &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Out{Out: &infrafleetv1.PtyOutput{Data: []byte("hello\n")}}}
+
+	seenSendResult, seenPush := false, false
+	for i := 0; i < 2; i++ {
+		got := readWireMessage(t, ctx, client)
+		switch {
+		case got.Type == "result" && got.ID == "send-1":
+			seenSendResult = true
+		case got.Type == "push" && got.Channel == "terminal.output":
+			seenPush = true
+			payload, ok := got.Args[0].(map[string]any)
+			if !ok || payload["ptyId"] != "pty-1" {
+				t.Fatalf("unexpected terminal.output push payload: %+v", got.Args)
+			}
+		default:
+			t.Fatalf("unexpected/corrupted frame %d: %+v", i, got)
+		}
+	}
+	if !seenSendResult || !seenPush {
+		t.Fatalf("missing frame(s): sendResult=%v push=%v", seenSendResult, seenPush)
+	}
+
+	// Drive the session to exit and confirm terminal.exited also arrives
+	// over the wire, end to end.
+	stream.recv <- &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Exited{Exited: &infrafleetv1.PtyExited{ExitCode: 3}}}
+	exited := readWireMessage(t, ctx, client)
+	if exited.Type != "push" || exited.Channel != "terminal.exited" {
+		t.Fatalf("expected a terminal.exited push frame, got %+v", exited)
+	}
+	exitPayload, ok := exited.Args[0].(map[string]any)
+	if !ok || exitPayload["ptyId"] != "pty-1" || exitPayload["exitCode"] != float64(3) {
+		t.Fatalf("unexpected terminal.exited payload: %+v", exited.Args)
 	}
 }
