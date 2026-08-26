@@ -78,7 +78,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := r.Context()
+	// terminalStreamsContext attaches a fresh, connection-scoped
+	// terminalStreamRegistry (channels_terminal.go) so terminal.create's
+	// StreamChannelHandler and the terminal.send/resize/close ChannelHandlers
+	// that follow it on THIS connection can find each other's open AttachPty
+	// streams — without leaking pty_ids across unrelated connections that
+	// happen to attach the same pty_id (see channels_terminal.go's package
+	// doc comment).
+	ctx := terminalStreamsContext(r.Context(), newTerminalStreamRegistry())
 
 	// writeMu serializes writes to conn — coder/websocket, like most WS
 	// libraries, does not allow concurrent writers on one connection. Reads
@@ -140,13 +147,20 @@ func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeM
 	dispatchCtx, dispatchCancel := context.WithTimeout(ctx, invokeTimeout)
 	defer dispatchCancel()
 
-	result, err := h.Registry.Dispatch(dispatchCtx, identity, msg.Channel, msg.Args)
+	// Check the stream-channel path first (e.g. terminal.create): its ack
+	// AND its events channel both come out of one call — see
+	// DispatchStreamChannel's doc comment. Everything else falls through to
+	// the ordinary Dispatch path, exactly as before.
+	ack, events, isStreamChannel, err := h.Registry.DispatchStreamChannel(dispatchCtx, identity, msg.Channel, msg.Args)
+	result := ack
+	if !isStreamChannel {
+		result, err = h.Registry.Dispatch(dispatchCtx, identity, msg.Channel, msg.Args)
+	}
 
 	// Attempt to acquire writeMu; log if we have to wait significantly
 	// (indicates concurrent timeout contention — see BUG-004 Cause B).
 	lockStart := time.Now()
 	writeMu.Lock()
-	defer writeMu.Unlock()
 	if waited := time.Since(lockStart); waited > 100*time.Millisecond {
 		h.Logger.WarnContext(context.Background(), "wscompat: writeMu contention detected",
 			slog.String("channel", msg.Channel),
@@ -159,13 +173,26 @@ func (h *Handler) handleInvoke(ctx context.Context, conn *websocket.Conn, writeM
 	// the parent HTTP request context has been cancelled (e.g. proxy
 	// timeout, client navigation) — the WS connection itself is still open.
 	writeCtx, writeCancel := context.WithTimeout(context.Background(), writeTimeout)
-	defer writeCancel()
 
 	if err != nil {
 		_ = wsjson.Write(writeCtx, conn, ErrorMessage{Type: "error", ID: msg.ID, Message: err.Error()})
+		writeCancel()
+		writeMu.Unlock()
 		return
 	}
 	_ = wsjson.Write(writeCtx, conn, ResultMessage{Type: "result", ID: msg.ID, Result: result})
+	writeCancel()
+	writeMu.Unlock()
+
+	// Start piping push events only AFTER the ack write above — mirrors
+	// handleSubscribe's own "ack first" ordering, so a push frame can never
+	// arrive before the client has seen the ack (e.g. the ptyId) it needs to
+	// associate that push with. Uses ctx (the connection's own lifetime), NOT
+	// dispatchCtx — dispatchCtx dies with invokeTimeout, but the push
+	// subscription must outlive this one invoke.
+	if isStreamChannel && err == nil && events != nil {
+		go pipePush(ctx, conn, writeMu, events)
+	}
 }
 
 // handleSubscribe opens a StreamHandler's subscription, acks the subscribe
