@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_accounts_test.go` (new)
 **Depends on:** TASK-021
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `channels_accounts_test.go` confirmed present with real test coverage for all 4 relay channels; verified passing.
 
 ---
 

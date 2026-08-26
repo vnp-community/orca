@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `internal/usecase/{ports.go,test_connection.go}` (new usecase), `internal/adapter/grpcclient/infrafleet_client.go` (new), `internal/adapter/grpc/server.go`, `internal/config/config.go`, `cmd/server/main.go`
 **Depends on:** TASK-024, TASK-025, TASK-026
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `test_connection.go` confirmed present and wired.
 
 ---
 

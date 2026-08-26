@@ -5,7 +5,7 @@
 **Service:** `credential-broker-service`
 **File:** `backend-go/proto/orca/credentialbroker/v1/credentialbroker.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `get_credential_metadata_by_owner.go`/`GetCredentialMetadataByOwner` RPC confirmed present in proto+usecase+postgres+grpc server; migration `0002_config_json` applied.
 
 ---
 

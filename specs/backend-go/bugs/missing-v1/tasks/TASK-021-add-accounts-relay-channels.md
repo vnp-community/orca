@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_accounts.go` (new), `channels.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `channels_accounts.go`/`channels_accounts_test.go` confirmed present and wired into `RegisterRealChannels`; relays `accounts.selectClaude/selectCodex/removeClaude/removeCodex` through infra-fleet-service's `Relay` RPC. This task doc's Status line was never updated by the implementing pass — code+tests verified against current merged state. See TASK-023 for the still-open agent-side/frontend-side prerequisites this relies on to actually work end-to-end.
 
 ---
 

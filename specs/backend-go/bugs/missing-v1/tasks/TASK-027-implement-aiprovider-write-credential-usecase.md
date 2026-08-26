@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `internal/usecase/write_credential.go` (new), `internal/adapter/grpc/server.go`
 **Depends on:** TASK-024
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `write_credential.go` confirmed present and wired.
 
 ---
 

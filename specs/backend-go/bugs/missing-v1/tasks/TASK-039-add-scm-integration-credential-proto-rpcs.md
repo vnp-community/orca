@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/proto/orca/scmintegration/v1/scmintegration.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `SetIntegrationCredential`/`GetIntegrationCredentialStatus`/`ListIntegrationCredentials` RPCs confirmed present in `scmintegration.proto` with matching request/response messages.
 
 ---
 

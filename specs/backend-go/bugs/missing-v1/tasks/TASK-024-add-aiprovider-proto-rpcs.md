@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/proto/orca/aiprovider/v1/aiprovider.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — all 6 RPCs (CreateAccount/ListAccounts/UpdateAccount/DeleteAccount/WriteCredential/TestConnection) confirmed present in `aiprovider.proto`; this task doc's Status line was never updated by the implementing pass.
 
 ---
 

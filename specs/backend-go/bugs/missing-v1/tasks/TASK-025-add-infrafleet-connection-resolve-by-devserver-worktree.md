@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`, `backend-go/services/infra-fleet-service/internal/usecase/{ports.go,resolve_connection.go}`, `backend-go/services/infra-fleet-service/internal/adapter/postgres/repository.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `ResolveConnectionByDevServer`/`ResolveConnectionByWorktree` confirmed present in `infra-fleet-service/internal/usecase/ports.go` + `resolve_connection.go`, backed by matching postgres repository methods; verified build/test clean.
 
 ---
 

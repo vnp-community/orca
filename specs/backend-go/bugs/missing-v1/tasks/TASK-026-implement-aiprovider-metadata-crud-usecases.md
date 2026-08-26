@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `internal/domain/provider_account.go`, `internal/usecase/{ports.go,list_accounts.go,update_account.go,delete_account.go}` (3 new), `internal/adapter/postgres/repository.go`, `migrations/0002_dev_server_id.up.sql` (new), `internal/adapter/grpc/server.go`
 **Depends on:** TASK-024
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `create_account.go`/`list_accounts.go`/`update_account.go`/`delete_account.go` confirmed present in `ai-provider-service/internal/usecase/` with tests; grpc server wiring confirmed in `internal/adapter/grpc/server.go`.
 
 ---
 

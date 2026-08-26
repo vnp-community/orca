@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `internal/usecase/{ports.go,set_integration_credential.go,get_integration_credential_status.go,list_integration_credentials.go}`, `internal/adapter/credentialbroker/client.go`, `internal/adapter/grpc/server.go`
 **Depends on:** TASK-037, TASK-038, TASK-039
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `set_integration_credential.go`/`get_integration_credential_status.go`/`list_integration_credentials.go` confirmed present in `scm-integration-service/internal/usecase/`, wired into `internal/adapter/grpc/server.go` and `internal/adapter/credentialbroker/client.go`'s `Resolver` (Write/WriteRaw/GetStatus/ListConfiguredProviders/RevokeByOwner all implemented).
 
 ---
 

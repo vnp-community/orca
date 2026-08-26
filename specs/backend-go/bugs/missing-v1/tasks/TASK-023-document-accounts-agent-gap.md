@@ -5,7 +5,7 @@
 **Service:** `agent` (out of scope) / `frontend` (out of scope)
 **File:** none — this task produces no code change; see "What to do" below
 **Depends on:** TASK-021
-**Status:** `[ ]` TODO
+**Status:** `[ ]` TODO — genuinely not code-produceable: this task's "done" criterion is 2 real tracking issues filed in the project's actual issue tracker (this repo has a live GitHub remote, `vnp-community/orca`), which is an outward-facing action needing explicit user sign-off, not something to do silently mid-audit. TASK-021/022 (the code side) are confirmed DONE and shipped-but-inert exactly as this task predicts, pending the agent-side JSON-RPC methods and frontend `connectionId` threading described below.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `credential-broker-service`
 **File:** `internal/domain/credential_metadata.go`, `internal/usecase/{ports.go,write_credential.go,get_credential_metadata_by_owner.go,list_credentials_by_category.go}`, `internal/adapter/postgres/repository.go`, `internal/adapter/grpc/server.go`
 **Depends on:** TASK-037
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `list_credentials_by_category.go`/`ListCredentialsByCategory` confirmed present and wired end-to-end.
 
 ---
 
