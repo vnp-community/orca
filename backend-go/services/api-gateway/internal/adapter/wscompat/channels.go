@@ -117,6 +117,7 @@ func RegisterRealChannels(
 	registerFilesChannels(r, gitClient)
 	registerAutomationTaskChannels(r, automationClient, taskClient)
 	registerWorktreeChannels(r, gitClient, projectClient)
+	registerWorkspaceChannels(r, gitClient, projectClient)
 	registerEmulatorFolderWorkspaceHostChannels(r, projectClient)
 	registerTeamChannels(r, tenantClient)
 	registerTerminalChannels(r, infraFleetClient)

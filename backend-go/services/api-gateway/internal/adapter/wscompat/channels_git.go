@@ -24,6 +24,10 @@ import (
 	"fmt"
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+
+	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
 // registerGitDeepChannels wires every git.* channel this scope's tasks
@@ -562,4 +566,96 @@ func registerFilesChannels(r *Registry, client gitgatewayv1.GitGatewayServiceCli
 	r.Register("files.unwatch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		return map[string]bool{"ok": true}, nil
 	})
+}
+
+// backendFileTreeNode mirrors the frontend's BackendFileTreeNode type
+// (WorkspaceContext.tsx:26-31 / WorkspaceContextV6.tsx) field-for-field —
+// {name, path, isDir, children?}. files.readDir's DirEntry only carries
+// name/is_directory (TASK-168's own doc comment already notes this shape
+// mismatch is expected and massaged client-side); path is reconstructed
+// here since DirEntry has none.
+type backendFileTreeNode struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	IsDir bool   `json:"isDir"`
+}
+
+// registerWorkspaceChannels wires the one legacy channel this pass still
+// owns: workspace.refreshFileTree, per rpc-catalog.md:481-485 "mostly
+// superseded by files.*/git.*". A pure rename/reshape wrapper over
+// files.readDir's backing RPC (GitGatewayService.ReadDir) — no independent
+// business logic beyond the projectId->worktreeId resolution every other
+// project-scoped channel in this package already does (see
+// channels_worktree.go's worktree.list for the identical
+// projectClient.ListWorktrees precedent this mirrors).
+//
+// Confirmed via the real frontend call sites (WorkspaceContext.tsx:128,
+// WorkspaceContextV6.tsx:157) that the actual params are {projectId, path},
+// not TASK-168's own doc sketch's assumption of a direct worktreeId —
+// resolved here by picking the project's active worktree the same way
+// worktree-scoped operations elsewhere in this codebase do (Worktree.active,
+// project.proto).
+func registerWorkspaceChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServiceClient, projectClient projectv1.ProjectServiceClient) {
+	r.Register("workspace.refreshFileTree", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type refreshArgs struct {
+			ProjectID string `json:"projectId"`
+			Path      string `json:"path"`
+		}
+		in, err := decodeArg[refreshArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if in.ProjectID == "" {
+			return nil, fmt.Errorf("wscompat: workspace.refreshFileTree requires projectId")
+		}
+		dirPath := in.Path
+		if dirPath == "" {
+			dirPath = "."
+		}
+
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+
+		worktreesResp, err := projectClient.ListWorktrees(ctx, &projectv1.ListWorktreesRequest{ProjectId: in.ProjectID})
+		if err != nil {
+			return nil, err
+		}
+		var worktreeID string
+		for _, wt := range worktreesResp.GetWorktrees() {
+			if wt.GetActive() {
+				worktreeID = wt.GetId()
+				break
+			}
+		}
+		if worktreeID == "" && len(worktreesResp.GetWorktrees()) > 0 {
+			// No worktree explicitly marked active — fall back to the
+			// first one rather than erroring, since a project with
+			// exactly one worktree (the common case) has nothing to
+			// disambiguate.
+			worktreeID = worktreesResp.GetWorktrees()[0].GetId()
+		}
+		if worktreeID == "" {
+			return nil, fmt.Errorf("wscompat: no worktree found for project %q", in.ProjectID)
+		}
+
+		resp, err := gitClient.ReadDir(ctx, &gitgatewayv1.ReadDirRequest{WorktreeId: worktreeID, Path: dirPath})
+		if err != nil {
+			return nil, err
+		}
+		return toBackendFileTreeNodes(dirPath, resp.GetEntries()), nil
+	})
+}
+
+// toBackendFileTreeNodes maps ReadDirResponse's DirEntry list onto the
+// frontend's flat {name, path, isDir} shape, joining dirPath+name since
+// DirEntry itself carries no path — see backendFileTreeNode's doc comment.
+func toBackendFileTreeNodes(dirPath string, entries []*gitgatewayv1.DirEntry) []backendFileTreeNode {
+	out := make([]backendFileTreeNode, 0, len(entries))
+	for _, e := range entries {
+		childPath := e.GetName()
+		if dirPath != "" && dirPath != "." {
+			childPath = dirPath + "/" + e.GetName()
+		}
+		out = append(out, backendFileTreeNode{Name: e.GetName(), Path: childPath, IsDir: e.GetIsDirectory()})
+	}
+	return out
 }
