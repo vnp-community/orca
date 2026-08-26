@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`, `infra-fleet-service`, `api-gateway`
 **File:** `services/ai-provider-service/internal/usecase/{list_accounts_test.go,update_account_test.go,delete_account_test.go,write_credential_test.go,test_connection_test.go}` (new), `services/infra-fleet-service/internal/usecase/resolve_connection_test.go` (extend), `services/api-gateway/internal/adapter/wscompat/channels_ai_provider_test.go` (new)
 **Depends on:** TASK-025, TASK-026, TASK-027, TASK-028, TASK-029
-**Status:** `[ ]` TODO
+**Status:** `[partial]` — `services/api-gateway/internal/adapter/wscompat/channels_ai_provider_test.go` added: one success + one error-propagation test per channel (6 channels, 13 tests total), plus a base64-decode-failure case for `writeCredential`, following `channels_accounts_test.go`'s fake-client + `outgoingTenantUser` conventions. `infra-fleet-service`'s `ResolveConnection` dev-server-id/worktree-id cases (`TestResolveConnection_ByDevServerID_MatchesByConnectionID`, `TestResolveConnection_ByWorktreeID_MatchesByConnectionID`) already existed pre-pass. NOT done in this pass: `ai-provider-service/internal/usecase/{update_account_test.go,delete_account_test.go,write_credential_test.go,test_connection_test.go}` — those usecases are implemented but have no dedicated tests yet; out of scope for this pass, which was narrowed to the `wscompat` channel layer only.
 
 ---
 

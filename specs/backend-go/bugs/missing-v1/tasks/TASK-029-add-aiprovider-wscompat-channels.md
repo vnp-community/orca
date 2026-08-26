@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_ai_provider.go` (new), `channels.go`, `cmd/server/main.go`
 **Depends on:** TASK-024, TASK-026, TASK-027, TASK-028
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `channels_ai_provider.go` wires all 6 channels (`aiProvider.create/list/update/delete/writeCredential/testConnection`) to `aiproviderv1.AiProviderServiceClient`, following this package's `decodeArg`/`AttachIdentity`/`rpcTimeout` conventions. `channels.go` and `main.go` were deliberately left untouched per this batch's shared-file-avoidance convention — see this task's companion report for the exact `registerAiProviderChannels(r, aiProviderClient)` call + `RegisterRealChannels` signature addition the integration pass still needs to make.
 
 ---
 
