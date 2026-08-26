@@ -246,6 +246,7 @@ func run() error {
 	wscompat.RegisterRealChannels(
 		wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient,
 		tenantClient, projectClient, issueTrackingClient, orchestrationClient, scmClient, workflowClient,
+		aiProviderClient,
 		rateLimiter,
 	)
 	// RegisterPushChannels wires the StreamHandler-backed (push-capable)

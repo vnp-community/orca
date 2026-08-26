@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"time"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
@@ -80,6 +81,7 @@ func RegisterRealChannels(
 	orchestrationClient orchestrationv1.OrchestrationServiceClient,
 	scmClient scmintegrationv1.ScmIntegrationServiceClient,
 	workflowClient workflowv1.WorkflowServiceClient,
+	aiProviderClient aiproviderv1.AiProviderServiceClient,
 	rateLimits rateLimitReader,
 ) {
 	registerAnnotationChannels(r, annotationClient)
@@ -100,6 +102,8 @@ func RegisterRealChannels(
 	// RegisterRealChannels" doc comment. See each file's package/function
 	// doc comment for which TASK-* IDs it covers.
 	registerAccountsChannels(r, infraFleetClient)
+	registerAiProviderChannels(r, aiProviderClient)
+	registerCredentialsChannels(r, issueTrackingClient)
 	registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)
 	registerRepoSshStatusWorkspaceChannels(r, projectClient, gitClient, infraFleetClient)
 	registerSCMChannels(r, scmClient)
