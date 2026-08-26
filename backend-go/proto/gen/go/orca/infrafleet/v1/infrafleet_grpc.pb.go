@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,14 +20,24 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InfraFleetService_RegisterDevServer_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
-	InfraFleetService_ResolveConnection_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
-	InfraFleetService_CreateSshTarget_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
-	InfraFleetService_GetFleetHealth_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
-	InfraFleetService_ScanWorkspacePorts_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
-	InfraFleetService_ListDevServers_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
-	InfraFleetService_CreateConnection_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
-	InfraFleetService_Relay_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_RegisterDevServer_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
+	InfraFleetService_ResolveConnection_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
+	InfraFleetService_CreateSshTarget_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
+	InfraFleetService_GetFleetHealth_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
+	InfraFleetService_ScanWorkspacePorts_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
+	InfraFleetService_ListDevServers_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
+	InfraFleetService_CreateConnection_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
+	InfraFleetService_Relay_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_SpawnTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
+	InfraFleetService_ResizeTerminalSession_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
+	InfraFleetService_KillTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
+	InfraFleetService_StopTerminalProcess_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/StopTerminalProcess"
+	InfraFleetService_ListTerminalSessions_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ListTerminalSessions"
+	InfraFleetService_WaitTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/WaitTerminalSession"
+	InfraFleetService_FocusTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/FocusTerminalSession"
+	InfraFleetService_GetTerminalAgentStatus_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
+	InfraFleetService_InspectTerminalProcess_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
+	InfraFleetService_AttachPty_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -58,6 +69,24 @@ type InfraFleetServiceClient interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(ctx context.Context, in *RelayRequest, opts ...grpc.CallOption) (*RelayResponse, error)
+	// --- Terminal/PTY lifecycle (control-plane, unary) ---
+	SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error)
+	ResizeTerminalSession(ctx context.Context, in *ResizeTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	KillTerminalSession(ctx context.Context, in *KillTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	StopTerminalProcess(ctx context.Context, in *StopTerminalProcessRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListTerminalSessions(ctx context.Context, in *ListTerminalSessionsRequest, opts ...grpc.CallOption) (*ListTerminalSessionsResponse, error)
+	WaitTerminalSession(ctx context.Context, in *WaitTerminalSessionRequest, opts ...grpc.CallOption) (*WaitTerminalSessionResponse, error)
+	FocusTerminalSession(ctx context.Context, in *FocusTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetTerminalAgentStatus(ctx context.Context, in *GetTerminalAgentStatusRequest, opts ...grpc.CallOption) (*GetTerminalAgentStatusResponse, error)
+	InspectTerminalProcess(ctx context.Context, in *InspectTerminalProcessRequest, opts ...grpc.CallOption) (*InspectTerminalProcessResponse, error)
+	// --- Terminal/PTY I/O ---
+	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
+	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
+	// §3's RouteTerminalWrite only routes control-plane metadata, never per-
+	// byte input, so a client->server data channel was still missing — this
+	// RPC is opened once per terminal.create by api-gateway's wscompat bridge
+	// (TASK-186) and piped into `push` frames via TASK-012's pipePush.
+	AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error)
 }
 
 type infraFleetServiceClient struct {
@@ -148,6 +177,109 @@ func (c *infraFleetServiceClient) Relay(ctx context.Context, in *RelayRequest, o
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SpawnTerminalSessionResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_SpawnTerminalSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ResizeTerminalSession(ctx context.Context, in *ResizeTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_ResizeTerminalSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) KillTerminalSession(ctx context.Context, in *KillTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_KillTerminalSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) StopTerminalProcess(ctx context.Context, in *StopTerminalProcessRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_StopTerminalProcess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ListTerminalSessions(ctx context.Context, in *ListTerminalSessionsRequest, opts ...grpc.CallOption) (*ListTerminalSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTerminalSessionsResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListTerminalSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) WaitTerminalSession(ctx context.Context, in *WaitTerminalSessionRequest, opts ...grpc.CallOption) (*WaitTerminalSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WaitTerminalSessionResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_WaitTerminalSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) FocusTerminalSession(ctx context.Context, in *FocusTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_FocusTerminalSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetTerminalAgentStatus(ctx context.Context, in *GetTerminalAgentStatusRequest, opts ...grpc.CallOption) (*GetTerminalAgentStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTerminalAgentStatusResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetTerminalAgentStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) InspectTerminalProcess(ctx context.Context, in *InspectTerminalProcessRequest, opts ...grpc.CallOption) (*InspectTerminalProcessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InspectTerminalProcessResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_InspectTerminalProcess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_AttachPty_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PtyClientFrame, PtyServerFrame]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_AttachPtyClient = grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame]
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -177,6 +309,24 @@ type InfraFleetServiceServer interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(context.Context, *RelayRequest) (*RelayResponse, error)
+	// --- Terminal/PTY lifecycle (control-plane, unary) ---
+	SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error)
+	ResizeTerminalSession(context.Context, *ResizeTerminalSessionRequest) (*emptypb.Empty, error)
+	KillTerminalSession(context.Context, *KillTerminalSessionRequest) (*emptypb.Empty, error)
+	StopTerminalProcess(context.Context, *StopTerminalProcessRequest) (*emptypb.Empty, error)
+	ListTerminalSessions(context.Context, *ListTerminalSessionsRequest) (*ListTerminalSessionsResponse, error)
+	WaitTerminalSession(context.Context, *WaitTerminalSessionRequest) (*WaitTerminalSessionResponse, error)
+	FocusTerminalSession(context.Context, *FocusTerminalSessionRequest) (*emptypb.Empty, error)
+	GetTerminalAgentStatus(context.Context, *GetTerminalAgentStatusRequest) (*GetTerminalAgentStatusResponse, error)
+	InspectTerminalProcess(context.Context, *InspectTerminalProcessRequest) (*InspectTerminalProcessResponse, error)
+	// --- Terminal/PTY I/O ---
+	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
+	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
+	// §3's RouteTerminalWrite only routes control-plane metadata, never per-
+	// byte input, so a client->server data channel was still missing — this
+	// RPC is opened once per terminal.create by api-gateway's wscompat bridge
+	// (TASK-186) and piped into `push` frames via TASK-012's pipePush.
+	AttachPty(grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]) error
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -210,6 +360,36 @@ func (UnimplementedInfraFleetServiceServer) CreateConnection(context.Context, *C
 }
 func (UnimplementedInfraFleetServiceServer) Relay(context.Context, *RelayRequest) (*RelayResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Relay not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SpawnTerminalSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ResizeTerminalSession(context.Context, *ResizeTerminalSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResizeTerminalSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) KillTerminalSession(context.Context, *KillTerminalSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method KillTerminalSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) StopTerminalProcess(context.Context, *StopTerminalProcessRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method StopTerminalProcess not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListTerminalSessions(context.Context, *ListTerminalSessionsRequest) (*ListTerminalSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTerminalSessions not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) WaitTerminalSession(context.Context, *WaitTerminalSessionRequest) (*WaitTerminalSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WaitTerminalSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) FocusTerminalSession(context.Context, *FocusTerminalSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method FocusTerminalSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetTerminalAgentStatus(context.Context, *GetTerminalAgentStatusRequest) (*GetTerminalAgentStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTerminalAgentStatus not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) InspectTerminalProcess(context.Context, *InspectTerminalProcessRequest) (*InspectTerminalProcessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InspectTerminalProcess not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) AttachPty(grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]) error {
+	return status.Error(codes.Unimplemented, "method AttachPty not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -376,6 +556,175 @@ func _InfraFleetService_Relay_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_SpawnTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SpawnTerminalSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SpawnTerminalSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SpawnTerminalSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SpawnTerminalSession(ctx, req.(*SpawnTerminalSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ResizeTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResizeTerminalSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ResizeTerminalSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ResizeTerminalSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ResizeTerminalSession(ctx, req.(*ResizeTerminalSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_KillTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KillTerminalSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).KillTerminalSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_KillTerminalSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).KillTerminalSession(ctx, req.(*KillTerminalSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_StopTerminalProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopTerminalProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).StopTerminalProcess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_StopTerminalProcess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).StopTerminalProcess(ctx, req.(*StopTerminalProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ListTerminalSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTerminalSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListTerminalSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListTerminalSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListTerminalSessions(ctx, req.(*ListTerminalSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_WaitTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WaitTerminalSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).WaitTerminalSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_WaitTerminalSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).WaitTerminalSession(ctx, req.(*WaitTerminalSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_FocusTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FocusTerminalSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).FocusTerminalSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_FocusTerminalSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).FocusTerminalSession(ctx, req.(*FocusTerminalSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetTerminalAgentStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTerminalAgentStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetTerminalAgentStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetTerminalAgentStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetTerminalAgentStatus(ctx, req.(*GetTerminalAgentStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_InspectTerminalProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InspectTerminalProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).InspectTerminalProcess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_InspectTerminalProcess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).InspectTerminalProcess(ctx, req.(*InspectTerminalProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_AttachPty_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(InfraFleetServiceServer).AttachPty(&grpc.GenericServerStream[PtyClientFrame, PtyServerFrame]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_AttachPtyServer = grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -415,7 +764,50 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Relay",
 			Handler:    _InfraFleetService_Relay_Handler,
 		},
+		{
+			MethodName: "SpawnTerminalSession",
+			Handler:    _InfraFleetService_SpawnTerminalSession_Handler,
+		},
+		{
+			MethodName: "ResizeTerminalSession",
+			Handler:    _InfraFleetService_ResizeTerminalSession_Handler,
+		},
+		{
+			MethodName: "KillTerminalSession",
+			Handler:    _InfraFleetService_KillTerminalSession_Handler,
+		},
+		{
+			MethodName: "StopTerminalProcess",
+			Handler:    _InfraFleetService_StopTerminalProcess_Handler,
+		},
+		{
+			MethodName: "ListTerminalSessions",
+			Handler:    _InfraFleetService_ListTerminalSessions_Handler,
+		},
+		{
+			MethodName: "WaitTerminalSession",
+			Handler:    _InfraFleetService_WaitTerminalSession_Handler,
+		},
+		{
+			MethodName: "FocusTerminalSession",
+			Handler:    _InfraFleetService_FocusTerminalSession_Handler,
+		},
+		{
+			MethodName: "GetTerminalAgentStatus",
+			Handler:    _InfraFleetService_GetTerminalAgentStatus_Handler,
+		},
+		{
+			MethodName: "InspectTerminalProcess",
+			Handler:    _InfraFleetService_InspectTerminalProcess_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "AttachPty",
+			Handler:       _InfraFleetService_AttachPty_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "orca/infrafleet/v1/infrafleet.proto",
 }

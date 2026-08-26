@@ -129,6 +129,8 @@ func run() error {
 	createTeamUC := usecase.NewCreateTeam(companies, teams)
 	addTeamMemberUC := usecase.NewAddTeamMember(teams, profileCache, invalidationPublisher)
 	listTeamMembersUC := usecase.NewListTeamMembers(teams)
+	listTeamsUC := usecase.NewListTeams(teams)
+	removeTeamMemberUC := usecase.NewRemoveTeamMember(teams, profileCache, invalidationPublisher)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	tenantv1.RegisterTenantServiceServer(grpcServer, tenantgrpc.New(
@@ -140,6 +142,8 @@ func run() error {
 		createTeamUC,
 		addTeamMemberUC,
 		listTeamMembersUC,
+		listTeamsUC,
+		removeTeamMemberUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

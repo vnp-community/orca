@@ -9,6 +9,25 @@
 // binary already produced.
 package domain
 
+import "errors"
+
+// ErrForceDeleteBranchUnsupported is returned when the relay target's Dev
+// Server Agent build predates a force-delete-branch method — the
+// operational counterpart to GitExecutor.ForceDeleteBranch's compile-time
+// guarantee (every implementation must have the method; this is "the
+// method call fails cleanly" for an outdated agent build), per BUG-031's
+// cited old-TS fallback comment ("older SSH relays predate
+// git.forceDeletePreservedBranch").
+//
+// Lives in domain, not internal/adapter/grpcclient, deliberately: TASK-194
+// Step 4's usecase.ForceDeleteBranch needs to check errors.Is against this
+// sentinel, and internal/adapter/grpcclient already imports internal/usecase
+// (for the port interfaces it implements) — usecase importing grpcclient
+// back for just this sentinel would be a real import cycle. domain has no
+// dependency on either package, so both grpcclient (which returns this
+// error) and usecase (which checks it) can import domain safely.
+var ErrForceDeleteBranchUnsupported = errors.New("git-gateway-service: relay target does not support force-delete-branch")
+
 // FileState enumerates the file-status values git-gateway-service's wire
 // protocol carries (mirrors the generated proto's FileStatus.state string
 // per gitgateway.proto's comment: "modified/added/deleted/untracked/conflicted").
@@ -78,4 +97,52 @@ type PushResult struct {
 type PullResult struct {
 	Success      bool
 	HadConflicts bool
+}
+
+// WorktreeCreateResult is what a successful `git worktree add` reports.
+type WorktreeCreateResult struct {
+	Path    string
+	HeadSHA string
+}
+
+// WorktreeResult is CreateWorktree's usecase-level result: the saga's
+// combined answer once both the git operation and project-service's
+// bookkeeping record have succeeded.
+type WorktreeResult struct {
+	WorktreeID string
+	Path       string
+	HeadSHA    string
+}
+
+// RepoInfo is project-service's answer to "does this repo exist, and what
+// project/URL does it belong to" — the minimal shape the worktree usecases
+// need to validate a repo id before dispatching a git operation against it.
+//
+// Deviation from TASK-193's original sketch: project.proto's real Repo
+// message (backend-go/proto/orca/project/v1/project.proto) has no
+// dev_server_id or path field — those fields were this task's best-effort
+// guess before checking the proto and don't exist. Dev-server/host
+// resolution for a worktree op instead goes entirely through
+// ConnectionResolver (see dispatchExecutor in usecase/ports.go), never
+// through RepoInfo; RepoInfo here only carries what Repo actually has.
+type RepoInfo struct {
+	ID          string
+	ProjectID   string
+	URL         string
+	DisplayName string
+}
+
+// WorktreeRecord mirrors project-service's Worktree message — the
+// bookkeeping row RecordWorktreeCreated/SetWorktreeActivation return.
+type WorktreeRecord struct {
+	ID     string
+	Path   string
+	Branch string
+}
+
+// ResolvedBase is PrefetchCreateBase/ResolvePrBase/ResolveMrBase's answer:
+// a base branch name plus the local SHA it resolved to once fetched.
+type ResolvedBase struct {
+	Branch string
+	SHA    string
 }

@@ -67,6 +67,14 @@ type session struct {
 	// wait for the agent to dial in again.
 	inbound bool
 
+	// ptyMu/ptySubs implement the notification demux TASK-183 adds: routing
+	// pty.data/pty.exit/pty.replay notifications (see routeNotification) to
+	// whichever StreamPty caller subscribed for a given pty id. Kept as its
+	// own mutex, not s.mu, so routing a notification never contends with
+	// call()/readLoop's request-response bookkeeping.
+	ptyMu   sync.Mutex
+	ptySubs map[string][]chan rawPtyNotification
+
 	reconnectAttempt int
 
 	closeCh chan struct{}
@@ -221,18 +229,128 @@ func (s *session) readLoop(conn *websocket.Conn) {
 		}
 
 		resp, ok, err := ParseJSONRPCResponse(decoded.Payload)
-		if err != nil || !ok {
-			continue // a notification or malformed payload — this client issues no onRequest/onNotification handlers yet (see README "Known gaps")
+		if err == nil && ok {
+			s.mu.Lock()
+			call := s.pending[resp.ID]
+			delete(s.pending, resp.ID)
+			s.mu.Unlock()
+			if call != nil {
+				call.resultCh <- resp
+			}
+			continue
 		}
 
-		s.mu.Lock()
-		call := s.pending[resp.ID]
-		delete(s.pending, resp.ID)
-		s.mu.Unlock()
-		if call != nil {
-			call.resultCh <- resp
+		// Not a response — route pty.data/pty.exit/pty.replay notifications
+		// (TASK-183's notification demux, see routeNotification). Anything
+		// else (malformed payload, a notification method this client
+		// doesn't demux) is dropped — this client issues no general-purpose
+		// onRequest/onNotification handlers yet (see README "Known gaps").
+		if notif, isNotif, nerr := ParseJSONRPCNotification(decoded.Payload); nerr == nil && isNotif {
+			s.routeNotification(notif)
 		}
 	}
+}
+
+// rawPtyNotification is session.go's internal decoding of one
+// pty.data/pty.exit/pty.replay notification — StreamPty (client.go) wraps
+// this into the exported usecase.PtyEvent shape.
+type rawPtyNotification struct {
+	PtyID    string
+	Data     []byte
+	Exited   bool
+	ExitCode int32
+}
+
+// ptyNotificationParams is this adapter's best-effort decoding of
+// pty.data/pty.exit/pty.replay notification params.
+//
+// FLAGGED (TASK-183): the exact field names were not confirmed against
+// pty-daemon-server.ts's/pty-handler.ts's actual notify() call sites for
+// these three methods specifically — out of this pass's scope/budget (the
+// TASK-183 spec file itself was also not present in this worktree, see this
+// package's README/the implementing PR's description). "id" (the pty id)
+// mirrors pty.write/pty.resize/pty.destroy's confirmed {id, ...} params
+// shape; "data" and "exitCode" are the most likely field names given
+// relay-protocol.ts's general JSON-RPC conventions elsewhere in this
+// adapter, but are UNCONFIRMED. Treat as a best-effort default, not a
+// verified contract, until checked against a real agent build.
+type ptyNotificationParams struct {
+	ID       string `json:"id"`
+	Data     string `json:"data"`
+	ExitCode int32  `json:"exitCode"`
+}
+
+// routeNotification decodes and fans out one pty.* notification to every
+// subscriber currently registered for its pty id (subscribePty/StreamPty).
+// A slow subscriber never blocks the read loop — see the non-blocking send
+// below, matching this adapter's "the read loop must never block on a
+// consumer" discipline (see keepAliveLoop's write-timeout, handleDisconnect's
+// unblocking of pending calls).
+func (s *session) routeNotification(n JSONRPCNotification) {
+	switch n.Method {
+	case "pty.data", "pty.exit", "pty.replay":
+	default:
+		return // not a pty notification this client demuxes, see package doc comment's "Two RPC surfaces" note
+	}
+
+	var p ptyNotificationParams
+	if len(n.Params) > 0 {
+		_ = json.Unmarshal(n.Params, &p) // best-effort, see ptyNotificationParams's FLAGGED doc comment
+	}
+	if p.ID == "" {
+		return
+	}
+
+	raw := rawPtyNotification{PtyID: p.ID}
+	if n.Method == "pty.exit" {
+		raw.Exited = true
+		raw.ExitCode = p.ExitCode
+	} else {
+		raw.Data = []byte(p.Data)
+	}
+
+	s.ptyMu.Lock()
+	subs := append([]chan rawPtyNotification(nil), s.ptySubs[p.ID]...)
+	s.ptyMu.Unlock()
+
+	for _, ch := range subs {
+		select {
+		case ch <- raw:
+		default: // slow/gone consumer — drop rather than block the read loop
+		}
+	}
+}
+
+// subscribePty registers a new listener for ptyID's notifications —
+// StreamPty's implementation. The returned channel is buffered so a burst of
+// output doesn't immediately trip routeNotification's drop-on-full path.
+func (s *session) subscribePty(ptyID string) chan rawPtyNotification {
+	ch := make(chan rawPtyNotification, 64)
+	s.ptyMu.Lock()
+	if s.ptySubs == nil {
+		s.ptySubs = make(map[string][]chan rawPtyNotification)
+	}
+	s.ptySubs[ptyID] = append(s.ptySubs[ptyID], ch)
+	s.ptyMu.Unlock()
+	return ch
+}
+
+// unsubscribePty removes and closes ch — MUST be called exactly once by
+// whoever called subscribePty (see StreamPty's returned unsubscribe func).
+func (s *session) unsubscribePty(ptyID string, ch chan rawPtyNotification) {
+	s.ptyMu.Lock()
+	subs := s.ptySubs[ptyID]
+	for i, c := range subs {
+		if c == ch {
+			s.ptySubs[ptyID] = append(subs[:i], subs[i+1:]...)
+			break
+		}
+	}
+	if len(s.ptySubs[ptyID]) == 0 {
+		delete(s.ptySubs, ptyID)
+	}
+	s.ptyMu.Unlock()
+	close(ch)
 }
 
 // keepAliveLoop sends a KeepAlive frame every cfg.KeepAliveInterval —

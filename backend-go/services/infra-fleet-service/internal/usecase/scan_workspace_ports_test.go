@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
@@ -10,15 +11,53 @@ import (
 
 // fakeDevServerAgentClient is an in-memory DevServerAgentClient — stands in
 // for adapter/devserveragent's real stub in these usecase-layer tests, which
-// only exercise ScanWorkspacePorts' dispatch logic, not the wire protocol.
+// only exercise dispatch logic, not the wire protocol. Also backs the
+// Terminal/PTY usecase tests (spawn_terminal_session_test.go,
+// attach_pty_test.go, wait_terminal_session_test.go, etc.) — guarded by mu
+// since AttachPty drives calls from its own goroutine (see attach_pty.go's
+// run method).
 type fakeDevServerAgentClient struct {
+	mu sync.Mutex
+
 	execResult map[string]any
 	execErr    error
 	execCalls  []string // methods called with, for assertions
+
+	spawnPtyResult SpawnPtyResult
+	spawnPtyErr    error
+	spawnPtyCalls  []SpawnPtyInput
+
+	writePtyErr   error
+	writePtyCalls [][]byte
+
+	resizePtyErr   error
+	resizePtyCalls []resizePtyCall
+
+	killPtyErr   error
+	killPtyCalls []string
+
+	// streamPtyEvents, if non-nil, is returned as-is from StreamPty — the
+	// test owns writing to (and closing) it. streamPtyUnsubscribed records
+	// whether the returned unsubscribe func was called.
+	streamPtyEvents       chan PtyEvent
+	streamPtyErr          error
+	streamPtyUnsubscribed bool
+
+	agentStatusResult AgentStatusResult
+	agentStatusErr    error
+
+	inspectResult InspectProcessResult
+	inspectErr    error
+}
+
+type resizePtyCall struct {
+	Cols, Rows int32
 }
 
 func (f *fakeDevServerAgentClient) Exec(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (map[string]any, error) {
+	f.mu.Lock()
 	f.execCalls = append(f.execCalls, method)
+	f.mu.Unlock()
 	if f.execErr != nil {
 		return nil, f.execErr
 	}
@@ -27,6 +66,67 @@ func (f *fakeDevServerAgentClient) Exec(ctx context.Context, devServer domain.De
 
 func (f *fakeDevServerAgentClient) Health(ctx context.Context, devServer domain.DevServer) (bool, error) {
 	return false, errors.New("not used by this test")
+}
+
+func (f *fakeDevServerAgentClient) SpawnPty(ctx context.Context, devServer domain.DevServer, in SpawnPtyInput) (SpawnPtyResult, error) {
+	f.mu.Lock()
+	f.spawnPtyCalls = append(f.spawnPtyCalls, in)
+	f.mu.Unlock()
+	if f.spawnPtyErr != nil {
+		return SpawnPtyResult{}, f.spawnPtyErr
+	}
+	return f.spawnPtyResult, nil
+}
+
+func (f *fakeDevServerAgentClient) WritePty(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error {
+	f.mu.Lock()
+	f.writePtyCalls = append(f.writePtyCalls, data)
+	f.mu.Unlock()
+	return f.writePtyErr
+}
+
+func (f *fakeDevServerAgentClient) ResizePty(ctx context.Context, devServer domain.DevServer, ptyID string, cols, rows int32) error {
+	f.mu.Lock()
+	f.resizePtyCalls = append(f.resizePtyCalls, resizePtyCall{Cols: cols, Rows: rows})
+	f.mu.Unlock()
+	return f.resizePtyErr
+}
+
+func (f *fakeDevServerAgentClient) KillPty(ctx context.Context, devServer domain.DevServer, ptyID string, graceful bool) error {
+	f.mu.Lock()
+	f.killPtyCalls = append(f.killPtyCalls, ptyID)
+	f.mu.Unlock()
+	return f.killPtyErr
+}
+
+func (f *fakeDevServerAgentClient) StreamPty(ctx context.Context, devServer domain.DevServer, ptyID string) (<-chan PtyEvent, func(), error) {
+	if f.streamPtyErr != nil {
+		return nil, nil, f.streamPtyErr
+	}
+	events := f.streamPtyEvents
+	if events == nil {
+		events = make(chan PtyEvent)
+	}
+	unsubscribe := func() {
+		f.mu.Lock()
+		f.streamPtyUnsubscribed = true
+		f.mu.Unlock()
+	}
+	return events, unsubscribe, nil
+}
+
+func (f *fakeDevServerAgentClient) AgentStatus(ctx context.Context, devServer domain.DevServer, ptyID string) (AgentStatusResult, error) {
+	if f.agentStatusErr != nil {
+		return AgentStatusResult{}, f.agentStatusErr
+	}
+	return f.agentStatusResult, nil
+}
+
+func (f *fakeDevServerAgentClient) InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (InspectProcessResult, error) {
+	if f.inspectErr != nil {
+		return InspectProcessResult{}, f.inspectErr
+	}
+	return f.inspectResult, nil
 }
 
 func TestScanWorkspacePorts_RequiresTenantContext(t *testing.T) {

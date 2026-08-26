@@ -27,11 +27,16 @@ type Config struct {
 	InfraFleetServiceAddr string
 
 	// ProjectServiceAddr is where a real worktree_id -> repo path resolver
-	// would dial project-service (git-gateway-service.md §7 step 1). Unused
-	// by this scaffold — see internal/usecase/ports.go's ResolvedConnection
-	// doc comment for why that resolution is currently folded into the
-	// ConnectionResolver stub instead.
+	// would dial project-service (git-gateway-service.md §7 step 1). Now a
+	// real outbound dependency (TASK-194): grpcclient.ProjectClient dials
+	// this for the CreateWorktree/RemoveWorktree saga's bookkeeping calls.
 	ProjectServiceAddr string
+
+	// SCMIntegrationServiceAddr is where scmclient.Client dials
+	// scm-integration-service for ResolvePrBase/ResolveMrBase's PR/MR
+	// base-branch lookups (SOL-031 / TASK-193) — a new outbound dependency
+	// edge this service didn't have before this batch.
+	SCMIntegrationServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -40,8 +45,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                  base,
-		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
-		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
+		Base:                      base,
+		InfraFleetServiceAddr:     commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		ProjectServiceAddr:        commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
+		SCMIntegrationServiceAddr: commonconfig.StringEnv("SCM_INTEGRATION_SERVICE_ADDR", "scm-integration-service:9090"),
 	}, nil
 }

@@ -10,6 +10,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -190,6 +191,76 @@ func TestRepository_ResolveChain_NotFound(t *testing.T) {
 	_, err := repo.ResolveChain(ctx, "55555555-5555-5555-5555-555555555555", "aaaaaaaa-0000-0000-0000-000000009999", 5)
 	if err == nil {
 		t.Fatal("expected an error resolving a chain for a template that doesn't exist")
+	}
+}
+
+func TestRepository_Update_CorrectVersion_Succeeds(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "66666666-6666-6666-6666-666666666666"
+
+	tmpl, err := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000003", tenantID, "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
+	if err != nil {
+		t.Fatalf("building template: %v", err)
+	}
+	if err := repo.CreateTemplate(ctx, tmpl); err != nil {
+		t.Fatalf("create template: %v", err)
+	}
+
+	tmpl.Name = "deploy-v2"
+	tmpl.DAGJSON = `{"steps":[{"id":"s1","type":"webhook"}]}`
+	tmpl.Scope = domain.ScopeTeam
+
+	updated, err := repo.Update(ctx, tmpl, 1)
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if updated.Version != 2 {
+		t.Fatalf("want bumped version 2, got %d", updated.Version)
+	}
+	if updated.Name != "deploy-v2" || updated.Scope != domain.ScopeTeam {
+		t.Fatalf("update did not persist the new fields: %+v", updated)
+	}
+
+	got, err := repo.GetTemplate(ctx, tenantID, tmpl.ID)
+	if err != nil {
+		t.Fatalf("get template: %v", err)
+	}
+	if got.Version != 2 || got.Name != "deploy-v2" || got.Scope != domain.ScopeTeam {
+		t.Fatalf("re-read template does not reflect the update: %+v", got)
+	}
+	if !jsonEqual(t, got.DAGJSON, tmpl.DAGJSON) {
+		t.Fatalf("re-read dag_json = %q, want structurally equal to %q", got.DAGJSON, tmpl.DAGJSON)
+	}
+}
+
+func TestRepository_Update_StaleVersion_ReturnsConflict(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "77777777-7777-7777-7777-777777777777"
+
+	tmpl, err := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000004", tenantID, "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
+	if err != nil {
+		t.Fatalf("building template: %v", err)
+	}
+	if err := repo.CreateTemplate(ctx, tmpl); err != nil {
+		t.Fatalf("create template: %v", err)
+	}
+
+	attempt := tmpl
+	attempt.Name = "should-not-apply"
+
+	_, err = repo.Update(ctx, attempt, 99)
+	if !errors.Is(err, domain.ErrTemplateVersionConflict) {
+		t.Fatalf("want domain.ErrTemplateVersionConflict, got %v", err)
+	}
+
+	got, err := repo.GetTemplate(ctx, tenantID, tmpl.ID)
+	if err != nil {
+		t.Fatalf("get template: %v", err)
+	}
+	if got.Version != 1 || got.Name != "deploy" {
+		t.Fatalf("row must be unchanged after a conflicting update, got %+v", got)
 	}
 }
 

@@ -108,6 +108,7 @@ func run() error {
 	cancelExecutionUC := usecase.NewCancelExecution(repo)
 	listTemplatesUC := usecase.NewListTemplates(repo)
 	resolveTemplateUC := usecase.NewResolveTemplate(repo)
+	updateTemplateUC := usecase.NewUpdateTemplate(repo)
 	recoverExecutionsUC := usecase.NewRecoverExecutions(repo, repo, repo, registry)
 
 	// Boot-time recovery scan (workflow-service.md §8: "before accepting
@@ -125,7 +126,7 @@ func run() error {
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowgrpc.New(
 		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
-		cancelExecutionUC, listTemplatesUC, resolveTemplateUC,
+		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

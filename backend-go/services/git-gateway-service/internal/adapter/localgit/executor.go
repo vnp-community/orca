@@ -125,6 +125,88 @@ func (e *Executor) Pull(ctx context.Context, repoPath string) (domain.PullResult
 	return domain.PullResult{Success: true}, nil
 }
 
+// CreateWorktree runs `git worktree add <path> -b <branch> <baseRef>` — a
+// new worktree directory is created as a sibling of repoPath, named after
+// the branch (mirrors the old TS backend's convention: worktree path =
+// repo root's parent dir / branch name, sanitized). This uses
+// repoPath + "-" + branch as the target path; adjust to match
+// project-service.md's actual path-template convention if it specifies
+// one more precisely — flagged as a best-effort default, not verified
+// against a real path-template spec.
+func (e *Executor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error) {
+	targetPath := repoPath + "-" + sanitizeBranchForPath(branch)
+	if _, err := e.run(ctx, repoPath, "worktree", "add", targetPath, "-b", branch, baseRef); err != nil {
+		return domain.WorktreeCreateResult{}, err
+	}
+	sha, err := e.run(ctx, targetPath, "rev-parse", "HEAD")
+	if err != nil {
+		return domain.WorktreeCreateResult{}, err
+	}
+	return domain.WorktreeCreateResult{Path: targetPath, HeadSHA: strings.TrimSpace(sha)}, nil
+}
+
+// RemoveWorktree runs `git worktree remove [--force] <worktreePath>`. Run
+// from the MAIN repo's directory is not required — git worktree remove
+// accepts an absolute path to the worktree itself.
+func (e *Executor) RemoveWorktree(ctx context.Context, worktreePath string, force bool) error {
+	args := []string{"worktree", "remove"}
+	if force {
+		args = append(args, "--force")
+	}
+	args = append(args, worktreePath)
+	_, err := e.run(ctx, worktreePath, args...)
+	return err
+}
+
+// FetchAndResolveRef runs `git fetch origin <ref>` then resolves its local
+// SHA via `git rev-parse FETCH_HEAD`.
+func (e *Executor) FetchAndResolveRef(ctx context.Context, repoPath, ref string) (string, error) {
+	if _, err := e.run(ctx, repoPath, "fetch", "origin", ref); err != nil {
+		return "", err
+	}
+	sha, err := e.run(ctx, repoPath, "rev-parse", "FETCH_HEAD")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(sha), nil
+}
+
+// ListWorktreePaths runs `git worktree list --porcelain` and extracts
+// every `worktree <path>` line — the raw on-disk truth DetectWorktrees
+// needs, with no bookkeeping join.
+func (e *Executor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+	out, err := e.run(ctx, repoPath, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, line := range strings.Split(out, "\n") {
+		if p, ok := strings.CutPrefix(line, "worktree "); ok {
+			paths = append(paths, p)
+		}
+	}
+	return paths, nil
+}
+
+// ForceDeleteBranch runs `git branch -D <branch>` — force delete, no
+// merge-check (the caller has already decided this branch's worktree is
+// being torn down). Available since Git 2.5, same baseline as this
+// package's other commands. Required on GitExecutor (TASK-194): the
+// structural fix for the old TS backend's optional
+// forceDeletePreservedBranch? crash-bug class (BUG-031) — every
+// GitExecutor implementation, including this one, must have this method
+// before the package even builds.
+func (e *Executor) ForceDeleteBranch(ctx context.Context, repoPath, branch string) error {
+	_, err := e.run(ctx, repoPath, "branch", "-D", branch)
+	return err
+}
+
+// sanitizeBranchForPath replaces path-hostile characters ('/' from e.g.
+// "feature/foo") so the worktree's directory name is filesystem-safe.
+func sanitizeBranchForPath(branch string) string {
+	return strings.ReplaceAll(branch, "/", "-")
+}
+
 // parsePorcelainStatus parses `git status --porcelain=v1 -b` output. The
 // first line is "## <branch>[...tracking info]"; subsequent lines are two
 // status-code characters (index, worktree), a space, and the path.

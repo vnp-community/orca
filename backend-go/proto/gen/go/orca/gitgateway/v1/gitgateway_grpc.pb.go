@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -25,6 +26,13 @@ const (
 	GitGatewayService_Push_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/Push"
 	GitGatewayService_Pull_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/Pull"
 	GitGatewayService_GenerateCommitMessage_FullMethodName = "/orca.gitgateway.v1.GitGatewayService/GenerateCommitMessage"
+	GitGatewayService_CreateWorktree_FullMethodName        = "/orca.gitgateway.v1.GitGatewayService/CreateWorktree"
+	GitGatewayService_RemoveWorktree_FullMethodName        = "/orca.gitgateway.v1.GitGatewayService/RemoveWorktree"
+	GitGatewayService_ForceDeleteBranch_FullMethodName     = "/orca.gitgateway.v1.GitGatewayService/ForceDeleteBranch"
+	GitGatewayService_DetectWorktrees_FullMethodName       = "/orca.gitgateway.v1.GitGatewayService/DetectWorktrees"
+	GitGatewayService_PrefetchCreateBase_FullMethodName    = "/orca.gitgateway.v1.GitGatewayService/PrefetchCreateBase"
+	GitGatewayService_ResolvePrBase_FullMethodName         = "/orca.gitgateway.v1.GitGatewayService/ResolvePrBase"
+	GitGatewayService_ResolveMrBase_FullMethodName         = "/orca.gitgateway.v1.GitGatewayService/ResolveMrBase"
 )
 
 // GitGatewayServiceClient is the client API for GitGatewayService service.
@@ -34,6 +42,12 @@ const (
 // GitGatewayService is a stateless dispatcher: resolve the worktree's owning
 // host via infra-fleet-service, execute locally or relay. Owns no data.
 // See specs/backend-go/services/git-gateway-service.md.
+//
+// NOTE (SOL-031 / TASK-192): this file is being edited concurrently by
+// another work group adding git.*/files.* RPCs — the worktree.* RPCs below
+// were added against the pre-existing (GetStatus..GenerateCommitMessage)
+// service surface only, and will need a manual merge against that group's
+// changes to this same file.
 type GitGatewayServiceClient interface {
 	GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
 	GetDiff(ctx context.Context, in *GetDiffRequest, opts ...grpc.CallOption) (*GetDiffResponse, error)
@@ -41,6 +55,22 @@ type GitGatewayServiceClient interface {
 	Push(ctx context.Context, in *PushRequest, opts ...grpc.CallOption) (*PushResponse, error)
 	Pull(ctx context.Context, in *PullRequest, opts ...grpc.CallOption) (*PullResponse, error)
 	GenerateCommitMessage(ctx context.Context, in *GenerateCommitMessageRequest, opts ...grpc.CallOption) (*GenerateCommitMessageResponse, error)
+	CreateWorktree(ctx context.Context, in *CreateWorktreeRequest, opts ...grpc.CallOption) (*CreateWorktreeResponse, error)
+	RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Required on every GitExecutor implementation from day one — TASK-194
+	// makes it a required interface method, not an optional one, closing the
+	// old TS backend's crash-bug class (forceDeletePreservedBranch? was
+	// optional and only one provider implemented it).
+	ForceDeleteBranch(ctx context.Context, in *ForceDeleteBranchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// DetectWorktrees is the concrete form of project-service.md §4's
+	// "git-gateway-service reconciles on demand" — returns raw on-disk
+	// paths, no bookkeeping join (that diff happens at api-gateway's edge
+	// layer, TASK-195, per 05-data-architecture.md's cross-service
+	// aggregation rule).
+	DetectWorktrees(ctx context.Context, in *DetectWorktreesRequest, opts ...grpc.CallOption) (*DetectWorktreesResponse, error)
+	PrefetchCreateBase(ctx context.Context, in *PrefetchCreateBaseRequest, opts ...grpc.CallOption) (*PrefetchCreateBaseResponse, error)
+	ResolvePrBase(ctx context.Context, in *ResolvePrBaseRequest, opts ...grpc.CallOption) (*ResolveBaseResponse, error)
+	ResolveMrBase(ctx context.Context, in *ResolveMrBaseRequest, opts ...grpc.CallOption) (*ResolveBaseResponse, error)
 }
 
 type gitGatewayServiceClient struct {
@@ -111,6 +141,76 @@ func (c *gitGatewayServiceClient) GenerateCommitMessage(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) CreateWorktree(ctx context.Context, in *CreateWorktreeRequest, opts ...grpc.CallOption) (*CreateWorktreeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateWorktreeResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CreateWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, GitGatewayService_RemoveWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ForceDeleteBranch(ctx context.Context, in *ForceDeleteBranchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, GitGatewayService_ForceDeleteBranch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) DetectWorktrees(ctx context.Context, in *DetectWorktreesRequest, opts ...grpc.CallOption) (*DetectWorktreesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DetectWorktreesResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_DetectWorktrees_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) PrefetchCreateBase(ctx context.Context, in *PrefetchCreateBaseRequest, opts ...grpc.CallOption) (*PrefetchCreateBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PrefetchCreateBaseResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_PrefetchCreateBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ResolvePrBase(ctx context.Context, in *ResolvePrBaseRequest, opts ...grpc.CallOption) (*ResolveBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveBaseResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ResolvePrBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ResolveMrBase(ctx context.Context, in *ResolveMrBaseRequest, opts ...grpc.CallOption) (*ResolveBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveBaseResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ResolveMrBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GitGatewayServiceServer is the server API for GitGatewayService service.
 // All implementations must embed UnimplementedGitGatewayServiceServer
 // for forward compatibility.
@@ -118,6 +218,12 @@ func (c *gitGatewayServiceClient) GenerateCommitMessage(ctx context.Context, in 
 // GitGatewayService is a stateless dispatcher: resolve the worktree's owning
 // host via infra-fleet-service, execute locally or relay. Owns no data.
 // See specs/backend-go/services/git-gateway-service.md.
+//
+// NOTE (SOL-031 / TASK-192): this file is being edited concurrently by
+// another work group adding git.*/files.* RPCs — the worktree.* RPCs below
+// were added against the pre-existing (GetStatus..GenerateCommitMessage)
+// service surface only, and will need a manual merge against that group's
+// changes to this same file.
 type GitGatewayServiceServer interface {
 	GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error)
 	GetDiff(context.Context, *GetDiffRequest) (*GetDiffResponse, error)
@@ -125,6 +231,22 @@ type GitGatewayServiceServer interface {
 	Push(context.Context, *PushRequest) (*PushResponse, error)
 	Pull(context.Context, *PullRequest) (*PullResponse, error)
 	GenerateCommitMessage(context.Context, *GenerateCommitMessageRequest) (*GenerateCommitMessageResponse, error)
+	CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error)
+	RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*emptypb.Empty, error)
+	// Required on every GitExecutor implementation from day one — TASK-194
+	// makes it a required interface method, not an optional one, closing the
+	// old TS backend's crash-bug class (forceDeletePreservedBranch? was
+	// optional and only one provider implemented it).
+	ForceDeleteBranch(context.Context, *ForceDeleteBranchRequest) (*emptypb.Empty, error)
+	// DetectWorktrees is the concrete form of project-service.md §4's
+	// "git-gateway-service reconciles on demand" — returns raw on-disk
+	// paths, no bookkeeping join (that diff happens at api-gateway's edge
+	// layer, TASK-195, per 05-data-architecture.md's cross-service
+	// aggregation rule).
+	DetectWorktrees(context.Context, *DetectWorktreesRequest) (*DetectWorktreesResponse, error)
+	PrefetchCreateBase(context.Context, *PrefetchCreateBaseRequest) (*PrefetchCreateBaseResponse, error)
+	ResolvePrBase(context.Context, *ResolvePrBaseRequest) (*ResolveBaseResponse, error)
+	ResolveMrBase(context.Context, *ResolveMrBaseRequest) (*ResolveBaseResponse, error)
 	mustEmbedUnimplementedGitGatewayServiceServer()
 }
 
@@ -152,6 +274,27 @@ func (UnimplementedGitGatewayServiceServer) Pull(context.Context, *PullRequest) 
 }
 func (UnimplementedGitGatewayServiceServer) GenerateCommitMessage(context.Context, *GenerateCommitMessageRequest) (*GenerateCommitMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateCommitMessage not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateWorktree not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveWorktree not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ForceDeleteBranch(context.Context, *ForceDeleteBranchRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ForceDeleteBranch not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) DetectWorktrees(context.Context, *DetectWorktreesRequest) (*DetectWorktreesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DetectWorktrees not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) PrefetchCreateBase(context.Context, *PrefetchCreateBaseRequest) (*PrefetchCreateBaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PrefetchCreateBase not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ResolvePrBase(context.Context, *ResolvePrBaseRequest) (*ResolveBaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolvePrBase not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ResolveMrBase(context.Context, *ResolveMrBaseRequest) (*ResolveBaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveMrBase not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) mustEmbedUnimplementedGitGatewayServiceServer() {}
 func (UnimplementedGitGatewayServiceServer) testEmbeddedByValue()                           {}
@@ -282,6 +425,132 @@ func _GitGatewayService_GenerateCommitMessage_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_CreateWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CreateWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CreateWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CreateWorktree(ctx, req.(*CreateWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_RemoveWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).RemoveWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_RemoveWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).RemoveWorktree(ctx, req.(*RemoveWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ForceDeleteBranch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForceDeleteBranchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ForceDeleteBranch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ForceDeleteBranch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ForceDeleteBranch(ctx, req.(*ForceDeleteBranchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_DetectWorktrees_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DetectWorktreesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).DetectWorktrees(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_DetectWorktrees_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).DetectWorktrees(ctx, req.(*DetectWorktreesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_PrefetchCreateBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PrefetchCreateBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).PrefetchCreateBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_PrefetchCreateBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).PrefetchCreateBase(ctx, req.(*PrefetchCreateBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ResolvePrBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolvePrBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ResolvePrBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ResolvePrBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ResolvePrBase(ctx, req.(*ResolvePrBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ResolveMrBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveMrBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ResolveMrBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ResolveMrBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ResolveMrBase(ctx, req.(*ResolveMrBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GitGatewayService_ServiceDesc is the grpc.ServiceDesc for GitGatewayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -312,6 +581,34 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateCommitMessage",
 			Handler:    _GitGatewayService_GenerateCommitMessage_Handler,
+		},
+		{
+			MethodName: "CreateWorktree",
+			Handler:    _GitGatewayService_CreateWorktree_Handler,
+		},
+		{
+			MethodName: "RemoveWorktree",
+			Handler:    _GitGatewayService_RemoveWorktree_Handler,
+		},
+		{
+			MethodName: "ForceDeleteBranch",
+			Handler:    _GitGatewayService_ForceDeleteBranch_Handler,
+		},
+		{
+			MethodName: "DetectWorktrees",
+			Handler:    _GitGatewayService_DetectWorktrees_Handler,
+		},
+		{
+			MethodName: "PrefetchCreateBase",
+			Handler:    _GitGatewayService_PrefetchCreateBase_Handler,
+		},
+		{
+			MethodName: "ResolvePrBase",
+			Handler:    _GitGatewayService_ResolvePrBase_Handler,
+		},
+		{
+			MethodName: "ResolveMrBase",
+			Handler:    _GitGatewayService_ResolveMrBase_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

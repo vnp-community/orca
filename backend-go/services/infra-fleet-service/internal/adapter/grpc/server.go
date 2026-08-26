@@ -9,7 +9,12 @@ import (
 	"context"
 	"encoding/json"
 
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/grpcmw"
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
@@ -28,6 +33,18 @@ type Server struct {
 	listDevServers     *usecase.ListDevServers
 	createConnection   *usecase.CreateConnection
 	relay              *usecase.Relay
+
+	// --- Terminal/PTY (TASK-185) ---
+	spawnTerminalSession   *usecase.SpawnTerminalSession
+	resizeTerminalSession  *usecase.ResizeTerminalSession
+	killTerminalSession    *usecase.KillTerminalSession
+	stopTerminalProcess    *usecase.StopTerminalProcess
+	listTerminalSessions   *usecase.ListTerminalSessions
+	waitTerminalSession    *usecase.WaitTerminalSession
+	focusTerminalSession   *usecase.FocusTerminalSession
+	getTerminalAgentStatus *usecase.GetTerminalAgentStatus
+	inspectTerminalProcess *usecase.InspectTerminalProcess
+	attachPty              *usecase.AttachPty
 }
 
 func New(
@@ -39,16 +56,36 @@ func New(
 	listDevServers *usecase.ListDevServers,
 	createConnection *usecase.CreateConnection,
 	relay *usecase.Relay,
+	spawnTerminalSession *usecase.SpawnTerminalSession,
+	resizeTerminalSession *usecase.ResizeTerminalSession,
+	killTerminalSession *usecase.KillTerminalSession,
+	stopTerminalProcess *usecase.StopTerminalProcess,
+	listTerminalSessions *usecase.ListTerminalSessions,
+	waitTerminalSession *usecase.WaitTerminalSession,
+	focusTerminalSession *usecase.FocusTerminalSession,
+	getTerminalAgentStatus *usecase.GetTerminalAgentStatus,
+	inspectTerminalProcess *usecase.InspectTerminalProcess,
+	attachPty *usecase.AttachPty,
 ) *Server {
 	return &Server{
-		registerDevServer:  registerDevServer,
-		resolveConnection:  resolveConnection,
-		createSshTarget:    createSshTarget,
-		getFleetHealth:     getFleetHealth,
-		scanWorkspacePorts: scanWorkspacePorts,
-		listDevServers:     listDevServers,
-		createConnection:   createConnection,
-		relay:              relay,
+		registerDevServer:      registerDevServer,
+		resolveConnection:      resolveConnection,
+		createSshTarget:        createSshTarget,
+		getFleetHealth:         getFleetHealth,
+		scanWorkspacePorts:     scanWorkspacePorts,
+		listDevServers:         listDevServers,
+		createConnection:       createConnection,
+		relay:                  relay,
+		spawnTerminalSession:   spawnTerminalSession,
+		resizeTerminalSession:  resizeTerminalSession,
+		killTerminalSession:    killTerminalSession,
+		stopTerminalProcess:    stopTerminalProcess,
+		listTerminalSessions:   listTerminalSessions,
+		waitTerminalSession:    waitTerminalSession,
+		focusTerminalSession:   focusTerminalSession,
+		getTerminalAgentStatus: getTerminalAgentStatus,
+		inspectTerminalProcess: inspectTerminalProcess,
+		attachPty:              attachPty,
 	}
 }
 
@@ -203,6 +240,213 @@ func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 		Host:        ds.Host,
 		Mode:        toProtoConnectionMode(ds.Mode),
 		SshTargetId: ds.SSHTargetID,
+	}
+}
+
+// --- Terminal/PTY (TASK-185) ---
+
+func (s *Server) SpawnTerminalSession(ctx context.Context, req *infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
+	session, err := s.spawnTerminalSession.Execute(ctx, usecase.SpawnTerminalSessionInput{
+		ConnectionID: req.GetConnectionId(),
+		Cwd:          req.GetCwd(),
+		Shell:        req.GetShell(),
+		Cols:         req.GetCols(),
+		Rows:         req.GetRows(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.SpawnTerminalSessionResponse{Session: toProtoTerminalSession(session)}, nil
+}
+
+func (s *Server) ResizeTerminalSession(ctx context.Context, req *infrafleetv1.ResizeTerminalSessionRequest) (*emptypb.Empty, error) {
+	if err := s.resizeTerminalSession.Execute(ctx, usecase.ResizeTerminalSessionInput{PtyID: req.GetPtyId(), Cols: req.GetCols(), Rows: req.GetRows()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) KillTerminalSession(ctx context.Context, req *infrafleetv1.KillTerminalSessionRequest) (*emptypb.Empty, error) {
+	if err := s.killTerminalSession.Execute(ctx, req.GetPtyId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) StopTerminalProcess(ctx context.Context, req *infrafleetv1.StopTerminalProcessRequest) (*emptypb.Empty, error) {
+	if err := s.stopTerminalProcess.Execute(ctx, req.GetPtyId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ListTerminalSessions(ctx context.Context, req *infrafleetv1.ListTerminalSessionsRequest) (*infrafleetv1.ListTerminalSessionsResponse, error) {
+	sessions, err := s.listTerminalSessions.Execute(ctx, usecase.ListTerminalSessionsInput{ConnectionID: req.GetConnectionId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.TerminalSession, 0, len(sessions))
+	for _, session := range sessions {
+		out = append(out, toProtoTerminalSession(session))
+	}
+	return &infrafleetv1.ListTerminalSessionsResponse{Sessions: out}, nil
+}
+
+func (s *Server) WaitTerminalSession(ctx context.Context, req *infrafleetv1.WaitTerminalSessionRequest) (*infrafleetv1.WaitTerminalSessionResponse, error) {
+	result, err := s.waitTerminalSession.Execute(ctx, usecase.WaitTerminalSessionInput{PtyID: req.GetPtyId(), TimeoutMs: req.GetTimeoutMs()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.WaitTerminalSessionResponse{Exited: result.Exited, ExitCode: result.ExitCode, TimedOut: result.TimedOut}, nil
+}
+
+func (s *Server) FocusTerminalSession(ctx context.Context, req *infrafleetv1.FocusTerminalSessionRequest) (*emptypb.Empty, error) {
+	if err := s.focusTerminalSession.Execute(ctx, req.GetPtyId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetTerminalAgentStatus(ctx context.Context, req *infrafleetv1.GetTerminalAgentStatusRequest) (*infrafleetv1.GetTerminalAgentStatusResponse, error) {
+	result, err := s.getTerminalAgentStatus.Execute(ctx, req.GetPtyId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.GetTerminalAgentStatusResponse{
+		AgentRunning:  result.AgentRunning,
+		AgentKind:     result.AgentKind,
+		ReadyForInput: result.ReadyForInput,
+	}, nil
+}
+
+func (s *Server) InspectTerminalProcess(ctx context.Context, req *infrafleetv1.InspectTerminalProcessRequest) (*infrafleetv1.InspectTerminalProcessResponse, error) {
+	result, err := s.inspectTerminalProcess.Execute(ctx, req.GetPtyId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.InspectTerminalProcessResponse{
+		Known:   result.Known,
+		Pid:     result.Pid,
+		Command: result.Command,
+		Cwd:     result.Cwd,
+	}, nil
+}
+
+// AttachPty implements the bidirectional streaming RPC: pumps
+// stream.Recv() into an inbound channel usecase.AttachPty.Execute consumes,
+// and pumps its two returned channels (outbound, errCh) back into
+// stream.Send()/the final returned error.
+//
+// Tenant extraction: grpcmw.ChainUnary only wires a UnaryServerInterceptor
+// chain (see that function's doc comment) — there is no stream-interceptor
+// counterpart registered in cmd/server/main.go, so a streaming RPC's ctx
+// does NOT get tenant.WithTenantID applied automatically the way every
+// unary handler's does. This handler works around that gap locally (mirrors
+// grpcmw.TenantExtractionInterceptor's own metadata-read exactly) rather
+// than editing the shared common/grpcmw package, which would widen this
+// pass's blast radius beyond this one streaming RPC. FLAGGED as a known gap:
+// a real stream interceptor in common/grpcmw would be the more correct fix
+// if more streaming RPCs are added later.
+func (s *Server) AttachPty(stream infrafleetv1.InfraFleetService_AttachPtyServer) error {
+	ctx := withTenantFromStreamMetadata(stream.Context())
+
+	inbound := make(chan usecase.PtyClientMessage)
+	go pumpAttachPtyInbound(stream, inbound)
+
+	outbound, errCh := s.attachPty.Execute(ctx, inbound)
+	for {
+		select {
+		case msg, ok := <-outbound:
+			if !ok {
+				outbound = nil
+				continue
+			}
+			if err := stream.Send(toProtoPtyServerFrame(msg)); err != nil {
+				return err
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				return nil
+			}
+			if err != nil {
+				return apperrors.ToGRPCStatus(err)
+			}
+			return nil
+		}
+		if outbound == nil {
+			// outbound closed — drain errCh for the final (possibly nil) error.
+			if err := <-errCh; err != nil {
+				return apperrors.ToGRPCStatus(err)
+			}
+			return nil
+		}
+	}
+}
+
+// pumpAttachPtyInbound reads stream.Recv() until it errors/EOFs, translating
+// each PtyClientFrame into usecase.PtyClientMessage and pushing it onto
+// inbound; closes inbound when the client stream ends so
+// usecase.AttachPty.run's read loop observes !ok and returns.
+func pumpAttachPtyInbound(stream infrafleetv1.InfraFleetService_AttachPtyServer, inbound chan<- usecase.PtyClientMessage) {
+	defer close(inbound)
+	for {
+		frame, err := stream.Recv()
+		if err != nil {
+			return // io.EOF (client closed send side) or a real transport error — either way, stop
+		}
+		msg, ok := toUsecasePtyClientMessage(frame)
+		if !ok {
+			continue // frame carried no oneof variant — ignore rather than error the whole stream
+		}
+		select {
+		case inbound <- msg:
+		case <-stream.Context().Done():
+			return
+		}
+	}
+}
+
+func withTenantFromStreamMetadata(ctx context.Context) context.Context {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ctx
+	}
+	if v := md.Get(grpcmw.MetadataTenantID); len(v) > 0 && v[0] != "" {
+		ctx = tenant.WithTenantID(ctx, v[0])
+	}
+	if v := md.Get(grpcmw.MetadataUserID); len(v) > 0 && v[0] != "" {
+		ctx = tenant.WithUserID(ctx, v[0])
+	}
+	return ctx
+}
+
+func toUsecasePtyClientMessage(frame *infrafleetv1.PtyClientFrame) (usecase.PtyClientMessage, bool) {
+	switch f := frame.GetFrame().(type) {
+	case *infrafleetv1.PtyClientFrame_Attach:
+		return usecase.PtyClientMessage{Attach: &usecase.PtyAttachMessage{PtyID: f.Attach.GetPtyId()}}, true
+	case *infrafleetv1.PtyClientFrame_Input:
+		return usecase.PtyClientMessage{Input: f.Input.GetData()}, true
+	case *infrafleetv1.PtyClientFrame_Resize:
+		return usecase.PtyClientMessage{Resize: &usecase.PtyResizeMessage{Cols: f.Resize.GetCols(), Rows: f.Resize.GetRows()}}, true
+	default:
+		return usecase.PtyClientMessage{}, false
+	}
+}
+
+func toProtoPtyServerFrame(msg usecase.PtyServerMessage) *infrafleetv1.PtyServerFrame {
+	if msg.Exited {
+		return &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Exited{Exited: &infrafleetv1.PtyExited{ExitCode: msg.ExitCode}}}
+	}
+	return &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Out{Out: &infrafleetv1.PtyOutput{Data: msg.Output}}}
+}
+
+func toProtoTerminalSession(session domain.TerminalSession) *infrafleetv1.TerminalSession {
+	return &infrafleetv1.TerminalSession{
+		PtyId:              session.PtyID,
+		ConnectionId:       session.ConnectionID,
+		Cwd:                session.Cwd,
+		CreatedAtUnixMs:    session.CreatedAt.UnixMilli(),
+		LastActiveAtUnixMs: session.LastActiveAt.UnixMilli(),
 	}
 }
 

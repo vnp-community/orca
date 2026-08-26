@@ -1,0 +1,205 @@
+// methods.go holds the typed pty.* JSON-RPC wrappers TASK-181 adds to
+// DevServerAgentClient (SpawnPty/WritePty/ResizePty/KillPty/AgentStatus/
+// InspectProcess — StreamPty lives in client.go alongside session
+// management, see that file). Every method name/param shape below EXCEPT
+// AgentStatus/InspectProcess is grounded in the real agent source
+// (agent/src/relay/agent-rpc-dispatch.ts's pty.* case block and
+// pty-daemon-client.ts's exported handlers) — see each doc comment for the
+// exact citation. AgentStatus/InspectProcess are FLAGGED best-effort: see
+// their own doc comments below.
+package devserveragent
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
+)
+
+// SpawnPty calls pty.create. Params/result shape confirmed via
+// agent-rpc-dispatch.ts's doc comment on the 'pty.create' case:
+// `Params: { cwd, cols?, rows?, env?, shellOverride? }` /
+// `Returns: { id, cols, rows, cwd, shell }`. env is not threaded through
+// SpawnPtyInput (no caller populates it yet — usecase.SpawnPtyInput has no
+// Env field); shellOverride is SpawnPtyInput.Shell renamed to match the
+// agent's actual param name.
+func (c *Client) SpawnPty(ctx context.Context, devServer domain.DevServer, in usecase.SpawnPtyInput) (usecase.SpawnPtyResult, error) {
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return usecase.SpawnPtyResult{}, err
+	}
+
+	params := map[string]any{"cwd": in.Cwd}
+	if in.Shell != "" {
+		params["shellOverride"] = in.Shell
+	}
+	if in.Cols > 0 {
+		params["cols"] = in.Cols
+	}
+	if in.Rows > 0 {
+		params["rows"] = in.Rows
+	}
+
+	raw, err := sess.call(ctx, "pty.create", params)
+	if err != nil {
+		return usecase.SpawnPtyResult{}, err
+	}
+	var out struct {
+		ID    string `json:"id"`
+		Cols  int32  `json:"cols"`
+		Rows  int32  `json:"rows"`
+		Cwd   string `json:"cwd"`
+		Shell string `json:"shell"`
+	}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return usecase.SpawnPtyResult{}, fmt.Errorf("devserveragent: decoding pty.create result: %w", err)
+		}
+	}
+	return usecase.SpawnPtyResult{PtyID: out.ID, Cols: out.Cols, Rows: out.Rows, Cwd: out.Cwd, Shell: out.Shell}, nil
+}
+
+// WritePty calls pty.write. Params confirmed via agent-rpc-dispatch.ts's
+// doc comment on the 'pty.write' case: `Params: { id, data }`.
+func (c *Client) WritePty(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error {
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return err
+	}
+	_, err = sess.call(ctx, "pty.write", map[string]any{"id": ptyID, "data": string(data)})
+	return err
+}
+
+// ResizePty calls pty.resize. Params confirmed via agent-rpc-dispatch.ts's
+// doc comment on the 'pty.resize' case: `Params: { id, cols, rows }`.
+func (c *Client) ResizePty(ctx context.Context, devServer domain.DevServer, ptyID string, cols, rows int32) error {
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return err
+	}
+	_, err = sess.call(ctx, "pty.resize", map[string]any{"id": ptyID, "cols": cols, "rows": rows})
+	return err
+}
+
+// KillPty calls pty.destroy. Params confirmed via agent-rpc-dispatch.ts's
+// doc comment on the 'pty.destroy' case: `Params: { id, graceful? }`.
+func (c *Client) KillPty(ctx context.Context, devServer domain.DevServer, ptyID string, graceful bool) error {
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return err
+	}
+	_, err = sess.call(ctx, "pty.destroy", map[string]any{"id": ptyID, "graceful": graceful})
+	return err
+}
+
+// ptyProcessSummary mirrors pty-handler.ts's PtyProcessSummary — confirmed
+// via that file's private listProcesses() method, which builds exactly
+// {id, cwd, title, terminalHandle?} per live pty. terminalHandle is omitted
+// here: neither AgentStatus nor InspectProcess needs it.
+type ptyProcessSummary struct {
+	ID    string `json:"id"`
+	Cwd   string `json:"cwd"`
+	Title string `json:"title"`
+}
+
+// findPtyProcess calls pty.listProcesses (confirmed real, see
+// agent-rpc-dispatch.ts's 'pty.listProcesses' case and
+// pty-daemon-client.ts's handlePtyListProcesses) and returns the entry
+// matching ptyID — the shared lookup AgentStatus/InspectProcess both build
+// on, since neither has a dedicated per-pty-id RPC confirmed in the real
+// catalog (see both methods' FLAGGED doc comments).
+func (c *Client) findPtyProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (ptyProcessSummary, bool, error) {
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return ptyProcessSummary{}, false, err
+	}
+	raw, err := sess.call(ctx, "pty.listProcesses", map[string]any{})
+	if err != nil {
+		return ptyProcessSummary{}, false, err
+	}
+	var list []ptyProcessSummary
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &list); err != nil {
+			return ptyProcessSummary{}, false, fmt.Errorf("devserveragent: decoding pty.listProcesses result: %w", err)
+		}
+	}
+	for _, p := range list {
+		if p.ID == ptyID {
+			return p, true, nil
+		}
+	}
+	return ptyProcessSummary{}, false, nil
+}
+
+// knownAgentTitles maps a foreground-process title substring to the
+// AgentKind it implies — best-effort heuristic, see AgentStatus's FLAGGED
+// doc comment.
+var knownAgentTitles = []struct {
+	substr string
+	kind   string
+}{
+	{substr: "claude", kind: "claude"},
+	{substr: "codex", kind: "codex"},
+}
+
+// AgentStatus answers "is an agentic CLI running in this pane, and is it
+// ready for input" (GetTerminalAgentStatusResponse).
+//
+// FLAGGED (TASK-183): grepping agent/src/relay for an agent-status/
+// isRunningAgent pty.* RPC found nothing — there is no dedicated primitive
+// in the confirmed catalog. This is a best-effort heuristic built on
+// pty.listProcesses (see findPtyProcess): AgentRunning/AgentKind come from
+// matching the foreground process title against knownAgentTitles;
+// ReadyForInput is simply set equal to AgentRunning, since listProcesses's
+// {id,cwd,title} shape carries no busy/idle signal to distinguish "actively
+// streaming a response" from "idle at a prompt". Treat this whole method as
+// unconfirmed against a real agent build — a real implementation likely
+// needs a new agent-side RPC this pass did not add (agent/ changes were out
+// of scope here).
+func (c *Client) AgentStatus(ctx context.Context, devServer domain.DevServer, ptyID string) (usecase.AgentStatusResult, error) {
+	proc, found, err := c.findPtyProcess(ctx, devServer, ptyID)
+	if err != nil {
+		return usecase.AgentStatusResult{}, err
+	}
+	if !found {
+		return usecase.AgentStatusResult{}, nil
+	}
+	kind := agentKindFromTitle(proc.Title)
+	running := kind != ""
+	return usecase.AgentStatusResult{AgentRunning: running, AgentKind: kind, ReadyForInput: running}, nil
+}
+
+func agentKindFromTitle(title string) string {
+	lower := strings.ToLower(title)
+	for _, k := range knownAgentTitles {
+		if strings.Contains(lower, k.substr) {
+			return k.kind
+		}
+	}
+	return ""
+}
+
+// InspectProcess answers InspectTerminalProcessRequest — Known=true when
+// pty.listProcesses reports an entry for ptyID (Command=its title,
+// Cwd=its cwd), Known=false otherwise (a real "unknown", per
+// InspectTerminalProcessResponse's own doc comment, not a fabricated zero
+// value).
+//
+// Pid is always 0 — FLAGGED: pty-handler.ts's listProcesses() result shape
+// ({id,cwd,title}) has no pid field; a real pid lives in the separate
+// pty.serialize RPC, which needs an explicit id list and returns a
+// different shape ({id,pid,cols,rows,cwd,...}) — wiring that in is a known
+// gap left for a follow-up, not implemented by this pass.
+func (c *Client) InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (usecase.InspectProcessResult, error) {
+	proc, found, err := c.findPtyProcess(ctx, devServer, ptyID)
+	if err != nil {
+		return usecase.InspectProcessResult{}, err
+	}
+	if !found {
+		return usecase.InspectProcessResult{Known: false}, nil
+	}
+	return usecase.InspectProcessResult{Known: true, Command: proc.Title, Cwd: proc.Cwd}, nil
+}

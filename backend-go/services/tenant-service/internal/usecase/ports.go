@@ -50,7 +50,15 @@ type UserProfileRepository interface {
 type TeamRepository interface {
 	Create(ctx context.Context, team domain.Team) (domain.Team, error)
 	Get(ctx context.Context, companyID, id string) (domain.Team, bool, error)
+	// ListByCompany backs ListTeams — every team row scoped to companyID,
+	// same not-found-not-wrong-company posture as Get (tenant-service.md §9).
+	ListByCompany(ctx context.Context, companyID string) ([]domain.Team, error)
 	AddMember(ctx context.Context, member domain.TeamMember) error
+	// RemoveMember deletes one (team_id, user_id) row — backs
+	// RemoveTeamMember. Returns found=false (not an error) when no such row
+	// existed, so the usecase can treat "already removed" as an idempotent
+	// no-op, matching DELETE semantics elsewhere in this codebase.
+	RemoveMember(ctx context.Context, teamID, userID string) (bool, error)
 	ListMembers(ctx context.Context, teamID string) ([]domain.TeamMember, error)
 	// ListUserTeamLayers returns, for one user within one company, every
 	// team they belong to with that team's Settings and the membership's

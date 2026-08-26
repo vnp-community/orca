@@ -357,6 +357,56 @@ func (c *Client) dialRelaySSH(ctx context.Context, devServer domain.DevServer) (
 	return conn, nil
 }
 
+// StreamPty subscribes to ptyID's pty.data/pty.exit/pty.replay notifications
+// over devServer's persistent session (see session.go's subscribePty/
+// routeNotification) and translates them into usecase.PtyEvent. relay-ssh
+// mode has no persistent session (see package doc comment) so this always
+// errors for it, same as getInboundSession's absent-session case.
+//
+// The returned channel is closed once unsubscribe runs (or ctx is done,
+// whichever first) — every caller (usecase.AttachPty, usecase.WaitTerminalSession)
+// MUST call unsubscribe exactly once, typically via defer, to release the
+// session-level subscription slot.
+func (c *Client) StreamPty(ctx context.Context, devServer domain.DevServer, ptyID string) (<-chan usecase.PtyEvent, func(), error) {
+	if devServer.Mode == domain.ConnectionModeRelaySSH {
+		return nil, nil, fmt.Errorf("%w: relay-ssh mode has no pty.* JSON-RPC surface (no relay.js deployed)", ErrConnectionModeNotImplemented)
+	}
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	raw := sess.subscribePty(ptyID)
+	out := make(chan usecase.PtyEvent, 64)
+	done := make(chan struct{})
+	var closeOnce sync.Once
+
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case n, ok := <-raw:
+				if !ok {
+					return
+				}
+				out <- usecase.PtyEvent{PtyID: n.PtyID, Data: n.Data, Exited: n.Exited, ExitCode: n.ExitCode}
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	unsubscribe := func() {
+		closeOnce.Do(func() {
+			close(done)
+			sess.unsubscribePty(ptyID, raw)
+		})
+	}
+	return out, unsubscribe, nil
+}
+
 // Close tears down every open session — call on service shutdown.
 func (c *Client) Close() {
 	c.mu.Lock()

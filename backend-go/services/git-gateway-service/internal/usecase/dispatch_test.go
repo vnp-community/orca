@@ -28,19 +28,38 @@ func (f *fakeConnectionResolver) ResolveConnection(ctx context.Context, worktree
 type fakeGitExecutor struct {
 	name string // "local" or "relay", for assertion messages
 
-	calledGetStatus bool
-	calledGetDiff   bool
-	calledCommit    bool
-	calledPush      bool
-	calledPull      bool
+	calledGetStatus         bool
+	calledGetDiff           bool
+	calledCommit            bool
+	calledPush              bool
+	calledPull              bool
+	calledCreateWorktree    bool
+	calledRemoveWorktree    bool
+	calledFetchAndResolve   bool
+	calledListWorktreePaths bool
+	calledForceDeleteBranch bool
 
 	gotRepoPath string
 
-	statusErr error
-	diffErr   error
-	commitErr error
-	pushErr   error
-	pullErr   error
+	statusErr             error
+	diffErr               error
+	commitErr             error
+	pushErr               error
+	pullErr               error
+	createWorktreeErr     error
+	removeWorktreeErr     error
+	fetchAndResolveRefErr error
+	listWorktreePathsErr  error
+	forceDeleteBranchErr  error
+
+	createWorktreeResult  domain.WorktreeCreateResult
+	fetchAndResolveRefSHA string
+	listWorktreePathsOut  []string
+
+	createWorktreeCallCount int
+	removeWorktreeCallCount int
+	gotRemoveWorktreePath   string
+	gotRemoveWorktreeForce  bool
 }
 
 func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
@@ -86,6 +105,55 @@ func (f *fakeGitExecutor) Pull(ctx context.Context, repoPath string) (domain.Pul
 		return domain.PullResult{}, f.pullErr
 	}
 	return domain.PullResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error) {
+	f.calledCreateWorktree = true
+	f.createWorktreeCallCount++
+	f.gotRepoPath = repoPath
+	if f.createWorktreeErr != nil {
+		return domain.WorktreeCreateResult{}, f.createWorktreeErr
+	}
+	if f.createWorktreeResult != (domain.WorktreeCreateResult{}) {
+		return f.createWorktreeResult, nil
+	}
+	return domain.WorktreeCreateResult{Path: repoPath + "-" + branch, HeadSHA: "deadbeef"}, nil
+}
+
+func (f *fakeGitExecutor) RemoveWorktree(ctx context.Context, worktreePath string, force bool) error {
+	f.calledRemoveWorktree = true
+	f.removeWorktreeCallCount++
+	f.gotRepoPath = worktreePath
+	f.gotRemoveWorktreePath = worktreePath
+	f.gotRemoveWorktreeForce = force
+	return f.removeWorktreeErr
+}
+
+func (f *fakeGitExecutor) FetchAndResolveRef(ctx context.Context, repoPath, ref string) (string, error) {
+	f.calledFetchAndResolve = true
+	f.gotRepoPath = repoPath
+	if f.fetchAndResolveRefErr != nil {
+		return "", f.fetchAndResolveRefErr
+	}
+	if f.fetchAndResolveRefSHA != "" {
+		return f.fetchAndResolveRefSHA, nil
+	}
+	return "resolvedsha", nil
+}
+
+func (f *fakeGitExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+	f.calledListWorktreePaths = true
+	f.gotRepoPath = repoPath
+	if f.listWorktreePathsErr != nil {
+		return nil, f.listWorktreePathsErr
+	}
+	return f.listWorktreePathsOut, nil
+}
+
+func (f *fakeGitExecutor) ForceDeleteBranch(ctx context.Context, repoPath, branch string) error {
+	f.calledForceDeleteBranch = true
+	f.gotRepoPath = repoPath
+	return f.forceDeleteBranchErr
 }
 
 func TestGetStatus_NotConnected_RoutesToLocalExecutor(t *testing.T) {

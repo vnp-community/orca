@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
@@ -33,10 +34,13 @@ import (
 	gitgatewaygrpc "github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/grpcclient"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/localgit"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/scmclient"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -83,6 +87,26 @@ func run() error {
 	relay := grpcclient.NewRelayExecutor(infraFleetClient)
 	local := localgit.New()
 
+	// project-service and scm-integration-service are new outbound
+	// dependencies as of this batch (TASK-193/194, SOL-031): the worktree
+	// create/remove saga's bookkeeping calls, and ResolvePrBase/
+	// ResolveMrBase's PR/MR base-branch lookups, respectively.
+	projectConn, err := grpcclient.Dial(cfg.ProjectServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing project-service: %w", err)
+	}
+	defer func() { _ = projectConn.Close() }()
+	projectServiceClient := projectv1.NewProjectServiceClient(projectConn)
+	projectClient := grpcclient.NewProjectClient(projectServiceClient)
+
+	scmConn, err := grpcclient.Dial(cfg.SCMIntegrationServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing scm-integration-service: %w", err)
+	}
+	defer func() { _ = scmConn.Close() }()
+	scmIntegrationClient := scmintegrationv1.NewScmIntegrationServiceClient(scmConn)
+	scmClient := scmclient.New(scmIntegrationClient)
+
 	getStatusUC := usecase.NewGetStatus(resolver, local, relay)
 	getDiffUC := usecase.NewGetDiff(resolver, local, relay)
 	commitUC := usecase.NewCommit(resolver, local, relay)
@@ -90,17 +114,34 @@ func run() error {
 	pullUC := usecase.NewPull(resolver, local, relay)
 	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getDiffUC, relay)
 
+	createWorktreeUC := usecase.NewCreateWorktree(resolver, projectClient, local, relay)
+	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, local, relay)
+	forceDeleteBranchUC := usecase.NewForceDeleteBranch(resolver, local, relay)
+	detectWorktreesUC := usecase.NewDetectWorktrees(resolver, projectClient, local, relay)
+	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)
+	resolvePrBaseUC := usecase.NewResolvePrBase(scmClient, resolver, projectClient, local, relay)
+	resolveMrBaseUC := usecase.NewResolveMrBase(scmClient, resolver, projectClient, local, relay)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
 		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
+		createWorktreeUC, removeWorktreeUC, forceDeleteBranchUC, detectWorktreesUC,
+		prefetchCreateBaseUC, resolvePrBaseUC, resolveMrBaseUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// No database, so no readiness checker depends on a connection pool —
 	// per git-gateway-service.md §8, this service is horizontally scaled
 	// precisely because it holds no such state. /readyz reports healthy as
-	// soon as the process is up.
+	// soon as the process is up. infra-fleet-service/project-service/
+	// scm-integration-service ARE real outbound dependencies this service
+	// can't function without as of this batch, though, so their connection
+	// health is still worth surfacing — same grpcConnHealthCheck pattern
+	// api-gateway's main.go uses for its many outbound connections.
 	healthSrv := health.New()
+	healthSrv.Register("infra-fleet-service", grpcConnHealthCheck(infraFleetConn))
+	healthSrv.Register("project-service", grpcConnHealthCheck(projectConn))
+	healthSrv.Register("scm-integration-service", grpcConnHealthCheck(scmConn))
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
@@ -144,4 +185,18 @@ func run() error {
 	_ = httpServer.Shutdown(shutdownCtx)
 
 	return nil
+}
+
+// grpcConnHealthCheck reports readiness from the ClientConn's connectivity
+// state — not a full RPC round trip, just "is this connection not
+// currently failing", cheap enough to run on every /readyz poll. Mirrors
+// api-gateway's cmd/server/main.go helper of the same name/shape.
+func grpcConnHealthCheck(conn *grpc.ClientConn) health.Checker {
+	return func() error {
+		state := conn.GetState()
+		if state == connectivity.TransientFailure || state == connectivity.Shutdown {
+			return fmt.Errorf("connection state: %s", state)
+		}
+		return nil
+	}
 }

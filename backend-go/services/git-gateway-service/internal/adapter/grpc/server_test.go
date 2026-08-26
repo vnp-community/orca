@@ -47,6 +47,55 @@ func (fakeExecutor) Pull(context.Context, string) (domain.PullResult, error) {
 	return domain.PullResult{Success: true, HadConflicts: false}, nil
 }
 
+func (fakeExecutor) CreateWorktree(context.Context, string, string, string) (domain.WorktreeCreateResult, error) {
+	return domain.WorktreeCreateResult{Path: "/repo-branch", HeadSHA: "deadbeef"}, nil
+}
+
+func (fakeExecutor) RemoveWorktree(context.Context, string, bool) error {
+	return nil
+}
+
+func (fakeExecutor) FetchAndResolveRef(context.Context, string, string) (string, error) {
+	return "resolvedsha", nil
+}
+
+func (fakeExecutor) ListWorktreePaths(context.Context, string) ([]string, error) {
+	return []string{"/repo", "/repo-branch"}, nil
+}
+
+func (fakeExecutor) ForceDeleteBranch(context.Context, string, string) error {
+	return nil
+}
+
+// fakeProjectClient/fakeSCMClient are minimal stubs for exercising the
+// worktree usecases' wire<->usecase translation — none of this file's
+// tests exercise the saga/compensation logic itself (that's
+// internal/usecase's own test suite); these just need to satisfy the New(...)
+// constructor's signature with something that succeeds.
+type fakeProjectClient struct{}
+
+func (fakeProjectClient) GetRepo(_ context.Context, repoID string) (domain.RepoInfo, error) {
+	return domain.RepoInfo{ID: repoID}, nil
+}
+
+func (fakeProjectClient) RecordWorktreeCreated(_ context.Context, _, _, path, branch string) (domain.WorktreeRecord, error) {
+	return domain.WorktreeRecord{ID: "wt-1", Path: path, Branch: branch}, nil
+}
+
+func (fakeProjectClient) RecordWorktreeRemoved(context.Context, string) error {
+	return nil
+}
+
+type fakeSCMClient struct{}
+
+func (fakeSCMClient) GetPullRequestBase(context.Context, string, int32) (string, string, error) {
+	return "main", "basesha", nil
+}
+
+func (fakeSCMClient) GetMergeRequestBase(context.Context, string, int32) (string, string, error) {
+	return "main", "basesha", nil
+}
+
 // fakeAICompleter is a usecase.AICompleter stub for exercising
 // GenerateCommitMessage's wire<->usecase translation.
 type fakeAICompleter struct{ message string }
@@ -58,6 +107,8 @@ func (f fakeAICompleter) Complete(context.Context, string, string) (string, erro
 func newTestServer() *Server {
 	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: false, RepoPath: "/repo"}}
 	exec := fakeExecutor{}
+	projects := fakeProjectClient{}
+	scm := fakeSCMClient{}
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	return New(
 		usecase.NewGetStatus(resolver, exec, exec),
@@ -66,6 +117,13 @@ func newTestServer() *Server {
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
 		usecase.NewGenerateCommitMessage(resolver, getDiffUC, fakeAICompleter{message: "generated message"}),
+		usecase.NewCreateWorktree(resolver, projects, exec, exec),
+		usecase.NewRemoveWorktree(resolver, projects, exec, exec),
+		usecase.NewForceDeleteBranch(resolver, exec, exec),
+		usecase.NewDetectWorktrees(resolver, projects, exec, exec),
+		usecase.NewPrefetchCreateBase(resolver, projects, exec, exec),
+		usecase.NewResolvePrBase(scm, resolver, projects, exec, exec),
+		usecase.NewResolveMrBase(scm, resolver, projects, exec, exec),
 	)
 }
 
@@ -127,6 +185,8 @@ func TestServer_GenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *
 func TestServer_GenerateCommitMessage_Connected_TranslatesResult(t *testing.T) {
 	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo"}}
 	exec := fakeExecutor{}
+	projects := fakeProjectClient{}
+	scm := fakeSCMClient{}
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	s := New(
 		usecase.NewGetStatus(resolver, exec, exec),
@@ -135,6 +195,13 @@ func TestServer_GenerateCommitMessage_Connected_TranslatesResult(t *testing.T) {
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
 		usecase.NewGenerateCommitMessage(resolver, getDiffUC, fakeAICompleter{message: "generated message"}),
+		usecase.NewCreateWorktree(resolver, projects, exec, exec),
+		usecase.NewRemoveWorktree(resolver, projects, exec, exec),
+		usecase.NewForceDeleteBranch(resolver, exec, exec),
+		usecase.NewDetectWorktrees(resolver, projects, exec, exec),
+		usecase.NewPrefetchCreateBase(resolver, projects, exec, exec),
+		usecase.NewResolvePrBase(scm, resolver, projects, exec, exec),
+		usecase.NewResolveMrBase(scm, resolver, projects, exec, exec),
 	)
 
 	resp, err := s.GenerateCommitMessage(context.Background(), &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: "wt-1"})

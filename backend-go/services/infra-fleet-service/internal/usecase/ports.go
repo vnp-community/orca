@@ -13,6 +13,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
@@ -106,4 +107,118 @@ type DevServerAgentClient interface {
 	// Health performs an agent-level reachability/handshake check, distinct
 	// from the SSH-exec-based fleet health poll that GetFleetHealth reads.
 	Health(ctx context.Context, devServer domain.DevServer) (bool, error)
+
+	// --- Terminal/PTY (TASK-180..187) ---
+	// The six methods below extend the same generic-Exec transport with
+	// typed wrappers over the agent's real pty.* JSON-RPC catalog (pty.create/
+	// write/resize/destroy/listProcesses — see
+	// internal/adapter/devserveragent/methods.go and client.go's StreamPty).
+	// Unlike Exec, these ARE method-name-aware, because the terminal RPC
+	// surface (TASK-180's proto additions) needs typed request/response
+	// shapes at the usecase layer, not a generic map[string]any passthrough.
+
+	// SpawnPty calls pty.create, returning the agent-assigned pty id and the
+	// effective cwd/cols/rows/shell it actually started with.
+	SpawnPty(ctx context.Context, devServer domain.DevServer, in SpawnPtyInput) (SpawnPtyResult, error)
+	// WritePty calls pty.write — raw input bytes for ptyID's stdin.
+	WritePty(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error
+	// ResizePty calls pty.resize.
+	ResizePty(ctx context.Context, devServer domain.DevServer, ptyID string, cols, rows int32) error
+	// KillPty calls pty.destroy.
+	KillPty(ctx context.Context, devServer domain.DevServer, ptyID string, graceful bool) error
+	// StreamPty subscribes to ptyID's pty.data/pty.exit/pty.replay
+	// notifications over devServer's persistent session (see
+	// devserveragent/session.go's notification demux) and returns a
+	// receive-only event channel plus an unsubscribe func. unsubscribe MUST
+	// be called exactly once by every caller (typically via defer) to
+	// release the subscription and let the channel be closed — usecase.AttachPty
+	// and usecase.WaitTerminalSession are the two callers.
+	StreamPty(ctx context.Context, devServer domain.DevServer, ptyID string) (<-chan PtyEvent, func(), error)
+	// AgentStatus answers both terminal.agentStatus and terminal.isRunningAgent
+	// (see GetTerminalAgentStatusResponse's doc comment) — FLAGGED best-effort,
+	// see devserveragent/methods.go's AgentStatus doc comment for exactly
+	// what this is derived from (there is no dedicated agent-status RPC in
+	// the real pty.* catalog this pass could confirm).
+	AgentStatus(ctx context.Context, devServer domain.DevServer, ptyID string) (AgentStatusResult, error)
+	// InspectProcess answers InspectTerminalProcessRequest — best-effort,
+	// Known=false when the agent can't (or this adapter can't) answer, never
+	// a fabricated zero value.
+	InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (InspectProcessResult, error)
+}
+
+// SpawnPtyInput carries pty.create's request fields.
+type SpawnPtyInput struct {
+	Cwd   string
+	Shell string
+	Cols  int32
+	Rows  int32
+}
+
+// SpawnPtyResult carries pty.create's response fields — Cols/Rows/Cwd/Shell
+// are the agent's EFFECTIVE values (it applies its own defaults when the
+// request left them empty/zero), not an echo of SpawnPtyInput.
+type SpawnPtyResult struct {
+	PtyID string
+	Cols  int32
+	Rows  int32
+	Cwd   string
+	Shell string
+}
+
+// PtyEvent is one event pushed by the Dev Server Agent's pty-daemon over a
+// live pty.attach-style subscription — output bytes (pty.data/pty.replay) or
+// a process-exit notification (pty.exit). Exactly one of the two shapes is
+// populated: Exited=false means Data carries output bytes; Exited=true means
+// the process ended and ExitCode is meaningful (Data is nil).
+type PtyEvent struct {
+	PtyID    string
+	Data     []byte
+	Exited   bool
+	ExitCode int32
+}
+
+// AgentStatusResult carries GetTerminalAgentStatusResponse's fields.
+type AgentStatusResult struct {
+	AgentRunning  bool
+	AgentKind     string
+	ReadyForInput bool
+}
+
+// InspectProcessResult carries InspectTerminalProcessResponse's fields.
+type InspectProcessResult struct {
+	Known   bool
+	Pid     int32
+	Command string
+	Cwd     string
+}
+
+// TerminalSessionRepository is the persistence port for infra.terminal_sessions
+// (migrations/0004_terminal_sessions) — the record of every PTY this service
+// has spawned through the agent, independent of the agent's own in-memory
+// pty-daemon state (which does not survive this service's restart, unlike
+// Postgres). tenantID is threaded explicitly on every method, matching
+// ConnectionResolver/SshTargetResolver's convention (see those ports' doc
+// comments) — an explicit parameter makes the tenant join impossible to
+// forget at any implementation's call site.
+type TerminalSessionRepository interface {
+	// Create inserts a new terminal session row and returns the persisted
+	// value.
+	Create(ctx context.Context, session domain.TerminalSession) (domain.TerminalSession, error)
+	// Get fetches one session scoped to tenantID. found=false with a nil
+	// error means "no such session for this tenant" — the caller's cue to
+	// return a not-found error, not that Get itself failed — mirrors
+	// ConnectionResolver.ResolveConnection's bool-found convention.
+	Get(ctx context.Context, tenantID, ptyID string) (found bool, session domain.TerminalSession, err error)
+	// List returns every OPEN session (closed_at IS NULL) for tenantID,
+	// optionally narrowed to one connectionID — empty connectionID means
+	// every dev server's sessions for this tenant, per
+	// ListTerminalSessionsRequest's doc comment.
+	List(ctx context.Context, tenantID, connectionID string) ([]domain.TerminalSession, error)
+	// Touch bumps last_active_at — called by FocusTerminalSession and every
+	// usecase that observes real activity on a session (resize, kill).
+	Touch(ctx context.Context, tenantID, ptyID string, now time.Time) error
+	// Close sets closed_at — called by KillTerminalSession. Idempotent: a
+	// session already closed simply gets a newer closed_at, not an error, so
+	// a duplicate/racing close request never fails the caller.
+	Close(ctx context.Context, tenantID, ptyID string, closedAt time.Time) error
 }

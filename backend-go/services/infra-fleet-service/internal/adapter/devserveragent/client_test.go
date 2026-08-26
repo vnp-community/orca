@@ -31,6 +31,25 @@ type fakeAgent struct {
 	requireToken    string
 	results         map[string]any // method -> result to reply with
 	rejectHandshake bool
+
+	// pushNotifications, if set, are sent (no id, matching a real
+	// pty.data/pty.exit/pty.replay push) shortly after the handshake
+	// completes — TASK-183/187's StreamPty test support. Fixed field names
+	// (id/data/exitCode) mirror ptyNotificationParams's FLAGGED best-effort
+	// shape (see session.go).
+	pushNotifications []fakeAgentNotification
+}
+
+type fakeAgentNotification struct {
+	method   string
+	ptyID    string
+	data     string
+	exitCode int32
+}
+
+func (n fakeAgentNotification) toJSONRPC() JSONRPCNotification {
+	params, _ := json.Marshal(map[string]any{"id": n.ptyID, "data": n.data, "exitCode": n.exitCode})
+	return JSONRPCNotification{JSONRPC: "2.0", Method: n.method, Params: params}
 }
 
 func (f *fakeAgent) handler(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +97,21 @@ func (f *fakeAgent) handler(w http.ResponseWriter, r *http.Request) {
 			resp := JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: result}
 			frame, _ := EncodeJSONRPCFrame(resp, 1, decoded.ID)
 			_ = conn.Write(ctx, websocket.MessageBinary, frame)
+
+			if len(f.pushNotifications) > 0 {
+				go func() {
+					time.Sleep(20 * time.Millisecond) // give the client time to subscribe before pushing
+					for i, n := range f.pushNotifications {
+						frame, err := EncodeJSONRPCFrame(n.toJSONRPC(), uint32(100+i), 0)
+						if err != nil {
+							continue
+						}
+						if err := conn.Write(context.Background(), websocket.MessageBinary, frame); err != nil {
+							return
+						}
+					}
+				}()
+			}
 			continue
 		}
 

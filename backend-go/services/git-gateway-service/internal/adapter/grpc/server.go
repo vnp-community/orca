@@ -8,6 +8,8 @@ package grpc
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
@@ -25,6 +27,15 @@ type Server struct {
 	push                  *usecase.Push
 	pull                  *usecase.Pull
 	generateCommitMessage *usecase.GenerateCommitMessage
+
+	// New, SOL-031 (TASK-192/193/194):
+	createWorktree     *usecase.CreateWorktree
+	removeWorktree     *usecase.RemoveWorktree
+	forceDeleteBranch  *usecase.ForceDeleteBranch
+	detectWorktrees    *usecase.DetectWorktrees
+	prefetchCreateBase *usecase.PrefetchCreateBase
+	resolvePrBase      *usecase.ResolvePrBase
+	resolveMrBase      *usecase.ResolveMrBase
 }
 
 func New(
@@ -34,6 +45,13 @@ func New(
 	push *usecase.Push,
 	pull *usecase.Pull,
 	generateCommitMessage *usecase.GenerateCommitMessage,
+	createWorktree *usecase.CreateWorktree,
+	removeWorktree *usecase.RemoveWorktree,
+	forceDeleteBranch *usecase.ForceDeleteBranch,
+	detectWorktrees *usecase.DetectWorktrees,
+	prefetchCreateBase *usecase.PrefetchCreateBase,
+	resolvePrBase *usecase.ResolvePrBase,
+	resolveMrBase *usecase.ResolveMrBase,
 ) *Server {
 	return &Server{
 		getStatus:             getStatus,
@@ -42,6 +60,13 @@ func New(
 		push:                  push,
 		pull:                  pull,
 		generateCommitMessage: generateCommitMessage,
+		createWorktree:        createWorktree,
+		removeWorktree:        removeWorktree,
+		forceDeleteBranch:     forceDeleteBranch,
+		detectWorktrees:       detectWorktrees,
+		prefetchCreateBase:    prefetchCreateBase,
+		resolvePrBase:         resolvePrBase,
+		resolveMrBase:         resolveMrBase,
 	}
 }
 
@@ -108,6 +133,62 @@ func (s *Server) GenerateCommitMessage(ctx context.Context, req *gitgatewayv1.Ge
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.GenerateCommitMessageResponse{Message: message}, nil
+}
+
+func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+	result, err := s.createWorktree.Execute(ctx, usecase.CreateWorktreeInput{
+		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: result.WorktreeID, Path: result.Path, HeadSha: result.HeadSHA}, nil
+}
+
+func (s *Server) RemoveWorktree(ctx context.Context, req *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error) {
+	if err := s.removeWorktree.Execute(ctx, req.GetWorktreeId(), req.GetForce()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ForceDeleteBranch(ctx context.Context, req *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error) {
+	if err := s.forceDeleteBranch.Execute(ctx, req.GetWorktreeId(), req.GetBranch()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) DetectWorktrees(ctx context.Context, req *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error) {
+	paths, err := s.detectWorktrees.Execute(ctx, req.GetRepoId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.DetectWorktreesResponse{OnDiskPaths: paths}, nil
+}
+
+func (s *Server) PrefetchCreateBase(ctx context.Context, req *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error) {
+	sha, err := s.prefetchCreateBase.Execute(ctx, req.GetRepoId(), req.GetBaseRef())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.PrefetchCreateBaseResponse{ResolvedSha: sha}, nil
+}
+
+func (s *Server) ResolvePrBase(ctx context.Context, req *gitgatewayv1.ResolvePrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error) {
+	resolved, err := s.resolvePrBase.Execute(ctx, req.GetRepoId(), req.GetPrNumber())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ResolveBaseResponse{BaseBranch: resolved.Branch, BaseSha: resolved.SHA}, nil
+}
+
+func (s *Server) ResolveMrBase(ctx context.Context, req *gitgatewayv1.ResolveMrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error) {
+	resolved, err := s.resolveMrBase.Execute(ctx, req.GetRepoId(), req.GetMrNumber())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.ResolveBaseResponse{BaseBranch: resolved.Branch, BaseSha: resolved.SHA}, nil
 }
 
 func toProtoFileStatuses(files []domain.FileStatus) []*gitgatewayv1.FileStatus {

@@ -13,6 +13,8 @@ import (
 	"github.com/stablyai/orca-go/services/tenant-service/internal/usecase"
 
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
+
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // ResolvedProfileGetter is satisfied by both usecase.GetResolvedProfile and
@@ -35,6 +37,8 @@ type Server struct {
 	createTeam         *usecase.CreateTeam
 	addTeamMember      *usecase.AddTeamMember
 	listTeamMembers    *usecase.ListTeamMembers
+	listTeams          *usecase.ListTeams
+	removeTeamMember   *usecase.RemoveTeamMember
 }
 
 func New(
@@ -46,6 +50,8 @@ func New(
 	createTeam *usecase.CreateTeam,
 	addTeamMember *usecase.AddTeamMember,
 	listTeamMembers *usecase.ListTeamMembers,
+	listTeams *usecase.ListTeams,
+	removeTeamMember *usecase.RemoveTeamMember,
 ) *Server {
 	return &Server{
 		createCompany:      createCompany,
@@ -56,6 +62,8 @@ func New(
 		createTeam:         createTeam,
 		addTeamMember:      addTeamMember,
 		listTeamMembers:    listTeamMembers,
+		listTeams:          listTeams,
+		removeTeamMember:   removeTeamMember,
 	}
 }
 
@@ -159,6 +167,33 @@ func (s *Server) ListTeamMembers(ctx context.Context, req *tenantv1.ListTeamMemb
 		out = append(out, &tenantv1.TeamMember{UserId: m.UserID, Priority: m.Priority})
 	}
 	return &tenantv1.ListTeamMembersResponse{Members: out}, nil
+}
+
+func (s *Server) ListTeams(ctx context.Context, req *tenantv1.ListTeamsRequest) (*tenantv1.ListTeamsResponse, error) {
+	teams, err := s.listTeams.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*tenantv1.Team, 0, len(teams))
+	for _, t := range teams {
+		proto, err := toProtoTeam(t)
+		if err != nil {
+			return nil, apperrors.ToGRPCStatus(err)
+		}
+		out = append(out, proto)
+	}
+	return &tenantv1.ListTeamsResponse{Teams: out}, nil
+}
+
+func (s *Server) RemoveTeamMember(ctx context.Context, req *tenantv1.RemoveTeamMemberRequest) (*emptypb.Empty, error) {
+	err := s.removeTeamMember.Execute(ctx, usecase.RemoveTeamMemberInput{
+		TeamID: req.GetTeamId(),
+		UserID: req.GetUserId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func toProtoCompany(c domain.Company) (*tenantv1.Company, error) {

@@ -4,9 +4,17 @@ package orca.gitgateway.v1;
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1;gitgatewayv1";
 
+import "google/protobuf/empty.proto";
+
 // GitGatewayService is a stateless dispatcher: resolve the worktree's owning
 // host via infra-fleet-service, execute locally or relay. Owns no data.
 // See specs/backend-go/services/git-gateway-service.md.
+//
+// NOTE (SOL-031 / TASK-192): this file is being edited concurrently by
+// another work group adding git.*/files.* RPCs — the worktree.* RPCs below
+// were added against the pre-existing (GetStatus..GenerateCommitMessage)
+// service surface only, and will need a manual merge against that group's
+// changes to this same file.
 service GitGatewayService {
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
   rpc GetDiff(GetDiffRequest) returns (GetDiffResponse);
@@ -14,6 +22,25 @@ service GitGatewayService {
   rpc Push(PushRequest) returns (PushResponse);
   rpc Pull(PullRequest) returns (PullResponse);
   rpc GenerateCommitMessage(GenerateCommitMessageRequest) returns (GenerateCommitMessageResponse);
+
+  rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
+  rpc RemoveWorktree(RemoveWorktreeRequest) returns (google.protobuf.Empty);
+  // Required on every GitExecutor implementation from day one — TASK-194
+  // makes it a required interface method, not an optional one, closing the
+  // old TS backend's crash-bug class (forceDeletePreservedBranch? was
+  // optional and only one provider implemented it).
+  rpc ForceDeleteBranch(ForceDeleteBranchRequest) returns (google.protobuf.Empty);
+
+  // DetectWorktrees is the concrete form of project-service.md §4's
+  // "git-gateway-service reconciles on demand" — returns raw on-disk
+  // paths, no bookkeeping join (that diff happens at api-gateway's edge
+  // layer, TASK-195, per 05-data-architecture.md's cross-service
+  // aggregation rule).
+  rpc DetectWorktrees(DetectWorktreesRequest) returns (DetectWorktreesResponse);
+
+  rpc PrefetchCreateBase(PrefetchCreateBaseRequest) returns (PrefetchCreateBaseResponse);
+  rpc ResolvePrBase(ResolvePrBaseRequest) returns (ResolveBaseResponse);
+  rpc ResolveMrBase(ResolveMrBaseRequest) returns (ResolveBaseResponse);
 }
 
 message GetStatusRequest {
@@ -77,3 +104,37 @@ message GenerateCommitMessageRequest {
 message GenerateCommitMessageResponse {
   string message = 1;
 }
+
+message CreateWorktreeRequest {
+  string project_id = 1;
+  string repo_id = 2;
+  string branch = 3;      // new branch name for the worktree
+  string base_ref = 4;    // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
+}
+message CreateWorktreeResponse {
+  string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)
+  string path = 2;
+  string head_sha = 3;
+}
+
+message RemoveWorktreeRequest {
+  string worktree_id = 1;
+  bool   force = 2;       // maps to `git worktree remove --force` (uncommitted changes present)
+}
+
+message ForceDeleteBranchRequest {
+  string worktree_id = 1;
+  string branch = 2;
+}
+
+message DetectWorktreesRequest  { string repo_id = 1; }
+message DetectWorktreesResponse {
+  repeated string on_disk_paths = 1; // raw `git worktree list --porcelain` result for the repo
+}
+
+message PrefetchCreateBaseRequest  { string repo_id = 1; string base_ref = 2; }
+message PrefetchCreateBaseResponse { string resolved_sha = 1; } // ensures base_ref is fetched/up to date
+
+message ResolvePrBaseRequest { string repo_id = 1; int32 pr_number = 2; }
+message ResolveMrBaseRequest { string repo_id = 1; int32 mr_number = 2; }
+message ResolveBaseResponse  { string base_branch = 1; string base_sha = 2; }
