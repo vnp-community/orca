@@ -2,6 +2,7 @@ package wscompat
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -31,6 +32,23 @@ type fakeScmIntegrationClient struct {
 	getWorkItemDetailsFunc            func(ctx context.Context, in *scmintegrationv1.GetWorkItemDetailsRequest) (*scmintegrationv1.WorkItemDetailsGitLab, error)
 	createPullRequestFunc             func(ctx context.Context, in *scmintegrationv1.CreatePullRequestRequest) (*scmintegrationv1.CreatePullRequestResponse, error)
 	checkHostedReviewEligibilityFunc  func(ctx context.Context, in *scmintegrationv1.CheckHostedReviewEligibilityRequest) (*scmintegrationv1.HostedReviewEligibility, error)
+	removePullRequestReviewersFunc    func(ctx context.Context, in *scmintegrationv1.RemovePullRequestReviewersRequest) (*scmintegrationv1.PullRequest, error)
+	setPullRequestAutoMergeFunc       func(ctx context.Context, in *scmintegrationv1.SetPullRequestAutoMergeRequest) (*scmintegrationv1.PullRequest, error)
+	startOAuthFlowFunc                func(ctx context.Context, in *scmintegrationv1.StartOAuthFlowRequest) (*scmintegrationv1.StartOAuthFlowResponse, error)
+	revokeAuthFunc                    func(ctx context.Context, in *scmintegrationv1.RevokeAuthRequest) (*scmintegrationv1.RevokeAuthResponse, error)
+	resolveProjectRefFunc             func(ctx context.Context, in *scmintegrationv1.ResolveProjectRefRequest) (*scmintegrationv1.ResolveProjectRefResponse, error)
+	listProjectViewsFunc              func(ctx context.Context, in *scmintegrationv1.ListProjectViewsRequest) (*scmintegrationv1.ListProjectViewsResponse, error)
+	viewProjectTableFunc              func(ctx context.Context, in *scmintegrationv1.ViewProjectTableRequest) (*scmintegrationv1.ViewProjectTableResponse, error)
+	clearProjectItemFieldFunc         func(ctx context.Context, in *scmintegrationv1.ClearProjectItemFieldRequest) (*scmintegrationv1.ProjectItem, error)
+	getWorkItemDetailsBySlugFunc      func(ctx context.Context, in *scmintegrationv1.GetWorkItemDetailsBySlugRequest) (*scmintegrationv1.WorkItemDetails, error)
+	updateIssueBySlugFunc             func(ctx context.Context, in *scmintegrationv1.UpdateIssueBySlugRequest) (*scmintegrationv1.WorkItemDetails, error)
+	updatePullRequestBySlugFunc       func(ctx context.Context, in *scmintegrationv1.UpdatePullRequestBySlugRequest) (*scmintegrationv1.WorkItemDetails, error)
+	updateIssueTypeBySlugFunc         func(ctx context.Context, in *scmintegrationv1.UpdateIssueTypeBySlugRequest) (*scmintegrationv1.WorkItemDetails, error)
+	listIssueTypesBySlugFunc          func(ctx context.Context, in *scmintegrationv1.ListIssueTypesBySlugRequest) (*scmintegrationv1.ListIssueTypesBySlugResponse, error)
+	listAssignableUsersBySlugFunc     func(ctx context.Context, in *scmintegrationv1.ListAssignableUsersBySlugRequest) (*scmintegrationv1.ListAssignableUsersBySlugResponse, error)
+	listLabelsBySlugFunc              func(ctx context.Context, in *scmintegrationv1.ListLabelsBySlugRequest) (*scmintegrationv1.ListLabelsBySlugResponse, error)
+	addIssueCommentBySlugFunc         func(ctx context.Context, in *scmintegrationv1.AddIssueCommentBySlugRequest) (*scmintegrationv1.ProjectComment, error)
+	updateIssueCommentBySlugFunc      func(ctx context.Context, in *scmintegrationv1.UpdateIssueCommentBySlugRequest) (*scmintegrationv1.ProjectComment, error)
 }
 
 func (f *fakeScmIntegrationClient) MergePullRequest(ctx context.Context, in *scmintegrationv1.MergePullRequestRequest, _ ...grpc.CallOption) (*scmintegrationv1.MergePullRequestResponse, error) {
@@ -87,6 +105,74 @@ func (f *fakeScmIntegrationClient) CreatePullRequest(ctx context.Context, in *sc
 
 func (f *fakeScmIntegrationClient) CheckHostedReviewEligibility(ctx context.Context, in *scmintegrationv1.CheckHostedReviewEligibilityRequest, _ ...grpc.CallOption) (*scmintegrationv1.HostedReviewEligibility, error) {
 	return f.checkHostedReviewEligibilityFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) RemovePullRequestReviewers(ctx context.Context, in *scmintegrationv1.RemovePullRequestReviewersRequest, _ ...grpc.CallOption) (*scmintegrationv1.PullRequest, error) {
+	return f.removePullRequestReviewersFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) SetPullRequestAutoMerge(ctx context.Context, in *scmintegrationv1.SetPullRequestAutoMergeRequest, _ ...grpc.CallOption) (*scmintegrationv1.PullRequest, error) {
+	return f.setPullRequestAutoMergeFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) StartOAuthFlow(ctx context.Context, in *scmintegrationv1.StartOAuthFlowRequest, _ ...grpc.CallOption) (*scmintegrationv1.StartOAuthFlowResponse, error) {
+	return f.startOAuthFlowFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) RevokeAuth(ctx context.Context, in *scmintegrationv1.RevokeAuthRequest, _ ...grpc.CallOption) (*scmintegrationv1.RevokeAuthResponse, error) {
+	return f.revokeAuthFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ResolveProjectRef(ctx context.Context, in *scmintegrationv1.ResolveProjectRefRequest, _ ...grpc.CallOption) (*scmintegrationv1.ResolveProjectRefResponse, error) {
+	return f.resolveProjectRefFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ListProjectViews(ctx context.Context, in *scmintegrationv1.ListProjectViewsRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListProjectViewsResponse, error) {
+	return f.listProjectViewsFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ViewProjectTable(ctx context.Context, in *scmintegrationv1.ViewProjectTableRequest, _ ...grpc.CallOption) (*scmintegrationv1.ViewProjectTableResponse, error) {
+	return f.viewProjectTableFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ClearProjectItemField(ctx context.Context, in *scmintegrationv1.ClearProjectItemFieldRequest, _ ...grpc.CallOption) (*scmintegrationv1.ProjectItem, error) {
+	return f.clearProjectItemFieldFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) GetWorkItemDetailsBySlug(ctx context.Context, in *scmintegrationv1.GetWorkItemDetailsBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.WorkItemDetails, error) {
+	return f.getWorkItemDetailsBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) UpdateIssueBySlug(ctx context.Context, in *scmintegrationv1.UpdateIssueBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.WorkItemDetails, error) {
+	return f.updateIssueBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) UpdatePullRequestBySlug(ctx context.Context, in *scmintegrationv1.UpdatePullRequestBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.WorkItemDetails, error) {
+	return f.updatePullRequestBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) UpdateIssueTypeBySlug(ctx context.Context, in *scmintegrationv1.UpdateIssueTypeBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.WorkItemDetails, error) {
+	return f.updateIssueTypeBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ListIssueTypesBySlug(ctx context.Context, in *scmintegrationv1.ListIssueTypesBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIssueTypesBySlugResponse, error) {
+	return f.listIssueTypesBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ListAssignableUsersBySlug(ctx context.Context, in *scmintegrationv1.ListAssignableUsersBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListAssignableUsersBySlugResponse, error) {
+	return f.listAssignableUsersBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ListLabelsBySlug(ctx context.Context, in *scmintegrationv1.ListLabelsBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListLabelsBySlugResponse, error) {
+	return f.listLabelsBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) AddIssueCommentBySlug(ctx context.Context, in *scmintegrationv1.AddIssueCommentBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ProjectComment, error) {
+	return f.addIssueCommentBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) UpdateIssueCommentBySlug(ctx context.Context, in *scmintegrationv1.UpdateIssueCommentBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ProjectComment, error) {
+	return f.updateIssueCommentBySlugFunc(ctx, in)
 }
 
 // ── github.* ──────────────────────────────────────────────────────────────
@@ -320,6 +406,497 @@ func TestGitHubProjectDeleteIssueCommentBySlugChannel_ReturnsNil(t *testing.T) {
 	}
 	if gotReq.GetItemSlug() != "acme/repo#1" || gotReq.GetCommentId() != "c1" {
 		t.Errorf("unexpected request: %+v", gotReq)
+	}
+}
+
+func TestGitHubRateLimitChannelMatchesRESTContract(t *testing.T) {
+	// github.rateLimit and the REST route (GET /v1/scm/rate-limit?provider=github)
+	// both resolve to the identical GetRateLimitStatus RPC and return its
+	// response verbatim — same regression-guard shape as
+	// TestGitLabRateLimitChannelMatchesRESTContract above.
+	want := &scmintegrationv1.GetRateLimitStatusResponse{Remaining: 42, Limit: 5000, ResetUnix: 9999}
+	fake := &fakeScmIntegrationClient{
+		getRateLimitStatusFunc: func(ctx context.Context, in *scmintegrationv1.GetRateLimitStatusRequest) (*scmintegrationv1.GetRateLimitStatusResponse, error) {
+			if in.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB {
+				t.Fatalf("expected SCM_PROVIDER_GITHUB, got %v", in.GetProvider())
+			}
+			return want, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.rateLimit", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	direct, err := fake.GetRateLimitStatus(context.Background(), &scmintegrationv1.GetRateLimitStatusRequest{TenantId: "tenant-1", Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB})
+	if err != nil {
+		t.Fatalf("unexpected error calling the RPC directly: %v", err)
+	}
+	if !reflect.DeepEqual(result, direct) {
+		t.Fatalf("expected channel result to match a direct GetRateLimitStatus call, got %+v vs %+v", result, direct)
+	}
+}
+
+func TestGitHubRemovePRReviewersChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.RemovePullRequestReviewersRequest
+	fake := &fakeScmIntegrationClient{
+		removePullRequestReviewersFunc: func(ctx context.Context, in *scmintegrationv1.RemovePullRequestReviewersRequest) (*scmintegrationv1.PullRequest, error) {
+			gotReq = in
+			return &scmintegrationv1.PullRequest{Id: "1", Number: 42}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.removePRReviewers",
+		argsJSON(t, map[string]any{"repo": "o/r", "number": 42, "reviewerLogins": []string{"alice", "bob"}}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pr, ok := result.(*scmintegrationv1.PullRequest); !ok || pr.GetNumber() != 42 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB {
+		t.Errorf("expected SCM_PROVIDER_GITHUB, got %v", gotReq.GetProvider())
+	}
+	if len(gotReq.GetReviewerLogins()) != 2 || gotReq.GetReviewerLogins()[1] != "bob" {
+		t.Errorf("expected reviewerLogins passed through, got %+v", gotReq.GetReviewerLogins())
+	}
+}
+
+func TestGitHubRemovePRReviewersChannel_PropagatesError(t *testing.T) {
+	wantErr := errors.New("not a reviewer")
+	fake := &fakeScmIntegrationClient{
+		removePullRequestReviewersFunc: func(ctx context.Context, in *scmintegrationv1.RemovePullRequestReviewersRequest) (*scmintegrationv1.PullRequest, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.removePRReviewers",
+		argsJSON(t, map[string]any{"repo": "o/r", "number": 42, "reviewerLogins": []string{"alice"}}))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("want %v, got %v", wantErr, err)
+	}
+}
+
+func TestGitHubSetPRAutoMergeChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.SetPullRequestAutoMergeRequest
+	fake := &fakeScmIntegrationClient{
+		setPullRequestAutoMergeFunc: func(ctx context.Context, in *scmintegrationv1.SetPullRequestAutoMergeRequest) (*scmintegrationv1.PullRequest, error) {
+			gotReq = in
+			return &scmintegrationv1.PullRequest{Id: "1", Number: 42}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.setPRAutoMerge",
+		argsJSON(t, map[string]any{"repo": "o/r", "number": 42, "enabled": true, "mergeMethod": "squash"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pr, ok := result.(*scmintegrationv1.PullRequest); !ok || pr.GetNumber() != 42 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if !gotReq.GetEnabled() || gotReq.GetMergeMethod() != "squash" {
+		t.Errorf("expected enabled=true mergeMethod=squash, got enabled=%v mergeMethod=%s", gotReq.GetEnabled(), gotReq.GetMergeMethod())
+	}
+}
+
+func TestGitHubStartAuthLoginChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.StartOAuthFlowRequest
+	fake := &fakeScmIntegrationClient{
+		startOAuthFlowFunc: func(ctx context.Context, in *scmintegrationv1.StartOAuthFlowRequest) (*scmintegrationv1.StartOAuthFlowResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.StartOAuthFlowResponse{AuthorizationUrl: "https://github.com/login/oauth/authorize", State: "opaque-state"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "github.startAuthLogin",
+		argsJSON(t, map[string]any{"redirectUri": "https://app.example.com/callback"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.StartOAuthFlowResponse)
+	if !ok || resp.GetState() != "opaque-state" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetUserId() != "user-1" || gotReq.GetRedirectUri() != "https://app.example.com/callback" {
+		t.Errorf("expected userId/redirectUri passed through, got %+v", gotReq)
+	}
+	if gotReq.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB {
+		t.Errorf("expected SCM_PROVIDER_GITHUB, got %v", gotReq.GetProvider())
+	}
+}
+
+func TestGitHubRevokeAuthChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.RevokeAuthRequest
+	fake := &fakeScmIntegrationClient{
+		revokeAuthFunc: func(ctx context.Context, in *scmintegrationv1.RevokeAuthRequest) (*scmintegrationv1.RevokeAuthResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.RevokeAuthResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.revokeAuth", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := result.(*scmintegrationv1.RevokeAuthResponse); !ok {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB {
+		t.Errorf("expected SCM_PROVIDER_GITHUB, got %v", gotReq.GetProvider())
+	}
+}
+
+func TestGitHubRevokeAuthChannel_PropagatesError(t *testing.T) {
+	wantErr := errors.New("no stored credential")
+	fake := &fakeScmIntegrationClient{
+		revokeAuthFunc: func(ctx context.Context, in *scmintegrationv1.RevokeAuthRequest) (*scmintegrationv1.RevokeAuthResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.revokeAuth", nil)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("want %v, got %v", wantErr, err)
+	}
+}
+
+// ── github.project.* (remaining channels) ────────────────────────────────
+
+func TestGitHubProjectResolveRefChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.ResolveProjectRefRequest
+	fake := &fakeScmIntegrationClient{
+		resolveProjectRefFunc: func(ctx context.Context, in *scmintegrationv1.ResolveProjectRefRequest) (*scmintegrationv1.ResolveProjectRefResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.ResolveProjectRefResponse{Slug: "acme/7", Project: &scmintegrationv1.Project{Id: "p1", Slug: "acme/7", Number: 7, Owner: "acme"}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.resolveRef",
+		argsJSON(t, map[string]any{"owner": "acme", "number": 7}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.ResolveProjectRefResponse)
+	if !ok || resp.GetSlug() != "acme/7" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetOwner() != "acme" || gotReq.GetNumber() != 7 {
+		t.Errorf("expected owner=acme number=7, got owner=%s number=%d", gotReq.GetOwner(), gotReq.GetNumber())
+	}
+}
+
+func TestGitHubProjectListViewsChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.ListProjectViewsRequest
+	fake := &fakeScmIntegrationClient{
+		listProjectViewsFunc: func(ctx context.Context, in *scmintegrationv1.ListProjectViewsRequest) (*scmintegrationv1.ListProjectViewsResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.ListProjectViewsResponse{Views: []*scmintegrationv1.ProjectView{{Id: "v1", Name: "Board", Layout: "board"}}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listViews",
+		argsJSON(t, map[string]any{"projectSlug": "acme/7"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.ListProjectViewsResponse)
+	if !ok || len(resp.GetViews()) != 1 || resp.GetViews()[0].GetLayout() != "board" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetProjectSlug() != "acme/7" {
+		t.Errorf("expected projectSlug=acme/7, got %q", gotReq.GetProjectSlug())
+	}
+}
+
+func TestGitHubProjectViewTableChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.ViewProjectTableRequest
+	fake := &fakeScmIntegrationClient{
+		viewProjectTableFunc: func(ctx context.Context, in *scmintegrationv1.ViewProjectTableRequest) (*scmintegrationv1.ViewProjectTableResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.ViewProjectTableResponse{Items: []*scmintegrationv1.ProjectItem{{Id: "item-1"}}, NextPageToken: "next"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.viewTable",
+		argsJSON(t, map[string]any{"projectSlug": "acme/7", "viewId": "v1", "pageToken": "tok", "pageSize": 25}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.ViewProjectTableResponse)
+	if !ok || len(resp.GetItems()) != 1 || resp.GetNextPageToken() != "next" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetViewId() != "v1" || gotReq.GetPageToken() != "tok" || gotReq.GetPageSize() != 25 {
+		t.Errorf("request fields not mapped correctly: %+v", gotReq)
+	}
+}
+
+func TestGitHubProjectClearItemFieldChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.ClearProjectItemFieldRequest
+	fake := &fakeScmIntegrationClient{
+		clearProjectItemFieldFunc: func(ctx context.Context, in *scmintegrationv1.ClearProjectItemFieldRequest) (*scmintegrationv1.ProjectItem, error) {
+			gotReq = in
+			return &scmintegrationv1.ProjectItem{Id: "item-1"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.clearItemField",
+		argsJSON(t, map[string]any{"projectSlug": "acme/7", "itemId": "item-1", "fieldId": "f1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if item, ok := result.(*scmintegrationv1.ProjectItem); !ok || item.GetId() != "item-1" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetFieldId() != "f1" || gotReq.GetItemId() != "item-1" {
+		t.Errorf("request fields not mapped correctly: %+v", gotReq)
+	}
+}
+
+func TestGitHubProjectWorkItemDetailsBySlugChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.GetWorkItemDetailsBySlugRequest
+	fake := &fakeScmIntegrationClient{
+		getWorkItemDetailsBySlugFunc: func(ctx context.Context, in *scmintegrationv1.GetWorkItemDetailsBySlugRequest) (*scmintegrationv1.WorkItemDetails, error) {
+			gotReq = in
+			return &scmintegrationv1.WorkItemDetails{Slug: in.GetItemSlug(), Title: "Bug"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.workItemDetailsBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	details, ok := result.(*scmintegrationv1.WorkItemDetails)
+	if !ok || details.GetSlug() != "acme/repo#1" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetItemSlug() != "acme/repo#1" {
+		t.Errorf("expected itemSlug=acme/repo#1, got %q", gotReq.GetItemSlug())
+	}
+}
+
+func TestGitHubProjectUpdateIssueBySlugChannel_OmitsUnsetOptionalFields(t *testing.T) {
+	var gotReq *scmintegrationv1.UpdateIssueBySlugRequest
+	fake := &fakeScmIntegrationClient{
+		updateIssueBySlugFunc: func(ctx context.Context, in *scmintegrationv1.UpdateIssueBySlugRequest) (*scmintegrationv1.WorkItemDetails, error) {
+			gotReq = in
+			return &scmintegrationv1.WorkItemDetails{Slug: in.GetItemSlug()}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateIssueBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "addLabels": []string{"bug"}}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.Title != nil || gotReq.Body != nil || gotReq.State != nil {
+		t.Errorf("expected unset optional fields to stay nil, got title=%v body=%v state=%v", gotReq.Title, gotReq.Body, gotReq.State)
+	}
+	if len(gotReq.GetAddLabels()) != 1 || gotReq.GetAddLabels()[0] != "bug" {
+		t.Errorf("expected addLabels passed through, got %+v", gotReq.GetAddLabels())
+	}
+}
+
+func TestGitHubProjectUpdateIssueBySlugChannel_PropagatesError(t *testing.T) {
+	wantErr := errors.New("item not found")
+	fake := &fakeScmIntegrationClient{
+		updateIssueBySlugFunc: func(ctx context.Context, in *scmintegrationv1.UpdateIssueBySlugRequest) (*scmintegrationv1.WorkItemDetails, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateIssueBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "title": "new title"}))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("want %v, got %v", wantErr, err)
+	}
+}
+
+func TestGitHubProjectUpdatePullRequestBySlugChannel_SetsProvidedOptionalFields(t *testing.T) {
+	var gotReq *scmintegrationv1.UpdatePullRequestBySlugRequest
+	fake := &fakeScmIntegrationClient{
+		updatePullRequestBySlugFunc: func(ctx context.Context, in *scmintegrationv1.UpdatePullRequestBySlugRequest) (*scmintegrationv1.WorkItemDetails, error) {
+			gotReq = in
+			return &scmintegrationv1.WorkItemDetails{Slug: in.GetItemSlug()}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updatePullRequestBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#2", "state": "closed"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.State == nil || gotReq.GetState() != "closed" {
+		t.Errorf("expected state set to %q, got %v", "closed", gotReq.State)
+	}
+	if gotReq.Title != nil || gotReq.Body != nil {
+		t.Errorf("expected unset optional fields to stay nil, got title=%v body=%v", gotReq.Title, gotReq.Body)
+	}
+}
+
+func TestGitHubProjectUpdateIssueTypeBySlugChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.UpdateIssueTypeBySlugRequest
+	fake := &fakeScmIntegrationClient{
+		updateIssueTypeBySlugFunc: func(ctx context.Context, in *scmintegrationv1.UpdateIssueTypeBySlugRequest) (*scmintegrationv1.WorkItemDetails, error) {
+			gotReq = in
+			return &scmintegrationv1.WorkItemDetails{Slug: in.GetItemSlug()}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateIssueTypeBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "issueType": "Bug"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := result.(*scmintegrationv1.WorkItemDetails); !ok {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetIssueType() != "Bug" {
+		t.Errorf("expected issueType=Bug, got %q", gotReq.GetIssueType())
+	}
+}
+
+func TestGitHubProjectListIssueTypesBySlugChannel_Success(t *testing.T) {
+	fake := &fakeScmIntegrationClient{
+		listIssueTypesBySlugFunc: func(ctx context.Context, in *scmintegrationv1.ListIssueTypesBySlugRequest) (*scmintegrationv1.ListIssueTypesBySlugResponse, error) {
+			return &scmintegrationv1.ListIssueTypesBySlugResponse{IssueTypes: []*scmintegrationv1.IssueType{{Id: "t1", Name: "Bug"}}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listIssueTypesBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.ListIssueTypesBySlugResponse)
+	if !ok || len(resp.GetIssueTypes()) != 1 || resp.GetIssueTypes()[0].GetName() != "Bug" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitHubProjectListAssignableUsersBySlugChannel_Success(t *testing.T) {
+	fake := &fakeScmIntegrationClient{
+		listAssignableUsersBySlugFunc: func(ctx context.Context, in *scmintegrationv1.ListAssignableUsersBySlugRequest) (*scmintegrationv1.ListAssignableUsersBySlugResponse, error) {
+			return &scmintegrationv1.ListAssignableUsersBySlugResponse{Users: []*scmintegrationv1.AssignableUser{{Login: "octocat", Name: "The Octocat"}}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listAssignableUsersBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.ListAssignableUsersBySlugResponse)
+	if !ok || len(resp.GetUsers()) != 1 || resp.GetUsers()[0].GetLogin() != "octocat" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitHubProjectListLabelsBySlugChannel_Success(t *testing.T) {
+	fake := &fakeScmIntegrationClient{
+		listLabelsBySlugFunc: func(ctx context.Context, in *scmintegrationv1.ListLabelsBySlugRequest) (*scmintegrationv1.ListLabelsBySlugResponse, error) {
+			return &scmintegrationv1.ListLabelsBySlugResponse{Labels: []*scmintegrationv1.Label{{Name: "bug", Color: "d73a4a"}}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listLabelsBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.ListLabelsBySlugResponse)
+	if !ok || len(resp.GetLabels()) != 1 || resp.GetLabels()[0].GetName() != "bug" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitHubProjectAddIssueCommentBySlugChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.AddIssueCommentBySlugRequest
+	fake := &fakeScmIntegrationClient{
+		addIssueCommentBySlugFunc: func(ctx context.Context, in *scmintegrationv1.AddIssueCommentBySlugRequest) (*scmintegrationv1.ProjectComment, error) {
+			gotReq = in
+			return &scmintegrationv1.ProjectComment{Id: "c1", Body: in.GetBody()}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.addIssueCommentBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "body": "a comment"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	comment, ok := result.(*scmintegrationv1.ProjectComment)
+	if !ok || comment.GetBody() != "a comment" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetItemSlug() != "acme/repo#1" {
+		t.Errorf("expected itemSlug=acme/repo#1, got %q", gotReq.GetItemSlug())
+	}
+}
+
+func TestGitHubProjectUpdateIssueCommentBySlugChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.UpdateIssueCommentBySlugRequest
+	fake := &fakeScmIntegrationClient{
+		updateIssueCommentBySlugFunc: func(ctx context.Context, in *scmintegrationv1.UpdateIssueCommentBySlugRequest) (*scmintegrationv1.ProjectComment, error) {
+			gotReq = in
+			return &scmintegrationv1.ProjectComment{Id: in.GetCommentId(), Body: in.GetBody()}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateIssueCommentBySlug",
+		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "commentId": "c1", "body": "edited"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	comment, ok := result.(*scmintegrationv1.ProjectComment)
+	if !ok || comment.GetId() != "c1" || comment.GetBody() != "edited" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetCommentId() != "c1" {
+		t.Errorf("expected commentId=c1, got %q", gotReq.GetCommentId())
 	}
 }
 
