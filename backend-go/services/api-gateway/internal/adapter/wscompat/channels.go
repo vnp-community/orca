@@ -103,7 +103,7 @@ func RegisterRealChannels(
 	// doc comment for which TASK-* IDs it covers.
 	registerAccountsChannels(r, infraFleetClient)
 	registerAiProviderChannels(r, aiProviderClient)
-	registerCredentialsChannels(r, issueTrackingClient)
+	registerCredentialsChannels(r, scmClient, issueTrackingClient)
 	registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)
 	registerRepoSshStatusWorkspaceChannels(r, projectClient, gitClient, infraFleetClient)
 	registerSCMChannels(r, scmClient)

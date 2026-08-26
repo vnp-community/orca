@@ -49,6 +49,11 @@ type fakeScmIntegrationClient struct {
 	listLabelsBySlugFunc              func(ctx context.Context, in *scmintegrationv1.ListLabelsBySlugRequest) (*scmintegrationv1.ListLabelsBySlugResponse, error)
 	addIssueCommentBySlugFunc         func(ctx context.Context, in *scmintegrationv1.AddIssueCommentBySlugRequest) (*scmintegrationv1.ProjectComment, error)
 	updateIssueCommentBySlugFunc      func(ctx context.Context, in *scmintegrationv1.UpdateIssueCommentBySlugRequest) (*scmintegrationv1.ProjectComment, error)
+
+	// credentials.* group (channels_credentials_test.go, TASK-042).
+	setIntegrationCredentialFunc       func(ctx context.Context, in *scmintegrationv1.SetIntegrationCredentialRequest) (*scmintegrationv1.SetIntegrationCredentialResponse, error)
+	getIntegrationCredentialStatusFunc func(ctx context.Context, in *scmintegrationv1.GetIntegrationCredentialStatusRequest) (*scmintegrationv1.GetIntegrationCredentialStatusResponse, error)
+	listIntegrationCredentialsFunc     func(ctx context.Context, in *scmintegrationv1.ListIntegrationCredentialsRequest) (*scmintegrationv1.ListIntegrationCredentialsResponse, error)
 }
 
 func (f *fakeScmIntegrationClient) MergePullRequest(ctx context.Context, in *scmintegrationv1.MergePullRequestRequest, _ ...grpc.CallOption) (*scmintegrationv1.MergePullRequestResponse, error) {
@@ -121,6 +126,18 @@ func (f *fakeScmIntegrationClient) StartOAuthFlow(ctx context.Context, in *scmin
 
 func (f *fakeScmIntegrationClient) RevokeAuth(ctx context.Context, in *scmintegrationv1.RevokeAuthRequest, _ ...grpc.CallOption) (*scmintegrationv1.RevokeAuthResponse, error) {
 	return f.revokeAuthFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) SetIntegrationCredential(ctx context.Context, in *scmintegrationv1.SetIntegrationCredentialRequest, _ ...grpc.CallOption) (*scmintegrationv1.SetIntegrationCredentialResponse, error) {
+	return f.setIntegrationCredentialFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) GetIntegrationCredentialStatus(ctx context.Context, in *scmintegrationv1.GetIntegrationCredentialStatusRequest, _ ...grpc.CallOption) (*scmintegrationv1.GetIntegrationCredentialStatusResponse, error) {
+	return f.getIntegrationCredentialStatusFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ListIntegrationCredentials(ctx context.Context, in *scmintegrationv1.ListIntegrationCredentialsRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIntegrationCredentialsResponse, error) {
+	return f.listIntegrationCredentialsFunc(ctx, in)
 }
 
 func (f *fakeScmIntegrationClient) ResolveProjectRef(ctx context.Context, in *scmintegrationv1.ResolveProjectRefRequest, _ ...grpc.CallOption) (*scmintegrationv1.ResolveProjectRefResponse, error) {
