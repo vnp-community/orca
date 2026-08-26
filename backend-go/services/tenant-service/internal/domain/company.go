@@ -35,3 +35,11 @@ func NewCompany(id, name string, settings Settings) (Company, error) {
 	}
 	return Company{ID: id, Name: name, Settings: emptySettings(settings)}, nil
 }
+
+// CompanySettingsPatch carries UpdateCompany's field-mask semantics: an
+// empty string means "leave unchanged" — mirrors project-service's
+// ProjectUpdatePatch convention (project-service/internal/domain/project.go).
+type CompanySettingsPatch struct {
+	Name         string
+	SettingsJSON string // "" = no change; parsed to Settings by the usecase
+}

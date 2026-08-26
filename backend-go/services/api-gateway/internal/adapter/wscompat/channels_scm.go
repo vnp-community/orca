@@ -25,10 +25,10 @@ import (
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
-// rpcTimeout bounds every outbound gRPC call this file makes to
+// scmRPCTimeout bounds every outbound gRPC call this file makes to
 // scm-integration-service — no channel here should be able to hang a
 // WebSocket connection indefinitely on a slow upstream provider API call.
-const rpcTimeout = 30 * time.Second
+const scmRPCTimeout = 30 * time.Second
 
 // attachSCMIdentity is a one-line convenience every handler below uses —
 // same AttachIdentity call channels.go's existing handlers make, just
@@ -56,7 +56,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 	// github.rateLimit — real backing RPC already exists (BUG-012's
 	// finding); this is the wiring-only piece.
 	r.Register("github.rateLimit", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.GetRateLimitStatus(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.GetRateLimitStatusRequest{TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB})
@@ -78,7 +78,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.MergePullRequest(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.MergePullRequestRequest{
@@ -103,7 +103,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.RequestPullRequestReviewers(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.RequestPullRequestReviewersRequest{
@@ -126,7 +126,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.RemovePullRequestReviewers(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.RemovePullRequestReviewersRequest{
@@ -150,7 +150,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.SetPullRequestAutoMerge(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.SetPullRequestAutoMergeRequest{
@@ -192,7 +192,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if in.State != nil {
 			req.State = in.State
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.UpdateIssue(attachSCMIdentity(rpcCtx, id), req)
 		if err != nil {
@@ -210,7 +210,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.GetPullRequestForBranch(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.GetPullRequestForBranchRequest{
@@ -234,7 +234,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ResolveRepoSlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ResolveRepoSlugRequest{
@@ -256,7 +256,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.StartOAuthFlow(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.StartOAuthFlowRequest{
@@ -270,7 +270,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 	})
 
 	r.Register("github.revokeAuth", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.RevokeAuth(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.RevokeAuthRequest{TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB})
@@ -288,7 +288,7 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 
 func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient) {
 	r.Register("github.project.listAccessible", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ListAccessibleProjects(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ListAccessibleProjectsRequest{TenantId: id.TenantID})
@@ -307,7 +307,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ResolveProjectRef(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ResolveProjectRefRequest{TenantId: id.TenantID, Owner: in.Owner, Number: in.Number})
@@ -325,7 +325,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ListProjectViews(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ListProjectViewsRequest{TenantId: id.TenantID, ProjectSlug: in.ProjectSlug})
@@ -346,7 +346,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ViewProjectTable(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ViewProjectTableRequest{
@@ -370,7 +370,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.UpdateProjectItemField(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.UpdateProjectItemFieldRequest{
@@ -393,7 +393,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ClearProjectItemField(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ClearProjectItemFieldRequest{TenantId: id.TenantID, ProjectSlug: in.ProjectSlug, ItemId: in.ItemID, FieldId: in.FieldID})
@@ -411,7 +411,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.GetWorkItemDetailsBySlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.GetWorkItemDetailsBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug})
@@ -444,7 +444,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if in.State != nil {
 			req.State = in.State
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.UpdateIssueBySlug(attachSCMIdentity(rpcCtx, id), req)
 		if err != nil {
@@ -474,7 +474,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if in.State != nil {
 			req.State = in.State
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.UpdatePullRequestBySlug(attachSCMIdentity(rpcCtx, id), req)
 		if err != nil {
@@ -492,7 +492,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.UpdateIssueTypeBySlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.UpdateIssueTypeBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug, IssueType: in.IssueType})
@@ -510,7 +510,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ListIssueTypesBySlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ListIssueTypesBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug})
@@ -528,7 +528,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ListAssignableUsersBySlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ListAssignableUsersBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug})
@@ -546,7 +546,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ListLabelsBySlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ListLabelsBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug})
@@ -565,7 +565,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.AddIssueCommentBySlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.AddIssueCommentBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug, Body: in.Body})
@@ -585,7 +585,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.UpdateIssueCommentBySlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.UpdateIssueCommentBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug, CommentId: in.CommentID, Body: in.Body})
@@ -604,7 +604,7 @@ func registerGitHubProjectChannels(r *Registry, client scmintegrationv1.ScmInteg
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		_, err = client.DeleteIssueCommentBySlug(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.DeleteIssueCommentBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug, CommentId: in.CommentID})
@@ -621,7 +621,7 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 	// gitlab.rateLimit — real backing RPC already exists (BUG-013's
 	// finding), provider-generic, same as github.rateLimit.
 	r.Register("gitlab.rateLimit", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.GetRateLimitStatus(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.GetRateLimitStatusRequest{TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB})
@@ -641,7 +641,7 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ListMergeRequests(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ListMergeRequestsRequest{
@@ -664,7 +664,7 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.ResolveMergeRequestDiscussion(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.ResolveMergeRequestDiscussionRequest{
@@ -687,7 +687,7 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.GetWorkItemDetails(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.GetWorkItemDetailsRequest{
@@ -710,7 +710,7 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.StartOAuthFlow(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.StartOAuthFlowRequest{
@@ -724,7 +724,7 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 	})
 
 	r.Register("gitlab.revokeAuth", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.RevokeAuth(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.RevokeAuthRequest{TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB})
@@ -752,7 +752,7 @@ func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegr
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.CreatePullRequest(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.CreatePullRequestRequest{
@@ -779,7 +779,7 @@ func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegr
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.GetPullRequestForBranch(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.GetPullRequestForBranchRequest{
@@ -806,7 +806,7 @@ func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegr
 		if err != nil {
 			return nil, err
 		}
-		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
 		defer cancel()
 		resp, err := client.CheckHostedReviewEligibility(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.CheckHostedReviewEligibilityRequest{

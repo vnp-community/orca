@@ -26,6 +26,21 @@ type fakeProjectRepository struct {
 	updateErr        error
 	deleteErr        error
 	getMembershipErr error
+
+	// countOwners is CountOwners's canned return value — tests set this
+	// directly to exercise AssertNotLastOwnerRemoval's boundary without
+	// needing to seed exactly-matching owner rows in members.
+	countOwners     int
+	countOwnersErr  error
+	listMembersErr  error
+	removeMemberErr error
+	updateRoleErr   error
+
+	// removeMemberCalled/updateMemberRoleCalled let tests assert the
+	// ownerless guard fires BEFORE any repository mutation — see
+	// TestRemoveMember_RejectsWhenWouldBeOwnerless's doc comment.
+	removeMemberCalled     bool
+	updateMemberRoleCalled bool
 }
 
 func newFakeProjectRepository() *fakeProjectRepository {
@@ -125,6 +140,61 @@ func (f *fakeProjectRepository) GetMembership(ctx context.Context, projectID, us
 		}
 	}
 	return domain.ProjectMember{}, domain.ErrMembershipNotFound
+}
+
+// ListMembers implements usecase.ProjectRepository.ListMembers.
+func (f *fakeProjectRepository) ListMembers(ctx context.Context, projectID string) ([]domain.ProjectMember, error) {
+	if f.listMembersErr != nil {
+		return nil, f.listMembersErr
+	}
+	var out []domain.ProjectMember
+	for _, m := range f.members {
+		if m.ProjectID == projectID {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+// RemoveMember implements usecase.ProjectRepository.RemoveMember.
+func (f *fakeProjectRepository) RemoveMember(ctx context.Context, projectID, userID string) error {
+	f.removeMemberCalled = true
+	if f.removeMemberErr != nil {
+		return f.removeMemberErr
+	}
+	for i, m := range f.members {
+		if m.ProjectID == projectID && m.UserID == userID {
+			f.members = append(f.members[:i], f.members[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrMembershipNotFound
+}
+
+// UpdateMemberRole implements usecase.ProjectRepository.UpdateMemberRole.
+func (f *fakeProjectRepository) UpdateMemberRole(ctx context.Context, projectID, userID string, role domain.ProjectRole) (domain.ProjectMember, error) {
+	f.updateMemberRoleCalled = true
+	if f.updateRoleErr != nil {
+		return domain.ProjectMember{}, f.updateRoleErr
+	}
+	for i, m := range f.members {
+		if m.ProjectID == projectID && m.UserID == userID {
+			f.members[i].Role = role
+			return f.members[i], nil
+		}
+	}
+	return domain.ProjectMember{}, domain.ErrMembershipNotFound
+}
+
+// CountOwners implements usecase.ProjectRepository.CountOwners — returns
+// f.countOwners directly (a settable fixture value), NOT derived from
+// f.members, so tests can exercise AssertNotLastOwnerRemoval's boundary
+// precisely.
+func (f *fakeProjectRepository) CountOwners(ctx context.Context, projectID string) (int, error) {
+	if f.countOwnersErr != nil {
+		return 0, f.countOwnersErr
+	}
+	return f.countOwners, nil
 }
 
 // fakeOPAClient is an in-memory usecase.OPAClient. decide, when set,
@@ -361,6 +431,19 @@ type fakeProjectGroupRepository struct {
 	updateErr error
 	deleteErr error
 	listErr   error
+
+	upsertLeafErr error
+	// upsertLeafCalled records whether UpsertLeafGroupForProject was
+	// invoked — MoveProject's test plan asserts the usecase itself never
+	// branches on "does a leaf group already exist" (that's the
+	// repository's find-or-create job).
+	upsertLeafCalled bool
+
+	importNestedErr error
+	// importNestedGroups/importNestedProjects are ImportNested's canned
+	// return values — one pair per candidate, set by the test.
+	importNestedGroups   []domain.ProjectGroup
+	importNestedProjects []domain.Project
 }
 
 func newFakeProjectGroupRepository() *fakeProjectGroupRepository {
@@ -500,6 +583,33 @@ func (f *fakeFolderWorkspaceRepository) Get(ctx context.Context, id string) (*do
 	return &fw, nil
 }
 
+// UpsertLeafGroupForProject implements
+// usecase.ProjectGroupRepository.UpsertLeafGroupForProject.
+func (f *fakeProjectGroupRepository) UpsertLeafGroupForProject(ctx context.Context, tenantID, projectID, projectName, targetParentGroupID string) (domain.ProjectGroup, error) {
+	f.upsertLeafCalled = true
+	if f.upsertLeafErr != nil {
+		return domain.ProjectGroup{}, f.upsertLeafErr
+	}
+	for _, g := range f.groups {
+		if g.ProjectID == projectID {
+			g.ParentGroupID = targetParentGroupID
+			f.groups[g.ID] = g
+			return g, nil
+		}
+	}
+	g := domain.ProjectGroup{ID: "leaf-" + projectID, TenantID: tenantID, Name: projectName, ParentGroupID: targetParentGroupID, ProjectID: projectID}
+	f.groups[g.ID] = g
+	return g, nil
+}
+
+// ImportNested implements usecase.ProjectGroupRepository.ImportNested.
+func (f *fakeProjectGroupRepository) ImportNested(ctx context.Context, tenantID, createdBy, devServerID, parentGroupID string, candidates []domain.NestedRepoCandidate) ([]domain.ProjectGroup, []domain.Project, error) {
+	if f.importNestedErr != nil {
+		return nil, nil, f.importNestedErr
+	}
+	return f.importNestedGroups, f.importNestedProjects, nil
+}
+
 func withTenant(ctx context.Context, tenantID string) context.Context {
 	return tenant.WithTenantID(ctx, tenantID)
 }
@@ -533,4 +643,175 @@ func assertAppError(t *testing.T, err error, kind apperrors.Kind, code string) {
 func assertFailedPrecondition(t *testing.T, err error) {
 	t.Helper()
 	assertAppError(t, err, apperrors.KindFailedPrecondition, "PROJECT_HAS_ACTIVE_WORKFLOWS")
+}
+
+// fakeDevServerRelay is an in-memory usecase.DevServerRelay — records every
+// call so tests can assert exact (devServerID, repoPath, worktreeID)/
+// (connectionID, method, paramsJSON) arguments (ScanNested/
+// SetupExistingFolder's test plans both need this).
+type fakeDevServerRelay struct {
+	createConnectionErr error
+	connectionID        string
+
+	relayErr    error
+	relayResult []byte
+
+	createConnectionCalls []fakeCreateConnectionCall
+	relayCalls            []fakeRelayCall
+}
+
+type fakeCreateConnectionCall struct {
+	DevServerID string
+	RepoPath    string
+	WorktreeID  string
+}
+
+type fakeRelayCall struct {
+	ConnectionID string
+	Method       string
+	ParamsJSON   []byte
+}
+
+func (f *fakeDevServerRelay) CreateConnection(ctx context.Context, devServerID, repoPath, worktreeID string) (string, error) {
+	f.createConnectionCalls = append(f.createConnectionCalls, fakeCreateConnectionCall{DevServerID: devServerID, RepoPath: repoPath, WorktreeID: worktreeID})
+	if f.createConnectionErr != nil {
+		return "", f.createConnectionErr
+	}
+	connID := f.connectionID
+	if connID == "" {
+		connID = "conn-1"
+	}
+	return connID, nil
+}
+
+func (f *fakeDevServerRelay) Relay(ctx context.Context, connectionID, method string, paramsJSON []byte) ([]byte, error) {
+	f.relayCalls = append(f.relayCalls, fakeRelayCall{ConnectionID: connectionID, Method: method, ParamsJSON: paramsJSON})
+	if f.relayErr != nil {
+		return nil, f.relayErr
+	}
+	return f.relayResult, nil
+}
+
+// fakeHostSetupRepository is an in-memory usecase.HostSetupRepository.
+type fakeHostSetupRepository struct {
+	setups map[string]domain.HostSetup
+
+	createErr    error
+	getErr       error
+	listErr      error
+	updateErr    error
+	deleteErr    error
+	setStatusErr error
+	completeErr  error
+
+	// createCalled/projectsCreateCalled-style flags let tests assert a
+	// mutation never ran — see TestCreateHostSetup_ValidatesDevServerID.
+	createCalled bool
+}
+
+func newFakeHostSetupRepository() *fakeHostSetupRepository {
+	return &fakeHostSetupRepository{setups: map[string]domain.HostSetup{}}
+}
+
+func (f *fakeHostSetupRepository) Create(ctx context.Context, s domain.HostSetup) (domain.HostSetup, error) {
+	f.createCalled = true
+	if f.createErr != nil {
+		return domain.HostSetup{}, f.createErr
+	}
+	f.setups[s.ID] = s
+	return s, nil
+}
+
+func (f *fakeHostSetupRepository) Get(ctx context.Context, tenantID, id string) (domain.HostSetup, error) {
+	if f.getErr != nil {
+		return domain.HostSetup{}, f.getErr
+	}
+	s, ok := f.setups[id]
+	if !ok || s.TenantID != tenantID {
+		return domain.HostSetup{}, domain.ErrHostSetupNotFound
+	}
+	return s, nil
+}
+
+func (f *fakeHostSetupRepository) List(ctx context.Context, tenantID string) ([]domain.HostSetup, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.HostSetup
+	for _, s := range f.setups {
+		if s.TenantID == tenantID {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeHostSetupRepository) Update(ctx context.Context, tenantID, id string, patch domain.HostSetupPatch) (domain.HostSetup, error) {
+	if f.updateErr != nil {
+		return domain.HostSetup{}, f.updateErr
+	}
+	s, ok := f.setups[id]
+	if !ok || s.TenantID != tenantID {
+		return domain.HostSetup{}, domain.ErrHostSetupNotFound
+	}
+	if patch.FolderPath != "" {
+		s.FolderPath = patch.FolderPath
+	}
+	if patch.DisplayName != "" {
+		s.DisplayName = patch.DisplayName
+	}
+	f.setups[id] = s
+	return s, nil
+}
+
+func (f *fakeHostSetupRepository) Delete(ctx context.Context, tenantID, id string) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	s, ok := f.setups[id]
+	if !ok || s.TenantID != tenantID {
+		return domain.ErrHostSetupNotFound
+	}
+	delete(f.setups, id)
+	return nil
+}
+
+func (f *fakeHostSetupRepository) SetStatus(ctx context.Context, tenantID, id string, status domain.HostSetupStatus) error {
+	if f.setStatusErr != nil {
+		return f.setStatusErr
+	}
+	s, ok := f.setups[id]
+	if !ok || s.TenantID != tenantID {
+		return domain.ErrHostSetupNotFound
+	}
+	s.Status = status
+	f.setups[id] = s
+	return nil
+}
+
+func (f *fakeHostSetupRepository) Complete(ctx context.Context, tenantID, id, projectID string) (domain.HostSetup, error) {
+	if f.completeErr != nil {
+		return domain.HostSetup{}, f.completeErr
+	}
+	s, ok := f.setups[id]
+	if !ok || s.TenantID != tenantID {
+		return domain.HostSetup{}, domain.ErrHostSetupNotFound
+	}
+	s.Status = domain.HostSetupCompleted
+	s.ProjectID = projectID
+	f.setups[id] = s
+	return s, nil
+}
+
+// fakeDevServerLister is an in-memory usecase.DevServerLister.
+type fakeDevServerLister struct {
+	exists bool
+	err    error
+}
+
+func (f *fakeDevServerLister) Exists(ctx context.Context, tenantID, devServerID string) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.exists, nil
 }

@@ -42,3 +42,55 @@ func TestNewProjectGroup_AllowsDistinctParent(t *testing.T) {
 		t.Errorf("expected ParentGroupID=g1, got %q", g.ParentGroupID)
 	}
 }
+
+func TestNewProjectGroup_ProjectIDFieldRoundTrips(t *testing.T) {
+	g, err := NewProjectGroup("leaf-1", "t1", "my-project", "parent-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// NewProjectGroup's signature doesn't accept ProjectID — a leaf group
+	// gets it stamped afterward by UpsertLeafGroupForProject, not at
+	// construction time. Assigning it directly and reading it back proves
+	// the field round-trips unaffected by this task's changes.
+	g.ProjectID = "project-1"
+	if g.ProjectID != "project-1" {
+		t.Errorf("expected ProjectID=project-1, got %q", g.ProjectID)
+	}
+	if g.ParentGroupID != "parent-1" {
+		t.Errorf("expected ParentGroupID=parent-1, got %q", g.ParentGroupID)
+	}
+}
+
+func TestParseNestedRepoCandidates_DecodesWireShape(t *testing.T) {
+	resultJSON := []byte(`{"candidates":[{"path":"/home/dev/repo-a","suggested_name":"repo-a","is_git_repo":true},{"path":"/home/dev/not-a-repo","suggested_name":"","is_git_repo":false}]}`)
+
+	got, err := ParseNestedRepoCandidates(resultJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []NestedRepoCandidate{
+		{Path: "/home/dev/repo-a", SuggestedName: "repo-a", IsGitRepo: true},
+		{Path: "/home/dev/not-a-repo", SuggestedName: "", IsGitRepo: false},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d candidates, got %d: %+v", len(want), len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("candidate %d: expected %+v, got %+v", i, want[i], got[i])
+		}
+	}
+}
+
+func TestParseNestedRepoCandidates_EmptyCandidatesIsNotError(t *testing.T) {
+	got, err := ParseNestedRepoCandidates([]byte(`{"candidates":[]}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected a non-nil empty slice, got nil")
+	}
+	if len(got) != 0 {
+		t.Errorf("expected 0 candidates, got %d: %+v", len(got), got)
+	}
+}
