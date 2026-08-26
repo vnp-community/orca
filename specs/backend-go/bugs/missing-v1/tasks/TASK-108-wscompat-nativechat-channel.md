@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_nativechat.go` (new), `channels.go`, `cmd/server/main.go`
 **Depends on:** none
-**Status:** `[partial]` — implemented as a standalone file registering into `channels_issuetracking_orchestration.go` (per cross-group convention, `channels.go` untouched). Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`. **Integration note:** needs `registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)` added to `RegisterRealChannels`/`main.go` — all 3 clients already dialed there.
+**Status:** `[x]` DONE — verified `channels_nativechat.go` implements `nativeChat.readSession` exactly as this doc describes: relays via `infraFleetClient.Relay`, fails closed with a clear error when `connectionId` is absent, and passes `result_json` through verbatim. Confirmed wired into `RegisterRealChannels`/`main.go`. `go build`/`go vet` clean.
 
 ---
 

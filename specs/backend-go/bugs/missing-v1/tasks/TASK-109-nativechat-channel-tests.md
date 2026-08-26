@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_nativechat_test.go` (new)
 **Depends on:** TASK-108
-**Status:** `[partial]` — usecase/adapter/wscompat tests written and passing (30 new wscompat tests total across the group). Postgres integration test halves written, compile under `-tags=integration`, but not executed — no Docker/Postgres in this environment. Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`.
+**Status:** `[x]` DONE — verified `channels_nativechat_test.go` already implements all 4 tests this doc specifies (relays to infra-fleet, fails closed on missing `connectionId`, propagates relay errors, passes `result_json` through verbatim for both success and error payload shapes), using `fakeInfraFleetClient.relayFunc`. `go test ./services/api-gateway/internal/adapter/wscompat/... -run TestNativeChat` passes (4/4).
 
 ---
 

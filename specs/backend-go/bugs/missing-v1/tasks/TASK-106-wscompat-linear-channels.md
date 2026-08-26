@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_linear.go` (new), `channels.go`, `cmd/server/main.go`
 **Depends on:** TASK-100, TASK-104, TASK-105
-**Status:** `[partial]` — implemented as a standalone file registering into `channels_issuetracking_orchestration.go` (per cross-group convention, `channels.go` untouched). Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`. **Integration note:** needs `registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)` added to `RegisterRealChannels`/`main.go` — all 3 clients already dialed there.
+**Status:** `[x]` DONE — verified `channels_linear.go` implements all 19 `linear.*` channels (status, testConnection, connect, disconnect, selectWorkspace, searchIssues, listIssues, getIssue, createIssue, updateIssue, addIssueComment, issueComments, createProject, getProject, teamStates, listTeams, teamLabels, teamMembers, getCustomView) with field mapping matching this doc exactly, including the `{items,hasMore}` envelope for `linear.listIssues` and the `linear.listTeams`→`ListTeams`/`jira.listProjects`→`ListProjects` no-false-unification guard. Confirmed wired into `RegisterRealChannels`/`main.go`. `go build`/`go vet` clean.
 
 ---
 

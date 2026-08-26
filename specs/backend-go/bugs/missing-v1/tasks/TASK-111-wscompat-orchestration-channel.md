@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/channels_orchestration.go` (new), `channels.go`, `cmd/server/main.go`
 **Depends on:** TASK-110
-**Status:** `[partial]` — implemented as a standalone file registering into `channels_issuetracking_orchestration.go` (per cross-group convention, `channels.go` untouched). Worktree `agent-a412325f0d1276bb5`, committed as `c29ca9e6a`. **Integration note:** needs `registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)` added to `RegisterRealChannels`/`main.go` — all 3 clients already dialed there.
+**Status:** `[x]` DONE — verified `channels_orchestration.go` implements `orchestration.dispatchShow` exactly as this doc describes: calls `GetDispatchContextForTask`, translates `DispatchContext.handle` to `dispatchView.AssigneeHandle` (the wire-naming fix), returns `{dispatch: nil}` when no dispatch exists, leaves `status` as `""` per the documented adjacent-gap note. Confirmed wired into `RegisterRealChannels`/`main.go`. `go build`/`go vet` clean.
 
 ---
 
