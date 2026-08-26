@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_test.go`
 **Depends on:** TASK-058
-**Status:** `[partial]` 4 of 18 `files.*` channels covered in the new `channels_git_test.go` (`files.read`, `files.writeBase64` incl. base64-decode-then-forward, `files.rename` incl. known-gap error passthrough, `files.commitUpload` local no-op ack). NOT covered: the remaining 14 channels (`files.stat`/`readDir`/`readChunk`/`readPreview`/`write`/`writeBase64Chunk`/`createDir`/`createDirNoClobber`/`delete`/`search`/`listAll`/`listMarkdownDocuments`/`copy`/`unwatch`) and the specific "invalid base64 rejected before any RPC call" regression guard this task calls out. `go test` passes for what's written.
+**Status:** `[x]` DONE — All 18 `files.*` channels now covered in `channels_git_test.go`: `files.read`/`files.stat`/`files.readDir` (unwrapped entries)/`files.readChunk` (incl. known-gap error passthrough)/`files.readPreview`/`files.write`+`files.writeBase64` (collapse regression guard)/`files.writeBase64` invalid-base64 regression guard (no RPC call)/`files.writeBase64Chunk`/`files.createDir`+`files.createDirNoClobber` (shared-RPC regression guard)/`files.delete`/`files.search` (unwrapped matches)/`files.listAll`+`files.listMarkdownDocuments` (unwrapped paths)/`files.rename`+`files.copy` (known-gap error passthrough)/`files.commitUpload`+`files.unwatch` (local no-op acks). `fakeGitGatewayClient` extended with one func field + override per new RPC (`StatFile`/`ReadDir`/`ReadFileChunk`/`ReadFilePreview`/`WriteFileChunk`/`CreateDir`/`DeleteFile`/`SearchFiles`/`ListAllFiles`/`ListMarkdownDocuments`/`CopyFile`). `go build`/`go vet`/`go test ./internal/adapter/wscompat/... -run TestFiles` clean (20 tests).
 
 ---
 

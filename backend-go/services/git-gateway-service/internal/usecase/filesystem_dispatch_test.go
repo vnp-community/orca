@@ -12,15 +12,20 @@ import (
 // LocalOnlyFilesystemExecutor — records which method was called so tests
 // can assert dispatch routing, mirroring fakeGitExecutor's pattern above.
 type fakeFilesystemExecutor struct {
-	calledReadFile   bool
-	calledWriteFile  bool
-	calledRename     bool
-	calledCopy       bool
-	calledSearch     bool
-	calledGlob       bool
-	gotRepoPath      string
-	readFileContent  []byte
-	readFileErr      error
+	calledReadFile       bool
+	calledReadDir        bool
+	calledWriteFile      bool
+	calledWriteFileChunk bool
+	calledCreateDir      bool
+	calledDelete         bool
+	calledStat           bool
+	calledRename         bool
+	calledCopy           bool
+	calledSearch         bool
+	calledGlob           bool
+	gotRepoPath          string
+	readFileContent      []byte
+	readFileErr          error
 }
 
 func (f *fakeFilesystemExecutor) ReadFile(ctx context.Context, repoPath, relPath string) ([]byte, error) {
@@ -40,6 +45,8 @@ func (f *fakeFilesystemExecutor) ReadFilePreview(ctx context.Context, repoPath, 
 }
 
 func (f *fakeFilesystemExecutor) ReadDir(ctx context.Context, repoPath, relPath string) ([]domain.DirEntry, error) {
+	f.calledReadDir = true
+	f.gotRepoPath = repoPath
 	return []domain.DirEntry{{Name: "a.txt"}}, nil
 }
 
@@ -50,18 +57,26 @@ func (f *fakeFilesystemExecutor) WriteFile(ctx context.Context, repoPath, relPat
 }
 
 func (f *fakeFilesystemExecutor) WriteFileChunk(ctx context.Context, repoPath, relPath string, offsetBytes int64, content []byte, isFinal bool) (int64, error) {
+	f.calledWriteFileChunk = true
+	f.gotRepoPath = repoPath
 	return int64(len(content)), nil
 }
 
 func (f *fakeFilesystemExecutor) CreateDir(ctx context.Context, repoPath, relPath string, recursive, noClobber bool) error {
+	f.calledCreateDir = true
+	f.gotRepoPath = repoPath
 	return nil
 }
 
 func (f *fakeFilesystemExecutor) Delete(ctx context.Context, repoPath, relPath string, recursive bool) error {
+	f.calledDelete = true
+	f.gotRepoPath = repoPath
 	return nil
 }
 
 func (f *fakeFilesystemExecutor) Stat(ctx context.Context, repoPath, relPath string) (domain.FileStat, error) {
+	f.calledStat = true
+	f.gotRepoPath = repoPath
 	return domain.FileStat{Exists: true}, nil
 }
 
@@ -72,6 +87,7 @@ func (f *fakeFilesystemExecutor) Search(ctx context.Context, repoPath string, op
 
 func (f *fakeFilesystemExecutor) Glob(ctx context.Context, repoPath, pattern string, maxResults int) ([]string, error) {
 	f.calledGlob = true
+	f.gotRepoPath = repoPath
 	return []string{"a.txt", "b.md"}, nil
 }
 
@@ -203,5 +219,182 @@ func TestCopyFileUseCase_Connected_ReturnsNotSupported(t *testing.T) {
 	err := uc.Execute(context.Background(), "wt1", "a.txt", "b.txt")
 	if !errors.Is(err, ErrFileOpNotSupportedOverRelay) {
 		t.Fatalf("expected ErrFileOpNotSupportedOverRelay, got %v", err)
+	}
+}
+
+func TestReadDirUseCase_RoutesByConnectionState(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewReadDirUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, RepoPath: "/repo"}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), "wt1", "subdir")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledReadDir || local.calledReadDir {
+		t.Error("expected ReadDir to route to relay when Connected=true")
+	}
+	if relay.gotRepoPath != "/repo" {
+		t.Errorf("expected resolved repo path to reach executor, got %q", relay.gotRepoPath)
+	}
+	if len(got) != 1 || got[0].Name != "a.txt" {
+		t.Errorf("unexpected entries: %+v", got)
+	}
+}
+
+func TestReadDirUseCase_NotConnected_CallsLocal(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewReadDirUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}, local, relay)
+
+	if _, err := uc.Execute(context.Background(), "wt1", "subdir"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledReadDir || relay.calledReadDir {
+		t.Error("expected ReadDir to route to local when Connected=false")
+	}
+}
+
+func TestStatFileUseCase_RoutesByConnectionState(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewStatFileUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, RepoPath: "/repo"}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), "wt1", "a.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledStat || local.calledStat {
+		t.Error("expected Stat to route to relay when Connected=true")
+	}
+	if !got.Exists {
+		t.Errorf("unexpected stat result: %+v", got)
+	}
+}
+
+func TestStatFileUseCase_NotConnected_CallsLocal(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewStatFileUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}, local, relay)
+
+	if _, err := uc.Execute(context.Background(), "wt1", "a.txt"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledStat || relay.calledStat {
+		t.Error("expected Stat to route to local when Connected=false")
+	}
+}
+
+func TestCreateDirUseCase_RoutesByConnectionState(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewCreateDirUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, RepoPath: "/repo"}}, local, relay)
+
+	if err := uc.Execute(context.Background(), "wt1", "newdir", true, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledCreateDir || local.calledCreateDir {
+		t.Error("expected CreateDir to route to relay when Connected=true")
+	}
+}
+
+func TestCreateDirUseCase_NotConnected_CallsLocal(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	// noClobber=true exercises the files.createDirNoClobber call site — same
+	// usecase, one bool param, per SOL-009's proto-collapse note.
+	uc := NewCreateDirUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}, local, relay)
+
+	if err := uc.Execute(context.Background(), "wt1", "newdir", false, true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledCreateDir || relay.calledCreateDir {
+		t.Error("expected CreateDir to route to local when Connected=false")
+	}
+}
+
+func TestDeleteFileUseCase_RoutesByConnectionState(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewDeleteFileUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, RepoPath: "/repo"}}, local, relay)
+
+	if err := uc.Execute(context.Background(), "wt1", "a.txt", false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledDelete || local.calledDelete {
+		t.Error("expected Delete to route to relay when Connected=true")
+	}
+}
+
+func TestDeleteFileUseCase_NotConnected_CallsLocal(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewDeleteFileUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}, local, relay)
+
+	if err := uc.Execute(context.Background(), "wt1", "a.txt", true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledDelete || relay.calledDelete {
+		t.Error("expected Delete to route to local when Connected=false")
+	}
+}
+
+func TestWriteFileChunkUseCase_RoutesByConnectionState(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewWriteFileChunkUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, RepoPath: "/repo"}}, local, relay)
+
+	n, err := uc.Execute(context.Background(), "wt1", "a.txt", 0, []byte("hello"), true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledWriteFileChunk || local.calledWriteFileChunk {
+		t.Error("expected WriteFileChunk to route to relay when Connected=true")
+	}
+	if n != 5 {
+		t.Errorf("expected 5 bytes written, got %d", n)
+	}
+}
+
+func TestWriteFileChunkUseCase_NotConnected_CallsLocal(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewWriteFileChunkUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}, local, relay)
+
+	if _, err := uc.Execute(context.Background(), "wt1", "a.txt", 0, []byte("hi"), false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledWriteFileChunk || relay.calledWriteFileChunk {
+		t.Error("expected WriteFileChunk to route to local when Connected=false")
+	}
+}
+
+func TestListAllFilesUseCase_RoutesByConnectionState(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewListAllFilesUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, RepoPath: "/repo"}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), "wt1", "*", 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledGlob || local.calledGlob {
+		t.Error("expected ListAllFiles to route to relay (via Glob) when Connected=true")
+	}
+	if len(got) != 2 {
+		t.Errorf("unexpected paths: %+v", got)
+	}
+}
+
+func TestListAllFilesUseCase_NotConnected_CallsLocal(t *testing.T) {
+	local := &fakeFilesystemExecutor{}
+	relay := &fakeFilesystemExecutor{}
+	uc := NewListAllFilesUseCase(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}, local, relay)
+
+	if _, err := uc.Execute(context.Background(), "wt1", "*", 10); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledGlob || relay.calledGlob {
+		t.Error("expected ListAllFiles to route to local (via Glob) when Connected=false")
 	}
 }

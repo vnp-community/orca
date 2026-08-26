@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/dispatch_test.go` (extend), plus new `*_test.go` files as needed
 **Depends on:** TASK-207, TASK-208, TASK-209, TASK-210, TASK-211
-**Status:** `[partial]` Dispatch-routing tests added for every usecase this pass actually implemented (Stage/Unstage/History/CheckIgnored/ForkSync/UpstreamStatus/RemoteCommitURL/RemoteFileURL/GeneratePullRequestFields/DiscoverCommitMessageModels, plus the file-io usecases in `filesystem_dispatch_test.go`) in `dispatch_test.go`, following its existing `fakeGitExecutor`-per-package convention. Only covers what's implemented — TASK-207's 9 branch/ref methods and TASK-209/210's 6 BLOCKED methods have no usecases to test since they were never built. `go test ./internal/usecase/...` passes (42 tests).
+**Status:** `[x]` DONE — Dispatch-routing tests added for every usecase this pass actually implemented (Stage/Unstage/History/CheckIgnored/ForkSync/UpstreamStatus/RemoteCommitURL/RemoteFileURL/GeneratePullRequestFields/DiscoverCommitMessageModels, plus the file-io usecases in `filesystem_dispatch_test.go`) in `dispatch_test.go`, following its existing `fakeGitExecutor`-per-package convention. Closed the 2 remaining gaps found this pass: `TestUnstage_MissingPaths_ReturnsError` (Stage had this validation test, Unstage didn't) and `TestRemoteFileURL_RoutesByConnectionState` (RemoteCommitURL had a routing test, RemoteFileURL only had its missing-path guard). Only covers what's implemented — TASK-207's 9 branch/ref methods and TASK-209/210's 6 BLOCKED methods have no usecases to test since they were never built. `go build`/`go vet`/`go test ./internal/usecase/...` clean (80 tests).
 
 ---
 

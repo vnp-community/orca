@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-057
-**Status:** `[partial]` `files.rename`/`files.copy`/`files.commitUpload`/`files.unwatch` all registered, completing `registerFilesChannels` in `channels_git.go` — 16 of 18 `files.*` frontend methods now backed (the other 2, `writeBase64`/`createDirNoClobber`, collapse onto existing RPCs per TASK-049's design, not separate channels). NOT done: the actual `RegisterRealChannels`/`main.go` wiring call (`registerFilesChannels(r, gitClient)`) — deliberately left for the integration pass per the parent scope's explicit instruction not to edit `channels.go`/`main.go` directly. `go build`/`go vet`/`go test` clean; `gitgatewayv1.GitGatewayServiceClient` confirmed to include all 16 new methods.
+**Status:** `[x]` DONE — `files.rename`/`files.copy`/`files.commitUpload`/`files.unwatch` all registered, completing `registerFilesChannels` in `channels_git.go` — 16 of 18 `files.*` frontend methods now backed (the other 2, `writeBase64`/`createDirNoClobber`, collapse onto existing RPCs per TASK-049's design, not separate channels). The `RegisterRealChannels`/`main.go` wiring call (`registerFilesChannels(r, gitClient)`) has since landed in `channels.go`'s "final integration wiring pass" — verified present and building clean. `go build`/`go vet`/`go test` clean; `gitgatewayv1.GitGatewayServiceClient` confirmed to include all 16 new methods.
 
 ---
 

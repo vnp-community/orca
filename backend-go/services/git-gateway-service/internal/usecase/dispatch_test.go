@@ -607,6 +607,14 @@ func TestUnstage_RoutesByConnectionState(t *testing.T) {
 	}
 }
 
+func TestUnstage_MissingPaths_ReturnsError(t *testing.T) {
+	uc := NewUnstage(&fakeConnectionResolver{}, &fakeGitExecutor{}, &fakeGitExecutor{})
+	_, err := uc.Execute(context.Background(), UnstageInput{WorktreeID: "wt1"})
+	if err == nil {
+		t.Fatal("expected error for missing paths")
+	}
+}
+
 // ── TASK-209 (shippable-now subset): History/CheckIgnored/ForkSync/UpstreamStatus ──
 
 func TestHistory_RoutesByConnectionState(t *testing.T) {
@@ -716,6 +724,23 @@ func TestRemoteFileURL_MissingPath_ReturnsError(t *testing.T) {
 	_, err := uc.Execute(context.Background(), RemoteFileURLInput{WorktreeID: "wt1"})
 	if err == nil {
 		t.Fatal("expected error for missing path")
+	}
+}
+
+func TestRemoteFileURL_RoutesByConnectionState(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewRemoteFileURL(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1"}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), RemoteFileURLInput{WorktreeID: "wt1", Path: "a.txt", Ref: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledRemoteFile || local.calledRemoteFile {
+		t.Error("expected RemoteFileURL to route to relay when Connected=true")
+	}
+	if got == "" {
+		t.Error("expected non-empty url")
 	}
 }
 

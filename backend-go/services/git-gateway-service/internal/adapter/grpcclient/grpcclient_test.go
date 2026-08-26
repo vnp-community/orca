@@ -310,6 +310,87 @@ func TestRelayExecutor_ForkSync_SendsExpectedUpstream(t *testing.T) {
 	}
 }
 
+func TestRelayExecutor_UpstreamStatus_SendsWorktreePathAndPushTarget(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{"hasUpstream": true, "ahead": 2, "behind": 1})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.UpstreamStatus(ctxWithTenant(t), "/repo", "origin")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.upstreamStatus" {
+		t.Errorf("expected method=git.upstreamStatus, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["pushTarget"] != "origin" {
+		t.Errorf("unexpected params: %+v", params)
+	}
+	if !got.HasUpstream || got.Ahead != 2 || got.Behind != 1 {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestRelayExecutor_RemoteCommitURL_SendsWorktreePathAndSha(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{"url": "https://github.com/org/repo/commit/abc123"})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.RemoteCommitURL(ctxWithTenant(t), "/repo", "abc123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.remoteCommitUrl" {
+		t.Errorf("expected method=git.remoteCommitUrl, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["sha"] != "abc123" {
+		t.Errorf("unexpected params: %+v", params)
+	}
+	if got != "https://github.com/org/repo/commit/abc123" {
+		t.Errorf("unexpected url: %q", got)
+	}
+}
+
+func TestRelayExecutor_RemoteFileURL_SendsWorktreePathPathAndRef(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{"url": "https://github.com/org/repo/blob/main/a.txt"})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.RemoteFileURL(ctxWithTenant(t), "/repo", "a.txt", "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.remoteFileUrl" {
+		t.Errorf("expected method=git.remoteFileUrl, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["worktreePath"] != "/repo" || params["path"] != "a.txt" || params["ref"] != "main" {
+		t.Errorf("unexpected params: %+v", params)
+	}
+	if got != "https://github.com/org/repo/blob/main/a.txt" {
+		t.Errorf("unexpected url: %q", got)
+	}
+}
+
 // ── usecase.FilesystemExecutor compile-time guards (TASK-050/051/055) ────
 
 func TestRelayExecutor_ImplementsFilesystemExecutorNotLocalOnly(t *testing.T) {
