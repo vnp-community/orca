@@ -175,10 +175,17 @@ type fakeEdgeRepository struct {
 	edges   []domain.TaskEdge
 	addErr  error
 	listErr error
+	// addErrAfterCalls, when > 0, lets the first N Add calls succeed before
+	// addErr starts firing — used by ai_apply_test.go's mid-loop-failure
+	// case to simulate AIApply's documented non-transactional gap (one
+	// proposal committed, a later one failing) without a real database.
+	addErrAfterCalls int
+	addCalls         int
 }
 
 func (f *fakeEdgeRepository) Add(ctx context.Context, tenantID string, edge domain.TaskEdge) error {
-	if f.addErr != nil {
+	f.addCalls++
+	if f.addErr != nil && f.addCalls > f.addErrAfterCalls {
 		return f.addErr
 	}
 	f.edges = append(f.edges, edge)
