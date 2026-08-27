@@ -1,31 +1,7 @@
-# TASK-MB-01-08: Add `api-gateway` REST routes for device pairing (1 unauthenticated, 3 authenticated)
-
-**From Solution:** SOL-MB-01
-**Priority:** P0
-**Service:** `api-gateway`
-**File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/pairing_routes.go`, `backend-go/services/api-gateway/internal/adapter/httpgateway/router.go`
-**Depends on:** TASK-MB-01-07
-**Status:** `[x]` DONE — added `pairing_routes.go` (3 authed handlers + unauthenticated `CompleteDevicePairing`), `pairingRateLimitMiddleware` (keys on remote addr, disjoint "pairing:" bucket prefix on the shared `RateLimiter`) in `middleware.go`, wired both mount points in `router.go` per the precedent; `go build`/`go vet` clean; `pairing_routes_test.go` covers `TestCompleteDevicePairing_NoAuthRequired`, `TestCompleteDevicePairing_ErrorsShareIdenticalShape` (invalid/expired/used all map to identical status+body), plus Initiate/List/Unpair success paths — all pass.
-
----
-
-## Context
-
-`CompleteDevicePairing` is the one REST endpoint on the entire gateway
-surface that bypasses `authMiddleware` by design (there is no session yet).
-`router.go`'s existing `mountPushRoutes` (mounted outside the authed
-`r.Group`, see its doc comment referencing `BUG-003`) is the exact
-unauthenticated-mount precedent this task follows — never move this route
-inside the authed group.
-
-## Changes to make
-
-`backend-go/services/api-gateway/internal/adapter/httpgateway/pairing_routes.go`:
-
-```go
 package httpgateway
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 
@@ -90,8 +66,9 @@ func handleCompleteDevicePairing(client authv1.AuthServiceClient) http.HandlerFu
 			// Generic error shape only — no distinguishing "expired" vs.
 			// "wrong token" vs. "already consumed" in the HTTP response, so
 			// an unauthenticated prober learns nothing about pairing-session
-			// existence. writeGRPCError already maps auth-service's single
-			// AUTH_PAIRING_TOKEN_INVALID code to one generic 404 shape.
+			// existence. writeGRPCError maps whatever single gRPC code
+			// auth-service returns for every one of these cases to the same
+			// HTTP status + error body shape.
 			writeGRPCError(w, err)
 			return
 		}
@@ -136,44 +113,3 @@ func handleUnpairDevice(client authv1.AuthServiceClient) http.HandlerFunc {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
-```
-
-Add `"encoding/base64"` to the import block.
-
-In `router.go`, mount the unauthenticated route next to `mountPushRoutes`
-(outside `r.Group`), and the authenticated 3 inside the existing
-`if deps.AuthClient != nil { ... }` block alongside `mountAuthAdminRoutes`:
-
-```go
-// outside the authed group, next to mountPushRoutes:
-if deps.AuthClient != nil {
-	mountUnauthenticatedPairingRoutes(r, deps.AuthClient, pairingRateLimitMiddleware(deps.RateLimiter))
-}
-// ...
-r.Group(func(authed chi.Router) {
-	// ...
-	if deps.AuthClient != nil {
-		mountAuthAdminRoutes(authed, deps.AuthClient)
-		mountAdminRoutes(authed, deps.AuthClient)
-		mountPairingRoutes(authed, deps.AuthClient)
-	}
-```
-
-`pairingRateLimitMiddleware` can be a stricter-limit wrapper around the
-same `rateLimitMiddleware`/`deps.RateLimiter` primitive `router.go` already
-uses — check `rateLimitMiddleware`'s signature before adding a new limiter
-type.
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/api-gateway/... && go vet ./services/api-gateway/...
-go test ./services/api-gateway/internal/adapter/httpgateway/... -run Pairing
-```
-
-Add `TestCompleteDevicePairing_NoAuthRequired` mirroring
-`TestPushRoutes_NoAuthRequired` — a request with no `Authorization`
-header/session cookie must reach the handler (not `authMiddleware`'s 401).
-Add a test asserting an invalid/expired/already-used token all produce the
-identical HTTP status + error body shape.

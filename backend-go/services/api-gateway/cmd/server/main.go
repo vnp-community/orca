@@ -254,6 +254,13 @@ func run() error {
 	// request/response ChannelHandlers, see channels_push.go's doc comment.
 	clientEventBus := wscompat.NewClientEventBus()
 	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus)
+
+	// mobile.* channels (SOL-MB-01/03/04) — deviceSecretResolver wraps
+	// auth-service's internal-only ResolveDeviceSharedSecret RPC, the same
+	// authClient every other real channel registration above shares.
+	deviceSecretResolver := authclient.NewDeviceSecretResolver(authClient)
+	wscompat.RegisterMobileChannels(wsCompatRegistry, infraFleetClient, projectClient, deviceSecretResolver)
+
 	wsCompatHandler := wscompat.New(logger, sessionValidator, wsCompatRegistry)
 
 	// agentProxyHandler raw-proxies the Dev Server Agent's /agent (WS) and
