@@ -29,6 +29,7 @@ import { OrchestrationSkillAgentCoverage } from './OrchestrationSkillAgentCovera
 import { OrchestrationExampleDialog } from './OrchestrationExamplesDialog'
 import { OrchestrationSkillPromptDialog } from './OrchestrationSkillPromptDialog'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
 
 const EXAMPLE_ICONS = {
   handoff: ArrowRightLeft,
@@ -108,10 +109,10 @@ export function OrchestrationPane(): React.JSX.Element {
         preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
         getPrerequisiteStatus={() =>
           activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-            ? window.api.cli.getWslInstallStatus(
+            ? getRuntimeWslCliInstallStatus(
                 getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
               )
-            : window.api.cli.getInstallStatus()
+            : getRuntimeCliInstallStatus()
         }
         onBeforeOpenTerminal={async () => {
           useAppStore.getState().recordFeatureInteraction('agent-orchestration-setup')

@@ -27,8 +27,8 @@ export const migration0009Workflows: Migration = {
         definition_json     TEXT    NOT NULL DEFAULT '{"steps":[]}',
         owner_id            TEXT,
         scope               TEXT    NOT NULL DEFAULT 'user',
-        created_at          INTEGER NOT NULL,
-        updated_at          INTEGER NOT NULL
+        created_at          BIGINT NOT NULL,
+        updated_at          BIGINT NOT NULL
       )
     `)
 
@@ -42,10 +42,10 @@ export const migration0009Workflows: Migration = {
         current_wave        INTEGER NOT NULL DEFAULT 0,
         triggered_by        TEXT    NOT NULL,
         project_id          TEXT,
-        started_at          INTEGER,
-        completed_at        INTEGER,
+        started_at          BIGINT,
+        completed_at        BIGINT,
         error_message       TEXT,
-        created_at          INTEGER NOT NULL
+        created_at          BIGINT NOT NULL
       )
     `)
     await db.exec(`
@@ -64,8 +64,8 @@ export const migration0009Workflows: Migration = {
         execution_id  TEXT    NOT NULL REFERENCES orca_workflow_executions(id) ON DELETE CASCADE,
         step_id       TEXT    NOT NULL,
         status        TEXT    NOT NULL DEFAULT 'pending',
-        started_at    INTEGER,
-        completed_at  INTEGER,
+        started_at    BIGINT,
+        completed_at  BIGINT,
         output_json   TEXT,
         error_message TEXT
       )

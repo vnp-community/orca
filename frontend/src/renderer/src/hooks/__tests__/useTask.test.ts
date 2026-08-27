@@ -3,7 +3,7 @@
  *
  * Covers `src/renderer/src/hooks/useTask.ts` — instrumented with
  * `Tracers.uiTaskGraphAiPlanFlow` (`ui:taskGraph.aiPlan`), forwarding
- * `traceId` to `tasks.aiPlan` and logging `promptLength` instead of the
+ * `traceId` to `task.aiDecompose` and logging `promptLength` instead of the
  * full instruction text.
  *
  * @module renderer/hooks/__tests__/useTask.test
@@ -20,7 +20,7 @@ vi.mock('../../runtime/runtime-rpc-client', () => ({
 }))
 
 const mockStore: any = {
-  tasks: [{ id: 'task-1', title: 'Task 1' }],
+  tasks: [{ id: 'task-1', title: 'Task 1', projectId: 'proj-1' }],
   updateTask: vi.fn(),
   removeTask: vi.fn(),
   addTask: vi.fn(),
@@ -28,10 +28,9 @@ const mockStore: any = {
 }
 
 vi.mock('../../store', () => ({
-  useAppStore: Object.assign(
-    (fn?: any) => (fn ? fn(mockStore) : mockStore),
-    { getState: () => mockStore }
-  )
+  useAppStore: Object.assign((fn?: any) => (fn ? fn(mockStore) : mockStore), {
+    getState: () => mockStore
+  })
 }))
 
 const mockRpc = vi.mocked(callRuntimeRpc)
@@ -47,8 +46,8 @@ describe('useTask().aiDecompose() tracing', () => {
     vi.clearAllMocks()
   })
 
-  it('with instruction → start({hasInstruction:true, promptLength}), traceId forwarded to tasks.aiPlan', async () => {
-    mockRpc.mockResolvedValueOnce({ subtasks: [{ title: 'a' }, { title: 'b' }] })
+  it('with instruction → start({hasInstruction:true, promptLength}), traceId forwarded to task.aiDecompose', async () => {
+    mockRpc.mockResolvedValueOnce([{ title: 'a' }, { title: 'b' }])
     const { events, stop } = captureTraceEvents()
     const { useTask } = await import('../useTask')
     const { result } = renderHook(() => useTask('task-1'))
@@ -64,12 +63,13 @@ describe('useTask().aiDecompose() tracing', () => {
     expect(startEvent?.fields.promptLength).toBe('do the thing'.length)
 
     const callArgs = mockRpc.mock.calls[0]
-    expect(callArgs?.[1]).toBe('tasks.aiPlan')
+    expect(callArgs?.[1]).toBe('task.aiDecompose')
+    expect((callArgs?.[2] as { projectId?: string }).projectId).toBe('proj-1')
     expect((callArgs?.[2] as { traceId?: string }).traceId).toBe(startEvent?.id)
   })
 
   it('without instruction → start({hasInstruction:false, promptLength:0})', async () => {
-    mockRpc.mockResolvedValueOnce({ subtasks: [] })
+    mockRpc.mockResolvedValueOnce([])
     const { events, stop } = captureTraceEvents()
     const { useTask } = await import('../useTask')
     const { result } = renderHook(() => useTask('task-1'))
@@ -85,7 +85,7 @@ describe('useTask().aiDecompose() tracing', () => {
   })
 
   it('success → span.ok({taskId, subtaskCount}) matches result.subtasks.length', async () => {
-    mockRpc.mockResolvedValueOnce({ subtasks: [{ title: 'a' }, { title: 'b' }, { title: 'c' }] })
+    mockRpc.mockResolvedValueOnce([{ title: 'a' }, { title: 'b' }, { title: 'c' }])
     const { events, stop } = captureTraceEvents()
     const { useTask } = await import('../useTask')
     const { result } = renderHook(() => useTask('task-1'))
@@ -121,9 +121,9 @@ describe('useTask().aiDecompose() tracing', () => {
   })
 
   it('updateTask/deleteTask/acceptSubtasks — regression: no ui:taskGraph.aiPlan span emitted', async () => {
-    mockRpc.mockResolvedValueOnce(undefined) // tasks.update
-    mockRpc.mockResolvedValueOnce(undefined) // tasks.delete
-    mockRpc.mockResolvedValueOnce([]) // tasks.createSubtasks
+    mockRpc.mockResolvedValueOnce(undefined) // task.update
+    mockRpc.mockResolvedValueOnce(undefined) // task.delete
+    mockRpc.mockResolvedValueOnce([]) // task.aiApply
     const { events, stop } = captureTraceEvents()
     const { useTask } = await import('../useTask')
     const { result } = renderHook(() => useTask('task-1'))

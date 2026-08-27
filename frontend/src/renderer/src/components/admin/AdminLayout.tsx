@@ -13,6 +13,7 @@ export type AdminRoute =
   | '/profile'
   | '/ai-providers'
   | '/fleet'
+  | '/teams'
 
 type Props = {
   currentRoute: AdminRoute
@@ -32,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { route: '/audit',         label: 'Audit Log',    icon: '📋' },
   { route: '/ai-providers',  label: 'AI Providers', icon: '🤖' },
   { route: '/profile',       label: 'Profile',      icon: '🏢' },
+  { route: '/teams',         label: 'Teams',        icon: '🧑‍🤝‍🧑' },
   { route: '/fleet',         label: 'Fleet',        icon: '🖥️' },
 ]
 

@@ -7,6 +7,7 @@ import { translate } from '@/i18n/i18n'
 import { NetworkInterfacePicker } from '../mobile/NetworkInterfacePicker'
 import type { MobileNetworkInterface } from './mobile-network-interface-selection'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 const TAILSCALE_DOWNLOAD_URL = 'https://tailscale.com/download'
 
 type MobileNetworkInterfaceSectionProps = {
@@ -127,7 +128,7 @@ export function MobileNetworkInterfaceSection({
                 )}{' '}
                 <button
                   type="button"
-                  onClick={() => void window.api.shell.openUrl(TAILSCALE_DOWNLOAD_URL)}
+                  onClick={() => void shellOpenUrl(TAILSCALE_DOWNLOAD_URL)}
                   className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline"
                 >
                   {translate(

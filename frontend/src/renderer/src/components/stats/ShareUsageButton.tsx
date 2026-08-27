@@ -7,6 +7,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { ShareUsageCard, type ShareUsageCardProps } from './ShareUsageCard'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardImage } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 type ShareUsageButtonProps = ShareUsageCardProps
 
 function XIcon(): React.JSX.Element {
@@ -53,7 +55,7 @@ export function ShareUsageButton(props: ShareUsageButtonProps): React.JSX.Elemen
         pixelRatio: 2,
         backgroundColor: undefined
       })
-      await window.api.ui.writeClipboardImage(dataUrl)
+      await uiWriteClipboardImage(dataUrl)
       return true
     } finally {
       if (isMountedRef.current) {
@@ -113,7 +115,7 @@ export function ShareUsageButton(props: ShareUsageButtonProps): React.JSX.Elemen
       'github.com/stablyai/orca'
     ]
     const url = `https://x.com/intent/post?text=${encodeURIComponent(lines.join('\n'))}`
-    await window.api.shell.openUrl(url)
+    await shellOpenUrl(url)
   }, [props])
 
   return (

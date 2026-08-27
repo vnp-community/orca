@@ -633,7 +633,7 @@ describe('useComposerState host-context boundaries', () => {
     )
     expect(recipeLoadSection).toContain('settings?.experimentalEphemeralVms === true')
     expect(recipeLoadSection).toContain('!ephemeralVmsEnabled')
-    expect(recipeLoadSection).toContain('window.api.ephemeralVm')
+    expect(recipeLoadSection).toContain('listRuntimeEphemeralVmRecipes')
 
     const submitSection = sourceBetween(
       HOOK_SOURCE,

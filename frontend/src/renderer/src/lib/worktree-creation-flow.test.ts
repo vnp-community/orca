@@ -5,6 +5,7 @@ import type {
   PendingWorktreeCreation,
   WorktreeCreationRequest
 } from '@/lib/pending-worktree-creation'
+import type * as RuntimeRpcClientModule from '@/runtime/runtime-rpc-client'
 
 const { prepareEphemeralVmWorkspaceTargetMock } = vi.hoisted(() => ({
   prepareEphemeralVmWorkspaceTargetMock: vi.fn()
@@ -75,12 +76,21 @@ vi.mock('@/lib/ephemeral-vm-workspace-target', () => ({
   prepareEphemeralVmWorkspaceTarget: prepareEphemeralVmWorkspaceTargetMock
 }))
 
+vi.mock('@/runtime/runtime-rpc-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof RuntimeRpcClientModule>()
+  return {
+    ...actual,
+    callRuntimeRpc: vi.fn()
+  }
+})
+
 import { toast } from 'sonner'
 import {
   activateAndRevealWorktree,
   ensureWorktreeHasInitialTerminal
 } from '@/lib/worktree-activation'
 import { queueNewWorkspaceTerminalFocus } from '@/lib/new-workspace-terminal-focus'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import {
   beginBackgroundWorktreePreparation,
   continueBackgroundWorktreeCreation,
@@ -535,13 +545,13 @@ describe('staged background worktree creation', () => {
 
   it('does not reveal a workspace cancelled during post-create trust preflight', async () => {
     let resolveTrust!: () => void
-    const markTrusted = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveTrust = resolve
-        })
-    )
-    globalThis.window = { api: { agentTrust: { markTrusted } } } as never
+    const trustPromise = new Promise<void>((resolve) => {
+      resolveTrust = resolve
+    })
+    vi.mocked(callRuntimeRpc).mockReturnValueOnce(trustPromise as never)
+    // Why: markRuntimeAgentTrusted gates on window.api.agentTrust presence before
+    // routing the call through the mocked callRuntimeRpc above.
+    globalThis.window = { api: { agentTrust: {} } } as never
     store.repos = [{ id: 'repo-1', connectionId: null }]
     store.createWorktree.mockResolvedValueOnce({
       worktree: { id: 'wt-1', repoId: 'repo-1', path: '/repo/wt-1' }
@@ -554,7 +564,7 @@ describe('staged background worktree creation', () => {
     )
 
     expect(started).toBe(true)
-    await vi.waitFor(() => expect(markTrusted).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(callRuntimeRpc).toHaveBeenCalledTimes(1))
     delete store.pendingWorktreeCreations['creation-1']
     store.activePendingCreationId = null
     resolveTrust()

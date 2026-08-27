@@ -128,6 +128,7 @@ import { recordCreatedTerminalPaneSplit } from './terminal-pane-split-completion
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { seedStartupSessionRestoredBanner } from './session-restored-banner-pane-state'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function recordRuntimeCreatedTerminalPaneSplit(
   createdPane: unknown,
   args: {
@@ -456,7 +457,20 @@ export function shouldDetachPaneTransportOnUnmount(args: {
   worktreeTabs: readonly TerminalTab[] | undefined
 }): boolean {
   if (!args.ptyId) {
-    return false
+    // FIX BUG-FE-PTY-001: a spawn still in flight (no ptyId back yet) used to
+    // fall straight to `return false` — destroy — even when the tab itself
+    // was still alive (group rehoming momentarily unmounts this TerminalPane,
+    // see the transport-teardown loop below). transport.destroy() sets its
+    // `destroyed` flag, which makes the in-flight terminal.create's completion
+    // handler close the just-created PTY server-side the instant it resolves
+    // (remote-runtime-pty-transport.ts's connect()) — racing ahead of
+    // pendingSpawnByPaneKey (pty-connection.ts), the mechanism that lets a
+    // remounted pane for the SAME tab find that in-flight spawn and attach to
+    // it once it resolves. The PTY was dead before the remount ever got a
+    // chance to reattach, surfacing as SSH_SESSION_EXPIRED/"PTY not found" on
+    // the very next click. Detaching (not destroying) here lets the create
+    // finish normally and keeps the PTY alive for that reattach.
+    return args.tabStillExists
   }
   if (args.tabStillExists) {
     return true
@@ -830,7 +844,7 @@ export function useTerminalPaneLifecycle({
           guardParserHandler('osc-52-clipboard', (data) =>
             handleOsc52ClipboardRequest(data, {
               allowClipboardWrite: settingsRef.current?.terminalAllowOsc52Clipboard === true,
-              writeClipboardText: window.api.ui.writeClipboardText,
+              writeClipboardText: uiWriteClipboardText,
               onBlockedWrite: showOsc52ClipboardBlockedToast
             })
           )
@@ -1111,7 +1125,7 @@ export function useTerminalPaneLifecycle({
           if (!selection) {
             return
           }
-          void window.api.ui.writeClipboardText(selection).catch(() => {
+          void uiWriteClipboardText(selection).catch(() => {
             /* ignore clipboard write failures */
           })
         })

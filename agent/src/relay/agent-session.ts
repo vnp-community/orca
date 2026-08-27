@@ -26,7 +26,11 @@ import {
 } from './agent-wire'
 import { createRpcDispatcher } from './agent-rpc-dispatch'
 import type { JsonRpcRequest } from './agent-rpc-dispatch'
-import { AGENT_HANDSHAKE_METHOD, AGENT_KEEPALIVE_INTERVAL_MS } from '../shared/agent-wire-protocol'
+import {
+  AGENT_HANDSHAKE_METHOD,
+  AGENT_KEEPALIVE_INTERVAL_MS,
+  AGENT_TIMEOUT_MS
+} from '../shared/agent-wire-protocol'
 import { MessageType } from '../main/ssh/relay-protocol'
 import { createTracer } from '../shared/trace'
 import { cleanupAllPtys } from './agent-spawner'
@@ -54,6 +58,14 @@ export function createSession(
   tokenOverride?: string
 ): AgentSession {
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null
+  let idleWatchdogTimer: ReturnType<typeof setInterval> | null = null
+  // Why: AGENT_TIMEOUT_MS ("if no frame received in 20000ms → close
+  // connection") was declared as a wire-protocol constant but never actually
+  // enforced anywhere — see specs/agent/api/gaps-and-findings.md #8. Track the
+  // last time ANY frame (data or keepalive) was received so a watchdog can
+  // detect and close a connection whose peer has gone dark without a clean
+  // TCP close (e.g. a network partition), instead of leaking it forever.
+  let lastFrameReceivedAt = Date.now()
   let handshakeDone = false
   const handshakeOkCallbacks: (() => void)[] = []
   const dispatcher = createRpcDispatcher(tools, config, log)
@@ -226,6 +238,20 @@ export function createSession(
     }, AGENT_KEEPALIVE_INTERVAL_MS)
   }
 
+  function startIdleWatchdog(ws: WebSocket, span: ReturnType<typeof sessionTracer.start>): void {
+    idleWatchdogTimer = setInterval(() => {
+      if (ws.readyState !== 1 /* WebSocket.OPEN */) {
+        return
+      }
+      const idleMs = Date.now() - lastFrameReceivedAt
+      if (idleMs >= AGENT_TIMEOUT_MS) {
+        log.warn(`Idle timeout: no frame received in ${idleMs}ms (limit ${AGENT_TIMEOUT_MS}ms) — closing connection`)
+        span.fail(`idle timeout: ${idleMs}ms`, { idleMs })
+        ws.close(1001, 'idle timeout - no frames received')
+      }
+    }, AGENT_KEEPALIVE_INTERVAL_MS)
+  }
+
   return {
     start(ws: WebSocket): void {
       // wireState is scoped to this connection — not shared
@@ -237,7 +263,9 @@ export function createSession(
         void sendHandshake(ws, wireState)
           .then(() => {
             span.step('handshake-sent')
+            lastFrameReceivedAt = Date.now()
             startKeepalive(ws, wireState)
+            startIdleWatchdog(ws, span)
           })
           .catch((err: unknown) => {
             const msg = err instanceof Error ? err.message : String(err)
@@ -267,6 +295,13 @@ export function createSession(
           log.warn('Received malformed frame (too short) — ignoring')
           return
         }
+        // Any successfully-decoded frame (data or keepalive) counts as
+        // liveness for the idle watchdog — see startIdleWatchdog().
+        lastFrameReceivedAt = Date.now()
+        // TEMP DIAG BUG-FE-PTY-001
+        log.info(
+          `[DIAG BUG-FE-PTY-001] recv frame type=${frame.type} seq=${frame.seq} ack=${frame.ack} len=${frame.length} readyState=${ws.readyState} t=${Date.now()}`
+        )
 
         // Respond to KeepAlive frames immediately to maintain ACK progress
         if (frame.type === MessageType.KeepAlive) {
@@ -313,7 +348,20 @@ export function createSession(
 
         // Post-handshake: dispatch JSON-RPC request
         if (typeof rpc.method === 'string') {
-          void dispatcher.dispatch(ws, wireState, rpc as JsonRpcRequest)
+          // TEMP DIAG BUG-FE-PTY-001: dispatch() is fire-and-forget (void) —
+          // if it ever rejects, that's an unhandled rejection with no other
+          // visibility. Wrap it here so a throw is at least logged with which
+          // request triggered it, in addition to the process-level handler
+          // in agent-entry.ts.
+          log.info(`[DIAG BUG-FE-PTY-001] dispatch start id=${rpc.id} method=${rpc.method} t=${Date.now()}`)
+          dispatcher
+            .dispatch(ws, wireState, rpc as JsonRpcRequest)
+            .then(() => {
+              log.info(`[DIAG BUG-FE-PTY-001] dispatch done id=${rpc.id} method=${rpc.method} readyState=${ws.readyState} t=${Date.now()}`)
+            })
+            .catch((err: unknown) => {
+              log.error(`[DIAG BUG-FE-PTY-001] dispatch THREW id=${rpc.id} method=${rpc.method}: ${err instanceof Error ? err.stack : String(err)}`)
+            })
         }
       })
 
@@ -338,6 +386,10 @@ export function createSession(
       if (keepaliveTimer !== null) {
         clearInterval(keepaliveTimer)
         keepaliveTimer = null
+      }
+      if (idleWatchdogTimer !== null) {
+        clearInterval(idleWatchdogTimer)
+        idleWatchdogTimer = null
       }
       // ORCH-011: Kill any orphaned agent-spawned (agent.spawn) PTYs — a
       // separate PTY population from pty.create terminals, with no reattach

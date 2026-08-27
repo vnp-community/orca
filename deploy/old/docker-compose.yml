@@ -1,0 +1,186 @@
+# ============================================================
+# Orca Dev Server — Docker Compose (Gateway server-side)
+# ============================================================
+#
+# Kiến trúc:  Nginx (HTTPS reverse proxy) + Orca (backend/ + frontend/, 1 container)
+#
+# Workflow:
+#   [Local Machine]
+#     1. (tuỳ chọn) ./scripts/build-local.sh   # build thử backend/+frontend/ để bắt lỗi sớm
+#     2. ./scripts/sync-to-server.sh <version>  # rsync source lên server
+#
+#   [Server] (file này) — docker/backend/Dockerfile tự build backend/ và
+#   frontend/ (2 stage riêng, xem comment đầu Dockerfile) rồi gộp vào 1 image:
+#     3. docker compose up -d --build     # build image + chạy containers
+#     4. docker compose logs orca         # check logs
+#
+# Developer kết nối:
+#   Browser → https://ORCA_DOMAIN/
+#   Orca Desktop App → paste orca://pair?code=...
+#
+# Ports:
+#   6768 — WebSocket/RPC (Orca clients kết nối)
+#   6769 — HTTP (web UI static files + /health/*)
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # Postgres — shared database for main process + EVERY user-process
+  # (ORCA_MULTI_USER=1 forks 1 process per authenticated user; without a
+  # shared DB each fork gets its own isolated SQLite file — see
+  # docs/guides/postgres-shared-database-design.md, BUG-BE-RPC-001/002/003).
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: orca-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${ORCA_DB_USER:-orca}
+      POSTGRES_PASSWORD: ${ORCA_DB_PASSWORD:?ORCA_DB_PASSWORD required — set in .env}
+      POSTGRES_DB: ${ORCA_DB_NAME:-orca}
+    volumes:
+      - orca-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORCA_DB_USER:-orca} -d ${ORCA_DB_NAME:-orca}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    networks:
+      - orca-net
+
+  # ----------------------------------------------------------
+  # Orca Server — Node.js pure backend (server mode)
+  # Build từ source trên server (không cần Electron/Xvfb)
+  # ----------------------------------------------------------
+  orca:
+    build:
+      context: ../../
+      dockerfile: deploy/dev/docker/backend/Dockerfile
+    image: vnpblc/orca-server:${ORCA_VERSION:-latest}
+    container_name: orca-server
+    restart: unless-stopped
+
+    environment:
+      ORCA_DOMAIN: ${ORCA_DOMAIN:-172.20.2.31}
+      ORCA_PORT: ${ORCA_PORT:-6768}
+      ORCA_HTTP_PORT: ${ORCA_HTTP_PORT:-6769}
+      ORCA_USER_DATA_PATH: /data/orca
+      ORCA_VERSION: ${ORCA_VERSION:-0.0.0}
+      NODE_ENV: production
+
+      # AI API Keys (shared hoặc để trống, developer set qua UI)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+
+      # Shared Postgres — see "postgres" service above. loadDatabaseConfig()
+      # (backend/src/main/db/config-loader.ts) picks this up ahead of any
+      # SQLite fallback; propagates automatically to every forked user-process
+      # (SessionManager.spawnUserProcess() spreads ...process.env into the child).
+      # Shared Postgres — see "postgres" service above. Re-enabled 2026-08-14
+      # after fixing migrations for dialect portability + pg-adapter.ts's
+      # ?→$N placeholder translation. See docs/guides/postgres-shared-database-design.md.
+      ORCA_DB_URL: postgresql://${ORCA_DB_USER:-orca}:${ORCA_DB_PASSWORD:?ORCA_DB_PASSWORD required — set in .env}@postgres:5432/${ORCA_DB_NAME:-orca}
+
+    volumes:
+      # Persistent data: SQLite database, encryption keys, relay binaries
+      - orca-data:/data/orca
+
+      # SSH key để Orca Server SSH vào các Dev Servers (internal)
+      - ./docker/backend/ssh:/home/orca/.ssh:ro
+
+      # Project repos (mount từ host, NFS, hoặc volume)
+      - orca-projects:/srv/projects
+
+    expose:
+      - "${ORCA_PORT:-6768}"
+      - "${ORCA_HTTP_PORT:-6769}"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - orca-net
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${ORCA_HTTP_PORT:-6769}/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ----------------------------------------------------------
+  # Nginx — HTTPS + WebSocket + HTTP reverse proxy
+  # Image: nginx:alpine (5MB — smallest official)
+  # ----------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: orca-nginx
+    restart: unless-stopped
+
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+
+    volumes:
+      - ./docker/nginx/conf.d/orca.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
+      - nginx-logs:/var/log/nginx
+
+    depends_on:
+      orca:
+        condition: service_healthy
+
+    networks:
+      - orca-net
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+# ----------------------------------------------------------
+# Networks
+# ----------------------------------------------------------
+networks:
+  orca-net:
+    driver: bridge
+
+# ----------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------
+volumes:
+  orca-data:
+    driver: local
+  orca-projects:
+    driver: local
+  nginx-logs:
+    driver: local
+  orca-postgres-data:
+    driver: local

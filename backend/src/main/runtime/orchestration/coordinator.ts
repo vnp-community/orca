@@ -1,5 +1,15 @@
 /* eslint-disable max-lines -- Why: the coordinator keeps message processing, task dispatch, gate handling, escalation, and convergence checking in one class so the polling loop can make atomic decisions across all these concerns without split-brain behavior. */
-import type { OrchestrationDb } from './db'
+// ADR-021 — "chỉ dùng 1 database": OrchestrationDb (SQLite) → PgOrchestrationDb
+// (Postgres, async). Every method that reads `this.db` is async now,
+// including several (processMessages, handleLifecycleMessage,
+// handleEscalation, handleDecisionGateMessage, processDecisionGates,
+// warnStaleDispatches, checkConvergence) that were synchronous before —
+// `tick()` already awaited them out of order, so making them async + adding
+// `await` at each call site is a mechanical, order-preserving change. This
+// class is otherwise unused by any synchronous/event-driven caller (see
+// pg-db.ts's module doc comment) — every method here is already reached
+// through `run()`/`runFromExistingRun()`, both `async`.
+import type { PgOrchestrationDb } from './pg-db'
 import type { MessageRow, TaskRow, CoordinatorStatus } from './types'
 import { buildDispatchPreamble } from './preamble'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
@@ -92,7 +102,7 @@ const MAX_CONCURRENT_DEFAULT = 4
 const HUNG_THRESHOLD_MS = 10 * 60 * 1000
 
 export class Coordinator {
-  private db: OrchestrationDb
+  private db: PgOrchestrationDb
   private runtime: CoordinatorRuntime
   private state: CoordinatorState
   private stopped = false
@@ -101,7 +111,7 @@ export class Coordinator {
     worktree?: string
   }
 
-  constructor(db: OrchestrationDb, runtime: CoordinatorRuntime, options: CoordinatorOptions) {
+  constructor(db: PgOrchestrationDb, runtime: CoordinatorRuntime, options: CoordinatorOptions) {
     this.db = db
     this.runtime = runtime
     this.opts = {
@@ -128,7 +138,7 @@ export class Coordinator {
     failedTasks: string[]
     escalations: MessageRow[]
   }> {
-    const run = this.db.createCoordinatorRun({
+    const run = await this.db.createCoordinatorRun({
       spec: this.opts.spec,
       coordinatorHandle: this.opts.coordinatorHandle,
       pollIntervalMs: this.opts.pollIntervalMs
@@ -172,7 +182,7 @@ export class Coordinator {
 
       // Why: if stopped early, treat it as failed since tasks are incomplete.
       // Also failed if any task explicitly failed.
-      const tasks = this.db.listTasks()
+      const tasks = await this.db.listTasks()
       const allDone = tasks.every((t) => t.status === 'completed' || t.status === 'failed')
       const failedTasks = [
         ...new Set([
@@ -182,7 +192,7 @@ export class Coordinator {
       ]
       const finalStatus =
         this.stopped || failedTasks.length > 0 || !allDone ? 'failed' : 'completed'
-      this.db.updateCoordinatorRun(runId, finalStatus)
+      await this.db.updateCoordinatorRun(runId, finalStatus)
       this.opts.onLog(`Coordinator run ${runId} ${finalStatus}`)
 
       return {
@@ -193,7 +203,7 @@ export class Coordinator {
         escalations: this.state.escalations
       }
     } catch (err) {
-      this.db.updateCoordinatorRun(runId, 'failed')
+      await this.db.updateCoordinatorRun(runId, 'failed')
       throw err
     }
   }
@@ -209,7 +219,7 @@ export class Coordinator {
   // itself is an LLM agent.
   private async decompose(): Promise<void> {
     this.state.phase = 'decomposing'
-    const existing = this.db.listTasks()
+    const existing = await this.db.listTasks()
     if (existing.length === 0) {
       throw new Error(
         'No tasks found. Create tasks with orchestration.taskCreate before running the coordinator.'
@@ -220,10 +230,10 @@ export class Coordinator {
   }
 
   private async tick(): Promise<boolean> {
-    this.processMessages()
+    await this.processMessages()
     this.processEscalations()
-    this.processDecisionGates()
-    this.warnStaleDispatches()
+    await this.processDecisionGates()
+    await this.warnStaleDispatches()
     await this.dispatchReadyTasks()
     return this.checkConvergence()
   }
@@ -233,9 +243,9 @@ export class Coordinator {
   // producing correct output) is higher than the false-negative cost (a hung
   // worker keeps its terminal slot until a human notices). Auto-fail policy
   // is a separate decision documented in R6 of DESIGN_DOC_PREAMBLE_FIX.md.
-  private warnStaleDispatches(): void {
+  private async warnStaleDispatches(): Promise<void> {
     const thresholdIso = new Date(Date.now() - HUNG_THRESHOLD_MS).toISOString()
-    const stale = this.db.getStaleDispatches(thresholdIso)
+    const stale = await this.db.getStaleDispatches(thresholdIso)
     for (const ctx of stale) {
       const minutes = Math.round(HUNG_THRESHOLD_MS / 60000)
       this.opts.onLog(
@@ -244,25 +254,31 @@ export class Coordinator {
     }
   }
 
-  private processMessages(): void {
-    const messages = this.db.getUnreadMessages(this.opts.coordinatorHandle)
+  private async processMessages(): Promise<void> {
+    const messages = await this.db.getUnreadMessages(this.opts.coordinatorHandle)
     if (messages.length === 0) {
       return
     }
 
+    // Why sequential (for...of + await), not Promise.all: the original
+    // synchronous loop processed messages strictly in order, and later
+    // messages in the same batch can depend on earlier ones having already
+    // mutated task/dispatch state (e.g. two worker_done messages for
+    // sibling tasks feeding the same DAG-promotion check). Concurrent
+    // processing would reorder that.
     for (const msg of messages) {
       switch (msg.type) {
         case 'worker_done':
-          this.handleLifecycleMessage(msg)
+          await this.handleLifecycleMessage(msg)
           break
         case 'escalation':
-          this.handleEscalation(msg)
+          await this.handleEscalation(msg)
           break
         case 'decision_gate':
-          this.handleDecisionGateMessage(msg)
+          await this.handleDecisionGateMessage(msg)
           break
         case 'heartbeat':
-          this.handleLifecycleMessage(msg)
+          await this.handleLifecycleMessage(msg)
           break
         case 'status':
           this.opts.onLog(`Status from ${msg.from_handle}: ${msg.subject}`)
@@ -274,11 +290,11 @@ export class Coordinator {
       }
     }
 
-    this.db.markAsRead(messages.map((m) => m.id))
+    await this.db.markAsRead(messages.map((m) => m.id))
   }
 
-  private handleLifecycleMessage(msg: MessageRow): void {
-    const result = reconcileLifecycleMessage(this.db, msg, this.opts.onLog)
+  private async handleLifecycleMessage(msg: MessageRow): Promise<void> {
+    const result = await reconcileLifecycleMessage(this.db, msg, this.opts.onLog)
     if (result.action === 'completed') {
       if (!this.state.completedTasks.includes(result.taskId)) {
         this.state.completedTasks.push(result.taskId)
@@ -286,7 +302,7 @@ export class Coordinator {
     }
   }
 
-  private handleEscalation(msg: MessageRow): void {
+  private async handleEscalation(msg: MessageRow): Promise<void> {
     this.opts.onLog(`Escalation from ${msg.from_handle}: ${msg.subject}`)
     this.state.escalations.push(msg)
 
@@ -304,12 +320,12 @@ export class Coordinator {
       return
     }
 
-    const task = this.db.getTask(taskId)
+    const task = await this.db.getTask(taskId)
     if (!task || task.status === 'completed' || task.status === 'failed') {
       return
     }
 
-    const dispatch = this.db.getDispatchContext(taskId)
+    const dispatch = await this.db.getDispatchContext(taskId)
     if (!dispatch) {
       return
     }
@@ -317,17 +333,17 @@ export class Coordinator {
     // Why: fail the dispatch so the circuit breaker increments. If under
     // the threshold, the task returns to 'pending' and will be re-dispatched
     // to a (potentially different) terminal on the next tick.
-    const updated = this.db.failDispatch(dispatch.id, msg.subject)
+    const updated = await this.db.failDispatch(dispatch.id, msg.subject)
     if (updated?.status === 'circuit_broken') {
       this.opts.onLog(`Task ${taskId} circuit broken after repeated failures`)
-      this.db.updateTaskStatus(taskId, 'failed', `Circuit broken: ${msg.subject}`)
+      await this.db.updateTaskStatus(taskId, 'failed', `Circuit broken: ${msg.subject}`)
       this.state.failedTasks.push(taskId)
     } else {
       this.opts.onLog(`Task ${taskId} will be retried (failure ${updated?.failure_count ?? 0}/3)`)
     }
   }
 
-  private handleDecisionGateMessage(msg: MessageRow): void {
+  private async handleDecisionGateMessage(msg: MessageRow): Promise<void> {
     this.opts.onLog(`Decision gate from ${msg.from_handle}: ${msg.subject}`)
 
     let payload: { taskId?: string; question?: string; options?: string[] } = {}
@@ -344,7 +360,7 @@ export class Coordinator {
       return
     }
 
-    this.db.createGate({
+    await this.db.createGate({
       taskId: payload.taskId,
       question: payload.question,
       options: payload.options
@@ -359,31 +375,31 @@ export class Coordinator {
     // policies (e.g., auto-reassign after N minutes, notify external systems).
   }
 
-  private processDecisionGates(): void {
+  private async processDecisionGates(): Promise<void> {
     // Why: pending gates that haven't been resolved externally are surfaced
     // here. In production, the coordinator UI or a human operator resolves
     // gates via orchestration.gateResolve. The coordinator does not auto-
     // resolve gates — that would defeat their purpose as approval checkpoints.
-    const pendingGates = this.db.listGates({ status: 'pending' })
+    const pendingGates = await this.db.listGates({ status: 'pending' })
     for (const gate of pendingGates) {
-      const task = this.db.getTask(gate.task_id)
+      const task = await this.db.getTask(gate.task_id)
       if (task && task.status !== 'blocked') {
         // Why: gate exists but task isn't blocked — inconsistent state.
         // Re-block the task to maintain the invariant.
-        this.db.updateTaskStatus(gate.task_id, 'blocked')
+        await this.db.updateTaskStatus(gate.task_id, 'blocked')
       }
     }
   }
 
   private async dispatchReadyTasks(): Promise<void> {
     this.state.phase = 'dispatching'
-    const readyTasks = this.db.listTasks({ ready: true })
+    const readyTasks = await this.db.listTasks({ ready: true })
     if (readyTasks.length === 0) {
       return
     }
 
     // Why: count currently dispatched tasks to enforce concurrency limit.
-    const dispatched = this.db.listTasks({ status: 'dispatched' })
+    const dispatched = await this.db.listTasks({ status: 'dispatched' })
     let slotsAvailable = this.opts.maxConcurrent - dispatched.length
     if (slotsAvailable <= 0) {
       return
@@ -464,7 +480,7 @@ export class Coordinator {
       }
     }
 
-    const dispatch = this.db.createDispatchContext(
+    const dispatch = await this.db.createDispatchContext(
       task.id,
       targetHandle,
       this.runtime.getTerminalPaneKey?.(targetHandle) ?? undefined
@@ -495,7 +511,7 @@ export class Coordinator {
     // Why: check if the task was previously blocked by a decision gate that
     // has since been resolved. Include the resolution in the preamble so the
     // worker knows the decision outcome.
-    const gates = this.db.listGates({ taskId: task.id, status: 'resolved' })
+    const gates = await this.db.listGates({ taskId: task.id, status: 'resolved' })
     let gateContext = ''
     if (gates.length > 0) {
       const latest = gates.at(-1)!
@@ -505,7 +521,7 @@ export class Coordinator {
     try {
       await this.runtime.sendTerminalAgentPrompt(targetHandle, preamble + gateContext)
     } catch (err) {
-      const updated = this.db.failDispatch(
+      const updated = await this.db.failDispatch(
         dispatch.id,
         err instanceof Error ? err.message : String(err)
       )
@@ -522,11 +538,11 @@ export class Coordinator {
   private async getAvailableTerminals(): Promise<string[]> {
     try {
       const result = await this.runtime.listTerminals(this.opts.worktree)
-      const dispatched = this.db.listTasks({ status: 'dispatched' })
+      const dispatched = await this.db.listTasks({ status: 'dispatched' })
       const busyHandles = new Set<string>()
 
       for (const task of dispatched) {
-        const ctx = this.db.getDispatchContext(task.id)
+        const ctx = await this.db.getDispatchContext(task.id)
         if (ctx?.assignee_handle) {
           busyHandles.add(ctx.assignee_handle)
         }
@@ -551,8 +567,8 @@ export class Coordinator {
     }
   }
 
-  private checkConvergence(): boolean {
-    const tasks = this.db.listTasks()
+  private async checkConvergence(): Promise<boolean> {
+    const tasks = await this.db.listTasks()
     if (tasks.length === 0) {
       return true
     }

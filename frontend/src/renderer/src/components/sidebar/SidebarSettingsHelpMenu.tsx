@@ -34,7 +34,9 @@ import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
 import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
+import { updaterCheck } from '@/runtime/runtime-updater-client'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 const DOCS_URL = 'https://www.onorca.dev/docs'
 const CHANGELOG_URL = 'https://onorca.dev/changelog'
 const GITHUB_URL = 'https://github.com/stablyai/orca'
@@ -43,7 +45,7 @@ const X_URL = 'https://x.com/orca_build'
 const NO_UPDATE_CHECK_MODIFIERS = { ctrlKey: false, metaKey: false, shiftKey: false }
 
 function openExternalUrl(url: string): void {
-  void window.api.shell.openUrl(url)
+  void shellOpenUrl(url)
 }
 
 function DiscordIcon(): React.JSX.Element {
@@ -163,7 +165,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
   const handleCheckForUpdates = (): void => {
     const modifiers = updateCheckModifiersRef.current
     updateCheckModifiersRef.current = NO_UPDATE_CHECK_MODIFIERS
-    void window.api.updater.check(getUpdateCheckClickOptions(modifiers))
+    void updaterCheck(getUpdateCheckClickOptions(modifiers))
   }
 
   const openMilestones = (): void => {

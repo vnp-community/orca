@@ -29,6 +29,7 @@ import {
   getWslCliDistroRequest
 } from '@/components/settings/CliSkillRuntimeSetup'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
 
 type FloatingTerminalOrchestrationDialogProps = {
   open: boolean
@@ -142,10 +143,10 @@ export function FloatingTerminalOrchestrationDialog({
           preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
           getPrerequisiteStatus={() =>
             activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-              ? window.api.cli.getWslInstallStatus(
+              ? getRuntimeWslCliInstallStatus(
                   getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
                 )
-              : window.api.cli.getInstallStatus()
+              : getRuntimeCliInstallStatus()
           }
           onBeforeOpenTerminal={async () => {
             useAppStore.getState().recordFeatureInteraction('agent-orchestration-setup')

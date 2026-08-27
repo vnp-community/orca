@@ -5,7 +5,7 @@
 | **ID** | ADR-020 |
 | **Trạng thái** | 🚧 Proposed |
 | **Ngày** | 2026-07-30 |
-| **HLD Ref** | deployment.md, README (Rollout Strategy), security.md |
+| **HLD Ref** | v1/deployment.md, README (Rollout Strategy), v1/security.md |
 | **CR Ref** | CR-DS-001–005 |
 | **Code Ref** | `src/main/dev-server/agent-dispatcher.ts` (dual-mode), `deploy/agent/` |
 | **Feature Ref** | F22–F39 (tất cả enterprise features) |
@@ -16,7 +16,7 @@
 
 ## Bối cảnh
 
-Orca enterprise migration trải qua 3 phases rõ ràng theo HLD deployment.md và feature timeline. ADR-013 đã phác thảo migration path ở mức cao, nhưng cần ADR chi tiết hơn về:
+Orca enterprise migration trải qua 3 phases rõ ràng theo HLD v1/deployment.md và feature timeline. ADR-013 đã phác thảo migration path ở mức cao, nhưng cần ADR chi tiết hơn về:
 
 1. **Feature flags** — bật tắt features theo phase
 2. **Backward compat** — relay (v5) + agent (v6) cùng tồn tại
@@ -246,5 +246,5 @@ ORCA_MAX_MIGRATION=10  # or unset
 | [ADR-017](./ADR-017-dev-server-agent-layer-model.md) | Agent layer model |
 | [ADR-018](./ADR-018-control-plane-data-plane-separation.md) | Control/Data plane |
 | [ADR-019](./ADR-019-agent-autonomous-operation-reconnect.md) | Agent reconnect strategy |
-| **HLD deployment.md** | Deployment diagram + Docker Compose |
-| **HLD security.md** | Trust boundaries per phase |
+| **HLD v1/deployment.md** | Deployment diagram + Docker Compose |
+| **HLD v1/security.md** | Trust boundaries per phase |

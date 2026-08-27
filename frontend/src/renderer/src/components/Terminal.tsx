@@ -124,8 +124,13 @@ import { useContextualTour } from './contextual-tours/use-contextual-tour'
 import { openTabBarEntry, type TabCreateEntryArgs } from './tab-bar/tab-create-entry-action'
 import { closeTerminalTab } from './terminal/terminal-tab-actions'
 import { translate } from '@/i18n/i18n'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import {
+  getExplicitRuntimeEnvironmentIdForWorktree,
+  getRuntimeEnvironmentIdForWorktree
+} from '@/lib/worktree-runtime-owner'
 import { browserWorkspaceHasRemoteOwner } from '@/runtime/remote-browser-tab-ownership'
+import { Loader2 } from 'lucide-react'
+import { shouldDeferTerminalPaneMount } from './terminal-pane/terminal-pending-host-mirror-mount-gate'
 
 const EditorPanel = lazy(() => import('./editor/EditorPanel'))
 
@@ -2171,7 +2176,41 @@ function Terminal(): React.JSX.Element | null {
                         if (shouldColdParkTerminalPanes && !isActivityPortalTab) {
                           return null
                         }
-                        const terminalPane = (
+                        // Why (BUG-FE-PTY-001 #10): defer mounting TerminalPane
+                        // for a still-uncorrelated local tab on a Dev-Server
+                        // mirrored worktree, same rationale as
+                        // TerminalPaneOverlayLayer.tsx (the primary render
+                        // path) — see terminal-pending-host-mirror-mount-gate.ts.
+                        // This legacy surface has no per-tab child component to
+                        // host a forced-recheck timer, so the placeholder clears
+                        // on the next natural re-render after the grace window
+                        // rather than on an exact timer; acceptable since this
+                        // path only renders when no split-group layout exists.
+                        const shouldDeferMount = shouldDeferTerminalPaneMount(
+                          {
+                            pendingActivationSpawn: tab.pendingActivationSpawn,
+                            ptyId: tab.ptyId,
+                            createdAt: tab.createdAt
+                          },
+                          getExplicitRuntimeEnvironmentIdForWorktree(
+                            useAppStore.getState(),
+                            workspace.id
+                          ) !== null,
+                          Date.now()
+                        )
+                        const terminalPane = shouldDeferMount ? (
+                          <div className="flex size-full items-center justify-center text-muted-foreground">
+                            <div className="flex flex-col items-center gap-2">
+                              <Loader2 className="size-4 animate-spin" />
+                              <span className="text-xs">
+                                {translate(
+                                  'auto.components.Terminal.terminalMountGateConnecting',
+                                  'Connecting…'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
                           <TerminalPane
                             key={`${tab.id}-${tab.generation ?? 0}`}
                             tabId={tab.id}

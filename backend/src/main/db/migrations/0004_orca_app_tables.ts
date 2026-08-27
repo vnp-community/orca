@@ -9,12 +9,16 @@
  */
 
 import type { Migration } from './types'
+import { nowTextDefaultSql } from './sql-dialect'
 
 export const migration0004OrcaAppTables: Migration = {
   version: 4,
   name: 'orca_app_tables',
 
   async up(db) {
+    // BUG-BE-RPC-003: datetime('now') is SQLite-only — see sql-dialect.ts.
+    const now = nowTextDefaultSql(db.capabilities.dialect)
+
     // ── orca_projects ────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS orca_projects (
@@ -22,7 +26,7 @@ export const migration0004OrcaAppTables: Migration = {
         name        TEXT NOT NULL,
         tab_order   INTEGER NOT NULL DEFAULT 0,
         data        TEXT NOT NULL DEFAULT '{}',
-        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
     await db.exec(`
@@ -35,7 +39,7 @@ export const migration0004OrcaAppTables: Migration = {
         id          TEXT PRIMARY KEY,
         project_id  TEXT,
         data        TEXT NOT NULL DEFAULT '{}',
-        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
 
@@ -48,7 +52,7 @@ export const migration0004OrcaAppTables: Migration = {
         port        INTEGER NOT NULL DEFAULT 22,
         username    TEXT NOT NULL,
         data        TEXT NOT NULL DEFAULT '{}',
-        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
 
@@ -57,7 +61,7 @@ export const migration0004OrcaAppTables: Migration = {
       CREATE TABLE IF NOT EXISTS orca_global_settings (
         key         TEXT PRIMARY KEY,
         value       TEXT NOT NULL,
-        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
   },

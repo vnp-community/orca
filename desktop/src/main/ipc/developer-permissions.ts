@@ -21,7 +21,7 @@ const PRIVACY_PANE_URLS: Partial<Record<DeveloperPermissionId, string>> = {
   bluetooth: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth'
 }
 
-const DEVELOPER_PERMISSION_IDS: DeveloperPermissionId[] = [
+export const DEVELOPER_PERMISSION_IDS: DeveloperPermissionId[] = [
   'microphone',
   'camera',
   'screen',
@@ -73,7 +73,7 @@ function getAccessibilityStatus(): DeveloperPermissionStatus {
   return systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'unknown'
 }
 
-async function openPrivacyPane(id: DeveloperPermissionId): Promise<boolean> {
+export async function openPrivacyPane(id: DeveloperPermissionId): Promise<boolean> {
   const url = PRIVACY_PANE_URLS[id]
   if (!url) {
     await shell.openExternal(
@@ -156,7 +156,9 @@ function triggerLocalNetworkPrompt(): Promise<void> {
   })
 }
 
-async function getPermissionState(id: DeveloperPermissionId): Promise<DeveloperPermissionState> {
+export async function getPermissionState(
+  id: DeveloperPermissionId
+): Promise<DeveloperPermissionState> {
   switch (id) {
     case 'microphone':
     case 'camera':
@@ -175,7 +177,7 @@ async function getPermissionState(id: DeveloperPermissionId): Promise<DeveloperP
   }
 }
 
-async function requestPermission(
+export async function requestPermission(
   id: DeveloperPermissionId
 ): Promise<DeveloperPermissionRequestResult> {
   if (process.platform !== 'darwin') {

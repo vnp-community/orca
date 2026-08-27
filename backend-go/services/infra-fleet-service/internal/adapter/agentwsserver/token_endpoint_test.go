@@ -1,0 +1,265 @@
+package agentwsserver
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
+
+func newTestIssuer(secret string) (*TokenIssuer, *Registry) {
+	registry := NewRegistry(time.Hour)
+	issuer := NewTokenIssuer(registry, Config{APISecret: secret, OrcaVersion: "test-version", Port: 6768}, nil)
+	return issuer, registry
+}
+
+func doRequest(t *testing.T, issuer *TokenIssuer, method, body, bearer string) *httptest.ResponseRecorder {
+	t.Helper()
+	var reader *bytes.Reader
+	if body == "" {
+		reader = bytes.NewReader(nil)
+	} else {
+		reader = bytes.NewReader([]byte(body))
+	}
+	req := httptest.NewRequest(method, "/api/agent-token", reader)
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	rec := httptest.NewRecorder()
+	issuer.ServeHTTP(rec, req)
+	return rec
+}
+
+func decodeJSON(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
+	var out map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decoding response body %q: %v", rec.Body.String(), err)
+	}
+	return out
+}
+
+// TestTokenEndpoint_MissingAPISecret_AlwaysReturns401 is the most important
+// test here: fail-secure when ORCA_AGENT_API_SECRET is unset, regardless of
+// what Authorization header (if any) the caller sends.
+func TestTokenEndpoint_MissingAPISecret_AlwaysReturns401(t *testing.T) {
+	issuer, registry := newTestIssuer("") // no secret configured
+	t.Cleanup(registry.Stop)
+
+	cases := []struct {
+		name   string
+		bearer string
+	}{
+		{"no header", ""},
+		{"empty bearer", ""},
+		{"guessed admin-style bearer", "1"},
+		{"arbitrary bearer", "whatever-secret-someone-guesses"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := doRequest(t, issuer, http.MethodPost, `{}`, tc.bearer)
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want 401 (fail-secure with no ORCA_AGENT_API_SECRET configured)", rec.Code)
+			}
+		})
+	}
+}
+
+func TestTokenEndpoint_WrongBearer_Returns401(t *testing.T) {
+	issuer, registry := newTestIssuer("correct-secret")
+	t.Cleanup(registry.Stop)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{}`, "wrong-secret")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
+func TestTokenEndpoint_MissingAuthorizationHeader_Returns401(t *testing.T) {
+	issuer, registry := newTestIssuer("correct-secret")
+	t.Cleanup(registry.Stop)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/agent-token", strings.NewReader(`{}`))
+	rec := httptest.NewRecorder()
+	issuer.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
+// TestTokenEndpoint_ValidPOST_DefaultsAndEphemeralTTL covers the default
+// devServerId/name, and the default+capped TTL policy for a non-permanent
+// token with no ttl given.
+func TestTokenEndpoint_ValidPOST_DefaultsAndEphemeralTTL(t *testing.T) {
+	issuer, registry := newTestIssuer("s3cr3t")
+	t.Cleanup(registry.Stop)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{}`, "s3cr3t")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	body := decodeJSON(t, rec)
+
+	if body["devServerId"] != "dev-local" {
+		t.Errorf("devServerId = %v, want dev-local", body["devServerId"])
+	}
+	if body["name"] != "Dev Server (dev-local)" {
+		t.Errorf("name = %v, want 'Dev Server (dev-local)'", body["name"])
+	}
+	if expiresIn, _ := body["expiresIn"].(float64); expiresIn != 300 {
+		t.Errorf("expiresIn = %v, want 300 (default ttl)", body["expiresIn"])
+	}
+	if body["created"] != true {
+		t.Errorf("created = %v, want true", body["created"])
+	}
+	token, _ := body["token"].(string)
+	if !strings.HasPrefix(token, "agt-dev-local-") {
+		t.Errorf("token = %q, want prefix agt-dev-local-", token)
+	}
+	cmd, _ := body["agentCommand"].(string)
+	if !strings.Contains(cmd, token) || !strings.Contains(cmd, "AGENT_TOKEN=") {
+		t.Errorf("agentCommand = %q, want it to embed the token", cmd)
+	}
+
+	// The token must actually be usable — a real slot was registered.
+	if !registry.Has(token) {
+		t.Error("registered token not found in Registry")
+	}
+}
+
+// TestTokenEndpoint_TTLIsCappedAt600 covers the "ephemeral: max 10 min"
+// cap for a requested ttl above 600s.
+func TestTokenEndpoint_TTLIsCappedAt600(t *testing.T) {
+	issuer, registry := newTestIssuer("s3cr3t")
+	t.Cleanup(registry.Stop)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{"ttl": 999999}`, "s3cr3t")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := decodeJSON(t, rec)
+	if expiresIn, _ := body["expiresIn"].(float64); expiresIn != 600 {
+		t.Errorf("expiresIn = %v, want 600 (capped)", body["expiresIn"])
+	}
+}
+
+// TestTokenEndpoint_PermanentTTL covers permanent:true → 30-day TTL,
+// uncapped by the 600s ephemeral cap even if ttl is also present.
+func TestTokenEndpoint_PermanentTTL(t *testing.T) {
+	issuer, registry := newTestIssuer("s3cr3t")
+	t.Cleanup(registry.Stop)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{"permanent": true, "ttl": 30}`, "s3cr3t")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := decodeJSON(t, rec)
+	wantSeconds := float64(30 * 24 * 60 * 60)
+	if expiresIn, _ := body["expiresIn"].(float64); expiresIn != wantSeconds {
+		t.Errorf("expiresIn = %v, want %v (30 days, ignoring ttl for a permanent token)", body["expiresIn"], wantSeconds)
+	}
+}
+
+// TestTokenEndpoint_CustomDevServerIDAndName covers request fields that
+// override the defaults.
+func TestTokenEndpoint_CustomDevServerIDAndName(t *testing.T) {
+	issuer, registry := newTestIssuer("s3cr3t")
+	t.Cleanup(registry.Stop)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{"devServerId":"ds-42","name":"My Box"}`, "s3cr3t")
+	body := decodeJSON(t, rec)
+	if body["devServerId"] != "ds-42" {
+		t.Errorf("devServerId = %v, want ds-42", body["devServerId"])
+	}
+	if body["name"] != "My Box" {
+		t.Errorf("name = %v, want 'My Box'", body["name"])
+	}
+	token, _ := body["token"].(string)
+	if !strings.HasPrefix(token, "agt-ds-42-") {
+		t.Errorf("token = %q, want prefix agt-ds-42-", token)
+	}
+}
+
+func TestTokenEndpoint_MalformedJSONBody_Returns400(t *testing.T) {
+	issuer, registry := newTestIssuer("s3cr3t")
+	t.Cleanup(registry.Stop)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{not valid json`, "s3cr3t")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+	body := decodeJSON(t, rec)
+	if body["error"] != "bad_request" {
+		t.Errorf("error = %v, want bad_request", body["error"])
+	}
+}
+
+func TestTokenEndpoint_WrongMethod_Returns405(t *testing.T) {
+	issuer, registry := newTestIssuer("s3cr3t")
+	t.Cleanup(registry.Stop)
+
+	rec := doRequest(t, issuer, http.MethodDelete, "", "s3cr3t")
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", rec.Code)
+	}
+	body := decodeJSON(t, rec)
+	if body["error"] != "method_not_allowed" {
+		t.Errorf("error = %v, want method_not_allowed", body["error"])
+	}
+}
+
+// TestTokenEndpoint_GET_ListsPreviouslyIssuedToken covers issuing a token
+// via POST, then confirming GET lists it in plaintext.
+func TestTokenEndpoint_GET_ListsPreviouslyIssuedToken(t *testing.T) {
+	issuer, registry := newTestIssuer("s3cr3t")
+	t.Cleanup(registry.Stop)
+
+	postRec := doRequest(t, issuer, http.MethodPost, `{"devServerId":"ds-list"}`, "s3cr3t")
+	postBody := decodeJSON(t, postRec)
+	issuedToken, _ := postBody["token"].(string)
+	if issuedToken == "" {
+		t.Fatal("POST did not return a token")
+	}
+
+	getRec := doRequest(t, issuer, http.MethodGet, "", "s3cr3t")
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want 200", getRec.Code)
+	}
+	getBody := decodeJSON(t, getRec)
+	tokens, _ := getBody["tokens"].([]any)
+	if len(tokens) != 1 {
+		t.Fatalf("tokens = %v, want exactly 1 entry", tokens)
+	}
+	entry, _ := tokens[0].(map[string]any)
+	if entry["token"] != issuedToken {
+		t.Errorf("listed token = %v, want %v (plaintext, matching the POST response)", entry["token"], issuedToken)
+	}
+	if entry["devServerId"] != "ds-list" {
+		t.Errorf("listed devServerId = %v, want ds-list", entry["devServerId"])
+	}
+}
+
+// TestTokenEndpoint_GET_OmitsConsumedToken covers a token no longer being
+// listed once it's been consumed by a real handshake.
+func TestTokenEndpoint_GET_OmitsConsumedToken(t *testing.T) {
+	issuer, registry := newTestIssuer("s3cr3t")
+	t.Cleanup(registry.Stop)
+
+	postRec := doRequest(t, issuer, http.MethodPost, `{}`, "s3cr3t")
+	postBody := decodeJSON(t, postRec)
+	issuedToken, _ := postBody["token"].(string)
+
+	if _, ok := registry.Consume(issuedToken); !ok {
+		t.Fatal("Consume should have succeeded for a freshly issued token")
+	}
+
+	getRec := doRequest(t, issuer, http.MethodGet, "", "s3cr3t")
+	getBody := decodeJSON(t, getRec)
+	tokens, _ := getBody["tokens"].([]any)
+	if len(tokens) != 0 {
+		t.Errorf("tokens = %v, want empty — the token was already consumed", tokens)
+	}
+}

@@ -6,6 +6,7 @@ import type {
 import type { RateLimitState } from '../../../shared/rate-limit-types'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
+import { requireAccountsDevServerConnectionId } from './accounts-dev-server-connection'
 
 // Mirrors OrcaRuntime.getAccountsSnapshot() / the accounts.subscribe payload.
 export type ProviderAccountsSnapshot = {
@@ -136,42 +137,55 @@ export function watchProviderAccounts(
     }
   }, REMOTE_ACCOUNTS_FIRST_SNAPSHOT_TIMEOUT_MS)
 
-  void window.api.runtimeEnvironments
-    .subscribe(
-      {
-        selector: target.environmentId,
-        method: 'accounts.subscribe',
-        timeoutMs: REMOTE_ACCOUNTS_FIRST_SNAPSHOT_TIMEOUT_MS
-      },
-      {
-        onResponse: (response) => {
-          if (closed) {
-            return
-          }
-          const typed = response as RuntimeRpcResponse<ProviderAccountsSubscriptionMessage>
-          if (typed.ok === false) {
-            handlers.onError(new RuntimeRpcCallError(typed))
-            return
-          }
-          const message = typed.result
-          if ((message.type === 'ready' || message.type === 'snapshot') && message.snapshot) {
-            receivedSnapshot = true
-            handlers.onSnapshot(message.snapshot)
-          }
+  // Why: resolve the picked dev server to a connectionId BEFORE opening the
+  // subscription — an unresolved/disconnected pick must surface as this
+  // watcher's error, not a subscribe call already known to fail with
+  // ACCOUNTS_NO_CONNECTION (TASK-023).
+  void requireAccountsDevServerConnectionId(target)
+    .then((connectionId) => {
+      if (closed) {
+        return null
+      }
+      return window.api.runtimeEnvironments.subscribe(
+        {
+          selector: target.environmentId,
+          method: 'accounts.subscribe',
+          params: { connectionId },
+          timeoutMs: REMOTE_ACCOUNTS_FIRST_SNAPSHOT_TIMEOUT_MS
         },
-        onError: (error) => {
-          if (!closed) {
-            handlers.onError(new Error(error.message))
-          }
-        },
-        onClose: () => {
-          if (!closed && !receivedSnapshot) {
-            handlers.onError(new Error('Remote provider account subscription closed.'))
+        {
+          onResponse: (response) => {
+            if (closed) {
+              return
+            }
+            const typed = response as RuntimeRpcResponse<ProviderAccountsSubscriptionMessage>
+            if (typed.ok === false) {
+              handlers.onError(new RuntimeRpcCallError(typed))
+              return
+            }
+            const message = typed.result
+            if ((message.type === 'ready' || message.type === 'snapshot') && message.snapshot) {
+              receivedSnapshot = true
+              handlers.onSnapshot(message.snapshot)
+            }
+          },
+          onError: (error) => {
+            if (!closed) {
+              handlers.onError(new Error(error.message))
+            }
+          },
+          onClose: () => {
+            if (!closed && !receivedSnapshot) {
+              handlers.onError(new Error('Remote provider account subscription closed.'))
+            }
           }
         }
-      }
-    )
+      )
+    })
     .then((handle) => {
+      if (!handle) {
+        return
+      }
       unsubscribe = handle.unsubscribe
       if (closed) {
         unsubscribe()
@@ -217,10 +231,11 @@ export async function selectClaudeProviderAccount(
 ): Promise<ClaudeRateLimitAccountsState> {
   const target = getActiveRuntimeTarget(settings)
   if (target.kind === 'environment') {
+    const connectionId = await requireAccountsDevServerConnectionId(target)
     return callRuntimeRpc<ClaudeRateLimitAccountsState>(
       target,
       'accounts.selectClaude',
-      { accountId: selection.accountId },
+      { accountId: selection.accountId, connectionId },
       { timeoutMs: REMOTE_ACCOUNT_MUTATION_TIMEOUT_MS }
     )
   }
@@ -233,10 +248,11 @@ export async function selectCodexProviderAccount(
 ): Promise<CodexRateLimitAccountsState> {
   const target = getActiveRuntimeTarget(settings)
   if (target.kind === 'environment') {
+    const connectionId = await requireAccountsDevServerConnectionId(target)
     return callRuntimeRpc<CodexRateLimitAccountsState>(
       target,
       'accounts.selectCodex',
-      { accountId: selection.accountId },
+      { accountId: selection.accountId, connectionId },
       { timeoutMs: REMOTE_ACCOUNT_MUTATION_TIMEOUT_MS }
     )
   }
@@ -249,10 +265,11 @@ export async function removeClaudeProviderAccount(
 ): Promise<ClaudeRateLimitAccountsState> {
   const target = getActiveRuntimeTarget(settings)
   if (target.kind === 'environment') {
+    const connectionId = await requireAccountsDevServerConnectionId(target)
     return callRuntimeRpc<ClaudeRateLimitAccountsState>(
       target,
       'accounts.removeClaude',
-      { accountId },
+      { accountId, connectionId },
       { timeoutMs: REMOTE_ACCOUNT_MUTATION_TIMEOUT_MS }
     )
   }
@@ -265,10 +282,11 @@ export async function removeCodexProviderAccount(
 ): Promise<CodexRateLimitAccountsState> {
   const target = getActiveRuntimeTarget(settings)
   if (target.kind === 'environment') {
+    const connectionId = await requireAccountsDevServerConnectionId(target)
     return callRuntimeRpc<CodexRateLimitAccountsState>(
       target,
       'accounts.removeCodex',
-      { accountId },
+      { accountId, connectionId },
       { timeoutMs: REMOTE_ACCOUNT_MUTATION_TIMEOUT_MS }
     )
   }

@@ -47,6 +47,7 @@ import {
 } from './linear-agent-skill-runtime'
 import { LinearAgentSkillSetupDialog } from './LinearAgentSkillSetupDialog'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
 
 export const _linearAgentSkillSetupPromptInternalsForTests = {
   resetSessionReminders(): void {
@@ -168,8 +169,8 @@ export function LinearAgentSkillSetupPrompt({
     setCliLoading(true)
     try {
       const nextStatus = await (agentRuntime.runtime === 'wsl'
-        ? window.api.cli.getWslInstallStatus(getWslCliDistroRequest(agentRuntime))
-        : window.api.cli.getInstallStatus())
+        ? getRuntimeWslCliInstallStatus(getWslCliDistroRequest(agentRuntime))
+        : getRuntimeCliInstallStatus())
       writeIfCurrent(() => setCliStatus(nextStatus))
     } catch {
       writeIfCurrent(() => setCliStatus(null))
@@ -292,7 +293,7 @@ export function LinearAgentSkillSetupPrompt({
       error={skill.error}
       getPrerequisiteStatus={
         agentRuntime.runtime === 'wsl'
-          ? () => window.api.cli.getWslInstallStatus(getWslCliDistroRequest(agentRuntime))
+          ? () => getRuntimeWslCliInstallStatus(getWslCliDistroRequest(agentRuntime))
           : undefined
       }
       onBeforeOpenTerminal={async () => {

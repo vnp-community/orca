@@ -127,7 +127,14 @@ describe('createOptionAsAltProbe', () => {
 
     active = TURKISH_MAP
     win.fireFocus()
-    // Let the focus-triggered probe resolve.
+    // Let the focus-triggered probe resolve. Three ticks: readInputSourceId's
+    // default reader now chains through appGetKeyboardInputSourceId's
+    // isWebClientLocation() gate (one extra promise layer vs. the old direct
+    // window.api.app.getKeyboardInputSourceId? call) before falling through
+    // to the fingerprint probe.
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
     expect(probe.getCurrent()).toBe('non-us')

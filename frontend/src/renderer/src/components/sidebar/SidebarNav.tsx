@@ -1,5 +1,5 @@
 import React from 'react'
-import { Bell, CalendarClock, Search, Smartphone } from 'lucide-react'
+import { Bell, CalendarClock, FolderKanban, Search, Smartphone } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
@@ -42,6 +42,7 @@ const SidebarNav = React.memo(function SidebarNav() {
   const openAutomationsPage = useAppStore((s) => s.openAutomationsPage)
   const openActivityPage = useAppStore((s) => s.openActivityPage)
   const openMobilePage = useAppStore((s) => s.openMobilePage)
+  const setActiveView = useAppStore((s) => s.setActiveView)
   const openModal = useAppStore((s) => s.openModal)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const activeView = useAppStore((s) => s.activeView)
@@ -51,6 +52,7 @@ const SidebarNav = React.memo(function SidebarNav() {
   const automationsActive = activeView === 'automations'
   const activityActive = activeView === 'activity'
   const mobileActive = activeView === 'mobile'
+  const workspaceActive = activeView === 'workspace'
   const activityUnreadCount = useActivityUnreadCount(showAgentsButton, 'sidebar-badge')
   const mobileOnboardingBadge = useMobileSidebarOnboardingBadge(showMobileButton)
   const hideAutomationsButton = React.useCallback(() => {
@@ -162,6 +164,35 @@ const SidebarNav = React.memo(function SidebarNav() {
           <HideSidebarMenu onHide={hideMobileButton} />
         </ContextMenu>
       ) : null}
+      {/* Giai đoạn 2c (F38): additive-only entry point, does not replace the
+          Project/Repo sidebar flow above. Plain setActiveView (no
+          previousViewBeforeX tracking) — see TopLevelView's 'workspace'
+          member in shared/types.ts. */}
+      <button
+        type="button"
+        onClick={() => setActiveView('workspace')}
+        aria-current={workspaceActive ? 'page' : undefined}
+        className={cn(
+          'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] font-medium tracking-tight transition-colors',
+          workspaceActive
+            ? 'bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground'
+            : 'text-worktree-sidebar-foreground/60 hover:bg-worktree-sidebar-foreground/8'
+        )}
+      >
+        <FolderKanban
+          className={cn(
+            'size-4 shrink-0',
+            !workspaceActive && 'text-worktree-sidebar-foreground/30'
+          )}
+          strokeWidth={workspaceActive ? 2.25 : 1.75}
+        />
+        <span className="flex-1">
+          {translate(
+            'auto.components.sidebar.SidebarNav.workspace-beta-nav',
+            'Project Workspace (Beta)'
+          )}
+        </span>
+      </button>
       <button
         type="button"
         onClick={() => openModal('worktree-palette')}

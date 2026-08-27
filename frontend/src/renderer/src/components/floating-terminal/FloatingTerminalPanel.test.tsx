@@ -753,6 +753,12 @@ describe('FloatingTerminalPanel close behavior', () => {
       setItem: vi.fn()
     }
     vi.stubGlobal('window', {
+      // Why: runtime-app-client's isWebClientLocation() reads location.pathname
+      // and __ORCA_WEB_CLIENT__ to route app.* calls — force the web branch so
+      // these assertions stay on the already-mocked window.api.app.* mocks
+      // instead of the desktop runtime-RPC transport.
+      __ORCA_WEB_CLIENT__: true,
+      location: { pathname: '/' },
       addEventListener: vi.fn(),
       api: {
         app: {
@@ -762,6 +768,14 @@ describe('FloatingTerminalPanel close behavior', () => {
         },
         browser: { notifyActiveTabChanged: vi.fn() },
         cli: { getInstallStatus: mocks.getInstallStatus },
+        runtime: {
+          call: vi.fn(async ({ method }: { method: string }) => {
+            if (method === 'cli.getInstallStatus') {
+              return { ok: true, result: await mocks.getInstallStatus() }
+            }
+            throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+          })
+        },
         ui: { setFloatingTerminalInputFocused: vi.fn() }
       },
       innerHeight: 800,
@@ -1162,6 +1176,8 @@ describe('FloatingTerminalPanel close behavior', () => {
 
   it('does not crash if the preload focus bridge is stale during dev reload', async () => {
     vi.stubGlobal('window', {
+      __ORCA_WEB_CLIENT__: true,
+      location: { pathname: '/' },
       addEventListener: vi.fn(),
       api: {
         app: {
@@ -1171,6 +1187,14 @@ describe('FloatingTerminalPanel close behavior', () => {
         },
         browser: { notifyActiveTabChanged: vi.fn() },
         cli: { getInstallStatus: mocks.getInstallStatus },
+        runtime: {
+          call: vi.fn(async ({ method }: { method: string }) => {
+            if (method === 'cli.getInstallStatus') {
+              return { ok: true, result: await mocks.getInstallStatus() }
+            }
+            throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+          })
+        },
         ui: {}
       },
       innerWidth: 1200,

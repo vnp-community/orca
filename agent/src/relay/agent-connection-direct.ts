@@ -26,6 +26,32 @@ const connTracer = createTracer('agent:connection')
 /** Reconnect backoff delays (ms): 1s → 2s → 5s → 15s → 30s (max) */
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 15_000, 30_000]
 
+/**
+ * Minimum time a connection must stay handshaked before a later disconnect
+ * counts as "recovered" and resets the backoff to its shortest delay.
+ *
+ * Why: without this, a handshake that succeeds and then collapses again
+ * within milliseconds (a flapping WS path — proxy/LB hiccup, transient
+ * server-side session-slot race, etc.) resets reconnectAttempt to 0 on
+ * every single cycle, since the old code reset it the instant handshake-ok
+ * fired rather than once the connection proved it could actually stay up.
+ * The backoff then never escalates past its 1s floor, turning a recoverable
+ * blip into a sustained ~1/sec reconnect storm that hammers the server
+ * indefinitely (observed live: WS churn continued 16+ minutes after the
+ * triggering disconnect, every cycle waiting exactly RECONNECT_DELAYS_MS[0]).
+ * A connection that stays up for this long is genuinely healthy again and
+ * deserves a fresh attempt count; one that doesn't should keep backing off.
+ */
+const STABLE_CONNECTION_MS = 10_000
+
+/** Sent on an interval to keep the connection past any intermediate proxy's
+ *  idle-read timeout (LB, reverse proxy, NAT conntrack) — mirrors the
+ *  server's own 30s ping (agent-ws-server.ts) but from this side too, since
+ *  a proxy that only resets its idle timer on frames FROM the client would
+ *  otherwise still close an outbound-idle connection despite the server's
+ *  pings arriving fine. Well under any observed/typical idle-timeout range. */
+const KEEPALIVE_PING_MS = 20_000
+
 export async function connectDirect(
   config: AgentConfig,
   tools: ToolDefinition[],
@@ -77,16 +103,67 @@ export async function connectDirect(
         rejectUnauthorized: config.tlsRejectUnauthorized,
       })
 
+      // TEMP DIAG BUG-FE-PTY-001: no application code was found calling
+      // ws.close()/terminate() around the observed disconnect — wrap both so
+      // ANY call (ours, or from a library path we haven't traced) logs a
+      // stack trace instead of silently firing.
+      const diagOrigClose = ws.close.bind(ws)
+      const diagOrigTerminate = ws.terminate.bind(ws)
+      ws.close = ((...args: Parameters<typeof diagOrigClose>) => {
+        log.error(
+          `[DIAG BUG-FE-PTY-001] ws.close() called args=${JSON.stringify(args)} readyState=${ws.readyState}\n${new Error('close call site').stack}`
+        )
+        return diagOrigClose(...args)
+      }) as typeof ws.close
+      ws.terminate = (() => {
+        log.error(
+          `[DIAG BUG-FE-PTY-001] ws.terminate() called readyState=${ws.readyState}\n${new Error('terminate call site').stack}`
+        )
+        return diagOrigTerminate()
+      }) as typeof ws.terminate
+
+      // TEMP DIAG BUG-FE-PTY-001: raw socket-level visibility — logged once,
+      // right when the underlying TCP socket itself signals it's ending, to
+      // see which side/reason the 'ws' library attributes it to before any
+      // of our own 'close' handling runs.
+      ws.once('open', () => {
+        const sock = (ws as unknown as { _socket?: import('node:net').Socket })._socket
+        sock?.once('end', () => log.error('[DIAG BUG-FE-PTY-001] raw socket "end" (peer sent FIN)'))
+        sock?.once('close', (hadError: boolean) =>
+          log.error(`[DIAG BUG-FE-PTY-001] raw socket "close" hadError=${hadError}`)
+        )
+        sock?.once('error', (err: Error) =>
+          log.error(`[DIAG BUG-FE-PTY-001] raw socket "error": ${err.stack ?? err.message}`)
+        )
+      })
+
+      let handshakeOkAt: number | null = null
+      // Why this side pings too (not just relying on the server's own 30s
+      // ping in agent-ws-server.ts): defends against ANY intermediate hop
+      // (LB, reverse proxy, NAT conntrack) that only resets its idle timer
+      // on frames it sees FROM this side — the server pinging outbound
+      // wouldn't reset that half of the timeout.
+      let keepAliveTimer: ReturnType<typeof setInterval> | null = null
+
       const session = createSession(config, tools, log, undefined, token)
       session.onHandshakeOk(() => {
         lastHandshakeOk = true
-        reconnectAttempt = 0   // reset backoff on successful auth
+        handshakeOkAt = Date.now()
         connSpan.step('handshake-ok')
         log.info('Connection established and authenticated.')
+        keepAliveTimer = setInterval(() => {
+          try { ws.ping() } catch { /* socket already closing — 'close' handles cleanup */ }
+        }, KEEPALIVE_PING_MS)
       })
       session.start(ws)
 
       ws.once('close', (code: number) => {
+        // TEMP DIAG BUG-FE-PTY-001
+        log.error(`[DIAG BUG-FE-PTY-001] ws 'close' event fired code=${code} t=${Date.now()}`)
+        if (keepAliveTimer) {
+          clearInterval(keepAliveTimer)
+          keepAliveTimer = null
+        }
         session.stop()
 
         if (code === 1000) {
@@ -99,6 +176,15 @@ export async function connectDirect(
         if (lastHandshakeOk) {
           connSpan.fail(`connection dropped after handshake`, { code })
           log.warn(`Connection dropped (code=${code}). Reconnecting...`)
+          // Why reset backoff here (not at handshake-ok, see STABLE_CONNECTION_MS
+          // above): only a connection that actually stayed up counts as
+          // recovered. One that handshakes and immediately collapses again
+          // must keep backing off, or a flapping path turns into a sustained
+          // ~1/sec reconnect storm that never gives the path time to settle.
+          const stableMs = handshakeOkAt !== null ? Date.now() - handshakeOkAt : 0
+          if (stableMs >= STABLE_CONNECTION_MS) {
+            reconnectAttempt = 0
+          }
           // Why renew here too, not just on outright rejection: the server
           // consumes an agent token the moment it first connects successfully
           // (AgentWebSocketServer.registerSlot — single-use by design), so a

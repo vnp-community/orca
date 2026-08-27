@@ -28,6 +28,7 @@ import { TAB_CONTAINER_WIDTH_CLASSES, TAB_LABEL_WIDTH_CLASSES } from './tab-widt
 import { TabWorkspaceLayoutMenuSection } from './TabWorkspaceLayoutMenuSection'
 import { useTabStripPointerActivation } from './tab-strip-pointer-activation'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 function formatBrowserTabUrlLabel(url: string): string {
   if (url === ORCA_BROWSER_BLANK_URL || url === 'about:blank') {
     return 'New Tab'
@@ -305,7 +306,7 @@ export default function BrowserTab({
             {translate('auto.components.tab.bar.BrowserTab.9dd880bd56', 'Close Tabs To The Right')}
           </DropdownMenuItem>
           <DropdownMenuItem
-            onSelect={() => void window.api.shell.openUrl(openInBrowserUrl)}
+            onSelect={() => void shellOpenUrl(openInBrowserUrl)}
             disabled={!isHttpUrl}
           >
             <ExternalLink className="size-3.5" />

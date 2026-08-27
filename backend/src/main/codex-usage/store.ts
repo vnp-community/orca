@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- Why: this store owns Codex analytics persistence, scan policy, and renderer query semantics. Keeping them together prevents the Codex range/scope rules from drifting away from the scanner’s event model. */
 import { app } from 'electron'
-import { dirname, join } from 'node:path'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type {
   CodexUsageBreakdownKind,
   CodexUsageBreakdownRow,
@@ -14,10 +13,18 @@ import type {
   CodexUsageSummary
 } from '../../shared/codex-usage-types'
 import type { AutomationRunUsage } from '../../shared/automations-types'
-import type { Store } from '../persistence'
-import { loadKnownUsageWorktreesByRepo, type UsageWorktreeRef } from '../usage-worktree-metadata'
+// ADR-021 Phase 1: narrowed from `Store` — see UsageStoreRepoSource's module doc comment.
+import {
+  loadKnownUsageWorktreesByRepo,
+  type UsageStoreRepoSource,
+  type UsageWorktreeRef
+} from '../usage-worktree-metadata'
 import type { CodexUsagePersistedState } from './types'
 import { createWorktreeRefs, scanCodexUsageFiles } from './scanner'
+// ADR-021 — "chỉ dùng 1 database": same swap as claude-usage/store.ts, see
+// its identical import's comment.
+import type { UsageStatePersistence } from '../usage/usage-state-persistence'
+import { JsonFileUsageStatePersistence } from '../usage/json-file-usage-state-persistence'
 
 // Why: v5 keys Codex ownership on raw token_count identity without session id
 // so forks that rewrite session_meta still match. Older caches used session-
@@ -324,22 +331,40 @@ function getWorktreeFingerprint(worktreesByRepo: Map<string, UsageWorktreeRef[]>
 }
 
 export class CodexUsageStore {
-  private state: CodexUsagePersistedState
-  private readonly store: Store
+  // See claude-usage/store.ts's identical fields for the ADR-021 rationale
+  // (async persistence backend, constructors can't await).
+  private state: CodexUsagePersistedState | null = null
+  private loadPromise: Promise<void> | null = null
+  private readonly store: UsageStoreRepoSource
+  private readonly persistence: UsageStatePersistence<CodexUsagePersistedState>
   private scanPromise: Promise<void> | null = null
 
-  constructor(store: Store) {
+  constructor(
+    store: UsageStoreRepoSource,
+    persistence: UsageStatePersistence<CodexUsagePersistedState> = new JsonFileUsageStatePersistence(
+      getCodexUsageFile
+    )
+  ) {
     this.store = store
-    this.state = this.load()
+    this.persistence = persistence
   }
 
-  private load(): CodexUsagePersistedState {
+  private async ensureLoaded(): Promise<void> {
+    if (this.state) {return}
+    if (!this.loadPromise) {
+      this.loadPromise = this.load().then((state) => {
+        this.state = state
+      })
+    }
+    await this.loadPromise
+  }
+
+  private async load(): Promise<CodexUsagePersistedState> {
     try {
-      const usageFile = getCodexUsageFile()
-      if (!existsSync(usageFile)) {
+      const parsed = await this.persistence.load()
+      if (!parsed) {
         return getDefaultState()
       }
-      const parsed = JSON.parse(readFileSync(usageFile, 'utf-8')) as CodexUsagePersistedState
       return normalizePersistedState({
         ...getDefaultState(),
         ...parsed,
@@ -354,38 +379,40 @@ export class CodexUsageStore {
     }
   }
 
-  private writeToDisk(): void {
-    const usageFile = getCodexUsageFile()
-    const dir = dirname(usageFile)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
-    }
-    const tmpFile = `${usageFile}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`
-    writeFileSync(tmpFile, JSON.stringify(this.state), 'utf-8')
-    renameSync(tmpFile, usageFile)
+  private async persist(): Promise<void> {
+    if (!this.state) {return}
+    await this.persistence.save(this.state)
+  }
+
+  /** Non-null accessor — every caller has already awaited ensureLoaded() before touching this. */
+  private get s(): CodexUsagePersistedState {
+    return this.state!
   }
 
   async setEnabled(enabled: boolean): Promise<CodexUsageScanState> {
-    this.state.scanState.enabled = enabled
-    this.writeToDisk()
+    await this.ensureLoaded()
+    this.s.scanState.enabled = enabled
+    await this.persist()
     return this.getScanState()
   }
 
-  getScanState(): CodexUsageScanState {
+  async getScanState(): Promise<CodexUsageScanState> {
+    await this.ensureLoaded()
     return {
-      ...this.state.scanState,
+      ...this.s.scanState,
       isScanning: this.scanPromise !== null,
-      hasAnyCodexData: this.state.sessions.length > 0 || this.state.dailyAggregates.length > 0
+      hasAnyCodexData: this.s.sessions.length > 0 || this.s.dailyAggregates.length > 0
     }
   }
 
-  getSnapshot(
+  async getSnapshot(
     scope: CodexUsageScope,
     range: CodexUsageRange,
     recentSessionLimit = 10
-  ): CodexUsageSnapshot {
+  ): Promise<CodexUsageSnapshot> {
+    await this.ensureLoaded()
     return {
-      scanState: this.getScanState(),
+      scanState: await this.getScanState(),
       summary: this.buildSummary(scope, range),
       daily: this.buildDaily(scope, range),
       modelBreakdown: this.buildBreakdown(scope, range, 'model'),
@@ -395,13 +422,14 @@ export class CodexUsageStore {
   }
 
   async refresh(force = false): Promise<CodexUsageScanState> {
-    if (!this.state.scanState.enabled) {
+    await this.ensureLoaded()
+    if (!this.s.scanState.enabled) {
       return this.getScanState()
     }
     const currentWorktreeFingerprint = await this.getCurrentWorktreeFingerprint()
-    if (!force && this.state.scanState.lastScanCompletedAt) {
-      const ageMs = Date.now() - this.state.scanState.lastScanCompletedAt
-      if (ageMs < STALE_MS && this.state.worktreeFingerprint === currentWorktreeFingerprint) {
+    if (!force && this.s.scanState.lastScanCompletedAt) {
+      const ageMs = Date.now() - this.s.scanState.lastScanCompletedAt
+      if (ageMs < STALE_MS && this.s.worktreeFingerprint === currentWorktreeFingerprint) {
         return this.getScanState()
       }
     }
@@ -415,8 +443,8 @@ export class CodexUsageStore {
       return
     }
 
-    this.state.scanState.lastScanStartedAt = Date.now()
-    this.state.scanState.lastScanError = null
+    this.s.scanState.lastScanStartedAt = Date.now()
+    this.s.scanState.lastScanError = null
     // Why: start-only writes rewrite the full usage cache before scan results change.
 
     this.scanPromise = (async () => {
@@ -426,18 +454,18 @@ export class CodexUsageStore {
         const worktreeFingerprint = getWorktreeFingerprint(worktreesByRepo)
         const result = await scanCodexUsageFiles(
           createWorktreeRefs(repos, worktreesByRepo),
-          this.state.worktreeFingerprint === worktreeFingerprint ? this.state.processedFiles : []
+          this.s.worktreeFingerprint === worktreeFingerprint ? this.s.processedFiles : []
         )
-        this.state.processedFiles = result.processedFiles
-        this.state.sessions = result.sessions
-        this.state.dailyAggregates = result.dailyAggregates
-        this.state.worktreeFingerprint = worktreeFingerprint
-        this.state.scanState.lastScanCompletedAt = Date.now()
-        this.state.scanState.lastScanError = null
-        this.writeToDisk()
+        this.s.processedFiles = result.processedFiles
+        this.s.sessions = result.sessions
+        this.s.dailyAggregates = result.dailyAggregates
+        this.s.worktreeFingerprint = worktreeFingerprint
+        this.s.scanState.lastScanCompletedAt = Date.now()
+        this.s.scanState.lastScanError = null
+        await this.persist()
       } catch (error) {
-        this.state.scanState.lastScanError = error instanceof Error ? error.message : String(error)
-        this.writeToDisk()
+        this.s.scanState.lastScanError = error instanceof Error ? error.message : String(error)
+        await this.persist()
       } finally {
         this.scanPromise = null
       }
@@ -697,6 +725,7 @@ export class CodexUsageStore {
   }
 
   async getAutomationRunUsage(input: AutomationUsageLookupInput): Promise<AutomationRunUsage> {
+    await this.ensureLoaded()
     const collectedAt = Date.now()
     const unavailable = (
       unavailableReason: AutomationRunUsage['unavailableReason'],
@@ -720,7 +749,7 @@ export class CodexUsageStore {
       unavailableMessage
     })
 
-    if (!this.state.scanState.enabled) {
+    if (!this.s.scanState.enabled) {
       return unavailable('usage_not_enabled', 'Codex usage tracking is not enabled.')
     }
     if (!input.worktreeId || !input.startedAt || !input.completedAt) {
@@ -734,7 +763,7 @@ export class CodexUsageStore {
 
     const windowStart = input.startedAt - AUTOMATION_ATTRIBUTION_WINDOW_MS
     const windowEnd = input.completedAt + AUTOMATION_ATTRIBUTION_WINDOW_MS
-    const candidates = this.state.sessions.filter((session) => {
+    const candidates = this.s.sessions.filter((session) => {
       const first = new Date(session.firstTimestamp).getTime()
       const last = new Date(session.lastTimestamp).getTime()
       if (!Number.isFinite(first) || !Number.isFinite(last)) {
@@ -846,7 +875,7 @@ export class CodexUsageStore {
 
   private getFilteredDaily(scope: CodexUsageScope, range: CodexUsageRange) {
     const cutoff = getRangeCutoff(range)
-    return this.state.dailyAggregates.filter((entry) => {
+    return this.s.dailyAggregates.filter((entry) => {
       if (cutoff && entry.day < cutoff) {
         return false
       }
@@ -859,7 +888,7 @@ export class CodexUsageStore {
 
   private getFilteredSessions(scope: CodexUsageScope, range: CodexUsageRange) {
     const cutoff = getRangeCutoff(range)
-    return this.state.sessions.filter((session) => {
+    return this.s.sessions.filter((session) => {
       const day = getLocalDay(session.lastTimestamp)
       if (!day) {
         return false
@@ -925,7 +954,7 @@ export class CodexUsageStore {
   }
 
   private shouldForceAutomationUsageScan(completedAt: number): boolean {
-    const { lastScanCompletedAt, lastScanError } = this.state.scanState
+    const { lastScanCompletedAt, lastScanError } = this.s.scanState
     // Why: attribution needs a scan after the run finishes, but repeated
     // lookups after that point should not rescan all Codex session history.
     return (

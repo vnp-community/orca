@@ -3,6 +3,7 @@ import type { MutableRefObject } from 'react'
 import { copyMarkdownReviewNotesForAgent } from '@/lib/markdown-review-note-copy'
 import type { MarkdownReviewNote } from '@/lib/markdown-review-notes'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type UseRichMarkdownReviewCopyFeedbackOptions = {
   markdownReviewContent: string
   markdownReviewNotes: MarkdownReviewNote[]
@@ -73,7 +74,7 @@ async function copyReviewNotes(notes: MarkdownReviewNote[], content: string): Pr
     return await copyMarkdownReviewNotesForAgent({
       notes,
       content,
-      writeClipboardText: window.api.ui.writeClipboardText
+      writeClipboardText: uiWriteClipboardText
     })
   } catch {
     return false

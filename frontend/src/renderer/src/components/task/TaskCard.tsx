@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { TaskStatusBadge, TaskPriorityBadge } from './TaskStatusBadge'
 import { useAppStore } from '../../store'
-import type { OrcaTask } from '@shared/task-types'
+import type { OrcaTask } from '../../../../shared/task-types'
 import type { ReactNode } from 'react'
 
 type TaskCardProps = {
@@ -30,7 +30,9 @@ export function TaskCard({ task, depth, isExpanded, onToggle, onSelect, children
         <span className="flex-1 text-sm truncate">{task.title}</span>
         <TaskPriorityBadge priority={task.priority} />
         <TaskStatusBadge status={task.status} />
-        {task.progress > 0 && <span className="text-xs text-muted-foreground">{task.progress}%</span>}
+        {task.progressPercent > 0 && (
+          <span className="text-xs text-muted-foreground">{task.progressPercent}%</span>
+        )}
       </div>
       {children}
     </div>
