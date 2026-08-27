@@ -42,6 +42,10 @@ type DevServerRepository interface {
 	// (TASK-FLEET-02-05) and after EstablishConnection's handshake
 	// (TASK-FLEET-04-03), success or failure.
 	UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info HandshakeInfo, provisionedAt time.Time) error
+	// ListAllForPolling is cross-tenant by design (the poller is not
+	// answering one tenant's request), unlike every other
+	// DevServerRepository method's tenantID parameter.
+	ListAllForPolling(ctx context.Context) ([]domain.DevServer, error)
 }
 
 // HandshakeInfo is a usecase-owned mirror of
@@ -146,12 +150,47 @@ type ConnectionResolver interface {
 	ResolveConnectionByWorktree(ctx context.Context, tenantID, worktreeID string) (connected bool, devServer domain.DevServer, conn domain.Connection, err error)
 }
 
-// FleetHealthPort is the read port over fleet health samples. The
-// health-polling writer side (the 30s-cadence poller from
-// specs/backend-go/services/infra-fleet-service.md §8) is not implemented in
-// this scaffold — see this service's README "Known gaps".
+// FleetHealthPort is the read port over fleet health samples.
 type FleetHealthPort interface {
 	GetFleetHealth(ctx context.Context, tenantID string) ([]domain.DevServerHealth, error)
+}
+
+// FleetHealthWriter is the write side PollFleetHealth (TASK-FLEET-03-05)
+// needs — split from FleetHealthPort the same way other narrow ports
+// already split a single Repository's read/write concerns in this file.
+type FleetHealthWriter interface {
+	UpsertFleetHealth(ctx context.Context, sample domain.DevServerHealth) error
+	// GetPrevious reads the last-persisted sample for devServerID —
+	// PollFleetHealth diffs against it to detect a status_change (BL-FLEET-03's
+	// poll-flow step 4). found=false means no prior sample exists yet.
+	GetPrevious(ctx context.Context, devServerID string) (sample domain.DevServerHealth, found bool, err error)
+}
+
+// PollLockPort wraps a Postgres session-level advisory lock keyed by a hash
+// of devServerID — TryLock is non-blocking (pg_try_advisory_lock, not
+// pg_advisory_lock): a replica that loses the race skips this server this
+// tick rather than queueing, so a multi-replica poller never double-polls
+// the same dev server concurrently.
+type PollLockPort interface {
+	// TryLock returns locked=false (with a nil unlock, nil err) when
+	// another poller already holds the lock for devServerID — the caller
+	// skips this server this tick. When locked=true, unlock MUST be called
+	// exactly once to release the advisory lock.
+	TryLock(ctx context.Context, devServerID string) (locked bool, unlock func(), err error)
+}
+
+// HealthEventPublisher fans a status_change out onto the event bus (see
+// adapter/eventbus's health publisher) — fire-and-forget from
+// PollFleetHealth's perspective, hence no error return.
+type HealthEventPublisher interface {
+	PublishStatusChange(ctx context.Context, ds domain.DevServer, from, to domain.HealthStatus)
+}
+
+// WebhookAlerter delivers a status_change to BL-FLEET-03's configured
+// webhook endpoint — also fire-and-forget from PollFleetHealth's
+// perspective (a webhook delivery failure must never fail the poll tick).
+type WebhookAlerter interface {
+	NotifyStatusChange(ctx context.Context, ds domain.DevServer, from, to domain.HealthStatus, sample domain.DevServerHealth)
 }
 
 // BrowserProfileRepository is the persistence port for browser profile

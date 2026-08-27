@@ -121,6 +121,9 @@ func (f *fakeDevServerRepo) FindBySshTarget(ctx context.Context, tenantID, sshTa
 func (f *fakeDevServerRepo) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info usecase.HandshakeInfo, provisionedAt time.Time) error {
 	return nil
 }
+func (f *fakeDevServerRepo) ListAllForPolling(ctx context.Context) ([]domain.DevServer, error) {
+	return nil, nil
+}
 
 // fakeBulkProvisioner is a minimal usecase.Provisioner fake.
 type fakeBulkProvisioner struct{}

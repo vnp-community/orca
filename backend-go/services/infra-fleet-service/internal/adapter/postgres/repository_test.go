@@ -324,3 +324,148 @@ func TestRepository_UpdateProvisionResult(t *testing.T) {
 		t.Errorf("expected status to have transitioned to degraded, got %q", status2)
 	}
 }
+
+// registerTestDevServer is a small helper for the fleet-health/advisory-lock
+// tests below — they need a real infra.dev_servers row to satisfy
+// fleet_health's FK, but don't care about its ssh_target/mode details.
+func registerTestDevServer(t *testing.T, repo *Repository, id string) domain.DevServer {
+	t.Helper()
+	ds, err := domain.NewDevServer(id, testTenant1, "10.0.0.77", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	if _, err := repo.Register(context.Background(), ds); err != nil {
+		t.Fatalf("registering dev server: %v", err)
+	}
+	return ds
+}
+
+// TestUpsertFleetHealthAndGetPrevious covers the upsert-by-PK round trip
+// (dev_server_id is fleet_health's primary key) and GetPrevious's
+// found=false-on-no-prior-sample case.
+func TestUpsertFleetHealthAndGetPrevious(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	ds := registerTestDevServer(t, repo, testDevServer1)
+
+	if _, found, err := repo.GetPrevious(ctx, ds.ID); err != nil || found {
+		t.Fatalf("expected found=false before any sample exists, got found=%v err=%v", found, err)
+	}
+
+	sample := domain.DevServerHealth{
+		DevServerID: ds.ID, Reachable: true, CPUPercent: 42.5, RAMPercent: 30, DiskPercent: 10,
+		LatencyMS: 12, Status: domain.HealthStatusHealthy,
+	}
+	if err := repo.UpsertFleetHealth(ctx, sample); err != nil {
+		t.Fatalf("upsert fleet health: %v", err)
+	}
+
+	got, found, err := repo.GetPrevious(ctx, ds.ID)
+	if err != nil {
+		t.Fatalf("get previous: %v", err)
+	}
+	if !found {
+		t.Fatal("expected found=true after an upsert")
+	}
+	if got.Status != domain.HealthStatusHealthy || got.CPUPercent != 42.5 {
+		t.Errorf("expected the upserted sample to round-trip, got %+v", got)
+	}
+
+	// Second upsert with a changed status updates the same row in place —
+	// dev_server_id is the PK, so no duplicate row is possible.
+	sample.Status = domain.HealthStatusDegraded
+	sample.CPUPercent = 90
+	if err := repo.UpsertFleetHealth(ctx, sample); err != nil {
+		t.Fatalf("second upsert: %v", err)
+	}
+	got2, _, err := repo.GetPrevious(ctx, ds.ID)
+	if err != nil {
+		t.Fatalf("get previous (2nd): %v", err)
+	}
+	if got2.Status != domain.HealthStatusDegraded || got2.CPUPercent != 90 {
+		t.Errorf("expected the second upsert's values, got %+v", got2)
+	}
+
+	var count int
+	if err := repo.pool.QueryRow(ctx, `SELECT count(*) FROM infra.fleet_health WHERE dev_server_id = $1`, ds.ID).Scan(&count); err != nil {
+		t.Fatalf("counting rows: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected exactly 1 row after two upserts, got %d", count)
+	}
+}
+
+// TestTryLock_MutualExclusionAndReleaseAllowsReacquire is the concurrency
+// property TASK-FLEET-03-04 specifically calls out: two concurrent TryLock
+// calls for the same devServerID from two separate connections — exactly
+// one succeeds; after unlock(), a subsequent TryLock succeeds again.
+func TestTryLock_MutualExclusionAndReleaseAllowsReacquire(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	devServerID := "advisory-lock-test-target"
+
+	locked1, unlock1, err := repo.TryLock(ctx, devServerID)
+	if err != nil {
+		t.Fatalf("first TryLock: %v", err)
+	}
+	if !locked1 {
+		t.Fatal("expected the first TryLock to succeed")
+	}
+
+	locked2, unlock2, err := repo.TryLock(ctx, devServerID)
+	if err != nil {
+		t.Fatalf("second TryLock: %v", err)
+	}
+	if locked2 {
+		t.Error("expected the second concurrent TryLock for the same devServerID to fail")
+	}
+	if unlock2 != nil {
+		t.Error("expected a nil unlock func when locked=false")
+	}
+
+	unlock1()
+
+	locked3, unlock3, err := repo.TryLock(ctx, devServerID)
+	if err != nil {
+		t.Fatalf("third TryLock (after release): %v", err)
+	}
+	if !locked3 {
+		t.Fatal("expected TryLock to succeed again after the first lock was released")
+	}
+	unlock3()
+}
+
+// TestListAllForPolling_IsCrossTenant covers the one thing that
+// distinguishes this method from List: no tenant_id filter — dev servers
+// from every tenant come back.
+func TestListAllForPolling_IsCrossTenant(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	ds1, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server 1: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds1); err != nil {
+		t.Fatalf("registering dev server 1: %v", err)
+	}
+	ds2, err := domain.NewDevServer(testDevServer2, testTenant2, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server 2: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds2); err != nil {
+		t.Fatalf("registering dev server 2: %v", err)
+	}
+
+	got, err := repo.ListAllForPolling(ctx)
+	if err != nil {
+		t.Fatalf("list all for polling: %v", err)
+	}
+	tenants := map[string]bool{}
+	for _, ds := range got {
+		tenants[ds.TenantID] = true
+	}
+	if !tenants[testTenant1] || !tenants[testTenant2] {
+		t.Errorf("expected dev servers from both tenants, got %+v", got)
+	}
+}

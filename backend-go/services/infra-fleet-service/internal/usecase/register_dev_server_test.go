@@ -42,6 +42,20 @@ type fakeDevServerRepository struct {
 	lastProvisionAt            time.Time
 }
 
+// ListAllForPolling implements usecase.DevServerRepository.ListAllForPolling.
+func (f *fakeDevServerRepository) ListAllForPolling(ctx context.Context) ([]domain.DevServer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	out := make([]domain.DevServer, 0, len(f.byID))
+	for _, ds := range f.byID {
+		out = append(out, ds)
+	}
+	return out, nil
+}
+
 // UpdateProvisionResult implements usecase.DevServerRepository.UpdateProvisionResult.
 func (f *fakeDevServerRepository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info HandshakeInfo, provisionedAt time.Time) error {
 	f.mu.Lock()
