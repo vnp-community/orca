@@ -5,6 +5,7 @@ import type {
   CrashReportCopySubmissionFailure,
   CrashReportRecord
 } from '../../../../shared/crash-reporting'
+import { copyRuntimeCrashReportLatestDiagnostics } from '@/runtime/runtime-crash-reports-client'
 
 export const CRASH_REPORT_COPY_FAILURE_TOAST_ID = 'crash-report-copy-failure'
 
@@ -41,11 +42,17 @@ export function useCrashReportCopy(
   return useCallback(
     async (submissionFailure?: CrashReportCopySubmissionFailure): Promise<void> => {
       try {
-        const result = await window.api.crashReports.copyLatestDiagnostics({
+        // Why: mirror web's own "Unavailable on web" preload stub result when
+        // the wrapper no-ops to null (web is gated out of the desktop-only RPC
+        // path).
+        const result = (await copyRuntimeCrashReportLatestDiagnostics({
           ...(report ? { reportId: report.id } : {}),
           notes: reportNotes.value,
           ...(submissionFailure ? { submissionFailure } : {})
-        })
+        })) ?? {
+          ok: false as const,
+          error: translate('auto.web.web.preload.api.fb290366b2', 'Unavailable on web.')
+        }
         if (!result.ok) {
           showCopyFailure(result.error)
           return

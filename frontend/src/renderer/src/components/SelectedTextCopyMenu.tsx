@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Copy } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type SelectedTextCopyMenuProps = {
   children: React.ReactNode
   className?: string
@@ -95,7 +96,7 @@ export function SelectedTextCopyMenu({
     if (!menu) {
       return
     }
-    void window.api.ui.writeClipboardText(menu.text)
+    void uiWriteClipboardText(menu.text)
     setMenu(null)
   }, [menu])
 

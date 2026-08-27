@@ -24,6 +24,10 @@ vi.mock('sonner', () => ({
   }
 }))
 
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiWriteClipboardText: (text: string) => mocks.clipboardWrite(text)
+}))
+
 vi.mock('../onboarding/OnboardingInlineCommandTerminal', () => ({
   OnboardingInlineCommandTerminal: (props: { command: string; description: string }) => {
     mocks.terminalProps.push(props)
@@ -129,9 +133,6 @@ describe('AgentSkillSetupPanel', () => {
       value: {
         cli: {
           getInstallStatus: vi.fn()
-        },
-        ui: {
-          writeClipboardText: mocks.clipboardWrite
         }
       }
     })

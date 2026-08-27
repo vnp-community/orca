@@ -128,7 +128,9 @@ generate_agent_token() {
     log "Sinh agent token từ Orca server..."
 
     local ORCA_HTTP_HOST="${SERVER_HOST:-172.20.2.39}"
-    local ORCA_HTTP_PORT="${ORCA_HTTP_PORT:-6769}"
+    # 6768 = backend-go api-gateway's public port (deploy/dev/.env
+    # API_GATEWAY_PUBLIC_PORT) — NOT 6769, which is the frontend/nginx port.
+    local ORCA_HTTP_PORT="${ORCA_HTTP_PORT:-6768}"
     local API_SECRET="${ORCA_AGENT_API_SECRET:-}"
     local DEV_SERVER_ID="${DEV_SERVER_LABEL:-dev-local}"
 

@@ -49,6 +49,8 @@ import type {
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 type JiraIssueWorkspaceProps = {
   issue: JiraIssue | null
   onUse: (issue: JiraIssue) => void
@@ -99,7 +101,7 @@ function jiraStatusClass(categoryKey: string): string {
 
 async function copyTextToClipboard(text: string, label: string): Promise<void> {
   try {
-    await window.api.ui.writeClipboardText(text)
+    await uiWriteClipboardText(text)
     toast.success(
       translate('auto.components.JiraIssueWorkspace.2ff69a3545', '{{value0}} copied', {
         value0: label
@@ -364,7 +366,7 @@ export default function JiraIssueWorkspace({
       {
         label: translate('auto.components.JiraIssueWorkspace.69da9a208c', 'Open in Jira'),
         icon: ExternalLink,
-        action: () => window.api.shell.openUrl(displayed.url)
+        action: () => shellOpenUrl(displayed.url)
       },
       {
         label: translate('auto.components.JiraIssueWorkspace.779bb91ee0', 'Copy URL'),

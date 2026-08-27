@@ -9,6 +9,7 @@ import { translate } from '@/i18n/i18n'
 import { Button } from '../ui/button'
 import { cn } from '@/lib/utils'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const CLEANED_STATUSES = new Set<EphemeralVmRuntimeRecord['status']>(['cleaned'])
 
 export function getVisibleEphemeralVmRuntimes(
@@ -136,7 +137,7 @@ export function EphemeralVmRuntimesSection(): React.JSX.Element {
       const text = result.command
         ? `${result.command}\n\n# Cleanup payload:\n${result.payloadJson}`
         : result.payloadJson
-      await window.api.ui.writeClipboardText(text)
+      await uiWriteClipboardText(text)
       if (mountedRef.current) {
         toast.success(
           result.command

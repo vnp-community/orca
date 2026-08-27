@@ -1,4 +1,14 @@
-import type { OrchestrationDb } from './db'
+// ADR-021 — "chỉ dùng 1 database": OrchestrationDb → PgOrchestrationDb (async).
+// Every exported function here is async now; every internal db.X() call is
+// awaited. Call order within each function is unchanged (still sequential),
+// so this is a mechanical conversion, not a behavior change — see
+// pg-db.ts's module doc comment for why this file didn't need any
+// pool.withTransaction() wrapping (each function here does at most one
+// conditional write per db row it touches, no read-then-conditionally-write
+// sequence whose window a concurrent tick could invalidate into a wrong
+// answer, only import wise a stale one across ticks — same as the SQLite
+// version already tolerated).
+import type { PgOrchestrationDb } from './pg-db'
 import type { MessageRow } from './types'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 
@@ -82,11 +92,11 @@ function getPersistedLifecycleRejection(
   }
 }
 
-export function reconcileLifecycleMessage(
-  db: OrchestrationDb,
+export async function reconcileLifecycleMessage(
+  db: PgOrchestrationDb,
   msg: MessageRow,
   onLog: LogFn = noopLog
-): LifecycleReconciliationResult {
+): Promise<LifecycleReconciliationResult> {
   switch (msg.type) {
     case 'worker_done':
       return reconcileWorkerDoneMessage(db, msg, onLog)
@@ -102,11 +112,11 @@ export function reconcileLifecycleMessage(
   }
 }
 
-function reconcileHeartbeatMessage(
-  db: OrchestrationDb,
+async function reconcileHeartbeatMessage(
+  db: PgOrchestrationDb,
   msg: MessageRow,
   onLog: LogFn
-): LifecycleReconciliationResult {
+): Promise<LifecycleReconciliationResult> {
   if (!msg.payload) {
     onLog(`Heartbeat from ${msg.from_handle} missing payload; ignored`)
     return { action: 'ignored' }
@@ -128,11 +138,11 @@ function reconcileHeartbeatMessage(
     return { action: 'ignored' }
   }
 
-  const dispatch = db.getDispatchContextById(dispatchId)
+  const dispatch = await db.getDispatchContextById(dispatchId)
   if (!dispatch || dispatch.status !== 'dispatched') {
     // Why: an in-flight heartbeat can arrive after completion; retain it for
     // audit history without surfacing obsolete liveness to the coordinator.
-    db.markAsReadAndDelivered([msg.id])
+    await db.markAsReadAndDelivered([msg.id])
     onLog(`Heartbeat for inactive dispatch ${dispatchId} suppressed`)
     return { action: 'suppressed' }
   }
@@ -142,21 +152,21 @@ function reconcileHeartbeatMessage(
     // a hung assignee behind another agent's timer.
     const reason = buildLifecycleAuthorityRejectionReason(dispatchId, dispatch, msg)
     onLog(`Heartbeat rejected: ${reason}`)
-    db.convertLifecycleMessageToRejection(msg.id, reason)
+    await db.convertLifecycleMessageToRejection(msg.id, reason)
     return { action: 'rejected', code: 'sender_not_assignee', reason }
   }
 
   // Why: dispatchId-specific writes let the DB ignore late heartbeats for
   // completed/failed retries without masking a newer hung dispatch.
-  db.recordHeartbeat(dispatchId, msg.created_at)
+  await db.recordHeartbeat(dispatchId, msg.created_at)
   return { action: 'heartbeat_recorded', dispatchId }
 }
 
-function reconcileWorkerDoneMessage(
-  db: OrchestrationDb,
+async function reconcileWorkerDoneMessage(
+  db: PgOrchestrationDb,
   msg: MessageRow,
   onLog: LogFn
-): LifecycleReconciliationResult {
+): Promise<LifecycleReconciliationResult> {
   onLog(`Worker done: ${msg.from_handle} — ${msg.subject}`)
 
   const payload = parseObjectPayload(msg, () => {
@@ -182,7 +192,7 @@ function reconcileWorkerDoneMessage(
     return { action: 'ignored' }
   }
 
-  const task = db.getTask(taskId)
+  const task = await db.getTask(taskId)
   if (!task) {
     onLog(`Warning: worker_done for unknown task ${taskId}`)
     return { action: 'ignored' }
@@ -190,7 +200,7 @@ function reconcileWorkerDoneMessage(
 
   // Why: taskId alone is not a completion authority; retried tasks can have
   // stale worker_done messages racing the current active dispatch.
-  const dispatch = db.getDispatchContextById(dispatchId)
+  const dispatch = await db.getDispatchContextById(dispatchId)
   if (!dispatch) {
     onLog(`Warning: worker_done for unknown dispatch ${dispatchId}`)
     return { action: 'ignored' }
@@ -204,7 +214,7 @@ function reconcileWorkerDoneMessage(
   if (!hasLifecycleAuthority(dispatch, msg)) {
     const reason = buildLifecycleAuthorityRejectionReason(dispatchId, dispatch, msg)
     onLog(`Warning: worker_done rejected: ${reason}`)
-    db.convertLifecycleMessageToRejection(msg.id, reason)
+    await db.convertLifecycleMessageToRejection(msg.id, reason)
     return { action: 'rejected', code: 'sender_not_assignee', reason }
   }
   // Why: `orchestration.send` can release the DB lock before waking the
@@ -216,7 +226,8 @@ function reconcileWorkerDoneMessage(
     onLog(`Warning: worker_done for inactive dispatch ${dispatchId} ignored`)
     return { action: 'ignored' }
   }
-  if (db.getDispatchContext(taskId)?.id !== dispatchId || task.status !== 'dispatched') {
+  const currentDispatch = await db.getDispatchContext(taskId)
+  if (currentDispatch?.id !== dispatchId || task.status !== 'dispatched') {
     onLog(`Warning: worker_done for stale dispatch ${dispatchId} ignored`)
     return { action: 'ignored' }
   }
@@ -232,8 +243,8 @@ function reconcileWorkerDoneMessage(
     filesModified,
     completedAt: new Date().toISOString()
   })
-  db.updateTaskStatus(taskId, 'completed', result)
-  suppressEarlierHeartbeats(db, msg, dispatchId)
+  await db.updateTaskStatus(taskId, 'completed', result)
+  await suppressEarlierHeartbeats(db, msg, dispatchId)
 
   onLog(`Task ${taskId} completed`)
   return { action: 'completed', taskId, dispatchId }
@@ -251,13 +262,13 @@ function buildLifecycleAuthorityRejectionReason(
   )
 }
 
-function suppressEarlierHeartbeats(
-  db: OrchestrationDb,
+async function suppressEarlierHeartbeats(
+  db: PgOrchestrationDb,
   workerDone: MessageRow,
   dispatchId: string
-): void {
-  const heartbeatIds = db
-    .getUnreadMessages(workerDone.to_handle, ['heartbeat'])
+): Promise<void> {
+  const unread = await db.getUnreadMessages(workerDone.to_handle, ['heartbeat'])
+  const heartbeatIds = unread
     .filter((message) => {
       if (message.sequence >= workerDone.sequence) {
         return false
@@ -266,5 +277,5 @@ function suppressEarlierHeartbeats(
       return payload.dispatchId === dispatchId
     })
     .map((message) => message.id)
-  db.markAsReadAndDelivered(heartbeatIds)
+  await db.markAsReadAndDelivered(heartbeatIds)
 }

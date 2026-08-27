@@ -55,6 +55,7 @@ import {
   worktreeWorkspaceKey
 } from '../../../../shared/workspace-scope'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type Props = {
   worktree: Worktree
   children: React.ReactNode
@@ -425,7 +426,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   )
 
   const handleCopyPath = useCallback(() => {
-    window.api.ui.writeClipboardText(worktree.path)
+    uiWriteClipboardText(worktree.path)
   }, [worktree.path])
 
   const handleToggleRead = useCallback(() => {

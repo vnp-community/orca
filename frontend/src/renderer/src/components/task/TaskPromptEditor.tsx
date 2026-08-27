@@ -5,26 +5,29 @@ import { useAppStore } from '../../store'
 import { Button } from '../ui/button'
 import { Loader2 } from 'lucide-react'
 import { Tracers } from '../../../../shared/trace/tracers'
-import type { OrcaTask } from '../../types/task-types'
+import type { OrcaTask } from '../../../../shared/task-types'
 
 export function TaskPromptEditor({ task }: { task: OrcaTask }) {
-  const [prompt, setPrompt]       = useState(task.agentPrompt ?? '')
+  const [prompt, setPrompt] = useState(task.promptTemplate ?? '')
   const [isRunning, setIsRunning] = useState(false)
-  const { project }               = useWorkspace()
+  const { project, currentWorktree } = useWorkspace()
 
   const runWithAgent = async () => {
     setIsRunning(true)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    const span = Tracers.uiTaskGraphExecuteFlow.start({ taskId: task.id, entryPoint: 'prompt-editor', promptLength: prompt.length })
+    const span = Tracers.uiTaskGraphExecuteFlow.start({
+      taskId: task.id,
+      entryPoint: 'prompt-editor',
+      promptLength: prompt.length
+    })
     try {
-      // NOTE (doc/code drift): method 'task.runAgent' (số ít) khác với 'tasks.runAgent'
-      // mà TaskDetail dùng. Giữ nguyên method name hiện tại vì sửa routing RPC không
-      // thuộc phạm vi CR tracing này — chỉ thêm traceId.
-      await callRuntimeRpc(target, 'task.runAgent', {
+      // task.execute has no `prompt` param — the executor builds the agent prompt
+      // server-side from the task's own promptTemplate (TaskAgentExecutor.buildPrompt).
+      await callRuntimeRpc(target, 'task.execute', {
         taskId: task.id,
-        prompt: prompt || task.agentPrompt,
         projectId: project!.id,
-        traceId: span.id,
+        worktreePath: currentWorktree!.path,
+        traceId: span.id
       })
       span.ok({ taskId: task.id })
     } catch (err) {
@@ -40,12 +43,23 @@ export function TaskPromptEditor({ task }: { task: OrcaTask }) {
       <textarea
         className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         value={prompt}
-        onChange={e => setPrompt(e.target.value)}
+        onChange={(e) => setPrompt(e.target.value)}
         placeholder="Describe what the agent should do for this task..."
         rows={4}
       />
-      <Button onClick={runWithAgent} disabled={isRunning || !prompt.trim()} data-testid="run-agent-btn">
-        {isRunning ? <><Loader2 size={12} className="animate-spin mr-1" />Running...</> : '▶ Run with Agent'}
+      <Button
+        onClick={runWithAgent}
+        disabled={isRunning || !prompt.trim()}
+        data-testid="run-agent-btn"
+      >
+        {isRunning ? (
+          <>
+            <Loader2 size={12} className="animate-spin mr-1" />
+            Running...
+          </>
+        ) : (
+          '▶ Run with Agent'
+        )}
       </Button>
     </div>
   )

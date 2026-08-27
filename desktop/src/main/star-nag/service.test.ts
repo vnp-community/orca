@@ -1047,4 +1047,26 @@ describe('StarNagService', () => {
     expect(ui.starNagCompleted).toBeUndefined()
     expect(ui.starNagDeferredUntil).toBeGreaterThan(Date.now())
   })
+
+  it('notifies onVisibilityChanged listeners of show/hide alongside the webContents broadcast', async () => {
+    const window = createWindow()
+    browserWindowMock.getAllWindows.mockReturnValue([window])
+    const { service } = createHarness()
+    const events: unknown[] = []
+    const unsubscribe = service.onVisibilityChanged((event) => events.push(event))
+
+    service.registerIpcHandlers()
+    getIpcHandler('star-nag:forceShow')()
+    await getIpcHandler('star-nag:onboardingCompleted')()
+
+    expect(events).toEqual([
+      { type: 'show', mode: 'gh', surface: 'card' },
+      { type: 'hide' },
+      { type: 'show', mode: 'gh', surface: 'toast' }
+    ])
+
+    unsubscribe()
+    getIpcHandler('star-nag:dismiss')()
+    expect(events).toHaveLength(3)
+  })
 })

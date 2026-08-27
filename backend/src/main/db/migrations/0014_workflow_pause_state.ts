@@ -18,7 +18,7 @@ export const migration0014WorkflowPauseState: Migration = {
   async up(db) {
     // Why: nullable — most rows never pause. Cleared back to NULL by
     // WorkflowOrchestrator.resumeFromPause() so it always reflects "currently paused since".
-    await db.exec(`ALTER TABLE orca_workflow_executions ADD COLUMN paused_at INTEGER`)
+    await db.exec(`ALTER TABLE orca_workflow_executions ADD COLUMN paused_at BIGINT`)
   },
 
   async down(_db) {

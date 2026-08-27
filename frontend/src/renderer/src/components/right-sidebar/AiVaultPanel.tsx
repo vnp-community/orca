@@ -53,6 +53,8 @@ import {
   useAiVaultExecutionHostScope
 } from './ai-vault-host-scope'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenPath } from '../../runtime/runtime-shell-client'
 export default function AiVaultPanel(): React.JSX.Element {
   const activeWorktreeId = useActiveWorktreeId()
   const activeWorktree = useActiveWorktree()
@@ -231,7 +233,7 @@ export default function AiVaultPanel(): React.JSX.Element {
   )
 
   const copyText = useCallback(async (text: string, label: string): Promise<void> => {
-    await window.api.ui.writeClipboardText(text)
+    await uiWriteClipboardText(text)
     toast.success(
       translate('auto.components.right.sidebar.AiVaultPanel.valueCopied', '{{value0}} copied', {
         value0: label
@@ -393,10 +395,10 @@ export default function AiVaultPanel(): React.JSX.Element {
           )
         }
         onOpenLog={(session) => void openAiVaultSessionLogInOrca(session)}
-        onRevealLog={(session) => void window.api.shell.openPath(session.filePath)}
+        onRevealLog={(session) => void shellOpenPath(session.filePath)}
         onOpenCwd={(session) => {
           if (session.cwd) {
-            void window.api.shell.openPath(session.cwd)
+            void shellOpenPath(session.cwd)
           }
         }}
       />

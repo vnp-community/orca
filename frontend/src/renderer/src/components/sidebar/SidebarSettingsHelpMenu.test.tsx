@@ -118,14 +118,22 @@ vi.mock('./SidebarFeedbackDialog', () => ({
   SidebarFeedbackDialog: () => <div data-testid="feedback-dialog" />
 }))
 
+// Why: SidebarSettingsHelpMenu now calls the shell wrapper
+// (runtime-shell-client), not window.api.shell directly.
+vi.mock('@/runtime/runtime-shell-client', () => ({
+  shellOpenUrl: mocks.shellOpenUrl
+}))
+
 function installWindowApi(): void {
   Object.assign(window, {
+    // Why: runtime-app-client/runtime-shell-client/runtime-updater-client's
+    // isWebClientLocation() gate — force the web branch so these stay on the
+    // already-mocked window.api.* mocks instead of the desktop runtime-RPC
+    // transport (window.api.runtime isn't mocked here).
+    __ORCA_WEB_CLIENT__: true,
     api: {
       app: {
         restart: mocks.appRestart
-      },
-      shell: {
-        openUrl: mocks.shellOpenUrl
       },
       updater: {
         check: mocks.updaterCheck

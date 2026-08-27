@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { appGetFeatureWallAssetBaseUrl } from '@/runtime/runtime-app-client'
 
 export function toFeatureWallAssetUrl(baseUrl: string | null, assetPath: string): string | null {
   if (!baseUrl) {
@@ -20,8 +21,7 @@ export function useFeatureWallAssetBaseUrl(load: boolean): string | null {
     }
 
     let cancelled = false
-    void window.api.app
-      .getFeatureWallAssetBaseUrl()
+    void appGetFeatureWallAssetBaseUrl()
       .then((url) => {
         if (!cancelled) {
           setAssetBaseUrl(url)

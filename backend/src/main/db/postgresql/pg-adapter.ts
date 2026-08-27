@@ -18,24 +18,63 @@ import type {
 import { registerDatabaseProvider } from '../provider'
 import type { PostgresConfig } from '../config'
 
+/**
+ * BUG-BE-RPC-003 follow-up: every query in this codebase is written once,
+ * dialect-agnostic, using SQLite's `?` positional placeholder (never `$N`)
+ * — confirmed live: migrations crashed with a raw Postgres "syntax error at
+ * or near ','" the moment a `?`-placeholder query ran, because `pg` only
+ * understands `$1, $2, ...`. Translate here, once, rather than rewriting
+ * every call site across every service.
+ *
+ * Skips `?` inside single-quoted string literals so a literal `?` in SQL
+ * text (not a bind placeholder) is never mistranslated. SQL's doubled `''`
+ * escape for a quote-within-a-string still tracks correctly: toggling
+ * in/out of "inside a string" on every `'` nets back to the same state
+ * across an adjacent `''` pair, and no `?` can occur in that zero-width gap.
+ */
+export function translatePlaceholders(sql: string): string {
+  let result = ''
+  let paramIndex = 0
+  let inString = false
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i]
+    if (ch === "'") {
+      inString = !inString
+      result += ch
+      continue
+    }
+    if (ch === '?' && !inString) {
+      paramIndex++
+      result += `$${paramIndex}`
+      continue
+    }
+    result += ch
+  }
+  return result
+}
+
 class PgStatement implements IStatement {
+  private readonly pgSql: string
+
   constructor(
-    private readonly sql: string,
+    sql: string,
     private readonly client: unknown
-  ) {}
+  ) {
+    this.pgSql = translatePlaceholders(sql)
+  }
 
   async run(...params: BindValue[]): Promise<StatementResult> {
-    const result = await (this.client as any).query(this.sql, params)
+    const result = await (this.client as any).query(this.pgSql, params)
     return { changes: result.rowCount ?? 0, lastInsertRowid: 0 }
   }
 
   async get(...params: BindValue[]): Promise<Record<string, unknown> | undefined> {
-    const result = await (this.client as any).query(this.sql, params)
+    const result = await (this.client as any).query(this.pgSql, params)
     return result.rows[0]
   }
 
   async all(...params: BindValue[]): Promise<Record<string, unknown>[]> {
-    const result = await (this.client as any).query(this.sql, params)
+    const result = await (this.client as any).query(this.pgSql, params)
     return result.rows
   }
 }
@@ -112,9 +151,9 @@ export class PostgreSQLAdapter implements IAsyncDatabase {
     }
   }
 
-  async query(sql: string, params?: BindValue[]): Promise<Record<string, unknown>[]> {
-    const result = await (this.client as any).query(sql, params ?? [])
-    return result.rows
+  async query<T = Record<string, unknown>>(sql: string, params?: BindValue[]): Promise<T[]> {
+    const result = await (this.client as any).query(translatePlaceholders(sql), params ?? [])
+    return result.rows as T[]
   }
 }
 

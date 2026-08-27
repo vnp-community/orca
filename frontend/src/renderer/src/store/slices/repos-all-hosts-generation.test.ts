@@ -41,6 +41,10 @@ beforeEach(() => {
           createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
       }
     },
+    // Why: isWebClientLocation() (used by fetchReposForAllHosts to skip the
+    // redundant environment-loop fetch for paired web clients) reads
+    // window.location.pathname — a bare stub without it throws.
+    location: { pathname: '' },
     dispatchEvent: vi.fn()
   })
 })

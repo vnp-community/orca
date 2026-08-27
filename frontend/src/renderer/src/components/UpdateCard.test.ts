@@ -5,6 +5,21 @@ import type { ChangelogData, UpdateStatus } from '../../../shared/types'
 import { createUISlice } from '../store/slices/ui'
 import type { AppState } from '../store/types'
 import { isHttp2ProtocolError } from './UpdateCard'
+import { uiSet } from '@/runtime/runtime-ui-client'
+
+// Why: UpdateCard now calls the shell wrapper (runtime-shell-client), not
+// window.api.shell directly — mock it so any accidental exercise of an
+// openUrl-triggering callback doesn't hit isWebClientLocation()'s
+// window.location read against this suite's location-less window stub.
+vi.mock('@/runtime/runtime-shell-client', () => ({
+  shellOpenUrl: vi.fn()
+}))
+
+// Why: the ui store slice now calls the ui wrapper (runtime-ui-client), not
+// window.api.ui directly — mock it the same way as the shell wrapper above.
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiSet: vi.fn().mockResolvedValue(undefined)
+}))
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -34,16 +49,22 @@ function setState(store: StoreApi<AppState>, status: UpdateStatus): void {
 // ── Store-level tests for setUpdateStatus / changelog caching ────────
 
 beforeEach(() => {
+  vi.mocked(uiSet).mockClear()
   vi.stubGlobal('window', {
     api: {
-      ui: { set: vi.fn().mockResolvedValue(undefined) },
-      shell: { openUrl: vi.fn() },
       updater: {
         download: vi.fn().mockResolvedValue(undefined),
         quitAndInstall: vi.fn().mockResolvedValue(undefined),
         dismissNudge: vi.fn().mockResolvedValue(undefined)
       }
     },
+    // Why: runtime-updater-client branches on isWebClientLocation(); forcing the
+    // web branch here keeps these assertions on the already-mocked
+    // window.api.updater.* calls instead of the desktop runtime-RPC transport,
+    // which is exercised separately for the local/desktop path.
+    __ORCA_WEB_CLIENT__: true,
+    location: { pathname: '/' },
+    dispatchEvent: vi.fn(),
     matchMedia: vi.fn().mockReturnValue({
       matches: false,
       addEventListener: vi.fn(),
@@ -139,7 +160,7 @@ describe('dismissUpdate', () => {
     store.getState().dismissUpdate()
 
     expect(store.getState().dismissedUpdateVersion).toBe('1.2.0')
-    expect(window.api.ui.set).toHaveBeenCalledWith({ dismissedUpdateVersion: '1.2.0' })
+    expect(uiSet).toHaveBeenCalledWith({ dismissedUpdateVersion: '1.2.0' })
   })
 
   it('uses versionOverride when the current status has no version field (error state)', () => {
@@ -217,7 +238,7 @@ describe('updateCardCollapsed', () => {
 
     store.getState().setUpdateCardCollapsed(true)
     expect(store.getState().updateCardCollapsed).toBe(true)
-    expect(window.api.ui.set).not.toHaveBeenCalledWith(
+    expect(uiSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ updateCardCollapsed: expect.anything() })
     )
 
@@ -261,7 +282,7 @@ describe('markUpdateReassuranceSeen', () => {
     store.getState().markUpdateReassuranceSeen()
 
     expect(store.getState().updateReassuranceSeen).toBe(true)
-    expect(window.api.ui.set).toHaveBeenCalledWith({ updateReassuranceSeen: true })
+    expect(uiSet).toHaveBeenCalledWith({ updateReassuranceSeen: true })
   })
 })
 

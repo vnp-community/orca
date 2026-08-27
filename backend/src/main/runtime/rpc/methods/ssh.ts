@@ -1,14 +1,22 @@
 import { z } from 'zod'
 import {
+  addRegisteredSshPortForward,
   connectRegisteredSshTarget,
+  disconnectRegisteredSshTarget,
   getSshConnectionStore,
   getRegisteredSshState,
+  getRegisteredSshTarget,
   listRegisteredAllConnectionStates,
   listRegisteredFilteredTargets,
   listRegisteredRemovedSshTargetLabels,
+  listRegisteredSshDetectedPorts,
+  listRegisteredSshPortForwards,
   listRegisteredSshProjects,
   listRegisteredSshTargets,
-  listRegisteredSshTeams
+  listRegisteredSshTeams,
+  needsRegisteredSshPassphrasePrompt,
+  removeRegisteredSshPortForward,
+  updateRegisteredSshPortForward
 } from '../../../ipc/ssh'
 import { defineMethod, type RpcMethod } from '../core'
 import { bootstrapServer } from '../../../ssh/fleet-bootstrap-service.js'
@@ -29,6 +37,78 @@ export const SSH_METHODS: RpcMethod[] = [
     name: 'ssh.connect',
     params: SshTarget,
     handler: async (params) => ({ state: await connectRegisteredSshTarget(params.targetId) })
+  }),
+  // Why: there is no per-user Linux account provisioning today — SSH targets
+  // connect as whichever username is configured on the target (SshTarget.username).
+  // This honestly reports that configured account instead of a fabricated
+  // multi-step "provisioning" flow the backend doesn't implement.
+  defineMethod({
+    name: 'ssh.getUserAccount',
+    params: z.object({ serverId: z.string().min(1) }),
+    handler: (params) => {
+      const target = getRegisteredSshTarget(params.serverId)
+      return {
+        linuxUsername: target?.username ?? null,
+        provisioned: target !== undefined
+      }
+    }
+  }),
+  defineMethod({
+    name: 'ssh.disconnect',
+    params: SshTarget,
+    handler: async (params): Promise<void> => {
+      await disconnectRegisteredSshTarget(params.targetId)
+    }
+  }),
+  // Why: lets runtime RPC callers (paired/remote clients) avoid surprising the
+  // user with an unprompted credential dialog before auto-firing ssh.connect —
+  // mirrors desktop's ssh:needsPassphrasePrompt IPC handler.
+  defineMethod({
+    name: 'ssh.needsPassphrasePrompt',
+    params: SshTarget,
+    handler: (params) => ({ needsPrompt: needsRegisteredSshPassphrasePrompt(params.targetId) })
+  }),
+  // ── Port forwarding ──────────────────────────────────────────────────────
+  // Why: wraps the same SshPortForwardManager capability desktop's IPC surface
+  // exposes, so paired/remote clients get real port-forward CRUD instead of the
+  // web client's "unavailable" stubs.
+  defineMethod({
+    name: 'ssh.addPortForward',
+    params: z.object({
+      targetId: z.string().min(1),
+      localPort: z.number(),
+      remoteHost: z.string().min(1),
+      remotePort: z.number(),
+      label: z.string().optional()
+    }),
+    handler: async (params) => ({ entry: await addRegisteredSshPortForward(params) })
+  }),
+  defineMethod({
+    name: 'ssh.updatePortForward',
+    params: z.object({
+      id: z.string().min(1),
+      targetId: z.string().min(1),
+      localPort: z.number(),
+      remoteHost: z.string().min(1),
+      remotePort: z.number(),
+      label: z.string().optional()
+    }),
+    handler: async (params) => ({ entry: await updateRegisteredSshPortForward(params) })
+  }),
+  defineMethod({
+    name: 'ssh.removePortForward',
+    params: z.object({ id: z.string().min(1) }),
+    handler: async (params) => ({ entry: await removeRegisteredSshPortForward(params.id) })
+  }),
+  defineMethod({
+    name: 'ssh.listPortForwards',
+    params: z.object({ targetId: z.string().optional() }).nullable(),
+    handler: (params) => ({ forwards: listRegisteredSshPortForwards(params?.targetId) })
+  }),
+  defineMethod({
+    name: 'ssh.listDetectedPorts',
+    params: SshTarget,
+    handler: (params) => ({ ports: listRegisteredSshDetectedPorts(params.targetId) })
   }),
   defineMethod({
     name: 'ssh.listTargets',

@@ -691,9 +691,15 @@ export class PtyHandler {
     // GH_CONFIG_DIR/GLAB_CONFIG_DIR isolation as the github.*/gitlab.* RPC
     // handlers in external-api-connector.ts — otherwise every user's
     // `gh auth login` shares one default config on the Dev Server.
+    // Why prefix match, not exact: `command` now carries the full shell
+    // command line (e.g. "gh auth login --hostname ...", shell-quoted by the
+    // caller) rather than just the bare binary name — see
+    // specs/agent/api/gaps-and-findings.md #5. A trailing space after the
+    // binary name keeps this from also matching an unrelated "ghost"-style
+    // binary.
     const providerEnv =
-      userId && command === 'gh' ? buildGhEnv(userId, {}) :
-      userId && command === 'glab' ? buildGlabEnv(userId, {}) :
+      userId && command?.startsWith('gh ') ? buildGhEnv(userId, {}) :
+      userId && command?.startsWith('glab ') ? buildGlabEnv(userId, {}) :
       undefined
     const spawnEnv = this.buildSpawnEnv(
       // buildGhEnv/buildGlabEnv are typed as NodeJS.ProcessEnv (values may be

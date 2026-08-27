@@ -48,6 +48,10 @@ vi.mock('@/store', () => {
   return { useAppStore }
 })
 
+vi.mock('@/context/WorkspaceContext', () => ({
+  useWorkspace: () => ({ setCurrentWorktree: vi.fn() })
+}))
+
 vi.mock('@tanstack/react-virtual', () => ({
   defaultRangeExtractor: ({ startIndex, endIndex }: { startIndex: number; endIndex: number }) =>
     Array.from({ length: endIndex - startIndex + 1 }, (_, index) => startIndex + index),

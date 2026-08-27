@@ -9,6 +9,7 @@ import {
   getEphemeralVmRuntimeStatusLabel,
   getVisibleEphemeralVmRuntimes
 } from './EphemeralVmRuntimesSection'
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -20,6 +21,12 @@ vi.mock('sonner', () => ({
     success: toastMocks.success,
     error: toastMocks.error
   }
+}))
+
+// Why: this section now calls the ui wrapper (runtime-ui-client), not
+// window.api.ui directly — mock it the same way as the other runtime-*-client mocks.
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiWriteClipboardText: vi.fn().mockResolvedValue(undefined)
 }))
 
 const roots: Root[] = []
@@ -81,6 +88,7 @@ describe('EphemeralVmRuntimesSection', () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true
     toastMocks.success.mockClear()
     toastMocks.error.mockClear()
+    vi.mocked(uiWriteClipboardText).mockClear().mockResolvedValue(undefined)
     globalThis.window = {
       api: {
         ephemeralVm: {
@@ -98,9 +106,6 @@ describe('EphemeralVmRuntimesSection', () => {
               cleanupStatus: 'succeeded'
             })
           )
-        },
-        ui: {
-          writeClipboardText: vi.fn().mockResolvedValue(undefined)
         }
       }
     } as never
@@ -186,9 +191,7 @@ describe('EphemeralVmRuntimesSection', () => {
     expect(window.api.ephemeralVm.getCleanupCommand).toHaveBeenCalledWith({
       runtimeId: 'runtime-1'
     })
-    expect(window.api.ui.writeClipboardText).toHaveBeenCalledWith(
-      expect.stringContaining('Cleanup payload:')
-    )
+    expect(uiWriteClipboardText).toHaveBeenCalledWith(expect.stringContaining('Cleanup payload:'))
     expect(toastMocks.success).toHaveBeenCalledWith('Copied cleanup command.')
   })
 })

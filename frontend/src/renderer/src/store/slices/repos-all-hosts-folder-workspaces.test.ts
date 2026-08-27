@@ -157,6 +157,10 @@ beforeEach(() => {
         list: runtimeEnvironmentsList
       }
     },
+    // Why: isWebClientLocation() (used by the fetch*ForAllHosts actions to skip
+    // the redundant environment-loop fetch for paired web clients) reads
+    // window.location.pathname — a bare stub without it throws.
+    location: { pathname: '' },
     dispatchEvent: dispatchEventMock
   })
 })

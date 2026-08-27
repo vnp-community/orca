@@ -2,7 +2,9 @@
 
 **Level:** 1 — System Context  
 **Mô tả:** Orca trong môi trường sử dụng — users và external systems mà Orca tương tác  
-**Cập nhật:** 2026-07-28
+**Cập nhật:** 2026-08-14 (correction pass — xem ghi chú trạng thái kiến trúc bên dưới)
+
+> **Trạng thái kiến trúc:** File này mô tả cả hệ thống hiện hành (v5.0, đã triển khai) lẫn một số phần thuộc tầm nhìn "v6.0 Dev Server Agent" (🚧 Proposed, chưa triển khai — xem `docs/adrs/v2/ADR-017/018/019`, tất cả tự khai trạng thái Proposed). Kiến trúc thực tế đang chạy được tài liệu hoá chính xác hơn tại `docs/hld/backend-server-architecture.md`, `docs/hld/dev-server-architecture.md`, `docs/hld/web-server-architecture.md` (`docs/hld/` gốc, không phải `docs/hld/v1/`). Port Agent WebSocket thật là **`:6769/agent`** (httpPort), không phải `:6768` như một số chỗ trong tài liệu cũ ghi — đã sửa bên dưới; xem `audit/agent/connection-wire-protocol-vs-design-review.md` §2.3.
 
 ---
 
@@ -22,7 +24,7 @@ C4Context
   Person(agentdev, "Agent Developer", "Viết AI agent tích hợp qua WebSocket")
 
   System(orca, "Orca Desktop", "AI Orchestrator IDE — Electron app\nQuản lý multi-agent, worktree, terminal")
-  System(orca_web, "Orca Web Server", "Node.js server mode\nHTTP :6769 + WebSocket :6768\nMulti-user, Admin SPA, Agent WS")
+  System(orca_web, "Orca Web Server", "Node.js server mode\nHTTP :6769 + WebSocket RPC :6768 (single-user)\nMulti-user, Admin SPA, Agent WS trên :6769/agent")
   System(orca_mobile, "Orca Mobile", "Companion app iOS/Android\nMonitor và dispatch từ mobile")
   System(orca_cli, "Orca CLI", "Command-line interface\nAutomation và CI/CD integration")
 
@@ -46,7 +48,7 @@ C4Context
   Rel(devops, orca_cli, "Automate + CI/CD", "CLI")
   Rel(admin, orca_web, "Quản lý users/sessions", "HTTP /admin")
   Rel(agentdev, custom_agent, "Phát triển và déploy", "Code")
-  Rel(custom_agent, orca_web, "Kết nối WebSocket", "ws://orca:6768/agent")
+  Rel(custom_agent, orca_web, "Kết nối WebSocket", "ws://orca:6769/agent")
 
   Rel(orca, claude, "Spawn + communicate", "PTY / stdin-stdout")
   Rel(orca, codex, "Spawn + communicate", "PTY / stdin-stdout")
@@ -77,7 +79,7 @@ C4Context
 | QA Engineer | Test UI và bug reporting | Desktop app — Design mode, annotate |
 | DevOps Engineer | Automation + CI/CD | CLI + headless daemon |
 | **Admin** | Quản lý Orca Server users/sessions | Orca Web Server `/admin` SPA |
-| **Agent Developer** | Viết AI agent WebSocket | Custom agent code → `ws://orca:6768/agent` |
+| **Agent Developer** | Viết AI agent WebSocket | Custom agent code → `ws://orca:6769/agent` |
 
 ### External Systems
 
@@ -101,7 +103,7 @@ C4Context
 - Desktop application (Electron)
 - Mobile companion app (React Native)
 - Orca CLI tool
-- Orca Relay binary (deploy trên remote host)
+- Orca Relay / Dev Server Agent binary (deploy trên remote host — tên gọi cũ "Relay" vẫn dùng trong code (`relay-websocket`/`relay-ssh` mode), nhưng binary thật hiện làm nhiều hơn một relay PTY đơn thuần: PTY, git, fs, AI credential store, agent spawn — xem C2-containers.md)
 - Orca Daemon (background service)
 
 **Ngoài scope Orca:**
@@ -145,8 +147,11 @@ DevOps → Orca CLI → Orca Daemon → [Worktree] → [AI Agent]
 ### Flow 5: Web Server Multi-User
 ```
 User → Browser /login → POST /auth/local → orca_session cookie
-     → WebSocket :6768 → AuthMiddleware → WsSessionRouter
+     → WebSocket :6769 (khi ORCA_MULTI_USER=1) → AuthMiddleware → WsSessionRouter
      → Fork (userId) process → Unix Socket → User Workspace
+     # Ở single-user mode (ORCA_MULTI_USER không bật), browser WS dùng port :6768
+     # (RPC server riêng), không đi qua WsSessionRouter — xem
+     # audit/backend/backend-vs-design-review.md §2.2
 
 Admin → Browser /admin → requireAdmin guard
       → Users CRUD, Sessions, Audit Log
@@ -159,7 +164,7 @@ Orca → ws://agent:6799/orca-relay (Bearer token)
      → SshChannelMultiplexer ⇔ WsTransport ⇔ JSON-RPC
 
 # direct-websocket mode (Agent → Orca)
-Custom Agent → ws://orca:6768/agent
+Custom Agent → ws://orca:6769/agent
              → agent.handshake { agentToken }
              → handshake-ok { sessionId }
              → Full JSON-RPC over binary frames
@@ -232,7 +237,12 @@ Developer mở Task → [Run Agent]
     → [Commit & Push]
         → relay: git.push (stream progress)
     → [Create PR]
-        → relay: github.pr.create (gh CLI on dev server)
+        → Backend chạy trực tiếp `gh pr create` NGAY TRONG PROCESS của Backend
+          (KHÔNG relay tới Dev Server Agent) — dù Agent đã có sẵn implementation
+          đúng thiết kế relay này (`agent/src/relay/agent-git-handler.ts`,
+          `git.pr.create`), Backend hiện không gọi tới, nên không có per-user
+          GH_CONFIG_DIR isolation trong Web multi-user mode. Xem
+          `audit/backend/backend-vs-design-review.md` §2.12b.
     → PR URL → Task.prUrl = PR.url
     → Task status → 'review'
 ```
@@ -240,6 +250,8 @@ Developer mở Task → [Run Agent]
 ---
 
 ## Feature → Container Mapping (v5.0)
+
+> Bảng dưới chỉ thể hiện container mapping. Trạng thái triển khai thật (✅/⚠️/❌/🚧) của từng feature đã được đối chiếu với audit tại `README.md` → "Feature → HLD Traceability Matrix" — nhiều feature F22–F32 ở đây trước đánh dấu ngầm định là hoàn chỉnh nhưng thực tế chỉ Một phần/chưa làm (F24, F25, F27, F29, F30, F31), xem README.md để biết chi tiết.
 
 | Feature | Container chính | Container phụ |
 |---------|----------------|--------------|

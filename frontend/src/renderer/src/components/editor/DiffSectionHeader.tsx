@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import type { MouseEvent, ReactElement, ReactNode } from 'react'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function DiffSectionHeader({
   path,
   dirty,
@@ -42,7 +43,7 @@ export function DiffSectionHeader({
             event.stopPropagation()
             // Why: stop both mouse-down and click on the path affordance so
             // the parent section-toggle row cannot consume the interaction.
-            void window.api.ui.writeClipboardText(path).catch((error) => {
+            void uiWriteClipboardText(path).catch((error) => {
               console.error('Failed to copy diff path:', error)
             })
           }}
@@ -52,7 +53,7 @@ export function DiffSectionHeader({
             }
             event.preventDefault()
             event.stopPropagation()
-            void window.api.ui.writeClipboardText(path).catch((error) => {
+            void uiWriteClipboardText(path).catch((error) => {
               console.error('Failed to copy diff path:', error)
             })
           }}

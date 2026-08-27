@@ -9,7 +9,7 @@ import { registerTraceSink, type TraceEvent } from '../../../../../shared/trace'
 // Mock useAppStore for activeTaskId and settings
 vi.mock('../../../store', () => ({
   useAppStore: Object.assign(
-    vi.fn(selector => selector({ activeTaskId: 't1', settings: {} })),
+    vi.fn((selector) => selector({ activeTaskId: 't1', settings: {} })),
     { getState: () => ({ settings: {} }) }
   )
 }))
@@ -17,6 +17,14 @@ vi.mock('../../../store', () => ({
 // Mock useTask
 vi.mock('../../../hooks/useTask', () => ({
   useTask: vi.fn()
+}))
+
+// Mock useWorkspace (real one requires <WorkspaceProvider>)
+vi.mock('../../../context/WorkspaceContext', () => ({
+  useWorkspace: vi.fn().mockReturnValue({
+    project: { id: 'p1' },
+    currentWorktree: { id: 'wt-1', path: '/repo/p1', branch: 'main', isMain: true }
+  })
 }))
 
 // Mock RPC
@@ -49,7 +57,7 @@ describe('TaskDetail', () => {
       task: { id: 't1', title: 'My Task', status: 'todo', priority: 'high', projectId: 'p1' },
       updateTask
     } as any)
-    mockRpc.mockResolvedValue({ blockedBy: [], blocks: [] })
+    mockRpc.mockResolvedValue([]) // task.getDependencies returns a flat { task, edgeType }[]
   })
 
   it('null task → renders empty state', () => {
@@ -63,14 +71,19 @@ describe('TaskDetail', () => {
     expect(screen.getByTestId('task-title-input')).toHaveValue('My Task')
   })
 
-  it('Execute with Agent button calls tasks.runAgent with taskId + traceId', async () => {
+  it('Execute with Agent button calls task.execute with taskId/projectId/worktreePath + traceId', async () => {
     render(<TaskDetail />)
     fireEvent.click(screen.getByTestId('run-agent-btn'))
     await waitFor(() => {
       expect(mockRpc).toHaveBeenCalledWith(
         'mock-target',
-        'tasks.runAgent',
-        expect.objectContaining({ taskId: 't1', traceId: expect.any(String) })
+        'task.execute',
+        expect.objectContaining({
+          taskId: 't1',
+          projectId: 'p1',
+          worktreePath: '/repo/p1',
+          traceId: expect.any(String)
+        })
       )
     })
   })
@@ -81,7 +94,7 @@ describe('TaskDetail', () => {
     fireEvent.click(screen.getByTestId('run-agent-btn'))
 
     await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'tasks.runAgent', expect.any(Object))
+      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.execute', expect.any(Object))
     })
     stop()
 
@@ -90,16 +103,16 @@ describe('TaskDetail', () => {
     expect(startEvent?.fields.taskId).toBe('t1')
     expect(startEvent?.fields.entryPoint).toBe('task-detail')
 
-    const runAgentCall = mockRpc.mock.calls.find((c) => c[1] === 'tasks.runAgent')
+    const runAgentCall = mockRpc.mock.calls.find((c) => c[1] === 'task.execute')
     expect((runAgentCall?.[2] as { traceId?: string }).traceId).toBe(startEvent?.id)
   })
 
   it('RPC success → span.ok({taskId}), toast.success shown', async () => {
-    mockRpc.mockResolvedValueOnce({ blockedBy: [], blocks: [] }) // getDependencies (mount)
+    mockRpc.mockResolvedValueOnce([]) // task.getDependencies (mount)
     const { events, stop } = captureTraceEvents()
     render(<TaskDetail />)
 
-    mockRpc.mockResolvedValueOnce(undefined) // tasks.runAgent
+    mockRpc.mockResolvedValueOnce(undefined) // task.execute
     fireEvent.click(screen.getByTestId('run-agent-btn'))
 
     await waitFor(() => {
@@ -115,7 +128,7 @@ describe('TaskDetail', () => {
     const err = new Error('agent spawn failed')
     render(<TaskDetail />)
 
-    mockRpc.mockRejectedValueOnce(err) // tasks.runAgent
+    mockRpc.mockRejectedValueOnce(err) // task.execute
     const { events, stop } = captureTraceEvents()
     fireEvent.click(screen.getByTestId('run-agent-btn'))
 
@@ -130,10 +143,9 @@ describe('TaskDetail', () => {
   })
 
   it('dependencies section renders blocked-by list', async () => {
-    mockRpc.mockResolvedValueOnce({
-      blockedBy: [{ id: 'b1', title: 'Blocker 1' }],
-      blocks: []
-    })
+    mockRpc.mockResolvedValueOnce([
+      { task: { id: 'b1', title: 'Blocker 1' }, edgeType: 'depends_on' }
+    ])
     render(<TaskDetail />)
     await waitFor(() => {
       expect(screen.getByText('Blocker 1')).toBeInTheDocument()

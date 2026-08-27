@@ -11,6 +11,12 @@ import {
   updateGitHubHostedReviewState
 } from './hosted-review-github-actions'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
+import {
+  closeRuntimeGitLabMR,
+  mergeRuntimeGitLabMR,
+  reopenRuntimeGitLabMR
+} from '@/runtime/runtime-gitlab-client'
 
 export type HostedReviewActionInfo = Pick<
   HostedReviewInfo,
@@ -67,7 +73,7 @@ export function useHostedReviewActions({
       setActionError(null)
       try {
         const result = isGitLab
-          ? await window.api.gl.mergeMR({
+          ? await mergeRuntimeGitLabMR(useAppStore.getState().settings, {
               repoPath: repo.path,
               repoId: repo.id,
               iid: review.number,
@@ -159,12 +165,12 @@ export function useHostedReviewActions({
       try {
         const result = isGitLab
           ? isClosing
-            ? await window.api.gl.closeMR({
+            ? await closeRuntimeGitLabMR(useAppStore.getState().settings, {
                 repoPath: repo.path,
                 repoId: repo.id,
                 iid: review.number
               })
-            : await window.api.gl.reopenMR({
+            : await reopenRuntimeGitLabMR(useAppStore.getState().settings, {
                 repoPath: repo.path,
                 repoId: repo.id,
                 iid: review.number

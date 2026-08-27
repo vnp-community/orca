@@ -65,6 +65,11 @@ function isRuntimeClientEvent(
     message.type === 'worktreesChanged' ||
     message.type === 'sshStateChanged' ||
     message.type === 'linearLinkedIssueUpdated' ||
-    message.type === 'activateWorktree'
+    message.type === 'activateWorktree' ||
+    message.type === 'worktreeBaseStatus' ||
+    message.type === 'worktreeRemoteBranchConflict' ||
+    message.type === 'worktreeCreateProgress' ||
+    message.type === 'menuCommand' ||
+    message.type === 'windowStateChanged'
   )
 }

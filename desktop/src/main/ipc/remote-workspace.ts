@@ -18,6 +18,7 @@ import type { WorkspaceSessionState } from '../../shared/types'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree-id'
 import { getRemoteWorkspaceNamespace } from './remote-workspace-namespace'
 import { registerRemoteWorkspaceNotificationHandler } from './remote-workspace-events'
+import { notifyRemoteWorkspaceChangedListeners } from './remote-workspace-change-bus'
 
 const CLIENT_ID = randomUUID()
 const CLIENT_NAME = hostname() || 'This device'
@@ -378,6 +379,104 @@ export function handleRemoteWorkspaceNotification(
   if (win && !win.isDestroyed()) {
     win.webContents.send('remoteWorkspace:changed', event)
   }
+  notifyRemoteWorkspaceChangedListeners(event)
+}
+
+/** Underlying implementation of `remoteWorkspace:get` — also called by the RPC method. */
+export async function getRemoteWorkspaceForTarget(args: {
+  targetId: string
+}): Promise<RemoteWorkspaceSnapshot | null> {
+  const target = getSshConnectionStore()?.getTarget(args.targetId)
+  if (!target) {
+    return null
+  }
+  return getRemoteSnapshot(target)
+}
+
+/** Underlying implementation of `remoteWorkspace:setForConnectedTargets` — also called by the RPC method. */
+export async function setRemoteWorkspaceForConnectedTargets(
+  store: Store,
+  args: { session?: WorkspaceSessionState; hydratedTargetIds?: unknown }
+): Promise<{ targetId: string; result: RemoteWorkspacePatchResult }[]> {
+  const hydratedTargetIds = getExplicitHydratedTargetIds(args.hydratedTargetIds)
+  if (!hydratedTargetIds) {
+    // Why: an omitted hydration set used to broadcast one session to every
+    // SSH target, overwriting unrelated remote workspace snapshots.
+    return []
+  }
+  const targets =
+    getSshConnectionStore()
+      ?.listTargets()
+      .filter((target) => hydratedTargetIds.has(target.id) && getActiveMultiplexer(target.id)) ??
+    []
+
+  const workspaceSession = args.session ?? store.getWorkspaceSession()
+  const results = await Promise.all(
+    targets.map(async (target) => {
+      // Why: each target has its own revision stream. Keep same-target
+      // writes queued, but do not let one slow relay block others.
+      const session = exportSessionForTarget(store, target.id, workspaceSession)
+      const result = await queueRemoteWorkspacePatch(target.id, () =>
+        patchRemoteWorkspaceSession(target, session)
+      )
+      return result ? { targetId: target.id, result } : null
+    })
+  )
+  return results.filter(
+    (entry): entry is { targetId: string; result: RemoteWorkspacePatchResult } => entry !== null
+  )
+}
+
+/** Underlying implementation of `remoteWorkspace:listEnabledConnectedTargets` — also called by the RPC method. */
+export async function listEnabledConnectedRemoteWorkspaceTargets(): Promise<string[]> {
+  return (
+    getSshConnectionStore()
+      ?.listTargets()
+      .filter((target) => getActiveMultiplexer(target.id))
+      .map((target) => target.id) ?? []
+  )
+}
+
+/** Underlying implementation of `remoteWorkspace:listConnectedClients` — also called by the RPC method. */
+export async function listConnectedRemoteWorkspaceClients(args?: {
+  targetIds?: string[]
+}): Promise<{ targetId: string; clients: RemoteWorkspaceConnectedClient[] }[]> {
+  const requestedTargetIds = Array.isArray(args?.targetIds) ? new Set(args.targetIds) : null
+  const targets =
+    getSshConnectionStore()
+      ?.listTargets()
+      .filter(
+        (target) =>
+          getActiveMultiplexer(target.id) &&
+          (!requestedTargetIds || requestedTargetIds.has(target.id))
+      ) ?? []
+  const results: { targetId: string; clients: RemoteWorkspaceConnectedClient[] }[] = []
+  for (const target of targets) {
+    const mux = getActiveMultiplexer(target.id)
+    if (!mux) {
+      continue
+    }
+    const namespace = getRemoteWorkspaceNamespace(target)
+    try {
+      const raw = await mux.request('workspace.presence', {
+        namespace,
+        clientId: CLIENT_ID,
+        clientName: CLIENT_NAME
+      })
+      results.push({
+        targetId: target.id,
+        clients: normalizeConnectedClients(raw, CLIENT_ID)
+      })
+    } catch {
+      results.push({ targetId: target.id, clients: [] })
+    }
+  }
+  return results
+}
+
+/** Underlying implementation of `remoteWorkspace:clientId` — also called by the RPC method. */
+export function getRemoteWorkspaceClientId(): string {
+  return CLIENT_ID
 }
 
 export function registerRemoteWorkspaceHandlers(
@@ -395,93 +494,24 @@ export function registerRemoteWorkspaceHandlers(
   ipcMain.removeHandler('remoteWorkspace:listConnectedClients')
   ipcMain.removeHandler('remoteWorkspace:clientId')
 
-  ipcMain.handle('remoteWorkspace:get', async (_event, args: { targetId: string }) => {
-    const target = getSshConnectionStore()?.getTarget(args.targetId)
-    if (!target) {
-      return null
-    }
-    return getRemoteSnapshot(target)
-  })
-
-  ipcMain.handle(
-    'remoteWorkspace:setForConnectedTargets',
-    async (_event, args: { session?: WorkspaceSessionState; hydratedTargetIds?: unknown }) => {
-      const hydratedTargetIds = getExplicitHydratedTargetIds(args.hydratedTargetIds)
-      if (!hydratedTargetIds) {
-        // Why: an omitted hydration set used to broadcast one session to every
-        // SSH target, overwriting unrelated remote workspace snapshots.
-        return []
-      }
-      const targets =
-        getSshConnectionStore()
-          ?.listTargets()
-          .filter(
-            (target) => hydratedTargetIds.has(target.id) && getActiveMultiplexer(target.id)
-          ) ?? []
-
-      const workspaceSession = args.session ?? store.getWorkspaceSession()
-      const results = await Promise.all(
-        targets.map(async (target) => {
-          // Why: each target has its own revision stream. Keep same-target
-          // writes queued, but do not let one slow relay block others.
-          const session = exportSessionForTarget(store, target.id, workspaceSession)
-          const result = await queueRemoteWorkspacePatch(target.id, () =>
-            patchRemoteWorkspaceSession(target, session)
-          )
-          return result ? { targetId: target.id, result } : null
-        })
-      )
-      return results.filter(
-        (entry): entry is { targetId: string; result: RemoteWorkspacePatchResult } => entry !== null
-      )
-    }
+  ipcMain.handle('remoteWorkspace:get', async (_event, args: { targetId: string }) =>
+    getRemoteWorkspaceForTarget(args)
   )
 
   ipcMain.handle(
-    'remoteWorkspace:listEnabledConnectedTargets',
-    async () =>
-      getSshConnectionStore()
-        ?.listTargets()
-        .filter((target) => getActiveMultiplexer(target.id))
-        .map((target) => target.id) ?? []
+    'remoteWorkspace:setForConnectedTargets',
+    async (_event, args: { session?: WorkspaceSessionState; hydratedTargetIds?: unknown }) =>
+      setRemoteWorkspaceForConnectedTargets(store, args)
+  )
+
+  ipcMain.handle('remoteWorkspace:listEnabledConnectedTargets', async () =>
+    listEnabledConnectedRemoteWorkspaceTargets()
   )
 
   ipcMain.handle(
     'remoteWorkspace:listConnectedClients',
-    async (_event, args?: { targetIds?: string[] }) => {
-      const requestedTargetIds = Array.isArray(args?.targetIds) ? new Set(args.targetIds) : null
-      const targets =
-        getSshConnectionStore()
-          ?.listTargets()
-          .filter(
-            (target) =>
-              getActiveMultiplexer(target.id) &&
-              (!requestedTargetIds || requestedTargetIds.has(target.id))
-          ) ?? []
-      const results: { targetId: string; clients: RemoteWorkspaceConnectedClient[] }[] = []
-      for (const target of targets) {
-        const mux = getActiveMultiplexer(target.id)
-        if (!mux) {
-          continue
-        }
-        const namespace = getRemoteWorkspaceNamespace(target)
-        try {
-          const raw = await mux.request('workspace.presence', {
-            namespace,
-            clientId: CLIENT_ID,
-            clientName: CLIENT_NAME
-          })
-          results.push({
-            targetId: target.id,
-            clients: normalizeConnectedClients(raw, CLIENT_ID)
-          })
-        } catch {
-          results.push({ targetId: target.id, clients: [] })
-        }
-      }
-      return results
-    }
+    async (_event, args?: { targetIds?: string[] }) => listConnectedRemoteWorkspaceClients(args)
   )
 
-  ipcMain.handle('remoteWorkspace:clientId', () => CLIENT_ID)
+  ipcMain.handle('remoteWorkspace:clientId', () => getRemoteWorkspaceClientId())
 }

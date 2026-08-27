@@ -24,7 +24,9 @@ import type {
 } from '../../../../shared/skills'
 import { countSkillsBySource, filterSkills, type SkillsFilterState } from './skills-filter'
 import { translate } from '@/i18n/i18n'
+import { discoverRuntimeSkills } from '@/runtime/runtime-skills-client'
 
+import { shellOpenInFileManager } from '../../runtime/runtime-shell-client'
 const providerLabels: Record<SkillProvider, string> = {
   codex: 'Codex',
   claude: 'Claude',
@@ -57,7 +59,7 @@ function pluralize(count: number, singular: string): string {
 
 function SkillCard({ skill }: { skill: DiscoveredSkill }): React.JSX.Element {
   const revealSkill = async (): Promise<void> => {
-    const result = await window.api.shell.openInFileManager(skill.skillFilePath)
+    const result = await shellOpenInFileManager(skill.skillFilePath)
     if (!result.ok) {
       toast.error(
         translate('auto.components.skills.SkillsPage.995fde8337', 'Could not reveal skill file')
@@ -207,7 +209,7 @@ export default function SkillsPage(): React.JSX.Element {
   const loadSkills = useCallback(async (): Promise<void> => {
     setLoading(true)
     try {
-      const nextResult = await window.api.skills.discover()
+      const nextResult = await discoverRuntimeSkills(useAppStore.getState().settings)
       if (mountedRef.current) {
         setResult(nextResult)
       }
