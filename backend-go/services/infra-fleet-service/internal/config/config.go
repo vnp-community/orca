@@ -24,6 +24,13 @@ type Config struct {
 	// fail-safe: an unrecognized value should not silently widen what
 	// host-local terminal spawning is allowed.
 	ServerDeployment bool
+	// NATSURL is where the transactional-outbox relay (TASK-FLEET-03-06's
+	// HealthPublisher, dev_server.health_degraded) publishes — mirrors
+	// usage-service's identical Config.NATSURL/NATS_URL convention. If NATS
+	// is unreachable at startup, outbox rows still get written durably (see
+	// cmd/server/main.go), they just queue up unpublished until a future
+	// restart.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -34,5 +41,6 @@ func Load() (Config, error) {
 	return Config{
 		Base:             base,
 		ServerDeployment: os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		NATSURL:          commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

@@ -14,6 +14,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -467,5 +468,59 @@ func TestListAllForPolling_IsCrossTenant(t *testing.T) {
 	}
 	if !tenants[testTenant1] || !tenants[testTenant2] {
 		t.Errorf("expected dev servers from both tenants, got %+v", got)
+	}
+}
+
+// TestOutboxEnqueueFetchMarkPublished covers the round trip
+// EnqueueOutboxEvent -> FetchUnpublished -> MarkPublished ->
+// FetchUnpublished (empty) that outbox.Relay drives in production.
+func TestOutboxEnqueueFetchMarkPublished(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	id := uuid.NewString()
+	occurredAt := time.Now().UTC().Truncate(time.Millisecond)
+	payload := []byte(`{"devServerId":"ds1","from":"healthy","to":"degraded"}`)
+	if err := repo.EnqueueOutboxEvent(ctx, id, testTenant1, "dev_server.health_degraded", occurredAt, 1, payload); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+
+	unpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("fetch unpublished: %v", err)
+	}
+	if len(unpublished) != 1 {
+		t.Fatalf("expected exactly 1 unpublished row, got %d", len(unpublished))
+	}
+	rec := unpublished[0]
+	if rec.ID != id || rec.Subject != "dev_server.health_degraded" {
+		t.Errorf("unexpected record: %+v", rec)
+	}
+	if rec.Event.TenantID != testTenant1 {
+		t.Errorf("unexpected tenant id: %+v", rec.Event)
+	}
+	// JSONB round-trips semantically, not byte-for-byte (Postgres
+	// normalizes key order/whitespace) — compare decoded values instead.
+	var gotPayload, wantPayload map[string]any
+	if err := json.Unmarshal(rec.Event.Payload, &gotPayload); err != nil {
+		t.Fatalf("unmarshaling returned payload: %v", err)
+	}
+	if err := json.Unmarshal(payload, &wantPayload); err != nil {
+		t.Fatalf("unmarshaling expected payload: %v", err)
+	}
+	if !reflect.DeepEqual(gotPayload, wantPayload) {
+		t.Errorf("expected payload %+v, got %+v", wantPayload, gotPayload)
+	}
+
+	if err := repo.MarkPublished(ctx, []string{id}); err != nil {
+		t.Fatalf("mark published: %v", err)
+	}
+
+	stillUnpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("fetch unpublished (2nd): %v", err)
+	}
+	if len(stillUnpublished) != 0 {
+		t.Errorf("expected zero unpublished rows after MarkPublished, got %d", len(stillUnpublished))
 	}
 }

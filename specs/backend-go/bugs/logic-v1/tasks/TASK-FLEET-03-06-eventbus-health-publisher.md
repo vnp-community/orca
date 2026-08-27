@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (eventbus adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/eventbus/health_publisher.go` (new)
 **Depends on:** TASK-FLEET-03-03
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — major correction from the task's draft: infra-fleet-service had NO existing outbox infrastructure at all (no `outbox.Outbox` type exists in common/outbox — it exposes a Store port + Relay only; enqueueing is each service's own responsibility per that package's doc comment). Added migration 0010 (infra.outbox_events, mirrors usage.outbox_events), postgres.Repository.EnqueueOutboxEvent/FetchUnpublished/MarkPublished, and eventbus.HealthPublisher (declares its own narrow OutboxEnqueuer port). Added Config.NATSURL (mirrors usage-service's convention) for main.go wiring in TASK-FLEET-03-08. Unit tests (fake enqueuer: exact payload shape, enqueue-failure-never-panics) + real testcontainers-Postgres round-trip (enqueue->fetch->mark-published->fetch-empty) all pass.
 
 ---
 
