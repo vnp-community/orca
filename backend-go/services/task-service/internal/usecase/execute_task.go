@@ -106,7 +106,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	if worktreePath == "" {
 		worktreePath = resolvedPath // reuse path: EnsureWorktree returns "" for path on reuse, see TASK-TG-04-02
 	}
-	_ = worktreePath // resolved for parity with SOL-TG-04's design; SimpleExecutor/ComplexExecutor resolve their own worktree path today (TASK-TG-04-06 threads this through as a context preamble)
+	_ = worktreePath // resolved for parity with SOL-TG-04's design; SimpleExecutor resolves its own worktree path today (TASK-TG-04-06 threads this through as a context preamble)
 	if worktreeID != task.WorktreeID {
 		if err := uc.repo.UpdateWorktreeID(ctx, tenantID, in.TaskID, worktreeID); err != nil {
 			return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_WORKTREE_PERSIST_FAILED", "failed to persist worktree id", err)
@@ -119,7 +119,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	dispatchStart := uc.clock.Now()
 
 	if complex {
-		ref, err := uc.complex.Execute(ctx, tenantID, in.TaskID, in.RequestID)
+		ref, err := uc.complex.Execute(ctx, tenantID, in.TaskID, in.RequestID, worktreeID)
 		if err != nil {
 			// The fix: revert the in_progress write instead of leaving the task
 			// stuck — a dispatch failure must never leave permanently-false

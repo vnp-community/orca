@@ -381,7 +381,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		addEdgeUC,
 		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}),
 		resolvePermissionUC,
-		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, resolvePermissionUC,
+		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubComplexExecutor{}, resolvePermissionUC,
 			stubWorktreeProvisioner{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, usecase.SystemClock{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
@@ -476,6 +476,14 @@ func (stubOPA) Decision(ctx context.Context, level domain.GrantLevel, action, te
 type stubExecutor struct{}
 
 func (stubExecutor) Execute(ctx context.Context, tenantID, taskID, requestID string) (string, error) {
+	return "ref", nil
+}
+
+// stubComplexExecutor mirrors stubExecutor for usecase.ComplexExecutor's
+// widened (worktreeID-carrying) signature (TASK-TG-04-04).
+type stubComplexExecutor struct{}
+
+func (stubComplexExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreeID string) (string, error) {
 	return "ref", nil
 }
 

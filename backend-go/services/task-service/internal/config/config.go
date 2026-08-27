@@ -36,6 +36,10 @@ type Config struct {
 	// TenantServiceAddr is where TeamScopeResolver (TASK-TG-03-03) dials
 	// tenant-service's ListTeamsForUser RPC (TASK-TG-03-02).
 	TenantServiceAddr string
+	// OrchestrationServiceAddr is where ComplexExecutor (TASK-TG-04-04)
+	// dials orchestration-service's StartCoordinatorRun RPC — the complex
+	// (subtree-dispatch) execution path.
+	OrchestrationServiceAddr string
 	// NATSURL is where the transactional-outbox relay (TASK-TG-03-07)
 	// publishes grant audit events — mirrors usage-service's identical
 	// config field.
@@ -48,13 +52,14 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                  base,
-		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
-		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
-		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
-		GitGatewayServiceAddr: commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
-		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
-		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
-		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		Base:                     base,
+		OPABundlePath:            commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		InfraFleetServiceAddr:    commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		AIProviderServiceAddr:    commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
+		GitGatewayServiceAddr:    commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
+		ProjectServiceAddr:       commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
+		TenantServiceAddr:        commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
+		OrchestrationServiceAddr: commonconfig.StringEnv("ORCHESTRATION_SERVICE_ADDR", "orchestration-service:9090"),
+		NATSURL:                  commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

@@ -645,6 +645,26 @@ func (f *fakeExecutor) Execute(ctx context.Context, tenantID, taskID, requestID 
 	return f.ref, nil
 }
 
+// fakeComplexExecutor backs ExecuteTask's complex-path tests — a separate
+// type from fakeExecutor since usecase.ComplexExecutor's Execute takes an
+// extra worktreeID argument (TASK-TG-04-04) that usecase.SimpleExecutor's
+// doesn't.
+type fakeComplexExecutor struct {
+	ref           string
+	err           error
+	called        bool
+	gotWorktreeID string
+}
+
+func (f *fakeComplexExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreeID string) (string, error) {
+	f.called = true
+	f.gotWorktreeID = worktreeID
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.ref, nil
+}
+
 // fakeCommentRepository backs AddComment/ListComments' tests without a
 // database — id assignment mirrors postgres.Repository.AddComment
 // (server-generated id, not client-supplied).

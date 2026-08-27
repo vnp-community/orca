@@ -32,7 +32,7 @@ func seedOwnedTask(repo *fakeTaskRepository, id string) {
 }
 
 func TestExecuteTask_RequiresTenantContext(t *testing.T) {
-	uc := newExecuteTaskForTest(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{})
+	uc := newExecuteTaskForTest(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeComplexExecutor{})
 	_, err := uc.Execute(context.Background(), ExecuteTaskInput{TaskID: "t1"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -49,7 +49,7 @@ func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
 	seedOwnedTask(repo, "task-1")
 	edges := &fakeEdgeRepository{}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
 	uc := newExecuteTaskForTest(repo, edges, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -88,7 +88,7 @@ func TestExecuteTask_ComplexPath_HasSubtasks(t *testing.T) {
 		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
 	uc := newExecuteTaskForTest(repo, edges, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -125,7 +125,7 @@ func TestExecuteTask_ComplexPath_HasDependencies(t *testing.T) {
 		{FromTaskID: "task-1", ToTaskID: "blocking-task", Kind: domain.EdgeKindDependsOn},
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
 	uc := newExecuteTaskForTest(repo, edges, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -150,7 +150,7 @@ func TestExecuteTask_IgnoresEdgesToTheTaskWhenDecidingComplexity(t *testing.T) {
 		{FromTaskID: "other-task", ToTaskID: "task-1", Kind: domain.EdgeKindDependsOn},
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
 	uc := newExecuteTaskForTest(repo, edges, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -167,7 +167,7 @@ func TestExecuteTask_ExecutorFailurePropagates(t *testing.T) {
 	seedOwnedTask(repo, "task-1")
 	edges := &fakeEdgeRepository{}
 	simple := &fakeExecutor{err: errors.New("infra-fleet-service unavailable")}
-	uc := newExecuteTaskForTest(repo, edges, simple, &fakeExecutor{})
+	uc := newExecuteTaskForTest(repo, edges, simple, &fakeComplexExecutor{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
@@ -176,7 +176,7 @@ func TestExecuteTask_ExecutorFailurePropagates(t *testing.T) {
 }
 
 func TestExecuteTask_RequiresTaskID(t *testing.T) {
-	uc := newExecuteTaskForTest(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{})
+	uc := newExecuteTaskForTest(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeComplexExecutor{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{RequestID: "req-1"}); err == nil {
@@ -192,7 +192,7 @@ func TestExecuteTask_MarksTaskInProgressBeforeDispatching(t *testing.T) {
 	repo := newFakeTaskRepository()
 	seedOwnedTask(repo, "task-1")
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeExecutor{})
+	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
@@ -219,7 +219,7 @@ func TestExecuteTask_StatusUpdateFailurePropagatesAndSkipsDispatch(t *testing.T)
 	seedOwnedTask(repo, "task-1")
 	repo.updateStatusErr = errors.New("db unavailable")
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
 	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, complex)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -238,7 +238,7 @@ func TestExecuteTask_DispatchFailure_RevertsStatusToPrevious(t *testing.T) {
 	repo := newFakeTaskRepository()
 	repo.tasks["task-1"] = domain.Task{ID: "task-1", TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusReview}
 	simple := &fakeExecutor{err: errors.New("dev server offline")}
-	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeExecutor{})
+	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
@@ -273,7 +273,7 @@ func TestExecuteTask_PermissionDenied_NeverWritesStatus(t *testing.T) {
 	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1"}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
 	clock := &fakeClock{now: time.Unix(1000, 0)}
-	uc := NewExecuteTask(repo, &fakeEdgeRepository{}, simple, &fakeExecutor{}, resolvePermission, worktrees, resolver, clock)
+	uc := NewExecuteTask(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{}, resolvePermission, worktrees, resolver, clock)
 	ctx := withIdentity(context.Background(), "tenant-1", "attacker")
 
 	_, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -306,7 +306,7 @@ func TestExecuteTask_NoConnection_ReturnsFailedPrecondition(t *testing.T) {
 	resolver := &fakeProjectExecutionResolver{connected: false}
 	clock := &fakeClock{now: time.Unix(1000, 0)}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	uc := NewExecuteTask(repo, &fakeEdgeRepository{}, simple, &fakeExecutor{}, resolvePermission, worktrees, resolver, clock)
+	uc := NewExecuteTask(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{}, resolvePermission, worktrees, resolver, clock)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	_, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -336,7 +336,7 @@ func TestExecuteTask_ExistingWorktreeID_NeverCallsCreateBranch(t *testing.T) {
 	repo := newFakeTaskRepository()
 	repo.tasks["task-1"] = domain.Task{ID: "task-1", TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusOpen, WorktreeID: "existing-wt"}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeExecutor{})
+	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {

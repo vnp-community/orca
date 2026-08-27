@@ -40,6 +40,7 @@ import (
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
@@ -85,12 +86,24 @@ func run() error {
 
 	repo := taskpostgres.New(pool)
 
-	// Complex (orchestration-service) execution dispatch is still a STUB —
-	// see internal/adapter/grpcclient's doc comment and this service's
-	// README. Simple execution dispatch, the AI-relay path, and (as of
-	// TASK-TG-03-03) team-scope resolution are real, dialed against
-	// infra-fleet-service, ai-provider-service, and tenant-service below.
-	complexExecutor := taskgrpcclient.NewStubComplexExecutor()
+	// Complex (orchestration-service) execution dispatch is real as of
+	// TASK-TG-04-04: dials orchestration-service's StartCoordinatorRun RPC.
+	// FLAGGED DEPENDENCY (not covered by this task, orchestration-service's
+	// own scope): StartCoordinatorRun's server-side handler — persisting a
+	// coordinator_runs row, minting orchestration_tasks rows, starting the
+	// state-machine — may not exist yet in orchestration-service. Calling
+	// an RPC with no server implementation fails at dial/call time (a real,
+	// visible error), not at compile time, so this wiring is safe to land
+	// ahead of that landing; confirm it before relying on the complex path
+	// in production. StubComplexExecutor (grpcclient's doc comment) remains
+	// available as a fallback for environments where that handler isn't up.
+	orchConn, err := taskgrpcclient.Dial(cfg.OrchestrationServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing orchestration-service: %w", err)
+	}
+	defer func() { _ = orchConn.Close() }()
+	orchClient := orchestrationv1.NewOrchestrationServiceClient(orchConn)
+	complexExecutor := taskgrpcclient.NewComplexExecutor(orchClient, repo, repo)
 
 	tenantConn, err := taskgrpcclient.Dial(cfg.TenantServiceAddr)
 	if err != nil {
