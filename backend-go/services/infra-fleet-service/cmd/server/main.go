@@ -86,6 +86,7 @@ func run() error {
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
 	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
 	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
+	scrollbackStore := infrapostgres.NewTerminalScrollbackSnapshotStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
 	// wired below via agentwsserver) are both real, and so is relay-ssh now
@@ -157,6 +158,11 @@ func run() error {
 	emulatorRelayUC := usecase.NewEmulatorRelay(repo, agentClient)
 	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
 
+	// --- Terminal scrollback persistence (SOL-TM-03) ---
+	saveTerminalScrollbackSnapshotUC := usecase.NewSaveTerminalScrollbackSnapshot(scrollbackStore, usecase.RealClock{})
+	getTerminalScrollbackSnapshotUC := usecase.NewGetTerminalScrollbackSnapshot(scrollbackStore)
+	deleteTerminalScrollbackSnapshotsUC := usecase.NewDeleteTerminalScrollbackSnapshots(scrollbackStore)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -186,6 +192,9 @@ func run() error {
 		deleteBrowserProfileUC,
 		emulatorRelayUC,
 		getHostCapabilitiesUC,
+		saveTerminalScrollbackSnapshotUC,
+		getTerminalScrollbackSnapshotUC,
+		deleteTerminalScrollbackSnapshotsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

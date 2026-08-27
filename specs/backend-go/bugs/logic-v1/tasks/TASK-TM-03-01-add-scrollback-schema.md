@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/migrations/0009_terminal_scrollback_snapshots.up.sql`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migrations/0007_terminal_scrollback_snapshots.{up,down}.sql created (next-free number was 0007, not 0009 — 0008 didn't exist in this checkout); `go build ./services/infra-fleet-service/...` clean.
 
 ---
 

@@ -1470,7 +1470,9 @@ async function route(
 
     // ── v5.0: pty.create ─────────────────────────────────────────────────────
     // TM-001/TM-006: Create a PTY session in agent mode.
-    // Params: { cwd, cols?, rows?, env?, shellOverride? }
+    // Params: { cwd, cols?, rows?, env?, shellOverride?, shellIntegration? }
+    // shellIntegration (BR-TM-13, SOL-TM-04): opt-in PowerShell OSC 133
+    // bootstrap injection — default false, no effect on non-PowerShell shells.
     // Returns: { id, cols, rows, cwd, shell }
     // Why all six pty.* cases below pass makeNotifier(ws, state) (not just
     // create/attach): PTYs now live in the detached pty-daemon process

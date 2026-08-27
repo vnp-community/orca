@@ -1,30 +1,3 @@
-# TASK-TM-03-05: Add `SaveTerminalScrollbackSnapshot` usecase
-
-**From Solution:** SOL-TM-03
-**Priority:** P1
-**Service:** `infra-fleet-service`
-**File:** `backend-go/services/infra-fleet-service/internal/usecase/save_terminal_scrollback_snapshot.go`
-**Depends on:** TASK-TM-03-04 (repository port)
-**Status:** `[x]` DONE — save_terminal_scrollback_snapshot.go + test added (happy path, over-cap, missing-key); `go test -run TestSaveTerminalScrollbackSnapshot` — 3/3 pass.
-
----
-
-## Context
-
-The write path for scrollback snapshots: enforces BR-TM-10 (50MB
-per-worktree cap, rejected explicitly rather than silently truncated —
-truncating here would corrupt BR-TM-11's "restore exactly" guarantee),
-gzip-compresses the client-supplied ANSI blob, and upserts it. Trusts the
-caller's timing decision (BR-TM-09, "idle only") the same way
-`SpawnTerminalSession` trusts the caller's `Shell` string — this
-coordination-layer service never observes PTY bytes, so it cannot itself
-detect idle.
-
-## Changes to make
-
-Create `backend-go/services/infra-fleet-service/internal/usecase/save_terminal_scrollback_snapshot.go`:
-
-```go
 package usecase
 
 import (
@@ -117,38 +90,3 @@ func gzipDecompress(data []byte) ([]byte, error) {
 	defer r.Close()
 	return io.ReadAll(r)
 }
-```
-
-Confirm this service already has a `Clock` port (used elsewhere for
-testable time) — if not, add a minimal one to `ports.go`:
-
-```go
-// Clock abstracts time.Now for deterministic tests.
-type Clock interface{ Now() time.Time }
-```
-
-and a `RealClock` implementation (`func (RealClock) Now() time.Time { return time.Now().UTC() }`)
-wherever this service's other `Clock` usages already live — check first with
-`grep -rn "Clock interface" backend-go/services/infra-fleet-service` before
-adding a duplicate.
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/infra-fleet-service/...
-```
-
-Then add `save_terminal_scrollback_snapshot_test.go` with a fake
-`TerminalScrollbackSnapshotRepository`:
-- happy path upserts with gzip applied (decompress the captured `DataGzip`
-  and assert it equals the original input)
-- over-cap (`existingTotal + len(Data) > 50MB`) returns
-  `INFRA_SCROLLBACK_OVER_CAP` without calling `Upsert`
-- missing `WorktreeID`/`PaneKey` rejected before touching the repository
-
-```bash
-go test ./services/infra-fleet-service/internal/usecase/... -run TestSaveTerminalScrollbackSnapshot -v
-```
-
-Expected: clean build, all three cases pass.

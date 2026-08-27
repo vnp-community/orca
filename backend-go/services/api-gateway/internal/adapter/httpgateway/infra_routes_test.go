@@ -190,6 +190,18 @@ func (f *fakeInfraFleetServiceClient) DeleteBrowserProfile(context.Context, *inf
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+func (f *fakeInfraFleetServiceClient) SaveTerminalScrollbackSnapshot(context.Context, *infrafleetv1.SaveTerminalScrollbackSnapshotRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) GetTerminalScrollbackSnapshot(context.Context, *infrafleetv1.GetTerminalScrollbackSnapshotRequest, ...grpc.CallOption) (*infrafleetv1.GetTerminalScrollbackSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) DeleteTerminalScrollbackSnapshots(context.Context, *infrafleetv1.DeleteTerminalScrollbackSnapshotsRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // testInfraRouter mounts mountInfraRoutes alone on a fresh chi router — no
 // authMiddleware, since these tests inject identity into the request
 // context directly the way authMiddleware would (withIdentity), mirroring

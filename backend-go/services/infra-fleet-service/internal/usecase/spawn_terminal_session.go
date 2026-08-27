@@ -12,11 +12,12 @@ import (
 // SpawnTerminalSessionInput mirrors the gRPC request 1:1 by design, see
 // register_dev_server.go's comment for the rationale.
 type SpawnTerminalSessionInput struct {
-	ConnectionID string
-	Cwd          string
-	Shell        string
-	Cols         int32
-	Rows         int32
+	ConnectionID     string
+	Cwd              string
+	Shell            string
+	Cols             int32
+	Rows             int32
+	ShellIntegration bool // BR-TM-13 — forwarded to SpawnPtyInput, never inspected here
 }
 
 // SpawnTerminalSession creates a new PTY on the dev server ConnectionID
@@ -66,7 +67,10 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", nil)
 	}
 
-	result, err := uc.agent.SpawnPty(ctx, devServer, SpawnPtyInput{Cwd: in.Cwd, Shell: in.Shell, Cols: in.Cols, Rows: in.Rows})
+	result, err := uc.agent.SpawnPty(ctx, devServer, SpawnPtyInput{
+		Cwd: in.Cwd, Shell: in.Shell, Cols: in.Cols, Rows: in.Rows,
+		ShellIntegration: in.ShellIntegration,
+	})
 	if err != nil {
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindInternal, "INFRA_AGENT_SPAWN_PTY_FAILED", "failed to spawn pty on dev server agent", err)
 	}

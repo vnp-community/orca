@@ -20,40 +20,43 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InfraFleetService_RegisterDevServer_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
-	InfraFleetService_ResolveConnection_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
-	InfraFleetService_CreateSshTarget_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
-	InfraFleetService_GetFleetHealth_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
-	InfraFleetService_ScanWorkspacePorts_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
-	InfraFleetService_ListDevServers_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
-	InfraFleetService_CreateConnection_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
-	InfraFleetService_Relay_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/Relay"
-	InfraFleetService_ListSshTargets_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
-	InfraFleetService_GetSshState_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
-	InfraFleetService_EstablishConnection_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
-	InfraFleetService_KillWorkspacePort_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
-	InfraFleetService_SpawnTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
-	InfraFleetService_ResizeTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
-	InfraFleetService_KillTerminalSession_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
-	InfraFleetService_StopTerminalProcess_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/StopTerminalProcess"
-	InfraFleetService_ListTerminalSessions_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/ListTerminalSessions"
-	InfraFleetService_WaitTerminalSession_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/WaitTerminalSession"
-	InfraFleetService_FocusTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/FocusTerminalSession"
-	InfraFleetService_GetTerminalAgentStatus_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
-	InfraFleetService_InspectTerminalProcess_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
-	InfraFleetService_AttachPty_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
-	InfraFleetService_ListBrowserProfiles_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
-	InfraFleetService_CreateBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
-	InfraFleetService_DeleteBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/DeleteBrowserProfile"
-	InfraFleetService_ListEmulatorDevices_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListEmulatorDevices"
-	InfraFleetService_GetEmulatorAvailability_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/GetEmulatorAvailability"
-	InfraFleetService_AttachEmulatorSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/AttachEmulatorSession"
-	InfraFleetService_SendEmulatorTap_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorTap"
-	InfraFleetService_SendEmulatorGesture_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorGesture"
-	InfraFleetService_SendEmulatorButton_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorButton"
-	InfraFleetService_RotateEmulator_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/RotateEmulator"
-	InfraFleetService_ShutdownEmulator_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/ShutdownEmulator"
-	InfraFleetService_GetHostCapabilities_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetHostCapabilities"
+	InfraFleetService_RegisterDevServer_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
+	InfraFleetService_ResolveConnection_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
+	InfraFleetService_CreateSshTarget_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
+	InfraFleetService_GetFleetHealth_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
+	InfraFleetService_ScanWorkspacePorts_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
+	InfraFleetService_ListDevServers_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
+	InfraFleetService_CreateConnection_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
+	InfraFleetService_Relay_FullMethodName                             = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_ListSshTargets_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
+	InfraFleetService_GetSshState_FullMethodName                       = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
+	InfraFleetService_EstablishConnection_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
+	InfraFleetService_KillWorkspacePort_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
+	InfraFleetService_SpawnTerminalSession_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
+	InfraFleetService_ResizeTerminalSession_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
+	InfraFleetService_KillTerminalSession_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
+	InfraFleetService_StopTerminalProcess_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/StopTerminalProcess"
+	InfraFleetService_ListTerminalSessions_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/ListTerminalSessions"
+	InfraFleetService_WaitTerminalSession_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/WaitTerminalSession"
+	InfraFleetService_FocusTerminalSession_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/FocusTerminalSession"
+	InfraFleetService_GetTerminalAgentStatus_FullMethodName            = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
+	InfraFleetService_InspectTerminalProcess_FullMethodName            = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
+	InfraFleetService_SaveTerminalScrollbackSnapshot_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SaveTerminalScrollbackSnapshot"
+	InfraFleetService_GetTerminalScrollbackSnapshot_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetTerminalScrollbackSnapshot"
+	InfraFleetService_DeleteTerminalScrollbackSnapshots_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/DeleteTerminalScrollbackSnapshots"
+	InfraFleetService_AttachPty_FullMethodName                         = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
+	InfraFleetService_ListBrowserProfiles_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
+	InfraFleetService_CreateBrowserProfile_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
+	InfraFleetService_DeleteBrowserProfile_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/DeleteBrowserProfile"
+	InfraFleetService_ListEmulatorDevices_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/ListEmulatorDevices"
+	InfraFleetService_GetEmulatorAvailability_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/GetEmulatorAvailability"
+	InfraFleetService_AttachEmulatorSession_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/AttachEmulatorSession"
+	InfraFleetService_SendEmulatorTap_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorTap"
+	InfraFleetService_SendEmulatorGesture_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorGesture"
+	InfraFleetService_SendEmulatorButton_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorButton"
+	InfraFleetService_RotateEmulator_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/RotateEmulator"
+	InfraFleetService_ShutdownEmulator_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/ShutdownEmulator"
+	InfraFleetService_GetHostCapabilities_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/GetHostCapabilities"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -106,6 +109,15 @@ type InfraFleetServiceClient interface {
 	FocusTerminalSession(ctx context.Context, in *FocusTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetTerminalAgentStatus(ctx context.Context, in *GetTerminalAgentStatusRequest, opts ...grpc.CallOption) (*GetTerminalAgentStatusResponse, error)
 	InspectTerminalProcess(ctx context.Context, in *InspectTerminalProcessRequest, opts ...grpc.CallOption) (*InspectTerminalProcessResponse, error)
+	// --- Terminal scrollback persistence (SOL-TM-03) — distinct from
+	// AttachPty/live PTY I/O. NOT the same path as terminal.multiplex's
+	// SnapshotRequest opcode, which resolves against a LIVE pty_id this flow
+	// structurally cannot have (a fresh pty_id is spawned on worktree reopen).
+	SaveTerminalScrollbackSnapshot(ctx context.Context, in *SaveTerminalScrollbackSnapshotRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetTerminalScrollbackSnapshot(ctx context.Context, in *GetTerminalScrollbackSnapshotRequest, opts ...grpc.CallOption) (*GetTerminalScrollbackSnapshotResponse, error)
+	// Called by git-gateway-service's RemoveWorktree on hard worktree deletion
+	// — cleanup, not part of the save/restore flow itself.
+	DeleteTerminalScrollbackSnapshots(ctx context.Context, in *DeleteTerminalScrollbackSnapshotsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// --- Terminal/PTY I/O ---
 	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
 	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -368,6 +380,36 @@ func (c *infraFleetServiceClient) InspectTerminalProcess(ctx context.Context, in
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) SaveTerminalScrollbackSnapshot(ctx context.Context, in *SaveTerminalScrollbackSnapshotRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_SaveTerminalScrollbackSnapshot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetTerminalScrollbackSnapshot(ctx context.Context, in *GetTerminalScrollbackSnapshotRequest, opts ...grpc.CallOption) (*GetTerminalScrollbackSnapshotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTerminalScrollbackSnapshotResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetTerminalScrollbackSnapshot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DeleteTerminalScrollbackSnapshots(ctx context.Context, in *DeleteTerminalScrollbackSnapshotsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_DeleteTerminalScrollbackSnapshots_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_AttachPty_FullMethodName, cOpts...)
@@ -551,6 +593,15 @@ type InfraFleetServiceServer interface {
 	FocusTerminalSession(context.Context, *FocusTerminalSessionRequest) (*emptypb.Empty, error)
 	GetTerminalAgentStatus(context.Context, *GetTerminalAgentStatusRequest) (*GetTerminalAgentStatusResponse, error)
 	InspectTerminalProcess(context.Context, *InspectTerminalProcessRequest) (*InspectTerminalProcessResponse, error)
+	// --- Terminal scrollback persistence (SOL-TM-03) — distinct from
+	// AttachPty/live PTY I/O. NOT the same path as terminal.multiplex's
+	// SnapshotRequest opcode, which resolves against a LIVE pty_id this flow
+	// structurally cannot have (a fresh pty_id is spawned on worktree reopen).
+	SaveTerminalScrollbackSnapshot(context.Context, *SaveTerminalScrollbackSnapshotRequest) (*emptypb.Empty, error)
+	GetTerminalScrollbackSnapshot(context.Context, *GetTerminalScrollbackSnapshotRequest) (*GetTerminalScrollbackSnapshotResponse, error)
+	// Called by git-gateway-service's RemoveWorktree on hard worktree deletion
+	// — cleanup, not part of the save/restore flow itself.
+	DeleteTerminalScrollbackSnapshots(context.Context, *DeleteTerminalScrollbackSnapshotsRequest) (*emptypb.Empty, error)
 	// --- Terminal/PTY I/O ---
 	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
 	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -665,6 +716,15 @@ func (UnimplementedInfraFleetServiceServer) GetTerminalAgentStatus(context.Conte
 }
 func (UnimplementedInfraFleetServiceServer) InspectTerminalProcess(context.Context, *InspectTerminalProcessRequest) (*InspectTerminalProcessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InspectTerminalProcess not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SaveTerminalScrollbackSnapshot(context.Context, *SaveTerminalScrollbackSnapshotRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveTerminalScrollbackSnapshot not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetTerminalScrollbackSnapshot(context.Context, *GetTerminalScrollbackSnapshotRequest) (*GetTerminalScrollbackSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTerminalScrollbackSnapshot not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DeleteTerminalScrollbackSnapshots(context.Context, *DeleteTerminalScrollbackSnapshotsRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteTerminalScrollbackSnapshots not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) AttachPty(grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]) error {
 	return status.Error(codes.Unimplemented, "method AttachPty not implemented")
@@ -1104,6 +1164,60 @@ func _InfraFleetService_InspectTerminalProcess_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_SaveTerminalScrollbackSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveTerminalScrollbackSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SaveTerminalScrollbackSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SaveTerminalScrollbackSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SaveTerminalScrollbackSnapshot(ctx, req.(*SaveTerminalScrollbackSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetTerminalScrollbackSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTerminalScrollbackSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetTerminalScrollbackSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetTerminalScrollbackSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetTerminalScrollbackSnapshot(ctx, req.(*GetTerminalScrollbackSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DeleteTerminalScrollbackSnapshots_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTerminalScrollbackSnapshotsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DeleteTerminalScrollbackSnapshots(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DeleteTerminalScrollbackSnapshots_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DeleteTerminalScrollbackSnapshots(ctx, req.(*DeleteTerminalScrollbackSnapshotsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InfraFleetService_AttachPty_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(InfraFleetServiceServer).AttachPty(&grpc.GenericServerStream[PtyClientFrame, PtyServerFrame]{ServerStream: stream})
 }
@@ -1417,6 +1531,18 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InspectTerminalProcess",
 			Handler:    _InfraFleetService_InspectTerminalProcess_Handler,
+		},
+		{
+			MethodName: "SaveTerminalScrollbackSnapshot",
+			Handler:    _InfraFleetService_SaveTerminalScrollbackSnapshot_Handler,
+		},
+		{
+			MethodName: "GetTerminalScrollbackSnapshot",
+			Handler:    _InfraFleetService_GetTerminalScrollbackSnapshot_Handler,
+		},
+		{
+			MethodName: "DeleteTerminalScrollbackSnapshots",
+			Handler:    _InfraFleetService_DeleteTerminalScrollbackSnapshots_Handler,
 		},
 		{
 			MethodName: "ListBrowserProfiles",

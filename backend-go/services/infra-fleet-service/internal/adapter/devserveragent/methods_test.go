@@ -58,6 +58,65 @@ func TestClientSpawnPty_MissingIDInResponse_ReturnsClearError(t *testing.T) {
 	}
 }
 
+// TestClientSpawnPty_ShellIntegration_ForwardedToParams is TASK-TM-04-06's
+// regression guard: BR-TM-13's opt-in flag must actually reach pty.create's
+// params — infra-fleet-service never inspects it, only forwards it.
+func TestClientSpawnPty_ShellIntegration_ForwardedToParams(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
+		"pty.create": map[string]any{"id": "pty-si", "cols": 80, "rows": 24, "cwd": "/work", "shell": "powershell.exe"},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-shell-integration", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if _, err := client.SpawnPty(context.Background(), devServer, usecase.SpawnPtyInput{Cwd: "/repo", ShellIntegration: true}); err != nil {
+		t.Fatalf("SpawnPty: %v", err)
+	}
+
+	params := agent.lastParams(t, "pty.create")
+	got, ok := params["shellIntegration"]
+	if !ok {
+		t.Fatal("expected pty.create params to include shellIntegration")
+	}
+	if got != true {
+		t.Errorf("expected shellIntegration=true, got %v", got)
+	}
+}
+
+// TestClientSpawnPty_ShellIntegrationDefaultFalse_OmittedFromParams confirms
+// existing callers that don't set ShellIntegration see no behavior change —
+// the param is omitted entirely (not sent as false), matching every other
+// optional field in this method.
+func TestClientSpawnPty_ShellIntegrationDefaultFalse_OmittedFromParams(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
+		"pty.create": map[string]any{"id": "pty-default", "cols": 80, "rows": 24, "cwd": "/work", "shell": "/bin/bash"},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-default", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if _, err := client.SpawnPty(context.Background(), devServer, usecase.SpawnPtyInput{Cwd: "/repo"}); err != nil {
+		t.Fatalf("SpawnPty: %v", err)
+	}
+
+	params := agent.lastParams(t, "pty.create")
+	if _, ok := params["shellIntegration"]; ok {
+		t.Errorf("expected shellIntegration to be omitted when unset, got %v", params["shellIntegration"])
+	}
+}
+
 // TestClientWriteResizeKillPty_SendsExpectedParams verifies not just that
 // the right method name resolves (the fake agent replies per-method
 // regardless of params) but that the actual request params reaching the

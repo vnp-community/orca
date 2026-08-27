@@ -43,6 +43,9 @@ func (c *Client) SpawnPty(ctx context.Context, devServer domain.DevServer, in us
 	if in.Rows > 0 {
 		params["rows"] = in.Rows
 	}
+	if in.ShellIntegration {
+		params["shellIntegration"] = in.ShellIntegration
+	}
 
 	raw, err := sess.call(ctx, "pty.create", params)
 	if err != nil {
