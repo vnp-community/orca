@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** TASK-SSH-03-06, TASK-SSH-03-05
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — TeardownConnection RPC/usecase/repo methods (UpdateStatus, GetDevServerByConnection)/Client.CancelReconnect/session.cancelReconnect wired end to end; tests pass`
 
 ---
 

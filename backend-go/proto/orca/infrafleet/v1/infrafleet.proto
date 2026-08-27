@@ -42,6 +42,9 @@ service InfraFleetService {
   // handshake synchronously — it IS the connection-establishment act, not
   // a record of one requested. See usecase.EstablishConnection's doc comment.
   rpc EstablishConnection(EstablishConnectionRequest) returns (Connection);
+  // TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
+  // closed and stops any in-flight relaySSHReconnect backoff loop.
+  rpc TeardownConnection(TeardownConnectionRequest) returns (google.protobuf.Empty);
   rpc KillWorkspacePort(KillWorkspacePortRequest) returns (KillWorkspacePortResponse);
 
   // --- Terminal/PTY lifecycle (control-plane, unary) ---
@@ -288,10 +291,15 @@ message GetSshStateResponse {
   bool connected = 1;
   string connection_id = 2;       // empty when not connected
   int64 last_activity_unix_ms = 3; // 0 when not connected or never active
+  string status = 4; // "" | "established" | "degraded" | "reconnecting" | "closed"
 }
 
 message EstablishConnectionRequest {
   string ssh_target_id = 1;
+}
+
+message TeardownConnectionRequest {
+  string connection_id = 1;
 }
 
 message Connection {

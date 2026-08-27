@@ -88,6 +88,12 @@ func (f *fakeInfraFleetServiceClient) KillWorkspacePort(_ context.Context, in *i
 	return f.killWorkspacePortFn(in)
 }
 
+// TeardownConnection (BR-SSH-13): no httpgateway route exercises this yet —
+// same "not implemented" shape as the Terminal/PTY RPCs below.
+func (f *fakeInfraFleetServiceClient) TeardownConnection(_ context.Context, _ *infrafleetv1.TeardownConnectionRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // Terminal/PTY RPCs (TASK-180..185): no httpgateway route exercises these
 // (they're wired through wscompat's channels_terminal.go instead, with its
 // own fake client — see channels_terminal_test.go), so these exist only to

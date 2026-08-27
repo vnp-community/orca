@@ -60,6 +60,10 @@ type fakeDevServerAgentClient struct {
 
 	inspectResult InspectProcessResult
 	inspectErr    error
+
+	// cancelReconnectCalls records every CancelReconnect(devServerID) call —
+	// used by teardown_connection_test.go.
+	cancelReconnectCalls []string
 }
 
 type resizePtyCall struct {
@@ -151,6 +155,14 @@ func (f *fakeDevServerAgentClient) InspectProcess(ctx context.Context, devServer
 		return InspectProcessResult{}, f.inspectErr
 	}
 	return f.inspectResult, nil
+}
+
+// CancelReconnect implements usecase.DevServerAgentClient.CancelReconnect —
+// used by teardown_connection_test.go.
+func (f *fakeDevServerAgentClient) CancelReconnect(devServerID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.cancelReconnectCalls = append(f.cancelReconnectCalls, devServerID)
 }
 
 func TestScanWorkspacePorts_RequiresTenantContext(t *testing.T) {

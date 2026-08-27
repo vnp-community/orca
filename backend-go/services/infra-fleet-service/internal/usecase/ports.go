@@ -61,6 +61,16 @@ type ConnectionRepository interface {
 	// bound to devServerID, if any — backs ssh.getState's local read.
 	// found=false, err=nil means "no active connection", not an error.
 	GetActiveByDevServer(ctx context.Context, tenantID, devServerID string) (conn domain.Connection, found bool, err error)
+	// UpdateStatus sets connectionID's status column — TeardownConnection's
+	// "mark closed" step (BR-SSH-13), also usable by a future reconnect-state
+	// writer to record "reconnecting"/"degraded".
+	UpdateStatus(ctx context.Context, tenantID, connectionID, status string) error
+	// GetDevServerByConnection resolves connectionID's owning DevServer —
+	// TeardownConnection needs it to call DevServerAgentClient.CancelReconnect
+	// by DevServer.ID, not by connection id. found=false, err=nil means the
+	// connection row doesn't exist (already gone/never existed) — not an
+	// error, TeardownConnection stays idempotent on it.
+	GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (devServer domain.DevServer, found bool, err error)
 }
 
 // ConnectionResolver is THE core coordination/execution dispatch primitive
@@ -184,6 +194,13 @@ type DevServerAgentClient interface {
 	// handlePtyListProcesses now includes it) as of this pass — see
 	// devserveragent/methods.go's InspectProcess doc comment.
 	InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (InspectProcessResult, error)
+
+	// CancelReconnect stops devServerID's in-flight background-reconnect
+	// loop (relay-websocket's backgroundReconnect or relay-ssh's
+	// relaySSHReconnect) immediately — TeardownConnection's "Cancel" action
+	// (BR-SSH-13). No-op if no reconnect loop is running or no session
+	// exists for devServerID.
+	CancelReconnect(devServerID string)
 }
 
 // SpawnPtyInput carries pty.create's request fields.

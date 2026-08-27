@@ -5,7 +5,7 @@
 **Service:** agent/ (Dev Server Agent)
 **File:** `agent/src/relay/relay-detach-bridge.ts` (new)
 **Depends on:** TASK-SSH-03-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — relay-detach-bridge.ts's runConnectBridgeMode + --detach/--connect CLI wiring in agent-entry.ts (readSockPathArg helper); new bidirectional-pipe tests pass`
 
 ---
 

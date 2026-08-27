@@ -89,12 +89,17 @@ type fakeSSHServer struct {
 	// mkdirCalls counts real mkdir execs — TestProvision_VersionMatches_
 	// SkipsDeploy asserts this stays 0 when the version gate skips deploy.
 	mkdirCalls atomic.Int32
-	// skipHandshake, if true, makes the "--stdio" exec handler write a fake
-	// crash message to the SSH channel's stderr (extended data) and then
-	// simply never send agent.handshake — simulates a launched process that
-	// starts but never completes the handshake, driving
+	// skipHandshake, if true, makes the "--connect"/"--stdio" exec handler
+	// write a fake crash message to the SSH channel's stderr (extended data)
+	// and then simply never send agent.handshake — simulates a launched
+	// process that starts but never completes the handshake, driving
 	// TestProvision_HandshakeTimeout_IncludesDiagnostics.
 	skipHandshake bool
+	// detachedStarted tracks whether a "--detach --sock-path" exec has run
+	// — the fake server's stand-in for the real detached process actually
+	// creating its Unix socket, so a later `test -S <path>` (reattach's
+	// liveness probe) reports "alive" only after a real detach happened.
+	detachedStarted atomic.Bool
 }
 
 func startFakeSSHServer(t *testing.T, trustedCAPub ssh.PublicKey, expectPrincipal string, badChecksum bool) *fakeSSHServer {
@@ -261,7 +266,20 @@ func (s *fakeSSHServer) handleExec(t *testing.T, channel ssh.Channel, cmd string
 		}
 		_, _ = channel.Write([]byte(hexSum))
 		exitStatus(channel, 0)
-	case strings.Contains(cmd, "--stdio"):
+	case strings.Contains(cmd, "--detach"):
+		// launch.go's detach-start command: the parent blocks until the
+		// (simulated) detached child reports listening, then exits 0 — the
+		// fake server stands in for that by just flipping a flag other execs
+		// on this same fake connection can observe.
+		s.detachedStarted.Store(true)
+		exitStatus(channel, 0)
+	case strings.HasPrefix(cmd, "test -S"):
+		// launch.go/reattach's liveness probe: `test -S <sockPath> && echo alive`.
+		if s.detachedStarted.Load() {
+			_, _ = channel.Write([]byte("alive"))
+		}
+		exitStatus(channel, 0)
+	case strings.Contains(cmd, "--connect"), strings.Contains(cmd, "--stdio"):
 		if s.skipHandshake {
 			// Write to the channel's extended-data (stderr) stream — this is
 			// what session.Stderr (launch.go's diagnosticStderr) receives on

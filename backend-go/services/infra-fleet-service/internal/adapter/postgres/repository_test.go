@@ -238,6 +238,60 @@ func TestSshTargetStore_PersistsPortKnownHostsAndJumpHost(t *testing.T) {
 	}
 }
 
+// TestRepository_UpdateStatusAndGetDevServerByConnection is
+// TASK-SSH-03-07's regression: TeardownConnection's two new repository
+// methods against a real connections/dev_servers join.
+func TestRepository_UpdateStatusAndGetDevServerByConnection(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.9", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds); err != nil {
+		t.Fatalf("registering dev server: %v", err)
+	}
+
+	conn, err := domain.NewConnection("cccccccc-cccc-cccc-cccc-cccccccccccc", testTenant1, testDevServer1, "", "")
+	if err != nil {
+		t.Fatalf("building connection: %v", err)
+	}
+	created, err := repo.CreateConnection(ctx, conn)
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+
+	gotDS, found, err := repo.GetDevServerByConnection(ctx, testTenant1, created.ID)
+	if err != nil {
+		t.Fatalf("GetDevServerByConnection: %v", err)
+	}
+	if !found || gotDS.ID != testDevServer1 {
+		t.Errorf("expected to resolve dev server %q, got found=%v ds=%+v", testDevServer1, found, gotDS)
+	}
+
+	if err := repo.UpdateStatus(ctx, testTenant1, created.ID, "closed"); err != nil {
+		t.Fatalf("UpdateStatus: %v", err)
+	}
+
+	// A closed connection no longer shows up as "active" (matches
+	// GetActiveByDevServer's status <> 'closed' filter).
+	if _, found, err := repo.GetActiveByDevServer(ctx, testTenant1, testDevServer1); err != nil || found {
+		t.Errorf("expected no active connection after closing, found=%v err=%v", found, err)
+	}
+
+	// GetDevServerByConnection should still resolve the (now-closed)
+	// connection — TeardownConnection's idempotent-close path relies on this.
+	if _, found, err := repo.GetDevServerByConnection(ctx, testTenant1, created.ID); err != nil || !found {
+		t.Errorf("expected GetDevServerByConnection to still resolve a closed connection, found=%v err=%v", found, err)
+	}
+
+	// An unknown connection id is a clean not-found, not an error.
+	if _, found, err := repo.GetDevServerByConnection(ctx, testTenant1, testUnknownID); err != nil || found {
+		t.Errorf("expected not-found for an unknown connection id, found=%v err=%v", found, err)
+	}
+}
+
 // TestRepository_RegisterAndGet_PersistsSSHTargetID is the round-trip
 // regression for the ssh_target_id column added in
 // migrations/0003_dev_server_ssh_target — a relay-ssh DevServer must come

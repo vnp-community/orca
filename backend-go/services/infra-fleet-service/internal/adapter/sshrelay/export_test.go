@@ -7,6 +7,8 @@ package sshrelay
 // a second, internal test package.
 
 import (
+	"context"
+
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 )
 
@@ -25,11 +27,16 @@ type DiagnosticStderrForTest = diagnosticStderr
 
 var NewDiagnosticStderrForTest = newDiagnosticStderr
 
-// LaunchForTest wraps launch, whose second return value's type
-// (*diagnosticStderr) is unexported — callers outside this package get it
-// back as the DiagnosticStderrForTest alias instead.
-func LaunchForTest(conn *sshconn.Connection, remoteDirArg, devServerID string) (*sshExecTransport, *DiagnosticStderrForTest, error) {
-	return launch(conn, remoteDirArg, devServerID)
+// LaunchForTest wraps launch, whose *diagnosticStderr return is unexported —
+// callers outside this package get it back as the DiagnosticStderrForTest
+// alias instead.
+func LaunchForTest(ctx context.Context, conn *sshconn.Connection, remoteDirArg, devServerID string) (*sshExecTransport, string, *DiagnosticStderrForTest, error) {
+	return launch(ctx, conn, remoteDirArg, devServerID)
+}
+
+// ReattachForTest wraps reattach the same way LaunchForTest wraps launch.
+func ReattachForTest(ctx context.Context, conn *sshconn.Connection, remoteDirArg, sockPath string) (*sshExecTransport, string, *DiagnosticStderrForTest, error) {
+	return reattach(ctx, conn, remoteDirArg, sockPath)
 }
 
 // RemoteDirForTest / RemoteAgentFileForTest expose the package-level
@@ -39,3 +46,7 @@ const (
 	RemoteDirForTest       = remoteDir
 	RemoteAgentFileForTest = remoteAgentFile
 )
+
+// RelaySockPathForTest exposes relaySockPath for tests building the same
+// socket path launch()/reattach() compute internally.
+var RelaySockPathForTest = relaySockPath

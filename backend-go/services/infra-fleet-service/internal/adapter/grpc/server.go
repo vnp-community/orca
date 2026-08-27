@@ -59,6 +59,9 @@ type Server struct {
 	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
 	emulatorRelay       *usecase.EmulatorRelay
 	getHostCapabilities *usecase.GetHostCapabilities
+
+	// --- BR-SSH-13 reconnect cancellation ---
+	teardownConnection *usecase.TeardownConnection
 }
 
 func New(
@@ -89,6 +92,7 @@ func New(
 	deleteBrowserProfile *usecase.DeleteBrowserProfile,
 	emulatorRelay *usecase.EmulatorRelay,
 	getHostCapabilities *usecase.GetHostCapabilities,
+	teardownConnection *usecase.TeardownConnection,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -118,6 +122,7 @@ func New(
 		deleteBrowserProfile:   deleteBrowserProfile,
 		emulatorRelay:          emulatorRelay,
 		getHostCapabilities:    getHostCapabilities,
+		teardownConnection:     teardownConnection,
 	}
 }
 
@@ -273,7 +278,7 @@ func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateR
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	resp := &infrafleetv1.GetSshStateResponse{Connected: state.Connected, ConnectionId: state.ConnectionID}
+	resp := &infrafleetv1.GetSshStateResponse{Connected: state.Connected, ConnectionId: state.ConnectionID, Status: state.Status}
 	if state.LastActivity != nil {
 		resp.LastActivityUnixMs = state.LastActivity.UnixMilli()
 	}
@@ -290,6 +295,13 @@ func (s *Server) EstablishConnection(ctx context.Context, req *infrafleetv1.Esta
 		resp.EstablishedAtUnixMs = conn.LastActivityAt.UnixMilli()
 	}
 	return resp, nil
+}
+
+func (s *Server) TeardownConnection(ctx context.Context, req *infrafleetv1.TeardownConnectionRequest) (*emptypb.Empty, error) {
+	if err := s.teardownConnection.Execute(ctx, usecase.TeardownConnectionInput{ConnectionID: req.GetConnectionId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) KillWorkspacePort(ctx context.Context, req *infrafleetv1.KillWorkspacePortRequest) (*infrafleetv1.KillWorkspacePortResponse, error) {

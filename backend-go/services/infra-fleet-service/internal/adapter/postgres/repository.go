@@ -316,6 +316,49 @@ func (r *Repository) GetActiveByDevServer(ctx context.Context, tenantID, devServ
 	return conn, true, nil
 }
 
+// UpdateStatus sets connectionID's status column — TeardownConnection's
+// "mark closed" step (BR-SSH-13).
+func (r *Repository) UpdateStatus(ctx context.Context, tenantID, connectionID, status string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE infra.connections
+		SET status = $1
+		WHERE tenant_id = $2 AND id = $3
+	`, status, tenantID, connectionID)
+	if err != nil {
+		return fmt.Errorf("postgres: update connection status: %w", err)
+	}
+	return nil
+}
+
+// GetDevServerByConnection resolves connectionID's owning DevServer —
+// mirrors ResolveConnection's join shape but returns only the DevServer
+// half, since TeardownConnection only needs devServer.ID for
+// CancelReconnect.
+func (r *Repository) GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (domain.DevServer, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT ds.id, ds.tenant_id, ds.host, ds.connection_mode, ds.ssh_target_id
+		FROM infra.connections c
+		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
+		WHERE c.tenant_id = $1 AND c.id = $2
+	`, tenantID, connectionID)
+
+	var devServer domain.DevServer
+	var mode string
+	var sshTargetID *string
+	err := row.Scan(&devServer.ID, &devServer.TenantID, &devServer.Host, &mode, &sshTargetID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DevServer{}, false, nil
+	}
+	if err != nil {
+		return domain.DevServer{}, false, fmt.Errorf("postgres: get dev server by connection: %w", err)
+	}
+	devServer.Mode = domain.ConnectionMode(mode)
+	if sshTargetID != nil {
+		devServer.SSHTargetID = *sshTargetID
+	}
+	return devServer, true, nil
+}
+
 // FindBySshTarget returns the DevServer bound to sshTargetID, if any.
 func (r *Repository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (domain.DevServer, bool, error) {
 	row := r.pool.QueryRow(ctx, `

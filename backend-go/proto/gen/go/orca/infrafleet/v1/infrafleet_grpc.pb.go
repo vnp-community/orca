@@ -31,6 +31,7 @@ const (
 	InfraFleetService_ListSshTargets_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
 	InfraFleetService_GetSshState_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
 	InfraFleetService_EstablishConnection_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
+	InfraFleetService_TeardownConnection_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/TeardownConnection"
 	InfraFleetService_KillWorkspacePort_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
 	InfraFleetService_SpawnTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
 	InfraFleetService_ResizeTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
@@ -95,6 +96,9 @@ type InfraFleetServiceClient interface {
 	// handshake synchronously — it IS the connection-establishment act, not
 	// a record of one requested. See usecase.EstablishConnection's doc comment.
 	EstablishConnection(ctx context.Context, in *EstablishConnectionRequest, opts ...grpc.CallOption) (*Connection, error)
+	// TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
+	// closed and stops any in-flight relaySSHReconnect backoff loop.
+	TeardownConnection(ctx context.Context, in *TeardownConnectionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error)
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error)
@@ -262,6 +266,16 @@ func (c *infraFleetServiceClient) EstablishConnection(ctx context.Context, in *E
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Connection)
 	err := c.cc.Invoke(ctx, InfraFleetService_EstablishConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) TeardownConnection(ctx context.Context, in *TeardownConnectionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_TeardownConnection_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -540,6 +554,9 @@ type InfraFleetServiceServer interface {
 	// handshake synchronously — it IS the connection-establishment act, not
 	// a record of one requested. See usecase.EstablishConnection's doc comment.
 	EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error)
+	// TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
+	// closed and stops any in-flight relaySSHReconnect backoff loop.
+	TeardownConnection(context.Context, *TeardownConnectionRequest) (*emptypb.Empty, error)
 	KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error)
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error)
@@ -635,6 +652,9 @@ func (UnimplementedInfraFleetServiceServer) GetSshState(context.Context, *GetSsh
 }
 func (UnimplementedInfraFleetServiceServer) EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error) {
 	return nil, status.Error(codes.Unimplemented, "method EstablishConnection not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) TeardownConnection(context.Context, *TeardownConnectionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method TeardownConnection not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method KillWorkspacePort not implemented")
@@ -920,6 +940,24 @@ func _InfraFleetService_EstablishConnection_Handler(srv interface{}, ctx context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InfraFleetServiceServer).EstablishConnection(ctx, req.(*EstablishConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_TeardownConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TeardownConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).TeardownConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_TeardownConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).TeardownConnection(ctx, req.(*TeardownConnectionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1377,6 +1415,10 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EstablishConnection",
 			Handler:    _InfraFleetService_EstablishConnection_Handler,
+		},
+		{
+			MethodName: "TeardownConnection",
+			Handler:    _InfraFleetService_TeardownConnection_Handler,
 		},
 		{
 			MethodName: "KillWorkspacePort",

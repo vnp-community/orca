@@ -158,6 +158,10 @@ func run() error {
 	emulatorRelayUC := usecase.NewEmulatorRelay(repo, agentClient)
 	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
 
+	// BR-SSH-13: cancel an in-flight relaySSHReconnect/backgroundReconnect
+	// loop and mark the connection closed.
+	teardownConnectionUC := usecase.NewTeardownConnection(repo, agentClient)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -187,6 +191,7 @@ func run() error {
 		deleteBrowserProfileUC,
 		emulatorRelayUC,
 		getHostCapabilitiesUC,
+		teardownConnectionUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
