@@ -30,6 +30,7 @@ const (
 	WorkflowService_ListTemplates_FullMethodName       = "/orca.workflow.v1.WorkflowService/ListTemplates"
 	WorkflowService_ResolveTemplate_FullMethodName     = "/orca.workflow.v1.WorkflowService/ResolveTemplate"
 	WorkflowService_HasActiveExecutions_FullMethodName = "/orca.workflow.v1.WorkflowService/HasActiveExecutions"
+	WorkflowService_CloneTemplate_FullMethodName       = "/orca.workflow.v1.WorkflowService/CloneTemplate"
 )
 
 // WorkflowServiceClient is the client API for WorkflowService service.
@@ -75,6 +76,10 @@ type WorkflowServiceClient interface {
 	// project-service.RebindDevServer's guard, previously a client-side
 	// no-op because this RPC didn't exist.
 	HasActiveExecutions(ctx context.Context, in *HasActiveExecutionsRequest, opts ...grpc.CallOption) (*HasActiveExecutionsResponse, error)
+	// CloneTemplate snapshots a RESOLVED template (server-computed) into a
+	// brand-new, disconnected root template — distinct from CreateTemplate,
+	// which always takes caller-supplied dag_json.
+	CloneTemplate(ctx context.Context, in *CloneTemplateRequest, opts ...grpc.CallOption) (*CloneTemplateResponse, error)
 }
 
 type workflowServiceClient struct {
@@ -195,6 +200,16 @@ func (c *workflowServiceClient) HasActiveExecutions(ctx context.Context, in *Has
 	return out, nil
 }
 
+func (c *workflowServiceClient) CloneTemplate(ctx context.Context, in *CloneTemplateRequest, opts ...grpc.CallOption) (*CloneTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CloneTemplateResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_CloneTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkflowServiceServer is the server API for WorkflowService service.
 // All implementations must embed UnimplementedWorkflowServiceServer
 // for forward compatibility.
@@ -238,6 +253,10 @@ type WorkflowServiceServer interface {
 	// project-service.RebindDevServer's guard, previously a client-side
 	// no-op because this RPC didn't exist.
 	HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error)
+	// CloneTemplate snapshots a RESOLVED template (server-computed) into a
+	// brand-new, disconnected root template — distinct from CreateTemplate,
+	// which always takes caller-supplied dag_json.
+	CloneTemplate(context.Context, *CloneTemplateRequest) (*CloneTemplateResponse, error)
 	mustEmbedUnimplementedWorkflowServiceServer()
 }
 
@@ -280,6 +299,9 @@ func (UnimplementedWorkflowServiceServer) ResolveTemplate(context.Context, *Reso
 }
 func (UnimplementedWorkflowServiceServer) HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HasActiveExecutions not implemented")
+}
+func (UnimplementedWorkflowServiceServer) CloneTemplate(context.Context, *CloneTemplateRequest) (*CloneTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CloneTemplate not implemented")
 }
 func (UnimplementedWorkflowServiceServer) mustEmbedUnimplementedWorkflowServiceServer() {}
 func (UnimplementedWorkflowServiceServer) testEmbeddedByValue()                         {}
@@ -500,6 +522,24 @@ func _WorkflowService_HasActiveExecutions_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkflowService_CloneTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloneTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).CloneTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_CloneTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).CloneTemplate(ctx, req.(*CloneTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkflowService_ServiceDesc is the grpc.ServiceDesc for WorkflowService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -550,6 +590,10 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HasActiveExecutions",
 			Handler:    _WorkflowService_HasActiveExecutions_Handler,
+		},
+		{
+			MethodName: "CloneTemplate",
+			Handler:    _WorkflowService_CloneTemplate_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

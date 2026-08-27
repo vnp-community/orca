@@ -45,8 +45,12 @@ func (uc *CreateTemplate) Execute(ctx context.Context, in CreateTemplateInput) (
 	if err != nil {
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindUnauthenticated, "WORKFLOW_NO_TENANT", "no tenant in request context", err)
 	}
+	ownerID, ok := tenant.UserID(ctx)
+	if !ok {
+		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindUnauthenticated, "WORKFLOW_NO_USER", "no user in request context", nil)
+	}
 
-	tmpl, err := domain.NewWorkflowTemplate(uuid.NewString(), tenantID, in.Name, in.DAGJSON, domain.Scope(in.Scope), in.ParentTemplateID)
+	tmpl, err := domain.NewWorkflowTemplate(uuid.NewString(), tenantID, in.Name, in.DAGJSON, domain.Scope(in.Scope), in.ParentTemplateID, ownerID)
 	if err != nil {
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_TEMPLATE", err.Error(), err)
 	}

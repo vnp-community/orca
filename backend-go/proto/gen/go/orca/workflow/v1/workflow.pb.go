@@ -80,16 +80,24 @@ func (StepType) EnumDescriptor() ([]byte, []int) {
 }
 
 type WorkflowTemplate struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	TenantId         string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Name             string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	DagJson          string                 `protobuf:"bytes,4,opt,name=dag_json,json=dagJson,proto3" json:"dag_json,omitempty"`
-	Scope            string                 `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`                                                 // company | team | personal
-	ParentTemplateId string                 `protobuf:"bytes,6,opt,name=parent_template_id,json=parentTemplateId,proto3" json:"parent_template_id,omitempty"` // empty = root of its inheritance chain; see ResolveTemplate
-	Version          int32                  `protobuf:"varint,7,opt,name=version,proto3" json:"version,omitempty"`                                            // bumped by UpdateTemplate on every write; 1 at creation
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Id                   string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId             string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Name                 string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	DagJson              string                 `protobuf:"bytes,4,opt,name=dag_json,json=dagJson,proto3" json:"dag_json,omitempty"`
+	Scope                string                 `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`                                                 // company | team | personal
+	ParentTemplateId     string                 `protobuf:"bytes,6,opt,name=parent_template_id,json=parentTemplateId,proto3" json:"parent_template_id,omitempty"` // empty = root of its inheritance chain; see ResolveTemplate
+	Version              int32                  `protobuf:"varint,7,opt,name=version,proto3" json:"version,omitempty"`                                            // bumped by UpdateTemplate on every write; 1 at creation
+	OwnerId              string                 `protobuf:"bytes,8,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`                              // required — the authoring user, workflow-service.md §4
+	Description          string                 `protobuf:"bytes,9,opt,name=description,proto3" json:"description,omitempty"`
+	Tags                 []string               `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`
+	OverridesJson        string                 `protobuf:"bytes,11,opt,name=overrides_json,json=overridesJson,proto3" json:"overrides_json,omitempty"`         // Inherit-mode: map[stepId]json.RawMessage merge instructions
+	InjectStepsJson      string                 `protobuf:"bytes,12,opt,name=inject_steps_json,json=injectStepsJson,proto3" json:"inject_steps_json,omitempty"` // Inherit-mode: []Step appended after remove_steps is applied
+	RemoveStepsJson      string                 `protobuf:"bytes,13,opt,name=remove_steps_json,json=removeStepsJson,proto3" json:"remove_steps_json,omitempty"` // Inherit-mode: []string step ids to drop from the parent's resolved steps
+	UsageCount           int32                  `protobuf:"varint,14,opt,name=usage_count,json=usageCount,proto3" json:"usage_count,omitempty"`
+	ClonedFromTemplateId string                 `protobuf:"bytes,15,opt,name=cloned_from_template_id,json=clonedFromTemplateId,proto3" json:"cloned_from_template_id,omitempty"` // Clone-mode provenance pointer; never walked by ResolveTemplate
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *WorkflowTemplate) Reset() {
@@ -171,6 +179,62 @@ func (x *WorkflowTemplate) GetVersion() int32 {
 	return 0
 }
 
+func (x *WorkflowTemplate) GetOwnerId() string {
+	if x != nil {
+		return x.OwnerId
+	}
+	return ""
+}
+
+func (x *WorkflowTemplate) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *WorkflowTemplate) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *WorkflowTemplate) GetOverridesJson() string {
+	if x != nil {
+		return x.OverridesJson
+	}
+	return ""
+}
+
+func (x *WorkflowTemplate) GetInjectStepsJson() string {
+	if x != nil {
+		return x.InjectStepsJson
+	}
+	return ""
+}
+
+func (x *WorkflowTemplate) GetRemoveStepsJson() string {
+	if x != nil {
+		return x.RemoveStepsJson
+	}
+	return ""
+}
+
+func (x *WorkflowTemplate) GetUsageCount() int32 {
+	if x != nil {
+		return x.UsageCount
+	}
+	return 0
+}
+
+func (x *WorkflowTemplate) GetClonedFromTemplateId() string {
+	if x != nil {
+		return x.ClonedFromTemplateId
+	}
+	return ""
+}
+
 type CreateTemplateRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	TenantId         string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -178,6 +242,11 @@ type CreateTemplateRequest struct {
 	DagJson          string                 `protobuf:"bytes,3,opt,name=dag_json,json=dagJson,proto3" json:"dag_json,omitempty"`
 	Scope            string                 `protobuf:"bytes,4,opt,name=scope,proto3" json:"scope,omitempty"`
 	ParentTemplateId string                 `protobuf:"bytes,5,opt,name=parent_template_id,json=parentTemplateId,proto3" json:"parent_template_id,omitempty"` // optional; empty = no parent
+	Description      string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Tags             []string               `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty"`
+	OverridesJson    string                 `protobuf:"bytes,8,opt,name=overrides_json,json=overridesJson,proto3" json:"overrides_json,omitempty"`
+	InjectStepsJson  string                 `protobuf:"bytes,9,opt,name=inject_steps_json,json=injectStepsJson,proto3" json:"inject_steps_json,omitempty"`
+	RemoveStepsJson  string                 `protobuf:"bytes,10,opt,name=remove_steps_json,json=removeStepsJson,proto3" json:"remove_steps_json,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -247,6 +316,41 @@ func (x *CreateTemplateRequest) GetParentTemplateId() string {
 	return ""
 }
 
+func (x *CreateTemplateRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CreateTemplateRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *CreateTemplateRequest) GetOverridesJson() string {
+	if x != nil {
+		return x.OverridesJson
+	}
+	return ""
+}
+
+func (x *CreateTemplateRequest) GetInjectStepsJson() string {
+	if x != nil {
+		return x.InjectStepsJson
+	}
+	return ""
+}
+
+func (x *CreateTemplateRequest) GetRemoveStepsJson() string {
+	if x != nil {
+		return x.RemoveStepsJson
+	}
+	return ""
+}
+
 type CreateTemplateResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Template      *WorkflowTemplate      `protobuf:"bytes,1,opt,name=template,proto3" json:"template,omitempty"`
@@ -291,6 +395,121 @@ func (x *CreateTemplateResponse) GetTemplate() *WorkflowTemplate {
 	return nil
 }
 
+// CloneTemplate snapshots a RESOLVED template (server-computed) into a
+// brand-new, disconnected root template — distinct from CreateTemplate,
+// which always takes caller-supplied dag_json.
+type CloneTemplateRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	SourceTemplateId string                 `protobuf:"bytes,1,opt,name=source_template_id,json=sourceTemplateId,proto3" json:"source_template_id,omitempty"`
+	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description      string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Tags             []string               `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CloneTemplateRequest) Reset() {
+	*x = CloneTemplateRequest{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloneTemplateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloneTemplateRequest) ProtoMessage() {}
+
+func (x *CloneTemplateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloneTemplateRequest.ProtoReflect.Descriptor instead.
+func (*CloneTemplateRequest) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CloneTemplateRequest) GetSourceTemplateId() string {
+	if x != nil {
+		return x.SourceTemplateId
+	}
+	return ""
+}
+
+func (x *CloneTemplateRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CloneTemplateRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CloneTemplateRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+type CloneTemplateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Template      *WorkflowTemplate      `protobuf:"bytes,1,opt,name=template,proto3" json:"template,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloneTemplateResponse) Reset() {
+	*x = CloneTemplateResponse{}
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloneTemplateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloneTemplateResponse) ProtoMessage() {}
+
+func (x *CloneTemplateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloneTemplateResponse.ProtoReflect.Descriptor instead.
+func (*CloneTemplateResponse) Descriptor() ([]byte, []int) {
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CloneTemplateResponse) GetTemplate() *WorkflowTemplate {
+	if x != nil {
+		return x.Template
+	}
+	return nil
+}
+
 type ExecuteRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TemplateId    string                 `protobuf:"bytes,1,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"`
@@ -303,7 +522,7 @@ type ExecuteRequest struct {
 
 func (x *ExecuteRequest) Reset() {
 	*x = ExecuteRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[3]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -315,7 +534,7 @@ func (x *ExecuteRequest) String() string {
 func (*ExecuteRequest) ProtoMessage() {}
 
 func (x *ExecuteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[3]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -328,7 +547,7 @@ func (x *ExecuteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteRequest.ProtoReflect.Descriptor instead.
 func (*ExecuteRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{3}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ExecuteRequest) GetTemplateId() string {
@@ -372,7 +591,7 @@ type WorkflowExecution struct {
 
 func (x *WorkflowExecution) Reset() {
 	*x = WorkflowExecution{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[4]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -384,7 +603,7 @@ func (x *WorkflowExecution) String() string {
 func (*WorkflowExecution) ProtoMessage() {}
 
 func (x *WorkflowExecution) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[4]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -397,7 +616,7 @@ func (x *WorkflowExecution) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowExecution.ProtoReflect.Descriptor instead.
 func (*WorkflowExecution) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{4}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *WorkflowExecution) GetId() string {
@@ -444,7 +663,7 @@ type ExecuteResponse struct {
 
 func (x *ExecuteResponse) Reset() {
 	*x = ExecuteResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[5]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -456,7 +675,7 @@ func (x *ExecuteResponse) String() string {
 func (*ExecuteResponse) ProtoMessage() {}
 
 func (x *ExecuteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[5]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -469,7 +688,7 @@ func (x *ExecuteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteResponse.ProtoReflect.Descriptor instead.
 func (*ExecuteResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{5}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ExecuteResponse) GetExecution() *WorkflowExecution {
@@ -488,7 +707,7 @@ type GetExecutionRequest struct {
 
 func (x *GetExecutionRequest) Reset() {
 	*x = GetExecutionRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[6]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -500,7 +719,7 @@ func (x *GetExecutionRequest) String() string {
 func (*GetExecutionRequest) ProtoMessage() {}
 
 func (x *GetExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[6]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -513,7 +732,7 @@ func (x *GetExecutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExecutionRequest.ProtoReflect.Descriptor instead.
 func (*GetExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{6}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetExecutionRequest) GetId() string {
@@ -532,7 +751,7 @@ type GetExecutionResponse struct {
 
 func (x *GetExecutionResponse) Reset() {
 	*x = GetExecutionResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[7]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -544,7 +763,7 @@ func (x *GetExecutionResponse) String() string {
 func (*GetExecutionResponse) ProtoMessage() {}
 
 func (x *GetExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[7]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -557,7 +776,7 @@ func (x *GetExecutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExecutionResponse.ProtoReflect.Descriptor instead.
 func (*GetExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{7}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetExecutionResponse) GetExecution() *WorkflowExecution {
@@ -576,7 +795,7 @@ type PauseExecutionRequest struct {
 
 func (x *PauseExecutionRequest) Reset() {
 	*x = PauseExecutionRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[8]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -588,7 +807,7 @@ func (x *PauseExecutionRequest) String() string {
 func (*PauseExecutionRequest) ProtoMessage() {}
 
 func (x *PauseExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[8]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -601,7 +820,7 @@ func (x *PauseExecutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseExecutionRequest.ProtoReflect.Descriptor instead.
 func (*PauseExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{8}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PauseExecutionRequest) GetId() string {
@@ -620,7 +839,7 @@ type PauseExecutionResponse struct {
 
 func (x *PauseExecutionResponse) Reset() {
 	*x = PauseExecutionResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[9]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -632,7 +851,7 @@ func (x *PauseExecutionResponse) String() string {
 func (*PauseExecutionResponse) ProtoMessage() {}
 
 func (x *PauseExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[9]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -645,7 +864,7 @@ func (x *PauseExecutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseExecutionResponse.ProtoReflect.Descriptor instead.
 func (*PauseExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{9}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *PauseExecutionResponse) GetExecution() *WorkflowExecution {
@@ -664,7 +883,7 @@ type ResumeExecutionRequest struct {
 
 func (x *ResumeExecutionRequest) Reset() {
 	*x = ResumeExecutionRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[10]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -676,7 +895,7 @@ func (x *ResumeExecutionRequest) String() string {
 func (*ResumeExecutionRequest) ProtoMessage() {}
 
 func (x *ResumeExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[10]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -689,7 +908,7 @@ func (x *ResumeExecutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeExecutionRequest.ProtoReflect.Descriptor instead.
 func (*ResumeExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{10}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ResumeExecutionRequest) GetId() string {
@@ -708,7 +927,7 @@ type ResumeExecutionResponse struct {
 
 func (x *ResumeExecutionResponse) Reset() {
 	*x = ResumeExecutionResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[11]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -720,7 +939,7 @@ func (x *ResumeExecutionResponse) String() string {
 func (*ResumeExecutionResponse) ProtoMessage() {}
 
 func (x *ResumeExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[11]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -733,7 +952,7 @@ func (x *ResumeExecutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeExecutionResponse.ProtoReflect.Descriptor instead.
 func (*ResumeExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{11}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ResumeExecutionResponse) GetExecution() *WorkflowExecution {
@@ -757,7 +976,7 @@ type ExecuteAdHocStepRequest struct {
 
 func (x *ExecuteAdHocStepRequest) Reset() {
 	*x = ExecuteAdHocStepRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[12]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -769,7 +988,7 @@ func (x *ExecuteAdHocStepRequest) String() string {
 func (*ExecuteAdHocStepRequest) ProtoMessage() {}
 
 func (x *ExecuteAdHocStepRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[12]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -782,7 +1001,7 @@ func (x *ExecuteAdHocStepRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteAdHocStepRequest.ProtoReflect.Descriptor instead.
 func (*ExecuteAdHocStepRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{12}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ExecuteAdHocStepRequest) GetTenantId() string {
@@ -823,7 +1042,7 @@ type StepResult struct {
 
 func (x *StepResult) Reset() {
 	*x = StepResult{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[13]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -835,7 +1054,7 @@ func (x *StepResult) String() string {
 func (*StepResult) ProtoMessage() {}
 
 func (x *StepResult) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[13]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -848,7 +1067,7 @@ func (x *StepResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepResult.ProtoReflect.Descriptor instead.
 func (*StepResult) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{13}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StepResult) GetStatus() string {
@@ -874,7 +1093,7 @@ type ExecuteAdHocStepResponse struct {
 
 func (x *ExecuteAdHocStepResponse) Reset() {
 	*x = ExecuteAdHocStepResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[14]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -886,7 +1105,7 @@ func (x *ExecuteAdHocStepResponse) String() string {
 func (*ExecuteAdHocStepResponse) ProtoMessage() {}
 
 func (x *ExecuteAdHocStepResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[14]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -899,7 +1118,7 @@ func (x *ExecuteAdHocStepResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteAdHocStepResponse.ProtoReflect.Descriptor instead.
 func (*ExecuteAdHocStepResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{14}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ExecuteAdHocStepResponse) GetResult() *StepResult {
@@ -918,7 +1137,7 @@ type HasActiveExecutionsRequest struct {
 
 func (x *HasActiveExecutionsRequest) Reset() {
 	*x = HasActiveExecutionsRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[15]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -930,7 +1149,7 @@ func (x *HasActiveExecutionsRequest) String() string {
 func (*HasActiveExecutionsRequest) ProtoMessage() {}
 
 func (x *HasActiveExecutionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[15]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -943,7 +1162,7 @@ func (x *HasActiveExecutionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HasActiveExecutionsRequest.ProtoReflect.Descriptor instead.
 func (*HasActiveExecutionsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{15}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *HasActiveExecutionsRequest) GetProjectId() string {
@@ -962,7 +1181,7 @@ type HasActiveExecutionsResponse struct {
 
 func (x *HasActiveExecutionsResponse) Reset() {
 	*x = HasActiveExecutionsResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[16]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -974,7 +1193,7 @@ func (x *HasActiveExecutionsResponse) String() string {
 func (*HasActiveExecutionsResponse) ProtoMessage() {}
 
 func (x *HasActiveExecutionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[16]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -987,7 +1206,7 @@ func (x *HasActiveExecutionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HasActiveExecutionsResponse.ProtoReflect.Descriptor instead.
 func (*HasActiveExecutionsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{16}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *HasActiveExecutionsResponse) GetHasActive() bool {
@@ -1006,7 +1225,7 @@ type CancelExecutionRequest struct {
 
 func (x *CancelExecutionRequest) Reset() {
 	*x = CancelExecutionRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[17]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1018,7 +1237,7 @@ func (x *CancelExecutionRequest) String() string {
 func (*CancelExecutionRequest) ProtoMessage() {}
 
 func (x *CancelExecutionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[17]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1031,7 +1250,7 @@ func (x *CancelExecutionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelExecutionRequest.ProtoReflect.Descriptor instead.
 func (*CancelExecutionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{17}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CancelExecutionRequest) GetId() string {
@@ -1050,7 +1269,7 @@ type CancelExecutionResponse struct {
 
 func (x *CancelExecutionResponse) Reset() {
 	*x = CancelExecutionResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[18]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1062,7 +1281,7 @@ func (x *CancelExecutionResponse) String() string {
 func (*CancelExecutionResponse) ProtoMessage() {}
 
 func (x *CancelExecutionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[18]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1075,7 +1294,7 @@ func (x *CancelExecutionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelExecutionResponse.ProtoReflect.Descriptor instead.
 func (*CancelExecutionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{18}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CancelExecutionResponse) GetExecution() *WorkflowExecution {
@@ -1096,7 +1315,7 @@ type ListTemplatesRequest struct {
 
 func (x *ListTemplatesRequest) Reset() {
 	*x = ListTemplatesRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[19]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1108,7 +1327,7 @@ func (x *ListTemplatesRequest) String() string {
 func (*ListTemplatesRequest) ProtoMessage() {}
 
 func (x *ListTemplatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[19]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1121,7 +1340,7 @@ func (x *ListTemplatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTemplatesRequest.ProtoReflect.Descriptor instead.
 func (*ListTemplatesRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{19}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListTemplatesRequest) GetScope() string {
@@ -1155,7 +1374,7 @@ type ListTemplatesResponse struct {
 
 func (x *ListTemplatesResponse) Reset() {
 	*x = ListTemplatesResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[20]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1167,7 +1386,7 @@ func (x *ListTemplatesResponse) String() string {
 func (*ListTemplatesResponse) ProtoMessage() {}
 
 func (x *ListTemplatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[20]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1180,7 +1399,7 @@ func (x *ListTemplatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTemplatesResponse.ProtoReflect.Descriptor instead.
 func (*ListTemplatesResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{20}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListTemplatesResponse) GetTemplates() []*WorkflowTemplate {
@@ -1206,7 +1425,7 @@ type ResolveTemplateRequest struct {
 
 func (x *ResolveTemplateRequest) Reset() {
 	*x = ResolveTemplateRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[21]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1218,7 +1437,7 @@ func (x *ResolveTemplateRequest) String() string {
 func (*ResolveTemplateRequest) ProtoMessage() {}
 
 func (x *ResolveTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[21]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1231,7 +1450,7 @@ func (x *ResolveTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveTemplateRequest.ProtoReflect.Descriptor instead.
 func (*ResolveTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{21}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ResolveTemplateRequest) GetTemplateId() string {
@@ -1263,7 +1482,7 @@ type ResolveTemplateResponse struct {
 
 func (x *ResolveTemplateResponse) Reset() {
 	*x = ResolveTemplateResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[22]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1275,7 +1494,7 @@ func (x *ResolveTemplateResponse) String() string {
 func (*ResolveTemplateResponse) ProtoMessage() {}
 
 func (x *ResolveTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[22]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1288,7 +1507,7 @@ func (x *ResolveTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveTemplateResponse.ProtoReflect.Descriptor instead.
 func (*ResolveTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{22}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ResolveTemplateResponse) GetTemplate() *WorkflowTemplate {
@@ -1312,18 +1531,23 @@ type UpdateTemplateRequest struct {
 	// CreateTemplateRequest's shape — no PATCH-style partial update in this
 	// reduced surface, same simplification project-service.md's
 	// UpdateProject accepts for its own non-dev_server_id fields).
-	Name             string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	DagJson          string `protobuf:"bytes,3,opt,name=dag_json,json=dagJson,proto3" json:"dag_json,omitempty"`
-	Scope            string `protobuf:"bytes,4,opt,name=scope,proto3" json:"scope,omitempty"`
-	ParentTemplateId string `protobuf:"bytes,5,opt,name=parent_template_id,json=parentTemplateId,proto3" json:"parent_template_id,omitempty"` // empty = detach from any parent
-	ExpectedVersion  int32  `protobuf:"varint,6,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`     // optimistic concurrency: reject if templates.version has moved
+	Name             string   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	DagJson          string   `protobuf:"bytes,3,opt,name=dag_json,json=dagJson,proto3" json:"dag_json,omitempty"`
+	Scope            string   `protobuf:"bytes,4,opt,name=scope,proto3" json:"scope,omitempty"`
+	ParentTemplateId string   `protobuf:"bytes,5,opt,name=parent_template_id,json=parentTemplateId,proto3" json:"parent_template_id,omitempty"` // empty = detach from any parent
+	ExpectedVersion  int32    `protobuf:"varint,6,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`     // optimistic concurrency: reject if templates.version has moved
+	Description      string   `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	Tags             []string `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`
+	OverridesJson    string   `protobuf:"bytes,9,opt,name=overrides_json,json=overridesJson,proto3" json:"overrides_json,omitempty"`
+	InjectStepsJson  string   `protobuf:"bytes,10,opt,name=inject_steps_json,json=injectStepsJson,proto3" json:"inject_steps_json,omitempty"`
+	RemoveStepsJson  string   `protobuf:"bytes,11,opt,name=remove_steps_json,json=removeStepsJson,proto3" json:"remove_steps_json,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *UpdateTemplateRequest) Reset() {
 	*x = UpdateTemplateRequest{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[23]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1335,7 +1559,7 @@ func (x *UpdateTemplateRequest) String() string {
 func (*UpdateTemplateRequest) ProtoMessage() {}
 
 func (x *UpdateTemplateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[23]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1348,7 +1572,7 @@ func (x *UpdateTemplateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTemplateRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTemplateRequest) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{23}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *UpdateTemplateRequest) GetId() string {
@@ -1393,6 +1617,41 @@ func (x *UpdateTemplateRequest) GetExpectedVersion() int32 {
 	return 0
 }
 
+func (x *UpdateTemplateRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *UpdateTemplateRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *UpdateTemplateRequest) GetOverridesJson() string {
+	if x != nil {
+		return x.OverridesJson
+	}
+	return ""
+}
+
+func (x *UpdateTemplateRequest) GetInjectStepsJson() string {
+	if x != nil {
+		return x.InjectStepsJson
+	}
+	return ""
+}
+
+func (x *UpdateTemplateRequest) GetRemoveStepsJson() string {
+	if x != nil {
+		return x.RemoveStepsJson
+	}
+	return ""
+}
+
 type UpdateTemplateResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Template      *WorkflowTemplate      `protobuf:"bytes,1,opt,name=template,proto3" json:"template,omitempty"` // includes the bumped version
@@ -1402,7 +1661,7 @@ type UpdateTemplateResponse struct {
 
 func (x *UpdateTemplateResponse) Reset() {
 	*x = UpdateTemplateResponse{}
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[24]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1414,7 +1673,7 @@ func (x *UpdateTemplateResponse) String() string {
 func (*UpdateTemplateResponse) ProtoMessage() {}
 
 func (x *UpdateTemplateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[24]
+	mi := &file_orca_workflow_v1_workflow_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1427,7 +1686,7 @@ func (x *UpdateTemplateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTemplateResponse.ProtoReflect.Descriptor instead.
 func (*UpdateTemplateResponse) Descriptor() ([]byte, []int) {
-	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{24}
+	return file_orca_workflow_v1_workflow_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *UpdateTemplateResponse) GetTemplate() *WorkflowTemplate {
@@ -1441,7 +1700,7 @@ var File_orca_workflow_v1_workflow_proto protoreflect.FileDescriptor
 
 const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\n" +
-	"\x1forca/workflow/v1/workflow.proto\x12\x10orca.workflow.v1\"\xcc\x01\n" +
+	"\x1forca/workflow/v1/workflow.proto\x12\x10orca.workflow.v1\"\xf4\x03\n" +
 	"\x10WorkflowTemplate\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -1449,14 +1708,37 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\bdag_json\x18\x04 \x01(\tR\adagJson\x12\x14\n" +
 	"\x05scope\x18\x05 \x01(\tR\x05scope\x12,\n" +
 	"\x12parent_template_id\x18\x06 \x01(\tR\x10parentTemplateId\x12\x18\n" +
-	"\aversion\x18\a \x01(\x05R\aversion\"\xa7\x01\n" +
+	"\aversion\x18\a \x01(\x05R\aversion\x12\x19\n" +
+	"\bowner_id\x18\b \x01(\tR\aownerId\x12 \n" +
+	"\vdescription\x18\t \x01(\tR\vdescription\x12\x12\n" +
+	"\x04tags\x18\n" +
+	" \x03(\tR\x04tags\x12%\n" +
+	"\x0eoverrides_json\x18\v \x01(\tR\roverridesJson\x12*\n" +
+	"\x11inject_steps_json\x18\f \x01(\tR\x0finjectStepsJson\x12*\n" +
+	"\x11remove_steps_json\x18\r \x01(\tR\x0fremoveStepsJson\x12\x1f\n" +
+	"\vusage_count\x18\x0e \x01(\x05R\n" +
+	"usageCount\x125\n" +
+	"\x17cloned_from_template_id\x18\x0f \x01(\tR\x14clonedFromTemplateId\"\xdc\x02\n" +
 	"\x15CreateTemplateRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
 	"\bdag_json\x18\x03 \x01(\tR\adagJson\x12\x14\n" +
 	"\x05scope\x18\x04 \x01(\tR\x05scope\x12,\n" +
-	"\x12parent_template_id\x18\x05 \x01(\tR\x10parentTemplateId\"X\n" +
+	"\x12parent_template_id\x18\x05 \x01(\tR\x10parentTemplateId\x12 \n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x12\n" +
+	"\x04tags\x18\a \x03(\tR\x04tags\x12%\n" +
+	"\x0eoverrides_json\x18\b \x01(\tR\roverridesJson\x12*\n" +
+	"\x11inject_steps_json\x18\t \x01(\tR\x0finjectStepsJson\x12*\n" +
+	"\x11remove_steps_json\x18\n" +
+	" \x01(\tR\x0fremoveStepsJson\"X\n" +
 	"\x16CreateTemplateResponse\x12>\n" +
+	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate\"\x8e\x01\n" +
+	"\x14CloneTemplateRequest\x12,\n" +
+	"\x12source_template_id\x18\x01 \x01(\tR\x10sourceTemplateId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x12\n" +
+	"\x04tags\x18\x04 \x03(\tR\x04tags\"W\n" +
+	"\x15CloneTemplateResponse\x12>\n" +
 	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate\"\x93\x01\n" +
 	"\x0eExecuteRequest\x12\x1f\n" +
 	"\vtemplate_id\x18\x01 \x01(\tR\n" +
@@ -1524,14 +1806,20 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"templateId\"\x93\x01\n" +
 	"\x17ResolveTemplateResponse\x12>\n" +
 	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate\x128\n" +
-	"\x05chain\x18\x02 \x03(\v2\".orca.workflow.v1.WorkflowTemplateR\x05chain\"\xc5\x01\n" +
+	"\x05chain\x18\x02 \x03(\v2\".orca.workflow.v1.WorkflowTemplateR\x05chain\"\xfa\x02\n" +
 	"\x15UpdateTemplateRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
 	"\bdag_json\x18\x03 \x01(\tR\adagJson\x12\x14\n" +
 	"\x05scope\x18\x04 \x01(\tR\x05scope\x12,\n" +
 	"\x12parent_template_id\x18\x05 \x01(\tR\x10parentTemplateId\x12)\n" +
-	"\x10expected_version\x18\x06 \x01(\x05R\x0fexpectedVersion\"X\n" +
+	"\x10expected_version\x18\x06 \x01(\x05R\x0fexpectedVersion\x12 \n" +
+	"\vdescription\x18\a \x01(\tR\vdescription\x12\x12\n" +
+	"\x04tags\x18\b \x03(\tR\x04tags\x12%\n" +
+	"\x0eoverrides_json\x18\t \x01(\tR\roverridesJson\x12*\n" +
+	"\x11inject_steps_json\x18\n" +
+	" \x01(\tR\x0finjectStepsJson\x12*\n" +
+	"\x11remove_steps_json\x18\v \x01(\tR\x0fremoveStepsJson\"X\n" +
 	"\x16UpdateTemplateResponse\x12>\n" +
 	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate*\x9b\x01\n" +
 	"\bStepType\x12\x19\n" +
@@ -1540,7 +1828,7 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\x0fSTEP_TYPE_SHELL\x10\x02\x12\x1a\n" +
 	"\x16STEP_TYPE_NOTIFICATION\x10\x03\x12\x15\n" +
 	"\x11STEP_TYPE_WEBHOOK\x10\x04\x12\x17\n" +
-	"\x13STEP_TYPE_CONDITION\x10\x052\xe8\b\n" +
+	"\x13STEP_TYPE_CONDITION\x10\x052\xca\t\n" +
 	"\x0fWorkflowService\x12c\n" +
 	"\x0eCreateTemplate\x12'.orca.workflow.v1.CreateTemplateRequest\x1a(.orca.workflow.v1.CreateTemplateResponse\x12c\n" +
 	"\x0eUpdateTemplate\x12'.orca.workflow.v1.UpdateTemplateRequest\x1a(.orca.workflow.v1.UpdateTemplateResponse\x12N\n" +
@@ -1552,7 +1840,8 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\x0fCancelExecution\x12(.orca.workflow.v1.CancelExecutionRequest\x1a).orca.workflow.v1.CancelExecutionResponse\x12`\n" +
 	"\rListTemplates\x12&.orca.workflow.v1.ListTemplatesRequest\x1a'.orca.workflow.v1.ListTemplatesResponse\x12f\n" +
 	"\x0fResolveTemplate\x12(.orca.workflow.v1.ResolveTemplateRequest\x1a).orca.workflow.v1.ResolveTemplateResponse\x12r\n" +
-	"\x13HasActiveExecutions\x12,.orca.workflow.v1.HasActiveExecutionsRequest\x1a-.orca.workflow.v1.HasActiveExecutionsResponseBFZDgithub.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1b\x06proto3"
+	"\x13HasActiveExecutions\x12,.orca.workflow.v1.HasActiveExecutionsRequest\x1a-.orca.workflow.v1.HasActiveExecutionsResponse\x12`\n" +
+	"\rCloneTemplate\x12&.orca.workflow.v1.CloneTemplateRequest\x1a'.orca.workflow.v1.CloneTemplateResponseBFZDgithub.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1b\x06proto3"
 
 var (
 	file_orca_workflow_v1_workflow_proto_rawDescOnce sync.Once
@@ -1567,75 +1856,80 @@ func file_orca_workflow_v1_workflow_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_workflow_v1_workflow_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_workflow_v1_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_orca_workflow_v1_workflow_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_orca_workflow_v1_workflow_proto_goTypes = []any{
 	(StepType)(0),                       // 0: orca.workflow.v1.StepType
 	(*WorkflowTemplate)(nil),            // 1: orca.workflow.v1.WorkflowTemplate
 	(*CreateTemplateRequest)(nil),       // 2: orca.workflow.v1.CreateTemplateRequest
 	(*CreateTemplateResponse)(nil),      // 3: orca.workflow.v1.CreateTemplateResponse
-	(*ExecuteRequest)(nil),              // 4: orca.workflow.v1.ExecuteRequest
-	(*WorkflowExecution)(nil),           // 5: orca.workflow.v1.WorkflowExecution
-	(*ExecuteResponse)(nil),             // 6: orca.workflow.v1.ExecuteResponse
-	(*GetExecutionRequest)(nil),         // 7: orca.workflow.v1.GetExecutionRequest
-	(*GetExecutionResponse)(nil),        // 8: orca.workflow.v1.GetExecutionResponse
-	(*PauseExecutionRequest)(nil),       // 9: orca.workflow.v1.PauseExecutionRequest
-	(*PauseExecutionResponse)(nil),      // 10: orca.workflow.v1.PauseExecutionResponse
-	(*ResumeExecutionRequest)(nil),      // 11: orca.workflow.v1.ResumeExecutionRequest
-	(*ResumeExecutionResponse)(nil),     // 12: orca.workflow.v1.ResumeExecutionResponse
-	(*ExecuteAdHocStepRequest)(nil),     // 13: orca.workflow.v1.ExecuteAdHocStepRequest
-	(*StepResult)(nil),                  // 14: orca.workflow.v1.StepResult
-	(*ExecuteAdHocStepResponse)(nil),    // 15: orca.workflow.v1.ExecuteAdHocStepResponse
-	(*HasActiveExecutionsRequest)(nil),  // 16: orca.workflow.v1.HasActiveExecutionsRequest
-	(*HasActiveExecutionsResponse)(nil), // 17: orca.workflow.v1.HasActiveExecutionsResponse
-	(*CancelExecutionRequest)(nil),      // 18: orca.workflow.v1.CancelExecutionRequest
-	(*CancelExecutionResponse)(nil),     // 19: orca.workflow.v1.CancelExecutionResponse
-	(*ListTemplatesRequest)(nil),        // 20: orca.workflow.v1.ListTemplatesRequest
-	(*ListTemplatesResponse)(nil),       // 21: orca.workflow.v1.ListTemplatesResponse
-	(*ResolveTemplateRequest)(nil),      // 22: orca.workflow.v1.ResolveTemplateRequest
-	(*ResolveTemplateResponse)(nil),     // 23: orca.workflow.v1.ResolveTemplateResponse
-	(*UpdateTemplateRequest)(nil),       // 24: orca.workflow.v1.UpdateTemplateRequest
-	(*UpdateTemplateResponse)(nil),      // 25: orca.workflow.v1.UpdateTemplateResponse
+	(*CloneTemplateRequest)(nil),        // 4: orca.workflow.v1.CloneTemplateRequest
+	(*CloneTemplateResponse)(nil),       // 5: orca.workflow.v1.CloneTemplateResponse
+	(*ExecuteRequest)(nil),              // 6: orca.workflow.v1.ExecuteRequest
+	(*WorkflowExecution)(nil),           // 7: orca.workflow.v1.WorkflowExecution
+	(*ExecuteResponse)(nil),             // 8: orca.workflow.v1.ExecuteResponse
+	(*GetExecutionRequest)(nil),         // 9: orca.workflow.v1.GetExecutionRequest
+	(*GetExecutionResponse)(nil),        // 10: orca.workflow.v1.GetExecutionResponse
+	(*PauseExecutionRequest)(nil),       // 11: orca.workflow.v1.PauseExecutionRequest
+	(*PauseExecutionResponse)(nil),      // 12: orca.workflow.v1.PauseExecutionResponse
+	(*ResumeExecutionRequest)(nil),      // 13: orca.workflow.v1.ResumeExecutionRequest
+	(*ResumeExecutionResponse)(nil),     // 14: orca.workflow.v1.ResumeExecutionResponse
+	(*ExecuteAdHocStepRequest)(nil),     // 15: orca.workflow.v1.ExecuteAdHocStepRequest
+	(*StepResult)(nil),                  // 16: orca.workflow.v1.StepResult
+	(*ExecuteAdHocStepResponse)(nil),    // 17: orca.workflow.v1.ExecuteAdHocStepResponse
+	(*HasActiveExecutionsRequest)(nil),  // 18: orca.workflow.v1.HasActiveExecutionsRequest
+	(*HasActiveExecutionsResponse)(nil), // 19: orca.workflow.v1.HasActiveExecutionsResponse
+	(*CancelExecutionRequest)(nil),      // 20: orca.workflow.v1.CancelExecutionRequest
+	(*CancelExecutionResponse)(nil),     // 21: orca.workflow.v1.CancelExecutionResponse
+	(*ListTemplatesRequest)(nil),        // 22: orca.workflow.v1.ListTemplatesRequest
+	(*ListTemplatesResponse)(nil),       // 23: orca.workflow.v1.ListTemplatesResponse
+	(*ResolveTemplateRequest)(nil),      // 24: orca.workflow.v1.ResolveTemplateRequest
+	(*ResolveTemplateResponse)(nil),     // 25: orca.workflow.v1.ResolveTemplateResponse
+	(*UpdateTemplateRequest)(nil),       // 26: orca.workflow.v1.UpdateTemplateRequest
+	(*UpdateTemplateResponse)(nil),      // 27: orca.workflow.v1.UpdateTemplateResponse
 }
 var file_orca_workflow_v1_workflow_proto_depIdxs = []int32{
 	1,  // 0: orca.workflow.v1.CreateTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
-	5,  // 1: orca.workflow.v1.ExecuteResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
-	5,  // 2: orca.workflow.v1.GetExecutionResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
-	5,  // 3: orca.workflow.v1.PauseExecutionResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
-	5,  // 4: orca.workflow.v1.ResumeExecutionResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
-	0,  // 5: orca.workflow.v1.ExecuteAdHocStepRequest.step_type:type_name -> orca.workflow.v1.StepType
-	14, // 6: orca.workflow.v1.ExecuteAdHocStepResponse.result:type_name -> orca.workflow.v1.StepResult
-	5,  // 7: orca.workflow.v1.CancelExecutionResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
-	1,  // 8: orca.workflow.v1.ListTemplatesResponse.templates:type_name -> orca.workflow.v1.WorkflowTemplate
-	1,  // 9: orca.workflow.v1.ResolveTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
-	1,  // 10: orca.workflow.v1.ResolveTemplateResponse.chain:type_name -> orca.workflow.v1.WorkflowTemplate
-	1,  // 11: orca.workflow.v1.UpdateTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
-	2,  // 12: orca.workflow.v1.WorkflowService.CreateTemplate:input_type -> orca.workflow.v1.CreateTemplateRequest
-	24, // 13: orca.workflow.v1.WorkflowService.UpdateTemplate:input_type -> orca.workflow.v1.UpdateTemplateRequest
-	4,  // 14: orca.workflow.v1.WorkflowService.Execute:input_type -> orca.workflow.v1.ExecuteRequest
-	7,  // 15: orca.workflow.v1.WorkflowService.GetExecution:input_type -> orca.workflow.v1.GetExecutionRequest
-	9,  // 16: orca.workflow.v1.WorkflowService.PauseExecution:input_type -> orca.workflow.v1.PauseExecutionRequest
-	11, // 17: orca.workflow.v1.WorkflowService.ResumeExecution:input_type -> orca.workflow.v1.ResumeExecutionRequest
-	13, // 18: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:input_type -> orca.workflow.v1.ExecuteAdHocStepRequest
-	18, // 19: orca.workflow.v1.WorkflowService.CancelExecution:input_type -> orca.workflow.v1.CancelExecutionRequest
-	20, // 20: orca.workflow.v1.WorkflowService.ListTemplates:input_type -> orca.workflow.v1.ListTemplatesRequest
-	22, // 21: orca.workflow.v1.WorkflowService.ResolveTemplate:input_type -> orca.workflow.v1.ResolveTemplateRequest
-	16, // 22: orca.workflow.v1.WorkflowService.HasActiveExecutions:input_type -> orca.workflow.v1.HasActiveExecutionsRequest
-	3,  // 23: orca.workflow.v1.WorkflowService.CreateTemplate:output_type -> orca.workflow.v1.CreateTemplateResponse
-	25, // 24: orca.workflow.v1.WorkflowService.UpdateTemplate:output_type -> orca.workflow.v1.UpdateTemplateResponse
-	6,  // 25: orca.workflow.v1.WorkflowService.Execute:output_type -> orca.workflow.v1.ExecuteResponse
-	8,  // 26: orca.workflow.v1.WorkflowService.GetExecution:output_type -> orca.workflow.v1.GetExecutionResponse
-	10, // 27: orca.workflow.v1.WorkflowService.PauseExecution:output_type -> orca.workflow.v1.PauseExecutionResponse
-	12, // 28: orca.workflow.v1.WorkflowService.ResumeExecution:output_type -> orca.workflow.v1.ResumeExecutionResponse
-	15, // 29: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:output_type -> orca.workflow.v1.ExecuteAdHocStepResponse
-	19, // 30: orca.workflow.v1.WorkflowService.CancelExecution:output_type -> orca.workflow.v1.CancelExecutionResponse
-	21, // 31: orca.workflow.v1.WorkflowService.ListTemplates:output_type -> orca.workflow.v1.ListTemplatesResponse
-	23, // 32: orca.workflow.v1.WorkflowService.ResolveTemplate:output_type -> orca.workflow.v1.ResolveTemplateResponse
-	17, // 33: orca.workflow.v1.WorkflowService.HasActiveExecutions:output_type -> orca.workflow.v1.HasActiveExecutionsResponse
-	23, // [23:34] is the sub-list for method output_type
-	12, // [12:23] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	1,  // 1: orca.workflow.v1.CloneTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
+	7,  // 2: orca.workflow.v1.ExecuteResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
+	7,  // 3: orca.workflow.v1.GetExecutionResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
+	7,  // 4: orca.workflow.v1.PauseExecutionResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
+	7,  // 5: orca.workflow.v1.ResumeExecutionResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
+	0,  // 6: orca.workflow.v1.ExecuteAdHocStepRequest.step_type:type_name -> orca.workflow.v1.StepType
+	16, // 7: orca.workflow.v1.ExecuteAdHocStepResponse.result:type_name -> orca.workflow.v1.StepResult
+	7,  // 8: orca.workflow.v1.CancelExecutionResponse.execution:type_name -> orca.workflow.v1.WorkflowExecution
+	1,  // 9: orca.workflow.v1.ListTemplatesResponse.templates:type_name -> orca.workflow.v1.WorkflowTemplate
+	1,  // 10: orca.workflow.v1.ResolveTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
+	1,  // 11: orca.workflow.v1.ResolveTemplateResponse.chain:type_name -> orca.workflow.v1.WorkflowTemplate
+	1,  // 12: orca.workflow.v1.UpdateTemplateResponse.template:type_name -> orca.workflow.v1.WorkflowTemplate
+	2,  // 13: orca.workflow.v1.WorkflowService.CreateTemplate:input_type -> orca.workflow.v1.CreateTemplateRequest
+	26, // 14: orca.workflow.v1.WorkflowService.UpdateTemplate:input_type -> orca.workflow.v1.UpdateTemplateRequest
+	6,  // 15: orca.workflow.v1.WorkflowService.Execute:input_type -> orca.workflow.v1.ExecuteRequest
+	9,  // 16: orca.workflow.v1.WorkflowService.GetExecution:input_type -> orca.workflow.v1.GetExecutionRequest
+	11, // 17: orca.workflow.v1.WorkflowService.PauseExecution:input_type -> orca.workflow.v1.PauseExecutionRequest
+	13, // 18: orca.workflow.v1.WorkflowService.ResumeExecution:input_type -> orca.workflow.v1.ResumeExecutionRequest
+	15, // 19: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:input_type -> orca.workflow.v1.ExecuteAdHocStepRequest
+	20, // 20: orca.workflow.v1.WorkflowService.CancelExecution:input_type -> orca.workflow.v1.CancelExecutionRequest
+	22, // 21: orca.workflow.v1.WorkflowService.ListTemplates:input_type -> orca.workflow.v1.ListTemplatesRequest
+	24, // 22: orca.workflow.v1.WorkflowService.ResolveTemplate:input_type -> orca.workflow.v1.ResolveTemplateRequest
+	18, // 23: orca.workflow.v1.WorkflowService.HasActiveExecutions:input_type -> orca.workflow.v1.HasActiveExecutionsRequest
+	4,  // 24: orca.workflow.v1.WorkflowService.CloneTemplate:input_type -> orca.workflow.v1.CloneTemplateRequest
+	3,  // 25: orca.workflow.v1.WorkflowService.CreateTemplate:output_type -> orca.workflow.v1.CreateTemplateResponse
+	27, // 26: orca.workflow.v1.WorkflowService.UpdateTemplate:output_type -> orca.workflow.v1.UpdateTemplateResponse
+	8,  // 27: orca.workflow.v1.WorkflowService.Execute:output_type -> orca.workflow.v1.ExecuteResponse
+	10, // 28: orca.workflow.v1.WorkflowService.GetExecution:output_type -> orca.workflow.v1.GetExecutionResponse
+	12, // 29: orca.workflow.v1.WorkflowService.PauseExecution:output_type -> orca.workflow.v1.PauseExecutionResponse
+	14, // 30: orca.workflow.v1.WorkflowService.ResumeExecution:output_type -> orca.workflow.v1.ResumeExecutionResponse
+	17, // 31: orca.workflow.v1.WorkflowService.ExecuteAdHocStep:output_type -> orca.workflow.v1.ExecuteAdHocStepResponse
+	21, // 32: orca.workflow.v1.WorkflowService.CancelExecution:output_type -> orca.workflow.v1.CancelExecutionResponse
+	23, // 33: orca.workflow.v1.WorkflowService.ListTemplates:output_type -> orca.workflow.v1.ListTemplatesResponse
+	25, // 34: orca.workflow.v1.WorkflowService.ResolveTemplate:output_type -> orca.workflow.v1.ResolveTemplateResponse
+	19, // 35: orca.workflow.v1.WorkflowService.HasActiveExecutions:output_type -> orca.workflow.v1.HasActiveExecutionsResponse
+	5,  // 36: orca.workflow.v1.WorkflowService.CloneTemplate:output_type -> orca.workflow.v1.CloneTemplateResponse
+	25, // [25:37] is the sub-list for method output_type
+	13, // [13:25] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_orca_workflow_v1_workflow_proto_init() }
@@ -1649,7 +1943,7 @@ func file_orca_workflow_v1_workflow_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_workflow_v1_workflow_proto_rawDesc), len(file_orca_workflow_v1_workflow_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

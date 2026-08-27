@@ -14,7 +14,7 @@ import (
 
 func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult(t *testing.T) {
 	repo := newFakeTemplateRepository()
-	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
+	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	if err != nil {
 		t.Fatalf("building template: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult(t
 
 func TestUpdateTemplate_StaleExpectedVersion_ReturnsFailedPrecondition(t *testing.T) {
 	repo := newFakeTemplateRepository()
-	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
+	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	if err != nil {
 		t.Fatalf("building template: %v", err)
 	}
@@ -84,11 +84,11 @@ func TestUpdateTemplate_CyclicParent_RejectsBeforeWriting(t *testing.T) {
 	// case ErrTemplateSelfParent's updated doc comment says UpdateTemplate
 	// must now catch via ResolveChain, since NewWorkflowTemplate's
 	// direct-self-parent check alone can't see it.
-	tmplA, err := domain.NewWorkflowTemplate("tmpl-a", "tenant-1", "a", `{"steps":[]}`, domain.ScopePersonal, "")
+	tmplA, err := domain.NewWorkflowTemplate("tmpl-a", "tenant-1", "a", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	if err != nil {
 		t.Fatalf("building tmpl-a: %v", err)
 	}
-	tmplB, err := domain.NewWorkflowTemplate("tmpl-b", "tenant-1", "b", `{"steps":[]}`, domain.ScopePersonal, "tmpl-a")
+	tmplB, err := domain.NewWorkflowTemplate("tmpl-b", "tenant-1", "b", `{"steps":[]}`, domain.ScopePersonal, "tmpl-a", "owner-1")
 	if err != nil {
 		t.Fatalf("building tmpl-b: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestUpdateTemplate_CyclicParent_RejectsBeforeWriting(t *testing.T) {
 
 func TestUpdateTemplate_EmptyParent_SkipsResolveChain(t *testing.T) {
 	repo := newFakeTemplateRepository()
-	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
+	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	if err != nil {
 		t.Fatalf("building template: %v", err)
 	}

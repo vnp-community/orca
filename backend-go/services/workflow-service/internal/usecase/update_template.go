@@ -28,14 +28,18 @@ func (uc *UpdateTemplate) Execute(ctx context.Context, in UpdateTemplateInput) (
 	if err != nil {
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindUnauthenticated, "WORKFLOW_NO_TENANT", "no tenant in request context", err)
 	}
-	if _, err := uc.templates.GetTemplate(ctx, tenantID, in.ID); err != nil {
+	existing, err := uc.templates.GetTemplate(ctx, tenantID, in.ID)
+	if err != nil {
 		if errors.Is(err, domain.ErrTemplateNotFound) {
 			return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindNotFound, "WORKFLOW_TEMPLATE_NOT_FOUND", "template does not exist", nil)
 		}
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_TEMPLATE_LOOKUP_FAILED", "failed to look up template", err)
 	}
 
-	next, err := domain.NewWorkflowTemplate(in.ID, tenantID, in.Name, in.DAGJSON, in.Scope, in.ParentTemplateID)
+	// OwnerID is authoring provenance, not editable via update — it stays
+	// pinned to whoever originally created the template regardless of who is
+	// updating it now.
+	next, err := domain.NewWorkflowTemplate(in.ID, tenantID, in.Name, in.DAGJSON, in.Scope, in.ParentTemplateID, existing.OwnerID)
 	if err != nil {
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_TEMPLATE", err.Error(), err)
 	}

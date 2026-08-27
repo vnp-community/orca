@@ -18,7 +18,7 @@ func TestRecoverExecutions_ResumesAtFirstIncompleteWave_NotWaveZero(t *testing.T
 		{"id":"a","type":"shell"},
 		{"id":"b","type":"webhook","dependsOn":["a"]}
 	]}`
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", dagJSON, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", dagJSON, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
 	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
@@ -79,7 +79,7 @@ func TestRecoverExecutions_ResumesAtFirstIncompleteWave_NotWaveZero(t *testing.T
 // constraint in Postgres) rather than assuming it succeeded or failed.
 func TestRecoverExecutions_RedispatchesMidFlightStep(t *testing.T) {
 	templates := newFakeTemplateRepository()
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
 	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
@@ -133,7 +133,7 @@ func TestRecoverExecutions_RedispatchesMidFlightStep(t *testing.T) {
 // restart.
 func TestRecoverExecutions_NeverTouchesPausedExecution(t *testing.T) {
 	templates := newFakeTemplateRepository()
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
 	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
@@ -167,7 +167,7 @@ func TestRecoverExecutions_NeverTouchesPausedExecution(t *testing.T) {
 // asserts the end-to-end effect of that filter through RecoverExecutions.
 func TestRecoverExecutions_NeverTouchesTerminalExecutions(t *testing.T) {
 	templates := newFakeTemplateRepository()
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
 	executions := newFakeExecutionRepository()

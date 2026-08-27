@@ -45,8 +45,11 @@ func (r *fakeRegistry) Resolve(stepType domain.StepType) (domain.StepExecutor, e
 	return e, nil
 }
 
+// withTenantContext attaches both tenant and acting-user identity — a fixed
+// user id is fine here since these usecase tests only care that a user is
+// present (e.g. CreateTemplate's OwnerID), not who specifically.
 func withTenantContext(ctx context.Context, tenantID string) context.Context {
-	return tenant.WithTenantID(ctx, tenantID)
+	return tenant.WithUserID(tenant.WithTenantID(ctx, tenantID), "user-1")
 }
 
 func TestExecuteAdHocStep_ResolvesAndCallsExecutor(t *testing.T) {
