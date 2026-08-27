@@ -97,13 +97,19 @@ func (p *Provisioner) Provision(ctx context.Context, devServer domain.DevServer)
 	// context (not ctx) since conn outlives this Provision call.
 	conn.StartKeepAlive(context.Background(), 30*time.Second)
 
-	remoteDir, err := deploy(ctx, conn, p.cfg)
-	if err != nil {
+	// BR-SSH-07: skip the SFTP upload entirely when the already-deployed
+	// bundle's AGENT_VERSION matches this backend's OrcaVersion. A
+	// version-probe failure (verr != nil) or version mismatch falls through
+	// to deployWithRetry as before — deploying is always the safe default,
+	// skipping it is the optimization.
+	if version, present, verr := remoteVersionAndPresence(ctx, conn); verr == nil && present && version == p.cfg.OrcaVersion {
+		// already current — no deploy needed
+	} else if _, derr := deployWithRetry(ctx, conn, p.cfg); derr != nil {
 		_ = conn.Close()
-		return nil, devserveragent.HandshakeInfo{}, err
+		return nil, devserveragent.HandshakeInfo{}, derr
 	}
 
-	transport, err := launch(conn, remoteDir, devServer.ID)
+	transport, stderrBuf, err := launch(conn, remoteDir, devServer.ID)
 	if err != nil {
 		_ = conn.Close()
 		return nil, devserveragent.HandshakeInfo{}, err
@@ -112,7 +118,8 @@ func (p *Provisioner) Provision(ctx context.Context, devServer domain.DevServer)
 	info, err := p.receiveHandshake(ctx, transport)
 	if err != nil {
 		_ = transport.Close("handshake failed")
-		return nil, devserveragent.HandshakeInfo{}, err
+		diag := collectDiagnostics(ctx, conn, stderrBuf)
+		return nil, devserveragent.HandshakeInfo{}, fmt.Errorf("%w\n%s", err, diag)
 	}
 
 	return transport, info, nil

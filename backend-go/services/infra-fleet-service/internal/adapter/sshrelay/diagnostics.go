@@ -1,26 +1,3 @@
-# TASK-SSH-02-05: `diagnosticStderr` capped buffer + `collectDiagnostics` (A3)
-
-**From Solution:** SOL-SSH-02
-**Priority:** P1
-**Service:** `infra-fleet-service`
-**File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/diagnostics.go` (new)
-**Depends on:** none
-**Status:** `[x] DONE — diagnostics.go's diagnosticStderr (capped, tail-truncating) + collectDiagnostics added; tests pass`
-
----
-
-## Context
-
-A3 wants crash diagnostics surfaced when the launched relay process fails to
-handshake. `launch()` currently discards `session.Stderr` entirely, and no
-diagnostic collection exists. This task builds the two standalone pieces;
-wiring them into `launch()`/`provisioner.go` is TASK-SSH-02-06/07.
-
-## Changes to make
-
-Create `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/diagnostics.go`:
-
-```go
 package sshrelay
 
 import (
@@ -28,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 )
 
 // diagnosticStderr is a capped, thread-safe io.Writer collecting a launched
@@ -84,20 +63,3 @@ func probeResult(out string, err error) string {
 	}
 	return strings.TrimSpace(out)
 }
-```
-
-Add the `"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"`
-import.
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/infra-fleet-service/...
-go test ./services/infra-fleet-service/internal/adapter/sshrelay/... -run TestDiagnosticStderr -v
-```
-
-Expected new test (`diagnostics_test.go`): writing more than `cap` bytes
-keeps only the tail; `collectDiagnostics` against a fake `Connection` embeds
-each probe's output, and a probe failure degrades to `<error: ...>` text
-rather than aborting.

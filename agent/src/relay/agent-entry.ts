@@ -35,6 +35,13 @@ process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[DIAG BUG-FE-PTY-001] unhandledRejection: ${detail}\n`)
 })
 
+// AGENT_VERSION is injected at build time by build.mjs's esbuild `define`
+// (__AGENT_VERSION__) — infra-fleet-service's sshrelay.remoteVersionAndPresence
+// reads this via `require('./agent.js').AGENT_VERSION` to skip a redundant
+// redeploy when the remote bundle is already current (BR-SSH-07).
+export const AGENT_VERSION: string =
+  typeof __AGENT_VERSION__ !== 'undefined' ? __AGENT_VERSION__ : '0.0.0-dev'
+
 async function main(): Promise<void> {
   // Why this branch runs before anything else: pty-daemon-client.ts spawns
   // this SAME agent.js file with ORCA_PTY_DAEMON_SOCKET set to run as the
@@ -92,11 +99,9 @@ async function main(): Promise<void> {
   process.on('SIGINT',  () => shutdown('SIGINT'))
   process.on('SIGTERM', () => shutdown('SIGTERM'))
 
-  if (config.mode === 'relay-websocket') {
-    await listenRelay(config, tools, log)
-  } else {
-    await connectDirect(config, tools, log)
-  }
+  await (config.mode === 'relay-websocket'
+    ? listenRelay(config, tools, log)
+    : connectDirect(config, tools, log))
 }
 
 main().catch((err: unknown) => {

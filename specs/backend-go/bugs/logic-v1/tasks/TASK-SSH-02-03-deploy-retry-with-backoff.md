@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/deploy.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — ErrChecksumMismatch sentinel + deployWithRetry (3 network retries, 1 checksum re-upload) added to deploy.go; TestDeployWithRetry_* pass`
 
 ---
 

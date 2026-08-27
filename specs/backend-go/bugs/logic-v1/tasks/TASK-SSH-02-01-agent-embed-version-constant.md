@@ -5,7 +5,7 @@
 **Service:** agent/ (Dev Server Agent)
 **File:** `agent/build.mjs`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — build.mjs define + agent-entry.ts export AGENT_VERSION; node -e require().AGENT_VERSION prints "2.1.0"`
 
 ---
 

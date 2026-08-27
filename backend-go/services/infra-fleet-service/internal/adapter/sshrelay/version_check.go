@@ -1,27 +1,3 @@
-# TASK-SSH-02-02: `remoteVersionAndPresence` — probe a deployed relay's running version (BR-SSH-07)
-
-**From Solution:** SOL-SSH-02
-**Priority:** P0
-**Service:** `infra-fleet-service`
-**File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/version_check.go` (new)
-**Depends on:** TASK-SSH-02-01
-**Status:** `[x] DONE — version_check.go's remoteVersionAndPresence added; TestRemoteVersionAndPresence_* pass`
-
----
-
-## Context
-
-`Provisioner.Provision` always redeploys via `deploy()`'s SFTP
-upload+checksum round trip on every call, even when the already-deployed
-bundle is the exact version this backend-go instance would deploy. BR-SSH-07
-wants a version check before that upload. This task adds the cheap probe;
-wiring it into `Provision` is TASK-SSH-02-04.
-
-## Changes to make
-
-Create `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/version_check.go`:
-
-```go
 package sshrelay
 
 import (
@@ -59,17 +35,3 @@ func remoteVersionAndPresence(ctx context.Context, conn *sshconn.Connection) (ve
 	}
 	return v, true, nil
 }
-```
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/infra-fleet-service/...
-go test ./services/infra-fleet-service/internal/adapter/sshrelay/... -run TestRemoteVersionAndPresence -v
-```
-
-Expected new test (`version_check_test.go`, fake exec transport à la
-`connector_test.go`'s fake SSH server): no prior file returns
-`("", false, nil)`; a present file with a version prints returns
-`(version, true, nil)`; a probe command failure returns `("", false, err)`.
