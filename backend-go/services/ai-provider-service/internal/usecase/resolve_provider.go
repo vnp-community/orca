@@ -12,8 +12,9 @@ import (
 // may be empty (a spawn with no project context still resolves at server
 // scope). UserID is required — the cascade's narrowest tier.
 type ResolveProviderInput struct {
-	UserID    string
-	ProjectID string
+	UserID           string
+	ProjectID        string
+	ExcludeAccountID string // "" = no exclusion (existing callers unaffected)
 }
 
 // ResolveProvider implements the spawn-time cascade: user-scope wins over
@@ -53,7 +54,7 @@ func (uc *ResolveProvider) Resolve(ctx context.Context, in ResolveProviderInput)
 		if err != nil {
 			return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_RESOLVE_FAILED", "failed to list user-scope accounts", err)
 		}
-		if acc, ok := firstResolvable(accounts); ok {
+		if acc, ok := firstResolvable(accounts, in.ExcludeAccountID); ok {
 			return acc, nil
 		}
 		sawAnyCandidate = sawAnyCandidate || len(accounts) > 0
@@ -65,7 +66,7 @@ func (uc *ResolveProvider) Resolve(ctx context.Context, in ResolveProviderInput)
 		if err != nil {
 			return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_RESOLVE_FAILED", "failed to list project-scope accounts", err)
 		}
-		if acc, ok := firstResolvable(accounts); ok {
+		if acc, ok := firstResolvable(accounts, in.ExcludeAccountID); ok {
 			return acc, nil
 		}
 		sawAnyCandidate = sawAnyCandidate || len(accounts) > 0
@@ -76,7 +77,7 @@ func (uc *ResolveProvider) Resolve(ctx context.Context, in ResolveProviderInput)
 	if err != nil {
 		return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_RESOLVE_FAILED", "failed to list server-scope accounts", err)
 	}
-	if acc, ok := firstResolvable(accounts); ok {
+	if acc, ok := firstResolvable(accounts, in.ExcludeAccountID); ok {
 		return acc, nil
 	}
 	sawAnyCandidate = sawAnyCandidate || len(accounts) > 0
@@ -89,9 +90,15 @@ func (uc *ResolveProvider) Resolve(ctx context.Context, in ResolveProviderInput)
 }
 
 // firstResolvable returns the first account in accounts whose status makes
-// it eligible to be handed to a spawn-time caller (domain.ProviderAccount.Resolvable).
-func firstResolvable(accounts []domain.ProviderAccount) (domain.ProviderAccount, bool) {
+// it eligible to be handed to a spawn-time caller (domain.ProviderAccount.Resolvable()),
+// skipping excludeAccountID if set — see ResolveProviderInput.ExcludeAccountID's
+// doc comment. Cascade ORDER (user -> project -> server tier, and within a
+// tier, list order) is unchanged by this filter.
+func firstResolvable(accounts []domain.ProviderAccount, excludeAccountID string) (domain.ProviderAccount, bool) {
 	for _, acc := range accounts {
+		if excludeAccountID != "" && acc.ID == excludeAccountID {
+			continue
+		}
 		if acc.Resolvable() {
 			return acc, true
 		}

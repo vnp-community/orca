@@ -51,6 +51,7 @@ describe('RelayAgentHookServer', () => {
           paneKey: PANE_KEY,
           tabId: 'tab-1',
           worktreeId: 'wt-1',
+          ptyId: 'pty-user-1-task-1-12345',
           env: 'remote',
           version: '1',
           payload: { hook_event_name: 'UserPromptSubmit', prompt: 'hi' }
@@ -62,6 +63,9 @@ describe('RelayAgentHookServer', () => {
       expect(envelope.source).toBe('claude')
       expect(envelope.paneKey).toBe(PANE_KEY)
       expect(envelope.tabId).toBe('tab-1')
+      // TASK-AG-03-07: ptyId is the exact join key infra-fleet-service's
+      // RecordAgentHookProviderSession prefers over the worktreeId fallback.
+      expect(envelope.ptyId).toBe('pty-user-1-task-1-12345')
       expect(envelope.connectionId).toBeNull()
       expect(envelope.payload.state).toBe('working')
       expect(envelope.payload.prompt).toBe('hi')

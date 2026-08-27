@@ -5,7 +5,7 @@
 **Service:** `agent/` (cross-repo, outside `backend-go`)
 **File:** `agent/src/relay/agent-hook-server.ts`
 **Depends on:** none (independent of the backend-go tasks; backend-go's `AgentHookEvent`/`routeAgentHookNotification` already tolerate an eventually-added `ptyId` field being ignored today)
-**Status:** `[ ]` TODO — cross-repo, optional hardening; not required to close BUG-AG-03
+**Status:** `[x]` DONE — implemented on both sides. `agent/`: `ORCA_PTY_ID` stamped into the spawned process's env in `agent-spawner.ts` (right after `ptyId` is minted, before `nodePty.spawn`); `AgentHookEventPayload`/`AgentHookRelayEnvelope` extended with `ptyId` (`agent-hook-listener.ts`/`agent-hook-relay.ts`), read via `readStringField(record, 'ptyId')` in `normalizeHookPayload` and forwarded by `agent-hook-server.ts`'s `forwardEvent`; `agent-hook-server.test.ts` asserts it round-trips end-to-end over a real HTTP POST. `backend-go`: `agentHookNotificationParams`/`rawAgentHookNotification`/`usecase.AgentHookEvent` decode `ptyId`; `AgentSessionRepository.GetByPtyID` (+ `AgentSessionStore` impl) added; `RecordAgentHookProviderSession.Handle` now prefers the exact `GetByPtyID` join, falling back to `MostRecentActiveForWorktree` only when `ptyId` is empty (older agent builds). `npx tsc --noEmit` shows zero new errors (297 pre-existing baseline errors, unchanged before/after); `npx vitest run` green on `agent-hook-server.test.ts`/`agent-hook-listener.test.ts`/`__tests__/agent-spawner.test.ts`; Go side covered by `agent_methods_test.go`'s `TestStreamAgentHooks_*` and `usecase`'s `TestRecordAgentHookProviderSession_*`, all passing.
 
 ---
 

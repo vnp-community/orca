@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/agent_session.go` (new), `backend-go/services/infra-fleet-service/internal/usecase/ports.go`
 **Depends on:** TASK-AG-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain.AgentSession + AgentStatus added (internal/domain/agent_session.go); DevServerAgentClient extended with SpawnAgent/KillAgent/SendAgentInput/StreamAgentHooks, AgentSessionRepository/AIProviderResolverClient ports added to usecase/ports.go; `go build`/`go vet` clean.
 
 ---
 

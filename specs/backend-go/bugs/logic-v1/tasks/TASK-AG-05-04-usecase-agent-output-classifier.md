@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/agent_output_classifier.go` (new)
 **Depends on:** TASK-AG-01-05, TASK-AG-02-03, TASK-AG-05-01, TASK-AG-05-02, TASK-AG-05-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — AgentOutputClassifier implemented as specced (startupTimeout made an overridable struct field for testability, not a bare package const, so BR-AG-04's escalation path is exercisable without a real 30s wait). agent_output_classifier_test.go covers the Claude-fresh-spawn track-1-exclusivity case (with the required TODO on classifyStreamJSONLine's stub), rate-limit-publishes-not-status, startup-timeout-kills-and-marks-error, and exit-event-marks-stopped-or-error — all passing.
 
 ---
 

@@ -62,6 +62,10 @@ export type AgentHookRelayEnvelope = {
   launchToken?: string
   tabId?: string
   worktreeId?: string
+  /** Dev Server Agent's own pty registry id (ORCA_PTY_ID) for the process
+   *  that fired this hook — see AgentHookEventPayload's matching field
+   *  (TASK-AG-03-07). Undefined for a plain renderer-launched terminal. */
+  ptyId?: string
   /** Always `null` on the wire — relay does not know Orca's local connectionId. */
   connectionId: null
   /** Preserved from the relay-side normalized hook event so Orca can

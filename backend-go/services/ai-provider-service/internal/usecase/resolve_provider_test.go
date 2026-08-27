@@ -139,6 +139,48 @@ func TestResolveProvider_RequiresTenantContext(t *testing.T) {
 	}
 }
 
+// TestResolveProvider_ExcludeAccountID_SkipsThatTierFallsThroughToNext
+// exercises TASK-AG-04-02: excluding the only resolvable account in a tier
+// must skip that tier and fall through to the next, without reordering the
+// cascade — SwitchAgentAccount's own regression guard against re-resolving
+// straight back to the account it's switching away from.
+func TestResolveProvider_ExcludeAccountID_SkipsThatTierFallsThroughToNext(t *testing.T) {
+	repo := newFakeAccountRepository()
+	userAccount := mustAccount(t, "acc-user", "tenant-1", domain.ScopeUser, "user-1", "", domain.AccountStatusActive)
+	projectAccount := mustAccount(t, "acc-project", "tenant-1", domain.ScopeProject, "", "project-1", domain.AccountStatusActive)
+	_ = repo.Create(context.Background(), userAccount)
+	_ = repo.Create(context.Background(), projectAccount)
+
+	uc := NewResolveProvider(repo)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	got, err := uc.Resolve(ctx, ResolveProviderInput{UserID: "user-1", ProjectID: "project-1", ExcludeAccountID: "acc-user"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != "acc-project" {
+		t.Fatalf("expected the excluded user-scope account to be skipped in favor of project scope, got %q", got.ID)
+	}
+}
+
+// TestResolveProvider_ExcludeAccountID_AllTiersExcluded_ReturnsNoProviderAvailable
+// proves excluding every candidate account correctly falls all the way
+// through the cascade to ErrNoProviderAvailable, not a false match.
+func TestResolveProvider_ExcludeAccountID_AllTiersExcluded_ReturnsNoProviderAvailable(t *testing.T) {
+	repo := newFakeAccountRepository()
+	serverAccount := mustAccount(t, "acc-server", "tenant-1", domain.ScopeServer, "", "", domain.AccountStatusActive)
+	_ = repo.Create(context.Background(), serverAccount)
+
+	uc := NewResolveProvider(repo)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	_, err := uc.Resolve(ctx, ResolveProviderInput{UserID: "user-1", ExcludeAccountID: "acc-server"})
+	var notAvailable *domain.ErrNoProviderAvailable
+	if !errors.As(err, &notAvailable) {
+		t.Fatalf("expected *domain.ErrNoProviderAvailable when the only candidate is excluded, got %v", err)
+	}
+}
+
 func TestResolveProvider_DoesNotLeakOtherTenantsAccounts(t *testing.T) {
 	repo := newFakeAccountRepository()
 	otherTenant := mustAccount(t, "acc-other-tenant", "tenant-2", domain.ScopeUser, "user-1", "", domain.AccountStatusActive)

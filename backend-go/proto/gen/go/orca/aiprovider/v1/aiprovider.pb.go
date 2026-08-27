@@ -275,12 +275,13 @@ func (x *CreateAccountResponse) GetAccount() *ProviderAccount {
 // credential-broker-service (or the execution plane, for spawn-time use)
 // for the actual secret — never a plaintext key.
 type ResolveProviderRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ProjectId     string                 `protobuf:"bytes,3,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	TenantId         string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId           string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProjectId        string                 `protobuf:"bytes,3,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	ExcludeAccountId string                 `protobuf:"bytes,4,opt,name=exclude_account_id,json=excludeAccountId,proto3" json:"exclude_account_id,omitempty"` // additive — "" = no exclusion, existing callers unaffected
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ResolveProviderRequest) Reset() {
@@ -330,6 +331,13 @@ func (x *ResolveProviderRequest) GetUserId() string {
 func (x *ResolveProviderRequest) GetProjectId() string {
 	if x != nil {
 		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *ResolveProviderRequest) GetExcludeAccountId() string {
+	if x != nil {
+		return x.ExcludeAccountId
 	}
 	return ""
 }
@@ -1040,12 +1048,13 @@ const file_orca_aiprovider_v1_aiprovider_proto_rawDesc = "" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x124\n" +
 	"\x04type\x18\x02 \x01(\x0e2 .orca.aiprovider.v1.ProviderTypeR\x04type\"V\n" +
 	"\x15CreateAccountResponse\x12=\n" +
-	"\aaccount\x18\x01 \x01(\v2#.orca.aiprovider.v1.ProviderAccountR\aaccount\"m\n" +
+	"\aaccount\x18\x01 \x01(\v2#.orca.aiprovider.v1.ProviderAccountR\aaccount\"\x9b\x01\n" +
 	"\x16ResolveProviderRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
-	"project_id\x18\x03 \x01(\tR\tprojectId\"X\n" +
+	"project_id\x18\x03 \x01(\tR\tprojectId\x12,\n" +
+	"\x12exclude_account_id\x18\x04 \x01(\tR\x10excludeAccountId\"X\n" +
 	"\x17ResolveProviderResponse\x12=\n" +
 	"\aaccount\x18\x01 \x01(\v2#.orca.aiprovider.v1.ProviderAccountR\aaccount\"1\n" +
 	"\x10RotateKeyRequest\x12\x1d\n" +

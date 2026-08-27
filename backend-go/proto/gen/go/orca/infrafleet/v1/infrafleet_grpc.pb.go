@@ -54,6 +54,11 @@ const (
 	InfraFleetService_RotateEmulator_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/RotateEmulator"
 	InfraFleetService_ShutdownEmulator_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/ShutdownEmulator"
 	InfraFleetService_GetHostCapabilities_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetHostCapabilities"
+	InfraFleetService_StartAgentSession_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/StartAgentSession"
+	InfraFleetService_StopAgentSession_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/StopAgentSession"
+	InfraFleetService_KillAgentSession_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/KillAgentSession"
+	InfraFleetService_ResumeAgentSession_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/ResumeAgentSession"
+	InfraFleetService_SwitchAgentAccount_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/SwitchAgentAccount"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -148,6 +153,29 @@ type InfraFleetServiceClient interface {
 	// does not exist yet (confirmed absent as of this pass) — see
 	// usecase.GetHostCapabilities's doc comment.
 	GetHostCapabilities(ctx context.Context, in *GetHostCapabilitiesRequest, opts ...grpc.CallOption) (*GetHostCapabilitiesResponse, error)
+	// StartAgentSession spawns an AI-CLI agent (Claude Code, Codex, ...) via
+	// the Dev Server Agent's real agent.spawn RPC — sibling to
+	// SpawnTerminalSession, not a replacement (a bare shell PTY still uses
+	// SpawnTerminalSession).
+	StartAgentSession(ctx context.Context, in *StartAgentSessionRequest, opts ...grpc.CallOption) (*AgentSession, error)
+	// StopAgentSession sends agent.sendInput('\x03') — graceful interrupt,
+	// BR-AG-05. Does not tear the session down; the transition to 'stopped'
+	// happens once agent.exited arrives (TASK-AG-05's classifier) — status
+	// transition is exit-driven, not request-driven.
+	StopAgentSession(ctx context.Context, in *StopAgentSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// KillAgentSession sends agent.kill with the given signal (default
+	// SIGKILL) — full teardown, mirrors KillTerminalSession's "mark closed
+	// even if the agent call fails" discipline.
+	KillAgentSession(ctx context.Context, in *KillAgentSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ResumeAgentSession — loads the latest AgentSession for worktree_id,
+	// validates BR-AG-08 (7-day expiry) and BR-AG-09 (agent version match),
+	// then re-spawns via the same path as StartAgentSession with resume_id
+	// populated.
+	ResumeAgentSession(ctx context.Context, in *ResumeAgentSessionRequest, opts ...grpc.CallOption) (*AgentSession, error)
+	// SwitchAgentAccount — BL-AG-04's saga: force-kill the current session,
+	// resolve a replacement account excluding the one just switched away
+	// from, then resume/start with the new account.
+	SwitchAgentAccount(ctx context.Context, in *SwitchAgentAccountRequest, opts ...grpc.CallOption) (*AgentSession, error)
 }
 
 type infraFleetServiceClient struct {
@@ -501,6 +529,56 @@ func (c *infraFleetServiceClient) GetHostCapabilities(ctx context.Context, in *G
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) StartAgentSession(ctx context.Context, in *StartAgentSessionRequest, opts ...grpc.CallOption) (*AgentSession, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentSession)
+	err := c.cc.Invoke(ctx, InfraFleetService_StartAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) StopAgentSession(ctx context.Context, in *StopAgentSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_StopAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) KillAgentSession(ctx context.Context, in *KillAgentSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_KillAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ResumeAgentSession(ctx context.Context, in *ResumeAgentSessionRequest, opts ...grpc.CallOption) (*AgentSession, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentSession)
+	err := c.cc.Invoke(ctx, InfraFleetService_ResumeAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) SwitchAgentAccount(ctx context.Context, in *SwitchAgentAccountRequest, opts ...grpc.CallOption) (*AgentSession, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentSession)
+	err := c.cc.Invoke(ctx, InfraFleetService_SwitchAgentAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -593,6 +671,29 @@ type InfraFleetServiceServer interface {
 	// does not exist yet (confirmed absent as of this pass) — see
 	// usecase.GetHostCapabilities's doc comment.
 	GetHostCapabilities(context.Context, *GetHostCapabilitiesRequest) (*GetHostCapabilitiesResponse, error)
+	// StartAgentSession spawns an AI-CLI agent (Claude Code, Codex, ...) via
+	// the Dev Server Agent's real agent.spawn RPC — sibling to
+	// SpawnTerminalSession, not a replacement (a bare shell PTY still uses
+	// SpawnTerminalSession).
+	StartAgentSession(context.Context, *StartAgentSessionRequest) (*AgentSession, error)
+	// StopAgentSession sends agent.sendInput('\x03') — graceful interrupt,
+	// BR-AG-05. Does not tear the session down; the transition to 'stopped'
+	// happens once agent.exited arrives (TASK-AG-05's classifier) — status
+	// transition is exit-driven, not request-driven.
+	StopAgentSession(context.Context, *StopAgentSessionRequest) (*emptypb.Empty, error)
+	// KillAgentSession sends agent.kill with the given signal (default
+	// SIGKILL) — full teardown, mirrors KillTerminalSession's "mark closed
+	// even if the agent call fails" discipline.
+	KillAgentSession(context.Context, *KillAgentSessionRequest) (*emptypb.Empty, error)
+	// ResumeAgentSession — loads the latest AgentSession for worktree_id,
+	// validates BR-AG-08 (7-day expiry) and BR-AG-09 (agent version match),
+	// then re-spawns via the same path as StartAgentSession with resume_id
+	// populated.
+	ResumeAgentSession(context.Context, *ResumeAgentSessionRequest) (*AgentSession, error)
+	// SwitchAgentAccount — BL-AG-04's saga: force-kill the current session,
+	// resolve a replacement account excluding the one just switched away
+	// from, then resume/start with the new account.
+	SwitchAgentAccount(context.Context, *SwitchAgentAccountRequest) (*AgentSession, error)
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -704,6 +805,21 @@ func (UnimplementedInfraFleetServiceServer) ShutdownEmulator(context.Context, *S
 }
 func (UnimplementedInfraFleetServiceServer) GetHostCapabilities(context.Context, *GetHostCapabilitiesRequest) (*GetHostCapabilitiesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetHostCapabilities not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) StartAgentSession(context.Context, *StartAgentSessionRequest) (*AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartAgentSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) StopAgentSession(context.Context, *StopAgentSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method StopAgentSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) KillAgentSession(context.Context, *KillAgentSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method KillAgentSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ResumeAgentSession(context.Context, *ResumeAgentSessionRequest) (*AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeAgentSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SwitchAgentAccount(context.Context, *SwitchAgentAccountRequest) (*AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "method SwitchAgentAccount not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -1327,6 +1443,96 @@ func _InfraFleetService_GetHostCapabilities_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_StartAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).StartAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_StartAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).StartAgentSession(ctx, req.(*StartAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_StopAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).StopAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_StopAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).StopAgentSession(ctx, req.(*StopAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_KillAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KillAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).KillAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_KillAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).KillAgentSession(ctx, req.(*KillAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ResumeAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ResumeAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ResumeAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ResumeAgentSession(ctx, req.(*ResumeAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_SwitchAgentAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SwitchAgentAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SwitchAgentAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SwitchAgentAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SwitchAgentAccount(ctx, req.(*SwitchAgentAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1465,6 +1671,26 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHostCapabilities",
 			Handler:    _InfraFleetService_GetHostCapabilities_Handler,
+		},
+		{
+			MethodName: "StartAgentSession",
+			Handler:    _InfraFleetService_StartAgentSession_Handler,
+		},
+		{
+			MethodName: "StopAgentSession",
+			Handler:    _InfraFleetService_StopAgentSession_Handler,
+		},
+		{
+			MethodName: "KillAgentSession",
+			Handler:    _InfraFleetService_KillAgentSession_Handler,
+		},
+		{
+			MethodName: "ResumeAgentSession",
+			Handler:    _InfraFleetService_ResumeAgentSession_Handler,
+		},
+		{
+			MethodName: "SwitchAgentAccount",
+			Handler:    _InfraFleetService_SwitchAgentAccount_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

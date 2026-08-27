@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/resume_agent_session.go` (new)
 **Depends on:** TASK-AG-01-07, TASK-AG-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ResumeAgentSession usecase implemented (BR-AG-08 7-day expiry, BR-AG-09 version check via domain.DevServer.AgentVersion, added by this task); resume_agent_session_test.go covers no-prior-session, expired, no-resumable-id, version-mismatch, and happy-path-uses-provider-session-id-not-row-id — all passing.
 
 ---
 

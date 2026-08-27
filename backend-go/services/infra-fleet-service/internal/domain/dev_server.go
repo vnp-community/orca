@@ -58,6 +58,13 @@ type DevServer struct {
 	Host        string
 	Mode        ConnectionMode
 	SSHTargetID string
+	// AgentVersion is the dev server agent's reported build version — used by
+	// ResumeAgentSession (BR-AG-09) to detect a resume against a different
+	// agent build than the one a session was originally spawned with. Sourced
+	// from the agent's handshake (see adapter/devserveragent's HandshakeInfo)
+	// when a caller populates it; empty when unknown, which callers must
+	// treat as "skip the version check" rather than a mismatch.
+	AgentVersion string
 }
 
 // NewDevServer constructs a DevServer, enforcing the invariants a record

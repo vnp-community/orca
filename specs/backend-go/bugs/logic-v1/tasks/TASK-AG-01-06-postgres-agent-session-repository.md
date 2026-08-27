@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/postgres/agent_session_repository.go` (new)
 **Depends on:** TASK-AG-01-02, TASK-AG-01-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — AgentSessionStore implements the full AgentSessionRepository port (Create/Get/LatestForWorktree/UpdateStatus/MarkStopped) against infra.agent_sessions; agent_session_repository_test.go (`-tags=integration`, real Postgres) covers round-trip, BR-AG-01 concurrent-create conflict, and post-stop re-create — all passing.
 
 ---
 

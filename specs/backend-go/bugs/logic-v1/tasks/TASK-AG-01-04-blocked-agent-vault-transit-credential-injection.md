@@ -5,7 +5,7 @@
 **Service:** `agent/` (cross-repo, outside `backend-go`) — this task documents and isolates the gap for `infra-fleet-service`
 **File:** `agent/src/relay/agent-credential-store.ts`, `agent/src/relay/agent-spawner.ts`
 **Depends on:** none — this task should land (or at least be acknowledged/signed-off) before TASK-AG-01-08 and TASK-AG-04-03 are exercised against any keyed provider
-**Status:** `[ ]` BLOCKED — needs `agent/` Vault Transit support first
+**Status:** `[ ]` BLOCKED — Go-side error-mapping code (`translateAgentSpawnError`, TASK-AG-01-07's `start_agent_session.go`) is implemented and unit-tested (`TestStartAgentSession_CredentialInjectionUnavailable` passes). This task's own gate is unmet: no `agent/` Vault Transit decrypt implementation was written (real Vault Transit client work in `agent-credential-store.ts` is out of scope for this backend-go batch and needs product/security sign-off on option 1 vs. 2, per this task's own Context/Changes-to-make), and no `agent/`-repo tracking issue was filed (no issue tracker access from this environment). Both remain open — status stays BLOCKED until they land, exactly as this task specifies.
 
 ---
 

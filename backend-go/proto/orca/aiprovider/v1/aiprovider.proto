@@ -74,6 +74,7 @@ message ResolveProviderRequest {
   string tenant_id = 1;
   string user_id = 2;
   string project_id = 3;
+  string exclude_account_id = 4; // additive — "" = no exclusion, existing callers unaffected
 }
 
 message ResolveProviderResponse {
