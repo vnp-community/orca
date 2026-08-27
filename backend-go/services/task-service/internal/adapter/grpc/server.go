@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -35,6 +36,8 @@ type Server struct {
 	aiDecompose         *usecase.AIDecompose
 	aiApply             *usecase.AIApply
 	generateAgentPrompt *usecase.GenerateAgentPrompt
+	revokeGrant         *usecase.RevokeGrant
+	listGrants          *usecase.ListGrants
 }
 
 func New(
@@ -52,6 +55,8 @@ func New(
 	aiDecompose *usecase.AIDecompose,
 	aiApply *usecase.AIApply,
 	generateAgentPrompt *usecase.GenerateAgentPrompt,
+	revokeGrant *usecase.RevokeGrant,
+	listGrants *usecase.ListGrants,
 ) *Server {
 	return &Server{
 		createTask:          createTask,
@@ -68,6 +73,8 @@ func New(
 		aiDecompose:         aiDecompose,
 		aiApply:             aiApply,
 		generateAgentPrompt: generateAgentPrompt,
+		revokeGrant:         revokeGrant,
+		listGrants:          listGrants,
 	}
 }
 
@@ -114,28 +121,51 @@ func (s *Server) AddEdge(ctx context.Context, req *taskv1.AddEdgeRequest) (*task
 }
 
 func (s *Server) Grant(ctx context.Context, req *taskv1.GrantRequest) (*taskv1.GrantResponse, error) {
-	err := s.grant.Execute(ctx, usecase.GrantInput{
+	in := usecase.GrantInput{
 		TaskID:    req.GetTaskId(),
 		SubjectID: req.GetSubjectId(),
 		Level:     toDomainGrantLevel(req.GetLevel()),
 		ApplyTree: req.GetApplyTree(),
-	})
+	}
+	if req.GetExpiresAt() != nil {
+		t := req.GetExpiresAt().AsTime()
+		in.ExpiresAt = &t
+	}
+	id, err := s.grant.Execute(ctx, in)
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &taskv1.GrantResponse{}, nil
+	return &taskv1.GrantResponse{Id: id}, nil
+}
+
+func (s *Server) RevokeGrant(ctx context.Context, req *taskv1.RevokeGrantRequest) (*emptypb.Empty, error) {
+	if err := s.revokeGrant.Execute(ctx, usecase.RevokeGrantInput{TaskID: req.GetTaskId(), GrantID: req.GetGrantId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ListGrants(ctx context.Context, req *taskv1.ListGrantsRequest) (*taskv1.ListGrantsResponse, error) {
+	grants, err := s.listGrants.Execute(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.Grant, 0, len(grants))
+	for _, g := range grants {
+		pg := &taskv1.Grant{Id: g.ID, TaskId: g.TaskID, SubjectId: g.SubjectID, Level: toProtoGrantLevel(g.Level), ApplyTree: g.ApplyTree}
+		if g.ExpiresAt != nil {
+			pg.ExpiresAt = timestamppb.New(*g.ExpiresAt)
+		}
+		out = append(out, pg)
+	}
+	return &taskv1.ListGrantsResponse{Grants: out}, nil
 }
 
 func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error) {
 	level, err := s.resolvePermission.Execute(ctx, usecase.ResolvePermissionInput{
 		TaskID: req.GetTaskId(),
 		UserID: req.GetUserId(),
-		// ResolvePermissionRequest has no action-equivalent field yet (see
-		// this service's README "Known gaps") — default to "read", the one
-		// action task_grant.rego's level_actions table authorizes for
-		// every named GrantLevel, so a resolved grant of any kind still
-		// passes the OPA check until the wire contract grows a real field.
-		Action: "read",
+		Action: req.GetAction(), // real field now (TASK-TG-03-04/03-06) — closes README.md's "not reachable through the RPC surface yet" gap
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

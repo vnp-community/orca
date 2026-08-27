@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
@@ -192,6 +193,32 @@ func TestResolvePermission_NonOwnerWithRealGrant_ResolvesThatGrantNotOwner(t *te
 	}
 	if level != domain.GrantLevelUser {
 		t.Errorf("expected GrantLevelUser (not Owner) for a non-owner caller, got %v", level)
+	}
+}
+
+// TestResolvePermission_OwnerShortCircuit_NeverExpires composes the
+// owner-intrinsic short-circuit with expiry filtering: the synthesized
+// Owner grant is built fresh (ExpiresAt=nil) every call, so it's never
+// treated as expired regardless of what `now` the clock reports.
+func TestResolvePermission_OwnerShortCircuit_NeverExpires(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "task-1", domain.StatusOpen, "", "")
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	task.OwnerID = "user-1"
+	tasks.tasks["task-1"] = task
+
+	uc := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	uc.WithClock(&fakeClock{now: time.Now().Add(100 * 365 * 24 * time.Hour)}) // far future — would expire any real stored grant
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	level, err := uc.Execute(ctx, ResolvePermissionInput{TaskID: "task-1", UserID: "user-1", Action: "manage"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if level != domain.GrantLevelOwner {
+		t.Errorf("expected the owner short-circuit to still resolve regardless of `now`, got %v", level)
 	}
 }
 

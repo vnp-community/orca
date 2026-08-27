@@ -6,9 +6,24 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
+
+// Clock abstracts time.Now so expiry logic (ResolveGrant's grant-expiry
+// filter, SOL-TG-04's execute_task.go) is deterministically testable
+// against fakes, per specs/backend-go/standards/testing-strategy.md —
+// mirrors auth-service/internal/usecase/ports.go's identical Clock/
+// SystemClock pattern.
+type Clock interface {
+	Now() time.Time
+}
+
+// SystemClock is the real Clock, wired in cmd/server/main.go.
+type SystemClock struct{}
+
+func (SystemClock) Now() time.Time { return time.Now().UTC() }
 
 // TaskRepository is the persistence port for tasks. Implemented by
 // internal/adapter/postgres against task-service's own database — see
@@ -111,11 +126,29 @@ type EdgeRepository interface {
 
 // GrantRepository is the persistence port for task_grants rows.
 type GrantRepository interface {
-	Grant(ctx context.Context, tenantID string, grant domain.Grant) error
+	// Grant returns the persisted grant's id — needed by RevokeGrant
+	// callers (TASK-TG-03-04's GrantResponse.id).
+	Grant(ctx context.Context, tenantID string, grant domain.Grant) (string, error)
 	// ListGrantsForAncestors returns every grant recorded against any of
 	// taskIDs, grouped by task ID — the input ResolveGrant's BFS walk
-	// (domain/grant_resolution.go) consumes.
+	// (domain/grant_resolution.go) consumes. Excludes expired rows.
 	ListGrantsForAncestors(ctx context.Context, tenantID string, taskIDs []string) (map[string][]domain.Grant, error)
+	// Revoke deletes a grant by id — a nonexistent grant_id is a real
+	// error, never a silent no-op.
+	Revoke(ctx context.Context, tenantID, grantID string) error
+	// ListGrantsForTask returns only the grants recorded directly against
+	// taskID — NOT the ancestor chain, per usecase.ListGrants's doc
+	// comment (avoids leaking an ancestor's grant details).
+	ListGrantsForTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error)
+}
+
+// EventPublisher writes a best-effort outbox row for async consumption
+// (notification-service) — see internal/adapter/eventbus's doc comment for
+// the outbox-write + common/outbox.Relay polling-publish implementation,
+// mirroring usage-service's transactional-outbox pattern. No error return:
+// a missed audit event must never fail the grant mutation it describes.
+type EventPublisher interface {
+	Publish(ctx context.Context, tenantID, eventType string, payload map[string]any)
 }
 
 // CommentRepository is the persistence port for task.task_comments rows —

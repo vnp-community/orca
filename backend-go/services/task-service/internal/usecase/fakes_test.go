@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -358,17 +359,21 @@ func (f *fakeEdgeRepository) ListTo(ctx context.Context, tenantID, toTaskID stri
 }
 
 type fakeGrantRepository struct {
-	grants   []domain.Grant
-	grantErr error
-	listErr  error
+	grants    []domain.Grant
+	grantErr  error
+	listErr   error
+	revokeErr error
+	nextID    int
 }
 
-func (f *fakeGrantRepository) Grant(ctx context.Context, tenantID string, grant domain.Grant) error {
+func (f *fakeGrantRepository) Grant(ctx context.Context, tenantID string, grant domain.Grant) (string, error) {
 	if f.grantErr != nil {
-		return f.grantErr
+		return "", f.grantErr
 	}
+	f.nextID++
+	grant.ID = fmt.Sprintf("grant-%d", f.nextID)
 	f.grants = append(f.grants, grant)
-	return nil
+	return grant.ID, nil
 }
 
 func (f *fakeGrantRepository) ListGrantsForAncestors(ctx context.Context, tenantID string, taskIDs []string) (map[string][]domain.Grant, error) {
@@ -381,11 +386,61 @@ func (f *fakeGrantRepository) ListGrantsForAncestors(ctx context.Context, tenant
 	}
 	out := map[string][]domain.Grant{}
 	for _, g := range f.grants {
-		if ids[g.TaskID] {
-			out[g.TaskID] = append(out[g.TaskID], g)
+		if !ids[g.TaskID] {
+			continue
+		}
+		if g.ExpiresAt != nil && !g.ExpiresAt.After(time.Now()) {
+			continue // defense-in-depth expiry filter, mirroring the real SQL WHERE clause (TASK-TG-03-07)
+		}
+		out[g.TaskID] = append(out[g.TaskID], g)
+	}
+	return out, nil
+}
+
+// Revoke removes a grant by id — a nonexistent id is a real error, never a
+// silent no-op, mirroring the real repository's RowsAffected==0 check.
+func (f *fakeGrantRepository) Revoke(ctx context.Context, tenantID, grantID string) error {
+	if f.revokeErr != nil {
+		return f.revokeErr
+	}
+	for i, g := range f.grants {
+		if g.ID == grantID {
+			f.grants = append(f.grants[:i], f.grants[i+1:]...)
+			return nil
+		}
+	}
+	return errNotFound
+}
+
+// ListGrantsForTask returns only the grants recorded directly against
+// taskID — NOT the ancestor chain, mirroring the real repository.
+func (f *fakeGrantRepository) ListGrantsForTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.Grant
+	for _, g := range f.grants {
+		if g.TaskID == taskID {
+			out = append(out, g)
 		}
 	}
 	return out, nil
+}
+
+// fakeEventPublisher records every published event — backs Grant/RevokeGrant's
+// audit-event assertions without a real outbox/NATS.
+type fakeEventPublisher struct {
+	events []publishedEvent
+}
+
+type publishedEvent struct {
+	tenantID  string
+	eventType string
+	payload   map[string]any
+}
+
+func (f *fakeEventPublisher) Publish(ctx context.Context, tenantID, eventType string, payload map[string]any) {
+	f.events = append(f.events, publishedEvent{tenantID: tenantID, eventType: eventType, payload: payload})
 }
 
 type fakeTeamScopeResolver struct {
@@ -455,6 +510,13 @@ func (f *fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context,
 	}
 	return nil
 }
+
+// fakeClock backs Clock-dependent tests (grant-expiry assertions) with a
+// deterministic `now` — mirrors auth-service/internal/usecase/fakes_test.go's
+// identical fakeClock.
+type fakeClock struct{ now time.Time }
+
+func (f *fakeClock) Now() time.Time { return f.now }
 
 type fakeExecutor struct {
 	ref    string

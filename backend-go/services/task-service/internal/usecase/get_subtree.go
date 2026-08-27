@@ -27,11 +27,12 @@ type GetSubtree struct {
 	tasks    TaskRepository
 	grants   GrantRepository
 	teams    TeamScopeResolver
+	clock    Clock
 	maxDepth int
 }
 
 func NewGetSubtree(tasks TaskRepository, grants GrantRepository, teams TeamScopeResolver) *GetSubtree {
-	return &GetSubtree{tasks: tasks, grants: grants, teams: teams, maxDepth: domain.DefaultMaxAncestorDepth}
+	return &GetSubtree{tasks: tasks, grants: grants, teams: teams, clock: SystemClock{}, maxDepth: domain.DefaultMaxAncestorDepth}
 }
 
 func (uc *GetSubtree) Execute(ctx context.Context, in GetSubtreeInput) (GetSubtreeResult, error) {
@@ -67,7 +68,7 @@ func (uc *GetSubtree) Execute(ctx context.Context, in GetSubtreeInput) (GetSubtr
 	visibleIDs := make(map[string]bool, len(nodes))
 	for _, n := range nodes {
 		chain := chainOf(n.ID, byID) // n, parent, grandparent, ... root — no extra query, walks already-fetched ParentID pointers
-		if _, ok := domain.ResolveGrant(chain, grantsByTask, caller, uc.maxDepth); ok {
+		if _, ok := domain.ResolveGrant(chain, grantsByTask, caller, uc.maxDepth, uc.clock.Now()); ok {
 			visible = append(visible, n)
 			visibleIDs[n.ID] = true
 		}

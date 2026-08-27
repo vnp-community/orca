@@ -36,6 +36,10 @@ type Config struct {
 	// TenantServiceAddr is where TeamScopeResolver (TASK-TG-03-03) dials
 	// tenant-service's ListTeamsForUser RPC (TASK-TG-03-02).
 	TenantServiceAddr string
+	// NATSURL is where the transactional-outbox relay (TASK-TG-03-07)
+	// publishes grant audit events — mirrors usage-service's identical
+	// config field.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -51,5 +55,6 @@ func Load() (Config, error) {
 		GitGatewayServiceAddr: commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
 		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
+		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

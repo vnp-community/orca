@@ -11,15 +11,12 @@ import (
 type ResolvePermissionInput struct {
 	TaskID string
 	UserID string
-	// Action is the operation the caller wants to perform on TaskID —
-	// one of task_grant.rego's level_actions keys ("read"/"write"/
-	// "execute"/"admin"). The generated ResolvePermissionRequest proto
-	// message has no action-equivalent field yet (see this service's
-	// README "Known gaps"), so internal/adapter/grpc.Server.ResolvePermission
-	// defaults this to "read" today — every named GrantLevel authorizes
-	// "read", so this only changes behavior for the (already-denied)
-	// not-found case. Pass Action explicitly once the wire contract grows
-	// a real field for it.
+	// Action is the operation the caller wants to perform on TaskID — one
+	// of task_grant.rego's level_actions keys ("read"/"write"/"execute"/
+	// "admin"/"manage"). ResolvePermissionRequest.action (TASK-TG-03-04) is
+	// a real wire field as of TASK-TG-03-06 — internal/adapter/grpc.Server.
+	// ResolvePermission threads req.GetAction() straight through instead of
+	// hardcoding "read".
 	Action string
 }
 
@@ -41,11 +38,19 @@ type ResolvePermission struct {
 	grants   GrantRepository
 	teams    TeamScopeResolver
 	opa      OPAClient
+	clock    Clock
 	maxDepth int
 }
 
 func NewResolvePermission(tasks TaskRepository, grants GrantRepository, teams TeamScopeResolver, opa OPAClient) *ResolvePermission {
-	return &ResolvePermission{tasks: tasks, grants: grants, teams: teams, opa: opa, maxDepth: domain.DefaultMaxAncestorDepth}
+	return &ResolvePermission{tasks: tasks, grants: grants, teams: teams, opa: opa, clock: SystemClock{}, maxDepth: domain.DefaultMaxAncestorDepth}
+}
+
+// WithClock overrides the default SystemClock — used by tests that need a
+// deterministic `now` for grant-expiry assertions.
+func (uc *ResolvePermission) WithClock(clock Clock) *ResolvePermission {
+	uc.clock = clock
+	return uc
 }
 
 func (uc *ResolvePermission) Execute(ctx context.Context, in ResolvePermissionInput) (domain.GrantLevel, error) {
@@ -91,7 +96,7 @@ func (uc *ResolvePermission) Execute(ctx context.Context, in ResolvePermissionIn
 	}
 
 	caller := domain.CallerIdentity{UserID: in.UserID, TeamIDs: teamIDs, CompanyID: tenantID}
-	level, found := domain.ResolveGrant(chain, grantsByTask, caller, uc.maxDepth)
+	level, found := domain.ResolveGrant(chain, grantsByTask, caller, uc.maxDepth, uc.clock.Now())
 	if !found {
 		return domain.GrantLevelUnspecified, errNoGrant(nil)
 	}

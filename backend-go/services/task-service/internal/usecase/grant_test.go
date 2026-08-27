@@ -14,12 +14,12 @@ import (
 // the same fakes the rest of this package's tests use.
 func newGrantForTest(tasks *fakeTaskRepository, grants GrantRepository, opaAllow bool) *Grant {
 	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: opaAllow})
-	return NewGrant(grants, resolvePermission)
+	return NewGrant(grants, resolvePermission, &fakeEventPublisher{})
 }
 
 func TestGrant_RequiresTenantContext(t *testing.T) {
 	uc := newGrantForTest(newFakeTaskRepository(), &fakeGrantRepository{}, true)
-	err := uc.Execute(context.Background(), GrantInput{TaskID: "t1", SubjectID: "u1", Level: domain.GrantLevelAdmin})
+	_, err := uc.Execute(context.Background(), GrantInput{TaskID: "t1", SubjectID: "u1", Level: domain.GrantLevelAdmin})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
 	}
@@ -35,12 +35,34 @@ func TestGrant_PersistsAValidGrant(t *testing.T) {
 	uc := newGrantForTest(tasks, repo, true)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
-	err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "u1", Level: domain.GrantLevelAdmin, ApplyTree: true})
+	id, err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "u1", Level: domain.GrantLevelAdmin, ApplyTree: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(repo.grants) != 1 || repo.grants[0].Level != domain.GrantLevelAdmin {
+	if id == "" {
+		t.Error("expected a non-empty grant id to be returned")
+	}
+	if len(repo.grants) != 1 || repo.grants[0].Level != domain.GrantLevelAdmin || repo.grants[0].ID != id {
 		t.Errorf("unexpected grants: %+v", repo.grants)
+	}
+}
+
+// TestGrant_PublishesGrantReceivedEvent confirms the audit event is
+// published after a successful write (TASK-TG-03-07).
+func TestGrant_PublishesGrantReceivedEvent(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1"}
+	grants := &fakeGrantRepository{}
+	events := &fakeEventPublisher{}
+	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	uc := NewGrant(grants, resolvePermission, events)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "u1", Level: domain.GrantLevelAdmin}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(events.events) != 1 || events.events[0].eventType != "task.grant_received" {
+		t.Errorf("expected 1 task.grant_received event, got %+v", events.events)
 	}
 }
 
@@ -55,7 +77,7 @@ func TestGrant_DeniesWhenCallerHasNoManageAccessToTarget(t *testing.T) {
 	uc := newGrantForTest(tasks, repo, true) // even a permissive OPA can't rescue a caller with NO resolved grant level at all
 	ctx := withIdentity(context.Background(), "tenant-1", "attacker")
 
-	err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "attacker", Level: domain.GrantLevelOwner, ApplyTree: true})
+	_, err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "attacker", Level: domain.GrantLevelOwner, ApplyTree: true})
 	if err == nil {
 		t.Fatal("expected PermissionDenied for a caller with no manage access to the target task")
 	}
@@ -81,7 +103,7 @@ func TestGrant_DeniesWhenOPARefusesManageAction(t *testing.T) {
 	uc := newGrantForTest(tasks, grants, false) // OPA denies "manage" for a mere "user"-level grant
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
-	err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "user-1", Level: domain.GrantLevelOwner})
+	_, err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "user-1", Level: domain.GrantLevelOwner})
 	if err == nil {
 		t.Fatal("expected an error when OPA denies the manage action")
 	}
@@ -91,7 +113,7 @@ func TestGrant_RejectsAnUnrecognizedLevel(t *testing.T) {
 	uc := newGrantForTest(newFakeTaskRepository(), &fakeGrantRepository{}, true)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
-	err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "u1", Level: domain.GrantLevel(99)})
+	_, err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "u1", Level: domain.GrantLevel(99)})
 	if err == nil {
 		t.Fatal("expected an error for an unrecognized grant level")
 	}
@@ -101,7 +123,7 @@ func TestGrant_RejectsAnEmptySubject(t *testing.T) {
 	uc := newGrantForTest(newFakeTaskRepository(), &fakeGrantRepository{}, true)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
-	err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "", Level: domain.GrantLevelUser})
+	_, err := uc.Execute(ctx, GrantInput{TaskID: "t1", SubjectID: "", Level: domain.GrantLevelUser})
 	if err == nil {
 		t.Fatal("expected an error for an empty subject id")
 	}

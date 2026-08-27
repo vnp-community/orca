@@ -38,6 +38,8 @@ const (
 	TaskService_AddComment_FullMethodName          = "/orca.task.v1.TaskService/AddComment"
 	TaskService_ListComments_FullMethodName        = "/orca.task.v1.TaskService/ListComments"
 	TaskService_GenerateAgentPrompt_FullMethodName = "/orca.task.v1.TaskService/GenerateAgentPrompt"
+	TaskService_RevokeGrant_FullMethodName         = "/orca.task.v1.TaskService/RevokeGrant"
+	TaskService_ListGrants_FullMethodName          = "/orca.task.v1.TaskService/ListGrants"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -83,6 +85,8 @@ type TaskServiceClient interface {
 	AddComment(ctx context.Context, in *AddCommentRequest, opts ...grpc.CallOption) (*AddCommentResponse, error)
 	ListComments(ctx context.Context, in *ListCommentsRequest, opts ...grpc.CallOption) (*ListCommentsResponse, error)
 	GenerateAgentPrompt(ctx context.Context, in *GenerateAgentPromptRequest, opts ...grpc.CallOption) (*GenerateAgentPromptResponse, error)
+	RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error)
 }
 
 type taskServiceClient struct {
@@ -273,6 +277,26 @@ func (c *taskServiceClient) GenerateAgentPrompt(ctx context.Context, in *Generat
 	return out, nil
 }
 
+func (c *taskServiceClient) RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_RevokeGrant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListGrantsResponse)
+	err := c.cc.Invoke(ctx, TaskService_ListGrants_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -316,6 +340,8 @@ type TaskServiceServer interface {
 	AddComment(context.Context, *AddCommentRequest) (*AddCommentResponse, error)
 	ListComments(context.Context, *ListCommentsRequest) (*ListCommentsResponse, error)
 	GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error)
+	RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error)
+	ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -379,6 +405,12 @@ func (UnimplementedTaskServiceServer) ListComments(context.Context, *ListComment
 }
 func (UnimplementedTaskServiceServer) GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateAgentPrompt not implemented")
+}
+func (UnimplementedTaskServiceServer) RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeGrant not implemented")
+}
+func (UnimplementedTaskServiceServer) ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListGrants not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -725,6 +757,42 @@ func _TaskService_GenerateAgentPrompt_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_RevokeGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeGrantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RevokeGrant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RevokeGrant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RevokeGrant(ctx, req.(*RevokeGrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ListGrants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGrantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ListGrants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ListGrants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ListGrants(ctx, req.(*ListGrantsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -803,6 +871,14 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateAgentPrompt",
 			Handler:    _TaskService_GenerateAgentPrompt_Handler,
+		},
+		{
+			MethodName: "RevokeGrant",
+			Handler:    _TaskService_RevokeGrant_Handler,
+		},
+		{
+			MethodName: "ListGrants",
+			Handler:    _TaskService_ListGrants_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,14 +20,17 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/task-service/internal/config"
 
+	taskeventbus "github.com/stablyai/orca-go/services/task-service/internal/adapter/eventbus"
 	taskgrpc "github.com/stablyai/orca-go/services/task-service/internal/adapter/grpc"
 	taskgrpcclient "github.com/stablyai/orca-go/services/task-service/internal/adapter/grpcclient"
 	taskopaclient "github.com/stablyai/orca-go/services/task-service/internal/adapter/opaclient"
@@ -143,6 +147,34 @@ func run() error {
 	opaEvaluator := policy.NewEvaluator(cfg.OPABundlePath)
 	opaClient := taskopaclient.New(opaEvaluator)
 
+	// Transactional-outbox relay (TASK-TG-03-07): Grant/RevokeGrant durably
+	// enqueue an audit-event outbox row (internal/adapter/postgres's
+	// WriteOutboxEvent) via internal/adapter/eventbus.Publisher; this relay
+	// is what actually gets those rows to NATS. Same "queue up unpublished
+	// until an operator restarts this process" posture as usage-service's
+	// identical wiring if NATS is unreachable at startup.
+	var outboxRelay *outbox.Relay
+	natsPub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := natsPub.EnsureStream(ctx, "TASK", []string{"orca.task.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			outboxRelay = outbox.NewRelay(repo, natsPub, outbox.DefaultConfig, logger)
+		}
+	}
+	var relayWG sync.WaitGroup
+	if outboxRelay != nil {
+		relayWG.Add(1)
+		go func() {
+			defer relayWG.Done()
+			outboxRelay.Run(ctx)
+		}()
+	}
+	eventPublisher := taskeventbus.New(repo, logger)
+
 	createTaskUC := usecase.NewCreateTask(repo)
 	getTaskUC := usecase.NewGetTask(repo)
 	addEdgeUC := usecase.NewAddEdge(repo)
@@ -150,7 +182,9 @@ func run() error {
 	// requires 'manage' access to a task before writing a new grant on it,
 	// closing a live authorization gap (TASK-TG-03-01).
 	resolvePermissionUC := usecase.NewResolvePermission(repo, repo, teamScopeResolver, opaClient)
-	grantUC := usecase.NewGrant(repo, resolvePermissionUC)
+	grantUC := usecase.NewGrant(repo, resolvePermissionUC, eventPublisher)
+	revokeGrantUC := usecase.NewRevokeGrant(repo, resolvePermissionUC, eventPublisher)
+	listGrantsUC := usecase.NewListGrants(repo, resolvePermissionUC)
 	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor)
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)
@@ -176,6 +210,7 @@ func run() error {
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
 		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, generateAgentPromptUC,
+		revokeGrantUC, listGrantsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -226,6 +261,11 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	// Wait for the outbox relay goroutine (if started) to observe ctx
+	// cancellation and return, so it doesn't outlive the rest of the
+	// server on shutdown — same pattern usage-service's main.go uses.
+	relayWG.Wait()
 
 	return nil
 }

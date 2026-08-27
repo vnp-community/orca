@@ -52,6 +52,9 @@ service TaskService {
   rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse);
 
   rpc GenerateAgentPrompt(GenerateAgentPromptRequest) returns (GenerateAgentPromptResponse);
+
+  rpc RevokeGrant(RevokeGrantRequest) returns (google.protobuf.Empty);
+  rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse);
 }
 
 message Task {
@@ -136,9 +139,12 @@ message GrantRequest {
   string subject_id = 2; // user or team id
   GrantLevel level = 3;
   bool apply_tree = 4;
+  google.protobuf.Timestamp expires_at = 5; // optional; unset = never expires
 }
 
-message GrantResponse {}
+message GrantResponse {
+  string id = 1; // new — the persisted grant's id, needed by RevokeGrant callers
+}
 
 // ResolvePermission runs the BFS ancestor-resolution algorithm in domain/,
 // then the caller passes the result as OPA policy input for the final
@@ -146,6 +152,7 @@ message GrantResponse {}
 message ResolvePermissionRequest {
   string task_id = 1;
   string user_id = 2;
+  string action = 3; // new — closes README.md's "no action field on the wire" gap
 }
 
 message ResolvePermissionResponse {
@@ -265,3 +272,21 @@ message ListCommentsResponse { repeated AddCommentResponse comments = 1; string 
 
 message GenerateAgentPromptRequest { string task_id = 1; bool save = 2; }
 message GenerateAgentPromptResponse { string prompt = 1; }
+
+message RevokeGrantRequest {
+  string task_id = 1;
+  string grant_id = 2;
+}
+
+message ListGrantsRequest { string task_id = 1; }
+message Grant {
+  string id = 1;
+  string task_id = 2;
+  string subject_id = 3;
+  GrantLevel level = 4;
+  bool apply_tree = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+message ListGrantsResponse {
+  repeated Grant grants = 1;
+}

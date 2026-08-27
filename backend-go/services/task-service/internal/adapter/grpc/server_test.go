@@ -7,6 +7,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -36,9 +37,28 @@ func newFakeTaskRepository() *fakeTaskRepository {
 // fake stands in for both ports at once, same as postgres.Repository does
 // for real, so newTestServer can pass it to both NewGrant/NewResolvePermission
 // and NewCreateTask/NewListTasks/etc.
-func (f *fakeTaskRepository) Grant(ctx context.Context, tenantID string, grant domain.Grant) error {
+func (f *fakeTaskRepository) Grant(ctx context.Context, tenantID string, grant domain.Grant) (string, error) {
+	grant.ID = fmt.Sprintf("grant-%d", len(f.grants)+1)
 	f.grants = append(f.grants, grant)
-	return nil
+	return grant.ID, nil
+}
+func (f *fakeTaskRepository) Revoke(ctx context.Context, tenantID, grantID string) error {
+	for i, g := range f.grants {
+		if g.ID == grantID {
+			f.grants = append(f.grants[:i], f.grants[i+1:]...)
+			return nil
+		}
+	}
+	return errors.New("not found")
+}
+func (f *fakeTaskRepository) ListGrantsForTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error) {
+	var out []domain.Grant
+	for _, g := range f.grants {
+		if g.TaskID == taskID {
+			out = append(out, g)
+		}
+	}
+	return out, nil
 }
 func (f *fakeTaskRepository) ListGrantsForAncestors(ctx context.Context, tenantID string, taskIDs []string) (map[string][]domain.Grant, error) {
 	ids := map[string]bool{}
@@ -66,7 +86,23 @@ func (f *fakeTaskRepository) Get(ctx context.Context, tenantID, id string) (doma
 	return t, nil
 }
 func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id string, maxDepth int) ([]domain.Task, error) {
-	return nil, errors.New("not implemented")
+	current, ok := f.tasks[id]
+	if !ok || current.TenantID != tenantID {
+		return nil, errors.New("not found")
+	}
+	var chain []domain.Task
+	for i := 0; maxDepth <= 0 || i < maxDepth; i++ {
+		chain = append(chain, current)
+		if current.ParentID == "" {
+			break
+		}
+		parent, ok := f.tasks[current.ParentID]
+		if !ok {
+			break
+		}
+		current = parent
+	}
+	return chain, nil
 }
 func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
 	t, ok := f.tasks[id]
@@ -260,7 +296,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		createTaskUC,
 		usecase.NewGetTask(tasks),
 		addEdgeUC,
-		usecase.NewGrant(tasks, resolvePermissionUC),
+		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}),
 		resolvePermissionUC,
 		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}),
 		usecase.NewHasActiveExecutions(tasks),
@@ -275,8 +311,14 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		),
 		usecase.NewAIApply(fakeTxRunner{tasks: tasks, edges: edges}),
 		usecase.NewGenerateAgentPrompt(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "generated prompt text"}),
+		usecase.NewRevokeGrant(tasks, resolvePermissionUC, stubEvents{}),
+		usecase.NewListGrants(tasks, resolvePermissionUC),
 	)
 }
+
+type stubEvents struct{}
+
+func (stubEvents) Publish(ctx context.Context, tenantID, eventType string, payload map[string]any) {}
 
 type stubTeams struct{}
 
@@ -459,6 +501,61 @@ func TestServer_AIApplyAIDecompose_ProposalFieldsSurviveProtoRoundTrip(t *testin
 	}
 }
 
+// ctxWithTenantAndUser is ctxWithTenant plus a caller user ID — needed for
+// RPCs that route through Grant's manage-access check (TASK-TG-03-01),
+// which resolves the owner-intrinsic short-circuit off the caller's user
+// ID, not just the tenant.
+func ctxWithTenantAndUser(t *testing.T, userID string) context.Context {
+	t.Helper()
+	return tenant.WithUserID(ctxWithTenant(t), userID)
+}
+
+func TestServer_Grant_ReturnsPersistedID(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1"}
+	s := newTestServer(tasks, &fakeEdgeRepository{})
+
+	resp, err := s.Grant(ctxWithTenantAndUser(t, "user-1"), &taskv1.GrantRequest{TaskId: "t1", SubjectId: "u2", Level: taskv1.GrantLevel_GRANT_LEVEL_ADMIN})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetId() == "" {
+		t.Error("expected a non-empty grant id")
+	}
+}
+
+func TestServer_RevokeGrant_And_ListGrants(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1"}
+	s := newTestServer(tasks, &fakeEdgeRepository{})
+	ctx := ctxWithTenantAndUser(t, "user-1")
+
+	granted, err := s.Grant(ctx, &taskv1.GrantRequest{TaskId: "t1", SubjectId: "u2", Level: taskv1.GrantLevel_GRANT_LEVEL_USER})
+	if err != nil {
+		t.Fatalf("unexpected error granting: %v", err)
+	}
+
+	listResp, err := s.ListGrants(ctx, &taskv1.ListGrantsRequest{TaskId: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error listing: %v", err)
+	}
+	if len(listResp.GetGrants()) != 1 || listResp.GetGrants()[0].GetId() != granted.GetId() {
+		t.Fatalf("unexpected grants: %+v", listResp.GetGrants())
+	}
+
+	if _, err := s.RevokeGrant(ctx, &taskv1.RevokeGrantRequest{TaskId: "t1", GrantId: granted.GetId()}); err != nil {
+		t.Fatalf("unexpected error revoking: %v", err)
+	}
+
+	listResp2, err := s.ListGrants(ctx, &taskv1.ListGrantsRequest{TaskId: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error re-listing: %v", err)
+	}
+	if len(listResp2.GetGrants()) != 0 {
+		t.Errorf("expected the grant to be gone after revoke, got %+v", listResp2.GetGrants())
+	}
+}
+
 func TestServer_GenerateAgentPrompt(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
@@ -492,5 +589,34 @@ func TestServer_CreateTaskAndGetTask_StillWork(t *testing.T) {
 	}
 	if got.GetTask().GetTitle() != "x" {
 		t.Errorf("unexpected task: %+v", got.GetTask())
+	}
+}
+
+// recordingOPA records the action it was asked to decide on — used to
+// prove a real (non-"read") action on the wire actually reaches OPA,
+// regression guard against README.md's previously-undocumented
+// hardcoded-"read" gap (TASK-TG-03-06).
+type recordingOPA struct{ gotAction string }
+
+func (r *recordingOPA) Decision(ctx context.Context, level domain.GrantLevel, action, tenantID string) (bool, error) {
+	r.gotAction = action
+	return true, nil
+}
+
+func TestServer_ResolvePermission_ThreadsRealActionToOPA(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1"}
+	opa := &recordingOPA{}
+	// Constructed directly (not via newTestServer/New) so this test can
+	// inject a recording OPA fake without widening every other usecase's
+	// wiring just for this one assertion.
+	s := &Server{resolvePermission: usecase.NewResolvePermission(tasks, tasks, stubTeams{}, opa)}
+
+	_, err := s.ResolvePermission(ctxWithTenant(t), &taskv1.ResolvePermissionRequest{TaskId: "t1", UserId: "user-1", Action: "manage"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opa.gotAction != "manage" {
+		t.Errorf("expected the real wire action %q to reach OPA, got %q", "manage", opa.gotAction)
 	}
 }
