@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
 
 // agentExecMethod is the Relay method name AgentExecutor uses.
@@ -37,13 +39,16 @@ type agentExecParams struct {
 // agent invocation to infra-fleet-service's Relay RPC. See agentExecMethod's
 // doc comment for the method-name/param-shape caveat.
 type AgentExecutor struct {
-	client infrafleetv1.InfraFleetServiceClient
+	client   infrafleetv1.InfraFleetServiceClient
+	resolver usecase.ServerResolver
 }
 
-// NewAgentExecutor wraps an already-constructed infrafleetv1 client — used
-// by cmd/server/main.go (real dial) and by tests (fake client).
-func NewAgentExecutor(client infrafleetv1.InfraFleetServiceClient) *AgentExecutor {
-	return &AgentExecutor{client: client}
+// NewAgentExecutor wraps an already-constructed infrafleetv1 client and a
+// ServerResolver (see domain.AgentStepConfig.Target's doc comment) — used
+// by cmd/server/main.go (real dial + internal/adapter/serverresolver) and
+// by tests (fakes).
+func NewAgentExecutor(client infrafleetv1.InfraFleetServiceClient, resolver usecase.ServerResolver) *AgentExecutor {
+	return &AgentExecutor{client: client, resolver: resolver}
 }
 
 var _ domain.StepExecutor = (*AgentExecutor)(nil)
@@ -54,8 +59,17 @@ func (e *AgentExecutor) Execute(ctx context.Context, stepConfigJSON string) (dom
 		return domain.StepResult{}, fmt.Errorf("infrafleetclient: agent: invalid step config JSON: %w", err)
 	}
 
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: agent: %w", err)
+	}
+	connectionID, err := e.resolver.Resolve(ctx, tenantID, cfg.EffectiveTarget())
+	if err != nil {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: agent: resolve target: %w", err)
+	}
+
 	var result execResult
-	if err := relay(ctx, e.client, cfg.ConnectionID, agentExecMethod, agentExecParams{
+	if err := relay(ctx, e.client, connectionID, agentExecMethod, agentExecParams{
 		Prompt:       cfg.Prompt,
 		WorktreePath: cfg.WorktreePath,
 		TrustPreset:  cfg.TrustPreset,

@@ -22,6 +22,11 @@ type Config struct {
 	// Agent/Shell/Notification step executors on the execution plane —
 	// mirrors git-gateway-service's identically-named config field.
 	InfraFleetServiceAddr string
+	// ProjectServiceAddr is where internal/adapter/serverresolver dials
+	// project-service's GetProject RPC to resolve a "project:<id>" Target
+	// into a dev_server_id — mirrors git-gateway-service's identically-named
+	// config field.
+	ProjectServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -33,6 +38,7 @@ func Load() (Config, error) {
 		Base:                  base,
 		WebhookAllowlistHosts: splitCSV(commonconfig.StringEnv("WEBHOOK_ALLOWLIST_HOSTS", "")),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 	}, nil
 }
 

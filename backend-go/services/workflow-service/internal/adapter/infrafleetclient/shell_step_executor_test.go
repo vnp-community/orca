@@ -21,7 +21,7 @@ func TestShellExecutor_SuccessfulRelayProducesCompletedStepResult(t *testing.T) 
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewShellExecutor(fake)
+	exec := NewShellExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "conn-1", Script: "echo hi"})
@@ -47,7 +47,7 @@ func TestShellExecutor_NonZeroExitCodeProducesFailedStepResult(t *testing.T) {
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewShellExecutor(fake)
+	exec := NewShellExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "conn-1", Script: "not-a-command"})
@@ -66,7 +66,7 @@ func TestShellExecutor_RelayErrorPropagates(t *testing.T) {
 			return nil, errors.New("dev server unreachable")
 		},
 	}
-	exec := NewShellExecutor(fake)
+	exec := NewShellExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "conn-1", Script: "echo hi"})

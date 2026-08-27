@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/domain/step.go`
 **Depends on:** none
-**Status:** `[x]` DONE — `Target`/`ProviderPin`/`effectiveTarget()` added to `AgentStepConfig`/`ShellStepConfig`/`NotificationStepConfig` (ConnectionID kept as deprecated back-compat alias, `omitempty` now); `domain.ExecutionEvent` added; `ServerResolver`/`ProviderResolver`/`EventPublisher` ports added to `ports.go`. New `domain/step_test.go` table tests all three configs' `effectiveTarget()`. `go build ./... && go vet ./... && go test ./...` green. Note: the existing `infrafleetclient` executors still relay on raw `cfg.ConnectionID` directly — wiring them through `ServerResolver`/`effectiveTarget()` is TASK-WF-02-04's scope, not this one's.
+**Status:** `[x]` DONE — `Target`/`ProviderPin`/`EffectiveTarget()` added to `AgentStepConfig`/`ShellStepConfig`/`NotificationStepConfig` (ConnectionID kept as deprecated back-compat alias, `omitempty` now); `domain.ExecutionEvent` added; `ServerResolver`/`ProviderResolver`/`EventPublisher` ports added to `ports.go`. New `domain/step_test.go` table tests all three configs' `EffectiveTarget()`. `go build ./... && go vet ./... && go test ./...` green. Note: `EffectiveTarget` was exported (capitalized) rather than the spec's lowercase `effectiveTarget()` — TASK-WF-02-04 calls it from a different package (`infrafleetclient`), which an unexported method can't support; renamed during that task, both task files updated. Wiring `infrafleetclient` executors through `ServerResolver`/`EffectiveTarget()` was TASK-WF-02-04's scope, now also done.
 
 ---
 

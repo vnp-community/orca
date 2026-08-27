@@ -10,8 +10,20 @@ import (
 
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serverresolver"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
+
+// testResolver is the real serverresolver.New with nil project/infra
+// clients — safe here because every fixture in this package's tests uses
+// only the "connection:"/legacy-ConnectionID/empty Target shapes, none of
+// which ever touch those clients (see resolver.Resolve's switch). Testing
+// the RPC-calling shapes (server:/project:/fleet:tag:) is
+// internal/adapter/serverresolver's own job.
+func testResolver() usecase.ServerResolver {
+	return serverresolver.New(nil, nil)
+}
 
 // fakeInfraFleetClient implements infrafleetv1.InfraFleetServiceClient
 // directly — embedding the (nil) interface means any RPC this package's
@@ -41,7 +53,7 @@ func TestAgentExecutor_SuccessfulRelayProducesCompletedStepResult(t *testing.T) 
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing", WorktreePath: "/wt"})
@@ -70,7 +82,7 @@ func TestAgentExecutor_NonZeroExitCodeProducesFailedStepResult(t *testing.T) {
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
@@ -89,7 +101,7 @@ func TestAgentExecutor_RelayErrorPropagates(t *testing.T) {
 			return nil, errors.New("dev server unreachable")
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
@@ -106,7 +118,7 @@ func TestAgentExecutor_MissingConnectionIDErrorsWithoutCallingRelay(t *testing.T
 			return nil, nil
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{Prompt: "do the thing"})
@@ -123,7 +135,7 @@ func TestAgentExecutor_NoTenantInContextErrorsWithoutCallingRelay(t *testing.T) 
 			return nil, nil
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver())
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
 	_, err := exec.Execute(context.Background(), string(cfg))

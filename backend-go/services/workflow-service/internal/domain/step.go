@@ -61,7 +61,7 @@ type StepResult struct {
 //
 // ConnectionID is a deprecated alias: when Target is empty and
 // ConnectionID is set, it's treated as "connection:<ConnectionID>" — see
-// effectiveTarget.
+// EffectiveTarget.
 
 // AgentStepConfig is the Agent step type's config shape — the prompt-driven
 // agent invocation internal/adapter/infrafleetclient.AgentExecutor relays to
@@ -96,11 +96,11 @@ type ProviderPin struct {
 	AccountID string `json:"accountId"`
 }
 
-// effectiveTarget resolves AgentStepConfig's dispatch target: Target when
+// EffectiveTarget resolves AgentStepConfig's dispatch target: Target when
 // set, else ConnectionID mapped to its "connection:<id>" equivalent (the
 // deprecated back-compat path), else empty (execute locally, unchanged
 // from before Target existed).
-func (c AgentStepConfig) effectiveTarget() string {
+func (c AgentStepConfig) EffectiveTarget() string {
 	if c.Target != "" {
 		return c.Target
 	}
@@ -122,7 +122,7 @@ type ShellStepConfig struct {
 	Env          map[string]string `json:"env,omitempty"`
 }
 
-func (c ShellStepConfig) effectiveTarget() string {
+func (c ShellStepConfig) EffectiveTarget() string {
 	if c.Target != "" {
 		return c.Target
 	}
@@ -142,7 +142,7 @@ type NotificationStepConfig struct {
 	Message      string `json:"message"`
 }
 
-func (c NotificationStepConfig) effectiveTarget() string {
+func (c NotificationStepConfig) EffectiveTarget() string {
 	if c.Target != "" {
 		return c.Target
 	}

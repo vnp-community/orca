@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/adapter/serverresolver/resolver.go` (new)
 **Depends on:** TASK-WF-02-02, TASK-WF-02-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — new `internal/adapter/serverresolver` package implements all four `Target` prefixes + legacy-bare-string + empty, tenant forwarded via outbound gRPC metadata (matching `infrafleetclient.withTenantMetadata`'s convention); `server:`/`project:`/`fleet:tag:` resolution now fails loudly (not silent-local-execution) when `ResolveConnection` reports `Connected=false`, a deliberate strengthening beyond the literal pseudocode. Wired into all three `infrafleetclient` executors (`ServerResolver` injected, `cfg.EffectiveTarget()` resolved before `relay()`) and into `cmd/server/main.go` (new `PROJECT_SERVICE_ADDR` config + dial). `domain.*StepConfig.effectiveTarget` renamed to exported `EffectiveTarget` (required for cross-package use — see TASK-WF-02-02's updated note). New `resolver_test.go`: one test per prefix + not-connected + no-dev-server-bound + zero-healthy-servers + list-failure-propagates, plus a 20-goroutine concurrent round-robin test asserting both fake healthy servers get selected. `go build/vet/test -race` green for `serverresolver` (10/10); full-package `-race` surfaces a pre-existing, unrelated data race in `wave_dispatcher_test.go`'s `fakeStepExecutor` (confirmed via `git diff --stat` — file untouched by this task) — non-race `go test ./...` is green.
 
 ---
 
