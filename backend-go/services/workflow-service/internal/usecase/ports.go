@@ -40,6 +40,102 @@ type TemplateRepository interface {
 	// write unconditionally. Returns domain.ErrTemplateVersionConflict
 	// (wrapped) when expectedVersion doesn't match the current row's version.
 	Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32, bumpVersion bool) (domain.WorkflowTemplate, error)
+	// WithTx runs fn inside a single Postgres transaction, committing on
+	// nil and rolling back on any error fn returns — the transaction
+	// boundary BUG-WF-03's visibility/approval work needs (a template's
+	// Visibility transition and its Approval row, or its Visibility
+	// transition and an execution's usage-count increment, must commit
+	// together; see usecase.PublishTemplate/ResolveApproval and
+	// TemplateRepositoryTx's doc comment). First multi-statement-atomic
+	// requirement in this service — every existing usecase before
+	// TASK-WF-03-04 is single-statement.
+	WithTx(ctx context.Context, fn func(tx TemplateRepositoryTx) error) error
+	// GetByShareToken looks up the (at most one, per the DB's unique
+	// partial index) template whose share_token matches — backs
+	// PreviewSharedTemplate/ImportSharedTemplate. Returns
+	// domain.ErrTemplateNotFound (wrapped) if no template carries this
+	// token (also covers "the empty token", which no row can match since
+	// share_token is NULL until a template is published — see
+	// migrations/0008's partial unique index).
+	GetByShareToken(ctx context.Context, shareToken string) (domain.WorkflowTemplate, error)
+	// SetShareToken mints (or overwrites) templateID's share_token —
+	// backs usecase.GenerateShareLink.
+	SetShareToken(ctx context.Context, templateID, token string) error
+}
+
+// TemplateRepositoryTx is the tx-scoped subset of template writes
+// available inside TemplateRepository.WithTx's fn — every method here
+// participates in the SAME transaction that fn was called with, so a
+// caller composing several of these (e.g. UpdateVisibility + a sibling
+// ApprovalRepositoryTx.CreateTx, via ApprovalRepositoryTx.Templates())
+// gets a single atomic commit/rollback across all of them.
+type TemplateRepositoryTx interface {
+	// UpdateVisibility persists tmpl's Visibility (and returns the
+	// updated row) — the direct-apply path (no approval gate): owner/admin
+	// escalating outside the company tier, an admin escalating to
+	// company, or any unpublish.
+	UpdateVisibility(ctx context.Context, tmpl domain.WorkflowTemplate) (domain.WorkflowTemplate, error)
+	// SetVisibility is UpdateVisibility's narrower sibling — sets ONLY
+	// templateID's visibility column, used when the caller already has
+	// nothing else about the row to change (e.g.
+	// ResolveApproval.Execute's VisibilityCompany apply on approve, which
+	// only ever touches this one column, not a full template write).
+	SetVisibility(ctx context.Context, templateID string, v domain.Visibility) error
+	// CreateExecution mirrors ExecutionRepository.CreateExecution but
+	// inside THIS transaction — for an atomic
+	// create-execution-and-increment-usage-count write (see
+	// IncrementUsageCount's doc comment); not used by
+	// PublishTemplate/ResolveApproval themselves.
+	CreateExecution(ctx context.Context, exec domain.WorkflowExecution) error
+	// IncrementUsageCount bumps templateID's usage_count by 1 — the
+	// signal TASK-WF-01-06's version-bump-on-breaking-change gate reads
+	// (UsageCount > 0). Paired with CreateExecution in one transaction so
+	// "this template was actually executed" and "an execution row exists"
+	// can never disagree.
+	IncrementUsageCount(ctx context.Context, templateID string) error
+}
+
+// ApprovalRepositoryTx is the tx-scoped subset of approval writes
+// available inside ApprovalRepository.WithTx's fn.
+type ApprovalRepositoryTx interface {
+	// Get returns domain.ErrApprovalNotFound (wrapped) if no matching row
+	// exists for approvalID.
+	Get(ctx context.Context, approvalID string) (domain.Approval, error)
+	// Update persists approval's mutable fields (status, resolved_by,
+	// resolved_at) — called after Approve/Reject.
+	Update(ctx context.Context, approval domain.Approval) error
+	// Templates returns a TemplateRepositoryTx scoped to the SAME
+	// transaction as this ApprovalRepositoryTx — the mechanism
+	// ResolveApproval.Execute uses to apply VisibilityCompany atomically
+	// with the approval's status flip (see that usecase's doc comment).
+	Templates() TemplateRepositoryTx
+	// CreateTx inserts a new pending approval row — the tx-scoped sibling
+	// of a plain Create, named distinctly since this interface has no
+	// non-tx counterpart to collide with.
+	CreateTx(ctx context.Context, approval domain.Approval) error
+}
+
+// ApprovalRepository is the persistence port for template publish-approval
+// gate rows (workflow.approvals) — see domain.Approval's doc comment.
+type ApprovalRepository interface {
+	// WithTx runs fn inside a single Postgres transaction — see
+	// TemplateRepository.WithTx's doc comment for the same contract.
+	WithTx(ctx context.Context, fn func(tx ApprovalRepositoryTx) error) error
+	// ListPending keyset-paginates tenantID's pending approvals — same
+	// page_token/next-token convention as ListTemplates (opaque token =
+	// last-seen id, ORDER BY id).
+	ListPending(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Approval, string, error)
+}
+
+// OPAChecker mirrors orchestration-service's in-process OPA policy check
+// for ResolveDecisionGate — "requester is a lead"/"approver is an admin"
+// are auth-service/tenant-service facts, not something workflow-service
+// determines from its own tables, so this port exists to keep that
+// dependency explicit and swappable (a real OPA/auth-service-backed
+// implementation vs. a test fake) rather than workflow-service reaching
+// into auth-service's tables directly.
+type OPAChecker interface {
+	IsAdmin(ctx context.Context, userID string) bool
 }
 
 // ExecutionRepository is the persistence port for workflow executions.

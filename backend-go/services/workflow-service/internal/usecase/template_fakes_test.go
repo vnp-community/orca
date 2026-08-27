@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"sort"
 
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
@@ -28,6 +29,21 @@ type fakeTemplateRepository struct {
 	// lastUpdateBumpVersion captures the last bumpVersion Update was called
 	// with — TASK-WF-01-06's breaking-change + active-usage gate.
 	lastUpdateBumpVersion bool
+
+	// withTxErr, if set, makes WithTx fail before fn is even called (a
+	// begin-tx failure) — distinct from fn itself returning an error
+	// (rollback), which withTx below handles via its own staged-write
+	// discard.
+	withTxErr error
+	// executions records every CreateExecution call made through a
+	// COMMITTED transaction — staged writes from a rolled-back tx never
+	// land here, mirroring a real Postgres ROLLBACK.
+	executions []domain.WorkflowExecution
+	// txFailAfterWrites configures the NEXT WithTx call's tx to fail
+	// starting with its (1-indexed) Nth write op — 0 means "never fail" —
+	// the "inject a failure between two writes" mechanism TASK-WF-03-05's
+	// tests need.
+	txFailAfterWrites int
 }
 
 func newFakeTemplateRepository() *fakeTemplateRepository {
@@ -131,4 +147,126 @@ func (f *fakeTemplateRepository) Update(ctx context.Context, tmpl domain.Workflo
 	}
 	f.templates[tmpl.ID] = tmpl
 	return tmpl, nil
+}
+
+// GetByShareToken scans f.templates for a matching ShareToken — a linear
+// scan is fine for a fake with a handful of fixture rows.
+func (f *fakeTemplateRepository) GetByShareToken(ctx context.Context, shareToken string) (domain.WorkflowTemplate, error) {
+	for _, t := range f.templates {
+		if t.ShareToken != "" && t.ShareToken == shareToken {
+			return t, nil
+		}
+	}
+	return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
+}
+
+// SetShareToken mirrors the real repository's not-tenant-scoped contract
+// (the caller already confirmed ownership via GetTemplate).
+func (f *fakeTemplateRepository) SetShareToken(ctx context.Context, templateID, token string) error {
+	t, ok := f.templates[templateID]
+	if !ok {
+		return domain.ErrTemplateNotFound
+	}
+	t.ShareToken = token
+	f.templates[templateID] = t
+	return nil
+}
+
+// WithTx implements a genuine stage-then-commit-or-discard transaction
+// over f.templates/f.executions — a rolled-back write (fn returns a
+// non-nil error) must be provably invisible afterward, which the real
+// tests (TASK-WF-03-05's "inject a failure between two writes, assert
+// neither side effect landed") depend on; a shared in-memory map mutated
+// directly, with no staging, couldn't express that.
+func (f *fakeTemplateRepository) WithTx(ctx context.Context, fn func(tx TemplateRepositoryTx) error) error {
+	if f.withTxErr != nil {
+		return f.withTxErr
+	}
+	staged := &fakeTemplateRepositoryTx{repo: f, writes: make(map[string]domain.WorkflowTemplate), usageIncrements: make(map[string]int32), failAfterWrites: f.txFailAfterWrites}
+	if err := fn(staged); err != nil {
+		return err // rollback: nothing in `staged` is ever applied to f
+	}
+	for id, t := range staged.writes {
+		f.templates[id] = t
+	}
+	for id, n := range staged.usageIncrements {
+		t := f.templates[id]
+		t.UsageCount += n
+		f.templates[id] = t
+	}
+	f.executions = append(f.executions, staged.executions...)
+	return nil
+}
+
+// fakeTemplateRepositoryTx is fakeTemplateRepository.WithTx's tx-scoped
+// handle — see WithTx's doc comment for the stage-then-commit rationale.
+type fakeTemplateRepositoryTx struct {
+	repo            *fakeTemplateRepository
+	writes          map[string]domain.WorkflowTemplate
+	usageIncrements map[string]int32
+	executions      []domain.WorkflowExecution
+	failAfterWrites int // if > 0, the (1-indexed) write call after which every subsequent call errors — simulates "crash mid-transaction"
+	writeCount      int
+}
+
+// current returns id's current value, preferring an already-staged write
+// within this same tx over the committed repo state — later ops within one
+// WithTx call see earlier ops' effects, matching real transaction semantics.
+func (tx *fakeTemplateRepositoryTx) current(id string) (domain.WorkflowTemplate, bool) {
+	if t, ok := tx.writes[id]; ok {
+		return t, true
+	}
+	t, ok := tx.repo.templates[id]
+	return t, ok
+}
+
+func (tx *fakeTemplateRepositoryTx) checkFailure() error {
+	tx.writeCount++
+	if tx.failAfterWrites > 0 && tx.writeCount > tx.failAfterWrites {
+		return errors.New("fakeTemplateRepositoryTx: simulated failure")
+	}
+	return nil
+}
+
+func (tx *fakeTemplateRepositoryTx) UpdateVisibility(ctx context.Context, tmpl domain.WorkflowTemplate) (domain.WorkflowTemplate, error) {
+	if err := tx.checkFailure(); err != nil {
+		return domain.WorkflowTemplate{}, err
+	}
+	if _, ok := tx.current(tmpl.ID); !ok {
+		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
+	}
+	tx.writes[tmpl.ID] = tmpl
+	return tmpl, nil
+}
+
+func (tx *fakeTemplateRepositoryTx) SetVisibility(ctx context.Context, templateID string, v domain.Visibility) error {
+	if err := tx.checkFailure(); err != nil {
+		return err
+	}
+	t, ok := tx.current(templateID)
+	if !ok {
+		return domain.ErrTemplateNotFound
+	}
+	t.Visibility = v
+	tx.writes[templateID] = t
+	return nil
+}
+
+func (tx *fakeTemplateRepositoryTx) CreateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
+	if err := tx.checkFailure(); err != nil {
+		return err
+	}
+	tx.executions = append(tx.executions, exec)
+	return nil
+}
+
+func (tx *fakeTemplateRepositoryTx) IncrementUsageCount(ctx context.Context, templateID string) error {
+	if err := tx.checkFailure(); err != nil {
+		return err
+	}
+	if _, ok := tx.current(templateID); !ok {
+		return domain.ErrTemplateNotFound
+	}
+	tx.usageIncrements[templateID]++
+	return nil
 }
