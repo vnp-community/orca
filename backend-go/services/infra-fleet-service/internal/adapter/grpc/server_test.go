@@ -27,17 +27,17 @@ import (
 // need those fields instead.
 func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sendTerminalInput *usecase.SendTerminalInput, getTerminalScrollback *usecase.GetTerminalScrollback) *Server {
 	return New(
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-		nil, nil,
-		nil, nil, nil, // scrollback-snapshot usecases (SOL-TM-03), unused by this package's tests
-		getAgentTerminalSession, sendTerminalInput, getTerminalScrollback,
-		nil, nil, nil, nil, // fleet import/bulk-provision/detect/preflight usecases, unused here
-		nil, nil, nil, // persistent agent-token usecases (BL-AWS-03), unused here
-		nil,           // teardown-connection usecase (BR-SSH-13), unused here
-		nil, nil, nil, // port-forward CRUD usecases (SOL-SSH-04), unused here
-		nil,           // port-forward event broadcaster (TASK-SSH-04-08), unused here
-		nil, nil, nil, nil, nil, // agent-session usecases (TASK-AG-01..04), unused here
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, // 1-13
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, // 14-24
+		nil, nil, nil, nil, nil, // listBrowserProfiles..getHostCapabilities, 25-29
+		nil, nil, nil, // scrollback-snapshot usecases (SOL-TM-03), 30-32, unused by this package's tests
+		getAgentTerminalSession, sendTerminalInput, getTerminalScrollback, // 33-35
+		nil, nil, nil, nil, // fleet import/bulk-provision/detect/preflight usecases, 36-39, unused here
+		nil, nil, nil, // persistent agent-token usecases (BL-AWS-03), 40-42, unused here
+		nil,           // teardown-connection usecase (BR-SSH-13), 43, unused here
+		nil, nil, nil, // port-forward CRUD usecases (SOL-SSH-04), 44-46, unused here
+		nil,           // port-forward event broadcaster (TASK-SSH-04-08), 47, unused here
+		nil, nil, nil, nil, nil, // agent-session usecases (TASK-AG-01..04), 48-52, unused here
 	)
 }
 
@@ -101,6 +101,11 @@ type fakeDevServerAgentClient struct {
 
 func (f *fakeDevServerAgentClient) Exec(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (map[string]any, error) {
 	return nil, nil
+}
+func (f *fakeDevServerAgentClient) ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error) {
+	ch := make(chan map[string]any)
+	close(ch)
+	return ch, func() {}, nil
 }
 func (f *fakeDevServerAgentClient) Health(ctx context.Context, devServer domain.DevServer) (bool, error) {
 	return true, nil
@@ -384,6 +389,11 @@ func (f *fakeDevServerAgent) Exec(ctx context.Context, devServer domain.DevServe
 		return nil, f.execErr
 	}
 	return f.execResult, nil
+}
+func (f *fakeDevServerAgent) ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error) {
+	ch := make(chan map[string]any)
+	close(ch)
+	return ch, func() {}, nil
 }
 func (f *fakeDevServerAgent) Health(ctx context.Context, devServer domain.DevServer) (bool, error) {
 	return true, nil
