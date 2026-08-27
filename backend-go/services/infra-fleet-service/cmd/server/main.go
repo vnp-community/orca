@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,9 +21,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
@@ -30,11 +33,13 @@ import (
 
 	infraagentwsserver "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/agentwsserver"
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
+	infraeventbus "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infragrpcclient "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpcclient"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
@@ -89,6 +94,7 @@ func run() error {
 	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
 	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
 	agentSessionStore := infrapostgres.NewAgentSessionStore(pool)
+	agentRateLimitedOutboxStore := infrapostgres.NewAgentRateLimitedOutboxStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
 	// wired below via agentwsserver) are both real, and so is relay-ssh now
@@ -161,12 +167,6 @@ func run() error {
 	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
 
 	// --- Agent sessions (TASK-AG-01..05) ---
-	// AgentStatusPublisher (TASK-AG-05-05) + its NATS/outbox wiring
-	// (EnsureStream, outbox.Relay.Run, eventbus.Connect) are deliberately
-	// NOT started here — connecting the adapter into this composition root
-	// (so AgentOutputClassifier can actually publish) is TASK-AG-05-06's job,
-	// out of this batch's scope. infraeventbus.New/AgentRateLimitedOutboxStore
-	// are fully implemented and unit-tested as library code in the meantime.
 
 	// ai-provider-service dial — SwitchAgentAccount's first outbound call to
 	// ai-provider-service (TASK-AG-04-03, a new infra --> aiprov edge).
@@ -179,20 +179,60 @@ func run() error {
 	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
 	aiProviderResolver := infragrpcclient.NewAIProviderResolver(aiProviderClient)
 
-	startAgentSessionUC := usecase.NewStartAgentSession(repo, agentClient, agentSessionStore)
-	stopAgentSessionUC := usecase.NewStopAgentSession(agentSessionStore, repo, agentClient)
 	killAgentSessionUC := usecase.NewKillAgentSession(agentSessionStore, repo, agentClient, nil) // writeActivity: see TASK-AG-02-03/06
+
+	// TASK-AG-05-06: AgentOutputClassifier needs a real AgentStatusPublisher,
+	// which needs a live NATS connection — degrade gracefully (classifierUC
+	// stays nil, StartAgentSession skips launching it, see that usecase's
+	// nil-safe classifier field) rather than crash-looping this whole
+	// service over an optional event-delivery dependency, same posture
+	// every other NATS-consuming service in this codebase already takes
+	// (see e.g. usage-service's cmd/server/main.go).
+	var classifierUC *usecase.AgentOutputClassifier
+	natsPub, _, closeEventBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.Warn("eventbus unavailable — agent.statusChanged/agent.rateLimited will not be published", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeEventBus() }()
+		if err := natsPub.EnsureStream(ctx, "INFRA", []string{"orca.infra.agent.>"}); err != nil {
+			logger.Warn("failed to ensure jetstream stream for agent events", slog.Any("error", err))
+		} else {
+			agentStatusPublisher := infraeventbus.New(natsPub, agentRateLimitedOutboxStore)
+			classifierUC = usecase.NewAgentOutputClassifier(agentSessionStore, agentClient, agentStatusPublisher, killAgentSessionUC)
+
+			// agent:rateLimited outbox relay — mirrors usage-service's
+			// relay-startup call site's shape (cmd/server/main.go).
+			agentRateLimitedRelay := outbox.NewRelay(agentRateLimitedOutboxStore, natsPub, outbox.Config{PollInterval: 500 * time.Millisecond, BatchSize: 100}, logger)
+			go agentRateLimitedRelay.Run(ctx)
+		}
+	}
+
+	// TASK-AG-03-06: best-effort agent.hook consumer — one goroutine per dev
+	// server this process has resolved a connection for, guarded against
+	// duplicate starts. This is intentionally simple (a map + mutex in
+	// main.go, not a separate registry type) since it has exactly one
+	// caller today (StartAgentSession.Execute, via the callback below —
+	// covers ResumeAgentSession too, since it delegates to the same
+	// Execute).
+	var (
+		hookConsumersMu sync.Mutex
+		hookConsumers   = map[string]bool{} // dev server id -> already started
+	)
+	ensureAgentHookConsumer := func(ctx context.Context, tenantID string, devServer domain.DevServer) {
+		hookConsumersMu.Lock()
+		defer hookConsumersMu.Unlock()
+		if hookConsumers[devServer.ID] {
+			return
+		}
+		hookConsumers[devServer.ID] = true
+		recorder := usecase.NewRecordAgentHookProviderSession(agentSessionStore)
+		go recorder.Run(context.Background(), tenantID, devServer, agentClient)
+	}
+
+	startAgentSessionUC := usecase.NewStartAgentSession(repo, agentClient, agentSessionStore, classifierUC, ensureAgentHookConsumer)
+	stopAgentSessionUC := usecase.NewStopAgentSession(agentSessionStore, repo, agentClient)
 	resumeAgentSessionUC := usecase.NewResumeAgentSession(agentSessionStore, repo, startAgentSessionUC)
 	switchAgentAccountUC := usecase.NewSwitchAgentAccount(agentSessionStore, killAgentSessionUC, aiProviderResolver, startAgentSessionUC, resumeAgentSessionUC)
-
-	// usecase.RecordAgentHookProviderSession / usecase.AgentOutputClassifier
-	// (TASK-AG-03-05 / TASK-AG-05-04) are library code this composition root
-	// deliberately does NOT start yet: wiring their Run() goroutines to fire
-	// once per resolved dev-server-connection (idempotently — a registry
-	// keyed by dev_server_id, so a connection doesn't get double-subscribed)
-	// is TASK-AG-03-06/TASK-AG-05-06's job, out of this batch's scope. Both
-	// usecases are fully implemented and unit-tested; only this startup
-	// wiring is deferred.
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(

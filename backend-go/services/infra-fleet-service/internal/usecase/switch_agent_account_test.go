@@ -20,7 +20,7 @@ func newSwitchFixture(current domain.AgentSession) (*fakeConnectionResolver, *fa
 
 func newSwitchUC(resolver *fakeConnectionResolver, sessions *fakeAgentSessionRepository, agent *fakeDevServerAgentClient, resolveClient *fakeAIProviderResolverClient) *SwitchAgentAccount {
 	kill := NewKillAgentSession(sessions, resolver, agent, nil)
-	start := NewStartAgentSession(resolver, agent, sessions)
+	start := NewStartAgentSession(resolver, agent, sessions, nil, nil)
 	resume := NewResumeAgentSession(sessions, resolver, start)
 	return NewSwitchAgentAccount(sessions, kill, resolveClient, start, resume)
 }

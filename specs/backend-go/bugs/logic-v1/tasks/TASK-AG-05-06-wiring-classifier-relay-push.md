@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` + `api-gateway`
 **File:** `backend-go/services/infra-fleet-service/cmd/server/main.go`, `backend-go/services/infra-fleet-service/internal/usecase/start_agent_session.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_agent.go`
 **Depends on:** TASK-AG-05-04, TASK-AG-05-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `StartAgentSession` gained a nil-safe `classifier *AgentOutputClassifier` field launched post-persist (covers Resume transitively); main.go wires NATS connect + `infraeventbus.New` + `AgentOutputClassifier` + the `agentRateLimitedRelay` outbox relay goroutine, degrading gracefully (classifier stays nil) if NATS is unreachable at startup; api-gateway gained its first NATS `commoneventbus.Consumer` (also degrade-safe) and the `agent.subscribeStatus` push channel (`Registry.RegisterStream`) forwarding tenant-filtered `agent.statusChanged`/`agent:rateLimited`. `TestStartAgentSession_LaunchesClassifierAfterPersist` and `TestAgentSubscribeStatusChannel_NilBus_ReturnsClosedChannel` pass; a live NATS integration check (BR-AG-14 push-latency budget) is left for a real docker-compose run per this task's own note.
 
 ---
 

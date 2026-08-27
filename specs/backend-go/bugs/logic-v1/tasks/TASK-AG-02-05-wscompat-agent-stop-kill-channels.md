@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_agent.go`
 **Depends on:** TASK-AG-01-08, TASK-AG-02-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `agent.stop`/`agent.kill` added to `channels_agent.go` via plain `Registry.Register`; `TestAgentStopChannel_CallsStopRPC`/`TestAgentKillChannel_CallsKillRPC` pass (`go test ./services/api-gateway/internal/adapter/wscompat/... -run 'TestAgentStop|TestAgentKill' -v`).
 
 ---
 

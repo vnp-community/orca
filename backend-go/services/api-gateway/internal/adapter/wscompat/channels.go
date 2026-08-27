@@ -37,6 +37,7 @@ import (
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 
+	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
@@ -83,6 +84,7 @@ func RegisterRealChannels(
 	workflowClient workflowv1.WorkflowServiceClient,
 	aiProviderClient aiproviderv1.AiProviderServiceClient,
 	rateLimits rateLimitReader,
+	eventBusConsumer *commoneventbus.Consumer,
 ) {
 	registerAnnotationChannels(r, annotationClient)
 	registerTaskChannels(r, taskClient)
@@ -123,6 +125,7 @@ func RegisterRealChannels(
 	registerTerminalChannels(r, infraFleetClient)
 	registerTenantProjectChannels(r, tenantClient, projectClient)
 	registerWorkflowChannels(r, workflowClient)
+	registerAgentChannels(r, infraFleetClient, eventBusConsumer)
 }
 
 // ── annotation.* ────────────────────────────────────────────────────────

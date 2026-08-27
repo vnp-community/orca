@@ -33,11 +33,31 @@ type StartAgentSession struct {
 	resolver ConnectionResolver
 	agent    DevServerAgentClient
 	sessions AgentSessionRepository
-	clock    func() time.Time
+
+	// classifier — TASK-AG-05-06: started as a goroutine right after a new
+	// session persists, one per live AgentSession. Nil-safe (skipped) so
+	// every pre-existing test call site that has no use for classification
+	// doesn't need to construct one.
+	classifier *AgentOutputClassifier
+
+	// ensureHookConsumer — TASK-AG-03-06: called right after
+	// ResolveConnection succeeds (both StartAgentSession's own fresh-spawn
+	// path AND ResumeAgentSession's delegated call go through here, so one
+	// call site covers both) to lazily start RecordAgentHookProviderSession.Run
+	// for devServer, idempotently — see main.go's ensureAgentHookConsumer
+	// closure for the per-dev-server-id dedup guard. Nil-safe (skipped) for
+	// the same reason as classifier above.
+	ensureHookConsumer func(ctx context.Context, tenantID string, devServer domain.DevServer)
+
+	clock func() time.Time
 }
 
-func NewStartAgentSession(resolver ConnectionResolver, agent DevServerAgentClient, sessions AgentSessionRepository) *StartAgentSession {
-	return &StartAgentSession{resolver: resolver, agent: agent, sessions: sessions, clock: func() time.Time { return time.Now().UTC() }}
+func NewStartAgentSession(resolver ConnectionResolver, agent DevServerAgentClient, sessions AgentSessionRepository, classifier *AgentOutputClassifier, ensureHookConsumer func(ctx context.Context, tenantID string, devServer domain.DevServer)) *StartAgentSession {
+	return &StartAgentSession{
+		resolver: resolver, agent: agent, sessions: sessions,
+		classifier: classifier, ensureHookConsumer: ensureHookConsumer,
+		clock: func() time.Time { return time.Now().UTC() },
+	}
 }
 
 func (uc *StartAgentSession) Execute(ctx context.Context, in StartAgentSessionInput) (domain.AgentSession, error) {
@@ -49,6 +69,13 @@ func (uc *StartAgentSession) Execute(ctx context.Context, in StartAgentSessionIn
 	connected, devServer, _, err := uc.resolver.ResolveConnection(ctx, tenantID, in.ConnectionID)
 	if err != nil || !connected {
 		return domain.AgentSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", err)
+	}
+
+	// TASK-AG-03-06: lazily start (or no-op if already running) the
+	// per-dev-server agent.hook consumer — every path that needs one
+	// (fresh spawn, resume) already resolves devServer right here.
+	if uc.ensureHookConsumer != nil {
+		uc.ensureHookConsumer(ctx, tenantID, devServer)
 	}
 
 	// Minted here, passed as SpawnAgentInput.TaskID — agent.spawn's ptyId
@@ -80,6 +107,16 @@ func (uc *StartAgentSession) Execute(ctx context.Context, in StartAgentSessionIn
 		}
 		return domain.AgentSession{}, apperrors.New(apperrors.KindInternal, "INFRA_CREATE_AGENT_SESSION_FAILED", "failed to persist agent session", err)
 	}
+
+	// TASK-AG-05-06: classify this session's PTY output for real-time
+	// agent.statusChanged/agent:rateLimited delivery. context.Background(),
+	// not ctx — this goroutine must outlive the Start/Resume RPC call that
+	// spawned it, for the session's entire lifetime.
+	if uc.classifier != nil {
+		tenantIDForClassifier := tenantID // avoid capturing the outer var name ambiguity in the closure below
+		go uc.classifier.Run(context.Background(), tenantIDForClassifier, session, devServer)
+	}
+
 	return session, nil
 }
 

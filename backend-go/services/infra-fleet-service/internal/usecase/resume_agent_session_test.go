@@ -21,7 +21,7 @@ func newResumeFixture(prior domain.AgentSession) (*fakeConnectionResolver, *fake
 func TestResumeAgentSession_NoPriorSession_ReturnsNotFound(t *testing.T) {
 	resolver, sessions, agent := newResumeFixture(domain.AgentSession{})
 	sessions.byID = map[string]domain.AgentSession{} // wipe the fixture's zero-value entry
-	uc := NewResumeAgentSession(sessions, resolver, NewStartAgentSession(resolver, agent, sessions))
+	uc := NewResumeAgentSession(sessions, resolver, NewStartAgentSession(resolver, agent, sessions, nil, nil))
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	_, err := uc.Execute(ctx, ResumeAgentSessionInput{ConnectionID: "conn-1", WorktreeID: "wt-1", UserID: "user-1"})
@@ -42,7 +42,7 @@ func TestResumeAgentSession_Expired_ReturnsExpiredError(t *testing.T) {
 		LastActiveAt:            time.Now().Add(-8 * 24 * time.Hour), // > 7 days ago
 	}
 	resolver, sessions, agent := newResumeFixture(prior)
-	start := NewStartAgentSession(resolver, agent, sessions)
+	start := NewStartAgentSession(resolver, agent, sessions, nil, nil)
 	uc := NewResumeAgentSession(sessions, resolver, start)
 
 	ctx := withTenant(context.Background(), "tenant-1")
@@ -65,7 +65,7 @@ func TestResumeAgentSession_NoResumableProviderSessionID(t *testing.T) {
 		StartedAt: time.Now(), LastActiveAt: time.Now(), // recent, but no ResumeProviderSessionID
 	}
 	resolver, sessions, agent := newResumeFixture(prior)
-	uc := NewResumeAgentSession(sessions, resolver, NewStartAgentSession(resolver, agent, sessions))
+	uc := NewResumeAgentSession(sessions, resolver, NewStartAgentSession(resolver, agent, sessions, nil, nil))
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	_, err := uc.Execute(ctx, ResumeAgentSessionInput{ConnectionID: "conn-1", WorktreeID: "wt-1", UserID: "user-1"})
@@ -89,7 +89,7 @@ func TestResumeAgentSession_AgentVersionMismatch(t *testing.T) {
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
 	sessions := &fakeAgentSessionRepository{byID: map[string]domain.AgentSession{prior.ID: prior}}
 	agent := &fakeDevServerAgentClient{spawnAgentResult: SpawnAgentResult{PtyID: "agent-pty-2"}}
-	uc := NewResumeAgentSession(sessions, resolver, NewStartAgentSession(resolver, agent, sessions))
+	uc := NewResumeAgentSession(sessions, resolver, NewStartAgentSession(resolver, agent, sessions, nil, nil))
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	_, err := uc.Execute(ctx, ResumeAgentSessionInput{ConnectionID: "conn-1", WorktreeID: "wt-1", UserID: "user-1"})
@@ -109,7 +109,7 @@ func TestResumeAgentSession_HappyPath_UsesProviderSessionIDNotRowID(t *testing.T
 		StartedAt:               time.Now(), LastActiveAt: time.Now(),
 	}
 	resolver, sessions, agent := newResumeFixture(prior)
-	uc := NewResumeAgentSession(sessions, resolver, NewStartAgentSession(resolver, agent, sessions))
+	uc := NewResumeAgentSession(sessions, resolver, NewStartAgentSession(resolver, agent, sessions, nil, nil))
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	session, err := uc.Execute(ctx, ResumeAgentSessionInput{ConnectionID: "conn-1", WorktreeID: "wt-1", UserID: "user-1", Cwd: "/repo"})
