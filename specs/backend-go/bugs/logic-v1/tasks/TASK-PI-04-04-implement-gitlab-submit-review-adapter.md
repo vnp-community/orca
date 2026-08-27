@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/gitlab/client.go`
 **Depends on:** TASK-PI-04-01, TASK-PI-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — composed discussions+approve/note; failure on any discussion call stops before approve/note.`
 
 ---
 

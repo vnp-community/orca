@@ -19,26 +19,33 @@ import (
 type fakeGitGatewayServiceClient struct {
 	gitgatewayv1.GitGatewayServiceClient
 
-	createWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error)
-	removeWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error)
-	forceDeleteBranchFunc  func(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error)
-	prefetchCreateBaseFunc func(ctx context.Context, in *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error)
-	resolvePrBaseFunc      func(ctx context.Context, in *gitgatewayv1.ResolvePrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
-	resolveMrBaseFunc      func(ctx context.Context, in *gitgatewayv1.ResolveMrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
-	detectWorktreesFunc    func(ctx context.Context, in *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error)
+	createWorktreeFunc          func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error)
+	createWorktreeFromIssueFunc func(ctx context.Context, in *gitgatewayv1.CreateWorktreeFromIssueRequest) (*gitgatewayv1.CreateWorktreeFromIssueResponse, error)
+	removeWorktreeFunc          func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error)
+	forceDeleteBranchFunc       func(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error)
+	prefetchCreateBaseFunc      func(ctx context.Context, in *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error)
+	resolvePrBaseFunc           func(ctx context.Context, in *gitgatewayv1.ResolvePrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
+	resolveMrBaseFunc           func(ctx context.Context, in *gitgatewayv1.ResolveMrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
+	detectWorktreesFunc         func(ctx context.Context, in *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error)
 
-	calledCreateWorktree     bool
-	calledRemoveWorktree     bool
-	calledForceDeleteBranch  bool
-	calledPrefetchCreateBase bool
-	calledResolvePrBase      bool
-	calledResolveMrBase      bool
-	calledDetectWorktrees    bool
+	calledCreateWorktree          bool
+	calledCreateWorktreeFromIssue bool
+	calledRemoveWorktree          bool
+	calledForceDeleteBranch       bool
+	calledPrefetchCreateBase      bool
+	calledResolvePrBase           bool
+	calledResolveMrBase           bool
+	calledDetectWorktrees         bool
 }
 
 func (f *fakeGitGatewayServiceClient) CreateWorktree(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateWorktreeResponse, error) {
 	f.calledCreateWorktree = true
 	return f.createWorktreeFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) CreateWorktreeFromIssue(ctx context.Context, in *gitgatewayv1.CreateWorktreeFromIssueRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateWorktreeFromIssueResponse, error) {
+	f.calledCreateWorktreeFromIssue = true
+	return f.createWorktreeFromIssueFunc(ctx, in)
 }
 
 func (f *fakeGitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
@@ -114,6 +121,117 @@ func TestWorktreeCreateChannel_Success(t *testing.T) {
 	resp, ok := result.(*gitgatewayv1.CreateWorktreeResponse)
 	if !ok || resp.GetWorktreeId() != "wt-1" || resp.GetPath() != "/repo-feature" || resp.GetHeadSha() != "sha1" {
 		t.Errorf("expected response to be returned unmodified, got %+v", result)
+	}
+}
+
+func TestWorktreeCreateFromIssueChannel_ScmShapeDecodesCorrectly(t *testing.T) {
+	var gotReq *gitgatewayv1.CreateWorktreeFromIssueRequest
+	git := &fakeGitGatewayServiceClient{
+		createWorktreeFromIssueFunc: func(_ context.Context, in *gitgatewayv1.CreateWorktreeFromIssueRequest) (*gitgatewayv1.CreateWorktreeFromIssueResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CreateWorktreeFromIssueResponse{WorktreeId: "wt-1", BranchName: "fix/bug-42"}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.createFromIssue",
+		argsJSON(t, map[string]any{
+			"projectId": "proj-1", "repoId": "repo-1", "baseRef": "main",
+			"provider": "github", "repo": "o/r", "number": 42,
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	scmIssue := gotReq.GetScmIssue()
+	if scmIssue == nil {
+		t.Fatalf("expected ScmIssue oneof branch, got %+v", gotReq)
+	}
+	if scmIssue.GetProvider() != "github" || scmIssue.GetRepo() != "o/r" || scmIssue.GetNumber() != 42 {
+		t.Errorf("unexpected ScmIssue: %+v", scmIssue)
+	}
+	resp, ok := result.(*gitgatewayv1.CreateWorktreeFromIssueResponse)
+	if !ok || resp.GetWorktreeId() != "wt-1" || resp.GetBranchName() != "fix/bug-42" {
+		t.Errorf("expected response to be returned unmodified, got %+v", result)
+	}
+}
+
+func TestWorktreeCreateFromIssueChannel_TrackerShapeDecodesCorrectly(t *testing.T) {
+	var gotReq *gitgatewayv1.CreateWorktreeFromIssueRequest
+	git := &fakeGitGatewayServiceClient{
+		createWorktreeFromIssueFunc: func(_ context.Context, in *gitgatewayv1.CreateWorktreeFromIssueRequest) (*gitgatewayv1.CreateWorktreeFromIssueResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CreateWorktreeFromIssueResponse{WorktreeId: "wt-2"}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.createFromIssue",
+		argsJSON(t, map[string]any{
+			"projectId": "proj-1", "repoId": "repo-1", "baseRef": "main",
+			"provider": "linear", "issueRef": "ENG-123",
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	trackerIssue := gotReq.GetTrackerIssue()
+	if trackerIssue == nil {
+		t.Fatalf("expected TrackerIssue oneof branch, got %+v", gotReq)
+	}
+	if trackerIssue.GetProvider() != "linear" || trackerIssue.GetIssueRef() != "ENG-123" {
+		t.Errorf("unexpected TrackerIssue: %+v", trackerIssue)
+	}
+}
+
+func TestWorktreeCreateFromIssueChannel_UnknownProviderRejectedBeforeRPC(t *testing.T) {
+	git := &fakeGitGatewayServiceClient{}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "worktree.createFromIssue",
+		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "provider": "bitbucket"}))
+	if err == nil {
+		t.Fatal("expected an error for an unknown provider")
+	}
+	if git.calledCreateWorktreeFromIssue {
+		t.Error("expected no gRPC call for an unknown provider")
+	}
+}
+
+func TestWorktreeCreateFromIssueChannel_ScmProviderMissingRepoOrNumberRejectedBeforeRPC(t *testing.T) {
+	git := &fakeGitGatewayServiceClient{}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	// Missing "number".
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "worktree.createFromIssue",
+		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "provider": "github", "repo": "o/r"}))
+	if err == nil {
+		t.Fatal("expected an error when repo is set but number is missing")
+	}
+	if git.calledCreateWorktreeFromIssue {
+		t.Error("expected no gRPC call for a malformed scm issue ref")
+	}
+}
+
+func TestWorktreeCreateFromIssueChannel_TrackerProviderMissingIssueRefRejectedBeforeRPC(t *testing.T) {
+	git := &fakeGitGatewayServiceClient{}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "worktree.createFromIssue",
+		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "provider": "jira"}))
+	if err == nil {
+		t.Fatal("expected an error when issueRef is missing for a tracker provider")
+	}
+	if git.calledCreateWorktreeFromIssue {
+		t.Error("expected no gRPC call for a malformed tracker issue ref")
 	}
 }
 

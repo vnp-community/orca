@@ -84,6 +84,10 @@ service GitGatewayService {
   rpc WriteIssueCommand(WriteIssueCommandRequest) returns (google.protobuf.Empty);
   rpc ScanSetupScriptImports(ScanSetupScriptImportsRequest) returns (ScanSetupScriptImportsResponse);
   rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
+  // CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
+  // fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
+  // appended — see SOL-PI-02.
+  rpc CreateWorktreeFromIssue(CreateWorktreeFromIssueRequest) returns (CreateWorktreeFromIssueResponse);
   rpc RemoveWorktree(RemoveWorktreeRequest) returns (google.protobuf.Empty);
   // Required on every GitExecutor implementation from day one — TASK-194
   // makes it a required interface method, not an optional one, closing the
@@ -619,6 +623,44 @@ message CreateWorktreeResponse {
   string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)
   string path = 2;
   string head_sha = 3;
+}
+
+message ScmIssueRef {
+  string provider = 1;   // "github" | "gitlab"
+  string repo = 2;
+  int32 number = 3;
+}
+message TrackerIssueRef {
+  string provider = 1;   // "jira" | "linear"
+  string issue_ref = 2;  // provider-native key, e.g. "ENG-123"
+}
+
+// CreateWorktreeFromIssue is the same saga as CreateWorktree with two steps
+// prepended (fetch issue, derive branch name) and two appended (spawn
+// agent, thread the issue link through to project-service for BR-PI-06's
+// eventual status-sync consumer — see SOL-PI-03).
+message CreateWorktreeFromIssueRequest {
+  string project_id = 1;
+  string repo_id = 2;
+  string base_ref = 3;
+
+  oneof issue_source {
+    ScmIssueRef scm_issue = 4;
+    TrackerIssueRef tracker_issue = 5;
+  }
+
+  bool skip_status_update = 6;   // BR-PI-06 per-call opt-out
+  bool skip_agent_start = 7;
+}
+
+message CreateWorktreeFromIssueResponse {
+  string worktree_id = 1;
+  string path = 2;
+  string head_sha = 3;
+  string branch_name = 4;         // the derived name, surfaced for the UI's worktree card
+  string agent_session_id = 5;    // empty if skip_agent_start or spawn failed non-fatally
+  string agent_start_error = 6;   // non-fatal spawn error, if any
+  bool status_update_enqueued = 7;
 }
 
 message RemoveWorktreeRequest {

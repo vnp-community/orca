@@ -29,9 +29,44 @@ type Credential struct {
 	Token string
 }
 
-// IssueFilter narrows a ListIssues call. Empty State means "all states".
+// IssueFilter narrows a ListIssues call. All-empty fields mean "no filter".
 type IssueFilter struct {
-	State string
+	State     string
+	Assignee  string
+	Labels    []string
+	Milestone string
+}
+
+// CachedIssueList is what IssueListCache.Get returns on a hit.
+type CachedIssueList struct {
+	Issues   []domain.Issue
+	CachedAt time.Time
+}
+
+// IssueCacheKey identifies one cached ListIssues call by request shape —
+// distinct filter combos for the same tenant/provider/repo never collide.
+type IssueCacheKey struct {
+	TenantID string
+	Provider domain.ScmProvider
+	Repo     string
+	Filter   IssueFilter
+}
+
+// IssueListCache is a 5-minute-TTL hot read in front of ListIssues' live
+// provider call (BR-PI-01) — sibling of RateLimitCache
+// (adapter/postgres/rate_limit_cache.go), not a source of truth. Cache
+// read/write errors are logged by the caller and never fail Execute.
+type IssueListCache interface {
+	Get(ctx context.Context, key IssueCacheKey) (CachedIssueList, bool, error)
+	Put(ctx context.Context, key IssueCacheKey, issues []domain.Issue, cachedAt time.Time, ttl time.Duration) error
+}
+
+// BackoffExecutor wraps a provider call with jittered exponential retry
+// (BR-PI-03), keyed per (provider, tenant) — same key shape as §8's
+// circuit breaker so both mechanisms trip independently per provider, never
+// globally. A non-transient (4xx) error is not retried.
+type BackoffExecutor interface {
+	Do(ctx context.Context, provider domain.ScmProvider, fn func(context.Context) ([]domain.Issue, error)) ([]domain.Issue, error)
 }
 
 // CreatePullRequestInput is the provider-facing input for opening a new
@@ -85,6 +120,18 @@ type ScmProvider interface {
 	// error) when the path doesn't exist at ref — the expected case for
 	// "no CODEOWNERS file" on most repos.
 	GetRepoFileContent(ctx context.Context, cred Credential, repo, path, ref string) (content string, found bool, err error)
+
+	// GetLinkedPullRequestsForIssue — GitHub: parsed from the issue's
+	// timeline "cross-referenced" events; GitLab: the related MRs endpoint.
+	// supported=false means this provider has no cheap query for this —
+	// the caller returns an empty list, never an RPC error.
+	GetLinkedPullRequestsForIssue(ctx context.Context, cred Credential, repo string, issueNumber int32) (prs []domain.PullRequest, supported bool, err error)
+
+	// SubmitReview — BUG-PI-04/SOL-PI-04. GitHub: POST .../pulls/{n}/reviews
+	// in one call. GitLab: composed from discussions + approve/note (no
+	// single review endpoint) — see internal/adapter/gitlab/client.go's
+	// SubmitReview doc comment.
+	SubmitReview(ctx context.Context, cred Credential, repo string, prNumber int32, in domain.ReviewInput) (domain.Review, error)
 }
 
 // MergePullRequestInput carries the merge-method/commit-message fields
@@ -360,6 +407,10 @@ type GitHubProjectsProvider interface {
 	AddIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, body string) (ProjectComment, error)
 	UpdateIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, commentID, body string) (ProjectComment, error)
 	DeleteIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, commentID string) error
+	// ListIssueCommentsBySlug completes the *BySlug comment RPC group —
+	// AddIssueCommentBySlug/UpdateIssueCommentBySlug/DeleteIssueCommentBySlug
+	// already exist with no way to read the thread back (BUG-PI-01 step 6).
+	ListIssueCommentsBySlug(ctx context.Context, cred Credential, itemSlug string) ([]ProjectComment, error)
 }
 
 // MRFilter narrows a ListMergeRequests call — mirrors IssueFilter's shape.
@@ -376,4 +427,43 @@ type GitLabMergeRequestProvider interface {
 	ListMergeRequests(ctx context.Context, cred Credential, repo string, filter MRFilter) ([]domain.MergeRequest, error)
 	ResolveDiscussion(ctx context.Context, cred Credential, repo string, mrIID int32, discussionID string, resolved bool) (domain.MergeRequestDiscussion, error)
 	GetWorkItemDetails(ctx context.Context, cred Credential, repo string, iid int32, itemType string) (domain.WorkItemDetailsGitLab, error)
+}
+
+// OutboxEnqueuer durably records a lifecycle event for later relay to NATS
+// — same shape and rationale as issue-tracking-service's own OutboxEnqueuer
+// port (see that service's link_issue.go doc comment): CreatePullRequest/
+// MergePullRequest/ReceiveWebhook have no local domain-state row of their
+// own to share a transaction with — the successful provider API call IS
+// the domain-state change, so Enqueue is a single, already-atomic INSERT
+// (SOL-PI-03).
+type OutboxEnqueuer interface {
+	Enqueue(ctx context.Context, tenantID string, event domain.OutboxEvent) error
+}
+
+// ── ReceiveWebhook (BUG-PI-03/SOL-PI-03/TASK-PI-03-06) ──────────────────
+
+// WebhookVerifier verifies a provider's webhook signature — GitHub's
+// X-Hub-Signature-256 (HMAC-SHA256 over raw_body), GitLab's X-Gitlab-Token
+// (constant-time string compare).
+//
+// KNOWN GAP: this signature carries no tenant_id, so today's
+// implementation (internal/adapter/webhookverify) checks against ONE
+// shared secret per provider (from service config), not a real per-tenant
+// secret via CredentialResolver's per-tenant lookup — there is no
+// per-tenant webhook URL/secret registration surface anywhere in this
+// service yet (mirrors CredentialResolver's own STUB precedent: see that
+// interface's doc comment for the same "typed, documented gap, not
+// fabricated behavior" posture). Tightening this to real per-tenant
+// secrets is a follow-up once that registration surface exists.
+type WebhookVerifier interface {
+	Verify(ctx context.Context, provider domain.ScmProvider, rawBody []byte, signatureHeader string) bool
+}
+
+// WebhookDeliveryStore implements idempotent delivery tracking against
+// scm.webhook_delivery_log's existing (provider, delivery_id) uniqueness
+// constraint (migrations/0001_init.up.sql). No schema change; this is only
+// that table's first writer (BUG-PI-03).
+type WebhookDeliveryStore interface {
+	Exists(ctx context.Context, provider domain.ScmProvider, deliveryID string) (bool, error)
+	Record(ctx context.Context, provider domain.ScmProvider, deliveryID, status string) error
 }

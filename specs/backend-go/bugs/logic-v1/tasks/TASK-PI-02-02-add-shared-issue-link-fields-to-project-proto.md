@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/proto/orca/project/v1/project.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — Worktree/RecordWorktreeCreatedRequest linked_issue_provider/ref + Project.issue_status_sync_enabled added to project.proto.`
 
 ---
 

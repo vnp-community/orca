@@ -12,7 +12,7 @@ func TestMergePullRequest_Success(t *testing.T) {
 	pr, _ := domain.NewPullRequest("1", domain.ScmProviderGitHub, "o/r", "t", "closed", "url", "head", "base")
 	provider := &fakeProvider{mergedPR: pr, merged: true, mergeSHA: "abc123"}
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: provider}}
-	uc := NewMergePullRequest(&fakeCredentialResolver{token: "tok"}, registry)
+	uc := NewMergePullRequest(&fakeCredentialResolver{token: "tok"}, registry, nil, nil)
 
 	result, err := uc.Execute(context.Background(), MergePullRequestParams{
 		TenantID: "tenant-1", Provider: domain.ScmProviderGitHub, Repo: "o/r", Number: 1, MergeMethod: "squash",
@@ -31,7 +31,7 @@ func TestMergePullRequest_Success(t *testing.T) {
 func TestMergePullRequest_PropagatesProviderFailure(t *testing.T) {
 	provider := &fakeProvider{mergeErr: errors.New("merge conflict")}
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: provider}}
-	uc := NewMergePullRequest(&fakeCredentialResolver{token: "tok"}, registry)
+	uc := NewMergePullRequest(&fakeCredentialResolver{token: "tok"}, registry, nil, nil)
 
 	_, err := uc.Execute(context.Background(), MergePullRequestParams{
 		TenantID: "tenant-1", Provider: domain.ScmProviderGitHub, Repo: "o/r", Number: 1,
@@ -43,7 +43,7 @@ func TestMergePullRequest_PropagatesProviderFailure(t *testing.T) {
 
 func TestMergePullRequest_RequiresTenantRepoNumber(t *testing.T) {
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}}
-	uc := NewMergePullRequest(&fakeCredentialResolver{}, registry)
+	uc := NewMergePullRequest(&fakeCredentialResolver{}, registry, nil, nil)
 
 	cases := []MergePullRequestParams{
 		{Repo: "o/r", Number: 1},

@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/migrations/0010_issue_status_sync_enabled.up.sql` (new), `backend-go/services/project-service/internal/domain/project.go`, `backend-go/services/project-service/internal/adapter/postgres/project_repository.go`, `backend-go/services/project-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-PI-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — migrations/0009, domain.Project.IssueStatusSyncEnabled, UpdateProject field-mask (presence-based optional bool), GetProject/ListProjects mapping.`
 
 ---
 

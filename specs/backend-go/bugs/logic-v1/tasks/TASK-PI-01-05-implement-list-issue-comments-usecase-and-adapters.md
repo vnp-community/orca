@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/list_issue_comments.go` (new), `internal/usecase/ports.go`, `internal/adapter/github/client.go`, `internal/adapter/gitlab/client.go`
 **Depends on:** TASK-PI-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — ListIssueCommentsBySlug usecase + GitHub adapter (real GET .../issues/{n}/comments). GitLab NOT covered — *BySlug is a GitHub-Projects-v2-only port in this codebase (GitHubProjectsProvider), so a GitLab implementation doesn't fit this RPC group; documented in code.`
 
 ---
 

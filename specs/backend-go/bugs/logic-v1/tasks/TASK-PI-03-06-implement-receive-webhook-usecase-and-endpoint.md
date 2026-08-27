@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`, `api-gateway`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/receive_webhook.go` (new), `backend-go/services/scm-integration-service/internal/usecase/ports.go`, `backend-go/services/api-gateway/internal/adapter/httpgateway/scm_webhook_routes.go` (new)
 **Depends on:** TASK-PI-03-01, TASK-PI-03-04
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — WebhookVerifier/WebhookDeliveryStore ports + ReceiveWebhook usecase + webhook_parse.go (GitHub/GitLab merge detection) all new; webhookverify.Verifier (HMAC-SHA256 / constant-time token) + postgres.WebhookDeliveryRepository (webhook_delivery_log's first writer, placeholder system tenant_id — real per-tenant secret/tenant resolution documented as a known gap) wired into grpc/server.go + main.go; api-gateway POST /v1/scm/webhooks/{provider} mounted unauthenticated. Also completed TASK-PI-03-08's deferred receive_webhook_test.go (6 cases) + webhook_parse_test.go + webhookverify tests.`
 
 ---
 

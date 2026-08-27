@@ -2,7 +2,12 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
@@ -13,6 +18,13 @@ import (
 // Named *Params (not *Input) to avoid colliding with the port-level
 // CreatePullRequestInput in ports.go, which is the narrower shape the
 // ScmProvider adapter itself receives.
+//
+// LinkedIssueProvider/LinkedIssueRef would come from parsing the PR body's
+// closing-keyword reference (e.g. "Fixes #123") — no such parser exists in
+// this codebase yet (TASK-PI-03-05's own scope note), so both are always
+// empty for now; orca.scm.pull_request.created is still published with an
+// empty linked_issue_ref, which issue-status-sync's consumer already
+// no-ops on.
 type CreatePullRequestParams struct {
 	TenantID          string
 	Provider          domain.ScmProvider
@@ -23,6 +35,11 @@ type CreatePullRequestParams struct {
 	BaseBranch        string
 	Draft             bool  // NEW — BR-CR-20
 	LinkedIssueNumber int32 // NEW — BR-CR-19; 0 means "no linked issue"
+	// LinkedIssueProvider/LinkedIssueRef feed the orca.scm.pull_request.created
+	// outbox event payload (SOL-PI-03) — see this file's doc comment for why
+	// both are always empty today.
+	LinkedIssueProvider string
+	LinkedIssueRef      string
 }
 
 // CreatePullRequestResult carries the created PR plus a non-fatal
@@ -35,15 +52,23 @@ type CreatePullRequestResult struct {
 }
 
 // CreatePullRequest resolves this tenant's per-provider credential, resolves
-// the concrete provider adapter, and delegates.
+// the concrete provider adapter, and delegates. On success it durably
+// enqueues orca.scm.pull_request.created (SOL-PI-03/BR-PI-09) — enqueue
+// failure is logged, never fails the RPC, since the provider-side mutation
+// already succeeded.
 type CreatePullRequest struct {
 	credentials CredentialResolver
 	providers   ProviderRegistry
 	updateIssue *UpdateIssue // NEW — in-process composition, mirrors GenerateCommitMessage's pattern (SOL-CR-04)
+	outbox      OutboxEnqueuer
+	logger      *slog.Logger
 }
 
-func NewCreatePullRequest(credentials CredentialResolver, providers ProviderRegistry, updateIssue *UpdateIssue) *CreatePullRequest {
-	return &CreatePullRequest{credentials: credentials, providers: providers, updateIssue: updateIssue}
+func NewCreatePullRequest(credentials CredentialResolver, providers ProviderRegistry, updateIssue *UpdateIssue, outbox OutboxEnqueuer, logger *slog.Logger) *CreatePullRequest {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &CreatePullRequest{credentials: credentials, providers: providers, updateIssue: updateIssue, outbox: outbox, logger: logger}
 }
 
 func (uc *CreatePullRequest) Execute(ctx context.Context, in CreatePullRequestParams) (CreatePullRequestResult, error) {
@@ -100,6 +125,24 @@ func (uc *CreatePullRequest) Execute(ctx context.Context, in CreatePullRequestPa
 			Number: in.LinkedIssueNumber, Patch: IssuePatch{State: &state},
 		}); err != nil {
 			result.LinkedIssueUpdateError = err.Error()
+		}
+	}
+
+	if uc.outbox != nil {
+		payload, mErr := json.Marshal(prLifecycleEventPayload{
+			Provider: string(in.Provider), Repo: in.Repo, PrNumber: pr.Number,
+			LinkedIssueProvider: in.LinkedIssueProvider, LinkedIssueRef: in.LinkedIssueRef,
+		})
+		if mErr == nil {
+			event := domain.OutboxEvent{
+				ID: uuid.NewString(), Subject: subjectPullRequestCreated,
+				OccurredAt: time.Now().UTC(), PayloadJSON: payload,
+			}
+			if enqErr := uc.outbox.Enqueue(ctx, in.TenantID, event); enqErr != nil {
+				uc.logger.WarnContext(ctx, "failed to enqueue pr.created event", "error", enqErr, "pr", pr.ID)
+			}
+		} else {
+			uc.logger.WarnContext(ctx, "failed to marshal pr.created event payload", "error", mErr, "pr", pr.ID)
 		}
 	}
 	return result, nil

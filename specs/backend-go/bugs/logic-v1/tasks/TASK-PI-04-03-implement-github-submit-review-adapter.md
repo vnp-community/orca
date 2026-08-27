@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/github/client.go`
 **Depends on:** TASK-PI-04-01, TASK-PI-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — POST /pulls/{n}/reviews, single-call Comment/Approve/RequestChanges with per-line comments.`
 
 ---
 

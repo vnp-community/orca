@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/record_worktree_created.go`, `backend-go/services/project-service/internal/usecase/record_worktree_removed.go` (new usecase — none exists today per BUG-PI-03), `backend-go/services/project-service/internal/adapter/postgres/worktree_repository.go`, `backend-go/services/project-service/internal/usecase/ports.go`
 **Depends on:** TASK-PI-02-02, TASK-PI-02-06, TASK-PI-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — CreateWorktreeWithEvent/RemoveWorktreeWithEvent (both-or-neither tx), record_worktree_created.go/record_worktree_removed.go publish via outbox; migrations/0010 adds linked_issue_provider/ref to project.worktrees.`
 
 ---
 

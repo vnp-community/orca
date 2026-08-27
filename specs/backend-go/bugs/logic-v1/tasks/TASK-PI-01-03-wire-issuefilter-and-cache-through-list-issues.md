@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/list_issues.go`
 **Depends on:** TASK-PI-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — ListIssues.Execute now passes in.Filter through cache+backoff; gRPC handler maps FromCache/CachedAt.`
 
 ---
 

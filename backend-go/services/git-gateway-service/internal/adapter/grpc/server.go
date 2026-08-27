@@ -34,14 +34,14 @@ type Server struct {
 	stage   *usecase.Stage
 	unstage *usecase.Unstage
 
-	history        *usecase.History
-	checkIgnored   *usecase.CheckIgnored
-	forkSync       *usecase.ForkSync
-	upstreamStatus *usecase.UpstreamStatus
-	commitCompare  *usecase.CommitCompare
-	branchCompare  *usecase.BranchCompare
-	commitDiff     *usecase.CommitDiff
-	branchDiff     *usecase.BranchDiff
+	history         *usecase.History
+	checkIgnored    *usecase.CheckIgnored
+	forkSync        *usecase.ForkSync
+	upstreamStatus  *usecase.UpstreamStatus
+	commitCompare   *usecase.CommitCompare
+	branchCompare   *usecase.BranchCompare
+	commitDiff      *usecase.CommitDiff
+	branchDiff      *usecase.BranchDiff
 	submoduleStatus *usecase.SubmoduleStatus
 
 	remoteCommitURL *usecase.RemoteCommitURL
@@ -76,25 +76,26 @@ type Server struct {
 	scanSetupScriptImports *usecase.ScanSetupScriptImports
 
 	// New, SOL-031 (TASK-192/193/194):
-	createWorktree     *usecase.CreateWorktree
-	removeWorktree     *usecase.RemoveWorktree
-	forceDeleteBranch  *usecase.ForceDeleteBranch
-	detectWorktrees    *usecase.DetectWorktrees
-	prefetchCreateBase *usecase.PrefetchCreateBase
-	resolvePrBase      *usecase.ResolvePrBase
-	resolveMrBase      *usecase.ResolveMrBase
+	createWorktree          *usecase.CreateWorktree
+	createWorktreeFromIssue *usecase.CreateWorktreeFromIssue
+	removeWorktree          *usecase.RemoveWorktree
+	forceDeleteBranch       *usecase.ForceDeleteBranch
+	detectWorktrees         *usecase.DetectWorktrees
+	prefetchCreateBase      *usecase.PrefetchCreateBase
+	resolvePrBase           *usecase.ResolvePrBase
+	resolveMrBase           *usecase.ResolveMrBase
 
 	// Group A — branch/ref operations (TASK-207)
-	checkout           *usecase.Checkout
-	listLocalBranches  *usecase.ListLocalBranches
-	fastForward        *usecase.FastForward
-	rebaseFromBase     *usecase.RebaseFromBase
-	abortRebase        *usecase.AbortRebase
-	abortMerge         *usecase.AbortMerge
-	conflictOperation  *usecase.ConflictOperation
-	resolveConflict    *usecase.ResolveConflict
-	discard            *usecase.Discard
-	bulkDiscard        *usecase.BulkDiscard
+	checkout          *usecase.Checkout
+	listLocalBranches *usecase.ListLocalBranches
+	fastForward       *usecase.FastForward
+	rebaseFromBase    *usecase.RebaseFromBase
+	abortRebase       *usecase.AbortRebase
+	abortMerge        *usecase.AbortMerge
+	conflictOperation *usecase.ConflictOperation
+	resolveConflict   *usecase.ResolveConflict
+	discard           *usecase.Discard
+	bulkDiscard       *usecase.BulkDiscard
 }
 
 // New wires every usecase this server dispatches to. Parameter order
@@ -162,6 +163,7 @@ func New(
 	resolveConflict *usecase.ResolveConflict,
 	discard *usecase.Discard,
 	bulkDiscard *usecase.BulkDiscard,
+	createWorktreeFromIssue *usecase.CreateWorktreeFromIssue,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -210,13 +212,14 @@ func New(
 		writeIssueCommand:      writeIssueCommand,
 		scanSetupScriptImports: scanSetupScriptImports,
 
-		createWorktree:     createWorktree,
-		removeWorktree:     removeWorktree,
-		forceDeleteBranch:  forceDeleteBranch,
-		detectWorktrees:    detectWorktrees,
-		prefetchCreateBase: prefetchCreateBase,
-		resolvePrBase:      resolvePrBase,
-		resolveMrBase:      resolveMrBase,
+		createWorktree:          createWorktree,
+		createWorktreeFromIssue: createWorktreeFromIssue,
+		removeWorktree:          removeWorktree,
+		forceDeleteBranch:       forceDeleteBranch,
+		detectWorktrees:         detectWorktrees,
+		prefetchCreateBase:      prefetchCreateBase,
+		resolvePrBase:           resolvePrBase,
+		resolveMrBase:           resolveMrBase,
 
 		checkout:          checkout,
 		listLocalBranches: listLocalBranches,
@@ -684,6 +687,40 @@ func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWor
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: result.WorktreeID, Path: result.Path, HeadSha: result.HeadSHA}, nil
+}
+
+func (s *Server) CreateWorktreeFromIssue(ctx context.Context, req *gitgatewayv1.CreateWorktreeFromIssueRequest) (*gitgatewayv1.CreateWorktreeFromIssueResponse, error) {
+	ref, err := toDomainIssueRef(req)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	result, err := s.createWorktreeFromIssue.Execute(ctx, usecase.CreateWorktreeFromIssueInput{
+		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), BaseRef: req.GetBaseRef(),
+		IssueRef:         ref,
+		SkipStatusUpdate: req.GetSkipStatusUpdate(),
+		SkipAgentStart:   req.GetSkipAgentStart(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CreateWorktreeFromIssueResponse{
+		WorktreeId: result.Worktree.WorktreeID, Path: result.Worktree.Path, HeadSha: result.Worktree.HeadSHA,
+		BranchName: result.BranchName, AgentSessionId: result.AgentSessionID, AgentStartError: result.AgentStartError,
+		StatusUpdateEnqueued: result.StatusUpdateEnqueued,
+	}, nil
+}
+
+// toDomainIssueRef translates CreateWorktreeFromIssueRequest's oneof
+// issue_source into domain.IssueRef.
+func toDomainIssueRef(req *gitgatewayv1.CreateWorktreeFromIssueRequest) (domain.IssueRef, error) {
+	switch src := req.GetIssueSource().(type) {
+	case *gitgatewayv1.CreateWorktreeFromIssueRequest_ScmIssue:
+		return domain.IssueRef{Provider: src.ScmIssue.GetProvider(), Repo: src.ScmIssue.GetRepo(), Number: src.ScmIssue.GetNumber()}, nil
+	case *gitgatewayv1.CreateWorktreeFromIssueRequest_TrackerIssue:
+		return domain.IssueRef{Provider: src.TrackerIssue.GetProvider(), TrackerRef: src.TrackerIssue.GetIssueRef()}, nil
+	default:
+		return domain.IssueRef{}, apperrors.New(apperrors.KindInvalidArgument, "WORKTREE_FROM_ISSUE_NO_SOURCE", "issue_source is required", nil)
+	}
 }
 
 func (s *Server) RemoveWorktree(ctx context.Context, req *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error) {

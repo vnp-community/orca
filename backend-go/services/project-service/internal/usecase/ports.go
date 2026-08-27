@@ -145,6 +145,18 @@ type WorktreeRepository interface {
 	// GetWorktreeByIdempotencyKey's doc comment. found=false, err=nil means
 	// "no match yet", not an error.
 	FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.Worktree, bool, error)
+
+	// CreateWorktreeWithEvent inserts worktree and its worktree.created
+	// outbox event in ONE transaction (SOL-PI-03) — see usage-service's
+	// SaveSession(ctx, session, event) for the precedent this follows.
+	// RecordWorktreeCreated (used by usecase.RecordWorktreeCreated as of
+	// TASK-PI-03-03) now calls this instead of the bare method above.
+	CreateWorktreeWithEvent(ctx context.Context, worktree domain.Worktree, event domain.OutboxEvent) (domain.Worktree, error)
+	// RemoveWorktreeWithEvent deletes the row and enqueues worktree.deleted
+	// in the same transaction. buildEvent is called with the just-deleted
+	// row (for its linked-issue fields) so the caller can build the event
+	// payload without a separate pre-delete read.
+	RemoveWorktreeWithEvent(ctx context.Context, worktreeID string, buildEvent func(removed domain.Worktree) domain.OutboxEvent) error
 }
 
 // ProjectGroupRepository is the persistence port for the folder-style

@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/migrations/0011_outbox_events.up.sql` (new), `backend-go/services/project-service/internal/adapter/eventbus/publisher.go` (new), `backend-go/services/project-service/internal/adapter/postgres/outbox_repository.go` (new), `backend-go/services/project-service/cmd/server/main.go`
 **Depends on:** TASK-PI-02-06 (this task's migration number follows `0010_issue_status_sync_enabled`)
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — migrations/0011_outbox_events, domain.OutboxEvent, OutboxRepository (Fetch/MarkPublished), relay wired in main.go.`
 
 ---
 

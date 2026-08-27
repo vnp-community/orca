@@ -34,11 +34,11 @@ CREATE POLICY tenant_isolation ON scm.rate_limit_cache
 -- webhook_delivery_log: append-only record of inbound webhook deliveries
 -- processed (event id, provider, delivery id, received_at, outcome) —
 -- makes delivery idempotent against provider retries and gives operators a
--- debugging trail (§5). SCHEMA-ONLY as of this migration: no
--- webhook-receiving RPC/endpoint exists in this service yet (see README
--- "Known gaps" — matches this doc's own "don't build speculative
--- consumers" precedent, Epic G). The columns below are what §5's spec
--- calls for; nothing writes to this table until that receiver is built.
+-- debugging trail (§5). First writer: usecase.ReceiveWebhook /
+-- internal/adapter/postgres.WebhookDeliveryRepository (TASK-PI-03-06,
+-- BUG-PI-03) — tenant_id is written as a placeholder system UUID until
+-- this service can resolve a real per-webhook tenant_id (see that
+-- repository's doc comment).
 CREATE TABLE scm.webhook_delivery_log (
     id           UUID PRIMARY KEY,
     tenant_id    UUID NOT NULL,

@@ -65,6 +65,7 @@ const (
 	GitGatewayService_WriteIssueCommand_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/WriteIssueCommand"
 	GitGatewayService_ScanSetupScriptImports_FullMethodName      = "/orca.gitgateway.v1.GitGatewayService/ScanSetupScriptImports"
 	GitGatewayService_CreateWorktree_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/CreateWorktree"
+	GitGatewayService_CreateWorktreeFromIssue_FullMethodName     = "/orca.gitgateway.v1.GitGatewayService/CreateWorktreeFromIssue"
 	GitGatewayService_RemoveWorktree_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/RemoveWorktree"
 	GitGatewayService_ForceDeleteBranch_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/ForceDeleteBranch"
 	GitGatewayService_DetectWorktrees_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/DetectWorktrees"
@@ -160,6 +161,10 @@ type GitGatewayServiceClient interface {
 	WriteIssueCommand(ctx context.Context, in *WriteIssueCommandRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ScanSetupScriptImports(ctx context.Context, in *ScanSetupScriptImportsRequest, opts ...grpc.CallOption) (*ScanSetupScriptImportsResponse, error)
 	CreateWorktree(ctx context.Context, in *CreateWorktreeRequest, opts ...grpc.CallOption) (*CreateWorktreeResponse, error)
+	// CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
+	// fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
+	// appended — see SOL-PI-02.
+	CreateWorktreeFromIssue(ctx context.Context, in *CreateWorktreeFromIssueRequest, opts ...grpc.CallOption) (*CreateWorktreeFromIssueResponse, error)
 	RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Required on every GitExecutor implementation from day one — TASK-194
 	// makes it a required interface method, not an optional one, closing the
@@ -654,6 +659,16 @@ func (c *gitGatewayServiceClient) CreateWorktree(ctx context.Context, in *Create
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) CreateWorktreeFromIssue(ctx context.Context, in *CreateWorktreeFromIssueRequest, opts ...grpc.CallOption) (*CreateWorktreeFromIssueResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateWorktreeFromIssueResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CreateWorktreeFromIssue_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -891,6 +906,10 @@ type GitGatewayServiceServer interface {
 	WriteIssueCommand(context.Context, *WriteIssueCommandRequest) (*emptypb.Empty, error)
 	ScanSetupScriptImports(context.Context, *ScanSetupScriptImportsRequest) (*ScanSetupScriptImportsResponse, error)
 	CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error)
+	// CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
+	// fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
+	// appended — see SOL-PI-02.
+	CreateWorktreeFromIssue(context.Context, *CreateWorktreeFromIssueRequest) (*CreateWorktreeFromIssueResponse, error)
 	RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*emptypb.Empty, error)
 	// Required on every GitExecutor implementation from day one — TASK-194
 	// makes it a required interface method, not an optional one, closing the
@@ -1069,6 +1088,9 @@ func (UnimplementedGitGatewayServiceServer) ScanSetupScriptImports(context.Conte
 }
 func (UnimplementedGitGatewayServiceServer) CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateWorktree not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CreateWorktreeFromIssue(context.Context, *CreateWorktreeFromIssueRequest) (*CreateWorktreeFromIssueResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateWorktreeFromIssue not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveWorktree not implemented")
@@ -1949,6 +1971,24 @@ func _GitGatewayService_CreateWorktree_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_CreateWorktreeFromIssue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateWorktreeFromIssueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CreateWorktreeFromIssue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CreateWorktreeFromIssue_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CreateWorktreeFromIssue(ctx, req.(*CreateWorktreeFromIssueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GitGatewayService_RemoveWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RemoveWorktreeRequest)
 	if err := dec(in); err != nil {
@@ -2423,6 +2463,10 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateWorktree",
 			Handler:    _GitGatewayService_CreateWorktree_Handler,
+		},
+		{
+			MethodName: "CreateWorktreeFromIssue",
+			Handler:    _GitGatewayService_CreateWorktreeFromIssue_Handler,
 		},
 		{
 			MethodName: "RemoveWorktree",

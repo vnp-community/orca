@@ -64,13 +64,22 @@ type Server struct {
 	getWorkItemDetails            *usecase.GetWorkItemDetails
 
 	// SOL-014 — hostedReview.getCreationEligibility (TASK-088).
-	checkHostedReviewEligibility *usecase.CheckHostedReviewEligibility
+	checkHostedReviewEligibility   *usecase.CheckHostedReviewEligibility
 	setIntegrationCredential       *usecase.SetIntegrationCredential
 	getIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus
 	listIntegrationCredentials     *usecase.ListIntegrationCredentials
 
 	// SOL-CR-05 — CODEOWNERS-based reviewer suggestion (TASK-CR-05-06).
 	suggestPullRequestReviewers *usecase.SuggestPullRequestReviewers
+
+	// BUG-PI-01/SOL-PI-01 (TASK-PI-01-05/06) and BUG-PI-04/SOL-PI-04
+	// (TASK-PI-04-02) additions.
+	listIssueCommentsBySlug       *usecase.ListIssueCommentsBySlug
+	getLinkedPullRequestsForIssue *usecase.GetLinkedPullRequestsForIssue
+	submitReview                  *usecase.SubmitReview
+
+	// BUG-PI-03/SOL-PI-03 (TASK-PI-03-06).
+	receiveWebhook *usecase.ReceiveWebhook
 }
 
 func New(
@@ -113,6 +122,10 @@ func New(
 	getIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus,
 	listIntegrationCredentials *usecase.ListIntegrationCredentials,
 	suggestPullRequestReviewers *usecase.SuggestPullRequestReviewers,
+	listIssueCommentsBySlug *usecase.ListIssueCommentsBySlug,
+	getLinkedPullRequestsForIssue *usecase.GetLinkedPullRequestsForIssue,
+	submitReview *usecase.SubmitReview,
+	receiveWebhook *usecase.ReceiveWebhook,
 ) *Server {
 	return &Server{
 		listIssues:         listIssues,
@@ -153,29 +166,148 @@ func New(
 		resolveMergeRequestDiscussion: resolveMergeRequestDiscussion,
 		getWorkItemDetails:            getWorkItemDetails,
 
-		checkHostedReviewEligibility: checkHostedReviewEligibility,
+		checkHostedReviewEligibility:   checkHostedReviewEligibility,
 		setIntegrationCredential:       setIntegrationCredential,
 		getIntegrationCredentialStatus: getIntegrationCredentialStatus,
 		listIntegrationCredentials:     listIntegrationCredentials,
 
 		suggestPullRequestReviewers: suggestPullRequestReviewers,
+
+		listIssueCommentsBySlug:       listIssueCommentsBySlug,
+		getLinkedPullRequestsForIssue: getLinkedPullRequestsForIssue,
+		submitReview:                  submitReview,
+
+		receiveWebhook: receiveWebhook,
 	}
 }
 
 func (s *Server) ListIssues(ctx context.Context, req *scmintegrationv1.ListIssuesRequest) (*scmintegrationv1.ListIssuesResponse, error) {
-	issues, err := s.listIssues.Execute(ctx, usecase.ListIssuesInput{
-		TenantID: req.GetTenantId(),
-		Provider: toDomainProvider(req.GetProvider()),
-		Repo:     req.GetRepo(),
+	out, err := s.listIssues.Execute(ctx, usecase.ListIssuesInput{
+		TenantID:     req.GetTenantId(),
+		Provider:     toDomainProvider(req.GetProvider()),
+		Repo:         req.GetRepo(),
+		Filter:       toDomainIssueFilter(req.GetFilter()),
+		ForceRefresh: req.GetForceRefresh(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	out := make([]*scmintegrationv1.Issue, 0, len(issues))
-	for _, i := range issues {
-		out = append(out, toProtoIssue(i))
+	issues := make([]*scmintegrationv1.Issue, 0, len(out.Issues))
+	for _, i := range out.Issues {
+		issues = append(issues, toProtoIssue(i))
 	}
-	return &scmintegrationv1.ListIssuesResponse{Issues: out}, nil
+	resp := &scmintegrationv1.ListIssuesResponse{Issues: issues, FromCache: out.FromCache}
+	if !out.CachedAt.IsZero() {
+		resp.CachedAtUnixMs = out.CachedAt.UnixMilli()
+	}
+	return resp, nil
+}
+
+func toDomainIssueFilter(f *scmintegrationv1.IssueFilter) usecase.IssueFilter {
+	return usecase.IssueFilter{
+		State:     f.GetState(),
+		Assignee:  f.GetAssignee(),
+		Labels:    f.GetLabels(),
+		Milestone: f.GetMilestone(),
+	}
+}
+
+func (s *Server) ListIssueCommentsBySlug(ctx context.Context, req *scmintegrationv1.ListIssueCommentsBySlugRequest) (*scmintegrationv1.ListIssueCommentsBySlugResponse, error) {
+	comments, err := s.listIssueCommentsBySlug.Execute(ctx, usecase.ListIssueCommentsBySlugParams{
+		TenantID: req.GetTenantId(), Provider: domain.ScmProviderGitHub, ItemSlug: req.GetItemSlug(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*scmintegrationv1.ProjectComment, 0, len(comments))
+	for _, c := range comments {
+		out = append(out, toProtoProjectComment(c))
+	}
+	return &scmintegrationv1.ListIssueCommentsBySlugResponse{Comments: out}, nil
+}
+
+func (s *Server) GetLinkedPullRequestsForIssue(ctx context.Context, req *scmintegrationv1.GetLinkedPullRequestsForIssueRequest) (*scmintegrationv1.GetLinkedPullRequestsForIssueResponse, error) {
+	out, err := s.getLinkedPullRequestsForIssue.Execute(ctx, usecase.GetLinkedPullRequestsForIssueInput{
+		TenantID: req.GetTenantId(), Provider: toDomainProvider(req.GetProvider()),
+		Repo: req.GetRepo(), IssueNumber: req.GetIssueNumber(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	prs := make([]*scmintegrationv1.PullRequest, 0, len(out.PullRequests))
+	for _, pr := range out.PullRequests {
+		prs = append(prs, toProtoPullRequest(pr))
+	}
+	return &scmintegrationv1.GetLinkedPullRequestsForIssueResponse{PullRequests: prs, CapabilityUnsupported: out.CapabilityUnsupported}, nil
+}
+
+func (s *Server) SubmitReview(ctx context.Context, req *scmintegrationv1.SubmitReviewRequest) (*scmintegrationv1.Review, error) {
+	comments := make([]domain.ReviewComment, 0, len(req.GetComments()))
+	for _, c := range req.GetComments() {
+		comments = append(comments, domain.ReviewComment{Path: c.GetPath(), Line: c.GetLine(), Body: c.GetBody()})
+	}
+	review, err := s.submitReview.Execute(ctx, usecase.SubmitReviewParams{
+		TenantID: req.GetTenantId(), Provider: toDomainProvider(req.GetProvider()),
+		Repo: req.GetRepo(), PRNumber: req.GetPrNumber(),
+		ReviewType: toDomainReviewType(req.GetReviewType()), Summary: req.GetSummaryBody(), Comments: comments,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoReview(review), nil
+}
+
+// ReceiveWebhook — BUG-PI-03/SOL-PI-03. provider arrives as a plain string
+// (not the ScmProvider enum every other RPC uses) since api-gateway derives
+// it straight from the /v1/scm/webhooks/{provider} path segment — its
+// literal values ("github", "gitlab", ...) already match domain.ScmProvider's
+// own string values 1:1, so no enum-parsing helper is needed here.
+func (s *Server) ReceiveWebhook(ctx context.Context, req *scmintegrationv1.ReceiveWebhookRequest) (*scmintegrationv1.ReceiveWebhookResponse, error) {
+	out, err := s.receiveWebhook.Execute(ctx, usecase.ReceiveWebhookInput{
+		Provider: domain.ScmProvider(req.GetProvider()), RawBody: req.GetRawBody(),
+		SignatureHeader: req.GetSignatureHeader(), DeliveryIDHeader: req.GetDeliveryIdHeader(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.ReceiveWebhookResponse{Accepted: out.Accepted, Duplicate: out.Duplicate}, nil
+}
+
+func toDomainReviewType(t scmintegrationv1.ReviewType) domain.ReviewType {
+	switch t {
+	case scmintegrationv1.ReviewType_REVIEW_TYPE_COMMENT:
+		return domain.ReviewTypeComment
+	case scmintegrationv1.ReviewType_REVIEW_TYPE_APPROVE:
+		return domain.ReviewTypeApprove
+	case scmintegrationv1.ReviewType_REVIEW_TYPE_REQUEST_CHANGES:
+		return domain.ReviewTypeRequestChanges
+	default:
+		return domain.ReviewTypeUnspecified
+	}
+}
+
+func toProtoReviewType(t domain.ReviewType) scmintegrationv1.ReviewType {
+	switch t {
+	case domain.ReviewTypeComment:
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_COMMENT
+	case domain.ReviewTypeApprove:
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_APPROVE
+	case domain.ReviewTypeRequestChanges:
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_REQUEST_CHANGES
+	default:
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_UNSPECIFIED
+	}
+}
+
+func toProtoReview(r domain.Review) *scmintegrationv1.Review {
+	comments := make([]*scmintegrationv1.ReviewComment, 0, len(r.Comments))
+	for _, c := range r.Comments {
+		comments = append(comments, &scmintegrationv1.ReviewComment{Path: c.Path, Line: c.Line, Body: c.Body})
+	}
+	return &scmintegrationv1.Review{
+		Id: r.ID, ReviewerId: r.ReviewerID, State: toProtoReviewType(r.State),
+		SubmittedAt: r.SubmittedAt, Comments: comments, Url: r.URL,
+	}
 }
 
 func (s *Server) CreatePullRequest(ctx context.Context, req *scmintegrationv1.CreatePullRequestRequest) (*scmintegrationv1.CreatePullRequestResponse, error) {

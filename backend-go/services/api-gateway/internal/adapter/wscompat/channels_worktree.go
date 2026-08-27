@@ -28,6 +28,7 @@ import (
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
@@ -48,6 +49,58 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 		resp, err := gitClient.CreateWorktree(ctx, &gitgatewayv1.CreateWorktreeRequest{
 			ProjectId: in.ProjectID, RepoId: in.RepoID, Branch: in.Branch, BaseRef: in.BaseRef,
 		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// worktree.createFromIssue — CreateWorktreeFromIssue's saga (SOL-PI-02),
+	// next to worktree.create above. Translates the decoded args' flat
+	// provider/repo/number/issueRef shape into the RPC's oneof issue_source
+	// (ScmIssueRef vs. TrackerIssueRef).
+	r.Register("worktree.createFromIssue", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type createFromIssueArgs struct {
+			ProjectID        string `json:"projectId"`
+			RepoID           string `json:"repoId"`
+			BaseRef          string `json:"baseRef"`
+			Provider         string `json:"provider"` // "github"|"gitlab"|"jira"|"linear"
+			Repo             string `json:"repo"`     // scm only
+			Number           int32  `json:"number"`   // scm only
+			IssueRef         string `json:"issueRef"` // tracker only
+			SkipAgentStart   bool   `json:"skipAgentStart"`
+			SkipStatusUpdate bool   `json:"skipStatusUpdate"`
+		}
+		in, err := decodeArg[createFromIssueArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+
+		req := &gitgatewayv1.CreateWorktreeFromIssueRequest{
+			ProjectId: in.ProjectID, RepoId: in.RepoID, BaseRef: in.BaseRef,
+			SkipAgentStart: in.SkipAgentStart, SkipStatusUpdate: in.SkipStatusUpdate,
+		}
+		switch in.Provider {
+		case "github", "gitlab":
+			if in.Repo == "" || in.Number == 0 {
+				return nil, apperrors.New(apperrors.KindInvalidArgument, "WORKTREE_FROM_ISSUE_MISSING_SCM_FIELDS", "repo and number are required for github/gitlab", nil)
+			}
+			req.IssueSource = &gitgatewayv1.CreateWorktreeFromIssueRequest_ScmIssue{
+				ScmIssue: &gitgatewayv1.ScmIssueRef{Provider: in.Provider, Repo: in.Repo, Number: in.Number},
+			}
+		case "jira", "linear":
+			if in.IssueRef == "" {
+				return nil, apperrors.New(apperrors.KindInvalidArgument, "WORKTREE_FROM_ISSUE_MISSING_TRACKER_REF", "issueRef is required for jira/linear", nil)
+			}
+			req.IssueSource = &gitgatewayv1.CreateWorktreeFromIssueRequest_TrackerIssue{
+				TrackerIssue: &gitgatewayv1.TrackerIssueRef{Provider: in.Provider, IssueRef: in.IssueRef},
+			}
+		default:
+			return nil, apperrors.New(apperrors.KindInvalidArgument, "WORKTREE_FROM_ISSUE_UNKNOWN_PROVIDER", "provider must be one of github/gitlab/jira/linear", nil)
+		}
+
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		resp, err := gitClient.CreateWorktreeFromIssue(ctx, req)
 		if err != nil {
 			return nil, err
 		}

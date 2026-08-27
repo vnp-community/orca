@@ -266,7 +266,7 @@ func (fakeProjectClient) GetRepo(_ context.Context, repoID string) (domain.RepoI
 	return domain.RepoInfo{ID: repoID}, nil
 }
 
-func (fakeProjectClient) RecordWorktreeCreated(_ context.Context, _, _, path, branch string) (domain.WorktreeRecord, error) {
+func (fakeProjectClient) RecordWorktreeCreated(_ context.Context, _, _, path, branch string, _ domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	return domain.WorktreeRecord{ID: "wt-1", Path: path, Branch: branch}, nil
 }
 
@@ -278,6 +278,10 @@ func (fakeProjectClient) FindWorktreeByIdempotencyKey(context.Context, string, s
 	return domain.WorktreeRecord{}, false, nil
 }
 
+func (fakeProjectClient) IsIssueStatusSyncEnabled(context.Context, string) (bool, error) {
+	return true, nil
+}
+
 // fakeScrollbackCleaner is a usecase.ScrollbackCleaner stub — this file's
 // tests exercise the gRPC wire<->usecase translation, not RemoveWorktree's
 // best-effort cleanup call itself (that's internal/usecase's own test
@@ -287,6 +291,18 @@ type fakeScrollbackCleaner struct{}
 
 func (fakeScrollbackCleaner) DeleteTerminalScrollbackSnapshots(context.Context, string) error {
 	return nil
+}
+
+type fakeIssueSourceClient struct{}
+
+func (fakeIssueSourceClient) GetIssue(context.Context, domain.IssueRef) (domain.Issue, error) {
+	return domain.Issue{Title: "fake issue", Provider: "github", ExternalRef: "owner/repo#1"}, nil
+}
+
+type fakeAgentSpawner struct{}
+
+func (fakeAgentSpawner) SpawnAndInject(context.Context, string, string, string) (string, error) {
+	return "session-1", nil
 }
 
 type fakeSCMClient struct{}
@@ -321,6 +337,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 	reachability := fakeReachability{reachable: false}
 	projects := fakeProjectClient{}
 	scm := fakeSCMClient{}
+	createWorktreeUC := usecase.NewCreateWorktree(resolver, projects, exec, exec)
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	completer := fakeAICompleter{message: "generated message"}
 	historyUC := usecase.NewHistory(resolver, exec, exec)
@@ -369,7 +386,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewReadIssueCommand(resolver, exec, exec),
 		usecase.NewWriteIssueCommand(resolver, exec, exec),
 		usecase.NewScanSetupScriptImports(resolver, exec, exec),
-		usecase.NewCreateWorktree(resolver, projects, exec, exec),
+		createWorktreeUC,
 		usecase.NewRemoveWorktree(resolver, projects, fakeScrollbackCleaner{}, exec, exec),
 		usecase.NewForceDeleteBranch(resolver, exec, exec),
 		usecase.NewDetectWorktrees(resolver, projects, exec, exec),
@@ -386,6 +403,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewResolveConflict(resolver, exec, exec),
 		usecase.NewDiscard(resolver, exec, exec),
 		usecase.NewBulkDiscard(resolver, exec, exec),
+		usecase.NewCreateWorktreeFromIssue(fakeIssueSourceClient{}, createWorktreeUC, fakeAgentSpawner{}, projects),
 	)
 }
 

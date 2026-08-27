@@ -2,6 +2,7 @@ package httpgateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -22,6 +23,7 @@ import (
 func mountSCMRoutes(r chi.Router, client scmintegrationv1.ScmIntegrationServiceClient) {
 	r.Route("/v1/scm", func(sub chi.Router) {
 		sub.Get("/issues", handleListSCMIssues(client))
+		sub.Get("/issues/{number}/comments", handleListIssueComments(client))
 		sub.Post("/pull-requests", handleCreatePullRequest(client))
 		sub.Get("/pull-requests", handleListPullRequests(client))
 		sub.Get("/rate-limit", handleGetRateLimitStatus(client))
@@ -42,6 +44,36 @@ func handleListSCMIssues(client scmintegrationv1.ScmIntegrationServiceClient) ht
 			TenantId: identity.TenantID,
 			Provider: parseSCMProvider(q.Get("provider")),
 			Repo:     q.Get("repo"),
+			Filter: &scmintegrationv1.IssueFilter{
+				State:     q.Get("state"),
+				Assignee:  q.Get("assignee"),
+				Labels:    q["label"], // repeatable query param, e.g. ?label=bug&label=p0
+				Milestone: q.Get("milestone"),
+			},
+			ForceRefresh: q.Get("refresh") == "true",
+		})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+// handleListIssueComments serves GET /v1/scm/issues/{number}/comments —
+// repo is a query param (not a path segment) since repo slugs contain "/"
+// and this route's path only reserves {number}, matching /v1/scm/issues'
+// own repo-as-query-param convention above.
+func handleListIssueComments(client scmintegrationv1.ScmIntegrationServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		repo := r.URL.Query().Get("repo")
+		number := chi.URLParam(r, "number")
+		slug := fmt.Sprintf("%s#%s", repo, number)
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.ListIssueCommentsBySlug(ctx, &scmintegrationv1.ListIssueCommentsBySlugRequest{
+			TenantId: identity.TenantID, ItemSlug: slug,
 		})
 		if err != nil {
 			writeGRPCError(w, err)
@@ -246,6 +278,24 @@ func handleRevokeAuth(client scmintegrationv1.ScmIntegrationServiceClient) http.
 			return
 		}
 		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+// parseReviewType maps a REST/WS-facing review-type string to
+// scmintegrationv1.ReviewType — "" (omitted) resolves to
+// REVIEW_TYPE_UNSPECIFIED, which SubmitReview's usecase then defaults to
+// REQUEST_CHANGES server-side (BR-PI-11), so an unrecognized string here
+// degrades the same safe way an omitted one does, rather than erroring.
+func parseReviewType(v string) scmintegrationv1.ReviewType {
+	switch v {
+	case "comment":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_COMMENT
+	case "approve":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_APPROVE
+	case "request_changes":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_REQUEST_CHANGES
+	default:
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_UNSPECIFIED
 	}
 }
 

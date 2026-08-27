@@ -251,6 +251,40 @@ type WorktreeRecord struct {
 	Branch string
 }
 
+// WorktreeLineageCapture carries the linked-issue reference
+// CreateWorktreeFromIssue resolves through to project-service's
+// RecordWorktreeCreated (SOL-PI-02/SOL-PI-03) — empty fields mean "no
+// linked issue" (BR-PI-06 opt-out, or a plain CreateWorktree call).
+type WorktreeLineageCapture struct {
+	Origin              string
+	CaptureSource       string
+	LinkedIssueProvider string
+	LinkedIssueRef      string
+}
+
+// IssueRef identifies an issue in either an SCM (GitHub/GitLab) or an
+// issue-tracker (Jira/Linear), resolved by IssueSourceClient — mirrors
+// gitgatewayv1.CreateWorktreeFromIssueRequest's oneof issue_source.
+type IssueRef struct {
+	Provider   string // "github" | "gitlab" | "jira" | "linear"
+	Repo       string // scm only
+	Number     int32  // scm only
+	TrackerRef string // tracker only, e.g. "ENG-123"
+}
+
+// Issue is the minimal shape create_worktree_from_issue.go needs from
+// either issue source — title/labels feed branch-name derivation,
+// description/AC/comments feed the agent prompt.
+type Issue struct {
+	Title              string
+	Description        string
+	AcceptanceCriteria string
+	Labels             []string
+	Comments           []string
+	Provider           string
+	ExternalRef        string // "owner/repo#123" or "ENG-123", matches Worktree.linked_issue_ref
+}
+
 // ResolvedBase is PrefetchCreateBase/ResolvePrBase/ResolveMrBase's answer:
 // a base branch name plus the local SHA it resolved to once fetched.
 type ResolvedBase struct {

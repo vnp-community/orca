@@ -12,6 +12,7 @@ use (
 	./services/credential-broker-service
 	./services/git-gateway-service
 	./services/infra-fleet-service
+	./services/issue-status-sync
 	./services/issue-tracking-service
 	./services/notification-service
 	./services/orchestration-service

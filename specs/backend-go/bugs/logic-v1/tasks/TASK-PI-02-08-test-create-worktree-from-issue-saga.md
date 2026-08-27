@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service` + `api-gateway`
 **File:** `services/git-gateway-service/internal/usecase/branch_name_test.go` (new), `agent_prompt_test.go` (new), `create_worktree_from_issue_test.go` (new), `services/api-gateway/internal/adapter/wscompat/channels_worktree_test.go`
 **Depends on:** TASK-PI-02-05, TASK-PI-02-06, TASK-PI-02-07
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — branch_name_test.go, agent_prompt_test.go, create_worktree_from_issue_test.go (7 cases incl. TestCreateWorktreeFromIssue_AgentAndStatusFailuresNeverFailTheSaga) all new; channels_worktree_test.go extended with 5 worktree.createFromIssue cases (both oneof shapes + 3 malformed-input rejections).`
 
 ---
 

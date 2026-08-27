@@ -376,3 +376,15 @@ func (c *Client) GetRepoFileContent(ctx context.Context, cred usecase.Credential
 	}
 	return string(body), true, nil
 }
+
+// GetLinkedPullRequestsForIssue — Azure DevOps' work-item/PR linking uses a
+// different addressing scheme (work item id, not issue number) this
+// adapter doesn't otherwise resolve; same placeholder posture as
+// MergePullRequest/ResolveRepoSlug above until wired.
+func (c *Client) GetLinkedPullRequestsForIssue(_ context.Context, _ usecase.Credential, _ string, _ int32) ([]domain.PullRequest, bool, error) {
+	return nil, false, nil
+}
+
+func (c *Client) SubmitReview(_ context.Context, _ usecase.Credential, _ string, _ int32, _ domain.ReviewInput) (domain.Review, error) {
+	return domain.Review{}, ErrCapabilityUnsupported
+}

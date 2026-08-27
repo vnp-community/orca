@@ -41,6 +41,7 @@ import (
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 )
@@ -122,6 +123,20 @@ func run() error {
 	defer func() { _ = scmConn.Close() }()
 	scmIntegrationClient := scmintegrationv1.NewScmIntegrationServiceClient(scmConn)
 	scmClient := scmclient.New(scmIntegrationClient)
+	scmSourceClient := grpcclient.NewScmSourceClient(scmIntegrationClient)
+
+	// issue-tracking-service — new outbound dependency (SOL-PI-02):
+	// CreateWorktreeFromIssue's tracker_issue half of its oneof issue_source.
+	issueTrackingConn, err := grpcclient.Dial(cfg.IssueTrackingServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing issue-tracking-service: %w", err)
+	}
+	defer func() { _ = issueTrackingConn.Close() }()
+	issueTrackingClient := issuetrackingv1.NewIssueTrackingServiceClient(issueTrackingConn)
+	issueTrackingSourceClient := grpcclient.NewIssueTrackingSourceClient(issueTrackingClient)
+	issueSourceClient := grpcclient.NewIssueSourceDispatcher(scmSourceClient, issueTrackingSourceClient)
+
+	agentSpawner := grpcclient.NewInfraFleetAgentSpawner(infraFleetClient, logger)
 
 	getStatusUC := usecase.NewGetStatus(resolver, local, relay)
 	getDiffUC := usecase.NewGetDiff(resolver, local, relay)
@@ -188,6 +203,7 @@ func run() error {
 	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)
 	resolvePrBaseUC := usecase.NewResolvePrBase(scmClient, resolver, projectClient, local, relay)
 	resolveMrBaseUC := usecase.NewResolveMrBase(scmClient, resolver, projectClient, local, relay)
+	createWorktreeFromIssueUC := usecase.NewCreateWorktreeFromIssue(issueSourceClient, createWorktreeUC, agentSpawner, projectClient)
 
 	// Group A — branch/ref operations (TASK-207). Checkout/ListLocalBranches/
 	// FastForward/ConflictOperation's shapes were redesigned against the real
@@ -221,6 +237,7 @@ func run() error {
 		checkoutUC, listLocalBranchesUC, fastForwardUC, rebaseFromBaseUC,
 		abortRebaseUC, abortMergeUC, conflictOperationUC, resolveConflictUC,
 		discardUC, bulkDiscardUC,
+		createWorktreeFromIssueUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -236,6 +253,7 @@ func run() error {
 	healthSrv.Register("infra-fleet-service", grpcConnHealthCheck(infraFleetConn))
 	healthSrv.Register("project-service", grpcConnHealthCheck(projectConn))
 	healthSrv.Register("scm-integration-service", grpcConnHealthCheck(scmConn))
+	healthSrv.Register("issue-tracking-service", grpcConnHealthCheck(issueTrackingConn))
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),

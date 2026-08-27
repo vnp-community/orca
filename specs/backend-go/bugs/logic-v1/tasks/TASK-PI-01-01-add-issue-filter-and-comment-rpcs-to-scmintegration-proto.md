@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/proto/orca/scmintegration/v1/scmintegration.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — IssueFilter/ListIssueCommentsBySlug/GetLinkedPullRequestsForIssue added to scmintegration.proto, buf generate clean.`
 
 ---
 
