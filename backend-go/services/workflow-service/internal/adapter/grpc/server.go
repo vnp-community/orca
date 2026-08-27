@@ -30,6 +30,7 @@ type Server struct {
 	listTemplates       *usecase.ListTemplates
 	resolveTemplate     *usecase.ResolveTemplate
 	updateTemplate      *usecase.UpdateTemplate
+	cloneTemplate       *usecase.CloneTemplate
 }
 
 func New(
@@ -44,6 +45,7 @@ func New(
 	listTemplates *usecase.ListTemplates,
 	resolveTemplate *usecase.ResolveTemplate,
 	updateTemplate *usecase.UpdateTemplate,
+	cloneTemplate *usecase.CloneTemplate,
 ) *Server {
 	return &Server{
 		createTemplate:      createTemplate,
@@ -57,6 +59,7 @@ func New(
 		listTemplates:       listTemplates,
 		resolveTemplate:     resolveTemplate,
 		updateTemplate:      updateTemplate,
+		cloneTemplate:       cloneTemplate,
 	}
 }
 
@@ -181,6 +184,19 @@ func (s *Server) UpdateTemplate(ctx context.Context, req *workflowv1.UpdateTempl
 	return &workflowv1.UpdateTemplateResponse{Template: toProtoTemplate(updated)}, nil
 }
 
+func (s *Server) CloneTemplate(ctx context.Context, req *workflowv1.CloneTemplateRequest) (*workflowv1.CloneTemplateResponse, error) {
+	tmpl, err := s.cloneTemplate.Execute(ctx, usecase.CloneTemplateInput{
+		SourceTemplateID: req.GetSourceTemplateId(),
+		Name:             req.GetName(),
+		Description:      req.GetDescription(),
+		Tags:             req.GetTags(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.CloneTemplateResponse{Template: toProtoTemplate(tmpl)}, nil
+}
+
 func toDomainStepType(t workflowv1.StepType) domain.StepType {
 	switch t {
 	case workflowv1.StepType_STEP_TYPE_AGENT:
@@ -200,13 +216,21 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 
 func toProtoTemplate(t domain.WorkflowTemplate) *workflowv1.WorkflowTemplate {
 	return &workflowv1.WorkflowTemplate{
-		Id:               t.ID,
-		TenantId:         t.TenantID,
-		Name:             t.Name,
-		DagJson:          t.DAGJSON,
-		Scope:            string(t.Scope),
-		ParentTemplateId: t.ParentTemplateID,
-		Version:          t.Version,
+		Id:                   t.ID,
+		TenantId:             t.TenantID,
+		Name:                 t.Name,
+		DagJson:              t.DAGJSON,
+		Scope:                string(t.Scope),
+		ParentTemplateId:     t.ParentTemplateID,
+		Version:              t.Version,
+		OwnerId:              t.OwnerID,
+		Description:          t.Description,
+		Tags:                 t.Tags,
+		OverridesJson:        t.OverridesJSON,
+		InjectStepsJson:      t.InjectStepsJSON,
+		RemoveStepsJson:      t.RemoveStepsJSON,
+		UsageCount:           t.UsageCount,
+		ClonedFromTemplateId: t.ClonedFromTemplateID,
 	}
 }
 

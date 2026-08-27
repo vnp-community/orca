@@ -211,7 +211,7 @@ func TestRepository_Update_CorrectVersion_Succeeds(t *testing.T) {
 	tmpl.DAGJSON = `{"steps":[{"id":"s1","type":"webhook"}]}`
 	tmpl.Scope = domain.ScopeTeam
 
-	updated, err := repo.Update(ctx, tmpl, 1)
+	updated, err := repo.Update(ctx, tmpl, 1, true)
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -234,6 +234,54 @@ func TestRepository_Update_CorrectVersion_Succeeds(t *testing.T) {
 	}
 }
 
+func TestRepository_Update_NoBump_LeavesVersionUnchanged(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "88888888-8888-8888-8888-888888888888"
+
+	tmpl, err := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000007", tenantID, "deploy", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
+	if err != nil {
+		t.Fatalf("building template: %v", err)
+	}
+	if err := repo.CreateTemplate(ctx, tmpl); err != nil {
+		t.Fatalf("create template: %v", err)
+	}
+
+	tmpl.Name = "deploy-metadata-only"
+	tmpl.DAGJSON = `{"steps":[{"id":"s1","type":"webhook"}]}`
+
+	updated, err := repo.Update(ctx, tmpl, 1, false)
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if updated.Version != 1 {
+		t.Fatalf("want version unchanged at 1 when bumpVersion=false, got %d", updated.Version)
+	}
+	if updated.Name != "deploy-metadata-only" {
+		t.Fatalf("update did not persist the new name despite bumpVersion=false: %+v", updated)
+	}
+
+	got, err := repo.GetTemplate(ctx, tenantID, tmpl.ID)
+	if err != nil {
+		t.Fatalf("get template: %v", err)
+	}
+	if got.Version != 1 || got.Name != "deploy-metadata-only" {
+		t.Fatalf("re-read template does not reflect the update: %+v", got)
+	}
+	if !jsonEqual(t, got.DAGJSON, tmpl.DAGJSON) {
+		t.Fatalf("re-read dag_json = %q, want structurally equal to %q", got.DAGJSON, tmpl.DAGJSON)
+	}
+
+	// expected_version still gates the write even with bumpVersion=false —
+	// a second call at the same (unmoved) expected_version must succeed
+	// again, proving the WHERE clause isn't accidentally always-true.
+	tmpl2 := got
+	tmpl2.Name = "deploy-metadata-only-2"
+	if _, err := repo.Update(ctx, tmpl2, 1, false); err != nil {
+		t.Fatalf("second no-bump update at unmoved expected_version: %v", err)
+	}
+}
+
 func TestRepository_Update_StaleVersion_ReturnsConflict(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
@@ -250,7 +298,7 @@ func TestRepository_Update_StaleVersion_ReturnsConflict(t *testing.T) {
 	attempt := tmpl
 	attempt.Name = "should-not-apply"
 
-	_, err = repo.Update(ctx, attempt, 99)
+	_, err = repo.Update(ctx, attempt, 99, true)
 	if !errors.Is(err, domain.ErrTemplateVersionConflict) {
 		t.Fatalf("want domain.ErrTemplateVersionConflict, got %v", err)
 	}

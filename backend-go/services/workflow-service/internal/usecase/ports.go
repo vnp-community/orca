@@ -32,10 +32,14 @@ type TemplateRepository interface {
 	// feeds. Returns domain.ErrTemplateNotFound (wrapped) if templateID
 	// itself doesn't exist for tenantID.
 	ResolveChain(ctx context.Context, tenantID, templateID string, maxDepth int) ([]domain.WorkflowTemplate, error)
-	// Update performs the version-bump-on-write conditional UPDATE.
-	// Returns domain.ErrTemplateVersionConflict (wrapped) when
-	// expectedVersion doesn't match the current row's version.
-	Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32) (domain.WorkflowTemplate, error)
+	// Update performs the conditional UPDATE, gated by expectedVersion —
+	// still an optimistic-concurrency check on every write. templates.version
+	// itself is only incremented when bumpVersion is true (SOL-030's
+	// breaking-change + active-usage gate — see
+	// usecase.UpdateTemplate.Execute's isBreakingChange call), not on every
+	// write unconditionally. Returns domain.ErrTemplateVersionConflict
+	// (wrapped) when expectedVersion doesn't match the current row's version.
+	Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32, bumpVersion bool) (domain.WorkflowTemplate, error)
 }
 
 // ExecutionRepository is the persistence port for workflow executions.

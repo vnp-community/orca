@@ -138,6 +138,18 @@ func parseSteps(dagJSON string) []domain.Step {
 	return dag.Steps
 }
 
+// parseStepsByID is parseSteps indexed by step id — the lookup shape
+// isBreakingChange (update_template.go) needs to answer "does this id
+// still exist, and with the same Type" in O(1) per old step.
+func parseStepsByID(dagJSON string) map[string]domain.Step {
+	steps := parseSteps(dagJSON)
+	byID := make(map[string]domain.Step, len(steps))
+	for _, s := range steps {
+		byID[s.ID] = s
+	}
+	return byID
+}
+
 // parseInjectSteps parses an Inherit-mode inject_steps instruction
 // ([]domain.Step, JSON) — malformed/empty parses to no steps, same
 // best-effort convention as parseSteps.

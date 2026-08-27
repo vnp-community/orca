@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/update_template.go`
 **Depends on:** TASK-WF-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `isBreakingChange`/`parseStepsByID` added, `UpdateTemplate.Execute` gates `bumpVersion := existing.UsageCount > 0 && isBreakingChange(...)`; `TemplateRepository.Update` gained a `bumpVersion bool` param (ports.go + fake + postgres adapter); postgres `UPDATE` now does `version = version + (CASE WHEN $8 THEN 1 ELSE 0 END)`. Also fixed a pre-existing bug found while here: `parent_template_id = NULLIF($4, '')` failed a Postgres uuid-cast on any non-empty value — now `NULLIF($4, '')::uuid`. Table test `TestUpdateTemplate_VersionBumpGate` covers all 4 matrix cases + a dag-unchanged case; new `TestRepository_Update_NoBump_LeavesVersionUnchanged` integration test added. `go build ./... && go vet ./... && go test ./...` green; `go test -tags=integration -run TestRepository_Update ./internal/adapter/postgres/...` passes 3/3 in isolation (shared Docker contention from concurrent worktree agents causes transient failures when run alongside the full suite — not a regression).
 
 ---
 

@@ -25,6 +25,9 @@ type fakeTemplateRepository struct {
 	// lastUpdateExpectedVersion captures the last expectedVersion Update
 	// was called with, so tests can confirm it's forwarded unchanged.
 	lastUpdateExpectedVersion int32
+	// lastUpdateBumpVersion captures the last bumpVersion Update was called
+	// with — TASK-WF-01-06's breaking-change + active-usage gate.
+	lastUpdateBumpVersion bool
 }
 
 func newFakeTemplateRepository() *fakeTemplateRepository {
@@ -114,13 +117,18 @@ func (f *fakeTemplateRepository) ResolveChain(ctx context.Context, tenantID, tem
 // Update mirrors the real repository's version-bump-on-write contract: on
 // success it returns tmpl with Version = expectedVersion+1 (the bumped
 // value a real conditional UPDATE's RETURNING clause would produce).
-func (f *fakeTemplateRepository) Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32) (domain.WorkflowTemplate, error) {
+func (f *fakeTemplateRepository) Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32, bumpVersion bool) (domain.WorkflowTemplate, error) {
 	f.updateCalls++
 	f.lastUpdateExpectedVersion = expectedVersion
+	f.lastUpdateBumpVersion = bumpVersion
 	if f.updateErr != nil {
 		return domain.WorkflowTemplate{}, f.updateErr
 	}
-	tmpl.Version = expectedVersion + 1
+	if bumpVersion {
+		tmpl.Version = expectedVersion + 1
+	} else {
+		tmpl.Version = expectedVersion
+	}
 	f.templates[tmpl.ID] = tmpl
 	return tmpl, nil
 }

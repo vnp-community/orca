@@ -62,20 +62,23 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (doma
 	return tmpl, nil
 }
 
-// Update performs the version-bump-on-write conditional UPDATE — the
-// versioning rule this solution adds (SOL-030), mirroring SOL-001's
-// AccessPolicy pattern. pgx.ErrNoRows here is unambiguous: the caller
+// Update performs the conditional UPDATE, gated by expectedVersion — the
+// optimistic-concurrency check this solution adds (SOL-030), mirroring
+// SOL-001's AccessPolicy pattern. templates.version itself only increments
+// when bumpVersion is true (TASK-WF-01-06: a breaking DAG change to a
+// template with active usage) — everything else about the row still
+// updates unconditionally. pgx.ErrNoRows here is unambiguous: the caller
 // (usecase.UpdateTemplate) already confirmed the row exists via GetTemplate
 // before calling this, so a zero-row UPDATE can only mean the version
 // moved between that read and this write.
-func (r *Repository) Update(ctx context.Context, t domain.WorkflowTemplate, expectedVersion int32) (domain.WorkflowTemplate, error) {
+func (r *Repository) Update(ctx context.Context, t domain.WorkflowTemplate, expectedVersion int32, bumpVersion bool) (domain.WorkflowTemplate, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE workflow.templates
-		SET name = $1, dag_json = $2::jsonb, scope = $3, parent_template_id = NULLIF($4, ''),
-		    version = version + 1, updated_at = now()
+		SET name = $1, dag_json = $2::jsonb, scope = $3, parent_template_id = NULLIF($4, '')::uuid,
+		    version = version + (CASE WHEN $8 THEN 1 ELSE 0 END), updated_at = now()
 		WHERE id = $5 AND tenant_id = $6 AND version = $7
 		RETURNING id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, ''), version
-	`, t.Name, t.DAGJSON, string(t.Scope), t.ParentTemplateID, t.ID, t.TenantID, expectedVersion)
+	`, t.Name, t.DAGJSON, string(t.Scope), t.ParentTemplateID, t.ID, t.TenantID, expectedVersion, bumpVersion)
 
 	var updated domain.WorkflowTemplate
 	var scope string
