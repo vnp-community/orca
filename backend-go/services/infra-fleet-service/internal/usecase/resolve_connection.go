@@ -23,6 +23,12 @@ type ResolveConnectionOutput struct {
 	// without conflating it with DevServer.ID, a different id space.
 	ConnectionID string
 	WorktreeID   string
+	// NodeVersion is the connected session's self-reported Node.js version
+	// (TASK-INT-03-02) — empty when Connected is false, when Sessions is
+	// nil, or when the live session predates this field. Never populated
+	// by any resolver other than Sessions (see HandshakeInfoProvider's doc
+	// comment).
+	NodeVersion string
 }
 
 // ResolveConnectionInput mirrors ResolveConnectionRequest 1:1 — exactly one
@@ -41,6 +47,10 @@ type ResolveConnectionInput struct {
 // binding; any connectionId-bound feature in the system reduces to this call.
 type ResolveConnection struct {
 	resolver ConnectionResolver
+	// Sessions is optional (nil by default) — set directly by the
+	// composition root when a live-session Node-version enrichment is
+	// available (TASK-INT-03-02). See HandshakeInfoProvider's doc comment.
+	Sessions HandshakeInfoProvider
 }
 
 func NewResolveConnection(resolver ConnectionResolver) *ResolveConnection {
@@ -75,5 +85,11 @@ func (uc *ResolveConnection) Execute(ctx context.Context, in ResolveConnectionIn
 	if err != nil {
 		return ResolveConnectionOutput{}, apperrors.New(apperrors.KindInternal, "INFRA_RESOLVE_FAILED", "failed to resolve connection", err)
 	}
-	return ResolveConnectionOutput{Connected: connected, DevServer: devServer, ConnectionID: conn.ID, RepoPath: conn.RepoPath, WorktreeID: conn.WorktreeID}, nil
+	out := ResolveConnectionOutput{Connected: connected, DevServer: devServer, ConnectionID: conn.ID, RepoPath: conn.RepoPath, WorktreeID: conn.WorktreeID}
+	if connected && uc.Sessions != nil {
+		if v, ok := uc.Sessions.NodeVersionFor(devServer.ID); ok {
+			out.NodeVersion = v
+		}
+	}
+	return out, nil
 }

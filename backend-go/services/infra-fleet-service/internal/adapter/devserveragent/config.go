@@ -10,26 +10,16 @@ import (
 // side's constants directly (see doc comments) rather than inventing new
 // tuning knobs.
 //
-// domain.DevServer (this scaffold's proto-sized subset — see its own doc
-// comment) carries only Host, not a port or per-device token: unlike
-// direct-websocket's per-connection AgentTokenManager-issued token,
-// relay-websocket's ORCA_AGENT_TOKEN is documented
-// (specs/agent/api/connection-modes.md §"relay-websocket token (contrast)")
-// as "a static, operator-set, long-lived shared secret ... never expires or
-// rotates" — i.e. deployment-wide, not per-dev-server. Modeling it as
-// service-level Config rather than adding columns/proto fields for a
-// single shared secret matches that reality; a future per-dev-server
-// override would need domain.DevServer extended plus a migration, tracked
-// as a follow-up (see this package's README "Known gaps"), not invented
-// here.
+// Per-DevServer bearer tokens are NOT modeled here — see TASK-AWS-01-03 and
+// SOL-AWS-01: a single deployment-wide shared-secret token field here used
+// to mean every relay-websocket DevServer authenticated with the same
+// value, so revoking or rotating one DevServer's token was impossible
+// without a full redeploy. Client.AgentTokenSource (client.go) now
+// resolves each dial's token individually via usecase.AgentTokenRepository
+// + usecase.CredentialBrokerClient.
 type Config struct {
 	// Port is the agent's AGENT_PORT (agent-connection-relay.ts default 6799).
 	Port int
-	// Token is sent as `Authorization: Bearer <token>` per
-	// agent-connection-relay.ts's authenticate(). Empty means relay-websocket
-	// dev servers cannot be reached — Exec/Health report a clear error
-	// rather than silently dialing unauthenticated.
-	Token string
 	// OrcaVersion is sent in the agent.handshake params — cosmetic
 	// (agent-session.ts doesn't gate on it), but included for parity with
 	// dev-server-relay-bridge.ts's getPlatform().app.getVersion().
@@ -72,10 +62,11 @@ func DefaultConfig() Config {
 	}
 }
 
-// LoadConfigFromEnv reads AGENT_PORT / ORCA_AGENT_TOKEN / ORCA_VERSION on
-// top of DefaultConfig — matching agent-connection-relay.ts's own env var
-// names on the agent side, so operators set one consistent name across
-// both processes.
+// LoadConfigFromEnv reads AGENT_PORT / ORCA_VERSION on top of DefaultConfig
+// — matching agent-connection-relay.ts's own env var names on the agent
+// side, so operators set one consistent name across both processes. The
+// per-DevServer bearer token is resolved separately per dial — see the
+// package doc comment above and AgentTokenSource (client.go).
 func LoadConfigFromEnv() Config {
 	cfg := DefaultConfig()
 	if v := os.Getenv("AGENT_PORT"); v != "" {
@@ -83,7 +74,6 @@ func LoadConfigFromEnv() Config {
 			cfg.Port = port
 		}
 	}
-	cfg.Token = os.Getenv("ORCA_AGENT_TOKEN")
 	cfg.OrcaVersion = os.Getenv("ORCA_VERSION")
 	if cfg.OrcaVersion == "" {
 		cfg.OrcaVersion = "backend-go-dev"

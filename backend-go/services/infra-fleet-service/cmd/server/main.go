@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
@@ -31,9 +32,11 @@ import (
 	infraagentwsserver "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/agentwsserver"
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
+	infragrpcclient "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpcclient"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -86,6 +89,7 @@ func run() error {
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
 	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
 	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
+	agentTokenStore := infrapostgres.NewAgentTokenStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
 	// wired below via agentwsserver) are both real, and so is relay-ssh now
@@ -103,8 +107,21 @@ func run() error {
 	// lazily inside sshrelay.deploy rather than here, since it's still worth
 	// constructing the provisioner (so config wiring is visibly complete)
 	// even if deploy will fail until an operator sets the bundle path.
+	credentialBrokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
+	}
+	defer credentialBrokerConn.Close()
+	credentialBrokerClient := infragrpcclient.New(credentialBrokerConn)
+
 	agentCfg := infradevserveragent.LoadConfigFromEnv()
-	var agentOpts []infradevserveragent.Option
+	// agentTokenSource resolves a relay-websocket DevServer's current bearer
+	// token fresh on every dial (never cached across process restarts) — see
+	// TASK-AWS-01-03/SOL-AWS-01, replacing the former single deployment-wide
+	// ORCA_AGENT_TOKEN.
+	agentOpts := []infradevserveragent.Option{
+		infradevserveragent.WithAgentTokens(agentTokenSource{tokens: agentTokenStore, broker: credentialBrokerClient}),
+	}
 	vaultClient, err := secrets.NewClient()
 	if err != nil {
 		logger.Warn("failed to construct Vault client — relay-ssh mode will report ErrConnectionModeNotImplemented", slog.Any("error", err))
@@ -123,6 +140,7 @@ func run() error {
 
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
+	resolveConnectionUC.Sessions = handshakeInfoProvider{client: agentClient} // TASK-INT-03-02: optional node_version enrichment
 	createSshTargetUC := usecase.NewCreateSshTarget(sshTargetStore)
 	getFleetHealthUC := usecase.NewGetFleetHealth(repo)
 	scanWorkspacePortsUC := usecase.NewScanWorkspacePorts(repo, agentClient)
@@ -157,6 +175,11 @@ func run() error {
 	emulatorRelayUC := usecase.NewEmulatorRelay(repo, agentClient)
 	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
 
+	// --- Persistent agent tokens (BL-AWS-03) ---
+	createAgentTokenUC := usecase.NewCreateAgentToken(agentTokenStore, repo, credentialBrokerClient)
+	listAgentTokensUC := usecase.NewListAgentTokens(agentTokenStore)
+	revokeAgentTokenUC := usecase.NewRevokeAgentToken(agentTokenStore, agentClient)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -186,6 +209,9 @@ func run() error {
 		deleteBrowserProfileUC,
 		emulatorRelayUC,
 		getHostCapabilitiesUC,
+		createAgentTokenUC,
+		listAgentTokensUC,
+		revokeAgentTokenUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -209,6 +235,8 @@ func run() error {
 	slotRegistry := infraagentwsserver.NewRegistry(infraagentwsserver.DefaultConnectTimeout)
 	defer slotRegistry.Stop()
 	agentWSServer := infraagentwsserver.New(slotRegistry, agentClient, agentWSCfg, logger)
+	agentWSServer.Sessions = agentClient // TASK-AWS-02-03: agentClient already implements LiveSessionCount
+	agentWSServer.Tokens = agentTokenValidator{repo: agentTokenStore} // TASK-AWS-03-06: persistent-token handshake fallback
 	agentTokenIssuer := infraagentwsserver.NewTokenIssuer(slotRegistry, agentWSCfg, logger)
 
 	mux := http.NewServeMux()
@@ -258,4 +286,69 @@ func run() error {
 	_ = httpServer.Shutdown(shutdownCtx)
 
 	return nil
+}
+
+// agentTokenSource adapts usecase.AgentTokenRepository +
+// usecase.CredentialBrokerClient into devserveragent.AgentTokenSource —
+// resolving a relay-websocket DevServer's current bearer token fresh on
+// every dial, never cached across process restarts, so a revoked token is
+// honored on the very next reconnect (TASK-AWS-01-03, SOL-AWS-01). Kept
+// here in the composition root rather than as its own adapter package,
+// since it exists purely to combine two other adapters' already-dialed
+// clients — the same "the only place allowed to know about every layer at
+// once" reasoning as this file's other wiring.
+type agentTokenSource struct {
+	tokens usecase.AgentTokenRepository
+	broker usecase.CredentialBrokerClient
+}
+
+func (s agentTokenSource) TokenFor(ctx context.Context, devServer domain.DevServer) (string, error) {
+	tok, found, err := s.tokens.ActiveForDevServer(ctx, devServer.TenantID, devServer.ID)
+	if err != nil {
+		return "", fmt.Errorf("resolving active agent token for dev server %s: %w", devServer.ID, err)
+	}
+	if !found {
+		return "", fmt.Errorf("no active agent token registered for dev server %s", devServer.ID)
+	}
+	plaintext, err := s.broker.ResolveCredential(ctx, tok.CredentialRefID)
+	if err != nil {
+		return "", fmt.Errorf("resolving agent token credential for dev server %s: %w", devServer.ID, err)
+	}
+	return string(plaintext), nil
+}
+
+// agentTokenValidator adapts usecase.AgentTokenRepository into
+// agentwsserver.TokenValidator — direct-websocket's persistent-token
+// handshake fallback once Registry.Consume misses (TASK-AWS-03-06). Thin
+// composition-root wrapper, same pattern as agentTokenSource above.
+type agentTokenValidator struct {
+	repo usecase.AgentTokenRepository
+}
+
+func (v agentTokenValidator) FindActiveByHash(ctx context.Context, hash string) (devServerID, tokenID string, found bool, err error) {
+	t, found, err := v.repo.FindActiveByHash(ctx, hash)
+	if err != nil || !found {
+		return "", "", found, err
+	}
+	return t.DevServerID, t.ID, true, nil
+}
+
+func (v agentTokenValidator) TouchLastUsed(ctx context.Context, tokenID string) {
+	_ = v.repo.TouchLastUsed(ctx, tokenID) // best-effort, never blocks the handshake on its result
+}
+
+// handshakeInfoProvider adapts devserveragent.Client.HandshakeInfoFor into
+// usecase.HandshakeInfoProvider — ResolveConnection's optional Node-version
+// enrichment (TASK-INT-03-02). Thin composition-root wrapper, same pattern
+// as agentTokenSource/agentTokenValidator above.
+type handshakeInfoProvider struct {
+	client *infradevserveragent.Client
+}
+
+func (p handshakeInfoProvider) NodeVersionFor(devServerID string) (string, bool) {
+	info, ok := p.client.HandshakeInfoFor(devServerID)
+	if !ok {
+		return "", false
+	}
+	return info.NodeVersion, true
 }

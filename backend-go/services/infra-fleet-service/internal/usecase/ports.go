@@ -262,3 +262,88 @@ type TerminalSessionRepository interface {
 	// a duplicate/racing close request never fails the caller.
 	Close(ctx context.Context, tenantID, ptyID string, closedAt time.Time) error
 }
+
+// CredentialBrokerClient is infra-fleet-service's port to
+// credential-broker-service — used ONLY for relay-websocket agent tokens
+// (SOL-AWS-01). Unlike most services' identically-named ports, this one
+// DOES call the plaintext-returning ResolveCredential RPC: relay-websocket
+// mode requires Orca to present the token outbound as an Authorization
+// header, not merely compare against a stored hash the way
+// direct-websocket's TokenHash branch does. See adapter/grpcclient's doc
+// comment for the full justification before touching this port.
+type CredentialBrokerClient interface {
+	// WriteCredential writes envelope (raw token bytes) under
+	// (tenantID, ownerID=devServerID, CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN)
+	// and returns a reference — the plaintext itself is never returned.
+	WriteCredential(ctx context.Context, tenantID, ownerID string, envelope []byte) (CredentialRef, error)
+	// ResolveCredential returns the plaintext bytes for credentialRefID —
+	// called once per dial (never cached across process restarts), see
+	// SOL-AWS-01's "resolve on every dial" guarantee.
+	ResolveCredential(ctx context.Context, credentialRefID string) ([]byte, error)
+}
+
+// CredentialRef is what CredentialBrokerClient.WriteCredential returns —
+// an opaque pointer, never the secret itself.
+type CredentialRef struct {
+	ID string
+}
+
+// AgentTokenRepository is the persistence port for infra.agent_tokens
+// (migrations/0007_agent_tokens, TASK-AWS-03-01) — BL-AWS-03's persistent,
+// named, per-DevServer agent token set. tenantID is threaded explicitly on
+// every method, matching ConnectionResolver/TerminalSessionRepository's
+// convention.
+type AgentTokenRepository interface {
+	// CountActive returns the number of non-revoked tokens for devServerID
+	// — enforces domain.MaxActiveAgentTokensPerDevServer.
+	CountActive(ctx context.Context, tenantID, devServerID string) (int, error)
+	// Insert persists a new token row. Callers must set exactly one of
+	// TokenHash/CredentialRefID (domain.AgentToken's own invariant,
+	// enforced again by the table's exactly_one_secret_ref CHECK).
+	Insert(ctx context.Context, t domain.AgentToken) error
+	// ListActive returns every non-revoked token for devServerID, newest
+	// first — backs ListAgentTokens.
+	ListActive(ctx context.Context, tenantID, devServerID string) ([]domain.AgentToken, error)
+	// FindActiveByHash looks up a non-revoked direct-websocket token by its
+	// SHA-256 hash — the agentwsserver handshake fallback's read path
+	// (TASK-AWS-03-06). found=false, err=nil means "no such active token".
+	FindActiveByHash(ctx context.Context, hash string) (t domain.AgentToken, found bool, err error)
+	// ActiveForDevServer returns the most-recently-created non-revoked
+	// token for a relay-websocket DevServer — SOL-AWS-01's per-dial
+	// resolution read. Relay-websocket DevServers are expected to carry
+	// exactly one active token in ordinary operation. found=false, err=nil
+	// means "no active token registered yet".
+	ActiveForDevServer(ctx context.Context, tenantID, devServerID string) (t domain.AgentToken, found bool, err error)
+	// TouchLastUsed bumps last_used_at — called best-effort on a successful
+	// handshake/dial, never blocks the caller on its result.
+	TouchLastUsed(ctx context.Context, id string) error
+	// Revoke sets revoked_at and returns the updated row.
+	Revoke(ctx context.Context, tenantID, id string) (domain.AgentToken, error)
+}
+
+// HandshakeInfoProvider is ResolveConnection's optional read port for the
+// connected session's self-reported Node.js version (TASK-INT-03-02,
+// SOL-INT-03) — implemented by devserveragent.Client via a small
+// composition-root adapter (see cmd/server/main.go). nil (or a miss)
+// leaves ResolveConnectionOutput.NodeVersion empty rather than erroring —
+// a connection with no live session, or one that predates this field, is
+// not a failure condition for ResolveConnection's own contract.
+type HandshakeInfoProvider interface {
+	// NodeVersionFor returns devServerID's live session's self-reported
+	// Node.js version. found=false means no live session right now (or a
+	// session that never sent one) — never an error.
+	NodeVersionFor(devServerID string) (nodeVersion string, found bool)
+}
+
+// LiveSessionCloser closes any live direct-websocket session currently
+// authenticated with a given agent token — RevokeAgentToken's
+// immediate-effect guarantee (TASK-AWS-03-06's usecase calls this after
+// AgentTokenRepository.Revoke). Implemented by devserveragent.Client, which
+// already tracks one live session per devServerID.
+type LiveSessionCloser interface {
+	// CloseSessionsForDevServerToken closes any direct-websocket session on
+	// devServerID currently authenticated as tokenID, with WS close code
+	// 1008 and a "token revoked" reason — see SOL-AWS-02 for why 1008, not
+	// the never-implemented 4001.
+	CloseSessionsForDevServerToken(ctx context.Context, devServerID, tokenID string) (closed int, err error)
+}

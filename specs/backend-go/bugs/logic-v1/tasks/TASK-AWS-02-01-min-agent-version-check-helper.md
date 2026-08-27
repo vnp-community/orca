@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/agentwsserver/version.go` (new), `config.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `MinAgentVersion`/`MaxConcurrentSessions` added to Config; `version.go` + `version_test.go` created; `go build`/`go test` clean.
 
 ---
 

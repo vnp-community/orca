@@ -1,27 +1,3 @@
-# TASK-AWS-03-02: Add `domain.AgentToken` entity
-
-**From Solution:** SOL-AWS-03
-**Priority:** P0
-**Service:** `infra-fleet-service`
-**File:** `backend-go/services/infra-fleet-service/internal/domain/agent_token.go` (new)
-**Depends on:** TASK-AWS-03-01
-**Status:** [x] DONE — `domain/agent_token.go` created verbatim per spec; `go build`/`go vet` clean; zero non-stdlib imports.
-
----
-
-## Context
-
-The usecase/repository/proto layers all need a shared, pure-Go
-`AgentToken` shape before they can be written. Mirrors
-`infra.agent_tokens`' column shape from TASK-AWS-03-01. Per
-`specs/backend-go/architecture/03-clean-architecture-guidelines.md`, this
-package has zero non-stdlib imports — no database, no gRPC.
-
-## Changes to make
-
-Create `backend-go/services/infra-fleet-service/internal/domain/agent_token.go`:
-
-```go
 package domain
 
 import (
@@ -70,14 +46,3 @@ var (
 // (a relay-websocket DevServer dials with exactly one active token at a
 // time; see SOL-AWS-01's ActiveForDevServer doc comment).
 const MaxActiveAgentTokensPerDevServer = 10
-```
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/infra-fleet-service/internal/domain/...
-go vet ./services/infra-fleet-service/internal/domain/...
-```
-
-Expected: clean build; `domain` package still has zero non-stdlib imports.

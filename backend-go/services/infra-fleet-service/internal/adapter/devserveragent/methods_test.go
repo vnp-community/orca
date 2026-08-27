@@ -2,7 +2,6 @@ package devserveragent
 
 import (
 	"context"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -16,7 +15,7 @@ func TestClientSpawnPtySucceedsAgainstFakeAgent(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -44,7 +43,7 @@ func TestClientSpawnPty_MissingIDInResponse_ReturnsClearError(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-missing-id", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -71,7 +70,7 @@ func TestClientWriteResizeKillPty_SendsExpectedParams(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-params", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -112,7 +111,7 @@ func TestClientWriteResizeKillPty_CallExpectedMethods(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -142,7 +141,7 @@ func TestClientSendSignal_SendsExpectedParams(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-signal", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -167,7 +166,7 @@ func TestClientSendSignal_RejectsUnknownSignal_WithoutACall(t *testing.T) {
 	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-signal-bad", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -189,7 +188,7 @@ func TestClientAgentStatusAndInspectProcess_FromListProcesses(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -238,7 +237,7 @@ func TestClientStreamPty_RoutesDataAndExitNotifications(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-4", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -301,7 +300,7 @@ func TestClientStreamPty_TwoConcurrentSubscriptions_EachGetsOwnEvents(t *testing
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-5", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
@@ -365,7 +364,7 @@ func TestClientStreamPty_ContextCancellationClosesOutputChannel(t *testing.T) {
 	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	devServer, err := domain.NewDevServer("ds-6", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")

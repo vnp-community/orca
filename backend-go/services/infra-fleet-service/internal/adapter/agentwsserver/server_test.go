@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -238,6 +239,304 @@ func TestServer_WrongFirstMessage_ClosesConnection(t *testing.T) {
 	case <-attacher.attached:
 		t.Fatal("AttachInboundSession must not be called for a protocol violation")
 	default:
+	}
+}
+
+// TestServer_BelowMinVersion_RejectsWithHandshakeFailed covers
+// TASK-AWS-02-02: an agentVersion below Cfg.MinAgentVersion is rejected
+// with code -33100 (handshakeFailedCode) and close 1008, and
+// AttachInboundSession is never called.
+func TestServer_BelowMinVersion_RejectsWithHandshakeFailed(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-old", "ds-old", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version", MinAgentVersion: "1.0.0"}, nil)
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{
+		"agentToken":   "tok-old",
+		"agentVersion": "0.9.0",
+	})
+	defer conn.CloseNow()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, data, err := conn.Read(ctx)
+	if err != nil {
+		t.Fatalf("reading error response: %v", err)
+	}
+	frame, err := devserveragent.DecodeFrame(data)
+	if err != nil {
+		t.Fatalf("decoding response frame: %v", err)
+	}
+	resp, ok, err := devserveragent.ParseJSONRPCResponse(frame.Payload)
+	if err != nil || !ok {
+		t.Fatalf("parsing response: ok=%v err=%v", ok, err)
+	}
+	if resp.Error == nil || resp.Error.Code != handshakeFailedCode {
+		t.Fatalf("Error = %+v, want code %d", resp.Error, handshakeFailedCode)
+	}
+	if !containsBothVersions(resp.Error.Message, "0.9.0", "1.0.0") {
+		t.Errorf("Error.Message = %q, want it to contain both versions", resp.Error.Message)
+	}
+
+	select {
+	case <-attacher.attached:
+		t.Fatal("AttachInboundSession must not be called for a below-minimum version")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	_, _, err = conn.Read(ctx)
+	if status := websocket.CloseStatus(err); status != websocket.StatusPolicyViolation {
+		t.Errorf("close status = %v (err=%v), want %v", status, err, websocket.StatusPolicyViolation)
+	}
+}
+
+// TestServer_NoAgentVersion_NotRejected covers the fail-open path: a
+// handshake with no agentVersion field is never rejected on version
+// grounds, even with MinAgentVersion configured.
+func TestServer_NoAgentVersion_NotRejected(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-noversion", "ds-noversion", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version", MinAgentVersion: "1.0.0"}, nil)
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{"agentToken": "tok-noversion"})
+	defer conn.CloseNow()
+
+	select {
+	case call := <-attacher.attached:
+		if call.devServerID != "ds-noversion" {
+			t.Errorf("devServerID = %q, want ds-noversion", call.devServerID)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AttachInboundSession was never called — a missing agentVersion must fail open, not be rejected")
+	}
+}
+
+// TestServer_AtOrAboveMinVersion_Succeeds covers the boundary: a version
+// equal to or newer than MinAgentVersion succeeds unchanged.
+func TestServer_AtOrAboveMinVersion_Succeeds(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-current", "ds-current", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version", MinAgentVersion: "1.0.0"}, nil)
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{
+		"agentToken":   "tok-current",
+		"agentVersion": "1.0.0",
+	})
+	defer conn.CloseNow()
+
+	select {
+	case call := <-attacher.attached:
+		if call.devServerID != "ds-current" {
+			t.Errorf("devServerID = %q, want ds-current", call.devServerID)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AttachInboundSession was never called for a version at the minimum")
+	}
+}
+
+func containsBothVersions(msg, a, b string) bool {
+	return len(msg) > 0 && strings.Contains(msg, a) && strings.Contains(msg, b)
+}
+
+// fakeTokenValidator is an in-memory TokenValidator for TASK-AWS-03-06's
+// persistent-token handshake fallback tests.
+type fakeTokenValidator struct {
+	byHash    map[string]struct{ devServerID, tokenID string }
+	revoked   map[string]bool
+	touched   []string
+	findErr   error
+}
+
+func newFakeTokenValidator() *fakeTokenValidator {
+	return &fakeTokenValidator{
+		byHash:  make(map[string]struct{ devServerID, tokenID string }),
+		revoked: make(map[string]bool),
+	}
+}
+
+func (f *fakeTokenValidator) register(token, devServerID, tokenID string) {
+	f.byHash[hashAgentToken(token)] = struct{ devServerID, tokenID string }{devServerID, tokenID}
+}
+
+func (f *fakeTokenValidator) revoke(token string) {
+	f.revoked[hashAgentToken(token)] = true
+}
+
+func (f *fakeTokenValidator) FindActiveByHash(ctx context.Context, hash string) (string, string, bool, error) {
+	if f.findErr != nil {
+		return "", "", false, f.findErr
+	}
+	if f.revoked[hash] {
+		return "", "", false, nil
+	}
+	v, ok := f.byHash[hash]
+	if !ok {
+		return "", "", false, nil
+	}
+	return v.devServerID, v.tokenID, true, nil
+}
+
+func (f *fakeTokenValidator) TouchLastUsed(ctx context.Context, tokenID string) {
+	f.touched = append(f.touched, tokenID)
+}
+
+// TestServer_PersistentToken_SucceedsAndIsNonSingleUse covers
+// TASK-AWS-03-06: a handshake succeeds against a persistent (non-Registry)
+// token, and succeeds again on a second handshake with the same token
+// (proves it is non-single-use, unlike Registry's Consume).
+func TestServer_PersistentToken_SucceedsAndIsNonSingleUse(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+
+	tokens := newFakeTokenValidator()
+	tokens.register("persistent-tok", "ds-persistent", "tok-id-1")
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version"}, nil)
+	srv.Tokens = tokens
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	for i := 0; i < 2; i++ {
+		conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{"agentToken": "persistent-tok"})
+		select {
+		case call := <-attacher.attached:
+			if call.devServerID != "ds-persistent" {
+				t.Errorf("attempt %d: devServerID = %q, want ds-persistent", i, call.devServerID)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("attempt %d: AttachInboundSession was never called", i)
+		}
+		conn.CloseNow()
+	}
+	if len(tokens.touched) != 2 {
+		t.Errorf("expected TouchLastUsed to be called twice, got %d", len(tokens.touched))
+	}
+}
+
+// TestServer_RevokedPersistentToken_Rejected covers TASK-AWS-03-06: a
+// revoked persistent token's handshake is rejected exactly like an
+// unregistered one.
+func TestServer_RevokedPersistentToken_Rejected(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+
+	tokens := newFakeTokenValidator()
+	tokens.register("revoked-tok", "ds-revoked", "tok-id-2")
+	tokens.revoke("revoked-tok")
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version"}, nil)
+	srv.Tokens = tokens
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{"agentToken": "revoked-tok"})
+	defer conn.CloseNow()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, _, err := conn.Read(ctx); err != nil {
+		t.Fatalf("reading error response: %v", err)
+	}
+	_, _, err := conn.Read(ctx)
+	if status := websocket.CloseStatus(err); status != websocket.StatusPolicyViolation {
+		t.Errorf("close status = %v (err=%v), want %v", status, err, websocket.StatusPolicyViolation)
+	}
+	select {
+	case <-attacher.attached:
+		t.Fatal("AttachInboundSession must not be called for a revoked token")
+	default:
+	}
+}
+
+// fakeSessionCounter is a stubbed SessionCounter for TASK-AWS-02-03's
+// capacity tests.
+type fakeSessionCounter struct {
+	count int
+}
+
+func (f *fakeSessionCounter) LiveSessionCount() int { return f.count }
+
+// TestServer_AtCapacity_RejectsBeforeHandshake covers TASK-AWS-02-03: a
+// SessionCounter stubbed at the configured cap rejects new connections
+// with 1008 before the handshake read even starts — Registry.Consume must
+// never be reached (the reject is pre-auth), asserted here by the token
+// remaining unconsumed.
+func TestServer_AtCapacity_RejectsBeforeHandshake(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-cap", "ds-cap", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version", MaxConcurrentSessions: 2}, nil)
+	srv.Sessions = &fakeSessionCounter{count: 2}
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := websocket.Dial(ctx, wsURLFor(ts), nil)
+	if err != nil {
+		t.Fatalf("dialing test server: %v", err)
+	}
+	defer conn.CloseNow()
+
+	_, _, err = conn.Read(ctx)
+	if status := websocket.CloseStatus(err); status != websocket.StatusPolicyViolation {
+		t.Errorf("close status = %v (err=%v), want %v", status, err, websocket.StatusPolicyViolation)
+	}
+
+	if !registry.Has("tok-cap") {
+		t.Error("token should NOT have been consumed — a capacity reject must happen before Registry.Consume is ever reached")
+	}
+	select {
+	case <-attacher.attached:
+		t.Fatal("AttachInboundSession must not be called when at capacity")
+	default:
+	}
+}
+
+// TestServer_MaxConcurrentSessionsDisabled_NoRegression covers
+// MaxConcurrentSessions <= 0 leaving the check fully disabled (existing
+// behavior, no regression), even with a SessionCounter reporting a huge
+// count.
+func TestServer_MaxConcurrentSessionsDisabled_NoRegression(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-nolimit", "ds-nolimit", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version", MaxConcurrentSessions: 0}, nil)
+	srv.Sessions = &fakeSessionCounter{count: 999999}
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{"agentToken": "tok-nolimit"})
+	defer conn.CloseNow()
+
+	select {
+	case call := <-attacher.attached:
+		if call.devServerID != "ds-nolimit" {
+			t.Errorf("devServerID = %q, want ds-nolimit", call.devServerID)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AttachInboundSession was never called — MaxConcurrentSessions<=0 must disable the check entirely")
 	}
 }
 

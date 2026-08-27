@@ -1,26 +1,3 @@
-# TASK-AWS-03-04: Implement `AgentTokenRepository` over Postgres
-
-**From Solution:** SOL-AWS-03
-**Priority:** P0
-**Service:** `infra-fleet-service`
-**File:** `backend-go/services/infra-fleet-service/internal/adapter/postgres/agent_token_repository.go` (new)
-**Depends on:** TASK-AWS-03-01, TASK-AWS-03-03
-**Status:** [x] DONE — `AgentTokenStore` created verbatim per spec, `var _ usecase.AgentTokenRepository = (*AgentTokenStore)(nil)` compiles; wired into main.go (`agentTokenStore`, consumed by TASK-AWS-03-05/06/07); `go build`/`go vet` clean. No live Postgres available in this worktree for the RLS/exclusion integration test — left for a follow-up with a test DB.
-
----
-
-## Context
-
-Implements `usecase.AgentTokenRepository` against `infra.agent_tokens`,
-following `BrowserProfileStore`'s existing shape (own type over the shared
-`pgxpool.Pool`, not a method on the umbrella `Repository`, per that
-adapter's package doc comment on method-name collisions).
-
-## Changes to make
-
-Create `backend-go/services/infra-fleet-service/internal/adapter/postgres/agent_token_repository.go`:
-
-```go
 package postgres
 
 import (
@@ -158,24 +135,3 @@ func (s *AgentTokenStore) Revoke(ctx context.Context, tenantID, id string) (doma
 	}
 	return t, nil
 }
-```
-
-Wire `agentTokenStore := infrapostgres.NewAgentTokenStore(pool)` into
-`services/infra-fleet-service/cmd/server/main.go` alongside the other
-`infrapostgres.New*Store(pool)` calls (TASK-AWS-03-05/06/07 consume it).
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/infra-fleet-service/...
-go vet ./services/infra-fleet-service/internal/adapter/postgres/...
-```
-
-Expected: clean build; `var _ usecase.AgentTokenRepository = (*AgentTokenStore)(nil)`
-compiles, confirming full interface satisfaction.
-
-Once a test Postgres is available, add
-`adapter/postgres/agent_token_repository_test.go` per SOL-AWS-03's test
-plan: `FindActiveByHash`/`CountActive`/`ActiveForDevServer` exclude revoked
-rows; RLS smoke test (tenant B cannot see tenant A's rows).

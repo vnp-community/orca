@@ -5,7 +5,7 @@
 **Service:** `credential-broker-service` (proto shared with `infra-fleet-service`)
 **File:** `backend-go/proto/orca/credentialbroker/v1/credentialbroker.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — enum value 6 added to proto+domain+grpc mapping; `buf generate` regenerated stubs; credential-broker-service builds clean (buf breaking skipped: local `main` git ref in this worktree predates backend-go, change is purely additive).
 
 ---
 

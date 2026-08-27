@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/migrations/0007_agent_tokens.up.sql` (+ `.down.sql`)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `0007_agent_tokens.up.sql`/`.down.sql` created, following `0005_terminal_sessions`'s FK+RLS style; no live Postgres available in this worktree to round-trip-verify, syntax matches the existing migration pattern exactly.
 
 ---
 

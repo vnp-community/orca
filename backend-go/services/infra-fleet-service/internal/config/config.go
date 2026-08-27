@@ -24,6 +24,9 @@ type Config struct {
 	// fail-safe: an unrecognized value should not silently widen what
 	// host-local terminal spawning is allowed.
 	ServerDeployment bool
+	// CredentialBrokerAddr is credential-broker-service's gRPC target —
+	// dialed for relay-websocket agent token write/resolve (SOL-AWS-01).
+	CredentialBrokerAddr string
 }
 
 func Load() (Config, error) {
@@ -32,7 +35,8 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:             base,
-		ServerDeployment: os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		Base:                  base,
+		ServerDeployment:      os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		CredentialBrokerAddr:  commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
 	}, nil
 }

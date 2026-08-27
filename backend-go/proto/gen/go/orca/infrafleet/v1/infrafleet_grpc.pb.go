@@ -32,6 +32,9 @@ const (
 	InfraFleetService_GetSshState_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
 	InfraFleetService_EstablishConnection_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
 	InfraFleetService_KillWorkspacePort_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
+	InfraFleetService_CreateAgentToken_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/CreateAgentToken"
+	InfraFleetService_ListAgentTokens_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/ListAgentTokens"
+	InfraFleetService_RevokeAgentToken_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/RevokeAgentToken"
 	InfraFleetService_SpawnTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
 	InfraFleetService_ResizeTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
 	InfraFleetService_KillTerminalSession_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
@@ -96,6 +99,12 @@ type InfraFleetServiceClient interface {
 	// a record of one requested. See usecase.EstablishConnection's doc comment.
 	EstablishConnection(ctx context.Context, in *EstablishConnectionRequest, opts ...grpc.CallOption) (*Connection, error)
 	KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error)
+	// CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
+	// persistent, named, per-DevServer agent token admin surface — see
+	// specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-03-agent-token-management.md.
+	CreateAgentToken(ctx context.Context, in *CreateAgentTokenRequest, opts ...grpc.CallOption) (*CreateAgentTokenResponse, error)
+	ListAgentTokens(ctx context.Context, in *ListAgentTokensRequest, opts ...grpc.CallOption) (*ListAgentTokensResponse, error)
+	RevokeAgentToken(ctx context.Context, in *RevokeAgentTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error)
 	ResizeTerminalSession(ctx context.Context, in *ResizeTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -272,6 +281,36 @@ func (c *infraFleetServiceClient) KillWorkspacePort(ctx context.Context, in *Kil
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(KillWorkspacePortResponse)
 	err := c.cc.Invoke(ctx, InfraFleetService_KillWorkspacePort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) CreateAgentToken(ctx context.Context, in *CreateAgentTokenRequest, opts ...grpc.CallOption) (*CreateAgentTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateAgentTokenResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_CreateAgentToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ListAgentTokens(ctx context.Context, in *ListAgentTokensRequest, opts ...grpc.CallOption) (*ListAgentTokensResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentTokensResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListAgentTokens_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) RevokeAgentToken(ctx context.Context, in *RevokeAgentTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_RevokeAgentToken_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -541,6 +580,12 @@ type InfraFleetServiceServer interface {
 	// a record of one requested. See usecase.EstablishConnection's doc comment.
 	EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error)
 	KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error)
+	// CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
+	// persistent, named, per-DevServer agent token admin surface — see
+	// specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-03-agent-token-management.md.
+	CreateAgentToken(context.Context, *CreateAgentTokenRequest) (*CreateAgentTokenResponse, error)
+	ListAgentTokens(context.Context, *ListAgentTokensRequest) (*ListAgentTokensResponse, error)
+	RevokeAgentToken(context.Context, *RevokeAgentTokenRequest) (*emptypb.Empty, error)
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error)
 	ResizeTerminalSession(context.Context, *ResizeTerminalSessionRequest) (*emptypb.Empty, error)
@@ -638,6 +683,15 @@ func (UnimplementedInfraFleetServiceServer) EstablishConnection(context.Context,
 }
 func (UnimplementedInfraFleetServiceServer) KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method KillWorkspacePort not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CreateAgentToken(context.Context, *CreateAgentTokenRequest) (*CreateAgentTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAgentToken not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListAgentTokens(context.Context, *ListAgentTokensRequest) (*ListAgentTokensResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentTokens not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) RevokeAgentToken(context.Context, *RevokeAgentTokenRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeAgentToken not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SpawnTerminalSession not implemented")
@@ -938,6 +992,60 @@ func _InfraFleetService_KillWorkspacePort_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InfraFleetServiceServer).KillWorkspacePort(ctx, req.(*KillWorkspacePortRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_CreateAgentToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAgentTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CreateAgentToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CreateAgentToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CreateAgentToken(ctx, req.(*CreateAgentTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ListAgentTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentTokensRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListAgentTokens(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListAgentTokens_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListAgentTokens(ctx, req.(*ListAgentTokensRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_RevokeAgentToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeAgentTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).RevokeAgentToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_RevokeAgentToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).RevokeAgentToken(ctx, req.(*RevokeAgentTokenRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1381,6 +1489,18 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "KillWorkspacePort",
 			Handler:    _InfraFleetService_KillWorkspacePort_Handler,
+		},
+		{
+			MethodName: "CreateAgentToken",
+			Handler:    _InfraFleetService_CreateAgentToken_Handler,
+		},
+		{
+			MethodName: "ListAgentTokens",
+			Handler:    _InfraFleetService_ListAgentTokens_Handler,
+		},
+		{
+			MethodName: "RevokeAgentToken",
+			Handler:    _InfraFleetService_RevokeAgentToken_Handler,
 		},
 		{
 			MethodName: "SpawnTerminalSession",
