@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/fanout/` (new package)
 **Depends on:** TASK-WT-02-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — internal/adapter/fanout package created (GRPCWorktreeCreator/GRPCAgentSpawner/GRPCPromptInjector); field names verified against real generated protos (GetProjectRequest.Id, not ProjectId); builds clean
 
 ---
 

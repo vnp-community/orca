@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_worktree.go`
 **Depends on:** TASK-WT-05-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — worktree.merge channel added with BR-WT-18 optional best-effort cleanup composition; builds clean
 
 ---
 

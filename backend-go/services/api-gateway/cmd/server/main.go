@@ -35,6 +35,7 @@ import (
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/authclient"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/fanout"
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/httpgateway"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wsbridge"
@@ -235,6 +236,15 @@ func run() error {
 	})
 	wsHandler := wsbridge.New(logger, authValidator, sessionValidator, notificationStreamOpener)
 
+	// fanOutUseCase composes SOL-WT-02's "create N worktrees, spawn N
+	// agents, inject N prompts" saga out of three already-real per-service
+	// gRPC clients — see usecase.FanOutCreateWorktrees's doc comment.
+	fanOutUseCase := usecase.NewFanOutCreateWorktrees(
+		fanout.NewGRPCWorktreeCreator(gitClient),
+		fanout.NewGRPCAgentSpawner(projectClient, infraFleetClient),
+		fanout.NewGRPCPromptInjector(infraFleetClient),
+	)
+
 	// wscompat: the legacy channel-based RPC transport the deployed
 	// frontend/ actually speaks over /ws (see internal/adapter/wscompat's
 	// package doc and docs/execution-plan.md's frontend-compatibility-layer
@@ -248,6 +258,7 @@ func run() error {
 		tenantClient, projectClient, issueTrackingClient, orchestrationClient, scmClient, workflowClient,
 		aiProviderClient,
 		rateLimiter,
+		fanOutUseCase,
 	)
 	// RegisterPushChannels wires the StreamHandler-backed (push-capable)
 	// channels — a separate registration mechanism from RegisterRealChannels'

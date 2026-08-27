@@ -1,23 +1,3 @@
-# TASK-WT-02-02: `FanOutCreateWorktrees` usecase (BR-WT-05/06/07/08)
-
-**From Solution:** SOL-WT-02
-**Priority:** P0
-**Service:** `api-gateway`
-**File:** `backend-go/services/api-gateway/internal/usecase/fan_out_create_worktrees.go` (new)
-**Depends on:** TASK-WT-02-01
-**Status:** `[x]` DONE — fan_out_create_worktrees.go created with WaitGroup-based per-item isolation; builds clean
-
----
-
-## Context
-
-The saga itself. **Critical correctness note from [SOL-WT-02](../solutions/SOL-WT-02-fan-out-worktree.md)**: this is deliberately NOT `errgroup.WithContext`'s cancel-on-first-error pattern (the shape `worktree.detectedList` already uses at `channels_worktree.go:209-220` for read-aggregation). BR-WT-08 requires the opposite — one item's failure must never cancel a sibling's in-flight call — so this uses a plain `sync.WaitGroup` with per-index result capture.
-
-## Changes to make
-
-Create `backend-go/services/api-gateway/internal/usecase/fan_out_create_worktrees.go`:
-
-```go
 package usecase
 
 import (
@@ -110,15 +90,14 @@ func (uc *FanOutCreateWorktrees) runOne(ctx context.Context, in FanOutCreateWork
 
 	return FanOutItemResult{Index: idx, WorktreeID: worktreeID, Path: path, HeadSHA: headSHA, PtyID: ptyID, ConnectionID: connectionID, Status: "ready"}
 }
-```
 
-**Known limitation, carried forward from the SOL, not silently resolved**: BR-WT-07 says the prompt must be injected only after the agent is *fully started*, not merely after the PTY process exists. No documented "CLI inside this PTY is ready for input" signal exists anywhere in `infra-fleet-service.md` or the agent RPC catalog. This implementation uses "`SpawnTerminalSession` returned successfully" as the readiness signal — a conservative under-approximation. A real fix needs either a per-agent-type ready-output pattern or an explicit `agent.ready` signal from the Dev Server Agent side, both out of scope here since the agent-side contract doesn't exist yet.
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/api-gateway/...
-```
-
-Expected: clean build. Behavior tests land in [TASK-WT-02-05](./TASK-WT-02-05-tests-usecase.md).
+// Known limitation, carried forward from the SOL, not silently resolved:
+// BR-WT-07 says the prompt must be injected only after the agent is fully
+// started, not merely after the PTY process exists. No documented "CLI
+// inside this PTY is ready for input" signal exists anywhere in
+// infra-fleet-service.md or the agent RPC catalog. This implementation uses
+// "SpawnTerminalSession returned successfully" as the readiness signal — a
+// conservative under-approximation. A real fix needs either a per-agent-type
+// ready-output pattern or an explicit agent.ready signal from the Dev Server
+// Agent side, both out of scope here since the agent-side contract doesn't
+// exist yet.

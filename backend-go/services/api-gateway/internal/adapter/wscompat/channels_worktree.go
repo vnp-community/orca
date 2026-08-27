@@ -42,7 +42,12 @@ func nonEmptyPtr(s string) *string {
 	return &s
 }
 
-func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServiceClient, projectClient projectv1.ProjectServiceClient) {
+func registerWorktreeChannels(
+	r *Registry,
+	gitClient gitgatewayv1.GitGatewayServiceClient,
+	projectClient projectv1.ProjectServiceClient,
+	fanOutUseCase *usecase.FanOutCreateWorktrees,
+) {
 	r.Register("worktree.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
 			ProjectID string `json:"projectId"`
@@ -83,6 +88,67 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 			return nil, err
 		}
 		return resp, nil
+	})
+
+	// worktree.checkDeleteSafety — the read RPC a client calls before
+	// rendering the delete-confirm dialog (SOL-WT-03).
+	r.Register("worktree.checkDeleteSafety", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type checkArgs struct {
+			WorktreeID string `json:"worktreeId"`
+		}
+		in, err := decodeArg[checkArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		resp, err := gitClient.CheckWorktreeDeleteSafety(ctx, &gitgatewayv1.CheckWorktreeDeleteSafetyRequest{WorktreeId: in.WorktreeID})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// worktree.merge — completes the merge and, when the caller supplies
+	// cleanupWorktreeIds, best-effort removes each of those worktrees
+	// afterward (BR-WT-18, optional-by-construction). Never auto-cleans up
+	// after a conflicted merge, and one cleanup item's failure never masks
+	// the successful merge response — same per-item isolation posture as
+	// SOL-WT-02's fan-out, this time for a post-success chained call.
+	r.Register("worktree.merge", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type mergeArgs struct {
+			WorktreeID         string   `json:"worktreeId"`
+			BaseBranch         string   `json:"baseBranch"`
+			Strategy           string   `json:"strategy"`
+			CommitMessage      string   `json:"commitMessage"`
+			CleanupWorktreeIDs []string `json:"cleanupWorktreeIds"` // BR-WT-18 — optional
+		}
+		in, err := decodeArg[mergeArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		resp, err := gitClient.MergeBranch(ctx, &gitgatewayv1.MergeBranchRequest{
+			WorktreeId: in.WorktreeID, BaseBranch: in.BaseBranch, Strategy: in.Strategy, CommitMessage: in.CommitMessage,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if resp.GetHasConflicts() || len(in.CleanupWorktreeIDs) == 0 {
+			return resp, nil // never auto-cleanup on a conflicted merge
+		}
+
+		// BR-WT-18 — optional, best-effort, per-item isolated the same way
+		// SOL-WT-02's fan-out is: one cleanup failure must not mask the
+		// successful merge response.
+		cleanupResults := make(map[string]string, len(in.CleanupWorktreeIDs))
+		for _, wtID := range in.CleanupWorktreeIDs {
+			if _, err := gitClient.RemoveWorktree(ctx, &gitgatewayv1.RemoveWorktreeRequest{WorktreeId: wtID, Force: false}); err != nil {
+				cleanupResults[wtID] = err.Error()
+			} else {
+				cleanupResults[wtID] = "removed"
+			}
+		}
+		return map[string]any{"merge": resp, "cleanup": cleanupResults}, nil
 	})
 
 	r.Register("worktree.forceDeleteBranch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -245,5 +311,34 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 			}
 		}
 		return map[string]any{"orphanedPaths": orphaned}, nil
+	})
+
+	// worktree.fanOut — SOL-WT-02's "create N worktrees, spawn N agents,
+	// inject N prompts" saga, composed at api-gateway's edge from three
+	// already-real per-service RPCs. See usecase.FanOutCreateWorktrees for
+	// the per-item failure-isolation guarantee (BR-WT-08).
+	r.Register("worktree.fanOut", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type fanOutArgs struct {
+			ProjectID    string `json:"projectId"`
+			RepoID       string `json:"repoId"`
+			BaseRef      string `json:"baseRef"`
+			BranchPrefix string `json:"branchPrefix"`
+			Prompt       string `json:"prompt"`
+			AgentType    string `json:"agentType"`
+			N            int    `json:"n"`
+		}
+		in, err := decodeArg[fanOutArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		results, err := fanOutUseCase.Execute(ctx, usecase.FanOutCreateWorktreesInput{
+			ProjectID: in.ProjectID, RepoID: in.RepoID, BaseRef: in.BaseRef,
+			BranchPrefix: in.BranchPrefix, Prompt: in.Prompt, N: in.N, AgentType: in.AgentType,
+		})
+		if err != nil {
+			return nil, err // BR-WT-05 violation (n out of [1,10]) surfaces here, before any item runs
+		}
+		return map[string]any{"items": results}, nil
 	})
 }

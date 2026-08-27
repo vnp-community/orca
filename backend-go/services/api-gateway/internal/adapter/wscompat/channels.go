@@ -83,6 +83,7 @@ func RegisterRealChannels(
 	workflowClient workflowv1.WorkflowServiceClient,
 	aiProviderClient aiproviderv1.AiProviderServiceClient,
 	rateLimits rateLimitReader,
+	fanOutUseCase *usecase.FanOutCreateWorktrees,
 ) {
 	registerAnnotationChannels(r, annotationClient)
 	registerTaskChannels(r, taskClient)
@@ -116,7 +117,7 @@ func RegisterRealChannels(
 	registerGitDeepChannels(r, gitClient)
 	registerFilesChannels(r, gitClient)
 	registerAutomationTaskChannels(r, automationClient, taskClient)
-	registerWorktreeChannels(r, gitClient, projectClient)
+	registerWorktreeChannels(r, gitClient, projectClient, fanOutUseCase)
 	registerWorkspaceChannels(r, gitClient, projectClient)
 	registerEmulatorFolderWorkspaceHostChannels(r, projectClient, infraFleetClient)
 	registerTeamChannels(r, tenantClient)

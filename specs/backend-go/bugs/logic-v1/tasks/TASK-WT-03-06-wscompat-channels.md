@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_worktree.go`
 **Depends on:** TASK-WT-03-04, TASK-WT-03-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — worktree.checkDeleteSafety channel added; worktree.rm already threaded stopAgents from Phase 1's earlier commit; builds clean
 
 ---
 
