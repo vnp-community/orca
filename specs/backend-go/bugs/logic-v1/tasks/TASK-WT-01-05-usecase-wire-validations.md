@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/create_worktree.go`
 **Depends on:** TASK-WT-01-01, TASK-WT-01-02, TASK-WT-01-03, TASK-WT-01-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — create_worktree.go rewritten with BR-WT-01/04 + [A1]/[A2] validation (lineage-capture struct dropped — doesn't exist in this codebase's actual CreateWorktreeRequest, which only has fields 1-4); wscompat worktree.create forwards name/path. go build+test clean.
 
 ---
 

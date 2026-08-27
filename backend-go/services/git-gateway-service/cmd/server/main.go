@@ -33,6 +33,7 @@ import (
 
 	gitgatewaygrpc "github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/grpcclient"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/infraclient"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/localfs"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/localgit"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/scmclient"
@@ -194,9 +195,17 @@ func run() error {
 	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(resolver, local, relay)
 
 	scrollbackCleaner := grpcclient.NewScrollbackCleaner(infraFleetClient)
+	// terminalSessionLister backs BR-WT-09/10's server-side agent-running
+	// guards (RemoveWorktree) and CheckWorktreeDeleteSafety's read — both
+	// new outbound calls on the already-existing git-gateway-service -->
+	// infra-fleet-service dependency edge (SOL-WT-03), not a new one.
+	terminalSessionLister := infraclient.NewTerminalSessionLister(infraFleetClient)
 
 	createWorktreeUC := usecase.NewCreateWorktree(resolver, projectClient, local, relay)
-	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, scrollbackCleaner, scmClient, local, relay)
+	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, scrollbackCleaner, scmClient, local, relay, terminalSessionLister)
+	checkWorktreeDeleteSafetyUC := usecase.NewCheckWorktreeDeleteSafety(resolver, local, relay, terminalSessionLister)
+	compareWorktreesUC := usecase.NewCompareWorktrees(resolver, projectClient, local, relay)
+	mergeWorktreeIntoBaseUC := usecase.NewMergeWorktreeIntoBase(resolver, projectClient, local, relay)
 	forceDeleteBranchUC := usecase.NewForceDeleteBranch(resolver, local, relay)
 	detectWorktreesUC := usecase.NewDetectWorktrees(resolver, projectClient, local, relay)
 	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)
@@ -231,12 +240,12 @@ func run() error {
 		renameFileUC, copyFileUC,
 		cloneUC, initRepoUC, baseRefDefaultUC, searchRefsUC, checkHooksUC,
 		readIssueCommandUC, writeIssueCommandUC, scanSetupScriptImportsUC,
-		createWorktreeUC, removeWorktreeUC, forceDeleteBranchUC, detectWorktreesUC,
+		createWorktreeUC, createWorktreeFromIssueUC, removeWorktreeUC, forceDeleteBranchUC, detectWorktreesUC,
 		prefetchCreateBaseUC, resolvePrBaseUC, resolveMrBaseUC,
 		checkoutUC, listLocalBranchesUC, fastForwardUC, rebaseFromBaseUC,
 		abortRebaseUC, abortMergeUC, conflictOperationUC, resolveConflictUC,
 		discardUC, bulkDiscardUC,
-		createWorktreeFromIssueUC,
+		checkWorktreeDeleteSafetyUC, compareWorktreesUC, mergeWorktreeIntoBaseUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

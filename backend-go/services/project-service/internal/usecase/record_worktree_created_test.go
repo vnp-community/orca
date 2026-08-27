@@ -90,6 +90,45 @@ func TestRecordWorktreeCreated_RejectsEmptyPath(t *testing.T) {
 	assertAppError(t, err, apperrors.KindInvalidArgument, "PROJECT_WORKTREE_INVALID")
 }
 
+// TestRecordWorktreeCreated_WritesOutboxEventInSameTransaction (SOL-WT-01):
+// asserts the event built by Execute (via WorktreeRepository.
+// CreateWorktreeWithEvent) has the expected subject and a non-empty id, and
+// that its payload round-trips to the created worktree's id/project id —
+// see worktreeLifecycleEventPayload's doc comment for why repo_id/path/
+// branch aren't part of this payload (it mirrors
+// projectv1.WorktreeLifecycleEvent's wire fields, not the full Worktree row).
+func TestRecordWorktreeCreated_WritesOutboxEventInSameTransaction(t *testing.T) {
+	repo := newFakeWorktreeRepository()
+	uc := NewRecordWorktreeCreated(repo)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	got, err := uc.Execute(ctx, RecordWorktreeCreatedInput{
+		ProjectID: "p1", RepoID: "r1", Path: "/srv/worktrees/w1", Branch: "feature/x",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.enqueuedEvents) != 1 {
+		t.Fatalf("expected exactly one enqueued event, got %d", len(repo.enqueuedEvents))
+	}
+	event := repo.enqueuedEvents[0]
+
+	if event.Subject != "orca.project.worktree.created" {
+		t.Fatalf("expected subject orca.project.worktree.created, got %q", event.Subject)
+	}
+	if event.ID == "" {
+		t.Error("expected a non-empty event id")
+	}
+
+	var payload worktreeLifecycleEventPayload
+	if err := json.Unmarshal(event.PayloadJSON, &payload); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if payload.WorktreeID != got.ID || payload.ProjectID != "p1" {
+		t.Errorf("expected payload to round-trip the created worktree's id/project id, got %+v", payload)
+	}
+}
+
 func TestRecordWorktreeCreated_RequiresTenantContext(t *testing.T) {
 	repo := newFakeWorktreeRepository()
 	uc := NewRecordWorktreeCreated(repo)

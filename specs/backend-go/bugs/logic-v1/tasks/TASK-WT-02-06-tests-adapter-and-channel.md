@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_worktree_test.go`
 **Depends on:** TASK-WT-02-03, TASK-WT-02-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — agent_spawner_test.go/prompt_injector_test.go added to internal/adapter/fanout; TestWorktreeFanOut_HappyPath/_NOutOfRange added to channels_worktree_test.go; all pass
 
 ---
 

@@ -229,6 +229,7 @@ func run() error {
 	recordWorktreeCreatedUC := usecase.NewRecordWorktreeCreated(worktreeRepo)
 	recordWorktreeRemovedUC := usecase.NewRecordWorktreeRemoved(worktreeRepo)
 	listWorktreesUC := usecase.NewListWorktrees(worktreeRepo, repo, opa)
+	getWorktreeUC := usecase.NewGetWorktree(worktreeRepo)
 	setWorktreeActivationUC := usecase.NewSetWorktreeActivation(worktreeRepo)
 	renameWorktreeUC := usecase.NewRenameWorktree(worktreeRepo)
 	getWorktreeByIdempotencyKeyUC := usecase.NewGetWorktreeByIdempotencyKey(worktreeRepo)
@@ -272,6 +273,7 @@ func run() error {
 		RecordWorktreeCreated:       recordWorktreeCreatedUC,
 		RecordWorktreeRemoved:       recordWorktreeRemovedUC,
 		ListWorktrees:               listWorktreesUC,
+		GetWorktree:                 getWorktreeUC,
 		SetWorktreeActivation:       setWorktreeActivationUC,
 		RenameWorktree:              renameWorktreeUC,
 		GetWorktreeByIdempotencyKey: getWorktreeByIdempotencyKeyUC,
@@ -337,6 +339,9 @@ func run() error {
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
 
+	// Wait for the outbox relay goroutine (if started) to observe ctx
+	// cancellation and return, so it doesn't outlive the rest of the
+	// server on shutdown — same pattern usage-service's main.go uses.
 	relayWG.Wait()
 
 	return nil

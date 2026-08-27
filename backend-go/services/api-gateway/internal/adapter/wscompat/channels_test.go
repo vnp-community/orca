@@ -569,7 +569,7 @@ func TestPreflightCheckChannel_NoConnectionIDIsLocalOnly(t *testing.T) {
 // registration time.
 func TestRegisterRealChannels_RegistersAnnotationSendToAgent(t *testing.T) {
 	r := NewRegistry()
-	RegisterRealChannels(r, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &fakeRateLimitReader{})
+	RegisterRealChannels(r, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &fakeRateLimitReader{}, nil)
 
 	if _, ok := r.handlers["annotation.sendToAgent"]; !ok {
 		t.Error("want annotation.sendToAgent registered by RegisterRealChannels")

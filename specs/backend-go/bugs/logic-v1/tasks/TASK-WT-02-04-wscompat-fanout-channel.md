@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_worktree.go`
 **Depends on:** TASK-WT-02-02, TASK-WT-02-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — worktree.fanOut channel registered, RegisterRealChannels/main.go wired with fanOutUseCase; builds clean
 
 ---
 

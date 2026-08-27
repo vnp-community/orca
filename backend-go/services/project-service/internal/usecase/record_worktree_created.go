@@ -18,6 +18,7 @@ type RecordWorktreeCreatedInput struct {
 	Path           string
 	Branch         string
 	IdempotencyKey string
+	BaseRef        string // NEW (SOL-WT-04)
 	// LinkedIssueProvider/LinkedIssueRef come from git-gateway-service's
 	// CreateWorktreeFromIssue saga (SOL-PI-02) — empty for a plain
 	// CreateWorktree call.
@@ -48,7 +49,7 @@ func (uc *RecordWorktreeCreated) Execute(ctx context.Context, in RecordWorktreeC
 		return domain.Worktree{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
 	}
 
-	wt, err := domain.NewWorktree(uuid.NewString(), in.ProjectID, in.RepoID, in.Path, in.Branch, in.IdempotencyKey)
+	wt, err := domain.NewWorktree(uuid.NewString(), in.ProjectID, in.RepoID, in.Path, in.Branch, in.IdempotencyKey, in.BaseRef)
 	if err != nil {
 		return domain.Worktree{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_WORKTREE_INVALID", err.Error(), err)
 	}

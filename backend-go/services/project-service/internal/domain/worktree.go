@@ -62,6 +62,8 @@ type Worktree struct {
 
 	// Status is orthogonal to Active — see WorktreeStatus's doc comment.
 	Status WorktreeStatus
+
+	BaseRef *string // NEW (SOL-WT-04) — the branch/tag/sha this worktree was created from; nil for worktrees created before this backfill
 }
 
 // NewWorktree constructs a Worktree, enforcing the invariants a metadata
@@ -70,7 +72,7 @@ type Worktree struct {
 // called after the real `git worktree add` already succeeded, so there is
 // no "created but inactive"/"created but not yet active-status" state to
 // represent at construction time.
-func NewWorktree(id, projectID, repoID, path, branch, idempotencyKey string) (Worktree, error) {
+func NewWorktree(id, projectID, repoID, path, branch, idempotencyKey, baseRef string) (Worktree, error) {
 	if projectID == "" {
 		return Worktree{}, ErrEmptyProjectID
 	}
@@ -87,6 +89,7 @@ func NewWorktree(id, projectID, repoID, path, branch, idempotencyKey string) (Wo
 		ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true,
 		IdempotencyKey: nonEmptyPtr(idempotencyKey),
 		Status:         WorktreeStatusActive,
+		BaseRef:        nonEmptyPtr(baseRef),
 	}, nil
 }
 

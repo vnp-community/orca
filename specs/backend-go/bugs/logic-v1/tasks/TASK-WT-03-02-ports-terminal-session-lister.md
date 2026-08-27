@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/ports.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added TerminalSessionLister port + domain.TerminalSessionRef; go build clean.
 
 ---
 

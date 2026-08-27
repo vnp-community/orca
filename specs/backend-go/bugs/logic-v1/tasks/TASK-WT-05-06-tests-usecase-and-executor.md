@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/merge_worktree_into_base_test.go` (new)
 **Depends on:** TASK-WT-05-03, TASK-WT-05-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added merge_worktree_into_base_test.go (7 cases) and localgit executor_test.go MergeBranch cases (merge/squash/conflict, real git in temp repo). go test clean.
 
 ---
 

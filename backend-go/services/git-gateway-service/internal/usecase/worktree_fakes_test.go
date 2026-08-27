@@ -23,6 +23,7 @@ type fakeProjectClient struct {
 	gotRecordCreatedRepo    string
 	gotRecordCreatedPath    string
 	gotRecordCreatedBranch  string
+	gotRecordCreatedBaseRef string
 	gotRecordCreatedLineage domain.WorktreeLineageCapture
 
 	recordRemovedErr    error
@@ -36,6 +37,15 @@ type fakeProjectClient struct {
 
 	issueStatusSyncEnabled    bool
 	issueStatusSyncEnabledErr error
+
+	listWorktreesResult []domain.WorktreeRecord
+	listWorktreesErr    error
+	calledListWorktrees bool
+
+	getWorktreeResult domain.WorktreeInfo
+	getWorktreeErr    error
+	calledGetWorktree bool
+	gotGetWorktreeID  string
 }
 
 func (f *fakeProjectClient) GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error) {
@@ -50,12 +60,13 @@ func (f *fakeProjectClient) GetRepo(ctx context.Context, repoID string) (domain.
 	return domain.RepoInfo{ID: repoID}, nil
 }
 
-func (f *fakeProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
+func (f *fakeProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch, baseRef string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	f.calledRecordCreated = true
 	f.gotRecordCreatedProject = projectID
 	f.gotRecordCreatedRepo = repoID
 	f.gotRecordCreatedPath = path
 	f.gotRecordCreatedBranch = branch
+	f.gotRecordCreatedBaseRef = baseRef
 	f.gotRecordCreatedLineage = lineage
 	if f.recordCreatedErr != nil {
 		return domain.WorktreeRecord{}, f.recordCreatedErr
@@ -84,6 +95,26 @@ func (f *fakeProjectClient) IsIssueStatusSyncEnabled(ctx context.Context, projec
 	return f.issueStatusSyncEnabled, nil
 }
 
+func (f *fakeProjectClient) ListWorktrees(ctx context.Context, projectID string) ([]domain.WorktreeRecord, error) {
+	f.calledListWorktrees = true
+	if f.listWorktreesErr != nil {
+		return nil, f.listWorktreesErr
+	}
+	return f.listWorktreesResult, nil
+}
+
+func (f *fakeProjectClient) GetWorktree(ctx context.Context, worktreeID string) (domain.WorktreeInfo, error) {
+	f.calledGetWorktree = true
+	f.gotGetWorktreeID = worktreeID
+	if f.getWorktreeErr != nil {
+		return domain.WorktreeInfo{}, f.getWorktreeErr
+	}
+	if f.getWorktreeResult != (domain.WorktreeInfo{}) {
+		return f.getWorktreeResult, nil
+	}
+	return domain.WorktreeInfo{ID: worktreeID}, nil
+}
+
 // fakeScrollbackCleaner is an in-memory ScrollbackCleaner — used by
 // remove_worktree_test.go to assert RemoveWorktree's best-effort cleanup
 // call is made with the removed worktree's ID, and that a cleanup RPC
@@ -98,6 +129,34 @@ func (f *fakeScrollbackCleaner) DeleteTerminalScrollbackSnapshots(ctx context.Co
 	f.called = true
 	f.gotWorktreeID = worktreeID
 	return f.err
+}
+
+// fakeTerminalSessionLister is an in-memory TerminalSessionLister — shared
+// by remove_worktree_test.go and check_worktree_delete_safety_test.go.
+type fakeTerminalSessionLister struct {
+	sessions     []domain.TerminalSessionRef
+	listErr      error
+	killErr      error
+	calledList   bool
+	gotConnID    string
+	killedPtyIDs []string
+}
+
+func (f *fakeTerminalSessionLister) ListSessions(ctx context.Context, connectionID string) ([]domain.TerminalSessionRef, error) {
+	f.calledList = true
+	f.gotConnID = connectionID
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	return f.sessions, nil
+}
+
+func (f *fakeTerminalSessionLister) Kill(ctx context.Context, ptyID string) error {
+	if f.killErr != nil {
+		return f.killErr
+	}
+	f.killedPtyIDs = append(f.killedPtyIDs, ptyID)
+	return nil
 }
 
 // fakeSCMClient is an in-memory SCMClient — shared by resolve_pr_base_test.go

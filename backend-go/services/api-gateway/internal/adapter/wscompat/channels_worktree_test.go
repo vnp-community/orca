@@ -10,6 +10,8 @@ import (
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
 // fakeGitGatewayServiceClient/fakeProjectServiceClient are minimal test
@@ -19,23 +21,35 @@ import (
 type fakeGitGatewayServiceClient struct {
 	gitgatewayv1.GitGatewayServiceClient
 
-	createWorktreeFunc          func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error)
-	createWorktreeFromIssueFunc func(ctx context.Context, in *gitgatewayv1.CreateWorktreeFromIssueRequest) (*gitgatewayv1.CreateWorktreeFromIssueResponse, error)
-	removeWorktreeFunc          func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error)
-	forceDeleteBranchFunc       func(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error)
-	prefetchCreateBaseFunc      func(ctx context.Context, in *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error)
-	resolvePrBaseFunc           func(ctx context.Context, in *gitgatewayv1.ResolvePrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
-	resolveMrBaseFunc           func(ctx context.Context, in *gitgatewayv1.ResolveMrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
-	detectWorktreesFunc         func(ctx context.Context, in *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error)
+	createWorktreeFunc            func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error)
+	createWorktreeFromIssueFunc   func(ctx context.Context, in *gitgatewayv1.CreateWorktreeFromIssueRequest) (*gitgatewayv1.CreateWorktreeFromIssueResponse, error)
+	removeWorktreeFunc            func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error)
+	forceDeleteBranchFunc         func(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error)
+	prefetchCreateBaseFunc        func(ctx context.Context, in *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error)
+	resolvePrBaseFunc             func(ctx context.Context, in *gitgatewayv1.ResolvePrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
+	resolveMrBaseFunc             func(ctx context.Context, in *gitgatewayv1.ResolveMrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
+	detectWorktreesFunc           func(ctx context.Context, in *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error)
+	compareWorktreesFunc          func(ctx context.Context, in *gitgatewayv1.CompareWorktreesRequest) (*gitgatewayv1.CompareWorktreesResponse, error)
+	checkWorktreeDeleteSafetyFunc func(ctx context.Context, in *gitgatewayv1.CheckWorktreeDeleteSafetyRequest) (*gitgatewayv1.CheckWorktreeDeleteSafetyResponse, error)
+	mergeBranchFunc               func(ctx context.Context, in *gitgatewayv1.MergeBranchRequest) (*gitgatewayv1.MergeBranchResponse, error)
 
-	calledCreateWorktree          bool
-	calledCreateWorktreeFromIssue bool
-	calledRemoveWorktree          bool
-	calledForceDeleteBranch       bool
-	calledPrefetchCreateBase      bool
-	calledResolvePrBase           bool
-	calledResolveMrBase           bool
-	calledDetectWorktrees         bool
+	calledCreateWorktree            bool
+	calledCreateWorktreeFromIssue   bool
+	calledRemoveWorktree            bool
+	calledForceDeleteBranch         bool
+	calledPrefetchCreateBase        bool
+	calledResolvePrBase             bool
+	calledResolveMrBase             bool
+	calledDetectWorktrees           bool
+	calledCompareWorktrees          bool
+	calledCheckWorktreeDeleteSafety bool
+	calledMergeBranch               bool
+	removeWorktreeCalls             []*gitgatewayv1.RemoveWorktreeRequest
+}
+
+func (f *fakeGitGatewayServiceClient) CompareWorktrees(ctx context.Context, in *gitgatewayv1.CompareWorktreesRequest, _ ...grpc.CallOption) (*gitgatewayv1.CompareWorktreesResponse, error) {
+	f.calledCompareWorktrees = true
+	return f.compareWorktreesFunc(ctx, in)
 }
 
 func (f *fakeGitGatewayServiceClient) CreateWorktree(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateWorktreeResponse, error) {
@@ -48,9 +62,20 @@ func (f *fakeGitGatewayServiceClient) CreateWorktreeFromIssue(ctx context.Contex
 	return f.createWorktreeFromIssueFunc(ctx, in)
 }
 
-func (f *fakeGitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+func (f *fakeGitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.RemoveWorktreeResponse, error) {
 	f.calledRemoveWorktree = true
+	f.removeWorktreeCalls = append(f.removeWorktreeCalls, in)
 	return f.removeWorktreeFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) CheckWorktreeDeleteSafety(ctx context.Context, in *gitgatewayv1.CheckWorktreeDeleteSafetyRequest, _ ...grpc.CallOption) (*gitgatewayv1.CheckWorktreeDeleteSafetyResponse, error) {
+	f.calledCheckWorktreeDeleteSafety = true
+	return f.checkWorktreeDeleteSafetyFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) MergeBranch(ctx context.Context, in *gitgatewayv1.MergeBranchRequest, _ ...grpc.CallOption) (*gitgatewayv1.MergeBranchResponse, error) {
+	f.calledMergeBranch = true
+	return f.mergeBranchFunc(ctx, in)
 }
 
 func (f *fakeGitGatewayServiceClient) ForceDeleteBranch(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
@@ -108,7 +133,7 @@ func TestWorktreeCreateChannel_Success(t *testing.T) {
 	}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
 		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "branch": "feature", "baseRef": "main"}))
@@ -134,7 +159,7 @@ func TestWorktreeCreateFromIssueChannel_ScmShapeDecodesCorrectly(t *testing.T) {
 	}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.createFromIssue",
 		argsJSON(t, map[string]any{
@@ -167,7 +192,7 @@ func TestWorktreeCreateFromIssueChannel_TrackerShapeDecodesCorrectly(t *testing.
 	}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.createFromIssue",
 		argsJSON(t, map[string]any{
@@ -190,7 +215,7 @@ func TestWorktreeCreateFromIssueChannel_UnknownProviderRejectedBeforeRPC(t *test
 	git := &fakeGitGatewayServiceClient{}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "worktree.createFromIssue",
 		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "provider": "bitbucket"}))
@@ -206,7 +231,7 @@ func TestWorktreeCreateFromIssueChannel_ScmProviderMissingRepoOrNumberRejectedBe
 	git := &fakeGitGatewayServiceClient{}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	// Missing "number".
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "worktree.createFromIssue",
@@ -223,7 +248,7 @@ func TestWorktreeCreateFromIssueChannel_TrackerProviderMissingIssueRefRejectedBe
 	git := &fakeGitGatewayServiceClient{}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "worktree.createFromIssue",
 		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "provider": "jira"}))
@@ -238,14 +263,14 @@ func TestWorktreeCreateFromIssueChannel_TrackerProviderMissingIssueRefRejectedBe
 func TestWorktreeRmChannel_Success(t *testing.T) {
 	var gotReq *gitgatewayv1.RemoveWorktreeRequest
 	git := &fakeGitGatewayServiceClient{
-		removeWorktreeFunc: func(_ context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error) {
+		removeWorktreeFunc: func(_ context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error) {
 			gotReq = in
-			return &emptypb.Empty{}, nil
+			return &gitgatewayv1.RemoveWorktreeResponse{UncommittedFilesDiscarded: 3}, nil
 		},
 	}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.rm",
 		argsJSON(t, map[string]any{"worktreeId": "wt-1", "force": true}))
@@ -255,8 +280,35 @@ func TestWorktreeRmChannel_Success(t *testing.T) {
 	if gotReq.GetWorktreeId() != "wt-1" || !gotReq.GetForce() {
 		t.Errorf("unexpected request: %+v", gotReq)
 	}
-	if v, ok := result.(map[string]bool); !ok || !v["ok"] {
-		t.Errorf("expected {ok:true}, got %+v", result)
+	resp, ok := result.(*gitgatewayv1.RemoveWorktreeResponse)
+	if !ok || resp.GetUncommittedFilesDiscarded() != 3 {
+		t.Errorf("expected response to be returned unmodified, got %+v", result)
+	}
+}
+
+func TestWorktreeCompareChannel_Success(t *testing.T) {
+	var gotReq *gitgatewayv1.CompareWorktreesRequest
+	git := &fakeGitGatewayServiceClient{
+		compareWorktreesFunc: func(_ context.Context, in *gitgatewayv1.CompareWorktreesRequest) (*gitgatewayv1.CompareWorktreesResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CompareWorktreesResponse{BaseRef: "main"}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, nil)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.compare",
+		argsJSON(t, map[string]any{"worktreeIds": []string{"wt-1", "wt-2"}}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(gotReq.GetWorktreeIds()) != 2 {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	resp, ok := result.(*gitgatewayv1.CompareWorktreesResponse)
+	if !ok || resp.GetBaseRef() != "main" {
+		t.Errorf("expected response to be returned unmodified, got %+v", result)
 	}
 }
 
@@ -270,7 +322,7 @@ func TestWorktreeForceDeleteBranchChannel_Success(t *testing.T) {
 	}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.forceDeleteBranch",
 		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
@@ -295,7 +347,7 @@ func TestWorktreePrefetchCreateBaseChannel_Success(t *testing.T) {
 	}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.prefetchCreateBase",
 		argsJSON(t, map[string]any{"repoId": "repo-1", "baseRef": "main"}))
@@ -321,7 +373,7 @@ func TestWorktreeResolvePrBaseChannel_Success(t *testing.T) {
 	}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.resolvePrBase",
 		argsJSON(t, map[string]any{"repoId": "repo-1", "prNumber": 42}))
@@ -347,7 +399,7 @@ func TestWorktreeResolveMrBaseChannel_Success(t *testing.T) {
 	}
 	project := &fakeProjectServiceClient{}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.resolveMrBase",
 		argsJSON(t, map[string]any{"repoId": "repo-1", "mrNumber": 7}))
@@ -376,7 +428,7 @@ func TestWorktreeListChannel_CallsProjectClientNotGitClient(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.list",
 		argsJSON(t, map[string]any{"projectId": "proj-1"}))
@@ -410,7 +462,7 @@ func TestWorktreeSetChannel_CallsProjectClientNotGitClient(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.set",
 		argsJSON(t, map[string]any{"worktreeId": "wt-1", "active": true}))
@@ -444,7 +496,7 @@ func TestWorktreeDetectedListChannel_OrphanedPathNotInBookkeeping(t *testing.T) 
 		},
 	}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.detectedList",
 		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1"}))
@@ -476,7 +528,7 @@ func TestWorktreeDetectedListChannel_GitGatewayErrors_WholeCallFails(t *testing.
 		},
 	}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.detectedList",
 		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1"}))
@@ -500,7 +552,7 @@ func TestWorktreeDetectedListChannel_BothEmpty_ReturnsEmptyNotError(t *testing.T
 		},
 	}
 	r := NewRegistry()
-	registerWorktreeChannels(r, git, project)
+	registerWorktreeChannels(r, git, project, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.detectedList",
 		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1"}))
@@ -520,5 +572,263 @@ func TestWorktreeDetectedListChannel_BothEmpty_ReturnsEmptyNotError(t *testing.T
 	}
 	if len(orphaned) != 0 {
 		t.Errorf("expected orphanedPaths to be empty, got %v", orphaned)
+	}
+}
+
+// ── worktree.checkDeleteSafety / worktree.rm stopAgents threading ───────────
+
+func TestWorktreeCheckDeleteSafety_HappyPath(t *testing.T) {
+	var gotReq *gitgatewayv1.CheckWorktreeDeleteSafetyRequest
+	git := &fakeGitGatewayServiceClient{
+		checkWorktreeDeleteSafetyFunc: func(_ context.Context, in *gitgatewayv1.CheckWorktreeDeleteSafetyRequest) (*gitgatewayv1.CheckWorktreeDeleteSafetyResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CheckWorktreeDeleteSafetyResponse{
+				UncommittedFiles: 2, UntrackedFiles: 1, AgentRunning: true,
+				ActivePtyIds: []string{"pty-1"}, SafeToDelete: false,
+			}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, nil)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.checkDeleteSafety",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetWorktreeId() != "wt-1" {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	resp, ok := result.(*gitgatewayv1.CheckWorktreeDeleteSafetyResponse)
+	if !ok || resp.GetUncommittedFiles() != 2 || resp.GetUntrackedFiles() != 1 || !resp.GetAgentRunning() || resp.GetSafeToDelete() {
+		t.Errorf("expected response to be returned unmodified, got %+v", result)
+	}
+}
+
+func TestWorktreeRm_StopAgentsThreadsThroughToGRPCRequest(t *testing.T) {
+	var gotReq *gitgatewayv1.RemoveWorktreeRequest
+	git := &fakeGitGatewayServiceClient{
+		removeWorktreeFunc: func(_ context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.RemoveWorktreeResponse{StoppedPtyIds: []string{"pty-1"}}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, nil)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.rm",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "force": false, "stopAgents": true}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetWorktreeId() != "wt-1" || !gotReq.GetStopAgents() {
+		t.Errorf("expected StopAgents to be threaded through to RemoveWorktreeRequest, got %+v", gotReq)
+	}
+	resp, ok := result.(*gitgatewayv1.RemoveWorktreeResponse)
+	if !ok || len(resp.GetStoppedPtyIds()) != 1 || resp.GetStoppedPtyIds()[0] != "pty-1" {
+		t.Errorf("expected response to be returned unmodified, got %+v", result)
+	}
+}
+
+// ── worktree.merge (BR-WT-18 optional cleanup composition) ──────────────────
+
+func TestWorktreeMerge_HappyPath(t *testing.T) {
+	git := &fakeGitGatewayServiceClient{
+		mergeBranchFunc: func(_ context.Context, _ *gitgatewayv1.MergeBranchRequest) (*gitgatewayv1.MergeBranchResponse, error) {
+			return &gitgatewayv1.MergeBranchResponse{ResultSha: "sha-merged", HasConflicts: false}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, nil)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.merge",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseBranch": "main", "strategy": "merge"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*gitgatewayv1.MergeBranchResponse)
+	if !ok || resp.GetResultSha() != "sha-merged" {
+		t.Errorf("expected the raw MergeBranchResponse to be returned unmodified, got %+v (%T)", result, result)
+	}
+	if git.calledRemoveWorktree {
+		t.Error("expected RemoveWorktree NOT to be called when no cleanupWorktreeIds are given")
+	}
+}
+
+func TestWorktreeMerge_ConflictedMerge_NeverCallsRemoveWorktree_EvenWithCleanupIDsSet(t *testing.T) {
+	git := &fakeGitGatewayServiceClient{
+		mergeBranchFunc: func(_ context.Context, _ *gitgatewayv1.MergeBranchRequest) (*gitgatewayv1.MergeBranchResponse, error) {
+			return &gitgatewayv1.MergeBranchResponse{HasConflicts: true, ConflictedPaths: []string{"file.txt"}}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, nil)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.merge",
+		argsJSON(t, map[string]any{
+			"worktreeId": "wt-1", "baseBranch": "main", "strategy": "merge",
+			"cleanupWorktreeIds": []string{"wt-2", "wt-3"},
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*gitgatewayv1.MergeBranchResponse)
+	if !ok || !resp.GetHasConflicts() {
+		t.Errorf("expected the raw conflicted MergeBranchResponse to be returned, got %+v", result)
+	}
+	if git.calledRemoveWorktree {
+		t.Error("expected RemoveWorktree to never be called on a conflicted merge, even with cleanupWorktreeIds set")
+	}
+}
+
+func TestWorktreeMerge_CleanupOneFails_OthersStillRemoved_MergeResponseStillReturned(t *testing.T) {
+	git := &fakeGitGatewayServiceClient{
+		mergeBranchFunc: func(_ context.Context, _ *gitgatewayv1.MergeBranchRequest) (*gitgatewayv1.MergeBranchResponse, error) {
+			return &gitgatewayv1.MergeBranchResponse{ResultSha: "sha-merged", HasConflicts: false}, nil
+		},
+		removeWorktreeFunc: func(_ context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error) {
+			if in.GetWorktreeId() == "wt-2" {
+				return nil, errors.New("worktree has uncommitted changes")
+			}
+			return &gitgatewayv1.RemoveWorktreeResponse{}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, nil)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.merge",
+		argsJSON(t, map[string]any{
+			"worktreeId": "wt-1", "baseBranch": "main", "strategy": "merge",
+			"cleanupWorktreeIds": []string{"wt-2", "wt-3", "wt-4"},
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	mergeResp, ok := m["merge"].(*gitgatewayv1.MergeBranchResponse)
+	if !ok || mergeResp.GetResultSha() != "sha-merged" {
+		t.Fatalf("expected merge key to carry the successful merge response, got %+v", m["merge"])
+	}
+	cleanup, ok := m["cleanup"].(map[string]string)
+	if !ok {
+		t.Fatalf("unexpected cleanup type: %+v", m["cleanup"])
+	}
+	if cleanup["wt-3"] != "removed" || cleanup["wt-4"] != "removed" {
+		t.Errorf("expected wt-3/wt-4 to be marked removed, got %+v", cleanup)
+	}
+	if cleanup["wt-2"] == "removed" || cleanup["wt-2"] == "" {
+		t.Errorf("expected wt-2's failure to be surfaced as its error string, got %q", cleanup["wt-2"])
+	}
+	if len(git.removeWorktreeCalls) != 3 {
+		t.Errorf("expected all 3 cleanup ids to be attempted despite one failing, got %d calls", len(git.removeWorktreeCalls))
+	}
+}
+
+// ── worktree.fanOut ──────────────────────────────────────────────────────
+
+// fakeWorktreeCreatorPort/fakeAgentSpawnerPort/fakePromptInjectorPort
+// implement usecase.WorktreeCreator/AgentSpawner/PromptInjector directly —
+// this file's own local fakes (kept separate from usecase package's
+// unexported fan-out test fakes, which this package can't reach).
+type fakeWorktreeCreatorPort struct {
+	fn func(ctx context.Context, projectID, repoID, branch, baseRef string) (string, string, string, error)
+}
+
+func (f *fakeWorktreeCreatorPort) CreateWorktree(ctx context.Context, projectID, repoID, branch, baseRef string) (string, string, string, error) {
+	return f.fn(ctx, projectID, repoID, branch, baseRef)
+}
+
+type fakeAgentSpawnerPort struct {
+	fn func(ctx context.Context, projectID, worktreePath, agentType string) (string, string, error)
+}
+
+func (f *fakeAgentSpawnerPort) SpawnAgentTerminal(ctx context.Context, projectID, worktreePath, agentType string) (string, string, error) {
+	return f.fn(ctx, projectID, worktreePath, agentType)
+}
+
+type fakePromptInjectorPort struct {
+	fn func(ctx context.Context, connectionID, ptyID, prompt string) error
+}
+
+func (f *fakePromptInjectorPort) InjectPrompt(ctx context.Context, connectionID, ptyID, prompt string) error {
+	if f.fn == nil {
+		return nil
+	}
+	return f.fn(ctx, connectionID, ptyID, prompt)
+}
+
+func TestWorktreeFanOut_HappyPath(t *testing.T) {
+	worktrees := &fakeWorktreeCreatorPort{fn: func(_ context.Context, _, _, branch, _ string) (string, string, string, error) {
+		return "wt-" + branch, "/repo-" + branch, "sha-" + branch, nil
+	}}
+	agents := &fakeAgentSpawnerPort{fn: func(_ context.Context, _, worktreePath, _ string) (string, string, error) {
+		return "pty-" + worktreePath, "conn-" + worktreePath, nil
+	}}
+	prompts := &fakePromptInjectorPort{}
+	fanOutUseCase := usecase.NewFanOutCreateWorktrees(worktrees, agents, prompts)
+
+	git := &fakeGitGatewayServiceClient{}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, fanOutUseCase)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.fanOut",
+		argsJSON(t, map[string]any{
+			"projectId": "proj-1", "repoId": "repo-1", "baseRef": "main",
+			"branchPrefix": "feat", "prompt": "do it", "agentType": "claude", "n": 3,
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	items, ok := m["items"].([]usecase.FanOutItemResult)
+	if !ok {
+		t.Fatalf("unexpected items type: %+v", m["items"])
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(items))
+	}
+	for _, it := range items {
+		if it.Status != "ready" || it.WorktreeID == "" || it.Path == "" || it.PtyID == "" || it.ConnectionID == "" {
+			t.Errorf("expected every item to be fully populated and ready, got %+v", it)
+		}
+	}
+}
+
+func TestWorktreeFanOut_NOutOfRange_ErrorSurfacesAsChannelError(t *testing.T) {
+	worktrees := &fakeWorktreeCreatorPort{fn: func(_ context.Context, _, _, branch, _ string) (string, string, string, error) {
+		t.Fatal("CreateWorktree must never be called when n is out of range")
+		return "", "", "", nil
+	}}
+	agents := &fakeAgentSpawnerPort{fn: func(_ context.Context, _, _, _ string) (string, string, error) { return "", "", nil }}
+	prompts := &fakePromptInjectorPort{}
+	fanOutUseCase := usecase.NewFanOutCreateWorktrees(worktrees, agents, prompts)
+
+	git := &fakeGitGatewayServiceClient{}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, fanOutUseCase)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.fanOut",
+		argsJSON(t, map[string]any{
+			"projectId": "proj-1", "repoId": "repo-1", "baseRef": "main",
+			"branchPrefix": "feat", "prompt": "do it", "agentType": "claude", "n": 11,
+		}))
+	if err == nil {
+		t.Fatal("expected a non-nil error when n is out of range, not a 200 with an empty items array")
+	}
+	if result != nil {
+		t.Errorf("expected no partial result to leak through on error, got %+v", result)
 	}
 }

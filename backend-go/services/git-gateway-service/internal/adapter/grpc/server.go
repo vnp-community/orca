@@ -96,6 +96,11 @@ type Server struct {
 	resolveConflict   *usecase.ResolveConflict
 	discard           *usecase.Discard
 	bulkDiscard       *usecase.BulkDiscard
+
+	// New, SOL-WT-03/04/05 (logic-v1):
+	checkWorktreeDeleteSafety *usecase.CheckWorktreeDeleteSafety
+	compareWorktrees          *usecase.CompareWorktrees
+	mergeWorktreeIntoBase     *usecase.MergeWorktreeIntoBase
 }
 
 // New wires every usecase this server dispatches to. Parameter order
@@ -147,6 +152,7 @@ func New(
 	writeIssueCommand *usecase.WriteIssueCommand,
 	scanSetupScriptImports *usecase.ScanSetupScriptImports,
 	createWorktree *usecase.CreateWorktree,
+	createWorktreeFromIssue *usecase.CreateWorktreeFromIssue,
 	removeWorktree *usecase.RemoveWorktree,
 	forceDeleteBranch *usecase.ForceDeleteBranch,
 	detectWorktrees *usecase.DetectWorktrees,
@@ -163,7 +169,9 @@ func New(
 	resolveConflict *usecase.ResolveConflict,
 	discard *usecase.Discard,
 	bulkDiscard *usecase.BulkDiscard,
-	createWorktreeFromIssue *usecase.CreateWorktreeFromIssue,
+	checkWorktreeDeleteSafety *usecase.CheckWorktreeDeleteSafety,
+	compareWorktrees *usecase.CompareWorktrees,
+	mergeWorktreeIntoBase *usecase.MergeWorktreeIntoBase,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -231,6 +239,10 @@ func New(
 		resolveConflict:   resolveConflict,
 		discard:           discard,
 		bulkDiscard:       bulkDiscard,
+
+		checkWorktreeDeleteSafety: checkWorktreeDeleteSafety,
+		compareWorktrees:          compareWorktrees,
+		mergeWorktreeIntoBase:     mergeWorktreeIntoBase,
 	}
 }
 
@@ -682,6 +694,7 @@ func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWor
 	result, err := s.createWorktree.Execute(ctx, usecase.CreateWorktreeInput{
 		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(),
 		IdempotencyKey: req.GetIdempotencyKey(),
+		Name:           req.GetName(), Path: req.GetPath(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -723,11 +736,61 @@ func toDomainIssueRef(req *gitgatewayv1.CreateWorktreeFromIssueRequest) (domain.
 	}
 }
 
-func (s *Server) RemoveWorktree(ctx context.Context, req *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error) {
-	if err := s.removeWorktree.Execute(ctx, req.GetWorktreeId(), req.GetForce(), req.GetAllowOpenPr()); err != nil {
+func (s *Server) RemoveWorktree(ctx context.Context, req *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error) {
+	result, err := s.removeWorktree.Execute(ctx, usecase.RemoveWorktreeInput{
+		WorktreeID: req.GetWorktreeId(), Force: req.GetForce(), AllowOpenPR: req.GetAllowOpenPr(), StopAgents: req.GetStopAgents(),
+	})
+	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &emptypb.Empty{}, nil
+	return &gitgatewayv1.RemoveWorktreeResponse{
+		UncommittedFilesDiscarded: int32(result.UncommittedFilesDiscarded),
+		StoppedPtyIds:             result.StoppedPtyIDs,
+	}, nil
+}
+
+func (s *Server) CheckWorktreeDeleteSafety(ctx context.Context, req *gitgatewayv1.CheckWorktreeDeleteSafetyRequest) (*gitgatewayv1.CheckWorktreeDeleteSafetyResponse, error) {
+	report, err := s.checkWorktreeDeleteSafety.Execute(ctx, req.GetWorktreeId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CheckWorktreeDeleteSafetyResponse{
+		UncommittedFiles: int32(report.UncommittedFiles),
+		UntrackedFiles:   int32(report.UntrackedFiles),
+		AgentRunning:     report.AgentRunning,
+		ActivePtyIds:     report.ActivePtyIDs,
+		SafeToDelete:     report.SafeToDelete,
+	}, nil
+}
+
+func (s *Server) CompareWorktrees(ctx context.Context, req *gitgatewayv1.CompareWorktreesRequest) (*gitgatewayv1.CompareWorktreesResponse, error) {
+	result, err := s.compareWorktrees.Execute(ctx, req.GetWorktreeIds())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*gitgatewayv1.WorktreeComparison, 0, len(result.Worktrees))
+	for _, w := range result.Worktrees {
+		out = append(out, &gitgatewayv1.WorktreeComparison{
+			WorktreeId: w.WorktreeID, ChangedFiles: int32(w.ChangedFiles),
+			AddedLines: int32(w.AddedLines), RemovedLines: int32(w.RemovedLines),
+			MergeBase: w.MergeBase, Status: w.Status, ErrorMessage: w.ErrorMessage,
+		})
+	}
+	return &gitgatewayv1.CompareWorktreesResponse{BaseRef: result.BaseRef, Worktrees: out}, nil
+}
+
+func (s *Server) MergeBranch(ctx context.Context, req *gitgatewayv1.MergeBranchRequest) (*gitgatewayv1.MergeBranchResponse, error) {
+	result, err := s.mergeWorktreeIntoBase.Execute(ctx, usecase.MergeWorktreeInput{
+		WorktreeID: req.GetWorktreeId(), BaseBranch: req.GetBaseBranch(),
+		Strategy: req.GetStrategy(), CommitMessage: req.GetCommitMessage(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.MergeBranchResponse{
+		ResultSha: result.ResultSHA, HasConflicts: result.HasConflicts,
+		ConflictedPaths: result.ConflictedPaths, ConflictDispatchKey: result.ConflictDispatchKey,
+	}, nil
 }
 
 func (s *Server) ForceDeleteBranch(ctx context.Context, req *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error) {
@@ -796,7 +859,7 @@ func (s *Server) FastForward(ctx context.Context, req *gitgatewayv1.FastForwardR
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.FastForwardResponse{Success: result.Success}, nil
+	return &gitgatewayv1.FastForwardResponse{Success: result.Success, ResultSha: result.ResultSHA}, nil
 }
 
 func (s *Server) RebaseFromBase(ctx context.Context, req *gitgatewayv1.RebaseFromBaseRequest) (*gitgatewayv1.RebaseFromBaseResponse, error) {

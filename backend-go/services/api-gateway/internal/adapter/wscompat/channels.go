@@ -87,6 +87,7 @@ func RegisterRealChannels(
 	aiProviderClient aiproviderv1.AiProviderServiceClient,
 	credentialBrokerClient credentialbrokerv1.CredentialBrokerServiceClient, // NEW — SOL-INT-02/TASK-INT-02-01; not yet consumed, see TASK-INT-02-02's Status (BLOCKED)
 	rateLimits rateLimitReader,
+	fanOutUseCase *usecase.FanOutCreateWorktrees,
 ) {
 	registerAnnotationChannels(r, annotationClient)
 	registerAnnotationSendChannel(r, annotationClient, gitClient) // NEW — SOL-CR-03
@@ -123,7 +124,7 @@ func RegisterRealChannels(
 	registerGitDeepChannels(r, gitClient)
 	registerFilesChannels(r, gitClient)
 	registerAutomationTaskChannels(r, automationClient, taskClient)
-	registerWorktreeChannels(r, gitClient, projectClient)
+	registerWorktreeChannels(r, gitClient, projectClient, fanOutUseCase)
 	registerWorkspaceChannels(r, gitClient, projectClient)
 	registerEmulatorFolderWorkspaceHostChannels(r, projectClient, infraFleetClient)
 	registerTeamChannels(r, tenantClient)

@@ -21,9 +21,10 @@ func TestRemoveWorktree_HappyPath(t *testing.T) {
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
+	_, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -45,9 +46,10 @@ func TestRemoveWorktree_BookkeepingFails_NoCompensatingGitOperation(t *testing.T
 	projects := &fakeProjectClient{recordRemovedErr: errors.New("project-service unreachable")}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
+	_, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -74,12 +76,13 @@ func TestRemoveWorktree_GitRemoveFails_BookkeepingNeverCalled(t *testing.T) {
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
 	// force=true — this test exercises the RemoveWorktree-itself-fails
 	// path, not BR-AT-11's uncommitted-changes check (fakeGitExecutor's
 	// default GetStatus reports one modified file).
-	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
+	_, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -92,8 +95,11 @@ func TestRemoveWorktree_GitRemoveFails_BookkeepingNeverCalled(t *testing.T) {
 	}
 }
 
-// BR-AT-11: uncommitted changes block removal unless force=true.
-func TestRemoveWorktree_UncommittedChanges_BlocksWithoutForce(t *testing.T) {
+// BR-AT-11 / BR-WT-09: uncommitted changes block removal unless force=true —
+// this is the server-side re-check against a client that skips
+// CheckWorktreeDeleteSafety's pre-check call or races a change between
+// check and confirm.
+func TestRemoveWorktree_UncommittedChanges_ForceFalse_RejectsBeforeGitCall(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
 	// Default fakeGitExecutor.GetStatus reports one modified file.
 	local := &fakeGitExecutor{}
@@ -101,9 +107,10 @@ func TestRemoveWorktree_UncommittedChanges_BlocksWithoutForce(t *testing.T) {
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	err := uc.Execute(withTenantCtx(), "wt-1", false, false)
+	_, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: false})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -116,20 +123,25 @@ func TestRemoveWorktree_UncommittedChanges_BlocksWithoutForce(t *testing.T) {
 	}
 }
 
-func TestRemoveWorktree_UncommittedChanges_ProceedsWithForce(t *testing.T) {
+func TestRemoveWorktree_UncommittedChanges_ForceTrue_ProceedsToGitCall(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
-	local := &fakeGitExecutor{}
+	local := &fakeGitExecutor{} // GetStatus's fake default returns one changed file
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	if err := uc.Execute(withTenantCtx(), "wt-1", true, false); err != nil {
+	result, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if local.removeWorktreeCallCount != 1 {
-		t.Errorf("expected RemoveWorktree to be called, got %d", local.removeWorktreeCallCount)
+		t.Errorf("expected RemoveWorktree to be called exactly once, got %d", local.removeWorktreeCallCount)
+	}
+	if result.UncommittedFilesDiscarded != 1 {
+		t.Errorf("expected UncommittedFilesDiscarded=1 (echoing the overridden safety-check count), got %d", result.UncommittedFilesDiscarded)
 	}
 }
 
@@ -143,9 +155,10 @@ func TestRemoveWorktree_ScrollbackCleanupCalledWithWorktreeID(t *testing.T) {
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
+	_, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -167,9 +180,10 @@ func TestRemoveWorktree_ScrollbackCleanupFails_DoesNotFailRemoveWorktree(t *test
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{err: errors.New("infra-fleet-service unreachable")}
 	scm := &fakeSCMClient{}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
+	_, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err != nil {
 		t.Fatalf("expected a scrollback cleanup failure not to fail RemoveWorktree, got: %v", err)
 	}
@@ -190,9 +204,10 @@ func TestRemoveWorktree_OpenPR_BlocksWithoutAllowOpenPR(t *testing.T) {
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{prForBranch: PullRequestInfo{State: "open", Number: 42}, prForBranchFound: true}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
+	_, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -216,9 +231,10 @@ func TestRemoveWorktree_OpenPR_ProceedsWithAllowOpenPR(t *testing.T) {
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{prForBranch: PullRequestInfo{State: "open", Number: 42}, prForBranchFound: true}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	if err := uc.Execute(withTenantCtx(), "wt-1", true, true); err != nil {
+	if _, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true, AllowOpenPR: true}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if local.removeWorktreeCallCount != 1 {
@@ -236,12 +252,91 @@ func TestRemoveWorktree_SCMClientError_FailsOpenAndProceeds(t *testing.T) {
 	projects := &fakeProjectClient{}
 	scrollback := &fakeScrollbackCleaner{}
 	scm := &fakeSCMClient{prForBranchErr: errors.New("no SCM integration configured for this repo")}
-	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
 
-	if err := uc.Execute(withTenantCtx(), "wt-1", true, false); err != nil {
+	if _, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true}); err != nil {
 		t.Fatalf("expected the SCM lookup failure to fail open (no error), got %v", err)
 	}
 	if local.removeWorktreeCallCount != 1 {
 		t.Errorf("expected RemoveWorktree to be called despite the SCM lookup failure, got %d", local.removeWorktreeCallCount)
+	}
+}
+
+func TestRemoveWorktree_AgentRunning_StopAgentsFalse_RejectsBeforeGitCall(t *testing.T) {
+	// Connected: true routes dispatchExecutor to relay, not local — see
+	// dispatchExecutor's doc comment.
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutorCleanStatus{fakeGitExecutor: &fakeGitExecutor{}}
+	projects := &fakeProjectClient{}
+	scrollback := &fakeScrollbackCleaner{}
+	scm := &fakeSCMClient{}
+	terminals := &fakeTerminalSessionLister{sessions: []domain.TerminalSessionRef{{PtyID: "pty-1", Cwd: "/repo-feature"}}}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
+
+	_, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true, StopAgents: false})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_AGENT_RUNNING" {
+		t.Fatalf("expected WORKTREE_AGENT_RUNNING, got %v", err)
+	}
+	if relay.calledRemoveWorktree {
+		t.Error("expected RemoveWorktree NOT to be called when an active agent session blocks the removal")
+	}
+}
+
+func TestRemoveWorktree_AgentRunning_StopAgentsTrue_KillsSessionsThenRemoves(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutorCleanStatus{fakeGitExecutor: &fakeGitExecutor{}}
+	projects := &fakeProjectClient{}
+	scrollback := &fakeScrollbackCleaner{}
+	scm := &fakeSCMClient{}
+	terminals := &fakeTerminalSessionLister{sessions: []domain.TerminalSessionRef{
+		{PtyID: "pty-1", Cwd: "/repo-feature"},
+		{PtyID: "pty-2", Cwd: "/repo-feature/sub"},
+	}}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
+
+	result, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true, StopAgents: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(terminals.killedPtyIDs) != 2 {
+		t.Errorf("expected Kill to be called once per active session, got %d calls: %v", len(terminals.killedPtyIDs), terminals.killedPtyIDs)
+	}
+	if relay.removeWorktreeCallCount != 1 {
+		t.Errorf("expected RemoveWorktree to be called exactly once, after the kills, got %d", relay.removeWorktreeCallCount)
+	}
+	if len(result.StoppedPtyIDs) != 2 {
+		t.Errorf("expected StoppedPtyIDs to report both killed sessions, got %v", result.StoppedPtyIDs)
+	}
+}
+
+func TestRemoveWorktree_KillFails_StillProceedsWithRemoval_BestEffort(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutorCleanStatus{fakeGitExecutor: &fakeGitExecutor{}}
+	projects := &fakeProjectClient{}
+	scrollback := &fakeScrollbackCleaner{}
+	scm := &fakeSCMClient{}
+	terminals := &fakeTerminalSessionLister{
+		sessions: []domain.TerminalSessionRef{{PtyID: "pty-1", Cwd: "/repo-feature"}},
+		killErr:  errors.New("kill failed: process already exited"),
+	}
+	uc := NewRemoveWorktree(resolver, projects, scrollback, scm, local, relay, terminals)
+
+	result, err := uc.Execute(withTenantCtx(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true, StopAgents: true})
+	if err != nil {
+		t.Fatalf("expected a kill failure to be tolerated (best-effort), got error: %v", err)
+	}
+	if relay.removeWorktreeCallCount != 1 {
+		t.Errorf("expected RemoveWorktree to still be called despite the kill failure, got %d calls", relay.removeWorktreeCallCount)
+	}
+	if len(result.StoppedPtyIDs) != 0 {
+		t.Errorf("expected no StoppedPtyIDs recorded for the failed kill, got %v", result.StoppedPtyIDs)
 	}
 }

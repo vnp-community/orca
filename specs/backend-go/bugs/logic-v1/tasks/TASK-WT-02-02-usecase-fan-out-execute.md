@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/usecase/fan_out_create_worktrees.go` (new)
 **Depends on:** TASK-WT-02-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — fan_out_create_worktrees.go created with WaitGroup-based per-item isolation; builds clean
 
 ---
 

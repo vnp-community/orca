@@ -160,3 +160,148 @@ func TestCreateWorktree_RepoNotFound_NoExecutorCallAtAll(t *testing.T) {
 		t.Error("expected no GitExecutor method to be called when the repo lookup fails")
 	}
 }
+
+// ── SOL-WT-01: BR-WT-01/04, [A1]/[A2]/[A3] ──────────────────────────────────
+
+func TestCreateWorktree_InvalidName_RejectsBeforeAnyExecutorCall(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", Name: "Invalid Name!"})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_NAME_INVALID" {
+		t.Fatalf("expected WORKTREE_NAME_INVALID, got %v", err)
+	}
+	if local.calledCreateWorktree || relay.calledCreateWorktree {
+		t.Error("expected zero calls on either executor when the name is invalid")
+	}
+	if projects.calledGetRepo {
+		t.Error("expected GetRepo NOT to be called when the name is invalid")
+	}
+}
+
+func TestCreateWorktree_PathAlreadyExists_ReturnsSuggestedName_NoGitCallAttempted(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{listWorktreePathsOut: []string{"/repo-feature"}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_PATH_EXISTS" {
+		t.Fatalf("expected WORKTREE_PATH_EXISTS, got %v", err)
+	}
+	if local.calledCreateWorktree {
+		t.Error("expected CreateWorktree to never be called when the target path already exists")
+	}
+}
+
+func TestCreateWorktree_LimitExceeded_RejectsBeforeGitCall(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	existing := make([]domain.WorktreeRecord, 20)
+	for i := range existing {
+		existing[i] = domain.WorktreeRecord{ID: "wt", RepoID: "repo-1", Active: true}
+	}
+	projects := &fakeProjectClient{listWorktreesResult: existing}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_LIMIT_EXCEEDED" {
+		t.Fatalf("expected WORKTREE_LIMIT_EXCEEDED, got %v", err)
+	}
+	if local.calledCreateWorktree {
+		t.Error("expected CreateWorktree to never be called once the cap is exceeded")
+	}
+}
+
+func TestCreateWorktree_LimitCheckFailsOpen_WhenListWorktreesErrors(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{listWorktreesErr: errors.New("project-service unreachable"), recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
+	if err != nil {
+		t.Fatalf("expected creation to proceed despite the ListWorktrees error (fail open), got %v", err)
+	}
+	if !local.calledCreateWorktree {
+		t.Error("expected CreateWorktree to still be called")
+	}
+}
+
+func TestCreateWorktree_BaseRefNotFound_ClassifiesGitError_AttachesBranchList(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{
+		createWorktreeErr: errors.New("fatal: invalid reference: nonexistent"),
+		branchInfos:       []domain.BranchInfo{{Name: "main"}, {Name: "develop"}},
+	}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "nonexistent"})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_BASE_REF_NOT_FOUND" {
+		t.Fatalf("expected WORKTREE_BASE_REF_NOT_FOUND, got %v", err)
+	}
+	if !strings.Contains(ae.Message, "main") || !strings.Contains(ae.Message, "develop") {
+		t.Errorf("expected the error message to list available branches, got %q", ae.Message)
+	}
+}
+
+func TestCreateWorktree_CustomNameAndPath_PassedThroughToExecutor(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/custom/path", HeadSHA: "sha123"}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/custom/path", Branch: "feature"}}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{
+		ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", Name: "custom-name", Path: "/custom/path",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.gotCreateWorktreeTargetPath != "/custom/path" {
+		t.Errorf("expected targetPath to be passed through verbatim, got %q", local.gotCreateWorktreeTargetPath)
+	}
+}
+
+// TestCreateWorktree_ForwardsBaseRefToRecordWorktreeCreated is the direct
+// regression guard against SOL-WT-04's confirmed silent-drop bug: BaseRef
+// was received but never forwarded to RecordWorktreeCreated.
+func TestCreateWorktree_ForwardsBaseRefToRecordWorktreeCreated(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "develop"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if projects.gotRecordCreatedBaseRef != "develop" {
+		t.Errorf("expected in.BaseRef to be forwarded to RecordWorktreeCreated, got %q", projects.gotRecordCreatedBaseRef)
+	}
+}

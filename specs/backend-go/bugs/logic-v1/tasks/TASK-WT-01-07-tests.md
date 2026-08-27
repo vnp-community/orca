@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service` + `project-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/create_worktree_test.go`
 **Depends on:** TASK-WT-01-02, TASK-WT-01-03, TASK-WT-01-04, TASK-WT-01-05, TASK-WT-01-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added worktree_name_test.go, create_worktree_test.go new cases (invalid name/path exists/limit/base-ref-not-found/custom path), executor_test.go TestCreateWorktree_ExplicitTargetPath+TestCheckFreeSpace, record_worktree_created_test.go outbox assertion, worktree_repository_test.go outbox integration test. All pass (go test + integration -tags integration with real Postgres).
 
 ---
 

@@ -38,6 +38,11 @@ service ProjectService {
   rpc RecordWorktreeCreated(RecordWorktreeCreatedRequest) returns (RecordWorktreeCreatedResponse);
   rpc RecordWorktreeRemoved(RecordWorktreeRemovedRequest) returns (RecordWorktreeRemovedResponse);
   rpc ListWorktrees(ListWorktreesRequest) returns (ListWorktreesResponse);
+  // NEW (SOL-WT-04) — single-worktree lookup, the same class of gap SOL-031
+  // already flagged for GetRepo ("project.proto has no single-repo-by-id
+  // lookup RPC"). CompareWorktrees (git-gateway-service) uses this to look
+  // up each compared worktree's repo_id/branch/base_ref.
+  rpc GetWorktree(GetWorktreeRequest) returns (Worktree);
   rpc SetWorktreeActivation(SetWorktreeActivationRequest) returns (SetWorktreeActivationResponse);
   rpc RenameWorktree(RenameWorktreeRequest) returns (RenameWorktreeResponse);
 
@@ -271,7 +276,11 @@ message Worktree {
   optional string linked_issue_provider = 8;  // "github" | "gitlab" | "jira" | "linear"
   optional string linked_issue_ref = 9;       // provider-native ref: "owner/repo#123" or "ENG-123"
   string status = 10; // NEW — "active" | "completed" | "error" | "stopped"; orthogonal to activation_state (the `active` field above)
+  optional string base_ref = 11; // NEW (SOL-WT-04) — the branch/tag/sha this worktree was created from; empty for worktrees created before this backfill
 }
+
+// NEW (SOL-WT-04) — single-worktree lookup by id.
+message GetWorktreeRequest { string worktree_id = 1; }
 
 message RecordWorktreeCreatedRequest {
   string project_id = 1;
@@ -281,6 +290,7 @@ message RecordWorktreeCreatedRequest {
   optional string idempotency_key = 5; // BR-CLI-01, see Worktree.idempotency_key
   optional string linked_issue_provider = 6;
   optional string linked_issue_ref = 7;
+  optional string base_ref = 8; // NEW — the branch/tag/sha this worktree was created from
 }
 
 message RecordWorktreeCreatedResponse {

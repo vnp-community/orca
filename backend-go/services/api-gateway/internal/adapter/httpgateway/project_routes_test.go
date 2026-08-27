@@ -87,6 +87,9 @@ type fakeProjectServiceClient struct {
 	listWorktreesResp    *projectv1.ListWorktreesResponse
 	listWorktreesErr     error
 
+	getWorktreeResp *projectv1.Worktree
+	getWorktreeErr  error
+
 	lastSetWorktreeActivationReq *projectv1.SetWorktreeActivationRequest
 	setWorktreeActivationResp    *projectv1.SetWorktreeActivationResponse
 	setWorktreeActivationErr     error
@@ -298,6 +301,13 @@ func (f *fakeProjectServiceClient) ListWorktrees(_ context.Context, in *projectv
 		return nil, f.listWorktreesErr
 	}
 	return f.listWorktreesResp, nil
+}
+
+func (f *fakeProjectServiceClient) GetWorktree(_ context.Context, in *projectv1.GetWorktreeRequest, _ ...grpc.CallOption) (*projectv1.Worktree, error) {
+	if f.getWorktreeErr != nil {
+		return nil, f.getWorktreeErr
+	}
+	return f.getWorktreeResp, nil
 }
 
 func (f *fakeProjectServiceClient) SetWorktreeActivation(_ context.Context, in *projectv1.SetWorktreeActivationRequest, _ ...grpc.CallOption) (*projectv1.SetWorktreeActivationResponse, error) {
