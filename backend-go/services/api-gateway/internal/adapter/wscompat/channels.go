@@ -36,6 +36,7 @@ import (
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
+	"google.golang.org/protobuf/proto"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
@@ -85,6 +86,7 @@ func RegisterRealChannels(
 	rateLimits rateLimitReader,
 ) {
 	registerAnnotationChannels(r, annotationClient)
+	registerAnnotationSendChannel(r, annotationClient, gitClient) // NEW — SOL-CR-03
 	registerTaskChannels(r, taskClient)
 	registerGitChannels(r, gitClient)
 	registerAutomationChannels(r, automationClient)
@@ -128,18 +130,22 @@ func RegisterRealChannels(
 // ── annotation.* ────────────────────────────────────────────────────────
 
 type annotationAnchorArg struct {
-	RepoID   string `json:"repoId"`
-	FilePath string `json:"filePath"`
-	Line     int32  `json:"line"`
-	Ref      string `json:"ref"`
+	RepoID     string `json:"repoId"`
+	WorktreeID string `json:"worktreeId"` // NEW
+	FilePath   string `json:"filePath"`
+	Line       int32  `json:"line"`
+	EndLine    int32  `json:"endLine"` // NEW
+	Side       int32  `json:"side"`    // NEW
+	Ref        string `json:"ref"`
 }
 
 func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServiceClient) {
 	r.Register("annotation.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
-			Anchor    annotationAnchorArg `json:"anchor"`
-			Content   string              `json:"content"`
-			RequestID string              `json:"requestId"`
+			Anchor       annotationAnchorArg `json:"anchor"`
+			Content      string              `json:"content"`
+			RequestID    string              `json:"requestId"`
+			OriginalCode string              `json:"originalCode"` // NEW
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
@@ -147,13 +153,17 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 		}
 		resp, err := client.CreateAnnotation(ctx, &annotationv1.CreateAnnotationRequest{
 			Anchor: &annotationv1.Anchor{
-				RepoId:   in.Anchor.RepoID,
-				FilePath: in.Anchor.FilePath,
-				Line:     in.Anchor.Line,
-				Ref:      in.Anchor.Ref,
+				RepoId:     in.Anchor.RepoID,
+				WorktreeId: in.Anchor.WorktreeID,
+				FilePath:   in.Anchor.FilePath,
+				Line:       in.Anchor.Line,
+				EndLine:    in.Anchor.EndLine,
+				Side:       annotationv1.Side(in.Anchor.Side),
+				Ref:        in.Anchor.Ref,
 			},
-			Content:   in.Content,
-			RequestId: in.RequestID,
+			Content:      in.Content,
+			RequestId:    in.RequestID,
+			OriginalCode: in.OriginalCode,
 		})
 		if err != nil {
 			return nil, err
@@ -163,21 +173,28 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 
 	r.Register("annotation.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type listArgs struct {
-			RepoID    string `json:"repoId"`
-			FilePath  string `json:"filePath"`
-			PageToken string `json:"pageToken"`
-			PageSize  int32  `json:"pageSize"`
+			RepoID      string `json:"repoId"`
+			FilePath    string `json:"filePath"`
+			PageToken   string `json:"pageToken"`
+			PageSize    int32  `json:"pageSize"`
+			WorktreeID  string `json:"worktreeId"`  // NEW
+			SentToAgent *bool  `json:"sentToAgent"` // NEW
 		}
 		in, err := decodeArg[listArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.ListAnnotations(ctx, &annotationv1.ListAnnotationsRequest{
-			RepoId:    in.RepoID,
-			FilePath:  in.FilePath,
-			PageToken: in.PageToken,
-			PageSize:  in.PageSize,
-		})
+		req := &annotationv1.ListAnnotationsRequest{
+			RepoId:     in.RepoID,
+			FilePath:   in.FilePath,
+			PageToken:  in.PageToken,
+			PageSize:   in.PageSize,
+			WorktreeId: in.WorktreeID,
+		}
+		if in.SentToAgent != nil {
+			req.SentToAgent = proto.Bool(*in.SentToAgent)
+		}
+		resp, err := client.ListAnnotations(ctx, req)
 		if err != nil {
 			return nil, err
 		}
@@ -205,16 +222,32 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 
 	r.Register("annotation.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type deleteArgs struct {
-			ID string `json:"id"`
+			ID        string `json:"id"`
+			Confirmed bool   `json:"confirmed"` // NEW
 		}
 		in, err := decodeArg[deleteArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := client.DeleteAnnotation(ctx, &annotationv1.DeleteAnnotationRequest{Id: in.ID}); err != nil {
+		if _, err := client.DeleteAnnotation(ctx, &annotationv1.DeleteAnnotationRequest{Id: in.ID, Confirmed: in.Confirmed}); err != nil {
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil
+	})
+
+	r.Register("annotation.markSent", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type markSentArgs struct {
+			IDs []string `json:"ids"`
+		}
+		in, err := decodeArg[markSentArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.MarkAnnotationsSent(ctx, &annotationv1.MarkAnnotationsSentRequest{Ids: in.IDs})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
 	})
 }
 

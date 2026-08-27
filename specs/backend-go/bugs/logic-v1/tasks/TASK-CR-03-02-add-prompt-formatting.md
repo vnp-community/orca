@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_annotation_send.go`
 **Depends on:** TASK-CR-03-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — formatReviewPrompt/formatFeedbackBlock added; TestFormatReviewPrompt_MatchesBLCR03Example golden test passes against BL-CR-03's worked example.
 
 ---
 

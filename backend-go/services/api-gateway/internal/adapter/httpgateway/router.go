@@ -130,7 +130,7 @@ func NewRouter(deps Deps) http.Handler {
 			mountAdminRoutes(authed, deps.AuthClient)
 		}
 		if deps.AnnotationClient != nil {
-			mountAnnotationRoutes(authed, deps.AnnotationClient)
+			mountAnnotationRoutes(authed, deps.AnnotationClient, deps.GitGatewayClient)
 		}
 		if deps.TaskClient != nil {
 			mountTaskRoutes(authed, deps.TaskClient)

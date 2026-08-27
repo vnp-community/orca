@@ -11,8 +11,37 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
+	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
+
+// fakeAnnotationClient is a minimal test double for
+// annotationv1.AnnotationServiceClient — see fakeInfraFleetClient's doc
+// comment for the embedding pattern this follows.
+type fakeAnnotationClient struct {
+	annotationv1.AnnotationServiceClient
+
+	createAnnotationFunc    func(ctx context.Context, in *annotationv1.CreateAnnotationRequest) (*annotationv1.CreateAnnotationResponse, error)
+	listAnnotationsFunc     func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error)
+	deleteAnnotationFunc    func(ctx context.Context, in *annotationv1.DeleteAnnotationRequest) (*annotationv1.DeleteAnnotationResponse, error)
+	markAnnotationsSentFunc func(ctx context.Context, in *annotationv1.MarkAnnotationsSentRequest) (*annotationv1.MarkAnnotationsSentResponse, error)
+}
+
+func (f *fakeAnnotationClient) CreateAnnotation(ctx context.Context, in *annotationv1.CreateAnnotationRequest, _ ...grpc.CallOption) (*annotationv1.CreateAnnotationResponse, error) {
+	return f.createAnnotationFunc(ctx, in)
+}
+
+func (f *fakeAnnotationClient) ListAnnotations(ctx context.Context, in *annotationv1.ListAnnotationsRequest, _ ...grpc.CallOption) (*annotationv1.ListAnnotationsResponse, error) {
+	return f.listAnnotationsFunc(ctx, in)
+}
+
+func (f *fakeAnnotationClient) DeleteAnnotation(ctx context.Context, in *annotationv1.DeleteAnnotationRequest, _ ...grpc.CallOption) (*annotationv1.DeleteAnnotationResponse, error) {
+	return f.deleteAnnotationFunc(ctx, in)
+}
+
+func (f *fakeAnnotationClient) MarkAnnotationsSent(ctx context.Context, in *annotationv1.MarkAnnotationsSentRequest, _ ...grpc.CallOption) (*annotationv1.MarkAnnotationsSentResponse, error) {
+	return f.markAnnotationsSentFunc(ctx, in)
+}
 
 // fakeInfraFleetClient is a minimal test double for
 // infrafleetv1.InfraFleetServiceClient — embeds the (nil) interface so it
@@ -542,6 +571,87 @@ func TestPreflightCheckChannel_CompletesInstantly(t *testing.T) {
 		if info["authenticated"] != false {
 			t.Errorf("result[%q]['authenticated'] = %v, want false", tool, info["authenticated"])
 		}
+	}
+}
+
+// ── TASK-CR-03-04: RegisterRealChannels wiring ──────────────────────────────
+
+// TestRegisterRealChannels_RegistersAnnotationSendToAgent confirms
+// annotation.sendToAgent is wired into the composition root alongside every
+// other real channel — see channels_annotation_send.go's
+// registerAnnotationSendChannel and this file's RegisterRealChannels call
+// site. Every client arg besides rateLimits can be nil: registration only
+// closes over the client in each handler, it never calls a client method at
+// registration time.
+func TestRegisterRealChannels_RegistersAnnotationSendToAgent(t *testing.T) {
+	r := NewRegistry()
+	RegisterRealChannels(r, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &fakeRateLimitReader{})
+
+	if _, ok := r.handlers["annotation.sendToAgent"]; !ok {
+		t.Error("want annotation.sendToAgent registered by RegisterRealChannels")
+	}
+	if _, ok := r.handlers["annotation.markSent"]; !ok {
+		t.Error("want annotation.markSent registered by RegisterRealChannels")
+	}
+}
+
+// ── TASK-CR-02-07: annotation.delete/markSent tests ─────────────────────────
+
+// TestAnnotationDeleteChannel_ForwardsConfirmed verifies annotation.delete
+// threads the new `confirmed` arg (BR-CR-08) into DeleteAnnotationRequest.
+func TestAnnotationDeleteChannel_ForwardsConfirmed(t *testing.T) {
+	var gotReq *annotationv1.DeleteAnnotationRequest
+	fake := &fakeAnnotationClient{
+		deleteAnnotationFunc: func(ctx context.Context, in *annotationv1.DeleteAnnotationRequest) (*annotationv1.DeleteAnnotationResponse, error) {
+			gotReq = in
+			return &annotationv1.DeleteAnnotationResponse{}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerAnnotationChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"id": "annot-1", "confirmed": true})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "annotation.delete", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.Id != "annot-1" || !gotReq.Confirmed {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	m, ok := result.(map[string]bool)
+	if !ok || !m["ok"] {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+// TestAnnotationMarkSentChannel_Wired verifies annotation.markSent is wired
+// and forwards ids to MarkAnnotationsSent.
+func TestAnnotationMarkSentChannel_Wired(t *testing.T) {
+	var gotReq *annotationv1.MarkAnnotationsSentRequest
+	fake := &fakeAnnotationClient{
+		markAnnotationsSentFunc: func(ctx context.Context, in *annotationv1.MarkAnnotationsSentRequest) (*annotationv1.MarkAnnotationsSentResponse, error) {
+			gotReq = in
+			return &annotationv1.MarkAnnotationsSentResponse{
+				Annotations: []*annotationv1.Annotation{{Id: "annot-1"}, {Id: "annot-2"}},
+			}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerAnnotationChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"ids": []string{"annot-1", "annot-2"}})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "annotation.markSent", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(gotReq.GetIds()) != 2 || gotReq.GetIds()[0] != "annot-1" || gotReq.GetIds()[1] != "annot-2" {
+		t.Errorf("unexpected request ids: %v", gotReq.GetIds())
+	}
+	resp, ok := result.(*annotationv1.MarkAnnotationsSentResponse)
+	if !ok || len(resp.GetAnnotations()) != 2 {
+		t.Errorf("unexpected result: %+v", result)
 	}
 }
 

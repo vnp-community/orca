@@ -740,13 +740,15 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient) {
 	r.Register("hostedReview.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
-			Provider   string `json:"provider"`
-			Repo       string `json:"repo"`
-			Title      string `json:"title"`
-			Body       string `json:"body"`
-			HeadBranch string `json:"headBranch"`
-			BaseBranch string `json:"baseBranch"`
-			RequestID  string `json:"requestId"`
+			Provider          string `json:"provider"`
+			Repo              string `json:"repo"`
+			Title             string `json:"title"`
+			Body              string `json:"body"`
+			HeadBranch        string `json:"headBranch"`
+			BaseBranch        string `json:"baseBranch"`
+			RequestID         string `json:"requestId"`
+			Draft             bool   `json:"draft"`             // NEW — BR-CR-20
+			LinkedIssueNumber *int32 `json:"linkedIssueNumber"` // NEW — BR-CR-19; *int32 so an absent field round-trips as unset, not 0 (the frontend doesn't send this yet — no call site to confirm a 0-is-valid convention against)
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
@@ -759,11 +761,37 @@ func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegr
 				TenantId: id.TenantID, Provider: parseWSProvider(in.Provider),
 				Repo: in.Repo, Title: in.Title, Body: in.Body,
 				HeadBranch: in.HeadBranch, BaseBranch: in.BaseBranch, RequestId: in.RequestID,
+				Draft: in.Draft, LinkedIssueNumber: in.LinkedIssueNumber,
 			})
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetPullRequest(), nil
+		return resp, nil // NEW — was resp.GetPullRequest(); now returns the whole response so
+		// linked_issue_update_error (BR-CR-19) reaches the client too
+	})
+
+	r.Register("hostedReview.suggestReviewers", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type suggestArgs struct {
+			Provider     string   `json:"provider"`
+			Repo         string   `json:"repo"`
+			BaseRef      string   `json:"baseRef"`
+			ChangedFiles []string `json:"changedFiles"`
+		}
+		in, err := decodeArg[suggestArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.SuggestPullRequestReviewers(attachSCMIdentity(rpcCtx, id),
+			&scmintegrationv1.SuggestPullRequestReviewersRequest{
+				TenantId: id.TenantID, Provider: parseWSProvider(in.Provider),
+				Repo: in.Repo, BaseRef: in.BaseRef, ChangedFiles: in.ChangedFiles,
+			})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
 	})
 
 	// hostedReview.forBranch — uses the same provider-generic single-result

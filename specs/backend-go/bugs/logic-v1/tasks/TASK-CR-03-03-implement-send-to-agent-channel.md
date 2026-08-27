@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_annotation_send.go`
 **Depends on:** TASK-CR-03-01, TASK-CR-03-02, TASK-CR-02-06 (needs `MarkAnnotationsSent` on the annotation client), TASK-CR-02-01 (needs `SentToAgent`/`WorktreeId` list filters)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented as exported wscompat.SendReviewFeedbackToAgent (shared with TASK-CR-03-05's REST mirror) + registerAnnotationSendChannel wrapper; all listed orchestration test cases pass in channels_annotation_send_test.go.
 
 ---
 
