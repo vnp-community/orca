@@ -51,7 +51,7 @@ func TestSpawnTerminalSession_UnresolvedConnection_ReturnsNotFoundError(t *testi
 }
 
 func TestSpawnTerminalSession_ResolvedConnection_SpawnsAndPersists(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestSpawnTerminalSession_ResolvedConnection_SpawnsAndPersists(t *testing.T)
 }
 
 func TestSpawnTerminalSession_AgentFailurePropagates(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

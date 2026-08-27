@@ -29,7 +29,7 @@ func TestStopTerminalProcess_UnknownPty_ReturnsNotFoundError(t *testing.T) {
 // (agent/src/relay/pty-agent-bridge.ts's handlePtySendSignal, confirmed via
 // agent-rpc-dispatch.ts's 'pty.sendSignal' case) with signal=SIGINT.
 func TestStopTerminalProcess_SendsRealSIGINT_NotWritePtyCtrlC(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestStopTerminalProcess_SendsRealSIGINT_NotWritePtyCtrlC(t *testing.T) {
 }
 
 func TestStopTerminalProcess_AgentFailurePropagates(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

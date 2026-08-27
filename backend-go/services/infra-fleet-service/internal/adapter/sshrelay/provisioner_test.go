@@ -334,7 +334,7 @@ func TestProvision_SucceedsAgainstFakeServer(t *testing.T) {
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
 	})
 
-	devServer, err := domain.NewDevServer("ds-1", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1")
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -370,7 +370,7 @@ func TestProvision_FailsOnChecksumMismatch(t *testing.T) {
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
 	})
 
-	devServer, err := domain.NewDevServer("ds-2", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-2")
+	devServer, err := domain.NewDevServer("ds-2", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-2", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestProvision_FailsWhenBundlePathNotConfigured(t *testing.T) {
 	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{HandshakeTimeout: 5 * time.Second}) // no BundlePath
 
-	devServer, err := domain.NewDevServer("ds-3", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-3")
+	devServer, err := domain.NewDevServer("ds-3", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-3", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -416,7 +416,7 @@ func TestProvision_FailsWhenSshTargetUnresolvable(t *testing.T) {
 	connector := sshconn.NewConnector(&fakeIssuer{}, sshconn.Config{})
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{BundlePath: "/nonexistent", HandshakeTimeout: time.Second})
 
-	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-missing")
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-missing", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

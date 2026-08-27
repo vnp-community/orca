@@ -19,7 +19,7 @@ func TestClientSpawnPtySucceedsAgainstFakeAgent(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestClientSpawnPty_MissingIDInResponse_ReturnsClearError(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-missing-id", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-missing-id", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestClientWriteResizeKillPty_SendsExpectedParams(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-params", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-params", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestClientWriteResizeKillPty_CallExpectedMethods(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestClientSendSignal_SendsExpectedParams(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-signal", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-signal", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestClientSendSignal_RejectsUnknownSignal_WithoutACall(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-signal-bad", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-signal-bad", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestClientAgentStatusAndInspectProcess_FromListProcesses(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestClientStreamPty_RoutesDataAndExitNotifications(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-4", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestClientStreamPty_TwoConcurrentSubscriptions_EachGetsOwnEvents(t *testing
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-5", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-5", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -368,7 +368,7 @@ func TestClientStreamPty_ContextCancellationClosesOutputChannel(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-6", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-6", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

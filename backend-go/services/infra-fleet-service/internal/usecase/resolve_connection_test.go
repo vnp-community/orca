@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -95,7 +96,7 @@ func TestResolveConnection_EmptyConnectionID_ShortCircuitsToLocal(t *testing.T) 
 
 // Branch 1: found — the connectionId resolves to a live dev server.
 func TestResolveConnection_Found_ReturnsConnectedAndDevServer(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -110,7 +111,8 @@ func TestResolveConnection_Found_ReturnsConnectedAndDevServer(t *testing.T) {
 	if !out.Connected {
 		t.Fatal("expected Connected=true for a resolvable connectionId")
 	}
-	if out.DevServer != ds {
+	if out.DevServer.ID != ds.ID || out.DevServer.TenantID != ds.TenantID || out.DevServer.Host != ds.Host ||
+		out.DevServer.Mode != ds.Mode || out.DevServer.SSHTargetID != ds.SSHTargetID {
 		t.Errorf("expected resolved dev server %+v, got %+v", ds, out.DevServer)
 	}
 }
@@ -149,7 +151,7 @@ func TestResolveConnection_RepositoryFailurePropagates(t *testing.T) {
 // to the same output a by-ConnectionID resolve of the same live connection
 // would.
 func TestResolveConnection_ByDevServerID_MatchesByConnectionID(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -173,7 +175,7 @@ func TestResolveConnection_ByDevServerID_MatchesByConnectionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error resolving by dev server id: %v", err)
 	}
-	if gotOut != wantOut {
+	if !reflect.DeepEqual(gotOut, wantOut) {
 		t.Errorf("resolving by dev_server_id = %+v, want %+v (same as by connection_id)", gotOut, wantOut)
 	}
 	if gotOut.ConnectionID != "conn-1" {
@@ -183,7 +185,7 @@ func TestResolveConnection_ByDevServerID_MatchesByConnectionID(t *testing.T) {
 
 // TASK-025/TASK-030: same as above, but keyed by WorktreeID.
 func TestResolveConnection_ByWorktreeID_MatchesByConnectionID(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -207,7 +209,7 @@ func TestResolveConnection_ByWorktreeID_MatchesByConnectionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error resolving by worktree id: %v", err)
 	}
-	if gotOut != wantOut {
+	if !reflect.DeepEqual(gotOut, wantOut) {
 		t.Errorf("resolving by worktree_id = %+v, want %+v (same as by connection_id)", gotOut, wantOut)
 	}
 	if gotOut.ConnectionID != "conn-1" {

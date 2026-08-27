@@ -203,7 +203,7 @@ func TestSession_BackgroundReconnect_RecoversAfterDropWithoutCallerRetry(t *test
 	client := New(cfg, slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-reconnect", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-reconnect", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

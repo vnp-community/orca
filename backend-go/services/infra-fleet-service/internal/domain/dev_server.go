@@ -58,13 +58,18 @@ type DevServer struct {
 	Host        string
 	Mode        ConnectionMode
 	SSHTargetID string
+	// Tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east") —
+	// backs the "fleet:tag:<tag>" dispatch-target shape
+	// workflow-service.md §7/TASK-WF-02-02 resolves against
+	// ListDevServersByTag.
+	Tags []string
 }
 
 // NewDevServer constructs a DevServer, enforcing the invariants a record
 // must satisfy to be meaningful — this is where "infra-fleet-service owns
 // this data's correctness" actually lives, not scattered validation in the
 // gRPC handler.
-func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID string) (DevServer, error) {
+func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID string, tags []string) (DevServer, error) {
 	if tenantID == "" {
 		return DevServer{}, ErrEmptyDevServerTenant
 	}
@@ -77,12 +82,13 @@ func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID st
 	if mode == ConnectionModeRelaySSH && sshTargetID == "" {
 		return DevServer{}, ErrMissingSSHTargetForRelaySSH
 	}
-	return DevServer{ID: id, TenantID: tenantID, Host: host, Mode: mode, SSHTargetID: sshTargetID}, nil
+	return DevServer{ID: id, TenantID: tenantID, Host: host, Mode: mode, SSHTargetID: sshTargetID, Tags: tags}, nil
 }
 
 // IsZero reports whether ds is the zero-value DevServer — used by
 // ResolveConnection's not-found branch to signal "no dev server", distinct
-// from a real DevServer with a coincidentally empty field.
+// from a real DevServer with a coincidentally empty field. Field-by-field
+// (rather than == DevServer{}) since Tags ([]string) isn't comparable.
 func (ds DevServer) IsZero() bool {
-	return ds == DevServer{}
+	return ds.ID == "" && ds.TenantID == "" && ds.Host == "" && ds.Mode == "" && ds.SSHTargetID == "" && len(ds.Tags) == 0
 }

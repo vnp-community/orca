@@ -36,6 +36,10 @@ type DevServerRepository interface {
 	// in the usecase layer, not this adapter, matching every other `New*`
 	// call site in this service.
 	FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (ds domain.DevServer, found bool, err error)
+	// ListByTag returns tenantID's dev servers carrying tag exactly — backs
+	// usecase.ListDevServersByTag / workflow-service's "fleet:tag:<tag>"
+	// dispatch-target shape (TASK-WF-02-02).
+	ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error)
 }
 
 // SshTargetRepository is the persistence port for SSH target registration.

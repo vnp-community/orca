@@ -115,7 +115,7 @@ func (f *fakeSshProvisioner) Provision(context.Context, domain.DevServer) (Trans
 
 func relaySSHDevServer(t *testing.T, id string) domain.DevServer {
 	t.Helper()
-	ds, err := domain.NewDevServer(id, "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1")
+	ds, err := domain.NewDevServer(id, "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

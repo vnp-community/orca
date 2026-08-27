@@ -127,6 +127,7 @@ func run() error {
 	getFleetHealthUC := usecase.NewGetFleetHealth(repo)
 	scanWorkspacePortsUC := usecase.NewScanWorkspacePorts(repo, agentClient)
 	listDevServersUC := usecase.NewListDevServers(repo)
+	listDevServersByTagUC := usecase.NewListDevServersByTag(repo, repo)
 	createConnectionUC := usecase.NewCreateConnection(repo)
 	relayUC := usecase.NewRelay(repo, agentClient)
 	listSshTargetsUC := usecase.NewListSshTargets(sshTargetStore)
@@ -165,6 +166,7 @@ func run() error {
 		getFleetHealthUC,
 		scanWorkspacePortsUC,
 		listDevServersUC,
+		listDevServersByTagUC,
 		createConnectionUC,
 		relayUC,
 		listSshTargetsUC,

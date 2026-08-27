@@ -203,7 +203,7 @@ func TestClientExecSucceedsAgainstFakeAgent(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestClientExecTranslatesMethodNotFound(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-mnf", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-mnf", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -253,7 +253,7 @@ func TestClientHealthReflectsHandshake(t *testing.T) {
 	client := New(testConfig(port, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestClientHealthFalseOnAuthFailure(t *testing.T) {
 	client := New(testConfig(port, "wrong-token"), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestClientExecReturnsClearErrorForUnimplementedMode(t *testing.T) {
 	client := New(testConfig(0, fakeAgentToken), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "example.invalid", domain.ConnectionModeDirectWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "example.invalid", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

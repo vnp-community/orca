@@ -26,14 +26,15 @@ import (
 type Server struct {
 	infrafleetv1.UnimplementedInfraFleetServiceServer
 
-	registerDevServer  *usecase.RegisterDevServer
-	resolveConnection  *usecase.ResolveConnection
-	createSshTarget    *usecase.CreateSshTarget
-	getFleetHealth     *usecase.GetFleetHealth
-	scanWorkspacePorts *usecase.ScanWorkspacePorts
-	listDevServers     *usecase.ListDevServers
-	createConnection   *usecase.CreateConnection
-	relay              *usecase.Relay
+	registerDevServer   *usecase.RegisterDevServer
+	resolveConnection   *usecase.ResolveConnection
+	createSshTarget     *usecase.CreateSshTarget
+	getFleetHealth      *usecase.GetFleetHealth
+	scanWorkspacePorts  *usecase.ScanWorkspacePorts
+	listDevServers      *usecase.ListDevServers
+	listDevServersByTag *usecase.ListDevServersByTag
+	createConnection    *usecase.CreateConnection
+	relay               *usecase.Relay
 
 	listSshTargets      *usecase.ListSshTargets
 	getSshState         *usecase.GetSshState
@@ -68,6 +69,7 @@ func New(
 	getFleetHealth *usecase.GetFleetHealth,
 	scanWorkspacePorts *usecase.ScanWorkspacePorts,
 	listDevServers *usecase.ListDevServers,
+	listDevServersByTag *usecase.ListDevServersByTag,
 	createConnection *usecase.CreateConnection,
 	relay *usecase.Relay,
 	listSshTargets *usecase.ListSshTargets,
@@ -97,6 +99,7 @@ func New(
 		getFleetHealth:         getFleetHealth,
 		scanWorkspacePorts:     scanWorkspacePorts,
 		listDevServers:         listDevServers,
+		listDevServersByTag:    listDevServersByTag,
 		createConnection:       createConnection,
 		relay:                  relay,
 		listSshTargets:         listSshTargets,
@@ -166,6 +169,23 @@ func (s *Server) ListDevServers(ctx context.Context, req *infrafleetv1.ListDevSe
 		out = append(out, toProtoDevServer(ds))
 	}
 	return &infrafleetv1.ListDevServersResponse{DevServers: out}, nil
+}
+
+// ListDevServersByTag backs workflow-service's "fleet:tag:<tag>"
+// dispatch-target shape — see usecase.ListDevServersByTag's doc comment.
+func (s *Server) ListDevServersByTag(ctx context.Context, req *infrafleetv1.ListDevServersByTagRequest) (*infrafleetv1.ListDevServersByTagResponse, error) {
+	devServers, err := s.listDevServersByTag.Execute(ctx, usecase.ListDevServersByTagInput{
+		Tag:         req.GetTag(),
+		HealthyOnly: req.GetHealthyOnly(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.DevServer, 0, len(devServers))
+	for _, ds := range devServers {
+		out = append(out, toProtoDevServer(ds))
+	}
+	return &infrafleetv1.ListDevServersByTagResponse{DevServers: out}, nil
 }
 
 // CreateConnection is the write path for infra.connections — see
@@ -366,6 +386,7 @@ func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 		Host:        ds.Host,
 		Mode:        toProtoConnectionMode(ds.Mode),
 		SshTargetId: ds.SSHTargetID,
+		Tags:        ds.Tags,
 	}
 }
 

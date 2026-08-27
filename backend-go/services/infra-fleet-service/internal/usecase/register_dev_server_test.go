@@ -23,6 +23,10 @@ type fakeDevServerRepository struct {
 	findErr        error
 	registerCalled bool
 	lastRegistered domain.DevServer
+
+	// byTagErr drives ListByTag's fake error path — used by
+	// list_dev_servers_by_tag_test.go.
+	byTagErr error
 }
 
 func (f *fakeDevServerRepository) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
@@ -61,6 +65,27 @@ func (f *fakeDevServerRepository) List(ctx context.Context, tenantID string) ([]
 	for _, ds := range f.byID {
 		if ds.TenantID == tenantID {
 			out = append(out, ds)
+		}
+	}
+	return out, nil
+}
+
+// ListByTag implements usecase.DevServerRepository.ListByTag — used by
+// list_dev_servers_by_tag_test.go.
+func (f *fakeDevServerRepository) ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error) {
+	if f.byTagErr != nil {
+		return nil, f.byTagErr
+	}
+	var out []domain.DevServer
+	for _, ds := range f.byID {
+		if ds.TenantID != tenantID {
+			continue
+		}
+		for _, t := range ds.Tags {
+			if t == tag {
+				out = append(out, ds)
+				break
+			}
 		}
 	}
 	return out, nil
