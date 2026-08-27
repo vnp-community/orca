@@ -15,6 +15,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
@@ -261,4 +262,12 @@ type TerminalSessionRepository interface {
 	// session already closed simply gets a newer closed_at, not an error, so
 	// a duplicate/racing close request never fails the caller.
 	Close(ctx context.Context, tenantID, ptyID string, closedAt time.Time) error
+}
+
+// LifecycleEventPublisher publishes terminal-session agent-lifecycle
+// events for notification-service to translate into mobile pushes
+// (BL-MB-02). Best-effort — a publish failure must never fail the PTY
+// relay loop itself.
+type LifecycleEventPublisher interface {
+	PublishAgentLifecycle(ctx context.Context, tenantID, subject string, payload eventbus.AgentLifecyclePayload) error
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/ai-provider-service/internal/domain"
 )
 
@@ -205,6 +206,24 @@ func (f *fakeInfraFleetClient) Relay(ctx context.Context, devServerID, method st
 		return nil, f.relayErr
 	}
 	return f.relayResult, nil
+}
+
+// fakeRateLimitEventPublisher is an in-memory RateLimitEventPublisher —
+// backs test_connection_test.go's rate-limit publish assertions
+// (TASK-MB-02-04).
+type fakeRateLimitEventPublisher struct {
+	publishErr error
+
+	calls        int
+	lastTenantID string
+	lastPayload  eventbus.RateLimitPayload
+}
+
+func (f *fakeRateLimitEventPublisher) PublishRateLimited(ctx context.Context, tenantID string, payload eventbus.RateLimitPayload) error {
+	f.calls++
+	f.lastTenantID = tenantID
+	f.lastPayload = payload
+	return f.publishErr
 }
 
 var errBoom = errors.New("boom")

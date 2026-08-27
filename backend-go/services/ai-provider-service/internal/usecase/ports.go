@@ -14,6 +14,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/ai-provider-service/internal/domain"
 )
 
@@ -150,6 +151,11 @@ type CredentialBrokerClient interface {
 type ConnectionTestResult struct {
 	Success bool
 	Message string
+	// RateLimited/ResetAtMs surface a rate-limit signal from the agent's
+	// result map (SOL-MB-02) — see TestConnection.Execute, which publishes
+	// RateLimitEventPublisher.PublishRateLimited when RateLimited is true.
+	RateLimited bool
+	ResetAtMs   *int64
 }
 
 // InfraFleetClient is the narrow port TestConnection uses to reach
@@ -166,6 +172,15 @@ type InfraFleetClient interface {
 	// then calls infra-fleet-service's Relay RPC with method/params.
 	// Returns the agent's decoded JSON-RPC result.
 	Relay(ctx context.Context, devServerID, method string, params map[string]any) (map[string]any, error)
+}
+
+// RateLimitEventPublisher is the port TestConnection uses to notify
+// notification-service (SOL-MB-02) when a provider connection test comes
+// back rate-limited. Implemented by internal/adapter/eventbus against NATS
+// JetStream. A nil value (e.g. NATS unavailable at startup) means
+// TestConnection degrades to skipping the publish — see its Execute.
+type RateLimitEventPublisher interface {
+	PublishRateLimited(ctx context.Context, tenantID string, payload eventbus.RateLimitPayload) error
 }
 
 // ProviderResolutionPort is the interface the ResolveProvider usecase

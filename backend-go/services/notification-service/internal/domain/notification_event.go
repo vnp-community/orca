@@ -122,6 +122,24 @@ var subjectRules = map[string]subjectRule{
 		Type: "decision_gate_opened", Title: "Needs your decision", Body: "A workflow is waiting on your decision.",
 		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
 	},
+	// BL-MB-02 (SOL-MB-02): infra-fleet-service's PTY output-quiescence
+	// tracking and ai-provider-service's connection-test relay parsing.
+	"orca.infra.terminal_session.agent_completed": {
+		Type: "agent_completed", Title: "✅ Agent xong", Body: "{agent} đã hoàn thành task.",
+		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
+	"orca.infra.terminal_session.agent_error": {
+		Type: "agent_error", Title: "❌ Agent lỗi",
+		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
+	"orca.infra.terminal_session.agent_waiting": {
+		Type: "agent_waiting", Title: "⏸ Agent chờ input",
+		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
+	"orca.aiprovider.account.rate_limited": {
+		Type: "rate_limited", Title: "⚠️ Rate limit",
+		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
 }
 
 // defaultRule is used for any subject not in subjectRules — WS-only,
@@ -172,6 +190,14 @@ func TranslateEvent(id, sourceEventID, subject, tenantID string, payload EventPa
 		Channels:         rule.Channels,
 		CreatedAt:        occurredAt,
 	}, nil
+}
+
+// BufferedNotification is one pending buffered push notification (BR-MB-07)
+// — decoded back into a NotificationEvent so callers (StreamNotifications'
+// reconnect drain) can reuse the same wire-framing a live event uses.
+type BufferedNotification struct {
+	ID    string
+	Event NotificationEvent
 }
 
 func recipientsOf(p EventPayload) []string {

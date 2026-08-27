@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
@@ -30,6 +32,7 @@ import (
 
 	infraagentwsserver "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/agentwsserver"
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
+	infraeventbus "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
@@ -121,6 +124,35 @@ func run() error {
 	agentClient := infradevserveragent.New(agentCfg, logger, agentOpts...)
 	defer agentClient.Close()
 
+	healthSrv := health.New()
+	healthSrv.Register("postgres", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return pool.Ping(ctx)
+	})
+
+	// terminalLiveStates is the shared per-pod quiescence registry
+	// AttachPty writes and GetTerminalAgentStatus reads (TASK-MB-02-01/02) —
+	// constructed once here so both usecases share the exact same instance.
+	terminalLiveStates := &sync.Map{}
+
+	// Agent-lifecycle push-notification events (TASK-MB-02-01) — best-effort:
+	// NATS unavailable degrades to "no mobile push notifications", never a
+	// fatal error, mirroring tenant-service's eventbus wiring.
+	var lifecycleEvents usecase.LifecycleEventPublisher
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, agent-lifecycle push notifications will not be published", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, infraeventbus.StreamName, []string{"orca.infra.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			lifecycleEvents = infraeventbus.New(pub)
+			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
+		}
+	}
+
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
 	createSshTargetUC := usecase.NewCreateSshTarget(sshTargetStore)
@@ -144,9 +176,9 @@ func run() error {
 	listTerminalSessionsUC := usecase.NewListTerminalSessions(terminalSessionStore)
 	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, agentClient)
 	focusTerminalSessionUC := usecase.NewFocusTerminalSession(terminalSessionStore)
-	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient)
+	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient, terminalLiveStates, lifecycleEvents)
 	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
-	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter)
+	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter, terminalLiveStates, lifecycleEvents)
 	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
 	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
 	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
@@ -188,13 +220,6 @@ func run() error {
 		getHostCapabilitiesUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
-
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
 
 	// direct-websocket's inbound WS handler ("/agent") and token-issuance
 	// endpoint ("/api/agent-token") share this service's existing HTTP

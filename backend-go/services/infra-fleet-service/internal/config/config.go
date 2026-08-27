@@ -24,6 +24,10 @@ type Config struct {
 	// fail-safe: an unrecognized value should not silently widen what
 	// host-local terminal spawning is allowed.
 	ServerDeployment bool
+	// NATSURL backs the agent-lifecycle event publisher (TASK-MB-02-01) —
+	// mirrors tenant-service's NATSURL field. NATS unavailable degrades this
+	// service to "no mobile push notifications", never a fatal error.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -34,5 +38,6 @@ func Load() (Config, error) {
 	return Config{
 		Base:             base,
 		ServerDeployment: os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		NATSURL:          commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

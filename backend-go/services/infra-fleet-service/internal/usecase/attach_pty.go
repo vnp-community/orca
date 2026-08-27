@@ -3,9 +3,13 @@ package usecase
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"sync"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
@@ -50,6 +54,22 @@ type PtyServerMessage struct {
 // loop waiting on adapter/grpc's stream.Send pump.
 const outboundQueueSize = 64
 
+// ptyLiveState is one entry in the shared liveStates registry AttachPty
+// writes and GetTerminalAgentStatus reads (TASK-MB-02-01/02) — per-pod,
+// in-memory map[ptyID]*ptyLiveState. Inherits the same per-pod
+// live-connection-ownership caveat this service's existing AttachPty
+// pooling has (a connectionId's live transport lives on exactly one pod at
+// a time): a GetTerminalAgentStatus call landing on a different pod sees no
+// entry and falls back to the pre-quiescence behavior, an honest degrade.
+type ptyLiveState struct {
+	lastOutputAt time.Time
+	agentRunning bool
+	// readyNotified debounces agent_waiting — GetTerminalAgentStatus sets
+	// this true on the poll that first observes quiescence, so a later poll
+	// while still quiescent does not republish the same transition.
+	readyNotified bool
+}
+
 // AttachPty drives one bidirectional AttachPty stream: consumes decoded
 // client frames (adapter/grpc reads these off the actual grpc.ServerStream
 // and pushes them onto the inbound channel it hands to Execute), resolves
@@ -59,14 +79,16 @@ const outboundQueueSize = 64
 // back out. See Execute's doc comment for the two-channel contract
 // adapter/grpc's handler pumps against the real stream.
 type AttachPty struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
-	limiter  *ConnectionStreamLimiter
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	agent      DevServerAgentClient
+	limiter    *ConnectionStreamLimiter
+	liveStates *sync.Map // map[string]*ptyLiveState — shared with GetTerminalAgentStatus, see ptyLiveState's doc comment
+	events     LifecycleEventPublisher
 }
 
-func NewAttachPty(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient, limiter *ConnectionStreamLimiter) *AttachPty {
-	return &AttachPty{sessions: sessions, resolver: resolver, agent: agent, limiter: limiter}
+func NewAttachPty(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient, limiter *ConnectionStreamLimiter, liveStates *sync.Map, events LifecycleEventPublisher) *AttachPty {
+	return &AttachPty{sessions: sessions, resolver: resolver, agent: agent, limiter: limiter, liveStates: liveStates, events: events}
 }
 
 // Execute starts a goroutine driving the stream and returns immediately with
@@ -138,12 +160,48 @@ func (uc *AttachPty) run(ctx context.Context, inbound <-chan PtyClientMessage, o
 				return
 			}
 			if ev.Exited {
+				uc.liveStates.Delete(ptyID)
+				uc.publishExitEvent(ctx, tenantID, ptyID, session, ev.ExitCode)
 				outbound <- PtyServerMessage{Exited: true, ExitCode: ev.ExitCode}
 				return
+			}
+			if len(ev.Data) > 0 {
+				uc.liveStates.Store(ptyID, &ptyLiveState{lastOutputAt: time.Now(), agentRunning: true})
 			}
 			outbound <- PtyServerMessage{Output: ev.Data}
 		}
 	}
+}
+
+// publishExitEvent publishes agent_completed/agent_error for one pty exit —
+// best-effort (logged, never fails the relay loop): a missed publish only
+// means a mobile push notification is late/missing (TASK-MB-02-01).
+func (uc *AttachPty) publishExitEvent(ctx context.Context, tenantID, ptyID string, session domain.TerminalSession, exitCode int32) {
+	if uc.events == nil {
+		return
+	}
+	subject := eventbus.SubjectAgentCompleted
+	if exitCode != 0 {
+		subject = eventbus.SubjectAgentError
+	}
+	if err := uc.events.PublishAgentLifecycle(ctx, tenantID, subject, eventbus.AgentLifecyclePayload{
+		PtyID:        ptyID,
+		ConnectionID: session.ConnectionID,
+		ExitCode:     &exitCode,
+		UserIDs:      userIDsFor(session),
+	}); err != nil {
+		slog.Default().WarnContext(ctx, "failed to publish agent lifecycle event", slog.Any("error", err), slog.String("subject", subject), slog.String("pty_id", ptyID))
+	}
+}
+
+// userIDsFor returns the one known recipient for session's lifecycle
+// events, or nil when no user identity was captured at spawn time (see
+// domain.TerminalSession.CreatedByUserID's doc comment).
+func userIDsFor(session domain.TerminalSession) []string {
+	if session.CreatedByUserID == "" {
+		return nil
+	}
+	return []string{session.CreatedByUserID}
 }
 
 // handleInboundPtyMessage dispatches one client-stream message (input or

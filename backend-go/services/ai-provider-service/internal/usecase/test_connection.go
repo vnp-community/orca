@@ -5,6 +5,7 @@ import (
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/eventbus"
 )
 
 type TestConnectionInput struct {
@@ -16,12 +17,13 @@ type TestConnectionInput struct {
 // context for why ResolveCredential cannot be used here. The plaintext key
 // never crosses into this service's memory at any point.
 type TestConnection struct {
-	repo  ProviderAccountRepository
-	infra InfraFleetClient
+	repo            ProviderAccountRepository
+	infra           InfraFleetClient
+	rateLimitEvents RateLimitEventPublisher
 }
 
-func NewTestConnection(repo ProviderAccountRepository, infra InfraFleetClient) *TestConnection {
-	return &TestConnection{repo: repo, infra: infra}
+func NewTestConnection(repo ProviderAccountRepository, infra InfraFleetClient, rateLimitEvents RateLimitEventPublisher) *TestConnection {
+	return &TestConnection{repo: repo, infra: infra, rateLimitEvents: rateLimitEvents}
 }
 
 func (uc *TestConnection) Execute(ctx context.Context, in TestConnectionInput) (ConnectionTestResult, error) {
@@ -47,7 +49,17 @@ func (uc *TestConnection) Execute(ctx context.Context, in TestConnectionInput) (
 	if err != nil {
 		return ConnectionTestResult{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_TEST_CONNECTION_FAILED", "failed to relay connection test to dev server agent", err)
 	}
-	return parseConnectionTestResult(result), nil
+
+	parsed := parseConnectionTestResult(result)
+	if parsed.RateLimited && uc.rateLimitEvents != nil {
+		userID, _ := tenant.UserID(ctx)
+		// Best-effort — a publish failure must not fail the connection-test
+		// result itself (SOL-MB-02).
+		_ = uc.rateLimitEvents.PublishRateLimited(ctx, tenantID, eventbus.RateLimitPayload{
+			AccountID: in.AccountID, Provider: string(account.ProviderType), UserID: userID, ResetAt: parsed.ResetAtMs,
+		})
+	}
+	return parsed, nil
 }
 
 // parseConnectionTestResult maps the agent's generic map[string]any result
@@ -60,6 +72,13 @@ func parseConnectionTestResult(result map[string]any) ConnectionTestResult {
 	}
 	if v, ok := result["message"].(string); ok {
 		out.Message = v
+	}
+	if v, ok := result["rateLimited"].(bool); ok {
+		out.RateLimited = v
+	}
+	if v, ok := result["resetAtUnixMs"].(float64); ok {
+		ms := int64(v)
+		out.ResetAtMs = &ms
 	}
 	return out
 }

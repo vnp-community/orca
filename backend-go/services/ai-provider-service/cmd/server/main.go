@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
@@ -28,6 +29,7 @@ import (
 
 	svcconfig "github.com/stablyai/orca-go/services/ai-provider-service/internal/config"
 
+	aiprovidereventbus "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/eventbus"
 	aiprovidergrpc "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/grpc"
 	aiprovidergrpcclient "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/grpcclient"
 	aiproviderpostgres "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/postgres"
@@ -74,6 +76,33 @@ func run() error {
 	}
 	defer pool.Close()
 
+	healthSrv := health.New()
+	healthSrv.Register("postgres", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return pool.Ping(ctx)
+	})
+
+	// Best-effort rate-limit event publish (SOL-MB-02,
+	// TASK-MB-02-04) — notification-service consumes
+	// orca.aiprovider.account.rate_limited. Unreachable NATS must not be
+	// fatal: TestConnection degrades to skipping the publish (see its
+	// Execute), same graceful-degradation shape as tenant-service's
+	// profile-cache invalidation publisher.
+	var rateLimitEvents usecase.RateLimitEventPublisher
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, rate-limit events will not be published", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "AIPROVIDER", []string{"orca.aiprovider.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			rateLimitEvents = aiprovidereventbus.New(pub)
+			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
+		}
+	}
+
 	repo := aiproviderpostgres.New(pool)
 
 	// Real credential-broker-service connection — Epic B
@@ -108,7 +137,7 @@ func run() error {
 	updateAccountUC := usecase.NewUpdateAccount(repo)
 	deleteAccountUC := usecase.NewDeleteAccount(repo)
 	writeCredentialUC := usecase.NewWriteCredential(repo, broker)
-	testConnectionUC := usecase.NewTestConnection(repo, infraFleet)
+	testConnectionUC := usecase.NewTestConnection(repo, infraFleet, rateLimitEvents)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	aiproviderv1.RegisterAiProviderServiceServer(grpcServer, aiprovidergrpc.New(
@@ -116,13 +145,6 @@ func run() error {
 		listAccountsUC, updateAccountUC, deleteAccountUC, writeCredentialUC, testConnectionUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
-
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),

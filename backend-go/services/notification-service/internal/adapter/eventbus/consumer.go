@@ -48,6 +48,13 @@ var Subjects = []SubjectBinding{
 	{StreamName: "AUTOMATION", Subject: "orca.automation.run.completed"},
 	{StreamName: "CREDENTIAL", Subject: "orca.credential.credential.rotated"},
 	{StreamName: "ORCHESTRATION", Subject: "orca.orchestration.decision_gate.opened"},
+	// BL-MB-02 (SOL-MB-02): stream names must match infra-fleet-service's
+	// and ai-provider-service's own EnsureStream calls exactly ("INFRA",
+	// "AIPROVIDER" — see those services' cmd/server/main.go).
+	{StreamName: "INFRA", Subject: "orca.infra.terminal_session.agent_completed"},
+	{StreamName: "INFRA", Subject: "orca.infra.terminal_session.agent_error"},
+	{StreamName: "INFRA", Subject: "orca.infra.terminal_session.agent_waiting"},
+	{StreamName: "AIPROVIDER", Subject: "orca.aiprovider.account.rate_limited"},
 }
 
 // Consumer subscribes to every binding in Subjects and forwards each

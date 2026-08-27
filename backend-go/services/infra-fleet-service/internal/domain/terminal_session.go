@@ -16,6 +16,12 @@ type TerminalSession struct {
 	Cwd          string
 	CreatedAt    time.Time
 	LastActiveAt time.Time
+	// CreatedByUserID is threaded from SpawnTerminalSessionInput — empty for
+	// pre-migration rows and for any caller that doesn't carry a resolved
+	// user identity yet (see usecase.SpawnTerminalSession). Not included in
+	// IsZero's check below: an old row legitimately has it empty without
+	// being an absent session.
+	CreatedByUserID string
 	// ClosedAt is nil while the session is open — set by
 	// usecase.KillTerminalSession, mirrors Connection/DevServer's convention
 	// of a real Go zero value (nil pointer) over a sentinel time, per
