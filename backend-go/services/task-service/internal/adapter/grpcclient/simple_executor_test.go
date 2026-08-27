@@ -84,6 +84,9 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
 	panic("not implemented")
 }
+func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
+	panic("not implemented")
+}
 func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
 	panic("not implemented")
 }

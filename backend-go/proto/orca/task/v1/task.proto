@@ -59,6 +59,11 @@ service TaskService {
   rpc CreatePublicLink(CreatePublicLinkRequest) returns (CreatePublicLinkResponse); // requires 'manage'; returns the plaintext token ONCE
   rpc RevokePublicLink(RevokePublicLinkRequest) returns (google.protobuf.Empty);
   rpc ResolvePublicLink(ResolvePublicLinkRequest) returns (ResolvePublicLinkResponse); // token -> task_id + read-only grant, no auth required
+
+  // ReportTaskExecutionResult is called BY orchestration-service only — see
+  // this RPC's usecase doc comment for the service-identity check this
+  // handler must perform. api-gateway never routes to it.
+  rpc ReportTaskExecutionResult(ReportTaskExecutionResultRequest) returns (google.protobuf.Empty);
 }
 
 message Task {
@@ -301,3 +306,11 @@ message CreatePublicLinkResponse { string id = 1; string token = 2; } // token r
 message RevokePublicLinkRequest { string id = 1; }
 message ResolvePublicLinkRequest { string token = 1; }
 message ResolvePublicLinkResponse { string task_id = 1; }
+
+message ReportTaskExecutionResultRequest {
+  string task_id = 1;
+  string coordinator_run_id = 2; // must match the task's current active_execution_id
+  bool success = 3;
+  double actual_hours = 4;
+  string error_message = 5; // set iff !success
+}

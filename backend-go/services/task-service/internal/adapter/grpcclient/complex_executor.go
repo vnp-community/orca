@@ -59,6 +59,12 @@ func (c *ComplexExecutor) Execute(ctx context.Context, tenantID, taskID, request
 	if err != nil {
 		return "", fmt.Errorf("complex_executor: start coordinator run: %w", err)
 	}
+	// Record the new run's id as this task's active_execution_id — the
+	// staleness check ReportTaskExecutionResult (TASK-TG-04-05) needs to
+	// reject a callback for a run this task was re-dispatched away from.
+	if err := c.tasks.UpdateActiveExecutionID(ctx, tenantID, taskID, resp.GetId()); err != nil {
+		return "", fmt.Errorf("complex_executor: persist active_execution_id: %w", err)
+	}
 	return resp.GetId(), nil
 }
 

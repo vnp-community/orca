@@ -62,6 +62,10 @@ type TaskRepository interface {
 	// UpdateWorktreeID persists the provisioned worktree a task's execution
 	// is running in — see SOL-TG-04.
 	UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error
+	// UpdateActiveExecutionID persists the complex path's coordinator_run
+	// id (TASK-TG-04-04/05) — read back by ReportTaskExecutionResult to
+	// reject a stale/duplicate completion callback.
+	UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error
 	// UpdatePromptTemplate persists the "Generate Agent Prompt" output — see
 	// SOL-TG-02.
 	UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error

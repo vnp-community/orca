@@ -35,14 +35,21 @@ func (f *fakeOrchestrationServiceClient) StartCoordinatorRun(ctx context.Context
 
 // fakeSubtreeTaskRepository implements usecase.TaskRepository directly
 // (embeds the nil interface, panics on any unimplemented method) — this
-// file only needs GetSubtree, ComplexExecutor.buildOrchestrationSpec's one
-// dependency.
+// file needs GetSubtree (buildOrchestrationSpec's one dependency) and
+// UpdateActiveExecutionID (Execute persists the new run's id right after
+// StartCoordinatorRun succeeds, TASK-TG-04-05).
 type fakeSubtreeTaskRepository struct {
 	usecase.TaskRepository
 
-	subtree      []domain.Task
-	subtreeEdges []domain.TaskEdge
-	subtreeErr   error
+	subtree              []domain.Task
+	subtreeEdges         []domain.TaskEdge
+	subtreeErr           error
+	gotActiveExecutionID string
+}
+
+func (f *fakeSubtreeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
+	f.gotActiveExecutionID = activeExecutionID
+	return nil
 }
 
 func (f *fakeSubtreeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
@@ -73,6 +80,9 @@ func TestComplexExecutor_Execute_BuildsSpecAndStartsCoordinatorRun(t *testing.T)
 	}
 	if ref != "run-1" {
 		t.Errorf("expected the coordinator run's id, got %q", ref)
+	}
+	if tasks.gotActiveExecutionID != "run-1" {
+		t.Errorf("expected UpdateActiveExecutionID to be called with the new run's id, got %q", tasks.gotActiveExecutionID)
 	}
 
 	got := orch.gotStartCoordinatorRun

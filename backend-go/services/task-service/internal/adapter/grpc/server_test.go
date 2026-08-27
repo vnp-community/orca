@@ -150,6 +150,15 @@ func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id,
 	f.tasks[id] = t
 	return nil
 }
+func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
+	t, ok := f.tasks[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	t.ActiveExecutionID = activeExecutionID
+	f.tasks[id] = t
+	return nil
+}
 func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
 	t, ok := f.tasks[id]
 	if !ok {
@@ -404,6 +413,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		usecase.NewRecalculateProgress(tasks),
 		usecase.NewAddComment(comments),
 		usecase.NewListComments(comments),
+		usecase.NewReportTaskExecutionResult(tasks),
 	)
 }
 

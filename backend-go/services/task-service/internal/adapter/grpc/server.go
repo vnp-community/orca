@@ -24,29 +24,30 @@ import (
 type Server struct {
 	taskv1.UnimplementedTaskServiceServer
 
-	createTask          *usecase.CreateTask
-	getTask             *usecase.GetTask
-	addEdge             *usecase.AddEdge
-	grant               *usecase.Grant
-	resolvePermission   *usecase.ResolvePermission
-	executeTask         *usecase.ExecuteTask
-	hasActiveExecutions *usecase.HasActiveExecutions
-	listTasks           *usecase.ListTasks
-	updateTask          *usecase.UpdateTask
-	deleteTask          *usecase.DeleteTask
-	getDependencies     *usecase.GetDependencies
-	aiDecompose         *usecase.AIDecompose
-	aiApply             *usecase.AIApply
-	generateAgentPrompt *usecase.GenerateAgentPrompt
-	revokeGrant         *usecase.RevokeGrant
-	listGrants          *usecase.ListGrants
-	createPublicLink    *usecase.CreatePublicLink
-	revokePublicLink    *usecase.RevokePublicLink
-	resolvePublicLink   *usecase.ResolvePublicLink
-	getSubtree          *usecase.GetSubtree
-	recalculateProgress *usecase.RecalculateProgress
-	addComment          *usecase.AddComment
-	listComments        *usecase.ListComments
+	createTask            *usecase.CreateTask
+	getTask               *usecase.GetTask
+	addEdge               *usecase.AddEdge
+	grant                 *usecase.Grant
+	resolvePermission     *usecase.ResolvePermission
+	executeTask           *usecase.ExecuteTask
+	hasActiveExecutions   *usecase.HasActiveExecutions
+	listTasks             *usecase.ListTasks
+	updateTask            *usecase.UpdateTask
+	deleteTask            *usecase.DeleteTask
+	getDependencies       *usecase.GetDependencies
+	aiDecompose           *usecase.AIDecompose
+	aiApply               *usecase.AIApply
+	generateAgentPrompt   *usecase.GenerateAgentPrompt
+	revokeGrant           *usecase.RevokeGrant
+	listGrants            *usecase.ListGrants
+	createPublicLink      *usecase.CreatePublicLink
+	revokePublicLink      *usecase.RevokePublicLink
+	resolvePublicLink     *usecase.ResolvePublicLink
+	getSubtree            *usecase.GetSubtree
+	recalculateProgress   *usecase.RecalculateProgress
+	addComment            *usecase.AddComment
+	listComments          *usecase.ListComments
+	reportExecutionResult *usecase.ReportTaskExecutionResult
 }
 
 func New(
@@ -73,31 +74,33 @@ func New(
 	recalculateProgress *usecase.RecalculateProgress,
 	addComment *usecase.AddComment,
 	listComments *usecase.ListComments,
+	reportExecutionResult *usecase.ReportTaskExecutionResult,
 ) *Server {
 	return &Server{
-		createTask:          createTask,
-		getTask:             getTask,
-		addEdge:             addEdge,
-		grant:               grant,
-		resolvePermission:   resolvePermission,
-		executeTask:         executeTask,
-		hasActiveExecutions: hasActiveExecutions,
-		listTasks:           listTasks,
-		updateTask:          updateTask,
-		deleteTask:          deleteTask,
-		getDependencies:     getDependencies,
-		aiDecompose:         aiDecompose,
-		aiApply:             aiApply,
-		generateAgentPrompt: generateAgentPrompt,
-		revokeGrant:         revokeGrant,
-		listGrants:          listGrants,
-		createPublicLink:    createPublicLink,
-		revokePublicLink:    revokePublicLink,
-		resolvePublicLink:   resolvePublicLink,
-		getSubtree:          getSubtree,
-		recalculateProgress: recalculateProgress,
-		addComment:          addComment,
-		listComments:        listComments,
+		createTask:            createTask,
+		getTask:               getTask,
+		addEdge:               addEdge,
+		grant:                 grant,
+		resolvePermission:     resolvePermission,
+		executeTask:           executeTask,
+		hasActiveExecutions:   hasActiveExecutions,
+		listTasks:             listTasks,
+		updateTask:            updateTask,
+		deleteTask:            deleteTask,
+		getDependencies:       getDependencies,
+		aiDecompose:           aiDecompose,
+		aiApply:               aiApply,
+		generateAgentPrompt:   generateAgentPrompt,
+		revokeGrant:           revokeGrant,
+		listGrants:            listGrants,
+		createPublicLink:      createPublicLink,
+		revokePublicLink:      revokePublicLink,
+		resolvePublicLink:     resolvePublicLink,
+		getSubtree:            getSubtree,
+		recalculateProgress:   recalculateProgress,
+		addComment:            addComment,
+		listComments:          listComments,
+		reportExecutionResult: reportExecutionResult,
 	}
 }
 
@@ -216,6 +219,22 @@ func (s *Server) ResolvePublicLink(ctx context.Context, req *taskv1.ResolvePubli
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &taskv1.ResolvePublicLinkResponse{TaskId: taskID}, nil
+}
+
+// ReportTaskExecutionResult is called BY orchestration-service only — see
+// usecase.ReportTaskExecutionResult's doc comment for the service-identity
+// check this handler is missing (flagged, not resolved: no mTLS/mesh-identity
+// interceptor exists anywhere in this codebase's common/grpcmw to reuse; a
+// guessed-at check would be worse than an honest gap). api-gateway never
+// routes to this RPC.
+func (s *Server) ReportTaskExecutionResult(ctx context.Context, req *taskv1.ReportTaskExecutionResultRequest) (*emptypb.Empty, error) {
+	if err := s.reportExecutionResult.Execute(ctx, usecase.ReportTaskExecutionResultInput{
+		TaskID: req.GetTaskId(), CoordinatorRunID: req.GetCoordinatorRunId(),
+		Success: req.GetSuccess(), ActualHours: req.GetActualHours(),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error) {

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `backend-go/services/task-service/internal/usecase/report_execution_result.go` (new)
 **Depends on:** TASK-TG-04-04 (`coordinator_run_id`/`ActiveExecutionID` produced by `ComplexExecutor`)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — Added migration 0006 (active_execution_id column — 0005 was already taken by TG-03-07's outbox migration), domain.Task.ActiveExecutionID, repository.go column plumbing (taskColumns/scanTask/scanTaskAndTrailing/prefixedTaskColumns/GetAncestors's hand-written CTE) + UpdateActiveExecutionID; ComplexExecutor.Execute persists it right after StartCoordinatorRun succeeds. Added ReportTaskExecutionResult RPC/usecase/handler: a coordinator_run_id mismatch is a silent no-op (stale/duplicate callback), success -> StatusReview, failure -> StatusBlocked. Security note flagged, not resolved: no mesh-identity-extraction interceptor exists in common/grpcmw today to gate this RPC to orchestration-service only — documented as an open gap rather than guessed at. `go test ./services/task-service/internal/usecase/... -run TestReportTaskExecutionResult` passes (5/5); every backend-go service builds clean.
 
 ---
 

@@ -72,21 +72,29 @@ type Task struct {
 	// honest limit on what "in_progress" currently means here.
 	ProjectID string
 
-	Description     string
-	Type            string // task|bug|feature|epic
-	Priority        string
-	AssigneeID      string
-	OwnerID         string // see SOL-TG-03 — intrinsic-owner short-circuit
-	DueDate         *time.Time
-	EstimatedHours  *float64
-	ActualHours     *float64 // see SOL-TG-04
-	PromptTemplate  string   // see SOL-TG-02
-	AIContext       string
-	AIPlanJSON      string // see SOL-TG-02
-	Visibility      string
-	WorktreeID      string // see SOL-TG-04
-	AgentSessionID  string // see SOL-TG-04
-	ProgressPercent int
+	Description    string
+	Type           string // task|bug|feature|epic
+	Priority       string
+	AssigneeID     string
+	OwnerID        string // see SOL-TG-03 — intrinsic-owner short-circuit
+	DueDate        *time.Time
+	EstimatedHours *float64
+	ActualHours    *float64 // see SOL-TG-04
+	PromptTemplate string   // see SOL-TG-02
+	AIContext      string
+	AIPlanJSON     string // see SOL-TG-02
+	Visibility     string
+	WorktreeID     string // see SOL-TG-04
+	AgentSessionID string // see SOL-TG-04
+	// ActiveExecutionID is the complex path's ComplexExecutor.Execute
+	// return value (an orchestration-service coordinator_run id) — set
+	// right after StartCoordinatorRun succeeds (TASK-TG-04-04), read by
+	// ReportTaskExecutionResult (TASK-TG-04-05) to reject a stale/
+	// duplicate callback (retried delivery, or a callback for a run this
+	// task was re-dispatched away from) rather than erroring on it, per
+	// 05-data-architecture.md's at-least-once consumer idempotence note.
+	ActiveExecutionID string
+	ProgressPercent   int
 }
 
 func validStatus(s string) bool {

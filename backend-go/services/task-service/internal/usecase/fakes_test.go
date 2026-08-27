@@ -193,6 +193,14 @@ func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id,
 	return nil
 }
 
+func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.ActiveExecutionID = activeExecutionID
+		f.tasks[id] = t
+	}
+	return nil
+}
+
 func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.PromptTemplate = promptTemplate

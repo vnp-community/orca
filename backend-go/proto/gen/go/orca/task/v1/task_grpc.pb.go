@@ -20,29 +20,30 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TaskService_CreateTask_FullMethodName          = "/orca.task.v1.TaskService/CreateTask"
-	TaskService_GetTask_FullMethodName             = "/orca.task.v1.TaskService/GetTask"
-	TaskService_AddEdge_FullMethodName             = "/orca.task.v1.TaskService/AddEdge"
-	TaskService_Grant_FullMethodName               = "/orca.task.v1.TaskService/Grant"
-	TaskService_ResolvePermission_FullMethodName   = "/orca.task.v1.TaskService/ResolvePermission"
-	TaskService_Execute_FullMethodName             = "/orca.task.v1.TaskService/Execute"
-	TaskService_HasActiveExecutions_FullMethodName = "/orca.task.v1.TaskService/HasActiveExecutions"
-	TaskService_ListTasks_FullMethodName           = "/orca.task.v1.TaskService/ListTasks"
-	TaskService_UpdateTask_FullMethodName          = "/orca.task.v1.TaskService/UpdateTask"
-	TaskService_DeleteTask_FullMethodName          = "/orca.task.v1.TaskService/DeleteTask"
-	TaskService_GetDependencies_FullMethodName     = "/orca.task.v1.TaskService/GetDependencies"
-	TaskService_AIDecompose_FullMethodName         = "/orca.task.v1.TaskService/AIDecompose"
-	TaskService_AIApply_FullMethodName             = "/orca.task.v1.TaskService/AIApply"
-	TaskService_GetSubtree_FullMethodName          = "/orca.task.v1.TaskService/GetSubtree"
-	TaskService_RecalculateProgress_FullMethodName = "/orca.task.v1.TaskService/RecalculateProgress"
-	TaskService_AddComment_FullMethodName          = "/orca.task.v1.TaskService/AddComment"
-	TaskService_ListComments_FullMethodName        = "/orca.task.v1.TaskService/ListComments"
-	TaskService_GenerateAgentPrompt_FullMethodName = "/orca.task.v1.TaskService/GenerateAgentPrompt"
-	TaskService_RevokeGrant_FullMethodName         = "/orca.task.v1.TaskService/RevokeGrant"
-	TaskService_ListGrants_FullMethodName          = "/orca.task.v1.TaskService/ListGrants"
-	TaskService_CreatePublicLink_FullMethodName    = "/orca.task.v1.TaskService/CreatePublicLink"
-	TaskService_RevokePublicLink_FullMethodName    = "/orca.task.v1.TaskService/RevokePublicLink"
-	TaskService_ResolvePublicLink_FullMethodName   = "/orca.task.v1.TaskService/ResolvePublicLink"
+	TaskService_CreateTask_FullMethodName                = "/orca.task.v1.TaskService/CreateTask"
+	TaskService_GetTask_FullMethodName                   = "/orca.task.v1.TaskService/GetTask"
+	TaskService_AddEdge_FullMethodName                   = "/orca.task.v1.TaskService/AddEdge"
+	TaskService_Grant_FullMethodName                     = "/orca.task.v1.TaskService/Grant"
+	TaskService_ResolvePermission_FullMethodName         = "/orca.task.v1.TaskService/ResolvePermission"
+	TaskService_Execute_FullMethodName                   = "/orca.task.v1.TaskService/Execute"
+	TaskService_HasActiveExecutions_FullMethodName       = "/orca.task.v1.TaskService/HasActiveExecutions"
+	TaskService_ListTasks_FullMethodName                 = "/orca.task.v1.TaskService/ListTasks"
+	TaskService_UpdateTask_FullMethodName                = "/orca.task.v1.TaskService/UpdateTask"
+	TaskService_DeleteTask_FullMethodName                = "/orca.task.v1.TaskService/DeleteTask"
+	TaskService_GetDependencies_FullMethodName           = "/orca.task.v1.TaskService/GetDependencies"
+	TaskService_AIDecompose_FullMethodName               = "/orca.task.v1.TaskService/AIDecompose"
+	TaskService_AIApply_FullMethodName                   = "/orca.task.v1.TaskService/AIApply"
+	TaskService_GetSubtree_FullMethodName                = "/orca.task.v1.TaskService/GetSubtree"
+	TaskService_RecalculateProgress_FullMethodName       = "/orca.task.v1.TaskService/RecalculateProgress"
+	TaskService_AddComment_FullMethodName                = "/orca.task.v1.TaskService/AddComment"
+	TaskService_ListComments_FullMethodName              = "/orca.task.v1.TaskService/ListComments"
+	TaskService_GenerateAgentPrompt_FullMethodName       = "/orca.task.v1.TaskService/GenerateAgentPrompt"
+	TaskService_RevokeGrant_FullMethodName               = "/orca.task.v1.TaskService/RevokeGrant"
+	TaskService_ListGrants_FullMethodName                = "/orca.task.v1.TaskService/ListGrants"
+	TaskService_CreatePublicLink_FullMethodName          = "/orca.task.v1.TaskService/CreatePublicLink"
+	TaskService_RevokePublicLink_FullMethodName          = "/orca.task.v1.TaskService/RevokePublicLink"
+	TaskService_ResolvePublicLink_FullMethodName         = "/orca.task.v1.TaskService/ResolvePublicLink"
+	TaskService_ReportTaskExecutionResult_FullMethodName = "/orca.task.v1.TaskService/ReportTaskExecutionResult"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -93,6 +94,10 @@ type TaskServiceClient interface {
 	CreatePublicLink(ctx context.Context, in *CreatePublicLinkRequest, opts ...grpc.CallOption) (*CreatePublicLinkResponse, error)
 	RevokePublicLink(ctx context.Context, in *RevokePublicLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ResolvePublicLink(ctx context.Context, in *ResolvePublicLinkRequest, opts ...grpc.CallOption) (*ResolvePublicLinkResponse, error)
+	// ReportTaskExecutionResult is called BY orchestration-service only — see
+	// this RPC's usecase doc comment for the service-identity check this
+	// handler must perform. api-gateway never routes to it.
+	ReportTaskExecutionResult(ctx context.Context, in *ReportTaskExecutionResultRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type taskServiceClient struct {
@@ -333,6 +338,16 @@ func (c *taskServiceClient) ResolvePublicLink(ctx context.Context, in *ResolvePu
 	return out, nil
 }
 
+func (c *taskServiceClient) ReportTaskExecutionResult(ctx context.Context, in *ReportTaskExecutionResultRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_ReportTaskExecutionResult_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -381,6 +396,10 @@ type TaskServiceServer interface {
 	CreatePublicLink(context.Context, *CreatePublicLinkRequest) (*CreatePublicLinkResponse, error)
 	RevokePublicLink(context.Context, *RevokePublicLinkRequest) (*emptypb.Empty, error)
 	ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error)
+	// ReportTaskExecutionResult is called BY orchestration-service only — see
+	// this RPC's usecase doc comment for the service-identity check this
+	// handler must perform. api-gateway never routes to it.
+	ReportTaskExecutionResult(context.Context, *ReportTaskExecutionResultRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -459,6 +478,9 @@ func (UnimplementedTaskServiceServer) RevokePublicLink(context.Context, *RevokeP
 }
 func (UnimplementedTaskServiceServer) ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolvePublicLink not implemented")
+}
+func (UnimplementedTaskServiceServer) ReportTaskExecutionResult(context.Context, *ReportTaskExecutionResultRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportTaskExecutionResult not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -895,6 +917,24 @@ func _TaskService_ResolvePublicLink_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_ReportTaskExecutionResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportTaskExecutionResultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ReportTaskExecutionResult(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ReportTaskExecutionResult_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ReportTaskExecutionResult(ctx, req.(*ReportTaskExecutionResultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -993,6 +1033,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResolvePublicLink",
 			Handler:    _TaskService_ResolvePublicLink_Handler,
+		},
+		{
+			MethodName: "ReportTaskExecutionResult",
+			Handler:    _TaskService_ReportTaskExecutionResult_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

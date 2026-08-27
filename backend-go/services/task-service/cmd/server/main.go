@@ -238,13 +238,18 @@ func run() error {
 	recalculateProgressUC := usecase.NewRecalculateProgress(repo)
 	addCommentUC := usecase.NewAddComment(repo)
 	listCommentsUC := usecase.NewListComments(repo)
+	// reportExecutionResultUC (TASK-TG-04-05) is the complex path's inbound
+	// completion callback, called BY orchestration-service only — see
+	// server.go's ReportTaskExecutionResult doc comment for the flagged
+	// (unresolved) service-identity check this handler is missing.
+	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
 		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, generateAgentPromptUC,
 		revokeGrantUC, listGrantsUC, createPublicLinkUC, revokePublicLinkUC, resolvePublicLinkUC,
-		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC,
+		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC, reportExecutionResultUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

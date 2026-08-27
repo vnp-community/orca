@@ -77,7 +77,7 @@ const taskColumns = `
 	COALESCE(description, ''), task_type, priority, COALESCE(assignee_id::text, ''), COALESCE(owner_id::text, ''),
 	due_date, estimated_hours, actual_hours, COALESCE(prompt_template, ''), COALESCE(ai_context, ''),
 	COALESCE(ai_plan_json::text, ''), visibility, COALESCE(worktree_id::text, ''), COALESCE(agent_session_id, ''),
-	progress_percent
+	progress_percent, COALESCE(active_execution_id, '')
 `
 
 // rowScanner abstracts over pgx.Row/pgx.Rows — both satisfy Scan(...any)
@@ -94,7 +94,7 @@ func scanTask(row rowScanner) (domain.Task, error) {
 	err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID,
 		&t.Description, &t.Type, &t.Priority, &t.AssigneeID, &t.OwnerID,
 		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
-		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent)
+		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID)
 	return t, err
 }
 
@@ -107,7 +107,7 @@ func scanTaskAndTrailing(row rowScanner, extra ...any) (domain.Task, error) {
 	dest := []any{&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID,
 		&t.Description, &t.Type, &t.Priority, &t.AssigneeID, &t.OwnerID,
 		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
-		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent}
+		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID}
 	dest = append(dest, extra...)
 	err := row.Scan(dest...)
 	return t, err
@@ -123,7 +123,7 @@ func prefixedTaskColumns(alias string) string {
 	COALESCE(` + alias + `.description, ''), ` + alias + `.task_type, ` + alias + `.priority, COALESCE(` + alias + `.assignee_id::text, ''), COALESCE(` + alias + `.owner_id::text, ''),
 	` + alias + `.due_date, ` + alias + `.estimated_hours, ` + alias + `.actual_hours, COALESCE(` + alias + `.prompt_template, ''), COALESCE(` + alias + `.ai_context, ''),
 	COALESCE(` + alias + `.ai_plan_json::text, ''), ` + alias + `.visibility, COALESCE(` + alias + `.worktree_id::text, ''), COALESCE(` + alias + `.agent_session_id, ''),
-	` + alias + `.progress_percent
+	` + alias + `.progress_percent, COALESCE(` + alias + `.active_execution_id, '')
 `
 }
 
@@ -175,7 +175,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 			SELECT id, tenant_id, title, status, parent_id, project_id,
 				description, task_type, priority, assignee_id, owner_id,
 				due_date, estimated_hours, actual_hours, prompt_template, ai_context,
-				ai_plan_json, visibility, worktree_id, agent_session_id, progress_percent, 0 AS depth
+				ai_plan_json, visibility, worktree_id, agent_session_id, progress_percent, active_execution_id, 0 AS depth
 			FROM task.tasks
 			WHERE tenant_id = $1 AND id = $2
 
@@ -184,7 +184,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 			SELECT t.id, t.tenant_id, t.title, t.status, t.parent_id, t.project_id,
 				t.description, t.task_type, t.priority, t.assignee_id, t.owner_id,
 				t.due_date, t.estimated_hours, t.actual_hours, t.prompt_template, t.ai_context,
-				t.ai_plan_json, t.visibility, t.worktree_id, t.agent_session_id, t.progress_percent, a.depth + 1
+				t.ai_plan_json, t.visibility, t.worktree_id, t.agent_session_id, t.progress_percent, t.active_execution_id, a.depth + 1
 			FROM task.tasks t
 			JOIN ancestors a ON t.id = a.parent_id
 			WHERE a.depth + 1 < $3
@@ -193,7 +193,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 			COALESCE(description, ''), task_type, priority, COALESCE(assignee_id::text, ''), COALESCE(owner_id::text, ''),
 			due_date, estimated_hours, actual_hours, COALESCE(prompt_template, ''), COALESCE(ai_context, ''),
 			COALESCE(ai_plan_json::text, ''), visibility, COALESCE(worktree_id::text, ''), COALESCE(agent_session_id, ''),
-			progress_percent
+			progress_percent, COALESCE(active_execution_id, '')
 		FROM ancestors
 		ORDER BY depth
 	`, tenantID, id, maxDepth)
@@ -312,6 +312,18 @@ func (r *Repository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktre
 	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET worktree_id = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, nullableUUID(worktreeID))
 	if err != nil {
 		return fmt.Errorf("postgres: update task worktree_id: %w", err)
+	}
+	return nil
+}
+
+// UpdateActiveExecutionID persists the complex path's coordinator_run id —
+// set by ComplexExecutor.Execute right after StartCoordinatorRun succeeds
+// (TASK-TG-04-04), read by ReportTaskExecutionResult (TASK-TG-04-05) to
+// reject a stale/duplicate callback.
+func (r *Repository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
+	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET active_execution_id = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, activeExecutionID)
+	if err != nil {
+		return fmt.Errorf("postgres: update task active_execution_id: %w", err)
 	}
 	return nil
 }
