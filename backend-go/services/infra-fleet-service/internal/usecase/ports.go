@@ -73,6 +73,33 @@ type ConnectionRepository interface {
 	GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (devServer domain.DevServer, found bool, err error)
 }
 
+// PortForwardRepository is the storage port for domain.PortForward —
+// implemented by adapter/postgres.PortForwardStore (mirrors SshTargetStore's
+// own-Go-value-not-the-same-as-Repository shape).
+type PortForwardRepository interface {
+	Create(ctx context.Context, pf domain.PortForward) (domain.PortForward, error)
+	UpdateStatus(ctx context.Context, tenantID, id string, status domain.PortForwardStatus) error
+	ListActiveByConnection(ctx context.Context, tenantID, connectionID string) ([]domain.PortForward, error)
+}
+
+// PortForwardEventPublisher publishes port-forward lifecycle events for a
+// future push path to consume. Defined here (consumer-side) per this
+// codebase's Dependency Inversion convention.
+type PortForwardEventPublisher interface {
+	Publish(ctx context.Context, event string, pf domain.PortForward)
+}
+
+// TunnelOpener narrows sshconn.Connection.Forward to what this package needs.
+type TunnelOpener interface {
+	Forward(localPort, remotePort int) (Tunnel, error)
+}
+
+// Tunnel narrows sshconn.Tunnel to its Close method — the only thing
+// PollWorkspacePorts calls on it directly.
+type Tunnel interface {
+	Close() error
+}
+
 // ConnectionResolver is THE core coordination/execution dispatch primitive
 // of this service — see
 // specs/backend-go/services/infra-fleet-service.md §7's sequence diagram.

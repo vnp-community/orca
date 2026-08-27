@@ -43,6 +43,7 @@ import { PreflightHandler } from './preflight-handler'
 import { FsDirectoryBrowserHandler } from './fs-handler-directory-browse'
 import { ExternalAutomationsHandler } from './external-automations-handler'
 import { PortScanHandler } from './port-scan-handler'
+import { PortKillHandler } from './port-kill-handler'
 import { AgentExecHandler } from './agent-exec-handler'
 import { WorkspaceSessionHandler } from './workspace-session-handler'
 import { endpointDirForRelaySocket, RelayAgentHookServer } from './agent-hook-server'
@@ -485,6 +486,9 @@ async function main(): Promise<void> {
 
   const _portScanHandler = new PortScanHandler(dispatcher)
   void _portScanHandler
+
+  const _portKillHandler = new PortKillHandler(dispatcher)
+  void _portKillHandler
 
   const _agentExecHandler = new AgentExecHandler(dispatcher)
   void _agentExecHandler

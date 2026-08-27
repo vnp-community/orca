@@ -5,7 +5,7 @@
 **Service:** agent/ (Dev Server Agent)
 **File:** `agent/src/relay/port-kill-handler.ts` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — port-kill-handler.ts's PortKillHandler + handlePortsKill added; detectListeningPorts extracted from PortScanHandler as a shared free function; wired into BOTH the class-based RelayDispatcher (relay.ts, per spec) AND the actually-live switch dispatcher (agent-rpc-dispatch.ts's 'ports.detect'/'ports.kill' cases — the class-based relay.ts/dispatcher.ts registration was found to be unreachable dead code from agent-entry.ts's real bundle, so the switch-case wiring is what makes this work end-to-end); tests pass, verified present in the built out/agent.js bundle`
 
 ---
 

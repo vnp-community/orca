@@ -1,28 +1,5 @@
-# TASK-SSH-04-04: Local-port allocator (BR-SSH-16/17/19)
-
-**From Solution:** SOL-SSH-04
-**Priority:** P1
-**Service:** `infra-fleet-service`
-**File:** `backend-go/services/infra-fleet-service/internal/adapter/portalloc/allocator.go` (new)
-**Depends on:** none
-**Status:** `[x] DONE — portalloc.Allocator added; TestAllocator_* pass (exclusion, range, namespacing, release, exhaustion)`
-
----
-
-## Context
-
-Auto-port-forwarding needs a local port to bind for each detected remote
-port. BR-SSH-16 excludes well-known ports; BR-SSH-17 wants a fixed
-`[3001, 9999]` range (not an OS-chosen ephemeral port — users expect stable-
-looking local ports); BR-SSH-19's "namespacing" reduces to keying the
-allocator by `(connectionId, remotePort)` so two worktrees' remote port
-3000s don't collide on the same local port.
-
-## Changes to make
-
-Create `backend-go/services/infra-fleet-service/internal/adapter/portalloc/allocator.go`:
-
-```go
+// Package portalloc hands out local ports for auto-port-forwarding
+// (SOL-SSH-04) — see Allocator's doc comment.
 package portalloc
 
 import (
@@ -93,18 +70,3 @@ func (a *Allocator) Release(localPort int) {
 	defer a.mu.Unlock()
 	delete(a.inUse, localPort)
 }
-```
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/infra-fleet-service/...
-go test ./services/infra-fleet-service/internal/adapter/portalloc/... -v
-```
-
-Expected new tests (`allocator_test.go`): excludes 22/25/53/80/443; stays
-within `[3001, 9999]`; two `Allocate` calls for the same remote port from
-different `portForwardID`s get different local ports; `Release` frees a
-port for reuse; every port in range already OS-bound returns
-`ErrNoPortAvailable`.

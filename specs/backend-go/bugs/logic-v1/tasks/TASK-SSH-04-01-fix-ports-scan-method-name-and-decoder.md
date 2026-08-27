@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/scan_workspace_ports.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — ScanWorkspacePorts relays to ports.detect and decodes {port,host,pid,processName}; TestScanWorkspacePorts_* updated and pass`
 
 ---
 

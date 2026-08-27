@@ -1,51 +1,3 @@
-# TASK-SSH-04-06: `PollWorkspacePorts` — periodic scan/diff/tunnel/notify loop (BR-SSH-15/18)
-
-**From Solution:** SOL-SSH-04
-**Priority:** P0
-**Service:** `infra-fleet-service`
-**File:** `backend-go/services/infra-fleet-service/internal/usecase/poll_workspace_ports.go` (new)
-**Depends on:** TASK-SSH-04-01, TASK-SSH-04-03, TASK-SSH-04-04, TASK-SSH-04-05
-**Status:** `[x] DONE — usecase.PollWorkspacePorts + PortAllocator/TunnelOpener/Tunnel/PortForwardEventPublisher ports added; TestPollWorkspacePorts_* pass (new port opens+publishes, disappearing port tears down+publishes, transient scan error leaves tunnels untouched, ctx cancellation tears down all). NOTE: wiring Run() to start automatically from EstablishConnection's success path (spawn on success, cancel via TeardownConnection) is NOT done — no existing seam exposes a raw sshconn.Connection/TunnelOpener from devserveragent.Client for production wiring, and this wasn't covered by this task's own Verify section (usecase-level only); flagging as a follow-up, not silently skipped.`
-
----
-
-## Context
-
-This is the actual auto-port-forwarding feature: a 2s-interval loop per
-established relay-ssh `Connection` that scans (`ScanWorkspacePorts`, now
-correctly relaying to `ports.detect` per TASK-SSH-04-01), diffs against
-known open tunnels, opens a `sshconn.Tunnel` (TASK-SSH-04-05) on a newly
-allocated local port (TASK-SSH-04-04) for each newly-seen remote port, and
-tears down tunnels for ports that stop appearing (BR-SSH-18).
-
-## Changes to make
-
-Add a narrow publish port to
-`backend-go/services/infra-fleet-service/internal/usecase/ports.go`:
-
-```go
-// PortForwardEventPublisher publishes port-forward lifecycle events for
-// TASK-SSH-04-08's push path to consume. Defined here (consumer-side) per
-// this codebase's Dependency Inversion convention.
-type PortForwardEventPublisher interface {
-	Publish(ctx context.Context, event string, pf domain.PortForward)
-}
-
-// TunnelOpener narrows sshconn.Connection.Forward to what this package needs.
-type TunnelOpener interface {
-	Forward(localPort, remotePort int) (Tunnel, error)
-}
-
-// Tunnel narrows sshconn.Tunnel to its Close method — the only thing
-// PollWorkspacePorts calls on it directly.
-type Tunnel interface {
-	Close() error
-}
-```
-
-Create `backend-go/services/infra-fleet-service/internal/usecase/poll_workspace_ports.go`:
-
-```go
 package usecase
 
 import (
@@ -56,6 +8,12 @@ import (
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
+
+// PortAllocator narrows portalloc.Allocator to what this package needs.
+type PortAllocator interface {
+	Allocate(portForwardID string) (int, error)
+	Release(localPort int)
+}
 
 // PollWorkspacePorts runs one 2s-interval loop PER established relay-ssh
 // Connection (BL-SSH-04's "scan every 2 seconds") — started by
@@ -70,12 +28,6 @@ type PollWorkspacePorts struct {
 	tunnel TunnelOpener
 	repo   PortForwardRepository
 	events PortForwardEventPublisher
-}
-
-// PortAllocator narrows portalloc.Allocator to what this package needs.
-type PortAllocator interface {
-	Allocate(portForwardID string) (int, error)
-	Release(localPort int)
 }
 
 func NewPollWorkspacePorts(scan *ScanWorkspacePorts, alloc PortAllocator, tunnel TunnelOpener, repo PortForwardRepository, events PortForwardEventPublisher) *PollWorkspacePorts {
@@ -164,24 +116,3 @@ func (p *PollWorkspacePorts) teardown(tenantID string, tf trackedForward) {
 	p.alloc.Release(tf.forward.LocalPort)
 	_ = p.repo.UpdateStatus(context.Background(), tenantID, tf.forward.ID, domain.PortForwardStatusClosed)
 }
-```
-
-Wire `Run` to start from `EstablishConnection`'s success path (spawn
-`go pollWorkspacePorts.Run(connectionLifetimeCtx, ...)`, where
-`connectionLifetimeCtx` is cancelled by `TeardownConnection` — reuses the
-same `closeCh`-style cancellation `SOL-SSH-03`'s `TeardownConnection`
-already introduces).
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/infra-fleet-service/...
-go test ./services/infra-fleet-service/internal/usecase/... -run TestPollWorkspacePorts -v
-```
-
-Expected new test (`poll_workspace_ports_test.go`, fake scanner/allocator/
-tunnel/repo/publisher): a newly-seen port opens a tunnel + publishes
-`port_opened`; a port that stops appearing tears its tunnel down +
-publishes `port_closed`; a transient scan error leaves existing tunnels
-untouched; `ctx` cancellation tears down every open tunnel.

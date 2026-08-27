@@ -412,3 +412,73 @@ func (r *Repository) GetFleetHealth(ctx context.Context, tenantID string) ([]dom
 	}
 	return out, nil
 }
+
+// PortForwardStore is domain.PortForward's storage — same
+// own-Go-value-not-the-same-as-Repository shape as SshTargetStore, sharing
+// the same connection pool.
+type PortForwardStore struct {
+	pool *pgxpool.Pool
+}
+
+// NewPortForwardStore builds a PortForwardStore over the same pool
+// Repository/SshTargetStore use.
+func NewPortForwardStore(pool *pgxpool.Pool) *PortForwardStore {
+	return &PortForwardStore{pool: pool}
+}
+
+// Create inserts a new port forward and returns the persisted row.
+func (s *PortForwardStore) Create(ctx context.Context, pf domain.PortForward) (domain.PortForward, error) {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO infra.port_forwards (id, tenant_id, connection_id, local_port, remote_port, process_name, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, pf.ID, pf.TenantID, pf.ConnectionID, pf.LocalPort, pf.RemotePort, pf.ProcessName, string(pf.Status))
+	if err != nil {
+		return domain.PortForward{}, fmt.Errorf("postgres: insert port forward: %w", err)
+	}
+	return pf, nil
+}
+
+// UpdateStatus sets id's status column — PollWorkspacePorts' teardown step
+// (BR-SSH-18) writes "closed" here rather than deleting the row, keeping a
+// history of forwards for the connection's lifetime.
+func (s *PortForwardStore) UpdateStatus(ctx context.Context, tenantID, id string, status domain.PortForwardStatus) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE infra.port_forwards
+		SET status = $1
+		WHERE tenant_id = $2 AND id = $3
+	`, string(status), tenantID, id)
+	if err != nil {
+		return fmt.Errorf("postgres: update port forward status: %w", err)
+	}
+	return nil
+}
+
+// ListActiveByConnection returns every non-closed port forward for
+// connectionID.
+func (s *PortForwardStore) ListActiveByConnection(ctx context.Context, tenantID, connectionID string) ([]domain.PortForward, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, tenant_id, connection_id, local_port, remote_port, process_name, status
+		FROM infra.port_forwards
+		WHERE tenant_id = $1 AND connection_id = $2 AND status <> 'closed'
+		ORDER BY created_at DESC
+	`, tenantID, connectionID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query port forwards: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.PortForward
+	for rows.Next() {
+		var pf domain.PortForward
+		var status string
+		if err := rows.Scan(&pf.ID, &pf.TenantID, &pf.ConnectionID, &pf.LocalPort, &pf.RemotePort, &pf.ProcessName, &status); err != nil {
+			return nil, fmt.Errorf("postgres: scan port forward row: %w", err)
+		}
+		pf.Status = domain.PortForwardStatus(status)
+		out = append(out, pf)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate port forward rows: %w", err)
+	}
+	return out, nil
+}

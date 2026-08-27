@@ -31,6 +31,7 @@ import (
 	infraagentwsserver "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/agentwsserver"
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
+	infraportalloc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portalloc"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
@@ -162,6 +163,13 @@ func run() error {
 	// loop and mark the connection closed.
 	teardownConnectionUC := usecase.NewTeardownConnection(repo, agentClient)
 
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	portForwardStore := infrapostgres.NewPortForwardStore(pool)
+	portAllocator := infraportalloc.NewAllocator()
+	createPortForwardUC := usecase.NewCreatePortForward(portForwardStore, portAllocator)
+	listPortForwardsUC := usecase.NewListPortForwards(portForwardStore)
+	deletePortForwardUC := usecase.NewDeletePortForward(portForwardStore)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -192,6 +200,9 @@ func run() error {
 		emulatorRelayUC,
 		getHostCapabilitiesUC,
 		teardownConnectionUC,
+		createPortForwardUC,
+		listPortForwardsUC,
+		deletePortForwardUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

@@ -292,6 +292,75 @@ func TestRepository_UpdateStatusAndGetDevServerByConnection(t *testing.T) {
 	}
 }
 
+// TestPortForwardStore_CreateThenListActiveByConnection_RoundTripsProcessNameAndStatus
+// is TASK-SSH-04-03's regression: PortForwardStore.Create then
+// ListActiveByConnection must round-trip ProcessName/Status, and a
+// UpdateStatus(closed) row must drop out of ListActiveByConnection.
+func TestPortForwardStore_CreateThenListActiveByConnection_RoundTripsProcessNameAndStatus(t *testing.T) {
+	repo, sshTargetStore := setupSshTargetStore(t)
+	portForwardStore := NewPortForwardStore(repo.pool)
+	ctx := context.Background()
+
+	// infra.port_forwards.connection_id FKs to infra.connections, which FKs
+	// to infra.dev_servers — build the full chain, same as
+	// TestRepository_RegisterAndGet_PersistsSSHTargetID does.
+	sshTarget, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", 0, "deploy", "role-1", "", "")
+	if err != nil {
+		t.Fatalf("building ssh target: %v", err)
+	}
+	if _, err := sshTargetStore.Create(ctx, sshTarget); err != nil {
+		t.Fatalf("creating ssh target: %v", err)
+	}
+	ds, err := domain.NewDevServer(testDevServerRS, testTenant1, "10.0.0.5", domain.ConnectionModeRelaySSH, testSshTarget1)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds); err != nil {
+		t.Fatalf("registering dev server: %v", err)
+	}
+	conn, err := domain.NewConnection("dddddddd-dddd-dddd-dddd-dddddddddddd", testTenant1, testDevServerRS, "", "")
+	if err != nil {
+		t.Fatalf("building connection: %v", err)
+	}
+	createdConn, err := repo.CreateConnection(ctx, conn)
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+
+	pf := domain.PortForward{
+		ID: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", TenantID: testTenant1, ConnectionID: createdConn.ID,
+		LocalPort: 3001, RemotePort: 3000, ProcessName: "node", Status: domain.PortForwardStatusActive,
+	}
+	if _, err := portForwardStore.Create(ctx, pf); err != nil {
+		t.Fatalf("creating port forward: %v", err)
+	}
+
+	active, err := portForwardStore.ListActiveByConnection(ctx, testTenant1, createdConn.ID)
+	if err != nil {
+		t.Fatalf("ListActiveByConnection: %v", err)
+	}
+	if len(active) != 1 {
+		t.Fatalf("expected 1 active port forward, got %d: %+v", len(active), active)
+	}
+	if active[0].ProcessName != "node" || active[0].Status != domain.PortForwardStatusActive {
+		t.Errorf("expected ProcessName=node Status=active to round-trip, got %+v", active[0])
+	}
+	if active[0].LocalPort != 3001 || active[0].RemotePort != 3000 {
+		t.Errorf("expected LocalPort/RemotePort to round-trip, got %+v", active[0])
+	}
+
+	if err := portForwardStore.UpdateStatus(ctx, testTenant1, pf.ID, domain.PortForwardStatusClosed); err != nil {
+		t.Fatalf("UpdateStatus: %v", err)
+	}
+	afterClose, err := portForwardStore.ListActiveByConnection(ctx, testTenant1, createdConn.ID)
+	if err != nil {
+		t.Fatalf("ListActiveByConnection after close: %v", err)
+	}
+	if len(afterClose) != 0 {
+		t.Errorf("expected a closed port forward to drop out of ListActiveByConnection, got %+v", afterClose)
+	}
+}
+
 // TestRepository_RegisterAndGet_PersistsSSHTargetID is the round-trip
 // regression for the ssh_target_id column added in
 // migrations/0003_dev_server_ssh_target — a relay-ssh DevServer must come

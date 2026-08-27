@@ -47,6 +47,11 @@ service InfraFleetService {
   rpc TeardownConnection(TeardownConnectionRequest) returns (google.protobuf.Empty);
   rpc KillWorkspacePort(KillWorkspacePortRequest) returns (KillWorkspacePortResponse);
 
+  // --- Auto port-forwarding (SOL-SSH-04) ---
+  rpc CreatePortForward(CreatePortForwardRequest) returns (PortForward);
+  rpc ListPortForwards(ListPortForwardsRequest) returns (ListPortForwardsResponse);
+  rpc DeletePortForward(DeletePortForwardRequest) returns (google.protobuf.Empty);
+
   // --- Terminal/PTY lifecycle (control-plane, unary) ---
   rpc SpawnTerminalSession(SpawnTerminalSessionRequest) returns (SpawnTerminalSessionResponse);
   rpc ResizeTerminalSession(ResizeTerminalSessionRequest) returns (google.protobuf.Empty);
@@ -247,8 +252,15 @@ message ScanWorkspacePortsRequest {
   string worktree_id = 2;
 }
 
+message DetectedPortProto {
+  int32 port = 1;
+  string host = 2;
+  int32 pid = 3;
+  string process_name = 4;
+}
+
 message ScanWorkspacePortsResponse {
-  repeated int32 open_ports = 1;
+  repeated DetectedPortProto ports = 1;
 }
 
 message KillWorkspacePortRequest {
@@ -256,6 +268,28 @@ message KillWorkspacePortRequest {
   string worktree_id = 2;
   int32 pid = 3;
   int32 port = 4;
+}
+
+message PortForward {
+  string id = 1;
+  string connection_id = 2;
+  int32 local_port = 3;
+  int32 remote_port = 4;
+  string process_name = 5;
+  string status = 6; // "active" | "closed"
+}
+message CreatePortForwardRequest {
+  string connection_id = 1;
+  int32 remote_port = 2;
+}
+message ListPortForwardsRequest {
+  string connection_id = 1;
+}
+message ListPortForwardsResponse {
+  repeated PortForward port_forwards = 1;
+}
+message DeletePortForwardRequest {
+  string id = 1;
 }
 
 message KillWorkspacePortResponse {

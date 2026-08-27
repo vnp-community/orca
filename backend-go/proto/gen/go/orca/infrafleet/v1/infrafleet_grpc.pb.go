@@ -33,6 +33,9 @@ const (
 	InfraFleetService_EstablishConnection_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
 	InfraFleetService_TeardownConnection_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/TeardownConnection"
 	InfraFleetService_KillWorkspacePort_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
+	InfraFleetService_CreatePortForward_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/CreatePortForward"
+	InfraFleetService_ListPortForwards_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/ListPortForwards"
+	InfraFleetService_DeletePortForward_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/DeletePortForward"
 	InfraFleetService_SpawnTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
 	InfraFleetService_ResizeTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
 	InfraFleetService_KillTerminalSession_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
@@ -100,6 +103,10 @@ type InfraFleetServiceClient interface {
 	// closed and stops any in-flight relaySSHReconnect backoff loop.
 	TeardownConnection(ctx context.Context, in *TeardownConnectionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error)
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	CreatePortForward(ctx context.Context, in *CreatePortForwardRequest, opts ...grpc.CallOption) (*PortForward, error)
+	ListPortForwards(ctx context.Context, in *ListPortForwardsRequest, opts ...grpc.CallOption) (*ListPortForwardsResponse, error)
+	DeletePortForward(ctx context.Context, in *DeletePortForwardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error)
 	ResizeTerminalSession(ctx context.Context, in *ResizeTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -286,6 +293,36 @@ func (c *infraFleetServiceClient) KillWorkspacePort(ctx context.Context, in *Kil
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(KillWorkspacePortResponse)
 	err := c.cc.Invoke(ctx, InfraFleetService_KillWorkspacePort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) CreatePortForward(ctx context.Context, in *CreatePortForwardRequest, opts ...grpc.CallOption) (*PortForward, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PortForward)
+	err := c.cc.Invoke(ctx, InfraFleetService_CreatePortForward_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ListPortForwards(ctx context.Context, in *ListPortForwardsRequest, opts ...grpc.CallOption) (*ListPortForwardsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPortForwardsResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListPortForwards_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DeletePortForward(ctx context.Context, in *DeletePortForwardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_DeletePortForward_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -558,6 +595,10 @@ type InfraFleetServiceServer interface {
 	// closed and stops any in-flight relaySSHReconnect backoff loop.
 	TeardownConnection(context.Context, *TeardownConnectionRequest) (*emptypb.Empty, error)
 	KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error)
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	CreatePortForward(context.Context, *CreatePortForwardRequest) (*PortForward, error)
+	ListPortForwards(context.Context, *ListPortForwardsRequest) (*ListPortForwardsResponse, error)
+	DeletePortForward(context.Context, *DeletePortForwardRequest) (*emptypb.Empty, error)
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error)
 	ResizeTerminalSession(context.Context, *ResizeTerminalSessionRequest) (*emptypb.Empty, error)
@@ -658,6 +699,15 @@ func (UnimplementedInfraFleetServiceServer) TeardownConnection(context.Context, 
 }
 func (UnimplementedInfraFleetServiceServer) KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method KillWorkspacePort not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CreatePortForward(context.Context, *CreatePortForwardRequest) (*PortForward, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePortForward not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListPortForwards(context.Context, *ListPortForwardsRequest) (*ListPortForwardsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPortForwards not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DeletePortForward(context.Context, *DeletePortForwardRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeletePortForward not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SpawnTerminalSession not implemented")
@@ -976,6 +1026,60 @@ func _InfraFleetService_KillWorkspacePort_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InfraFleetServiceServer).KillWorkspacePort(ctx, req.(*KillWorkspacePortRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_CreatePortForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePortForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CreatePortForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CreatePortForward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CreatePortForward(ctx, req.(*CreatePortForwardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ListPortForwards_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPortForwardsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListPortForwards(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListPortForwards_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListPortForwards(ctx, req.(*ListPortForwardsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DeletePortForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePortForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DeletePortForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DeletePortForward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DeletePortForward(ctx, req.(*DeletePortForwardRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1423,6 +1527,18 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "KillWorkspacePort",
 			Handler:    _InfraFleetService_KillWorkspacePort_Handler,
+		},
+		{
+			MethodName: "CreatePortForward",
+			Handler:    _InfraFleetService_CreatePortForward_Handler,
+		},
+		{
+			MethodName: "ListPortForwards",
+			Handler:    _InfraFleetService_ListPortForwards_Handler,
+		},
+		{
+			MethodName: "DeletePortForward",
+			Handler:    _InfraFleetService_DeletePortForward_Handler,
 		},
 		{
 			MethodName: "SpawnTerminalSession",
