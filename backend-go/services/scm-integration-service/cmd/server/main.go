@@ -144,7 +144,6 @@ func run() error {
 	credentials := credentialbroker.New(brokerConn)
 
 	listIssuesUC := usecase.NewListIssues(credentials, registry)
-	createPullRequestUC := usecase.NewCreatePullRequest(credentials, registry)
 	listPullRequestsUC := usecase.NewListPullRequests(credentials, registry)
 	getRateLimitStatusUC := usecase.NewGetRateLimitStatus(credentials, registry, rateLimitCache)
 	getAuthStatusUC := usecase.NewGetAuthStatus(credentials)
@@ -166,6 +165,13 @@ func run() error {
 	updateIssueUC := usecase.NewUpdateIssue(credentials, registry)
 	getPullRequestForBranchUC := usecase.NewGetPullRequestForBranch(credentials, registry)
 	resolveRepoSlugUC := usecase.NewResolveRepoSlug(credentials, registry)
+
+	// createPullRequestUC composes updateIssueUC in-process (BR-CR-19's
+	// best-effort linked-issue update), so updateIssueUC must be
+	// constructed before this line — same ordering concern as
+	// git-gateway-service's historyUC/generateCommitMessageUC.
+	createPullRequestUC := usecase.NewCreatePullRequest(credentials, registry, updateIssueUC)
+	suggestPullRequestReviewersUC := usecase.NewSuggestPullRequestReviewers(credentials, registry)
 
 	// SOL-012 shape 3 — GitHub Projects v2 (TASK-079). githubProjectsAdapter
 	// is the SAME *github.Client instance registered in registry's map below
@@ -212,6 +218,7 @@ func run() error {
 		listMergeRequestsUC, resolveMergeRequestDiscussionUC, getWorkItemDetailsUC,
 		checkHostedReviewEligibilityUC,
 		setIntegrationCredentialUC, getIntegrationCredentialStatusUC, listIntegrationCredentialsUC,
+		suggestPullRequestReviewersUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

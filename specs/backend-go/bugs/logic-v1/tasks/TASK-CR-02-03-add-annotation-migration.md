@@ -5,7 +5,7 @@
 **Service:** `annotation-service`
 **File:** `backend-go/services/annotation-service/migrations/0003_annotation_side_range_sent.up.sql` (new), `0003_annotation_side_range_sent.down.sql` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — 0003_annotation_side_range_sent.up/down.sql created matching spec exactly; syntax verified by inspection (no local Postgres in this environment to run migrate up/down/up), postgres integration test file (repository_test.go, //go:build integration) compiles clean against the new schema
 
 ---
 

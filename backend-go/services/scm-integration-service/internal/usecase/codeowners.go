@@ -1,25 +1,3 @@
-# TASK-CR-05-05: Add pure CODEOWNERS parsing/matching (`codeowners.go`)
-
-**From Solution:** SOL-CR-05
-**Priority:** P1
-**Service:** `scm-integration-service`
-**File:** `backend-go/services/scm-integration-service/internal/usecase/codeowners.go` (new), `backend-go/services/scm-integration-service/internal/usecase/codeowners_test.go` (new)
-**Depends on:** none
-**Status:** `[x]` DONE — codeowners.go created (ParseCodeowners, MatchOwners, matchesCodeownersPattern); codeowners_test.go covers globs/comments/blanks/last-match-wins, all passing
-
----
-
-## Context
-
-CODEOWNERS parsing/matching is pure string logic with no port dependency —
-unit-testable without any fake provider, following the same domain-purity
-split as `commit_message_prompt.go` (SOL-CR-04/TASK-CR-04-01).
-
-## Changes to make
-
-Create `backend-go/services/scm-integration-service/internal/usecase/codeowners.go`:
-
-```go
 package usecase
 
 import (
@@ -118,18 +96,3 @@ func matchesCodeownersPattern(pattern, path string) bool {
 	}
 	return false
 }
-```
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go/services/scm-integration-service
-go build ./internal/usecase/...
-go test ./internal/usecase/... -run TestParseCodeowners -v
-go test ./internal/usecase/... -run TestMatchOwners -v
-```
-
-Create `codeowners_test.go` with a standard CODEOWNERS fixture covering:
-glob patterns (`*.go`, `/docs/**`), comments, blank lines; `MatchOwners`
-applies last-match-wins for overlapping patterns (a later, more specific
-rule overrides an earlier `*` catch-all).

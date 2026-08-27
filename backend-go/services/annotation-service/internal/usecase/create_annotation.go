@@ -15,12 +15,16 @@ import (
 // architecture/03's note that usecase granularity mirrors today's RPC
 // methods so the TS->Go mapping stays traceable.
 type CreateAnnotationInput struct {
-	RepoID    string
-	FilePath  string
-	Line      int32
-	Ref       string
-	Content   string
-	RequestID string // idempotency key, see standards/api-design-guidelines.md
+	RepoID       string
+	WorktreeID   string // NEW
+	FilePath     string
+	Line         int32
+	EndLine      int32       // NEW
+	Side         domain.Side // NEW
+	Ref          string
+	Content      string
+	OriginalCode string // NEW
+	RequestID    string // idempotency key, see standards/api-design-guidelines.md
 }
 
 // CreateAnnotation is annotation-service's core write path. TenantID/
@@ -48,7 +52,7 @@ func (uc *CreateAnnotation) Execute(ctx context.Context, in CreateAnnotationInpu
 		return domain.Annotation{}, apperrors.New(apperrors.KindInvalidArgument, "ANNOTATION_NO_REQUEST_ID", "request_id is required for idempotent create", nil)
 	}
 
-	anchor, err := domain.NewAnchor(in.RepoID, in.FilePath, in.Line, in.Ref)
+	anchor, err := domain.NewAnchor(in.RepoID, in.WorktreeID, in.FilePath, in.Line, in.EndLine, in.Side, in.Ref)
 	if err != nil {
 		return domain.Annotation{}, apperrors.New(apperrors.KindInvalidArgument, "ANNOTATION_INVALID_ANCHOR", err.Error(), err)
 	}
@@ -63,7 +67,7 @@ func (uc *CreateAnnotation) Execute(ctx context.Context, in CreateAnnotationInpu
 	}
 
 	now := time.Now().UTC()
-	annotation, err := domain.NewAnnotation(uuid.NewString(), tenantID, authorID, anchor, in.Content, false, in.RequestID, now, now)
+	annotation, err := domain.NewAnnotation(uuid.NewString(), tenantID, authorID, anchor, in.Content, in.OriginalCode, false, in.RequestID, now, now)
 	if err != nil {
 		return domain.Annotation{}, apperrors.New(apperrors.KindInvalidArgument, "ANNOTATION_INVALID", err.Error(), err)
 	}

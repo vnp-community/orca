@@ -71,6 +71,14 @@ func (f *fakeAnnotationServiceClient) DeleteAnnotation(_ context.Context, in *an
 	return f.deleteResp, nil
 }
 
+// MarkAnnotationsSent is not exercised by this file's tests yet (routing
+// for it is TASK-CR-02-07, out of this batch's scope) — this stub exists
+// only so fakeAnnotationServiceClient keeps satisfying
+// annotationv1.AnnotationServiceClient after TASK-CR-02-01 added the RPC.
+func (f *fakeAnnotationServiceClient) MarkAnnotationsSent(_ context.Context, in *annotationv1.MarkAnnotationsSentRequest, _ ...grpc.CallOption) (*annotationv1.MarkAnnotationsSentResponse, error) {
+	return &annotationv1.MarkAnnotationsSentResponse{}, nil
+}
+
 // annotationTestRouter mounts mountAnnotationRoutes standalone (not through
 // NewRouter, since router.go is out of scope here) and injects identity
 // into the request context the same way authMiddleware does for a real

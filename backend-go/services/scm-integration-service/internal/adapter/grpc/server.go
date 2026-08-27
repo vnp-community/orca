@@ -68,6 +68,9 @@ type Server struct {
 	setIntegrationCredential       *usecase.SetIntegrationCredential
 	getIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus
 	listIntegrationCredentials     *usecase.ListIntegrationCredentials
+
+	// SOL-CR-05 — CODEOWNERS-based reviewer suggestion (TASK-CR-05-06).
+	suggestPullRequestReviewers *usecase.SuggestPullRequestReviewers
 }
 
 func New(
@@ -109,6 +112,7 @@ func New(
 	setIntegrationCredential *usecase.SetIntegrationCredential,
 	getIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus,
 	listIntegrationCredentials *usecase.ListIntegrationCredentials,
+	suggestPullRequestReviewers *usecase.SuggestPullRequestReviewers,
 ) *Server {
 	return &Server{
 		listIssues:         listIssues,
@@ -153,6 +157,8 @@ func New(
 		setIntegrationCredential:       setIntegrationCredential,
 		getIntegrationCredentialStatus: getIntegrationCredentialStatus,
 		listIntegrationCredentials:     listIntegrationCredentials,
+
+		suggestPullRequestReviewers: suggestPullRequestReviewers,
 	}
 }
 
@@ -173,19 +179,42 @@ func (s *Server) ListIssues(ctx context.Context, req *scmintegrationv1.ListIssue
 }
 
 func (s *Server) CreatePullRequest(ctx context.Context, req *scmintegrationv1.CreatePullRequestRequest) (*scmintegrationv1.CreatePullRequestResponse, error) {
-	pr, err := s.createPullRequest.Execute(ctx, usecase.CreatePullRequestParams{
-		TenantID:   req.GetTenantId(),
-		Provider:   toDomainProvider(req.GetProvider()),
-		Repo:       req.GetRepo(),
-		Title:      req.GetTitle(),
-		Body:       req.GetBody(),
-		HeadBranch: req.GetHeadBranch(),
-		BaseBranch: req.GetBaseBranch(),
+	result, err := s.createPullRequest.Execute(ctx, usecase.CreatePullRequestParams{
+		TenantID:          req.GetTenantId(),
+		Provider:          toDomainProvider(req.GetProvider()),
+		Repo:              req.GetRepo(),
+		Title:             req.GetTitle(),
+		Body:              req.GetBody(),
+		HeadBranch:        req.GetHeadBranch(),
+		BaseBranch:        req.GetBaseBranch(),
+		Draft:             req.GetDraft(),
+		LinkedIssueNumber: req.GetLinkedIssueNumber(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &scmintegrationv1.CreatePullRequestResponse{PullRequest: toProtoPullRequest(pr)}, nil
+	return &scmintegrationv1.CreatePullRequestResponse{
+		PullRequest:            toProtoPullRequest(result.PullRequest),
+		LinkedIssueUpdateError: result.LinkedIssueUpdateError,
+	}, nil
+}
+
+func (s *Server) SuggestPullRequestReviewers(ctx context.Context, req *scmintegrationv1.SuggestPullRequestReviewersRequest) (*scmintegrationv1.SuggestPullRequestReviewersResponse, error) {
+	result, err := s.suggestPullRequestReviewers.Execute(ctx, usecase.SuggestPullRequestReviewersParams{
+		TenantID:     req.GetTenantId(),
+		Provider:     toDomainProvider(req.GetProvider()),
+		Repo:         req.GetRepo(),
+		BaseRef:      req.GetBaseRef(),
+		ChangedFiles: req.GetChangedFiles(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.SuggestPullRequestReviewersResponse{
+		ReviewerLogins:  result.ReviewerLogins,
+		TeamSlugs:       result.TeamSlugs,
+		CodeownersFound: result.Found,
+	}, nil
 }
 
 func (s *Server) ListPullRequests(ctx context.Context, req *scmintegrationv1.ListPullRequestsRequest) (*scmintegrationv1.ListPullRequestsResponse, error) {
@@ -727,6 +756,7 @@ func toProtoPullRequest(pr domain.PullRequest) *scmintegrationv1.PullRequest {
 		Url:    pr.URL,
 		State:  pr.State,
 		Number: pr.Number,
+		Draft:  pr.Draft, // NEW
 	}
 }
 

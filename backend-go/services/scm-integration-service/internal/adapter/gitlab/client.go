@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -137,13 +138,19 @@ type gitlabMergeRequest struct {
 	URL          string `json:"web_url"`
 	SourceBranch string `json:"source_branch"`
 	TargetBranch string `json:"target_branch"`
+	Draft        bool   `json:"draft"`
 }
 
 func toDomainPullRequest(repo string, gm gitlabMergeRequest) (domain.PullRequest, error) {
-	return domain.NewPullRequest(
+	pr, err := domain.NewPullRequest(
 		strconv.Itoa(gm.IID), domain.ScmProviderGitLab, repo, gm.Title, gm.State, gm.URL,
 		gm.SourceBranch, gm.TargetBranch,
 	)
+	if err != nil {
+		return domain.PullRequest{}, err
+	}
+	pr.Draft = gm.Draft
+	return pr, nil
 }
 
 // CreatePullRequest calls GitLab's REST API for real: POST
@@ -156,7 +163,8 @@ func (c *Client) CreatePullRequest(ctx context.Context, cred usecase.Credential,
 		Description  string `json:"description,omitempty"`
 		SourceBranch string `json:"source_branch"`
 		TargetBranch string `json:"target_branch"`
-	}{Title: input.Title, Description: input.Body, SourceBranch: input.HeadBranch, TargetBranch: input.BaseBranch})
+		Draft        bool   `json:"draft,omitempty"` // NEW
+	}{Title: input.Title, Description: input.Body, SourceBranch: input.HeadBranch, TargetBranch: input.BaseBranch, Draft: input.Draft})
 	if err != nil {
 		return domain.PullRequest{}, fmt.Errorf("gitlab: encode create pull request body: %w", err)
 	}
@@ -474,4 +482,33 @@ func (c *Client) GetWorkItemDetails(ctx context.Context, cred usecase.Credential
 		ID: strconv.Itoa(raw.ID), IID: int32(raw.IID), ItemType: itemType,
 		Title: raw.Title, Body: raw.Description, State: raw.State, URL: raw.WebURL, Labels: raw.Labels,
 	}, nil
+}
+
+// GetRepoFileContent fetches one file's raw content at ref via GitLab's
+// Repository Files API. found=false (not an error) on a 404 — the expected
+// case for "no CODEOWNERS file".
+func (c *Client) GetRepoFileContent(ctx context.Context, cred usecase.Credential, repo, path, ref string) (string, bool, error) {
+	reqURL := fmt.Sprintf("%s/projects/%s/repository/files/%s/raw?ref=%s", c.baseURL, projectPath(repo), url.PathEscape(path), url.QueryEscape(ref))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("gitlab: build get repo file content request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", false, fmt.Errorf("gitlab: get repo file content request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("gitlab: get repo file content: unexpected status %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", false, fmt.Errorf("gitlab: read repo file content response: %w", err)
+	}
+	return string(body), true, nil
 }

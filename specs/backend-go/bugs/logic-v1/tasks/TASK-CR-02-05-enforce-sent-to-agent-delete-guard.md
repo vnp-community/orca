@@ -5,7 +5,7 @@
 **Service:** `annotation-service`
 **File:** `backend-go/services/annotation-service/internal/usecase/delete_annotation.go`
 **Depends on:** TASK-CR-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — DeleteAnnotationInput.Confirmed + BR-CR-08 guard added; 3 new test cases (unconfirmed-rejects, confirmed-proceeds, not-yet-sent-succeeds-unconfirmed) passing
 
 ---
 

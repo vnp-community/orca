@@ -47,6 +47,14 @@ var (
 	ErrEmptyRepo = errors.New("domain: repo is required")
 	// ErrEmptyTitle guards against a titleless issue/PR.
 	ErrEmptyTitle = errors.New("domain: title is required")
+	// ErrCapabilityUnsupported is a shared sentinel a provider adapter wraps
+	// its own package-level "not supported" error with (via %w), so
+	// usecase/ code can detect the condition via errors.Is without
+	// importing the adapter package directly — see
+	// scm-integration-service.md §4's ErrCapabilityUnsupported degrade
+	// pattern and this file's package doc comment on why usecase/ never
+	// imports adapter packages.
+	ErrCapabilityUnsupported = errors.New("domain: capability not supported by this provider")
 )
 
 // Issue is a provider-agnostic issue — see scm-integration-service.md §4.
@@ -89,6 +97,7 @@ type PullRequest struct {
 	HeadBranch string
 	BaseBranch string
 	Number     int32
+	Draft      bool // NEW — BR-CR-20
 }
 
 // NewPullRequest constructs a PullRequest, enforcing the same non-empty

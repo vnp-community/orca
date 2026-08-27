@@ -21,10 +21,11 @@ import (
 type Server struct {
 	annotationv1.UnimplementedAnnotationServiceServer
 
-	createAnnotation *usecase.CreateAnnotation
-	listAnnotations  *usecase.ListAnnotations
-	updateAnnotation *usecase.UpdateAnnotation
-	deleteAnnotation *usecase.DeleteAnnotation
+	createAnnotation    *usecase.CreateAnnotation
+	listAnnotations     *usecase.ListAnnotations
+	updateAnnotation    *usecase.UpdateAnnotation
+	deleteAnnotation    *usecase.DeleteAnnotation
+	markAnnotationsSent *usecase.MarkAnnotationsSent
 }
 
 func New(
@@ -32,12 +33,14 @@ func New(
 	list *usecase.ListAnnotations,
 	update *usecase.UpdateAnnotation,
 	del *usecase.DeleteAnnotation,
+	markSent *usecase.MarkAnnotationsSent,
 ) *Server {
 	return &Server{
-		createAnnotation: create,
-		listAnnotations:  list,
-		updateAnnotation: update,
-		deleteAnnotation: del,
+		createAnnotation:    create,
+		listAnnotations:     list,
+		updateAnnotation:    update,
+		deleteAnnotation:    del,
+		markAnnotationsSent: markSent,
 	}
 }
 
@@ -87,10 +90,22 @@ func (s *Server) UpdateAnnotation(ctx context.Context, req *annotationv1.UpdateA
 }
 
 func (s *Server) DeleteAnnotation(ctx context.Context, req *annotationv1.DeleteAnnotationRequest) (*annotationv1.DeleteAnnotationResponse, error) {
-	if err := s.deleteAnnotation.Execute(ctx, usecase.DeleteAnnotationInput{ID: req.GetId()}); err != nil {
+	if err := s.deleteAnnotation.Execute(ctx, usecase.DeleteAnnotationInput{ID: req.GetId(), Confirmed: req.GetConfirmed()}); err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &annotationv1.DeleteAnnotationResponse{}, nil
+}
+
+func (s *Server) MarkAnnotationsSent(ctx context.Context, req *annotationv1.MarkAnnotationsSentRequest) (*annotationv1.MarkAnnotationsSentResponse, error) {
+	updated, err := s.markAnnotationsSent.Execute(ctx, usecase.MarkAnnotationsSentInput{IDs: req.GetIds()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	annotations := make([]*annotationv1.Annotation, 0, len(updated))
+	for _, a := range updated {
+		annotations = append(annotations, toProtoAnnotation(a))
+	}
+	return &annotationv1.MarkAnnotationsSentResponse{Annotations: annotations}, nil
 }
 
 func toProtoAnnotation(a domain.Annotation) *annotationv1.Annotation {
@@ -99,19 +114,27 @@ func toProtoAnnotation(a domain.Annotation) *annotationv1.Annotation {
 		TenantId: a.TenantID,
 		AuthorId: a.AuthorID,
 		Anchor: &annotationv1.Anchor{
-			RepoId:   a.Anchor.RepoID,
-			FilePath: a.Anchor.FilePath,
-			Line:     a.Anchor.Line,
-			Ref:      a.Anchor.Ref,
+			RepoId:     a.Anchor.RepoID,
+			FilePath:   a.Anchor.FilePath,
+			Line:       a.Anchor.Line,
+			Ref:        a.Anchor.Ref,
+			WorktreeId: a.Anchor.WorktreeID,
+			EndLine:    a.Anchor.EndLine,
+			Side:       annotationv1.Side(a.Anchor.Side),
 		},
-		Content:  a.Content,
-		Resolved: a.Resolved,
+		Content:      a.Content,
+		Resolved:     a.Resolved,
+		OriginalCode: a.OriginalCode,
+		SentToAgent:  a.SentToAgent,
 	}
 	if !a.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(a.CreatedAt)
 	}
 	if !a.UpdatedAt.IsZero() {
 		out.UpdatedAt = timestamppb.New(a.UpdatedAt)
+	}
+	if a.SentAt != nil {
+		out.SentAt = timestamppb.New(*a.SentAt)
 	}
 	return out
 }

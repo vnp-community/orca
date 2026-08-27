@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -127,6 +128,7 @@ type githubPullRequest struct {
 	Title   string `json:"title"`
 	State   string `json:"state"`
 	HTMLURL string `json:"html_url"`
+	Draft   bool   `json:"draft"`
 	Head    struct {
 		Ref string `json:"ref"`
 	} `json:"head"`
@@ -144,6 +146,7 @@ func toDomainPullRequest(repo string, gp githubPullRequest) (domain.PullRequest,
 		return domain.PullRequest{}, err
 	}
 	pr.Number = int32(gp.Number)
+	pr.Draft = gp.Draft
 	return pr, nil
 }
 
@@ -157,7 +160,8 @@ func (c *Client) CreatePullRequest(ctx context.Context, cred usecase.Credential,
 		Body  string `json:"body,omitempty"`
 		Head  string `json:"head"`
 		Base  string `json:"base"`
-	}{Title: input.Title, Body: input.Body, Head: input.HeadBranch, Base: input.BaseBranch})
+		Draft bool   `json:"draft,omitempty"` // NEW
+	}{Title: input.Title, Body: input.Body, Head: input.HeadBranch, Base: input.BaseBranch, Draft: input.Draft})
 	if err != nil {
 		return domain.PullRequest{}, fmt.Errorf("github: encode create pull request body: %w", err)
 	}
@@ -750,4 +754,35 @@ func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo
 	default:
 		return false, fmt.Errorf("github: branch exists: unexpected status %d", resp.StatusCode)
 	}
+}
+
+// GetRepoFileContent fetches one file's raw content at ref via GitHub's
+// Contents API. found=false (not an error) on a 404 — the expected case
+// for "no CODEOWNERS file".
+func (c *Client) GetRepoFileContent(ctx context.Context, cred usecase.Credential, repo, path, ref string) (string, bool, error) {
+	reqURL := fmt.Sprintf("%s/repos/%s/contents/%s?ref=%s", c.baseURL, repo, path, url.QueryEscape(ref))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("github: build get repo file content request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/vnd.github.raw+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", false, fmt.Errorf("github: get repo file content request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("github: get repo file content: unexpected status %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", false, fmt.Errorf("github: read repo file content response: %w", err)
+	}
+	return string(body), true, nil
 }

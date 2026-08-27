@@ -41,6 +41,7 @@ type CreatePullRequestInput struct {
 	Body       string
 	HeadBranch string
 	BaseBranch string
+	Draft      bool // NEW — BR-CR-20
 }
 
 // ScmProvider is the port each concrete provider adapter
@@ -78,6 +79,12 @@ type ScmProvider interface {
 	// supports uniformly, unlike SOL-012/SOL-013's provider-specific
 	// additions. Backs CheckHostedReviewEligibility's step 2 (SOL-014).
 	BranchExists(ctx context.Context, cred Credential, repo, branch string) (bool, error)
+
+	// GetRepoFileContent fetches one file's raw content at ref via the
+	// provider's own contents/raw-file REST endpoint. found=false (not an
+	// error) when the path doesn't exist at ref — the expected case for
+	// "no CODEOWNERS file" on most repos.
+	GetRepoFileContent(ctx context.Context, cred Credential, repo, path, ref string) (content string, found bool, err error)
 }
 
 // MergePullRequestInput carries the merge-method/commit-message fields

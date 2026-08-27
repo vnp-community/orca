@@ -12,6 +12,7 @@ option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegratio
 service ScmIntegrationService {
   rpc ListIssues(ListIssuesRequest) returns (ListIssuesResponse);
   rpc CreatePullRequest(CreatePullRequestRequest) returns (CreatePullRequestResponse);
+  rpc SuggestPullRequestReviewers(SuggestPullRequestReviewersRequest) returns (SuggestPullRequestReviewersResponse);
   rpc ListPullRequests(ListPullRequestsRequest) returns (ListPullRequestsResponse);
   rpc GetRateLimitStatus(GetRateLimitStatusRequest) returns (GetRateLimitStatusResponse);
 
@@ -128,6 +129,8 @@ message CreatePullRequestRequest {
   string head_branch = 6;
   string base_branch = 7;
   string request_id = 8;
+  bool draft = 9;                          // NEW — BR-CR-20
+  optional int32 linked_issue_number = 10; // NEW — BR-CR-19
 }
 
 message PullRequest {
@@ -137,10 +140,31 @@ message PullRequest {
   // number is GitHub's repo-scoped PR number — see Issue.number's doc
   // comment for why this is additive, not a breaking rename.
   int32 number = 4;
+  bool draft = 5; // NEW — echoes the provider's actual draft state; a
+                  // provider without draft support (Bitbucket) never
+                  // returns true even when requested
 }
 
 message CreatePullRequestResponse {
   PullRequest pull_request = 1;
+  // NEW — set only when linked_issue_number was provided and the PR was
+  // created successfully but the issue update itself failed. The PR is
+  // NOT rolled back for this.
+  string linked_issue_update_error = 2;
+}
+
+message SuggestPullRequestReviewersRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  string base_ref = 4;               // CODEOWNERS is read from base_ref, matching GitHub's own resolution rule
+  repeated string changed_files = 5; // caller-supplied — see TASK-CR-05-08 for why
+}
+
+message SuggestPullRequestReviewersResponse {
+  repeated string reviewer_logins = 1;
+  repeated string team_slugs = 2;
+  bool codeowners_found = 3; // false = no CODEOWNERS file at any canonical path; empty suggestion is not an error
 }
 
 message ListPullRequestsRequest {

@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/proto/orca/scmintegration/v1/scmintegration.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — scmintegration.proto updated with SuggestPullRequestReviewers RPC, Draft/LinkedIssueNumber/linked_issue_update_error fields; buf generate + buf breaking (against origin/main) clean, go build ./proto/... passes
 
 ---
 
