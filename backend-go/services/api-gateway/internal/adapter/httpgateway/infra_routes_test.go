@@ -94,6 +94,28 @@ func (f *fakeInfraFleetServiceClient) TeardownConnection(_ context.Context, _ *i
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+// CreatePortForward/ListPortForwards/DeletePortForward (SOL-SSH-04): no
+// httpgateway route exercises these yet — same "not implemented" shape.
+func (f *fakeInfraFleetServiceClient) CreatePortForward(_ context.Context, _ *infrafleetv1.CreatePortForwardRequest, _ ...grpc.CallOption) (*infrafleetv1.PortForward, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) ListPortForwards(_ context.Context, _ *infrafleetv1.ListPortForwardsRequest, _ ...grpc.CallOption) (*infrafleetv1.ListPortForwardsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) DeletePortForward(_ context.Context, _ *infrafleetv1.DeletePortForwardRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+// StreamPortForwardEvents (TASK-SSH-04-08): no httpgateway route exercises
+// this (it's wired through wscompat's channels_push.go instead, with its
+// own fake client — see channels_push_test.go) — same unconditional
+// Unimplemented-stub convention as this file's terminal/emulator RPCs.
+func (f *fakeInfraFleetServiceClient) StreamPortForwardEvents(context.Context, *infrafleetv1.StreamPortForwardEventsRequest, ...grpc.CallOption) (grpc.ServerStreamingClient[infrafleetv1.PortForwardEvent], error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // Terminal/PTY RPCs (TASK-180..185): no httpgateway route exercises these
 // (they're wired through wscompat's channels_terminal.go instead, with its
 // own fake client — see channels_terminal_test.go), so these exist only to

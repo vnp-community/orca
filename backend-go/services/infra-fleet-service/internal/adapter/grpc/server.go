@@ -16,6 +16,7 @@ import (
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portevents"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
@@ -67,6 +68,10 @@ type Server struct {
 	createPortForward *usecase.CreatePortForward
 	listPortForwards  *usecase.ListPortForwards
 	deletePortForward *usecase.DeletePortForward
+
+	// --- Port-forward push notifications (TASK-SSH-04-08) --- shared with
+	// PollWorkspacePorts as its usecase.PortForwardEventPublisher.
+	portEvents *portevents.Broadcaster
 }
 
 func New(
@@ -101,6 +106,7 @@ func New(
 	createPortForward *usecase.CreatePortForward,
 	listPortForwards *usecase.ListPortForwards,
 	deletePortForward *usecase.DeletePortForward,
+	portEvents *portevents.Broadcaster,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -134,6 +140,7 @@ func New(
 		createPortForward:      createPortForward,
 		listPortForwards:       listPortForwards,
 		deletePortForward:      deletePortForward,
+		portEvents:             portEvents,
 	}
 }
 
@@ -375,6 +382,31 @@ func toProtoPortForward(pf domain.PortForward) *infrafleetv1.PortForward {
 		RemotePort:   int32(pf.RemotePort),
 		ProcessName:  pf.ProcessName,
 		Status:       string(pf.Status),
+	}
+}
+
+// StreamPortForwardEvents pushes portevents.Broadcaster's per-connectionId
+// port_opened/port_closed events to the caller for as long as the stream
+// stays open — BR-SSH-15's live-push requirement (TASK-SSH-04-08), the same
+// "open a stream, forward each item" shape AttachPty already uses.
+func (s *Server) StreamPortForwardEvents(req *infrafleetv1.StreamPortForwardEventsRequest, stream infrafleetv1.InfraFleetService_StreamPortForwardEventsServer) error {
+	events, unsubscribe := s.portEvents.Subscribe(req.GetConnectionId())
+	defer unsubscribe()
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(&infrafleetv1.PortForwardEvent{
+				Kind:    ev.Kind,
+				Forward: toProtoPortForward(ev.Forward),
+			}); err != nil {
+				return err
+			}
+		case <-stream.Context().Done():
+			return nil
+		}
 	}
 }
 

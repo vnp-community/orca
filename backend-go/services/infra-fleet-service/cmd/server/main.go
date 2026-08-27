@@ -32,6 +32,7 @@ import (
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infraportalloc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portalloc"
+	infraportevents "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portevents"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
@@ -170,6 +171,18 @@ func run() error {
 	listPortForwardsUC := usecase.NewListPortForwards(portForwardStore)
 	deletePortForwardUC := usecase.NewDeletePortForward(portForwardStore)
 
+	// --- Port-forward push notifications (TASK-SSH-04-08, BR-SSH-15) ---
+	// One shared Broadcaster: usecase.PollWorkspacePorts.Run's future caller
+	// gets it as its PortForwardEventPublisher (see
+	// usecase.NewPollWorkspacePorts), and StreamPortForwardEvents subscribes
+	// to it per connectionId. NOTE: PollWorkspacePorts.Run() is not yet
+	// started anywhere in this composition root — its EstablishConnection
+	// wiring is a separate, already-flagged follow-up (see
+	// TASK-SSH-04-06-poll-workspace-ports-loop.md's Status note) — so no
+	// events flow yet in production, but the broadcaster/RPC plumbing this
+	// task owns is complete and ready for that wiring once it lands.
+	portEventsBroadcaster := infraportevents.NewBroadcaster()
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -203,6 +216,7 @@ func run() error {
 		createPortForwardUC,
 		listPortForwardsUC,
 		deletePortForwardUC,
+		portEventsBroadcaster,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

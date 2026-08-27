@@ -51,6 +51,10 @@ service InfraFleetService {
   rpc CreatePortForward(CreatePortForwardRequest) returns (PortForward);
   rpc ListPortForwards(ListPortForwardsRequest) returns (ListPortForwardsResponse);
   rpc DeletePortForward(DeletePortForwardRequest) returns (google.protobuf.Empty);
+  // StreamPortForwardEvents pushes port_opened/port_closed lifecycle events
+  // for one connectionId — BR-SSH-15's "live push, no polling" requirement
+  // (TASK-SSH-04-08), fed by internal/adapter/portevents.Broadcaster.
+  rpc StreamPortForwardEvents(StreamPortForwardEventsRequest) returns (stream PortForwardEvent);
 
   // --- Terminal/PTY lifecycle (control-plane, unary) ---
   rpc SpawnTerminalSession(SpawnTerminalSessionRequest) returns (SpawnTerminalSessionResponse);
@@ -290,6 +294,13 @@ message ListPortForwardsResponse {
 }
 message DeletePortForwardRequest {
   string id = 1;
+}
+message StreamPortForwardEventsRequest {
+  string connection_id = 1;
+}
+message PortForwardEvent {
+  string kind = 1; // "opened" | "closed"
+  PortForward forward = 2;
 }
 
 message KillWorkspacePortResponse {

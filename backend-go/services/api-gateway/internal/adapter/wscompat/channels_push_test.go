@@ -2,6 +2,7 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
 )
 
@@ -58,7 +60,7 @@ func TestNotificationsSubscribe_DeliversPushFrame(t *testing.T) {
 	})
 
 	registry := NewRegistry()
-	RegisterPushChannels(registry, opener, NewClientEventBus())
+	RegisterPushChannels(registry, opener, NewClientEventBus(), &fakeInfraFleetClient{})
 
 	ts := newTestHandlerServer(t, registry)
 	client := dialTestClient(t, ts)
@@ -90,7 +92,7 @@ func TestNotificationsSubscribe_OpenerErrorSurfacesAsErrorMessage(t *testing.T) 
 	})
 
 	registry := NewRegistry()
-	RegisterPushChannels(registry, opener, NewClientEventBus())
+	RegisterPushChannels(registry, opener, NewClientEventBus(), &fakeInfraFleetClient{})
 
 	ts := newTestHandlerServer(t, registry)
 	client := dialTestClient(t, ts)
@@ -313,5 +315,120 @@ func TestRegisterClientEventsChannel_SubscribeThenContextCancelUnsubscribes(t *t
 	}
 	if _, ok := <-events; ok {
 		t.Fatal("expected the returned events channel to be closed after unsubscribe")
+	}
+}
+
+// fakePortForwardEventsStream is a minimal
+// infrafleetv1.InfraFleetService_StreamPortForwardEventsClient test double —
+// same "embed the nil grpc.ClientStream, override only Recv" shape as
+// fakeNotificationStream above.
+type fakePortForwardEventsStream struct {
+	grpc.ClientStream
+
+	mu    sync.Mutex
+	items []*infrafleetv1.PortForwardEvent
+	err   error
+}
+
+func (f *fakePortForwardEventsStream) Recv() (*infrafleetv1.PortForwardEvent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.items) > 0 {
+		item := f.items[0]
+		f.items = f.items[1:]
+		return item, nil
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	return nil, io.EOF
+}
+
+// TestWorkspacePortsSubscribe_DeliversOpenedAndClosedPushFrames is
+// TASK-SSH-04-08's end-to-end assertion: a fake InfraFleetServiceClient
+// stream emitting one "opened" and one "closed" PortForwardEvent is
+// delivered as workspacePorts.opened/workspacePorts.closed push frames over
+// the WS transport (mirrors TestNotificationsSubscribe_DeliversPushFrame's
+// shape for notifications.subscribe).
+func TestWorkspacePortsSubscribe_DeliversOpenedAndClosedPushFrames(t *testing.T) {
+	stream := &fakePortForwardEventsStream{items: []*infrafleetv1.PortForwardEvent{
+		{Kind: "opened", Forward: &infrafleetv1.PortForward{Id: "pf-1", ConnectionId: "conn-1", LocalPort: 3001, RemotePort: 3000, ProcessName: "node", Status: "active"}},
+		{Kind: "closed", Forward: &infrafleetv1.PortForward{Id: "pf-1", ConnectionId: "conn-1", LocalPort: 3001, RemotePort: 3000, ProcessName: "node", Status: "closed"}},
+	}}
+	fake := &fakeInfraFleetClient{
+		streamPortForwardEventsFunc: func(ctx context.Context, in *infrafleetv1.StreamPortForwardEventsRequest) (infrafleetv1.InfraFleetService_StreamPortForwardEventsClient, error) {
+			if in.GetConnectionId() != "conn-1" {
+				t.Errorf("StreamPortForwardEvents called with connectionId = %q, want %q", in.GetConnectionId(), "conn-1")
+			}
+			return stream, nil
+		},
+	}
+
+	registry := NewRegistry()
+	RegisterPushChannels(registry, NotificationStreamOpener(func(ctx context.Context, userID string) (notificationv1.NotificationService_StreamNotificationsClient, error) {
+		return nil, errors.New("not used by this test")
+	}), NewClientEventBus(), fake)
+
+	ts := newTestHandlerServer(t, registry)
+	client := dialTestClient(t, ts)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := writeJSONFrame(ctx, client, InboundMessage{
+		ID: "sub-1", Type: "invoke", Channel: "workspacePorts.subscribe",
+		Args: []json.RawMessage{json.RawMessage(`{"connectionId":"conn-1"}`)},
+	}); err != nil {
+		t.Fatalf("writing subscribe invoke: %v", err)
+	}
+
+	ack := readWireMessage(t, ctx, client)
+	if ack.Type != "result" || ack.ID != "sub-1" {
+		t.Fatalf("first frame = %+v, want the subscribe ack", ack)
+	}
+
+	opened := readWireMessage(t, ctx, client)
+	if opened.Type != "push" || opened.Channel != "workspacePorts.opened" {
+		t.Fatalf("second frame = %+v, want type=push channel=workspacePorts.opened", opened)
+	}
+
+	closed := readWireMessage(t, ctx, client)
+	if closed.Type != "push" || closed.Channel != "workspacePorts.closed" {
+		t.Fatalf("third frame = %+v, want type=push channel=workspacePorts.closed", closed)
+	}
+}
+
+// TestRegisterWorkspacePortsStreamChannel_RecvErrorClosesOutputChannel
+// drives registerWorkspacePortsStreamChannel's StreamHandler directly
+// (bypassing the WS transport), mirroring
+// TestRegisterNotificationStreamChannel_RecvErrorClosesOutputChannel.
+func TestRegisterWorkspacePortsStreamChannel_RecvErrorClosesOutputChannel(t *testing.T) {
+	stream := &fakePortForwardEventsStream{err: errors.New("stream closed")}
+	fake := &fakeInfraFleetClient{
+		streamPortForwardEventsFunc: func(ctx context.Context, in *infrafleetv1.StreamPortForwardEventsRequest) (infrafleetv1.InfraFleetService_StreamPortForwardEventsClient, error) {
+			return stream, nil
+		},
+	}
+
+	registry := NewRegistry()
+	registerWorkspacePortsStreamChannel(registry, fake)
+
+	sh, ok := registry.StreamHandlerFor("workspacePorts.subscribe")
+	if !ok {
+		t.Fatal("expected workspacePorts.subscribe to be registered")
+	}
+
+	events, err := sh(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, []json.RawMessage{json.RawMessage(`{"connectionId":"conn-1"}`)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case _, ok := <-events:
+		if ok {
+			t.Fatal("expected the events channel to be closed after a Recv error, got a delivered item")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected the events channel to close after a Recv error, but reading blocked")
 	}
 }

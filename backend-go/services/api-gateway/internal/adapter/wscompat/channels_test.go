@@ -22,10 +22,11 @@ import (
 type fakeInfraFleetClient struct {
 	infrafleetv1.InfraFleetServiceClient
 
-	listDevServersFunc    func(ctx context.Context, in *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
-	registerDevServerFunc func(ctx context.Context, in *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
-	getFleetHealthFunc    func(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error)
-	relayFunc             func(ctx context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+	listDevServersFunc          func(ctx context.Context, in *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
+	registerDevServerFunc       func(ctx context.Context, in *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
+	getFleetHealthFunc          func(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error)
+	relayFunc                   func(ctx context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+	streamPortForwardEventsFunc func(ctx context.Context, in *infrafleetv1.StreamPortForwardEventsRequest) (infrafleetv1.InfraFleetService_StreamPortForwardEventsClient, error)
 }
 
 func (f *fakeInfraFleetClient) Relay(ctx context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
@@ -42,6 +43,10 @@ func (f *fakeInfraFleetClient) RegisterDevServer(ctx context.Context, in *infraf
 
 func (f *fakeInfraFleetClient) GetFleetHealth(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest, _ ...grpc.CallOption) (*infrafleetv1.GetFleetHealthResponse, error) {
 	return f.getFleetHealthFunc(ctx, in)
+}
+
+func (f *fakeInfraFleetClient) StreamPortForwardEvents(ctx context.Context, in *infrafleetv1.StreamPortForwardEventsRequest, _ ...grpc.CallOption) (infrafleetv1.InfraFleetService_StreamPortForwardEventsClient, error) {
+	return f.streamPortForwardEventsFunc(ctx, in)
 }
 
 // outgoingTenantUser reads back the metadata AttachIdentity is expected to

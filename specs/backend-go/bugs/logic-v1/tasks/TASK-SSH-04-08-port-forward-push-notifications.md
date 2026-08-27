@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` + `api-gateway`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/portevents/broadcaster.go` (new)
 **Depends on:** TASK-SSH-04-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — portevents.Broadcaster + StreamPortForwardEvents RPC + wscompat workspacePorts.subscribe channel added (found complete/verified in the shared worktree — not originally in this session's assigned list, but built, tested, and left uncommitted, so verified and committed here rather than left dangling); go build/vet/test clean across infra-fleet-service and api-gateway`
 
 ---
 

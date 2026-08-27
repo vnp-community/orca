@@ -253,7 +253,7 @@ func run() error {
 	// channels — a separate registration mechanism from RegisterRealChannels'
 	// request/response ChannelHandlers, see channels_push.go's doc comment.
 	clientEventBus := wscompat.NewClientEventBus()
-	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus)
+	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus, infraFleetClient)
 	wsCompatHandler := wscompat.New(logger, sessionValidator, wsCompatRegistry)
 
 	// agentProxyHandler raw-proxies the Dev Server Agent's /agent (WS) and
