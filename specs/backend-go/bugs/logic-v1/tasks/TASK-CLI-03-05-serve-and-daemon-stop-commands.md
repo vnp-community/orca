@@ -5,7 +5,7 @@
 **Service:** `orca-cli`
 **File:** `backend-go/cmd/orca-cli/internal/command/serve.go`, `daemon_stop.go`
 **Depends on:** TASK-CLI-03-03 (`ComposeSupervisor`), TASK-CLI-03-04 (`DaemonMode`)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added daemon_stop.go/serve.go + localdaemon/daemonize_{unix,windows}.go, wired `daemon stop [--local]` and `serve --daemon --local` (with a stripFlag re-exec guard against re-daemonizing) in root.go; added daemon_stop_test.go/serve_test.go (remote-mode refusal / not-local refusal, each proven via nil-supervisor panic guard); builds and vets clean for both linux and `GOOS=windows`; `go test ./cmd/orca-cli/internal/command/... -run 'TestDaemonStop|TestServe' -v` passes.
 
 ---
 

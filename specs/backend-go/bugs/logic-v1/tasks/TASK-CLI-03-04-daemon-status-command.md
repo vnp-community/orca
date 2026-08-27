@@ -5,7 +5,7 @@
 **Service:** `orca-cli`
 **File:** `backend-go/cmd/orca-cli/internal/command/daemon_status.go`
 **Depends on:** TASK-CLI-03-01 (`GetHealth`), TASK-CLI-03-03 (`ComposeSupervisor`)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added daemon_status.go (RunDaemonStatus), localdaemon/paths.go (DefaultPidFile/DefaultComposeFile XDG helpers), wired `daemon status --local` in root.go (nil cli/sup enforced per mode), added daemon_status_test.go proving each mode never touches the other's dependency via nil-pointer-panic guard; `go test ./cmd/orca-cli/internal/command/... -run TestDaemonStatus -v` passes.
 
 ---
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/stablyai/orca-go/cmd/orca-cli/internal/apiclient"
 	"github.com/stablyai/orca-go/cmd/orca-cli/internal/config"
+	"github.com/stablyai/orca-go/cmd/orca-cli/internal/localdaemon"
 	"github.com/stablyai/orca-go/cmd/orca-cli/internal/output"
 )
 
@@ -59,7 +60,171 @@ func NewRootCmd(clientFactory func() (*apiclient.Client, error)) (*cobra.Command
 	root.AddCommand(newWorktreeCmd(clientFactory, &jsonOutput, exitCode))
 	root.AddCommand(newAgentCmd(clientFactory, &jsonOutput, exitCode))
 	root.AddCommand(newSnapshotCmd(clientFactory, &jsonOutput, exitCode))
+	root.AddCommand(newDaemonCmd(clientFactory, &jsonOutput, exitCode))
+	root.AddCommand(newServeCmd(&jsonOutput, exitCode))
 	return root, exitCode
+}
+
+// newComposeSupervisor builds a ComposeSupervisor from the --compose-file/
+// --pid-file flag overrides (empty means "use the localdaemon package's
+// default resolution" — env override or repo-cwd-relative compose file,
+// XDG data-dir pidfile).
+func newComposeSupervisor(composeFile, pidFile string) (*localdaemon.ComposeSupervisor, error) {
+	if composeFile == "" {
+		composeFile = localdaemon.DefaultComposeFile()
+	}
+	if pidFile == "" {
+		var err error
+		pidFile, err = localdaemon.DefaultPidFile()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &localdaemon.ComposeSupervisor{ComposeFile: composeFile, PidFile: pidFile}, nil
+}
+
+func newDaemonCmd(clientFactory func() (*apiclient.Client, error), jsonOutput *bool, exitCode *int) *cobra.Command {
+	cmd := &cobra.Command{Use: "daemon", Short: "inspect or control the Orca daemon (remote health check, or a local docker-compose stack)"}
+	cmd.AddCommand(newDaemonStatusCmd(clientFactory, jsonOutput, exitCode))
+	cmd.AddCommand(newDaemonStopCmd(jsonOutput, exitCode))
+	return cmd
+}
+
+func newDaemonStopCmd(jsonOutput *bool, exitCode *int) *cobra.Command {
+	var local bool
+	var composeFile, pidFile string
+	cmd := &cobra.Command{
+		Use:   "stop",
+		Short: "stop the local docker-compose stack (--local); refused in remote/GitOps mode",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mode := ModeRemote
+			var sup *localdaemon.ComposeSupervisor
+			if local {
+				mode = ModeLocal
+				var err error
+				sup, err = newComposeSupervisor(composeFile, pidFile)
+				if err != nil {
+					*exitCode = output.ReportError(err, *jsonOutput)
+					return nil
+				}
+			}
+
+			if err := RunDaemonStop(cmd.Context(), mode, sup); err != nil {
+				*exitCode = output.ReportError(err, *jsonOutput)
+				return nil
+			}
+			*exitCode = output.Report(map[string]string{"status": "stopped"}, nil, *jsonOutput)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&local, "local", false, "stop this host's local docker-compose stack")
+	cmd.Flags().StringVar(&composeFile, "compose-file", "", "path to docker-compose.yml (--local only; default: $ORCA_COMPOSE_FILE or ./docker-compose.yml)")
+	cmd.Flags().StringVar(&pidFile, "pid-file", "", "path to the supervisor pidfile (--local only; default: XDG data dir/orca/daemon.pid)")
+	return cmd
+}
+
+func newServeCmd(jsonOutput *bool, exitCode *int) *cobra.Command {
+	var local, daemon bool
+	var composeFile, pidFile string
+	cmd := &cobra.Command{
+		Use:   "serve",
+		Short: "start the local docker-compose stack (--local required; --daemon backgrounds it)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if daemon && local {
+				// Re-exec detached (localdaemon.Daemonize), stripping
+				// --daemon so the child runs RunServe directly in the
+				// foreground of its own detached session instead of
+				// re-daemonizing forever. See serve.go's doc comment:
+				// daemonizing is a main.go/root.go-level concern, RunServe
+				// itself stays synchronous and testable.
+				childArgs := stripFlag(os.Args[1:], "--daemon")
+				if err := localdaemon.Daemonize(childArgs); err != nil {
+					*exitCode = output.ReportError(err, *jsonOutput)
+					return nil
+				}
+				fmt.Println("orca serve started in the background")
+				*exitCode = output.ExitOK
+				return nil
+			}
+
+			sup, err := newComposeSupervisor(composeFile, pidFile)
+			if err != nil {
+				*exitCode = output.ReportError(err, *jsonOutput)
+				return nil
+			}
+			if err := RunServe(cmd.Context(), local, sup); err != nil {
+				*exitCode = output.ReportError(err, *jsonOutput)
+				return nil
+			}
+			*exitCode = output.Report(map[string]string{"status": "started"}, nil, *jsonOutput)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&local, "local", false, "start this host's docker-compose stack (required)")
+	cmd.Flags().BoolVar(&daemon, "daemon", false, "background the process after starting")
+	cmd.Flags().StringVar(&composeFile, "compose-file", "", "path to docker-compose.yml (default: $ORCA_COMPOSE_FILE or ./docker-compose.yml)")
+	cmd.Flags().StringVar(&pidFile, "pid-file", "", "path to the supervisor pidfile (default: XDG data dir/orca/daemon.pid)")
+	return cmd
+}
+
+// stripFlag removes every exact-match occurrence of flag (a boolean flag
+// with no attached value, e.g. "--daemon") from args before re-exec'ing
+// the detached child — the child must not re-daemonize itself.
+func stripFlag(args []string, flag string) []string {
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == flag {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+func newDaemonStatusCmd(clientFactory func() (*apiclient.Client, error), jsonOutput *bool, exitCode *int) *cobra.Command {
+	var local bool
+	var composeFile, pidFile string
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "report daemon health — remote api-gateway healthz/readyz by default, or this host's compose stack with --local",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mode := ModeRemote
+			var cli *apiclient.Client
+			var sup *localdaemon.ComposeSupervisor
+			// The two modes must never bleed into each other — see
+			// daemon_status.go's doc comment: only one of cli/sup is ever
+			// non-nil below, matching RunDaemonStatus's nil-safety
+			// contract.
+			if local {
+				mode = ModeLocal
+				var err error
+				sup, err = newComposeSupervisor(composeFile, pidFile)
+				if err != nil {
+					*exitCode = output.ReportError(err, *jsonOutput)
+					return nil
+				}
+			} else {
+				var err error
+				cli, err = clientFactory()
+				if err != nil {
+					*exitCode = output.ReportError(err, *jsonOutput)
+					return nil
+				}
+			}
+
+			result, err := RunDaemonStatus(cmd.Context(), mode, cli, sup)
+			if err != nil {
+				*exitCode = output.ReportError(err, *jsonOutput)
+				return nil
+			}
+			*exitCode = output.Report(result, nil, *jsonOutput)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&local, "local", false, "check this host's local docker-compose stack instead of a remote api-gateway")
+	cmd.Flags().StringVar(&composeFile, "compose-file", "", "path to docker-compose.yml (--local only; default: $ORCA_COMPOSE_FILE or ./docker-compose.yml)")
+	cmd.Flags().StringVar(&pidFile, "pid-file", "", "path to the supervisor pidfile (--local only; default: XDG data dir/orca/daemon.pid)")
+	return cmd
 }
 
 func newWorktreeCmd(clientFactory func() (*apiclient.Client, error), jsonOutput *bool, exitCode *int) *cobra.Command {
