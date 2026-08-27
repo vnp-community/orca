@@ -109,6 +109,11 @@ func TestBrowserChannels_NotConnected_Errors(t *testing.T) {
 
 func TestBrowserChannels_AllGroupAAndBChannels_ResolveThenRelay(t *testing.T) {
 	channels := []string{
+		// goto/snapshot/click: TASK-036 option b's additive ops beyond
+		// SOL-006's original 9 — real headless-browser navigate/inspect/
+		// interact, implemented on the agent (browser-handler.ts). Same
+		// resolve-then-relay skeleton, so covered by this one table.
+		"browser.goto", "browser.snapshot", "browser.click",
 		"browser.eval", "browser.keypress", "browser.mouseDown", "browser.mouseMove",
 		"browser.mouseUp", "browser.mouseWheel", "browser.viewport", "browser.tabCreate", "browser.tabClose",
 	}

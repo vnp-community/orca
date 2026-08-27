@@ -1,97 +1,246 @@
-# TASK-036: Document the browser-driving `agent/` gap and the desktop-automation product decision (blocked, no code)
+# TASK-036: Remote headless-browser driving on the Dev Server Agent (TASK-036 option b)
 
-**From Solution:** SOL-006
-**Priority:** P3 — tracking only, blocks nothing in this repo's `backend-go` build
-**Service:** `agent` (out of scope) / product decision
-**File:** none — this task produces no code change; see "What to do" below
-**Depends on:** TASK-034
-**Status:** `[blocked]` — item 2 (dispatch-model disambiguation) is now DEFINITIVELY RESOLVED by tracing the real old TS backend source (see below) — this changes the picture for item 1's product decision, which is still genuinely not mine to make. Item 3 (agent-side capability) is now known to be the WRONG framing entirely, not just unstarted — see below. No code implemented; still correctly blocked, but for a different, now-clearer reason.
-
-**Dispatch-model disambiguation — RESOLVED, backend.*/`agent/` framing was based on a documentation gap:**
-`browser.*`'s real backend, `backend/src/main/browser/agent-browser-bridge.ts`'s `AgentBrowserBridge`, is confirmed **Electron-process-local**, not a remote Dev Server Agent (`agent/`) relay at all:
-- It imports `electron` (`app`, `WebContents`), `node:child_process`'s `execFile`, and `acquireElectronDebugger`/`CdpWsProxy` — it launches and drives a real Chrome/Chromium process via the Chrome DevTools Protocol **co-located with the desktop app's own process**, not over SSH/relay to a separate host.
-- `worktreeId` (threaded through every handler in `orca-runtime-browser.ts`, e.g. `browserSnapshot`/`browserClick`/`browserGoto`) is confirmed to be a **local multiplexing key only** — `activeWebContentsPerWorktree: Map<worktreeId, webContentsId>` selects which already-open local Electron `WebContents` (browser tab) a given worktree's pane currently targets. It is never used to select a remote host/connectionId — there is no such concept anywhere in this file.
-- "Agent" in `AgentBrowserBridge` does not refer to the Dev Server Agent (`agent/`) package at all — naming coincidence, not an architectural link. `agent/` genuinely has zero browser-driving capability, and (per this finding) was never the intended place for one — the real feature's execution boundary is the desktop Electron process, matching `backend-agent-execution-boundary.md:161`'s 🏠 classification **correctly**, not the mismatch SOL-006 suspected.
-
-**Practical implication:** TASK-031–035's existing backend-go plumbing (`channels_browser.go`, relaying `browser.*` through `infra-fleet-service`'s `Relay` RPC to a remote Dev Server Agent) is not just "inert until `agent/` catches up" — it is built on an **architecturally incompatible model**. Even if `agent/` grew a full CDP driver tomorrow, a remote SSH-connected dev server has no Electron process/desktop `WebContents` for it to control; the old feature fundamentally requires desktop co-location. A real "browser panes over backend-go/SSH-relay" feature would need a genuinely new design (e.g. driving a headless browser process ON the remote dev server host itself via `agent/`, screencasting frames back — closer to what SOL-006's own sketch already guessed at, coincidentally, but for the wrong reason: not because the old feature needs porting, but because the old feature literally cannot be ported as-is).
-
-**Item 1 (product decision) — still not mine to make, but now much better-scoped:** the real choice is no longer "should `agent/` grow CDP driving" (that was always going to be a big, separate feature even if yes) — it's simpler: **(a)** leave `browser.*` permanently backend-go-unsupported for SSH-relay/server deployments, consistent with `02-microservices-decomposition.md`'s other explicitly-desktop-only exclusions (same bucket as `emulator.*`'s ADB/simctl driving), and remove/reconsider TASK-031-035's now-known-incompatible relay plumbing; or **(b)** commission a genuinely new remote-headless-browser design from scratch, not a port. I have not implemented either — that's a real product call, not something to guess into code.
+**Priority:** P1 — implemented this pass
+**Services:** `agent` (new), `backend-go/services/api-gateway` (extended — 3 new ops on already-existing plumbing), `frontend` (gap documented, not changed)
+**Status:** `[partial]` — agent + backend-go layers real, built, and tested end-to-end against a real launched headless Chromium. Frontend dispatch to this path is a documented, unclosed gap (see "Frontend" section below). See per-layer status lines at the bottom.
 
 ---
 
 ## Context
 
-TASK-031 through TASK-035 make all 15 `browser.*` methods relay/resolve
-correctly through `infra-fleet-service`, but SOL-006 is explicit that this
-is the **larger** of the two agent-side gaps in this task batch (contrast
-TASK-023's `accounts.*` gap, flagged as small):
+Per the "Dispatch-model disambiguation — RESOLVED" finding already on this
+file before this pass (kept below for reference), the OLD `browser.*`
+(`backend/src/main/browser/agent-browser-bridge.ts`, `AgentBrowserBridge`)
+drives Electron's own embedded `WebContents` via CDP, co-located with the
+desktop process — genuinely incompatible with SSH-relay/backend-go dev
+servers, which have no Electron process to attach to. `worktreeId` there is
+a local multiplexing key only, never a remote-dispatch signal.
 
-> "driving a browser pane means the Dev Server Agent must be able to
-> **launch and control a full browser process** — navigate, inject input,
-> evaluate JS, manage tabs, stream frames back (`browser.screencast`), and
-> read/import OS-level browser profile data... Nothing in `specs/agent/api/`
-> documents the Dev Server Agent having this capability today — this is
-> not a small companion change."
+**User's explicit product decision (option b):** commission a genuinely new
+remote-headless-browser design — frontend initiates → backend-go relays →
+the Dev Server Agent (`agent/`) actually drives a real headless browser
+process running ON the remote dev server host. This is what this pass
+builds.
 
-SOL-006 also flags an open, **unresolved** question this solution
-deliberately does not answer on its own:
-
-> "is backend-go expected to support live remote browser panes at all, and
-> if so, is `agent/` growing a CDP/Playwright driver its own team's roadmap
-> already plans, or does this wait? That product decision is not
-> backend-go's to make unilaterally, and this proposal does not attempt to
-> make it — it only establishes where the plumbing goes *if* the answer is
-> yes."
-
-There is also an unresolved **dispatch-model disambiguation** SOL-006
-could not fully close from specs alone: `backend-agent-execution-boundary.md:161`
-classifies `browser.*` as 🏠 backend-local, but the worktree-scoping
-evidence in `browser-pane-remote.tsx`'s actual call sites contradicts that.
-SOL-006 concludes this doc's `browser.*` entry likely describes the
-separate `window.api.browser` Electron surface instead, but flags this as
-"pending someone tracing the actual old TS backend's `browser.*` RPC
-handler source to confirm definitively" — not fully dischargeable from
-specs alone.
-
-This task exists to track both open items explicitly, separate from
-`accounts.*`'s smaller companion-work tracking (TASK-023), since SOL-006
-frames this as needing product sign-off before agent-side work even
-starts, not just an engineering task to schedule.
+`backend-go/services/api-gateway/internal/adapter/wscompat/channels_browser.go`
+and its `worktree → connectionId` resolution (via
+`infrafleetv1.ResolveConnectionRequest.WorktreeId`,
+`infrafleetv1.ResolveConnectionResponse.ConnectionId`) were **already real
+and merged** on this branch before this pass, covering 9 ops (SOL-006
+Groups A/B: `eval`/`keypress`/`mouseDown`/`mouseMove`/`mouseUp`/
+`mouseWheel`/`viewport`/`tabCreate`/`tabClose`) and already wired into
+`RegisterRealChannels`. This pass's own implementing agent's worktree was
+mistakenly branched from a much older commit that predated all of this
+(and consequently spent effort reconstructing an already-solved
+worktree-resolution layer from scratch) — that reconstruction (a duplicate
+`WorktreeConnectionResolver` port, a duplicate proto field, a duplicate
+`infra-fleet-service` usecase/repository method) was **discarded, not
+merged**, since the real thing it duplicated already existed and worked.
+Only the agent's genuinely new work — the agent-side browser driver, its
+tests, and 3 new op names appended to the already-real `channels_browser.go`
+op list — was merged. This note exists so a future reader isn't confused by
+any residual references to that reconstruction in other branches/history.
 
 ---
 
-## What to do
+## What was built
 
-Not a code change. File (or link) three tracking items:
+### 1. Agent (`agent/src/relay/browser-handler.ts`, new)
 
-1. **Product decision (blocking, do this first):** "Decide whether
-   backend-go should support live remote browser panes (`browser.*`), and
-   if so, whether `agent/` grows a CDP/Playwright driver on its own
-   roadmap or waits." Link SOL-006's "The honest limit of this proposal"
-   section and this TASK file. TASK-031–TASK-035's shipped-but-inert
-   plumbing is safe to merge regardless of this decision's outcome (it's
-   dead code path until the agent side exists), but the agent-side work
-   itself should not start without this sign-off.
-2. **Dispatch-model confirmation:** "Confirm whether `browser.*` in
-   `backend-agent-execution-boundary.md:161`'s 🏠 classification actually
-   describes `window.api.browser` (Electron-local) rather than this
-   worktree-scoped RPC namespace — trace the old TS backend's `browser.*`
-   RPC handler source to confirm." Link SOL-006's "Resolving the
-   dispatch-model uncertainty" section.
-3. **Agent-side capability (only after item 1 is resolved "yes"):**
-   "Implement browser-process launch/control on the Dev Server Agent:
-   navigate, input injection, JS eval, tab management, frame streaming
-   (`browser.screencast` — needs its own server-streaming RPC design, not
-   covered by TASK-031–035's unary `Relay` plumbing), and OS-level browser
-   profile detection/import." Link TASK-034 (Groups A/B) and TASK-033
-   (Group C's 3 relayed profile ops) as the backend-go plumbing this
-   capability activates.
+Implements 12 `browser.*` JSON-RPC methods for real, registered in
+`agent/src/relay/agent-rpc-dispatch.ts`'s switch (Part A — the surface
+`infra-fleet-service`'s `Relay` RPC actually reaches; NOT the legacy
+`relay.ts`/`RelayDispatcher`, which is Electron-desktop-only):
+
+| Method | Real CLI op | Notes |
+|---|---|---|
+| `browser.goto` | `open <url>` | additive beyond SOL-006's original 9-op list |
+| `browser.snapshot` | `snapshot` | additive; returns accessibility-tree + refs |
+| `browser.click` | `click <selector-or-@ref>` | additive |
+| `browser.eval` | `eval <js>` | SOL-006 Group A |
+| `browser.keypress` | `press <key>` | SOL-006 Group A |
+| `browser.mouseMove` | `mouse move <x> <y>` | SOL-006 Group A |
+| `browser.mouseDown` | `mouse down [button]` | SOL-006 Group A |
+| `browser.mouseUp` | `mouse up [button]` | SOL-006 Group A |
+| `browser.mouseWheel` | `mouse wheel <dy> [dx]` | SOL-006 Group A |
+| `browser.viewport` | `set viewport <w> <h>` | SOL-006 Group A |
+| `browser.tabCreate` | `tab new` | SOL-006 Group B |
+| `browser.tabClose` | `tab close [tabId]` + conditional session teardown | SOL-006 Group B |
+
+**Engine choice — `agent-browser` (vercel-labs), not a new CDP client or
+chrome-launcher:** already a vendored dependency
+(`agent/package.json: "agent-browser": "~0.27.0"`) and, on inspection, is the
+**exact same engine** the OLD Electron bridge already shells out to
+(`AgentBrowserBridge.execAgentBrowser` in `agent-browser-bridge.ts` calls this
+same CLI, just with `--cdp <electronProxyPort>` to attach to the Electron
+webview instead of launching its own browser). It is a real, standalone CLI
+(native per-platform binaries, `bin/agent-browser-{platform}-{arch}`) that:
+finds or launches a real headless Chrome/Chromium on its own, speaks CDP
+internally, and exposes exactly the navigate/click/eval/mouse/tab vocabulary
+this task needs as `--json`-output subcommands. Verified in this sandbox: no
+system `chromium`/`google-chrome` binary was on `PATH`, but `agent-browser`
+located a Playwright-cached Chromium (`~/.cache/ms-playwright/chromium-*`)
+and launched it headlessly (`--headless=new`) without any `DISPLAY` set —
+confirmed via `ps -eo pid,ppid,cmd` showing the full Chrome process tree.
+
+**Session-scoping/cleanup model (decided, documented in
+`browser-handler.ts`'s header comment):**
+- One `agent-browser` **session per worktree**, via `--session <worktreeId>`.
+  `agent-browser` runs its own persistent background daemon per session name
+  (confirmed: the daemon process reparents to pid 1 and survives the
+  invoking short-lived CLI process) — this file does not manage a long-lived
+  child process itself; each RPC call is a short CLI invocation.
+- **Idle timeout (primary safety net):** every invocation sets
+  `AGENT_BROWSER_IDLE_TIMEOUT_MS=900000` (15 min) so an abandoned worktree's
+  daemon + Chrome process self-terminates. Verified this matters: without
+  it, three separate test sessions left ~15 Chrome subprocesses each running
+  indefinitely in this sandbox after the CLI invocation that spawned them
+  exited.
+- **Explicit teardown:** `browser.tabClose` closes the tab, checks
+  `tab list`, and if no tabs remain, also runs `close` to tear the whole
+  session down immediately rather than waiting out the idle timeout.
+- **Documented gap, not silently assumed:** no teardown tied to the
+  Orca↔agent WebSocket connection closing — `agent-rpc-dispatch.ts`'s
+  per-connection `WireState` isn't plumbed into this handler in this pass.
+  The idle timeout is the safety net for a dropped connection.
+
+**Operational requirement surfaced, not hidden:** the target host needs a
+Chrome/Chromium `agent-browser` can find (or reach for its own first-run
+download). `runBrowserCommand()` pattern-matches agent-browser's own
+"no usable browser"/"failed to launch"/"executable doesn't exist" failures
+and remaps them to a `BROWSER_ENGINE_UNAVAILABLE: ...` error (vs. an opaque
+`BROWSER_COMMAND_FAILED`), so a missing-Chrome host fails clearly on first
+use instead of silently.
+
+**Tests:**
+- `agent/src/relay/browser-handler.test.ts` — 20 tests, `node:child_process`
+  execFile mocked (no real Chrome needed): arg construction per op, session
+  scoping (`--session <worktreeId>`), idle-timeout env var set on every call,
+  validation errors (missing worktree / missing required param) fail fast
+  without spawning, CLI-failure → `BROWSER_COMMAND_FAILED`, "no usable
+  browser" → `BROWSER_ENGINE_UNAVAILABLE`, tabClose's
+  close-tab-then-maybe-close-session branching (both branches).
+- `agent/src/relay/browser-handler.real-browser.test.ts` — a REAL Chrome
+  WAS available in this sandbox (via Playwright's cache, not a system
+  package) — 4 additional tests run a real `agent-browser`-launched headless
+  Chromium end-to-end (`goto` against example.com, `snapshot` returns a real
+  accessibility tree, `click` on the real "Learn more" link, `tabCreate`
+  opens a second real tab), gated by a synchronous top-level probe so the
+  suite skips cleanly when no browser is reachable rather than failing CI.
+  Re-verified on this branch's actual merge target: 4 passed, 1 skipped.
+- `cd agent && npx vitest run src/relay/browser-handler.test.ts
+  src/relay/browser-handler.real-browser.test.ts` — 24 passed, 1 skipped.
+- `npx tsc --noEmit`: zero errors in `browser-handler.ts` or
+  `agent-rpc-dispatch.ts` (confirmed against this branch's real HEAD, which
+  has its own separate, pre-existing set of ~100 unrelated `tsc` errors from
+  other in-flight work — neither touched file appears in that output).
+
+### 2. Backend-go — 3 new ops on already-real plumbing
+
+`channels_browser.go`'s `registerBrowserChannels` now covers all 12 ops
+(SOL-006's original 9 relayed ops + this task's 3 additive navigate/
+inspect/interact ops: `goto`/`snapshot`/`click`), all sharing the same
+resolve-then-relay `registerBrowserRelay` helper that was already real and
+tested — no new backend-go design needed for the additive 3, they are just
+3 more entries in the same op list. `channels_browser_test.go`'s existing
+`TestBrowserChannels_AllGroupAAndBChannels_ResolveThenRelay` table extended
+to cover them.
+
+**Verify:**
+```
+cd backend-go/services/api-gateway
+go build ./... && go vet ./... && go test ./...   # clean
+```
+
+### 3. Frontend — investigated, NOT changed this pass (documented gap)
+
+Found two browser-pane components:
+- `browser-pane-local.tsx` (webview-embedded) uses `window.api.browser.*`,
+  which the web-mode preload (`frontend/src/renderer/src/web/web-preload-api.ts`,
+  `createBrowserApi()`) stubs out entirely to no-ops
+  (`registerGuest: () => Promise.resolve()`, etc.) — confirms this pane is
+  genuinely Electron-webview-only, matching this task's original finding.
+- `browser-pane-remote.tsx` ("RemoteBrowserPagePane") calls
+  `callRuntimeRpc(target, 'browser.goto', ...)` against a REAL
+  `{kind:'local'} | {kind:'environment', environmentId}` dispatch branch
+  (`runtime-rpc-client.ts`) — at first glance, exactly the local-vs-remote
+  branch this task's brief predicted might not exist.
+
+  Tracing `target.kind === 'environment'` further: it resolves through
+  `window.api.runtimeEnvironments.call`, which — per
+  `desktop/src/main/ipc/runtime-environments.ts` and
+  `web-preload-api.ts`'s `createRuntimeEnvironmentsApi()` (pairing-code /
+  `createStoredWebRuntimeEnvironment` / WebRTC offer-based) — is a **third,
+  separate "remote" concept**: pairing this Orca client to *another full
+  paired Orca desktop instance*, not `infra-fleet-service`'s SSH-relay dev
+  servers. It is unrelated to the `browser.*` wscompat channels this task
+  builds on.
+
+  **No frontend code path was found that maps a worktree bound to a
+  backend-go/`infra-fleet-service` dev-server connection to a call through
+  `api-gateway`'s wscompat WebSocket surface for `browser.*` specifically.**
+  Other already-migrated backend-go features (`git.*`, `devServer.*`,
+  `fleet.*`) reach `api-gateway` through a different client path than
+  `RemoteBrowserPagePane`'s `runtimeEnvironments` mechanism — matching the
+  same architecture gap this whole session independently found for
+  `accounts.*` (TASK-023) before BUG-005's fix narrowed it for that specific
+  namespace's transport. The equivalent fix for `browser.*` is NOT simply
+  "reuse BUG-005" — `RemoteBrowserPagePane` would need a genuinely new
+  local-vs-backend-go-SSH-relay dispatch branch (which existing "remote"
+  abstraction, if any, should own this, and whether
+  `RemoteBrowserPagePane`'s screencast-frame protocol generalizes over an
+  `api-gateway` WebSocket round-trip the same way it does over the
+  IPC/WebRTC paths it has today) — a genuine, separately-scoped frontend
+  architecture decision, not implemented this pass per this task's own
+  instruction not to force a rushed frontend change.
+
+  A client capable of calling `api-gateway`'s wscompat `browser.*` channels
+  with a resolved `worktree` selector (e.g. a test script, or a future
+  frontend change) can exercise the full agent+backend-go path today.
 
 ---
 
-## Verify
+## Status by layer
 
-N/A — no code produced by this task. "Done" means all three tracking items
-exist and are linked from this file, so TASK-031–TASK-035's shipped-but-
-inert state — and the still-open product/dispatch-model questions above
-it — are discoverable rather than silently assumed resolved.
+- **Agent (`agent/src/relay/browser-handler.ts` + dispatch wiring):** `[x]`
+  DONE — real, builds clean (`tsc --noEmit` zero errors in touched files),
+  20 mocked unit tests + 4 real-headless-Chrome integration tests all pass.
+- **Backend-go (`api-gateway`'s `channels_browser.go`, 3 new ops on
+  already-real plumbing):** `[x]` DONE — real, builds clean, `go vet`
+  clean, all tests pass (new + pre-existing, nothing broken).
+- **Frontend (browser-pane dispatch to this new relay path):** `[ ]` NOT
+  DONE — real, evidence-backed gap documented above; no frontend code
+  changed this pass; needs a separate, deliberately-scoped design decision
+  before implementation.
+- **Not verified against a real remote SSH-connected dev server host** — all
+  verification above ran against a sandbox's own local process tree (agent
+  process + backend-go services running in the same environment, not over
+  an actual SSH relay hop). The `Relay`/`ResolveConnection` RPC plumbing is
+  the same mechanism every other already-shipped relayed feature (`git.*`,
+  `devServer.*`) uses, but this specific new surface has not been
+  end-to-end tested against a live SSH-relay connection.
+
+---
+
+## Dispatch-model disambiguation — RESOLVED (kept from before this pass)
+
+`browser.*`'s OLD backend, `backend/src/main/browser/agent-browser-bridge.ts`'s
+`AgentBrowserBridge`, is confirmed **Electron-process-local**, not a remote
+Dev Server Agent (`agent/`) relay at all:
+
+- It imports `electron` (`app`, `WebContents`), `node:child_process`'s
+  `execFile`, and `acquireElectronDebugger`/`CdpWsProxy` — it launches and
+  drives a real Chrome/Chromium process via the Chrome DevTools Protocol
+  **co-located with the desktop app's own process**, not over SSH/relay to
+  a separate host.
+- `worktreeId` (threaded through every handler in `orca-runtime-browser.ts`,
+  e.g. `browserSnapshot`/`browserClick`/`browserGoto`) is confirmed to be a
+  **local multiplexing key only** — `activeWebContentsPerWorktree:
+  Map<worktreeId, webContentsId>` selects which already-open local Electron
+  `WebContents` (browser tab) a given worktree's pane currently targets. It
+  is never used to select a remote host/connectionId.
+- "Agent" in `AgentBrowserBridge` does not refer to the Dev Server Agent
+  (`agent/`) package at all — naming coincidence, not an architectural link.
+
+This pass's new capability (agent-launched headless Chromium, driven over
+`Relay`) is genuinely new, not a port of the above.

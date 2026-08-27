@@ -1280,6 +1280,133 @@ async function route(
       }
     }
 
+    // ── browser.* ────────────────────────────────────────────────────────────
+    // TASK-036 option b: drives a real headless Chromium process launched ON
+    // THIS HOST (via the vendored `agent-browser` CLI), relayed from
+    // backend-go's wscompat/channels_browser.go. See browser-handler.ts's
+    // header comment for the session-scoping/idle-timeout/cleanup model —
+    // this is a genuinely new capability, not a port of the old
+    // Electron-local `browser.*` (backend/src/main/browser/agent-browser-bridge.ts).
+    case 'browser.goto': {
+      try {
+        const { handleBrowserGoto } = await import('./browser-handler')
+        return (await handleBrowserGoto(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.goto unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.snapshot': {
+      try {
+        const { handleBrowserSnapshot } = await import('./browser-handler')
+        return (await handleBrowserSnapshot(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.snapshot unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.click': {
+      try {
+        const { handleBrowserClick } = await import('./browser-handler')
+        return (await handleBrowserClick(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.click unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.eval': {
+      try {
+        const { handleBrowserEval } = await import('./browser-handler')
+        return (await handleBrowserEval(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.eval unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.keypress': {
+      try {
+        const { handleBrowserKeypress } = await import('./browser-handler')
+        return (await handleBrowserKeypress(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.keypress unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.mouseMove': {
+      try {
+        const { handleBrowserMouseMove } = await import('./browser-handler')
+        return (await handleBrowserMouseMove(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.mouseMove unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.mouseDown': {
+      try {
+        const { handleBrowserMouseDown } = await import('./browser-handler')
+        return (await handleBrowserMouseDown(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.mouseDown unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.mouseUp': {
+      try {
+        const { handleBrowserMouseUp } = await import('./browser-handler')
+        return (await handleBrowserMouseUp(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.mouseUp unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.mouseWheel': {
+      try {
+        const { handleBrowserMouseWheel } = await import('./browser-handler')
+        return (await handleBrowserMouseWheel(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.mouseWheel unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.viewport': {
+      try {
+        const { handleBrowserViewport } = await import('./browser-handler')
+        return (await handleBrowserViewport(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.viewport unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.tabCreate': {
+      try {
+        const { handleBrowserTabCreate } = await import('./browser-handler')
+        return (await handleBrowserTabCreate(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.tabCreate unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.tabClose': {
+      try {
+        const { handleBrowserTabClose } = await import('./browser-handler')
+        return (await handleBrowserTabClose(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.tabClose unavailable: ${msg}`)
+      }
+    }
+
     // ── fs.mkdir ─────────────────────────────────────────────────────────────
     // Creates a directory (recursive) on the agent's filesystem.
     case 'fs.mkdir': {

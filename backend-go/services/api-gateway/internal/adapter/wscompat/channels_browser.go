@@ -16,7 +16,14 @@ import (
 func registerBrowserChannels(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
 	// Group A + B — one relay handler per channel, all sharing
 	// registerBrowserRelay's resolve-then-relay logic.
+	//
+	// goto/snapshot/click are additive beyond SOL-006's original 9-op
+	// inventory (TASK-036 option b): the agent side now implements them for
+	// real (agent/src/relay/browser-handler.ts) as the core navigate/
+	// inspect/interact ops driving a real headless browser process — no new
+	// resolve-then-relay design needed, just more ops sharing this list.
 	for _, op := range []string{
+		"goto", "snapshot", "click",
 		"eval", "keypress", "mouseDown", "mouseMove", "mouseUp", "mouseWheel",
 		"viewport", "tabCreate", "tabClose",
 	} {
