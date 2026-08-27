@@ -60,6 +60,16 @@ type fakeDevServerAgentClient struct {
 
 	inspectResult InspectProcessResult
 	inspectErr    error
+
+	// lastHandshakeInfo/lastHandshakeOK drive LastHandshakeInfo's fake
+	// answer — used by establish_connection_test.go.
+	lastHandshakeInfo HandshakeInfo
+	lastHandshakeOK   bool
+}
+
+// LastHandshakeInfo implements usecase.DevServerAgentClient.LastHandshakeInfo.
+func (f *fakeDevServerAgentClient) LastHandshakeInfo(devServerID string) (HandshakeInfo, bool) {
+	return f.lastHandshakeInfo, f.lastHandshakeOK
 }
 
 type resizePtyCall struct {

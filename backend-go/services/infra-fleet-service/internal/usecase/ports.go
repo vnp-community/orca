@@ -229,6 +229,13 @@ type DevServerAgentClient interface {
 	// Health performs an agent-level reachability/handshake check, distinct
 	// from the SSH-exec-based fleet health poll that GetFleetHealth reads.
 	Health(ctx context.Context, devServer domain.DevServer) (bool, error)
+	// LastHandshakeInfo returns the HandshakeInfo captured at the most
+	// recent successful handshake for devServerID, if a live session
+	// exists — a cheap in-memory lookup, no round trip to the remote host.
+	// EstablishConnection (SOL-FLEET-04) uses this right after a
+	// successful Health() call to persist platform/arch/node-version facts
+	// without a second round trip.
+	LastHandshakeInfo(devServerID string) (HandshakeInfo, bool)
 
 	// --- Terminal/PTY (TASK-180..187) ---
 	// The six methods below extend the same generic-Exec transport with

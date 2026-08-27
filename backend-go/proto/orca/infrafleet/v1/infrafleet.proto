@@ -112,6 +112,12 @@ service InfraFleetService {
   // a single terminal summary object. See usecase.BulkProvisionFleet's doc
   // comment.
   rpc BulkProvisionFleet(BulkProvisionFleetRequest) returns (BulkProvisionFleetResponse);
+
+  // DetectDevServerAgents/CheckDevServerPreflight close BL-FLEET-04 Steps
+  // 3/4 (agent detection, remote preflight) — see usecase.DetectDevServerAgents
+  // / usecase.CheckDevServerPreflight doc comments.
+  rpc DetectDevServerAgents(DetectDevServerAgentsRequest) returns (DetectDevServerAgentsResponse);
+  rpc CheckDevServerPreflight(CheckDevServerPreflightRequest) returns (CheckDevServerPreflightResponse);
 }
 
 enum ConnectionMode {
@@ -135,6 +141,14 @@ message DevServer {
   // status is domain.DevServerStatus verbatim: pending|healthy|degraded|
   // unhealthy — see BulkProvisionFleet's doc comment (SOL-FLEET-02).
   string status = 6;
+  // platform/arch/node_version/agent_version are handshake-derived facts
+  // (SOL-FLEET-04) — the same columns SOL-FLEET-02's BulkProvisionFleet
+  // also persists into (domain.DevServer), see
+  // usecase.DevServerRepository.UpdateProvisionResult.
+  string platform = 7;
+  string arch = 8;
+  string node_version = 9;
+  string agent_version = 10;
 }
 
 message RegisterDevServerRequest {
@@ -142,6 +156,9 @@ message RegisterDevServerRequest {
   string host = 2;
   ConnectionMode mode = 3;
   string ssh_target_id = 4; // required when mode=CONNECTION_MODE_RELAY_SSH
+  // relay_port: 0 = no daemon port — foreground stdio session, honest
+  // placeholder until agent/ gains a daemon (see TASK-FLEET-02-08).
+  int32 relay_port = 5;
 }
 
 message RegisterDevServerResponse {
@@ -522,4 +539,36 @@ message ProvisionOutcome { string dev_server_id = 1; string host = 2; string sta
 message BulkProvisionFleetResponse {
   int32 success = 1; int32 failed = 2; int32 skipped = 3;
   repeated ProvisionOutcome outcomes = 4;
+}
+
+// --- Dev server onboarding: agent detection + remote preflight (BL-FLEET-04) ---
+
+message AgentProbe {
+  string id = 1;
+  string cmd = 2;
+  repeated string required_commands = 3;
+  repeated string unsupported_runtimes = 4;
+}
+message DetectDevServerAgentsRequest {
+  string dev_server_id = 1;
+  repeated AgentProbe commands = 2;
+}
+message DetectDevServerAgentsResponse {
+  repeated string agents = 1;
+  string platform = 2;
+}
+
+message CheckDevServerPreflightRequest {
+  string dev_server_id = 1;
+  int32 probe_port = 2;
+}
+message CheckResult { bool installed = 1; string version = 2; bool meets_min = 3; }
+message DiskCheckResult { double free_gb = 1; bool meets_min = 2; }
+message PortCheckResult { int32 port = 1; bool available = 2; }
+message CheckDevServerPreflightResponse {
+  CheckResult git = 1;
+  CheckResult node = 2;
+  DiskCheckResult disk = 3;
+  PortCheckResult port = 4;
+  CheckResult gh = 5;
 }

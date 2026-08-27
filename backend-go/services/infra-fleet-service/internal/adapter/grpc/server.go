@@ -411,12 +411,16 @@ func toProtoConnectionMode(m domain.ConnectionMode) infrafleetv1.ConnectionMode 
 
 func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 	return &infrafleetv1.DevServer{
-		Id:          ds.ID,
-		TenantId:    ds.TenantID,
-		Host:        ds.Host,
-		Mode:        toProtoConnectionMode(ds.Mode),
-		SshTargetId: ds.SSHTargetID,
-		Status:      string(ds.Status),
+		Id:           ds.ID,
+		TenantId:     ds.TenantID,
+		Host:         ds.Host,
+		Mode:         toProtoConnectionMode(ds.Mode),
+		SshTargetId:  ds.SSHTargetID,
+		Status:       string(ds.Status),
+		Platform:     ds.Platform,
+		Arch:         ds.Arch,
+		NodeVersion:  ds.NodeVersion,
+		AgentVersion: ds.AgentVersion,
 	}
 }
 

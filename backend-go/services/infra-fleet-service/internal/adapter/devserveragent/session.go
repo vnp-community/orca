@@ -538,6 +538,18 @@ func (s *session) isHandshaked() bool {
 	return s.handshaked && s.transport != nil
 }
 
+// handshakeInfoSnapshot returns the HandshakeInfo captured at the most
+// recent attachTransport, if this session has completed one — see
+// Client.LastHandshakeInfo's doc comment for why this exists.
+func (s *session) handshakeInfoSnapshot() (HandshakeInfo, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.handshaked {
+		return HandshakeInfo{}, false
+	}
+	return s.handshakeInfo, true
+}
+
 // close tears down the session — used when a devServer is removed or the
 // service shuts down.
 func (s *session) close() {
