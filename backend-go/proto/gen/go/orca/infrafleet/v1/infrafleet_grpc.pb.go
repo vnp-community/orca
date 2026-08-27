@@ -54,6 +54,7 @@ const (
 	InfraFleetService_RotateEmulator_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/RotateEmulator"
 	InfraFleetService_ShutdownEmulator_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/ShutdownEmulator"
 	InfraFleetService_GetHostCapabilities_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetHostCapabilities"
+	InfraFleetService_ImportFleetInventory_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/ImportFleetInventory"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -148,6 +149,10 @@ type InfraFleetServiceClient interface {
 	// does not exist yet (confirmed absent as of this pass) — see
 	// usecase.GetHostCapabilities's doc comment.
 	GetHostCapabilities(ctx context.Context, in *GetHostCapabilitiesRequest, opts ...grpc.CallOption) (*GetHostCapabilitiesResponse, error)
+	// ImportFleetInventory is the batch YAML-import entry point for BL-FLEET-01
+	// — upserts SshTargets by (tenant_id, host, user), see
+	// usecase.ImportFleetInventory's doc comment.
+	ImportFleetInventory(ctx context.Context, in *ImportFleetInventoryRequest, opts ...grpc.CallOption) (*ImportFleetInventoryResponse, error)
 }
 
 type infraFleetServiceClient struct {
@@ -501,6 +506,16 @@ func (c *infraFleetServiceClient) GetHostCapabilities(ctx context.Context, in *G
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) ImportFleetInventory(ctx context.Context, in *ImportFleetInventoryRequest, opts ...grpc.CallOption) (*ImportFleetInventoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImportFleetInventoryResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ImportFleetInventory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -593,6 +608,10 @@ type InfraFleetServiceServer interface {
 	// does not exist yet (confirmed absent as of this pass) — see
 	// usecase.GetHostCapabilities's doc comment.
 	GetHostCapabilities(context.Context, *GetHostCapabilitiesRequest) (*GetHostCapabilitiesResponse, error)
+	// ImportFleetInventory is the batch YAML-import entry point for BL-FLEET-01
+	// — upserts SshTargets by (tenant_id, host, user), see
+	// usecase.ImportFleetInventory's doc comment.
+	ImportFleetInventory(context.Context, *ImportFleetInventoryRequest) (*ImportFleetInventoryResponse, error)
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -704,6 +723,9 @@ func (UnimplementedInfraFleetServiceServer) ShutdownEmulator(context.Context, *S
 }
 func (UnimplementedInfraFleetServiceServer) GetHostCapabilities(context.Context, *GetHostCapabilitiesRequest) (*GetHostCapabilitiesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetHostCapabilities not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ImportFleetInventory(context.Context, *ImportFleetInventoryRequest) (*ImportFleetInventoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ImportFleetInventory not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -1327,6 +1349,24 @@ func _InfraFleetService_GetHostCapabilities_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_ImportFleetInventory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportFleetInventoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ImportFleetInventory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ImportFleetInventory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ImportFleetInventory(ctx, req.(*ImportFleetInventoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1465,6 +1505,10 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHostCapabilities",
 			Handler:    _InfraFleetService_GetHostCapabilities_Handler,
+		},
+		{
+			MethodName: "ImportFleetInventory",
+			Handler:    _InfraFleetService_ImportFleetInventory_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -324,7 +324,7 @@ func TestProvision_SucceedsAgainstFakeServer(t *testing.T) {
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
 	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
 
-	target, err := domain.NewSshTarget("ssht-1", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-1", "tenant-1", "127.0.0.1", "deploy", "role-1", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
@@ -360,7 +360,7 @@ func TestProvision_FailsOnChecksumMismatch(t *testing.T) {
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", true) // badChecksum
 	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
 
-	target, err := domain.NewSshTarget("ssht-2", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-2", "tenant-1", "127.0.0.1", "deploy", "role-1", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
@@ -390,7 +390,7 @@ func TestProvision_FailsWhenBundlePathNotConfigured(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
 
-	target, err := domain.NewSshTarget("ssht-3", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-3", "tenant-1", "127.0.0.1", "deploy", "role-1", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}

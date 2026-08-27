@@ -48,6 +48,15 @@ type SshTargetRepository interface {
 	// List returns every SSH target registered for tenantID — backs
 	// ssh.listTargets/ssh.getUserAccount.
 	List(ctx context.Context, tenantID string) ([]domain.SshTarget, error)
+	// Upsert inserts or updates by (tenant_id, host, user_name) — the
+	// conflict target migrations/0007's unique index establishes.
+	// updated=true means an existing row's vault_ssh_role/project/tags were
+	// overwritten; updated=false means a new row was inserted.
+	Upsert(ctx context.Context, target domain.SshTarget) (saved domain.SshTarget, updated bool, err error)
+	// GetByHostUser is a narrow existence-probe used only by the
+	// dry-run import path (usecase.ImportFleetInventory) — it does not
+	// commit anything.
+	GetByHostUser(ctx context.Context, tenantID, host, userName string) (domain.SshTarget, bool, error)
 }
 
 // ConnectionRepository is the persistence port for the write side of

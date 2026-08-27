@@ -100,6 +100,11 @@ service InfraFleetService {
   // does not exist yet (confirmed absent as of this pass) — see
   // usecase.GetHostCapabilities's doc comment.
   rpc GetHostCapabilities(GetHostCapabilitiesRequest) returns (GetHostCapabilitiesResponse);
+
+  // ImportFleetInventory is the batch YAML-import entry point for BL-FLEET-01
+  // — upserts SshTargets by (tenant_id, host, user), see
+  // usecase.ImportFleetInventory's doc comment.
+  rpc ImportFleetInventory(ImportFleetInventoryRequest) returns (ImportFleetInventoryResponse);
 }
 
 enum ConnectionMode {
@@ -263,6 +268,8 @@ message SshTarget {
   string host = 3;
   string user = 4;
   string vault_ssh_role = 5; // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+  string project = 6;  // "" = ungrouped
+  repeated string tags = 7;
 }
 
 message ListSshTargetsRequest {
@@ -471,4 +478,26 @@ message GetHostCapabilitiesResponse {
   repeated string wsl_distros = 2;
   bool pwsh_available = 3;
   bool git_bash_available = 4;
+}
+
+// --- Fleet inventory import (BL-FLEET-01) ----------------------------------
+
+message FleetServerInput {
+  string host = 1;
+  string user = 2;
+  string vault_ssh_role = 3;
+  string project = 4;
+  repeated string tags = 5;
+}
+
+message ImportFleetInventoryRequest {
+  repeated FleetServerInput servers = 1;
+  bool dry_run = 2;
+}
+message ImportFleetInventoryError { string host = 1; string user = 2; string reason = 3; }
+message ImportFleetInventoryResponse {
+  int32 imported = 1;
+  int32 updated = 2;
+  int32 skipped = 3;
+  repeated ImportFleetInventoryError errors = 4;
 }

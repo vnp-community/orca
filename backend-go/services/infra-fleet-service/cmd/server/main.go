@@ -157,6 +157,8 @@ func run() error {
 	emulatorRelayUC := usecase.NewEmulatorRelay(repo, agentClient)
 	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
 
+	importFleetInventoryUC := usecase.NewImportFleetInventory(sshTargetStore)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -186,6 +188,7 @@ func run() error {
 		deleteBrowserProfileUC,
 		emulatorRelayUC,
 		getHostCapabilitiesUC,
+		importFleetInventoryUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

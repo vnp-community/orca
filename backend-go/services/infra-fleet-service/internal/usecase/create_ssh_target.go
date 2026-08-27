@@ -35,7 +35,7 @@ func (uc *CreateSshTarget) Execute(ctx context.Context, in CreateSshTargetInput)
 		return domain.SshTarget{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	target, err := domain.NewSshTarget(uuid.NewString(), tenantID, in.Host, in.UserName, in.VaultSSHRole)
+	target, err := domain.NewSshTarget(uuid.NewString(), tenantID, in.Host, in.UserName, in.VaultSSHRole, "", nil)
 	if err != nil {
 		return domain.SshTarget{}, apperrors.New(apperrors.KindInvalidArgument, "INFRA_INVALID_SSH_TARGET", err.Error(), err)
 	}

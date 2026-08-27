@@ -193,6 +193,44 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 	return target, nil
 }
 
+// Upsert inserts or updates by (tenant_id, host, user_name) — the conflict
+// target migrations/0007's unique index establishes. The `xmax != 0` trick
+// is the standard Postgres idiom for "insert vs. update" in one round trip,
+// avoiding a separate SELECT ... FOR UPDATE per row on a bulk-import fan-in.
+func (s *SshTargetStore) Upsert(ctx context.Context, target domain.SshTarget) (domain.SshTarget, bool, error) {
+	const query = `
+		INSERT INTO infra.ssh_targets (id, tenant_id, host, user_name, vault_ssh_role, project, tags)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (tenant_id, host, user_name) DO UPDATE SET
+		  vault_ssh_role = EXCLUDED.vault_ssh_role,
+		  project = EXCLUDED.project,
+		  tags = EXCLUDED.tags
+		RETURNING id, (xmax != 0) AS updated`
+	var id string
+	var updated bool
+	if err := s.pool.QueryRow(ctx, query, target.ID, target.TenantID, target.Host, target.UserName, target.VaultSSHRole, target.Project, target.Tags).Scan(&id, &updated); err != nil {
+		return domain.SshTarget{}, false, fmt.Errorf("postgres: upsert ssh target: %w", err)
+	}
+	target.ID = id
+	return target, updated, nil
+}
+
+// GetByHostUser is a narrow existence-probe used only by the dry-run import
+// path (usecase.ImportFleetInventory) — it does not commit anything.
+func (s *SshTargetStore) GetByHostUser(ctx context.Context, tenantID, host, userName string) (domain.SshTarget, bool, error) {
+	const query = `SELECT id, tenant_id, host, user_name, vault_ssh_role, project, tags
+		FROM infra.ssh_targets WHERE tenant_id = $1 AND host = $2 AND user_name = $3`
+	var t domain.SshTarget
+	err := s.pool.QueryRow(ctx, query, tenantID, host, userName).Scan(&t.ID, &t.TenantID, &t.Host, &t.UserName, &t.VaultSSHRole, &t.Project, &t.Tags)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.SshTarget{}, false, nil
+	}
+	if err != nil {
+		return domain.SshTarget{}, false, fmt.Errorf("postgres: query ssh target by host/user: %w", err)
+	}
+	return t, true, nil
+}
+
 // ResolveConnection is the storage-backed half of THE core coordination
 // primitive — see usecase.ConnectionResolver's doc comment.
 //

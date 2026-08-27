@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (grpc adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-FLEET-01-01, TASK-FLEET-01-05
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added Server.ImportFleetInventory handler, wired importFleetInventory field/constructor param, wired at cmd/server/main.go bootstrap; new server_test.go covers marshaling, error->gRPC-status mapping, and per-row skip. All tests pass.
 
 ---
 

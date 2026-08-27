@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/import_fleet_inventory.go` (new)
 **Depends on:** TASK-FLEET-01-03, TASK-FLEET-01-04
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added usecase/import_fleet_inventory.go + tests (all-new/updated/skip-and-continue/dry-run/no-tenant); `go test ./internal/usecase/... -run TestImportFleetInventory` passes.
 
 ---
 

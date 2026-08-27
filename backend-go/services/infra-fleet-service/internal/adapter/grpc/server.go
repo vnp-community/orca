@@ -59,6 +59,8 @@ type Server struct {
 	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
 	emulatorRelay       *usecase.EmulatorRelay
 	getHostCapabilities *usecase.GetHostCapabilities
+
+	importFleetInventory *usecase.ImportFleetInventory
 }
 
 func New(
@@ -89,6 +91,7 @@ func New(
 	deleteBrowserProfile *usecase.DeleteBrowserProfile,
 	emulatorRelay *usecase.EmulatorRelay,
 	getHostCapabilities *usecase.GetHostCapabilities,
+	importFleetInventory *usecase.ImportFleetInventory,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -118,6 +121,7 @@ func New(
 		deleteBrowserProfile:   deleteBrowserProfile,
 		emulatorRelay:          emulatorRelay,
 		getHostCapabilities:    getHostCapabilities,
+		importFleetInventory:   importFleetInventory,
 	}
 }
 
@@ -256,6 +260,29 @@ func (s *Server) ListSshTargets(ctx context.Context, req *infrafleetv1.ListSshTa
 		})
 	}
 	return &infrafleetv1.ListSshTargetsResponse{SshTargets: out}, nil
+}
+
+// ImportFleetInventory is BL-FLEET-01's batch YAML-import entry point —
+// see usecase.ImportFleetInventory's doc comment for the upsert semantics.
+func (s *Server) ImportFleetInventory(ctx context.Context, req *infrafleetv1.ImportFleetInventoryRequest) (*infrafleetv1.ImportFleetInventoryResponse, error) {
+	servers := make([]usecase.FleetServerInput, 0, len(req.GetServers()))
+	for _, sv := range req.GetServers() {
+		servers = append(servers, usecase.FleetServerInput{
+			Host: sv.GetHost(), UserName: sv.GetUser(), VaultSSHRole: sv.GetVaultSshRole(),
+			Project: sv.GetProject(), Tags: sv.GetTags(),
+		})
+	}
+	result, err := s.importFleetInventory.Execute(ctx, usecase.ImportFleetInventoryInput{Servers: servers, DryRun: req.GetDryRun()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.ImportFleetInventoryResponse{
+		Imported: int32(result.Imported), Updated: int32(result.Updated), Skipped: int32(result.Skipped),
+	}
+	for _, e := range result.Errors {
+		resp.Errors = append(resp.Errors, &infrafleetv1.ImportFleetInventoryError{Host: e.Host, User: e.UserName, Reason: e.Reason})
+	}
+	return resp, nil
 }
 
 func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error) {

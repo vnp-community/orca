@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (postgres migration)
 **File:** `backend-go/services/infra-fleet-service/migrations/0007_ssh_target_project_tags.up.sql` (new, plus matching `.down.sql`)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added 0007 up/down migration; no duplicate numbering (0007 free).
 
 ---
 

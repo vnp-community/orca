@@ -28,10 +28,14 @@ type SshTarget struct {
 	Host         string
 	UserName     string
 	VaultSSHRole string
+	Project      string   // "" = ungrouped; matches YAML's servers[].project
+	Tags         []string // matches YAML's servers[].tags
 }
 
 // NewSshTarget constructs an SshTarget, enforcing the invariants above.
-func NewSshTarget(id, tenantID, host, userName, vaultSSHRole string) (SshTarget, error) {
+// project/tags are optional grouping metadata (BL-FLEET-01) — both may be
+// zero-valued, no new invariant is added for either.
+func NewSshTarget(id, tenantID, host, userName, vaultSSHRole string, project string, tags []string) (SshTarget, error) {
 	if tenantID == "" {
 		return SshTarget{}, ErrEmptySshTargetTenant
 	}
@@ -44,5 +48,5 @@ func NewSshTarget(id, tenantID, host, userName, vaultSSHRole string) (SshTarget,
 	if vaultSSHRole == "" {
 		return SshTarget{}, ErrEmptyVaultSSHRole
 	}
-	return SshTarget{ID: id, TenantID: tenantID, Host: host, UserName: userName, VaultSSHRole: vaultSSHRole}, nil
+	return SshTarget{ID: id, TenantID: tenantID, Host: host, UserName: userName, VaultSSHRole: vaultSSHRole, Project: project, Tags: tags}, nil
 }

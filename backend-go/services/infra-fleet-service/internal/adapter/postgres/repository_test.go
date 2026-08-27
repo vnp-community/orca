@@ -16,9 +16,11 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/common/testutil"
@@ -140,7 +142,7 @@ func TestSshTargetStore_Get_FoundAndNotFound(t *testing.T) {
 	_, store := setupSshTargetStore(t)
 	ctx := context.Background()
 
-	target, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", "deploy", "role-1")
+	target, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", "deploy", "role-1", "", nil)
 	if err != nil {
 		t.Fatalf("building ssh target: %v", err)
 	}
@@ -152,7 +154,7 @@ func TestSshTargetStore_Get_FoundAndNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if got != target {
+	if !reflect.DeepEqual(got, target) {
 		t.Errorf("expected %+v, got %+v", target, got)
 	}
 
@@ -166,6 +168,64 @@ func TestSshTargetStore_Get_FoundAndNotFound(t *testing.T) {
 	}
 }
 
+// TestSshTargetStore_Upsert covers the (tenant_id, host, user_name) upsert
+// path migrations/0007's unique index enables — first call inserts
+// (updated=false), second call with a changed vault_ssh_role updates the
+// same row in place (updated=true), row count stays 1.
+func TestSshTargetStore_Upsert(t *testing.T) {
+	_, store := setupSshTargetStore(t)
+	ctx := context.Background()
+
+	first, err := domain.NewSshTarget(uuid.NewString(), testTenant1, "10.0.0.42", "deploy", "role-1", "team-a", []string{"prod"})
+	if err != nil {
+		t.Fatalf("building ssh target: %v", err)
+	}
+	saved, updated, err := store.Upsert(ctx, first)
+	if err != nil {
+		t.Fatalf("upsert (insert): %v", err)
+	}
+	if updated {
+		t.Error("expected updated=false on first insert")
+	}
+
+	second, err := domain.NewSshTarget(uuid.NewString(), testTenant1, "10.0.0.42", "deploy", "role-2", "team-b", []string{"prod", "canary"})
+	if err != nil {
+		t.Fatalf("building ssh target: %v", err)
+	}
+	saved2, updated2, err := store.Upsert(ctx, second)
+	if err != nil {
+		t.Fatalf("upsert (update): %v", err)
+	}
+	if !updated2 {
+		t.Error("expected updated=true on second upsert with same (tenant_id,host,user_name)")
+	}
+	if saved2.ID != saved.ID {
+		t.Errorf("expected the conflicting row's id %q to be preserved, got %q", saved.ID, saved2.ID)
+	}
+	if saved2.VaultSSHRole != "role-2" || saved2.Project != "team-b" {
+		t.Errorf("expected updated fields to stick, got %+v", saved2)
+	}
+
+	got, found, err := store.GetByHostUser(ctx, testTenant1, "10.0.0.42", "deploy")
+	if err != nil {
+		t.Fatalf("get by host/user: %v", err)
+	}
+	if !found {
+		t.Fatal("expected the upserted row to be found")
+	}
+	if got.VaultSSHRole != "role-2" || !reflect.DeepEqual(got.Tags, []string{"prod", "canary"}) {
+		t.Errorf("expected latest values to round-trip, got %+v", got)
+	}
+
+	_, found, err = store.GetByHostUser(ctx, testTenant1, "10.0.0.42", "no-such-user")
+	if err != nil {
+		t.Fatalf("get by host/user (miss): %v", err)
+	}
+	if found {
+		t.Error("expected found=false for an unregistered host/user pair")
+	}
+}
+
 // TestRepository_RegisterAndGet_PersistsSSHTargetID is the round-trip
 // regression for the ssh_target_id column added in
 // migrations/0003_dev_server_ssh_target — a relay-ssh DevServer must come
@@ -175,7 +235,7 @@ func TestRepository_RegisterAndGet_PersistsSSHTargetID(t *testing.T) {
 	repo, store := setupSshTargetStore(t)
 	ctx := context.Background()
 
-	target, err := domain.NewSshTarget(testSshTarget2, testTenant1, "10.0.0.9", "deploy", "role-1")
+	target, err := domain.NewSshTarget(testSshTarget2, testTenant1, "10.0.0.9", "deploy", "role-1", "", nil)
 	if err != nil {
 		t.Fatalf("building ssh target: %v", err)
 	}
