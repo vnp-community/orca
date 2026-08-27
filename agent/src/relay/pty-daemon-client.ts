@@ -254,6 +254,15 @@ export async function handlePtySendSignal(
   return forward('pty.sendSignal', id, params, log, notify)
 }
 
+export async function handlePtyListProcesses(
+  id: string | number | null,
+  params: Record<string, unknown>,
+  log: AgentLogger,
+  notify?: NotifyFn
+): Promise<object> {
+  return forward('pty.listProcesses', id, params, log, notify)
+}
+
 /**
  * notifyDaemonSessionClosed — Called when the agent's WebSocket to Orca
  * closes. Tells the daemon to start grace-period timers for every live PTY

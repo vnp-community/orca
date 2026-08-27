@@ -130,8 +130,24 @@ import { closeTerminalTab } from '@/components/terminal/terminal-tab-actions'
 import { initialAgentTabViewModeProps } from '@/lib/native-chat-initial-view-mode'
 import { getConnectionIdFromState } from '@/lib/connection-context'
 import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
+import { updaterGetStatus } from '@/runtime/runtime-updater-client'
+import { getRateLimitState } from '@/runtime/runtime-rate-limits-client'
+import {
+  getRemoteWorkspace,
+  getRemoteWorkspaceClientId as getRemoteWorkspaceClientIdRpc,
+  setRemoteWorkspaceForConnectedTargets,
+  subscribeToRemoteWorkspaceChanged
+} from '@/runtime/runtime-remote-workspace-client'
 import { useDevServersSync } from './useDevServersSync'
+import {
+  getRuntimeSshState,
+  listRuntimeSshDetectedPorts,
+  listRuntimeSshPortForwards,
+  listRuntimeSshRemovedTargetLabels,
+  listRuntimeSshTargets
+} from '@/runtime/runtime-ssh-client'
 
+import { uiSet } from '@/runtime/runtime-ui-client'
 function getShortcutPlatform(): NodeJS.Platform {
   if (navigator.userAgent.includes('Mac')) {
     return 'darwin'
@@ -161,17 +177,20 @@ function resolveTerminalPresentation(data: {
 
 /** [CR-OB-009] Resolve the dev server associated with a worktree via its repo. */
 function getDevServerForWorktree(store: AppState, worktreeId: string): string | null {
-  const wt = store.worktrees?.find((w) => w.id === worktreeId)
-  if (!wt) {return null}
+  const wt = Object.values(store.worktreesByRepo)
+    .flat()
+    .find((w) => w.id === worktreeId)
+  if (!wt) {
+    return null
+  }
   const repo = store.repos?.find((r) => r.id === wt.repoId)
   // DevServer repos carry the dev server id on the repo record (field added by CR-OB-002)
-  return (repo as unknown as Record<string, unknown>)?.devServerId as string | null ?? null
+  return ((repo as unknown as Record<string, unknown>)?.devServerId as string | null) ?? null
 }
 
 function isPinnedSessionTab(store: AppState, worktreeId: string, visibleId: string): boolean {
   return (store.unifiedTabsByWorktree?.[worktreeId] ?? []).some(
     (tab) => (tab.id === visibleId || tab.entityId === visibleId) && tab.isPinned
-
   )
 }
 
@@ -601,7 +620,7 @@ async function syncRemoteWorkspaceAfterConnect(targetId: string): Promise<void> 
   const hasLocalTabs = Array.from(worktreeIds).some(
     (worktreeId) => (useAppStore.getState().tabsByWorktree[worktreeId] ?? []).length > 0
   )
-  const snapshot = await window.api.remoteWorkspace.get({ targetId })
+  const snapshot = await getRemoteWorkspace(store.settings, { targetId })
   if (!snapshot) {
     useAppStore.getState().setRemoteWorkspaceSyncStatus(targetId, {
       phase: 'offline',
@@ -621,7 +640,7 @@ async function syncRemoteWorkspaceAfterConnect(targetId: string): Promise<void> 
     // Otherwise a reconnecting device can overwrite a newer cross-device
     // workspace snapshot with stale local renderer state.
     const session = buildWorkspaceSessionPayload(useAppStore.getState())
-    const results = await window.api.remoteWorkspace.setForConnectedTargets({
+    const results = await setRemoteWorkspaceForConnectedTargets(store.settings, {
       session,
       hydratedTargetIds: [targetId]
     })
@@ -1004,7 +1023,110 @@ export function useIpcEvents(): void {
     let handleSshStateChangedEvent: ((data: { targetId: string; state: unknown }) => void) | null =
       null
 
+    // Why: mirrors the menu-bar/global-shortcut command surface for a paired
+    // client watching this host's session — same store actions the native
+    // window.api.ui.on* listeners below invoke, minus commands intentionally
+    // excluded from MenuCommandPayload (destructive or local-device-only).
+    const dispatchMenuCommand = (
+      payload: Extract<RuntimeClientEvent, { type: 'menuCommand' }>
+    ): void => {
+      const store = useAppStore.getState()
+      switch (payload.command) {
+        case 'openSettings':
+          store.openSettingsPage()
+          return
+        case 'openSetupGuide':
+          store.openModal('setup-guide', { telemetrySource: 'help_menu' })
+          return
+        case 'openFeatureTour':
+          store.openModal('feature-wall', { source: 'help_menu' })
+          return
+        case 'toggleLeftSidebar':
+          store.toggleSidebar()
+          return
+        case 'toggleRightSidebar':
+          if (canShowRightSidebarForView(store.activeView)) {
+            store.toggleRightSidebar()
+          }
+          return
+        case 'toggleWorktreePalette':
+          if (store.activeModal === 'worktree-palette') {
+            store.closeModal()
+          } else {
+            store.openModal('worktree-palette')
+          }
+          return
+        case 'toggleFloatingTerminal':
+          window.dispatchEvent(new CustomEvent(TOGGLE_FLOATING_TERMINAL_EVENT))
+          return
+        case 'toggleStatusBar':
+          store.setStatusBarVisible(!store.statusBarVisible)
+          return
+        case 'toggleQuickCommandsMenu':
+          window.dispatchEvent(new CustomEvent(TOGGLE_QUICK_COMMANDS_MENU_EVENT))
+          return
+        case 'openQuickOpen':
+          if (store.activeView === 'terminal' && store.activeWorktreeId !== null) {
+            store.openModal('quick-open')
+          }
+          return
+        case 'openNewWorkspace':
+          openNewWorkspaceFromShortcut(store)
+          return
+        case 'openWorkspaceBoard':
+          if (store.activeView !== 'settings') {
+            store.setSidebarOpen(true)
+            window.dispatchEvent(new CustomEvent(OPEN_WORKSPACE_BOARD_EVENT))
+          }
+          return
+        case 'openTasks':
+          if (store.activeView !== 'settings' && store.repos.some((repo) => isGitRepoKind(repo))) {
+            store.openTaskPage()
+          }
+          return
+        case 'switchRecentTab':
+          handleSwitchRecentTab()
+          return
+        case 'jumpToWorktreeIndex': {
+          if (store.activeView !== 'terminal') {
+            return
+          }
+          const visibleIds = getVisibleWorktreeIds()
+          if (payload.index < visibleIds.length) {
+            activateAndRevealWorktree(visibleIds[payload.index])
+          }
+          return
+        }
+        case 'jumpToTabIndex':
+          activateTabNumberShortcut(payload.index)
+          return
+        case 'worktreeHistoryNavigate':
+          // Why: mirror the button-visibility rule — only meaningful in the
+          // terminal (worktree) view, same guard as the native listener.
+          if (store.activeView !== 'terminal') {
+            return
+          }
+          if (payload.direction === 'back') {
+            store.goBackWorktree()
+          } else {
+            store.goForwardWorktree()
+          }
+      }
+    }
+
     const handleRuntimeClientEvent = (environmentId: string, event: RuntimeClientEvent): void => {
+      if (event.type === 'menuCommand') {
+        dispatchMenuCommand(event)
+        return
+      }
+      if (event.type === 'windowStateChanged') {
+        // Why: BrowserWindow maximize/fullscreen and powerMonitor resume are
+        // per-device Electron-window signals (e.g. terminal wake-recovery
+        // clears THIS host's own WebGL glyph atlas) — a paired client's own
+        // OS/browser already fires its equivalent local focus/visibility
+        // signals, so there is nothing to mirror here yet.
+        return
+      }
       if (event.type === 'reposChanged') {
         runtimeProjectRefreshScheduler.request(environmentId)
         return
@@ -1034,6 +1156,22 @@ export function useIpcEvents(): void {
           .catch((error) => {
             console.error('Failed to refresh updated Linear issue:', error)
           })
+        return
+      }
+      if (event.type === 'worktreeBaseStatus') {
+        useAppStore.getState().updateWorktreeBaseStatus(event)
+        return
+      }
+      if (event.type === 'worktreeRemoteBranchConflict') {
+        useAppStore.getState().updateWorktreeRemoteBranchConflict(event)
+        return
+      }
+      if (event.type === 'worktreeCreateProgress') {
+        if (event.creationId) {
+          useAppStore
+            .getState()
+            .updatePendingWorktreeCreation(event.creationId, { phase: event.phase })
+        }
         return
       }
       void ensureRuntimeEventRepoKnown(environmentId, event.repoId)
@@ -1992,7 +2130,7 @@ export function useIpcEvents(): void {
     )
 
     // Hydrate initial update status then subscribe to changes
-    window.api.updater.getStatus().then((status) => {
+    updaterGetStatus().then((status) => {
       useAppStore.getState().setUpdateStatus(status as UpdateStatus)
     })
 
@@ -2595,7 +2733,7 @@ export function useIpcEvents(): void {
     )
     // Why: the startup get is a fallback; a live push may already include
     // system-default account snapshots that an older get result lacks.
-    window.api.rateLimits.get().then((state) => {
+    getRateLimitState().then((state) => {
       initialRateLimitsSnapshotPending = false
       if (receivedRateLimitsPushBeforeInitialSnapshot) {
         return
@@ -2618,20 +2756,21 @@ export function useIpcEvents(): void {
     // reflect the correct connected/disconnected state on app launch.
     void (async () => {
       try {
-        const targets = await window.api.ssh.listTargets()
+        const settings = useAppStore.getState().settings
+        const targets = await listRuntimeSshTargets(settings)
         useAppStore.getState().setSshTargetsMetadata(targets)
         // [CR-002] Also populate the full target list for fleet grouping/filtering.
         useAppStore.getState().setSshTargets(targets)
         // Why: ghost-host UI (removed target still referenced by a workspace)
         // shows a friendly name from the removal tombstones instead of the raw id.
         try {
-          const removedLabels = await window.api.ssh.listRemovedTargetLabels()
+          const removedLabels = await listRuntimeSshRemovedTargetLabels(settings)
           useAppStore.getState().setRemovedSshTargetLabels(removedLabels)
         } catch {
           // Best-effort — a missing map just falls back to the raw target id.
         }
         for (const target of targets) {
-          const state = await window.api.ssh.getState({ targetId: target.id })
+          const state = await getRuntimeSshState(settings, target.id)
           if (state) {
             useAppStore.getState().setSshConnectionState(target.id, state as SshConnectionState)
             // Why: if the renderer reattaches while an SSH session is alive
@@ -2640,8 +2779,8 @@ export function useIpcEvents(): void {
             // Ports panel doesn't show empty for an active session.
             if ((state as SshConnectionState).status === 'connected') {
               const [forwards, detected] = await Promise.all([
-                window.api.ssh.listPortForwards({ targetId: target.id }),
-                window.api.ssh.listDetectedPorts({ targetId: target.id })
+                listRuntimeSshPortForwards(settings, target.id),
+                listRuntimeSshDetectedPorts(settings, target.id)
               ])
               // Why: if the session disconnected while we were awaiting the
               // snapshot, the disconnect handler already cleared port state.
@@ -2787,16 +2926,12 @@ export function useIpcEvents(): void {
           break
         case 'bootstrap.done':
           store.finishBootstrap(event.serverId, true)
-          toast.success(
-            `Bootstrap complete: ${event.serverLabel}`
-          )
+          toast.success(`Bootstrap complete: ${event.serverLabel}`)
           scheduleRuntimeGraphSync()
           break
         case 'bootstrap.error':
           store.finishBootstrap(event.serverId, false)
-          toast.error(
-            `Bootstrap failed: ${event.serverLabel}`
-          )
+          toast.error(`Bootstrap failed: ${event.serverLabel}`)
           break
         default:
           break
@@ -2932,11 +3067,11 @@ export function useIpcEvents(): void {
         // Why: targets added after boot aren't in the labels map, while
         // removed targets can still race a final disconnect event. Confirm
         // with main before mutating renderer state for an unknown target id.
-        window.api.ssh
-          .listTargets()
+        const settings = useAppStore.getState().settings
+        listRuntimeSshTargets(settings)
           // Why: this refresh is now a deletion guard, not just a label fetch.
           // Retry once so a transient IPC failure does not drop a real added-target event.
-          .catch(() => window.api.ssh.listTargets())
+          .catch(() => listRuntimeSshTargets(settings))
           .then((targets) => {
             if (latestSshTargetStateEventByTargetId.get(data.targetId) !== stateEventId) {
               return
@@ -2970,15 +3105,12 @@ export function useIpcEvents(): void {
     let remoteWorkspaceClientId: string | null = null
     let remoteWorkspaceClientIdPromise: Promise<string | null> | null = null
     const getRemoteWorkspaceClientId = (): Promise<string | null> => {
-      const remoteWorkspace = window.api.remoteWorkspace
-      if (!remoteWorkspace) {
-        return Promise.resolve(null)
-      }
       if (remoteWorkspaceClientId) {
         return Promise.resolve(remoteWorkspaceClientId)
       }
-      remoteWorkspaceClientIdPromise ??= remoteWorkspace
-        .clientId()
+      remoteWorkspaceClientIdPromise ??= getRemoteWorkspaceClientIdRpc(
+        useAppStore.getState().settings
+      )
         .then((id) => {
           remoteWorkspaceClientId = id
           return id
@@ -2986,10 +3118,10 @@ export function useIpcEvents(): void {
         .catch(() => null)
       return remoteWorkspaceClientIdPromise
     }
-    if (window.api.remoteWorkspace) {
+    {
       void getRemoteWorkspaceClientId()
       unsubs.push(
-        window.api.remoteWorkspace.onChanged((event) => {
+        subscribeToRemoteWorkspaceChanged(useAppStore.getState().settings, (event) => {
           void (async () => {
             // Why: relay notifications can race the initial client-id IPC.
             // Self-originated writes must never bounce back into restore.
@@ -3026,7 +3158,7 @@ export function useIpcEvents(): void {
         if (target === 'editor') {
           const next = nextEditorFontZoomLevel(editorFontZoomLevel, direction)
           setEditorFontZoomLevel(next)
-          void window.api.ui.set({ editorFontZoomLevel: next })
+          void uiSet({ editorFontZoomLevel: next })
 
           // Why: use the same base font size the editor surfaces use (terminalFontSize)
           // and computeEditorFontSize to account for clamping, so the overlay percent
@@ -3044,7 +3176,7 @@ export function useIpcEvents(): void {
         const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, rawNext))
 
         applyUIZoom(next)
-        void window.api.ui.set({ uiZoomLevel: next })
+        void uiSet({ uiZoomLevel: next })
 
         dispatchZoomLevelChanged('ui', zoomLevelToPercent(next))
       })
@@ -3281,12 +3413,8 @@ export function useIpcEvents(): void {
           : undefined
       )
       applyResolvedAgentTerminalTitleToTab(store, data.paneKey, title, terminalTitle)
-      // [CR-OB-009] Checklist trigger: mark ranFirstAgent when agent transitions to 'running'
-      if (
-        statusPayload.state === 'running' &&
-        statusWorktreeId &&
-        options?.replay !== true
-      ) {
+      // [CR-OB-009] Checklist trigger: mark ranFirstAgent when agent transitions to 'working'
+      if (statusPayload.state === 'working' && statusWorktreeId && options?.replay !== true) {
         const devServerId = getDevServerForWorktree(store, statusWorktreeId)
         if (devServerId) {
           const perServer = store.checklistState?.perServer?.[devServerId]

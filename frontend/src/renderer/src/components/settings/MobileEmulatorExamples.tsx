@@ -5,6 +5,7 @@ import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const EMULATOR_EXAMPLE_PROMPTS = [
   'Using Orca CLI, attach to the active iPhone simulator, sign in with the test account, complete onboarding, and tell me where the flow feels confusing.',
   'With Orca CLI, run through the mobile checkout flow from product search to confirmation, capture any broken screens, and summarize the exact step that fails.',
@@ -13,7 +14,7 @@ const EMULATOR_EXAMPLE_PROMPTS = [
 
 async function copyPrompt(prompt: string): Promise<void> {
   try {
-    await window.api.ui.writeClipboardText(prompt)
+    await uiWriteClipboardText(prompt)
     toast.success(
       translate('auto.components.settings.MobileEmulatorExamples.2b077b5544', 'Copied prompt.')
     )

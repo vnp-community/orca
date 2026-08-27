@@ -32,6 +32,7 @@ import { RepositoryWindowsRuntimeSection } from './RepositoryWindowsRuntimeSecti
 import { matchesRepositoryIdentitySearch } from './repository-identity-search'
 import { RepositoryWorktreeDefaultsSection } from './RepositoryWorktreeDefaultsSection'
 import { getProjectRuntimeSessionSummary } from './repository-runtime-session-summary'
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export { getRepositoryPaneSearchEntries }
 export { matchesRepositoryIdentitySearch } from './repository-identity-search'
 
@@ -127,7 +128,7 @@ export function RepositoryPane({
   const handleCopyTemplate = async () => {
     // Why: the missing-`orca.yaml` state is a migration aid, so copying the shared-template
     // snippet should be one click rather than forcing users to reconstruct the expected shape.
-    await window.api.ui.writeClipboardText(`scripts:
+    await uiWriteClipboardText(`scripts:
   setup: |
     pnpm worktree:setup
   archive: |

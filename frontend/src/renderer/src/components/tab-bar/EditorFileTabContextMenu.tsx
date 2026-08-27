@@ -25,6 +25,8 @@ import { shouldBlockEditorTabLocalOpen } from './editor-tab-local-open-guard'
 import { translate } from '@/i18n/i18n'
 import { TabWorkspaceLayoutMenuSection } from './TabWorkspaceLayoutMenuSection'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenPath } from '../../runtime/runtime-shell-client'
 const isMac = navigator.userAgent.includes('Mac')
 const isLinux = navigator.userAgent.includes('Linux')
 
@@ -193,7 +195,7 @@ export function EditorFileTabContextMenu({
         ) : null}
         <DropdownMenuItem
           onSelect={() => {
-            void window.api.ui.writeClipboardText(file.filePath)
+            void uiWriteClipboardText(file.filePath)
           }}
         >
           <Copy className="size-3.5" />
@@ -201,7 +203,7 @@ export function EditorFileTabContextMenu({
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
-            void window.api.ui.writeClipboardText(file.relativePath)
+            void uiWriteClipboardText(file.relativePath)
           }}
         >
           <Copy className="size-3.5" />
@@ -223,7 +225,7 @@ export function EditorFileTabContextMenu({
               showLocalPathOpenBlockedToast()
               return
             }
-            window.api.shell.openPath(file.filePath)
+            shellOpenPath(file.filePath)
           }}
         >
           <ExternalLink className="size-3.5" />

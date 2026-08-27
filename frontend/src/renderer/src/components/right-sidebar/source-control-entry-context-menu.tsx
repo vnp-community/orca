@@ -20,6 +20,7 @@ import {
   openWorktreePath
 } from '@/components/sidebar/WorktreeOpenInMenu'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type SourceControlEntryContextMenuProps = {
   currentWorktreeId: string
   absolutePath?: string
@@ -50,7 +51,7 @@ export function SourceControlEntryContextMenu({
     if (!absolutePath) {
       return
     }
-    void window.api.ui.writeClipboardText(absolutePath)
+    void uiWriteClipboardText(absolutePath)
   }, [absolutePath])
 
   const handleRevealInOrcaExplorer = useCallback(() => {

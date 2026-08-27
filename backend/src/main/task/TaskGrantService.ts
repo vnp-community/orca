@@ -171,9 +171,9 @@ export class TaskGrantService {
   async listGrants(taskId: string): Promise<TaskGrant[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<GrantRow>(
-        `SELECT id, task_id as taskId, scope, scope_id as scopeId,
-                permission, apply_tree as applyTree, granted_by as grantedBy,
-                expires_at as expiresAt, created_at as createdAt
+        `SELECT id, task_id as "taskId", scope, scope_id as "scopeId",
+                permission, apply_tree as "applyTree", granted_by as "grantedBy",
+                expires_at as "expiresAt", created_at as "createdAt"
          FROM orca_task_grants WHERE task_id = ? ORDER BY created_at DESC`,
         [taskId]
       )
@@ -197,13 +197,13 @@ export class TaskGrantService {
   /** Get grants on a specific task; optionally filter by apply_tree=1 */
   private async getGrantsForTask(taskId: string, requireApplyTree: boolean): Promise<TaskGrant[]> {
     const sql = requireApplyTree
-      ? `SELECT id, task_id as taskId, scope, scope_id as scopeId,
-                permission, apply_tree as applyTree, granted_by as grantedBy,
-                expires_at as expiresAt, created_at as createdAt
+      ? `SELECT id, task_id as "taskId", scope, scope_id as "scopeId",
+                permission, apply_tree as "applyTree", granted_by as "grantedBy",
+                expires_at as "expiresAt", created_at as "createdAt"
          FROM orca_task_grants WHERE task_id = ? AND apply_tree = 1`
-      : `SELECT id, task_id as taskId, scope, scope_id as scopeId,
-                permission, apply_tree as applyTree, granted_by as grantedBy,
-                expires_at as expiresAt, created_at as createdAt
+      : `SELECT id, task_id as "taskId", scope, scope_id as "scopeId",
+                permission, apply_tree as "applyTree", granted_by as "grantedBy",
+                expires_at as "expiresAt", created_at as "createdAt"
          FROM orca_task_grants WHERE task_id = ?`
 
     const rows = await this.pool.withConnection((db) =>
@@ -225,7 +225,7 @@ export class TaskGrantService {
         if (!grant.scopeId) {return false}
         const rows = await this.pool.withConnection((db) =>
           db.query<{ userId: string }>(
-            `SELECT user_id as userId FROM orca_team_members
+            `SELECT user_id as "userId" FROM orca_team_members
              WHERE team_id = ? AND user_id = ?`,
             [grant.scopeId, userId]
           )

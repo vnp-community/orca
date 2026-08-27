@@ -1,4 +1,9 @@
 import { isRuntimeOwnedSshTargetId } from '../../../shared/execution-host'
+import type { GlobalSettings } from '../../../shared/types'
+import {
+  cleanupRuntimeEphemeralVmWorkspace,
+  listRuntimeEphemeralVmRuntimes
+} from '@/runtime/runtime-ephemeral-vm-client'
 
 /**
  * Tear down the ephemeral-VM runtimes backing a set of deleted workspaces (and,
@@ -18,14 +23,20 @@ export async function cleanupEphemeralVmRuntimesForDeleted(args: {
   // Raw runtime-owned SSH target ids (e.g. a removed repo's connectionId) whose
   // backing runtime should also be torn down, even if no workspace id matched.
   runtimeOwnedSshTargetIds?: readonly string[]
+  // Why: both callers are store-slice actions that already hold `get().settings`.
+  // Take it as a parameter instead of importing `@/store` here, which would
+  // create a require cycle (this module is imported from the worktrees/repos
+  // slices that make up that store).
+  settings?: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null
 }): Promise<string[]> {
   const destroyedSshTargetIds: string[] = []
   try {
+    const settings = args.settings
     const workspaceIdSet = new Set(args.workspaceIds ?? [])
     const sshTargetIdSet = new Set(
       (args.runtimeOwnedSshTargetIds ?? []).filter((id) => isRuntimeOwnedSshTargetId(id))
     )
-    const runtimes = await window.api.ephemeralVm.listRuntimes()
+    const runtimes = await listRuntimeEphemeralVmRuntimes(settings)
     const matchingRuntimes = runtimes.filter(
       (runtime) =>
         runtime.cleanupStatus !== 'succeeded' &&
@@ -36,7 +47,7 @@ export async function cleanupEphemeralVmRuntimesForDeleted(args: {
       if (runtime.sshTargetId) {
         destroyedSshTargetIds.push(runtime.sshTargetId)
       }
-      await window.api.ephemeralVm.cleanup({ runtimeId: runtime.id })
+      await cleanupRuntimeEphemeralVmWorkspace(settings, { runtimeId: runtime.id })
     }
   } catch (error) {
     console.error('Failed to clean up ephemeral VM runtime for deleted workspace:', error)

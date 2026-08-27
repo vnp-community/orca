@@ -6,6 +6,7 @@ import { resolveCursorAgentImeAnchor } from '@/lib/pane-manager/terminal-ime-anc
 import { detectAgentStatusFromTitle, agentTypeToIconAgent, isClaudeAgent } from '@/lib/agent-status'
 import { resolvePaneTitleDecision } from './terminal-title-evidence'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
+import { needsRuntimeSshPassphrasePrompt } from '@/runtime/runtime-ssh-client'
 import { useAppStore } from '@/store'
 import { getWorktreeMapFromState } from '@/store/selectors'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
@@ -29,6 +30,7 @@ import type { PtyBufferSnapshot, PtyConnectResult } from './pty-transport'
 import { createIpcPtyTransport } from './pty-transport'
 import { createRemoteRuntimePtyTransport } from './remote-runtime-pty-transport'
 import { getConnectionId } from '@/lib/connection-context'
+import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import {
   getCachedWindowsTerminalCapabilities,
@@ -91,6 +93,7 @@ import { subscribeToTerminalUserInput } from './terminal-user-input-signal'
 import { registerPtySerializer, registerPtyTitleSource } from './pty-buffer-serializer'
 import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-stream'
 import { inspectRuntimeTerminalProcess } from '@/runtime/runtime-terminal-inspection'
+import { connectRuntimeSsh } from '@/runtime/runtime-ssh-client'
 import {
   discardTerminalOutput,
   flushTerminalOutput,
@@ -442,6 +445,10 @@ type PendingStartupCommand = {
 
 type FreshSpawnOptions = {
   forceBlankRestoredViewport?: boolean
+  // Why BUG-FE-PTY-001: bounds the mirrored-host-attach retry in startFreshSpawn's
+  // onError to a single attempt so a persistently-dead host handle still
+  // surfaces its error instead of retrying forever.
+  mirroredHostAttachRetried?: boolean
 }
 
 type ColdRestoreAgentResumeStartup = PendingStartupCommand & {
@@ -662,6 +669,14 @@ function subscribeAgentTaskCompleteTrackingEnabled(listener: () => void): () => 
 }
 
 function recordPtyConnectDiagnostic(message: string): void {
+  // TEMP DIAG BUG-FE-PTY-001: the live repro shows a mirror transport
+  // created but never reaching any connectPanePty branch that calls
+  // transport.connect()/attach() (zero session.tabs.* RPCs in backend
+  // logs across the whole grace-close window) — persist every branch
+  // decision unconditionally (not gated by e2eConfig.exposeStore like the
+  // rest of this function) so the next repro's dump shows exactly which
+  // branch a given pane took, or that it took none at all.
+  logBugFePty001(`pty-connect ${message}`)
   if (!e2eConfig.exposeStore) {
     return
   }
@@ -748,7 +763,7 @@ async function waitForSshConnection(connectionId: string): Promise<SshConnectRes
 
   const promise: Promise<SshConnectResult> = (async (): Promise<SshConnectResult> => {
     try {
-      await window.api.ssh.connect({ targetId: connectionId })
+      await connectRuntimeSsh(useAppStore.getState().settings, connectionId)
       return { connected: true }
     } catch (err) {
       console.warn(`Deferred SSH reconnect failed for ${connectionId}:`, err)
@@ -4336,7 +4351,31 @@ export function connectPanePty(
         callbacks: {
           onData: dataCallback,
           onReplayData: replayDataCallback,
-          onError: reportError
+          onError: (message) => {
+            // FIX BUG-FE-PTY-001: mirror every sibling reattach handler in this
+            // file (the deferred-reattach .catch(), the detachedRemoteLeafPtyId
+            // try/catch, and the pending-spawn .catch()) — this was the one
+            // unguarded onError left. For a mirrored web-terminal-surface tab,
+            // transport.connect() routes into attachHostSessionMirror(), which
+            // attaches to an already-published host PTY handle rather than
+            // spawning a new one; a session-expired failure here means that
+            // handle died between the mirror publishing it and this attach
+            // landing (grace period elapsed, or an agent WS reconnect race —
+            // see worktree-runtime-owner.ts's isRepoOwnerDataLoadedForWorktree
+            // doc comment for the race this narrows but doesn't fully
+            // eliminate). Retry once instead of leaving the pane on a dead-end
+            // toast; mirroredHostAttachRetried bounds it to a single attempt so
+            // a genuinely-gone handle still surfaces its error.
+            if (isSshSessionExpiredError(message) && !options.mirroredHostAttachRetried) {
+              const staleMirroredPtyId = transport.getPtyId()
+              if (staleMirroredPtyId) {
+                deps.clearTabPtyId(deps.tabId, staleMirroredPtyId)
+              }
+              startFreshSpawn(startupOverride, { ...options, mirroredHostAttachRetried: true })
+              return
+            }
+            reportError(message)
+          }
         }
       })
 
@@ -6758,9 +6797,10 @@ export function connectPanePty(
           // as before.
           let needsPrompt = false
           try {
-            needsPrompt = await window.api.ssh.needsPassphrasePrompt({
-              targetId: connectionId
-            })
+            needsPrompt = await needsRuntimeSshPassphrasePrompt(
+              useAppStore.getState().settings,
+              connectionId
+            )
           } catch (err) {
             console.warn('[pty-connection] needsPassphrasePrompt probe failed:', err)
             // Why: if the probe fails, fall through to the existing auto-connect
@@ -7276,6 +7316,17 @@ export function connectPanePty(
             })
           })
           .catch((err) => {
+            // FIX BUG-FE-PTY-001: mirror every sibling reattach handler in this
+            // file (the deferred-reattach .catch() and the detachedRemoteLeafPtyId
+            // try/catch above) — a session-expired failure here means the PTY
+            // this pending spawn resolved to is already gone (grace period
+            // elapsed, agent restart, or the race this bug's transport-level fix
+            // narrows but doesn't fully eliminate). Retry with a fresh spawn
+            // instead of surfacing the raw backend error as a dead-end toast.
+            if (isSshSessionExpiredError(err)) {
+              startFreshSpawn()
+              return
+            }
             reportError(err instanceof Error ? err.message : String(err))
           })
       } else {

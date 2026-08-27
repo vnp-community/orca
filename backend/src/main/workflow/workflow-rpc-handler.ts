@@ -2,15 +2,17 @@
  * Workflow RPC Methods (TDD-17)
  *
  * Factory function — inject orchestrator and templateResolver at bootstrap.
- * 9 RPC methods:
+ * 10 RPC methods:
  *   workflow.execute, workflow.getExecution, workflow.listExecutions,
  *   workflow.cancel, workflow.pause, workflow.resume,
- *   workflow.template.create, workflow.template.list, workflow.template.resolve
+ *   workflow.template.create, workflow.template.list, workflow.template.resolve,
+ *   workflow.template.update
  *
  * Access control:
  * - All ops require authentication (userId from ctx.userId)
  * - workflow.cancel / workflow.pause / workflow.resume: only the triggeredBy user (or admin)
  * - workflow.template.create: any authenticated user
+ * - workflow.template.update: only the owning user (TemplateResolver.update() checks ownerId)
  *
  * [BUG-BE-HLD-009] workflow.resume calls orchestrator.resumeFromPause() — a SINGLE-execution,
  * user-triggered resume, NOT orchestrator.resumeRunningExecutions() (internal crash-recovery,
@@ -98,6 +100,15 @@ const TemplateResolveParam = z.object({
   templateId: z.string().min(1),
 })
 
+const TemplateUpdateParam = z.object({
+  templateId: z.string().min(1),
+  name: z.string().min(1).optional(),
+  definition: WorkflowDefinitionSchema.optional(),
+  scope: z.string().optional(),
+  parentTemplateId: z.string().optional(),
+  traceId: z.string().optional(), // [NEW] — forwarded from FE span.id, not persisted (mirrors ExecuteParam.traceId)
+})
+
 // ── Factory ────────────────────────────────────────────────────────────────────
 
 export function createWorkflowMethods(
@@ -128,7 +139,7 @@ export function createWorkflowMethods(
         let traceId: string | undefined
         if (pool) {
           const rows = await pool.withConnection((db) =>
-            db.query(`SELECT root_trace_id as rootTraceId FROM orca_workflow_executions WHERE id = ?`, [
+            db.query(`SELECT root_trace_id as "rootTraceId" FROM orca_workflow_executions WHERE id = ?`, [
               execution.id,
             ])
           )
@@ -251,6 +262,25 @@ export function createWorkflowMethods(
       params: TemplateResolveParam,
       handler: async (params) => {
         return templateResolver.resolve(params.templateId)
+      },
+    }),
+
+    // ── workflow.template.update ───────────────────────────────────────────
+
+    defineMethod({
+      name: 'workflow.template.update',
+      params: TemplateUpdateParam,
+      handler: async (params, ctx) => {
+        const userId = ctx.userId ?? 'system'
+        await templateResolver.update({
+          templateId: params.templateId,
+          ownerId: userId,
+          name: params.name,
+          definition: params.definition as Parameters<typeof templateResolver.update>[0]['definition'],
+          scope: params.scope,
+          parentTemplateId: params.parentTemplateId,
+        })
+        return { templateId: params.templateId, updated: true }
       },
     }),
   ]

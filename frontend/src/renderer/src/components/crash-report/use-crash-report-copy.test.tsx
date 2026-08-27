@@ -9,7 +9,9 @@ import type {
 } from '../../../../shared/crash-reporting'
 import { CRASH_REPORT_COPY_FAILURE_TOAST_ID, useCrashReportCopy } from './use-crash-report-copy'
 
-const copyLatestDiagnostics = vi.fn()
+const { copyLatestDiagnostics } = vi.hoisted(() => ({
+  copyLatestDiagnostics: vi.fn()
+}))
 
 vi.mock('sonner', () => ({
   toast: {
@@ -17,6 +19,10 @@ vi.mock('sonner', () => ({
     error: vi.fn(),
     success: vi.fn()
   }
+}))
+
+vi.mock('@/runtime/runtime-crash-reports-client', () => ({
+  copyRuntimeCrashReportLatestDiagnostics: copyLatestDiagnostics
 }))
 
 function report(id = 'crash-1'): CrashReportRecord {
@@ -41,10 +47,6 @@ function report(id = 'crash-1'): CrashReportRecord {
 beforeEach(() => {
   vi.clearAllMocks()
   copyLatestDiagnostics.mockResolvedValue({ ok: true })
-  Object.defineProperty(window, 'api', {
-    configurable: true,
-    value: { crashReports: { copyLatestDiagnostics } }
-  })
 })
 
 afterEach(() => {

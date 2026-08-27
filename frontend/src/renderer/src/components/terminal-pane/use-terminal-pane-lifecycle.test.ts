@@ -161,6 +161,33 @@ describe('shouldDetachPaneTransportOnUnmount', () => {
       })
     ).toBe(false)
   })
+
+  // FIX BUG-FE-PTY-001: a spawn still in flight (no ptyId yet) must not be
+  // destroyed just because the tab was momentarily unmounted (group rehoming)
+  // — destroying here races ahead of pendingSpawnByPaneKey's reattach and
+  // kills the PTY before a remount ever gets a chance to attach to it,
+  // surfacing as SSH_SESSION_EXPIRED/"PTY not found" on the very next open.
+  it('detaches (not destroys) an in-flight spawn when the tab still exists', () => {
+    expect(
+      shouldDetachPaneTransportOnUnmount({
+        tabStillExists: true,
+        tabId: 'tab-1',
+        ptyId: null,
+        worktreeTabs: []
+      })
+    ).toBe(true)
+  })
+
+  it('still destroys an in-flight spawn when the tab is genuinely gone', () => {
+    expect(
+      shouldDetachPaneTransportOnUnmount({
+        tabStillExists: false,
+        tabId: 'tab-1',
+        ptyId: null,
+        worktreeTabs: []
+      })
+    ).toBe(false)
+  })
 })
 
 describe('mapRestoredPaneTitlesByPaneId', () => {

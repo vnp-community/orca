@@ -19,10 +19,21 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function stubPetRead(read: ReturnType<typeof vi.fn>): void {
+function stubPetRead(
+  read: (id: string, fileName: string, kind?: 'image' | 'bundle') => Promise<ArrayBuffer>
+): void {
   vi.stubGlobal('window', {
     api: {
-      pet: { read }
+      runtime: {
+        call: async ({
+          params
+        }: {
+          params?: { id: string; fileName: string; kind?: 'image' | 'bundle' }
+        }) => ({
+          ok: true,
+          result: await read(params!.id, params!.fileName, params!.kind)
+        })
+      }
     }
   })
 }

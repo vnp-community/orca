@@ -30,6 +30,7 @@ import {
 import type { LaunchWorkItemDirectArgs } from '@/lib/launch-work-item-direct-types'
 import { resolveSourceControlLaunchPlatform } from '@/lib/source-control-launch-platform'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
+import { markRuntimeAgentTrusted } from '@/runtime/runtime-agent-trust-client'
 import {
   getLocalProjectExecutionRuntimeContext,
   getLocalRepoProjectExecutionRuntimeContext
@@ -252,11 +253,11 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
     // and we guard the IPC presence so a stale preload bundle (which can
     // ship a renderer that's ahead of the loaded preload) doesn't crash the
     // launch with "Cannot read properties of undefined".
-    if (effectiveAgent && worktreePath && window.api.agentTrust?.markTrusted) {
+    if (effectiveAgent && worktreePath) {
       const preflight = TUI_AGENT_CONFIG[effectiveAgent].preflightTrust
       if (preflight) {
         try {
-          await window.api.agentTrust.markTrusted({
+          await markRuntimeAgentTrusted({
             preset: preflight,
             workspacePath: worktreePath,
             ...(repo.connectionId ? { connectionId: repo.connectionId } : {})

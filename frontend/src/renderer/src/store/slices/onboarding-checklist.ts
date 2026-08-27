@@ -7,6 +7,7 @@
 import type { StateCreator } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../index'
+import { markRuntimeOnboardingChecklistItem } from '../../runtime/runtime-onboarding-client'
 import type { OnboardingChecklistState } from '../../../../shared/types'
 import type { PerServerChecklistState } from '../../../../shared/dev-server-types'
 import type { AppState } from '../types'
@@ -74,7 +75,10 @@ export const createOnboardingChecklistSlice: StateCreator<
     set((state) => ({
       checklistState: { ...state.checklistState, [item]: value },
     }))
-    void window.api.onboarding.markChecklistItem({ item: item as string, value })
+    void markRuntimeOnboardingChecklistItem(useAppStore.getState().settings, {
+      item: item as string,
+      value
+    })
   },
 
   markServerChecklistItem: (devServerId, item, value = true) => {
@@ -90,7 +94,7 @@ export const createOnboardingChecklistSlice: StateCreator<
         },
       },
     }))
-    void window.api.onboarding.markChecklistItem({
+    void markRuntimeOnboardingChecklistItem(useAppStore.getState().settings, {
       item: item as string,
       devServerId,
       value,

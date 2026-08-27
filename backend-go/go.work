@@ -1,0 +1,23 @@
+go 1.25.0
+
+use (
+	./common
+	./proto
+	./services/ai-provider-service
+	./services/annotation-service
+	./services/api-gateway
+	./services/auth-service
+	./services/automation-service
+	./services/credential-broker-service
+	./services/git-gateway-service
+	./services/infra-fleet-service
+	./services/issue-tracking-service
+	./services/notification-service
+	./services/orchestration-service
+	./services/project-service
+	./services/scm-integration-service
+	./services/task-service
+	./services/tenant-service
+	./services/usage-service
+	./services/workflow-service
+)

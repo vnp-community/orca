@@ -44,7 +44,7 @@ export class TaskDAGValidator {
 
       const rows = await this.pool.withConnection((db) =>
         db.query<{ toTaskId: string }>(
-          `SELECT to_task_id as toTaskId FROM orca_task_edges
+          `SELECT to_task_id as "toTaskId" FROM orca_task_edges
            WHERE from_task_id = ? AND edge_type = ?`,
           [current, edgeType]
         )
@@ -80,7 +80,7 @@ export class TaskDAGValidator {
 
       const rows = await this.pool.withConnection((db) =>
         db.query<{ toTaskId: string }>(
-          `SELECT to_task_id as toTaskId FROM orca_task_edges WHERE from_task_id = ?`,
+          `SELECT to_task_id as "toTaskId" FROM orca_task_edges WHERE from_task_id = ?`,
           [current]
         )
       )
@@ -113,7 +113,7 @@ export class TaskDAGValidator {
 
       const rows = await this.pool.withConnection((db) =>
         db.query<{ toTaskId: string }>(
-          `SELECT to_task_id as toTaskId FROM orca_task_edges WHERE from_task_id = ?`,
+          `SELECT to_task_id as "toTaskId" FROM orca_task_edges WHERE from_task_id = ?`,
           [current]
         )
       )

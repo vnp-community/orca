@@ -16,6 +16,10 @@ import type { ShellOpenLocalPathFailureReason } from '../../../../shared/shell-o
 import type { OpenInApplication } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
 
+import {
+  shellOpenInExternalEditor,
+  shellOpenInFileManager
+} from '../../runtime/runtime-shell-client'
 export { getLocalFileManagerLabel } from '@/lib/local-file-manager-label'
 
 type WorktreeOpenInMenuItemsProps = {
@@ -117,8 +121,8 @@ export async function openWorktreePath(args: {
 
   const result =
     args.target === 'file-manager'
-      ? await window.api.shell.openInFileManager(args.worktreePath)
-      : await window.api.shell.openInExternalEditor(args.worktreePath, args.command)
+      ? await shellOpenInFileManager(args.worktreePath)
+      : await shellOpenInExternalEditor(args.worktreePath, args.command)
   if (!result.ok) {
     showOpenFailureToast(result.reason)
   }

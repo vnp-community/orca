@@ -31,6 +31,7 @@ import {
 import { translate } from '@/i18n/i18n'
 import { isMacPlatform, nativeChatToggleShortcutLabel } from './native-chat-shortcut'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type NativeChatContextMenuState = {
   open: boolean
   point: { x: number; y: number }
@@ -133,7 +134,7 @@ export function useNativeChatContextMenu({
         >
           <DropdownMenuItem
             disabled={state.selectedText.trim().length === 0}
-            onSelect={() => void window.api.ui.writeClipboardText(state.selectedText)}
+            onSelect={() => void uiWriteClipboardText(state.selectedText)}
           >
             <Copy />
             {translate('auto.components.nativeChat.contextMenu.copy', 'Copy')}

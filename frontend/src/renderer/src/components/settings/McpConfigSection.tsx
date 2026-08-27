@@ -13,6 +13,7 @@ import {
 import { useAppStore } from '../../store'
 import { joinPath } from '../../lib/path'
 import { extractIpcErrorMessage } from '../../lib/ipc-error'
+import { writeRuntimeFile, type RuntimeFileOperationArgs } from '@/runtime/runtime-file-client'
 import { Button } from '../ui/button'
 import { isWindowsUserAgent } from '../terminal-pane/pane-helpers'
 import { McpConfigFileRow, type LoadedMcpConfigInspection } from './McpConfigFileRow'
@@ -20,6 +21,7 @@ import { McpMissingConfigList } from './McpMissingConfigList'
 import { loadMcpConfigInspections } from './mcp-config-inspection'
 import { translate } from '@/i18n/i18n'
 
+import { shellPathExists } from '../../runtime/runtime-shell-client'
 type McpConfigSectionProps = {
   repo: Repo
 }
@@ -37,6 +39,7 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
   const ensureWorktreeRootGroup = useAppStore((state) => state.ensureWorktreeRootGroup)
   const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
   const worktreesForRepo = useAppStore((state) => state.worktreesByRepo[repo.id] ?? EMPTY_WORKTREES)
+  const settings = useAppStore((state) => state.settings)
   const sshConnectionStatus = useAppStore((state) =>
     repo.connectionId ? state.sshConnectionStates.get(repo.connectionId)?.status : null
   )
@@ -68,6 +71,15 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
   }, [activeWorktreeId, repo.id, repo.path, worktreesForRepo])
   const targetWorktreeId = targetWorktree.id
   const targetRootPath = targetWorktree.path
+  const fileContext: RuntimeFileOperationArgs = useMemo(
+    () => ({
+      settings,
+      worktreeId: targetWorktreeId,
+      worktreePath: targetRootPath,
+      connectionId
+    }),
+    [settings, targetWorktreeId, targetRootPath, connectionId]
+  )
   const detectedCount = useMemo(() => configs.filter((config) => config.exists).length, [configs])
   const inspectionUnavailable = inspectionUnavailableMessage !== null
   const visibleConfigs = useMemo(
@@ -123,7 +135,7 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
         return
       }
 
-      if (!connectionId && !(await window.api.shell.pathExists(targetRootPath))) {
+      if (!connectionId && !(await shellPathExists(targetRootPath))) {
         if (mountedRef.current) {
           setConfigs(missingInspections)
           setInspectionUnavailableMessage('This workspace path is not available on disk.')
@@ -131,7 +143,7 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
         return
       }
 
-      const next = await loadMcpConfigInspections(targetRootPath, connectionId)
+      const next = await loadMcpConfigInspections(targetRootPath, fileContext)
       if (mountedRef.current) {
         setConfigs(next)
       }
@@ -147,7 +159,15 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
         setLoading(false)
       }
     }
-  }, [connectionId, isWindows, missingInspections, mountedRef, sshConnectionStatus, targetRootPath])
+  }, [
+    connectionId,
+    fileContext,
+    isWindows,
+    missingInspections,
+    mountedRef,
+    sshConnectionStatus,
+    targetRootPath
+  ])
 
   const clearCreateConfirmResetTimer = useCallback((): void => {
     if (createConfirmResetTimerRef.current !== null) {
@@ -194,7 +214,7 @@ export function McpConfigSection({ repo }: McpConfigSectionProps): React.JSX.Ele
     try {
       // Why: v1 only creates the root workspace config so we do not need to
       // guess per-agent directory layouts or mutate agent-specific files.
-      await window.api.fs.writeFile({ filePath: target, content: MCP_STARTER_CONFIG, connectionId })
+      await writeRuntimeFile(fileContext, target, MCP_STARTER_CONFIG)
       clearCreateConfirmResetTimer()
       if (mountedRef.current) {
         setCreateConfirm(false)

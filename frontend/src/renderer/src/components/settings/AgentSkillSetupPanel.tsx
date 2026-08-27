@@ -10,7 +10,9 @@ import { useMountedRef } from '@/hooks/useMountedRef'
 import { isOrcaCliAvailableOnPath } from '@/lib/agent-skill-cli-prerequisite'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeCliInstallStatus } from '@/runtime/runtime-cli-client'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type AgentSkillSetupPanelVariant = 'card' | 'inline'
 type SkillPrerequisiteStatus = Awaited<ReturnType<typeof window.api.cli.getInstallStatus>>
 
@@ -89,7 +91,7 @@ export function AgentSkillSetupPanel({
   )
   const mountedRef = useMountedRef()
   const readPrerequisiteStatus = useCallback(
-    () => (getPrerequisiteStatus ?? window.api.cli.getInstallStatus)(),
+    () => (getPrerequisiteStatus ?? getRuntimeCliInstallStatus)(),
     [getPrerequisiteStatus]
   )
   const activeCommand = installed ? (installedCommand ?? command) : command
@@ -143,7 +145,7 @@ export function AgentSkillSetupPanel({
 
   const copyActiveCommand = async (): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(openTerminalCommand)
+      await uiWriteClipboardText(openTerminalCommand)
       toast.success(
         translate('auto.components.settings.AgentSkillSetupPanel.copiedCommand', 'Copied command.')
       )

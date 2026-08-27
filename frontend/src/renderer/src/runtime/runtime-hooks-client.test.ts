@@ -13,57 +13,72 @@ import { clearRuntimeCompatibilityCacheForTests } from './runtime-rpc-client'
 
 const runtimeEnvironmentCall = vi.fn()
 const runtimeEnvironmentTransportCall = vi.fn()
+const runtimeLocalCall = vi.fn()
 const hooksCheck = vi.fn()
-const hooksInspectSetupScriptImports = vi.fn()
-const hooksReadIssueCommand = vi.fn()
-const hooksWriteIssueCommand = vi.fn()
 
 beforeEach(() => {
   clearRuntimeCompatibilityCacheForTests()
   runtimeEnvironmentCall.mockReset()
   runtimeEnvironmentTransportCall.mockReset()
+  runtimeLocalCall.mockReset()
   hooksCheck.mockReset()
-  hooksInspectSetupScriptImports.mockReset()
-  hooksReadIssueCommand.mockReset()
-  hooksWriteIssueCommand.mockReset()
   runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
     return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
   })
   vi.stubGlobal('window', {
     api: {
+      runtime: { call: runtimeLocalCall },
       runtimeEnvironments: { call: runtimeEnvironmentTransportCall },
       hooks: {
-        check: hooksCheck,
-        inspectSetupScriptImports: hooksInspectSetupScriptImports,
-        readIssueCommand: hooksReadIssueCommand,
-        writeIssueCommand: hooksWriteIssueCommand
+        check: hooksCheck
       }
     }
   })
 })
 
 describe('runtime hooks client', () => {
-  it('uses local hook IPC when no runtime environment is active', async () => {
-    hooksCheck.mockResolvedValue({ hasHooks: false, hooks: null, mayNeedUpdate: false })
-    hooksInspectSetupScriptImports.mockResolvedValue([])
-    hooksReadIssueCommand.mockResolvedValue({
-      localContent: null,
-      sharedContent: null,
-      effectiveContent: null,
-      localFilePath: '',
-      source: 'none'
+  it('routes setupScriptImports/issueCommand hook operations through the local RPC registry when no runtime environment is active', async () => {
+    runtimeLocalCall.mockResolvedValue({
+      id: 'rpc-1',
+      ok: true,
+      result: { ok: true },
+      _meta: { runtimeId: 'runtime-1' }
     })
+    hooksCheck.mockResolvedValue({ hasHooks: false, hooks: null, mayNeedUpdate: false })
 
     await checkRuntimeHooks({ activeRuntimeEnvironmentId: null }, 'repo-1')
     await inspectRuntimeSetupScriptImports({ activeRuntimeEnvironmentId: null }, 'repo-1')
     await readRuntimeIssueCommand({ activeRuntimeEnvironmentId: null }, 'repo-1')
     await writeRuntimeIssueCommand({ activeRuntimeEnvironmentId: null }, 'repo-1', 'Fix it')
 
-    expect(hooksCheck).toHaveBeenCalledWith({ repoId: 'repo-1' })
-    expect(hooksInspectSetupScriptImports).toHaveBeenCalledWith({ repoId: 'repo-1' })
-    expect(hooksReadIssueCommand).toHaveBeenCalledWith({ repoId: 'repo-1' })
-    expect(hooksWriteIssueCommand).toHaveBeenCalledWith({ repoId: 'repo-1', content: 'Fix it' })
+    // checkRuntimeHooks with no hostId unifies onto the local RPC registry too.
+    expect(runtimeLocalCall).toHaveBeenNthCalledWith(1, {
+      method: 'repo.hooksCheck',
+      params: { repo: 'repo-1' }
+    })
+    expect(runtimeLocalCall).toHaveBeenNthCalledWith(2, {
+      method: 'repo.setupScriptImports',
+      params: { repo: 'repo-1' }
+    })
+    expect(runtimeLocalCall).toHaveBeenNthCalledWith(3, {
+      method: 'repo.issueCommandRead',
+      params: { repo: 'repo-1' }
+    })
+    expect(runtimeLocalCall).toHaveBeenNthCalledWith(4, {
+      method: 'repo.issueCommandWrite',
+      params: { repo: 'repo-1', content: 'Fix it' }
+    })
+    expect(hooksCheck).not.toHaveBeenCalled()
     expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+  })
+
+  it('checks hooks via the local hostId-aware ipc channel when a hostId is given', async () => {
+    hooksCheck.mockResolvedValue({ hasHooks: false, hooks: null, mayNeedUpdate: false })
+
+    await checkRuntimeHooks({ activeRuntimeEnvironmentId: null }, 'repo-1', 'ssh:host-1')
+
+    expect(hooksCheck).toHaveBeenCalledWith({ repoId: 'repo-1', hostId: 'ssh:host-1' })
+    expect(runtimeLocalCall).not.toHaveBeenCalled()
   })
 
   it('routes hook operations through the active runtime environment', async () => {
@@ -104,8 +119,6 @@ describe('runtime hooks client', () => {
       timeoutMs: 15_000
     })
     expect(hooksCheck).not.toHaveBeenCalled()
-    expect(hooksInspectSetupScriptImports).not.toHaveBeenCalled()
-    expect(hooksReadIssueCommand).not.toHaveBeenCalled()
-    expect(hooksWriteIssueCommand).not.toHaveBeenCalled()
+    expect(runtimeLocalCall).not.toHaveBeenCalled()
   })
 })

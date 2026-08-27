@@ -10,6 +10,7 @@ import { translate } from '@/i18n/i18n'
 import { useActiveDevServer } from '../../store/slices/dev-servers'
 import { DevServerStatusBadge } from '../dev-server/DevServerStatusBadge'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 const AGENT_GRID_MAX_ROWS = 4
 
 type AgentStepProps = {
@@ -123,7 +124,11 @@ export function AgentStep({
         <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
           <span>Detecting agents on</span>
           <strong>{activeDevServer.name}</strong>
-          <DevServerStatusBadge status={activeDevServer.status} platform={activeDevServer.platform} showLabel />
+          <DevServerStatusBadge
+            status={activeDevServer.status}
+            platform={activeDevServer.platform}
+            showLabel
+          />
         </div>
       )}
       {!hasDetected && !isDetecting && (
@@ -146,7 +151,7 @@ export function AgentStep({
           <button
             type="button"
             className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-1 font-medium text-amber-800 hover:bg-amber-400/20 dark:text-amber-100"
-            onClick={() => void window.api.shell.openUrl(selectedEntry.homepageUrl)}
+            onClick={() => void shellOpenUrl(selectedEntry.homepageUrl)}
           >
             {translate('auto.components.onboarding.AgentStep.9c163bb0e0', 'Install instructions')}
             <ExternalLink className="size-3" />

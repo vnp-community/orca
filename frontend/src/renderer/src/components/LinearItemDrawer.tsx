@@ -51,6 +51,7 @@ import {
 } from '@/runtime/runtime-linear-client'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 function LinearIcon({ className }: { className?: string }): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className} fill="currentColor">
@@ -1429,7 +1430,7 @@ export default function LinearItemDrawer({
                         variant="ghost"
                         size="icon"
                         className="size-7"
-                        onClick={() => window.api.shell.openUrl(displayed.url)}
+                        onClick={() => shellOpenUrl(displayed.url)}
                         aria-label={translate(
                           'auto.components.LinearItemDrawer.0190b760c1',
                           'Open on Linear'

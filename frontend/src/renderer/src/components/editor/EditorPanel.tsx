@@ -25,6 +25,8 @@ import {
 } from './editor-panel-git-entry-selector'
 import { createEditorPanelDraftSelector } from './editor-panel-draft-selector'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenPath } from '../../runtime/runtime-shell-client'
 function EditorPanelInner({
   activeFileId: activeFileIdProp,
   activeViewStateId: activeViewStateIdProp,
@@ -215,7 +217,7 @@ function EditorPanelInner({
       return
     }
     try {
-      await window.api.ui.writeClipboardText(copyState.copyText)
+      await uiWriteClipboardText(copyState.copyText)
       if (!pathCopyMountedRef.current) {
         return
       }
@@ -319,7 +321,7 @@ function EditorPanelInner({
       showLocalPathOpenBlockedToast()
       return
     }
-    window.api.shell.openPath(activeFile.filePath)
+    shellOpenPath(activeFile.filePath)
   }
   const disableRenameBrowse = Boolean(
     settingsForRuntimeOwner(

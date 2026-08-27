@@ -38,6 +38,7 @@ import {
   syncTerminalScrollIntentFromViewport
 } from '@/lib/pane-manager/terminal-scroll-intent'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function resolveTerminalKeyboardShortcutAction(
   event: Parameters<typeof resolveTerminalShortcutAction>[0],
   isMac: Parameters<typeof resolveTerminalShortcutAction>[1],
@@ -437,7 +438,7 @@ export function useTerminalKeyboardShortcuts({
         }
         e.preventDefault()
         e.stopImmediatePropagation()
-        void window.api.ui.writeClipboardText(selection).catch(() => {
+        void uiWriteClipboardText(selection).catch(() => {
           /* ignore clipboard write failures */
         })
         return

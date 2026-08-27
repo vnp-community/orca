@@ -14,7 +14,9 @@ DEV_SERVER_USER="${DEV_SERVER_USER:-ubuntu}"
 SSH_KEY="${DEV_SERVER_KEY:-~/.ssh/id_ed25519}"
 ORCA_URL="${AGENT_ORCA_URL:-wss://b15.openledger.vn/agent}"
 ORCA_HTTP_HOST="${SERVER_HOST:-172.20.2.39}"
-ORCA_HTTP_PORT_VAL="${ORCA_HTTP_PORT:-6769}"
+# 6768 = backend-go api-gateway's public port (deploy/dev/.env
+# API_GATEWAY_PUBLIC_PORT) — NOT 6769, which is the frontend/nginx port.
+ORCA_HTTP_PORT_VAL="${ORCA_HTTP_PORT:-6768}"
 AUTH_HDR="${ORCA_AGENT_API_SECRET:+Authorization: Bearer ${ORCA_AGENT_API_SECRET}}"
 AUTH_HDR="${AUTH_HDR:-X-Orca-Admin: 1}"
 DEV_NAME="${DEV_SERVER_LABEL:-Dev Server (dev-local)}"

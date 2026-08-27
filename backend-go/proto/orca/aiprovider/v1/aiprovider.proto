@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package orca.aiprovider.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1;aiproviderv1";
+
+import "google/protobuf/empty.proto";
+
+// AiProviderService owns provider account metadata + quota tracking; secret
+// material always delegates to credential-broker-service. Never stores or
+// forwards plaintext keys (closes TS Gap 2). See specs/backend-go/services/ai-provider-service.md.
+service AiProviderService {
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+  rpc ResolveProvider(ResolveProviderRequest) returns (ResolveProviderResponse);
+  rpc RotateKey(RotateKeyRequest) returns (RotateKeyResponse);
+  rpc GetUsageToday(GetUsageTodayRequest) returns (GetUsageTodayResponse);
+
+  // ListAccounts/UpdateAccount/DeleteAccount back aiProvider.list/update/
+  // delete (SOL-005 Group B) — metadata-only CRUD, no credential-broker
+  // involvement.
+  rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse);
+  rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse);
+  rpc DeleteAccount(DeleteAccountRequest) returns (google.protobuf.Empty);
+
+  // WriteCredential backs aiProvider.writeCredential (SOL-005 Group C) —
+  // writes a credential onto an EXISTING account, distinct from
+  // CreateAccount's create-time credential write.
+  rpc WriteCredential(WriteCredentialRequest) returns (WriteCredentialResponse);
+
+  // TestConnection backs aiProvider.testConnection (SOL-005 Group D) —
+  // relays to the account's dev server via infra-fleet-service; see
+  // TASK-028. Never returns plaintext key material.
+  rpc TestConnection(TestConnectionRequest) returns (TestConnectionResponse);
+}
+
+enum ProviderType {
+  PROVIDER_TYPE_UNSPECIFIED = 0;
+  PROVIDER_TYPE_ANTHROPIC = 1;
+  PROVIDER_TYPE_OPENAI = 2;
+  PROVIDER_TYPE_GOOGLE = 3;
+  PROVIDER_TYPE_AZURE = 4;
+  PROVIDER_TYPE_AWS_BEDROCK = 5;
+  PROVIDER_TYPE_OLLAMA = 6;
+  PROVIDER_TYPE_VLLM = 7;
+}
+
+message ProviderAccount {
+  string id = 1;
+  string tenant_id = 2;
+  ProviderType type = 3;
+  string status = 4; // active | rotating | revoked
+  string credential_ref = 5; // credential-broker-service metadata id, never a secret value
+  // dev_server_id is which dev server holds this account's pushed
+  // ciphertext (ai-provider-service.md §9's PushCiphertext flow) — needed
+  // by TestConnection (TASK-028) to know where to relay. Empty for
+  // accounts that have never had a credential pushed to a dev server yet.
+  string dev_server_id = 6;
+}
+
+message CreateAccountRequest {
+  string tenant_id = 1;
+  ProviderType type = 2;
+}
+
+message CreateAccountResponse {
+  ProviderAccount account = 1;
+}
+
+// ResolveProvider implements the user-scope -> project-scope priority
+// cascade and returns only a reference the caller uses to ask
+// credential-broker-service (or the execution plane, for spawn-time use)
+// for the actual secret — never a plaintext key.
+message ResolveProviderRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string project_id = 3;
+}
+
+message ResolveProviderResponse {
+  ProviderAccount account = 1;
+}
+
+message RotateKeyRequest {
+  string account_id = 1;
+}
+
+message RotateKeyResponse {
+  ProviderAccount account = 1;
+}
+
+message GetUsageTodayRequest {
+  string account_id = 1;
+}
+
+message GetUsageTodayResponse {
+  double cost_usd = 1;
+  int64 request_count = 2;
+}
+
+message ListAccountsRequest {
+  string tenant_id = 1;    // ignored server-side, taken from ctx metadata — matches ResolveProviderRequest's convention
+  string dev_server_id = 2; // optional filter — matches the frontend's { devServerId } param
+}
+message ListAccountsResponse {
+  repeated ProviderAccount accounts = 1;
+}
+
+message UpdateAccountRequest {
+  string account_id = 1;
+  string label = 2;
+  string model_hint = 3;
+  string base_url = 4;
+}
+message UpdateAccountResponse {
+  ProviderAccount account = 1;
+}
+
+message DeleteAccountRequest {
+  string account_id = 1;
+}
+
+// WriteCredentialRequest/Response mirror ai-provider-service.md §3's sketch
+// — encrypted_blob/iv are client-side-encrypted, forwarded unopened (ADR-008).
+message WriteCredentialRequest {
+  string account_id = 1;
+  bytes encrypted_blob = 2;
+  bytes iv = 3;
+}
+message WriteCredentialResponse {
+  ProviderAccount account = 1;
+}
+
+message TestConnectionRequest {
+  string account_id = 1;
+  string trace_id = 2; // threaded into the outbound Relay call's request-id metadata for tracing correlation, not persisted
+}
+message TestConnectionResponse {
+  bool success = 1;
+  string message = 2; // human-readable result/error detail from the agent's live check, never a secret
+}

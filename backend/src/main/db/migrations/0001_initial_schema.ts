@@ -11,18 +11,23 @@
  */
 
 import type { Migration } from './types'
+import { nowTextDefaultSql } from './sql-dialect'
 
 export const migration0001InitialSchema: Migration = {
   version: 1,
   name: 'initial_schema',
 
   async up(db) {
+    // BUG-BE-RPC-003: datetime('now') is SQLite-only — nowTextDefaultSql()
+    // picks the equivalent per db.capabilities.dialect (see sql-dialect.ts).
+    const now = nowTextDefaultSql(db.capabilities.dialect)
+
     // ── settings ────────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS settings (
         key         TEXT PRIMARY KEY,
         value       TEXT NOT NULL,
-        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
 
@@ -32,8 +37,8 @@ export const migration0001InitialSchema: Migration = {
         id          TEXT PRIMARY KEY,
         name        TEXT NOT NULL,
         path        TEXT NOT NULL,
-        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at  TEXT NOT NULL DEFAULT ${now},
+        updated_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
 
@@ -44,8 +49,8 @@ export const migration0001InitialSchema: Migration = {
         project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         name        TEXT NOT NULL,
         remote_url  TEXT,
-        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at  TEXT NOT NULL DEFAULT ${now},
+        updated_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
     await db.exec(`
@@ -61,8 +66,8 @@ export const migration0001InitialSchema: Migration = {
         port        INTEGER NOT NULL DEFAULT 22,
         username    TEXT NOT NULL,
         key_path    TEXT,
-        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at  TEXT NOT NULL DEFAULT ${now},
+        updated_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
   },

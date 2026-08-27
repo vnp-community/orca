@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
+import { addRuntimeRepoRemote } from '@/runtime/runtime-repo-client'
 import type { NestedRepoScanResult } from '../../../../shared/types'
 import type { SshTarget, SshConnectionState } from '../../../../shared/ssh-types'
 import { createNestedRepoTelemetryAttemptId } from '../../../../shared/nested-repo-telemetry'
@@ -175,7 +176,7 @@ export function useRemoteRepo(
         return
       }
       setRemoteNestedScanId(null)
-      const result = await window.api.repos.addRemote({
+      const result = await addRuntimeRepoRemote(useAppStore.getState().settings, {
         connectionId: selectedTargetId,
         remotePath: trimmedRemotePath
       })
