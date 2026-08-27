@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_git.go`
 **Depends on:** TASK-PW-03-06
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — five channels (git.merge, git.stash.push, git.stash.pop, git.branch.create, git.branch.delete) wired in channels_git.go; 10 tests (success + FAILED_PRECONDITION passthrough per channel) pass.
 
 ---
 

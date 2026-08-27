@@ -278,6 +278,19 @@ func (fakeExecutor) DeleteBranch(context.Context, string, string) error {
 	return nil
 }
 
+// PushStream/PullStream (TASK-PW-03-08, SOL-PW-03) — fakeExecutor also
+// stands in for usecase.StreamingGitExecutor: one final success frame is
+// enough for this file's Server-adapter-layer tests, which only exercise
+// the wire<->usecase translation, not streaming content (that's
+// push_stream_test.go/pull_stream_test.go's job).
+func (fakeExecutor) PushStream(ctx context.Context, repoPath, remote, branch string, sink func(domain.GitProgressLine) error) error {
+	return sink(domain.GitProgressLine{IsFinal: true, Success: true})
+}
+
+func (fakeExecutor) PullStream(ctx context.Context, repoPath string, sink func(domain.GitProgressLine) error) error {
+	return sink(domain.GitProgressLine{IsFinal: true, Success: true})
+}
+
 // fakeProjectClient/fakeSCMClient are minimal stubs for exercising the
 // worktree usecases' wire<->usecase translation — none of this file's
 // tests exercise the saga/compensation logic itself (that's
@@ -337,6 +350,8 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewCommit(resolver, exec, exec),
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
+		usecase.NewPushStream(resolver, exec, exec),
+		usecase.NewPullStream(resolver, exec, exec),
 		usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, completer),
 		usecase.NewStage(resolver, exec, exec),
 		usecase.NewUnstage(resolver, exec, exec),

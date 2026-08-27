@@ -128,6 +128,8 @@ func run() error {
 	commitUC := usecase.NewCommit(resolver, local, relay)
 	pushUC := usecase.NewPush(resolver, local, relay)
 	pullUC := usecase.NewPull(resolver, local, relay)
+	pushStreamUC := usecase.NewPushStream(resolver, local, relay)
+	pullStreamUC := usecase.NewPullStream(resolver, local, relay)
 	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, relay)
 
 	stageUC := usecase.NewStage(resolver, local, relay)
@@ -212,7 +214,7 @@ func run() error {
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
-		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
+		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, pushStreamUC, pullStreamUC, generateCommitMessageUC,
 		stageUC, unstageUC,
 		historyUC, checkIgnoredUC, forkSyncUC, upstreamStatusUC,
 		commitCompareUC, branchCompareUC, commitDiffUC, branchDiffUC, submoduleStatusUC,

@@ -34,6 +34,7 @@ type Server struct {
 	listDevServers     *usecase.ListDevServers
 	createConnection   *usecase.CreateConnection
 	relay              *usecase.Relay
+	relayStream        *usecase.RelayStream
 
 	listSshTargets      *usecase.ListSshTargets
 	getSshState         *usecase.GetSshState
@@ -70,6 +71,7 @@ func New(
 	listDevServers *usecase.ListDevServers,
 	createConnection *usecase.CreateConnection,
 	relay *usecase.Relay,
+	relayStream *usecase.RelayStream,
 	listSshTargets *usecase.ListSshTargets,
 	getSshState *usecase.GetSshState,
 	establishConnection *usecase.EstablishConnection,
@@ -99,6 +101,7 @@ func New(
 		listDevServers:         listDevServers,
 		createConnection:       createConnection,
 		relay:                  relay,
+		relayStream:            relayStream,
 		listSshTargets:         listSshTargets,
 		getSshState:            getSshState,
 		establishConnection:    establishConnection,
@@ -207,6 +210,33 @@ func (s *Server) Relay(ctx context.Context, req *infrafleetv1.RelayRequest) (*in
 		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInternal, "INFRA_RELAY_ENCODE_FAILED", "failed to encode relay result", err))
 	}
 	return &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}, nil
+}
+
+// RelayStream is Relay's server-streaming counterpart — see
+// usecase.RelayStream's doc comment.
+func (s *Server) RelayStream(req *infrafleetv1.RelayStreamRequest, stream infrafleetv1.InfraFleetService_RelayStreamServer) error {
+	var params map[string]any
+	if raw := req.GetParamsJson(); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &params); err != nil {
+			return apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "INFRA_RELAY_STREAM_BAD_PARAMS", "params_json must be a JSON object", err))
+		}
+	}
+
+	err := s.relayStream.Execute(stream.Context(), usecase.RelayStreamInput{
+		ConnectionID: req.GetConnectionId(),
+		Method:       req.GetMethod(),
+		Params:       params,
+	}, func(frame map[string]any) error {
+		frameJSON, err := json.Marshal(frame)
+		if err != nil {
+			return apperrors.New(apperrors.KindInternal, "INFRA_RELAY_STREAM_ENCODE_FAILED", "failed to encode relay stream frame", err)
+		}
+		return stream.Send(&infrafleetv1.RelayStreamFrame{FrameJson: string(frameJSON)})
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	return nil
 }
 
 func (s *Server) CreateSshTarget(ctx context.Context, req *infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error) {

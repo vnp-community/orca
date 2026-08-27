@@ -51,6 +51,13 @@ type Config struct {
 	RateLimitRPS   float64
 	RateLimitBurst int
 
+	// NATSURL is the eventbus this service's workspace-event bridge
+	// (TASK-PW-04-07, SOL-PW-04) consumes from — same env var / default as
+	// notification-service's own NATS_URL, since both dial the same NATS
+	// cluster. Unavailable at startup logs a warning, does not fail service
+	// startup, matching every other eventbus consumer in this codebase.
+	NATSURL string
+
 	// OtherServiceAddrs holds the remaining 14 downstream services'
 	// addresses (auth, tenant, project, infra-fleet, git-gateway,
 	// scm-integration, issue-tracking, ai-provider, workflow, task,
@@ -83,6 +90,7 @@ func Load() (Config, error) {
 		InfraFleetHTTPAddr:      commonconfig.StringEnv("INFRA_FLEET_SERVICE_HTTP_ADDR", ""),
 		RateLimitRPS:            50,
 		RateLimitBurst:          100,
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		OtherServiceAddrs: map[string]string{
 			"auth-service":              commonconfig.StringEnv("AUTH_SERVICE_ADDR", ""),
 			"tenant-service":            commonconfig.StringEnv("TENANT_SERVICE_ADDR", ""),

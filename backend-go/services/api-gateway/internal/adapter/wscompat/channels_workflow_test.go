@@ -18,10 +18,13 @@ import (
 type fakeWorkflowServiceClient struct {
 	workflowv1.WorkflowServiceClient
 
-	executeFunc         func(ctx context.Context, in *workflowv1.ExecuteRequest) (*workflowv1.ExecuteResponse, error)
-	cancelExecutionFunc func(ctx context.Context, in *workflowv1.CancelExecutionRequest) (*workflowv1.CancelExecutionResponse, error)
-	createTemplateFunc  func(ctx context.Context, in *workflowv1.CreateTemplateRequest) (*workflowv1.CreateTemplateResponse, error)
-	updateTemplateFunc  func(ctx context.Context, in *workflowv1.UpdateTemplateRequest) (*workflowv1.UpdateTemplateResponse, error)
+	executeFunc             func(ctx context.Context, in *workflowv1.ExecuteRequest) (*workflowv1.ExecuteResponse, error)
+	cancelExecutionFunc     func(ctx context.Context, in *workflowv1.CancelExecutionRequest) (*workflowv1.CancelExecutionResponse, error)
+	createTemplateFunc      func(ctx context.Context, in *workflowv1.CreateTemplateRequest) (*workflowv1.CreateTemplateResponse, error)
+	updateTemplateFunc      func(ctx context.Context, in *workflowv1.UpdateTemplateRequest) (*workflowv1.UpdateTemplateResponse, error)
+	hasActiveExecutionsFunc func(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error)
+
+	lastRequest *workflowv1.HasActiveExecutionsRequest
 }
 
 func (f *fakeWorkflowServiceClient) Execute(ctx context.Context, in *workflowv1.ExecuteRequest, _ ...grpc.CallOption) (*workflowv1.ExecuteResponse, error) {
@@ -38,6 +41,14 @@ func (f *fakeWorkflowServiceClient) CreateTemplate(ctx context.Context, in *work
 
 func (f *fakeWorkflowServiceClient) UpdateTemplate(ctx context.Context, in *workflowv1.UpdateTemplateRequest, _ ...grpc.CallOption) (*workflowv1.UpdateTemplateResponse, error) {
 	return f.updateTemplateFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) HasActiveExecutions(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest, _ ...grpc.CallOption) (*workflowv1.HasActiveExecutionsResponse, error) {
+	f.lastRequest = in
+	if f.hasActiveExecutionsFunc != nil {
+		return f.hasActiveExecutionsFunc(ctx, in)
+	}
+	return &workflowv1.HasActiveExecutionsResponse{HasActive: true}, nil
 }
 
 func TestWorkflowExecuteChannel_Success(t *testing.T) {
@@ -239,5 +250,37 @@ func TestWorkflowTemplateUpdateChannel_Success(t *testing.T) {
 	}
 	if gotReq.ParentTemplateId != "tmpl-parent" || gotReq.Scope != "team" {
 		t.Errorf("unexpected request: %+v", gotReq)
+	}
+}
+
+// TestRegisterWorkflowChannels_HasActiveExecutions is a regression guard on
+// two fronts: the response envelope key must be hasActiveExecutions (not
+// the wire field name has_active), and tenant metadata must be attached to
+// the outbound ctx — a missing AttachIdentity here would let one tenant's
+// workspace-switch query another tenant's execution state.
+func TestRegisterWorkflowChannels_HasActiveExecutions(t *testing.T) {
+	fake := &fakeWorkflowServiceClient{
+		hasActiveExecutionsFunc: func(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error) {
+			return &workflowv1.HasActiveExecutionsResponse{HasActive: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"projectId": "p1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "workflow.hasActiveExecutions", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, ok := result.(map[string]bool)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	if want := map[string]bool{"hasActiveExecutions": true}; got["hasActiveExecutions"] != want["hasActiveExecutions"] {
+		t.Errorf("unexpected result: %+v", got)
+	}
+	if fake.lastRequest.GetProjectId() != "p1" {
+		t.Errorf("want projectId p1 forwarded, got %q", fake.lastRequest.GetProjectId())
 	}
 }

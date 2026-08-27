@@ -170,15 +170,18 @@ func TestAutomationRunsChannel_PropagatesError(t *testing.T) {
 type fakeTaskServiceClient struct {
 	taskv1.TaskServiceClient
 
-	createTaskFunc      func(ctx context.Context, in *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error)
-	getTaskFunc         func(ctx context.Context, in *taskv1.GetTaskRequest) (*taskv1.GetTaskResponse, error)
-	executeFunc         func(ctx context.Context, in *taskv1.TaskServiceExecuteRequest) (*taskv1.TaskServiceExecuteResponse, error)
-	listTasksFunc       func(ctx context.Context, in *taskv1.ListTasksRequest) (*taskv1.ListTasksResponse, error)
-	updateTaskFunc      func(ctx context.Context, in *taskv1.UpdateTaskRequest) (*taskv1.UpdateTaskResponse, error)
-	deleteTaskFunc      func(ctx context.Context, in *taskv1.DeleteTaskRequest) (*emptypb.Empty, error)
-	getDependenciesFunc func(ctx context.Context, in *taskv1.GetDependenciesRequest) (*taskv1.GetDependenciesResponse, error)
-	aiDecomposeFunc     func(ctx context.Context, in *taskv1.AIDecomposeRequest) (*taskv1.AIDecomposeResponse, error)
-	aiApplyFunc         func(ctx context.Context, in *taskv1.AIApplyRequest) (*taskv1.AIApplyResponse, error)
+	createTaskFunc          func(ctx context.Context, in *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error)
+	getTaskFunc             func(ctx context.Context, in *taskv1.GetTaskRequest) (*taskv1.GetTaskResponse, error)
+	executeFunc             func(ctx context.Context, in *taskv1.TaskServiceExecuteRequest) (*taskv1.TaskServiceExecuteResponse, error)
+	listTasksFunc           func(ctx context.Context, in *taskv1.ListTasksRequest) (*taskv1.ListTasksResponse, error)
+	updateTaskFunc          func(ctx context.Context, in *taskv1.UpdateTaskRequest) (*taskv1.UpdateTaskResponse, error)
+	deleteTaskFunc          func(ctx context.Context, in *taskv1.DeleteTaskRequest) (*emptypb.Empty, error)
+	getDependenciesFunc     func(ctx context.Context, in *taskv1.GetDependenciesRequest) (*taskv1.GetDependenciesResponse, error)
+	aiDecomposeFunc         func(ctx context.Context, in *taskv1.AIDecomposeRequest) (*taskv1.AIDecomposeResponse, error)
+	aiApplyFunc             func(ctx context.Context, in *taskv1.AIApplyRequest) (*taskv1.AIApplyResponse, error)
+	hasActiveExecutionsFunc func(ctx context.Context, in *taskv1.HasActiveExecutionsRequest) (*taskv1.HasActiveExecutionsResponse, error)
+
+	lastHasActiveExecutionsRequest *taskv1.HasActiveExecutionsRequest
 }
 
 func (f *fakeTaskServiceClient) CreateTask(ctx context.Context, in *taskv1.CreateTaskRequest, _ ...grpc.CallOption) (*taskv1.CreateTaskResponse, error) {
@@ -217,6 +220,14 @@ func (f *fakeTaskServiceClient) AIApply(ctx context.Context, in *taskv1.AIApplyR
 	return f.aiApplyFunc(ctx, in)
 }
 
+func (f *fakeTaskServiceClient) HasActiveExecutions(ctx context.Context, in *taskv1.HasActiveExecutionsRequest, _ ...grpc.CallOption) (*taskv1.HasActiveExecutionsResponse, error) {
+	f.lastHasActiveExecutionsRequest = in
+	if f.hasActiveExecutionsFunc != nil {
+		return f.hasActiveExecutionsFunc(ctx, in)
+	}
+	return &taskv1.HasActiveExecutionsResponse{HasActive: false}, nil
+}
+
 // TestTaskCreateGetChannels_StillRegistered guards the "keep, don't
 // remove" decision (TASK-222) against a future contributor treating
 // BUG-034's dead-code finding as license to delete these two channels —
@@ -238,6 +249,32 @@ func TestTaskCreateGetChannels_StillRegistered(t *testing.T) {
 	}
 	if _, err := r.Dispatch(context.Background(), Identity{}, "task.get", argsJSON(t, map[string]any{"id": "t1"})); err != nil {
 		t.Errorf("expected task.get to remain registered: %v", err)
+	}
+}
+
+// TestRegisterTaskChannels_HasActiveExecutions guards the response
+// envelope key (hasActiveExecutions, not the wire field name has_active)
+// and that projectId is forwarded to the outbound request.
+func TestRegisterTaskChannels_HasActiveExecutions(t *testing.T) {
+	fake := &fakeTaskServiceClient{}
+	r := NewRegistry()
+	registerTaskChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"},
+		"task.hasActiveExecutions", argsJSON(t, map[string]any{"projectId": "p1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, ok := result.(map[string]bool)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	if got["hasActiveExecutions"] != false {
+		t.Errorf("unexpected result: %+v", got)
+	}
+	if fake.lastHasActiveExecutionsRequest.GetProjectId() != "p1" {
+		t.Errorf("want projectId p1 forwarded, got %q", fake.lastHasActiveExecutionsRequest.GetProjectId())
 	}
 }
 

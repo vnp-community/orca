@@ -28,6 +28,7 @@ const (
 	InfraFleetService_ListDevServers_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
 	InfraFleetService_CreateConnection_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
 	InfraFleetService_Relay_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_RelayStream_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/RelayStream"
 	InfraFleetService_ListSshTargets_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
 	InfraFleetService_GetSshState_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
 	InfraFleetService_EstablishConnection_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
@@ -85,6 +86,15 @@ type InfraFleetServiceClient interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(ctx context.Context, in *RelayRequest, opts ...grpc.CallOption) (*RelayResponse, error)
+	// RelayStream is Relay's server-streaming counterpart (TASK-PW-03-08,
+	// SOL-PW-03) — mirrors Relay's connectionId+method+params shape but for
+	// agent methods that reply with multiple frames instead of one (currently
+	// only git-gateway-service's PushStream/PullStream, relaying to the
+	// agent's git.execStream — specs/agent/api/agent-rpc-catalog-git-fs.md's
+	// "git.execStream streaming shape" section). Each frame_json is one
+	// JSON-RPC response frame's result, encoded verbatim — same "no per-method
+	// translation" contract as RelayResponse.result_json, just repeated.
+	RelayStream(ctx context.Context, in *RelayStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RelayStreamFrame], error)
 	// ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
 	// latter derives from this same read — see wscompat's registerSshChannels).
 	ListSshTargets(ctx context.Context, in *ListSshTargetsRequest, opts ...grpc.CallOption) (*ListSshTargetsResponse, error)
@@ -238,6 +248,25 @@ func (c *infraFleetServiceClient) Relay(ctx context.Context, in *RelayRequest, o
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) RelayStream(ctx context.Context, in *RelayStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RelayStreamFrame], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_RelayStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[RelayStreamRequest, RelayStreamFrame]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_RelayStreamClient = grpc.ServerStreamingClient[RelayStreamFrame]
+
 func (c *infraFleetServiceClient) ListSshTargets(ctx context.Context, in *ListSshTargetsRequest, opts ...grpc.CallOption) (*ListSshTargetsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListSshTargetsResponse)
@@ -370,7 +399,7 @@ func (c *infraFleetServiceClient) InspectTerminalProcess(ctx context.Context, in
 
 func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_AttachPty_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[1], InfraFleetService_AttachPty_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -530,6 +559,15 @@ type InfraFleetServiceServer interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(context.Context, *RelayRequest) (*RelayResponse, error)
+	// RelayStream is Relay's server-streaming counterpart (TASK-PW-03-08,
+	// SOL-PW-03) — mirrors Relay's connectionId+method+params shape but for
+	// agent methods that reply with multiple frames instead of one (currently
+	// only git-gateway-service's PushStream/PullStream, relaying to the
+	// agent's git.execStream — specs/agent/api/agent-rpc-catalog-git-fs.md's
+	// "git.execStream streaming shape" section). Each frame_json is one
+	// JSON-RPC response frame's result, encoded verbatim — same "no per-method
+	// translation" contract as RelayResponse.result_json, just repeated.
+	RelayStream(*RelayStreamRequest, grpc.ServerStreamingServer[RelayStreamFrame]) error
 	// ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
 	// latter derives from this same read — see wscompat's registerSshChannels).
 	ListSshTargets(context.Context, *ListSshTargetsRequest) (*ListSshTargetsResponse, error)
@@ -626,6 +664,9 @@ func (UnimplementedInfraFleetServiceServer) CreateConnection(context.Context, *C
 }
 func (UnimplementedInfraFleetServiceServer) Relay(context.Context, *RelayRequest) (*RelayResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Relay not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) RelayStream(*RelayStreamRequest, grpc.ServerStreamingServer[RelayStreamFrame]) error {
+	return status.Error(codes.Unimplemented, "method RelayStream not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) ListSshTargets(context.Context, *ListSshTargetsRequest) (*ListSshTargetsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSshTargets not implemented")
@@ -869,6 +910,17 @@ func _InfraFleetService_Relay_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _InfraFleetService_RelayStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RelayStreamRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(InfraFleetServiceServer).RelayStream(m, &grpc.GenericServerStream[RelayStreamRequest, RelayStreamFrame]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_RelayStreamServer = grpc.ServerStreamingServer[RelayStreamFrame]
 
 func _InfraFleetService_ListSshTargets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListSshTargetsRequest)
@@ -1468,6 +1520,11 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "RelayStream",
+			Handler:       _InfraFleetService_RelayStream_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "AttachPty",
 			Handler:       _InfraFleetService_AttachPty_Handler,

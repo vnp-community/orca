@@ -72,6 +72,13 @@ func (f *fakeInfraFleetServiceClient) Relay(_ context.Context, in *infrafleetv1.
 	return f.relayFn(in)
 }
 
+// RelayStream is not exercised by this file's tests (httpgateway's REST
+// surface has no streaming route) — a fixed Unimplemented stub is enough to
+// satisfy infrafleetv1.InfraFleetServiceClient.
+func (f *fakeInfraFleetServiceClient) RelayStream(_ context.Context, _ *infrafleetv1.RelayStreamRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[infrafleetv1.RelayStreamFrame], error) {
+	return nil, status.Error(codes.Unimplemented, "RelayStream not implemented in fake")
+}
+
 func (f *fakeInfraFleetServiceClient) ListSshTargets(_ context.Context, in *infrafleetv1.ListSshTargetsRequest, _ ...grpc.CallOption) (*infrafleetv1.ListSshTargetsResponse, error) {
 	return f.listSshTargetsFn(in)
 }

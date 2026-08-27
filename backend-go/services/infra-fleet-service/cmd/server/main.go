@@ -129,6 +129,7 @@ func run() error {
 	listDevServersUC := usecase.NewListDevServers(repo)
 	createConnectionUC := usecase.NewCreateConnection(repo)
 	relayUC := usecase.NewRelay(repo, agentClient)
+	relayStreamUC := usecase.NewRelayStream(repo, agentClient)
 	listSshTargetsUC := usecase.NewListSshTargets(sshTargetStore)
 	getSshStateUC := usecase.NewGetSshState(sshTargetStore, repo, repo)
 	establishConnectionUC := usecase.NewEstablishConnection(sshTargetStore, repo, repo, agentClient)
@@ -167,6 +168,7 @@ func run() error {
 		listDevServersUC,
 		createConnectionUC,
 		relayUC,
+		relayStreamUC,
 		listSshTargetsUC,
 		getSshStateUC,
 		establishConnectionUC,

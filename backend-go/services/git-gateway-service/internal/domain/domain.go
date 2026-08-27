@@ -126,6 +126,22 @@ type PullResult struct {
 	HadConflicts bool
 }
 
+// GitProgressLine is one streamed line of push/pull progress output
+// (TASK-PW-03-08, SOL-PW-03) — mirrors gitgateway.proto's GitProgressEvent
+// 1:1 and the agent's git.execStream frame shape
+// (specs/agent/api/agent-rpc-catalog-git-fs.md: {type:'stream.chunk',
+// line,source?} / {type:'stream.end',exitCode}). IsFinal=true carries the
+// unary-equivalent outcome in Success/HadConflicts (mirroring PushResult/
+// PullResult's own shape) rather than a separate terminal message type.
+type GitProgressLine struct {
+	Line         string
+	Source       string // "stdout" | "stderr"; empty for the final line
+	IsFinal      bool
+	ExitCode     int32
+	Success      bool // only meaningful when IsFinal
+	HadConflicts bool // only meaningful when IsFinal (pull's had_conflicts shape)
+}
+
 // SimpleResult is the bare-success-flag shape shared by Stage/Unstage
 // (TASK-208) and Fetch — any operation with no richer result than
 // "did it work".

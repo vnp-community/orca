@@ -671,6 +671,191 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		}
 		return resp.GetModels(), nil
 	})
+
+	// ── TASK-PW-03-07 (SOL-PW-03 additions — merge/stash/branch
+	// create-delete). Same unary shape as git.checkout/git.abortMerge
+	// above; errors (e.g. FAILED_PRECONDITION over relay-ssh) surface
+	// unmodified, not swallowed or reshaped. ─────────────────────────────
+
+	r.Register("git.merge", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type mergeArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			Branch     string `json:"branch"`
+			NoFF       bool   `json:"noFf"`
+		}
+		in, err := decodeArg[mergeArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.MergeBranch(ctx, &gitgatewayv1.MergeBranchRequest{WorktreeId: in.WorktreeID, Branch: in.Branch, NoFf: in.NoFF})
+		if err != nil {
+			return nil, err // FAILED_PRECONDITION over relay-ssh surfaces as-is
+		}
+		return resp, nil
+	})
+
+	r.Register("git.stash.push", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type stashPushArgs struct {
+			WorktreeID       string `json:"worktreeId"`
+			Message          string `json:"message"`
+			IncludeUntracked bool   `json:"includeUntracked"`
+		}
+		in, err := decodeArg[stashPushArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.StashPush(ctx, &gitgatewayv1.StashPushRequest{
+			WorktreeId: in.WorktreeID, Message: in.Message, IncludeUntracked: in.IncludeUntracked,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.stash.pop", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type stashPopArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			StashRef   string `json:"stashRef"`
+		}
+		in, err := decodeArg[stashPopArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.StashPop(ctx, &gitgatewayv1.StashPopRequest{WorktreeId: in.WorktreeID, StashRef: in.StashRef})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.branch.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type createBranchArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			Branch     string `json:"branch"`
+			BaseRef    string `json:"baseRef"`
+			Checkout   bool   `json:"checkout"`
+		}
+		in, err := decodeArg[createBranchArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.CreateBranch(ctx, &gitgatewayv1.CreateBranchRequest{
+			WorktreeId: in.WorktreeID, Branch: in.Branch, BaseRef: in.BaseRef, Checkout: in.Checkout,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	r.Register("git.branch.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type deleteBranchArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			Branch     string `json:"branch"`
+		}
+		in, err := decodeArg[deleteBranchArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.DeleteBranch(ctx, &gitgatewayv1.DeleteBranchRequest{WorktreeId: in.WorktreeID, Branch: in.Branch})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// ── TASK-PW-03-08: git.push.progress/git.pull.progress (subscription-
+	// style, mirrors notifications.subscribe's "open a server-streaming
+	// gRPC call, forward each item" shape — see channels_push.go's
+	// registerNotificationStreamChannel, the confirmed existing wscompat
+	// streaming precedent this reuses rather than inventing a new
+	// mechanism). Each GitProgressEvent frame becomes one push frame under
+	// the SAME channel name; the final one (IsFinal) additionally carries
+	// success/exitCode, the unary-Push/PullResponse-equivalent outcome. ──
+
+	r.RegisterStream("git.push.progress", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
+		type pushStreamArgs struct {
+			WorktreeID string `json:"worktreeId"`
+			Remote     string `json:"remote"`
+			Branch     string `json:"branch"`
+		}
+		in, err := decodeArg[pushStreamArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		stream, err := client.PushStream(ctx, &gitgatewayv1.PushRequest{WorktreeId: in.WorktreeID, Remote: in.Remote, Branch: in.Branch})
+		if err != nil {
+			return nil, err // FAILED_PRECONDITION (relay-ssh) surfaces as-is — frontend retries against the unary git.push RPC
+		}
+		return pipeGitProgressStream(ctx, "git.push.progress", stream), nil
+	})
+
+	r.RegisterStream("git.pull.progress", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
+		type pullStreamArgs struct {
+			WorktreeID string `json:"worktreeId"`
+		}
+		in, err := decodeArg[pullStreamArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		stream, err := client.PullStream(ctx, &gitgatewayv1.PullRequest{WorktreeId: in.WorktreeID})
+		if err != nil {
+			return nil, err
+		}
+		return pipeGitProgressStream(ctx, "git.pull.progress", stream), nil
+	})
+}
+
+// gitProgressStreamClient is the common shape of
+// gitgatewayv1.GitGatewayService_PushStreamClient/_PullStreamClient —
+// declared narrowly here (Recv only) so pipeGitProgressStream doesn't need
+// two near-identical copies.
+type gitProgressStreamClient interface {
+	Recv() (*gitgatewayv1.GitProgressEvent, error)
+}
+
+// pipeGitProgressStream forwards stream's GitProgressEvent frames onto a
+// PushEvent channel under channelName, closing the channel once the stream
+// ends (final frame observed, ctx cancelled, or a transport error — see
+// notifications.subscribe's identical "stream.Recv() erroring just means
+// we're done" convention). The final (IsFinal) frame additionally carries
+// success (ExitCode==0) and exitCode, the unary Push/PullResponse-equivalent
+// outcome BUG-PW-03/TASK-PW-03-08 needs.
+//
+// KNOWN GAP: gitgatewayv1.GitProgressEvent carries no had_conflicts field
+// (only line/source/is_final/exit_code — see its proto doc comment), so
+// unlike the unary PullResponse.had_conflicts, this streamed final frame
+// cannot report conflict state directly; a caller that needs it must infer
+// it from the streamed lines' content (the same "CONFLICT" text
+// Executor.Pull's own local implementation already greps for) or fall back
+// to the unary Pull RPC.
+func pipeGitProgressStream(ctx context.Context, channelName string, stream gitProgressStreamClient) <-chan PushEvent {
+	out := make(chan PushEvent)
+	go func() {
+		defer close(out)
+		for {
+			ev, err := stream.Recv()
+			if err != nil {
+				return // stream closed, ctx cancelled, or a transport error — pipeGitProgressStream's caller sees the closed channel and returns too
+			}
+			frame := map[string]any{
+				"line":    ev.GetLine(),
+				"source":  ev.GetSource(),
+				"isFinal": ev.GetIsFinal(),
+			}
+			if ev.GetIsFinal() {
+				frame["exitCode"] = ev.GetExitCode()
+				frame["success"] = ev.GetExitCode() == 0
+			}
+			select {
+			case out <- PushEvent{Channel: channelName, Args: []any{frame}}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
 }
 
 // ── files.* (TASK-049..060) ─────────────────────────────────────────────

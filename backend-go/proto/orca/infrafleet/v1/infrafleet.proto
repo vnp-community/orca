@@ -32,6 +32,15 @@ service InfraFleetService {
   // shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
   // all go through this one).
   rpc Relay(RelayRequest) returns (RelayResponse);
+  // RelayStream is Relay's server-streaming counterpart (TASK-PW-03-08,
+  // SOL-PW-03) — mirrors Relay's connectionId+method+params shape but for
+  // agent methods that reply with multiple frames instead of one (currently
+  // only git-gateway-service's PushStream/PullStream, relaying to the
+  // agent's git.execStream — specs/agent/api/agent-rpc-catalog-git-fs.md's
+  // "git.execStream streaming shape" section). Each frame_json is one
+  // JSON-RPC response frame's result, encoded verbatim — same "no per-method
+  // translation" contract as RelayResponse.result_json, just repeated.
+  rpc RelayStream(RelayStreamRequest) returns (stream RelayStreamFrame);
   // ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
   // latter derives from this same read — see wscompat's registerSshChannels).
   rpc ListSshTargets(ListSshTargetsRequest) returns (ListSshTargetsResponse);
@@ -206,6 +215,21 @@ message RelayRequest {
 message RelayResponse {
   // result_json is the agent's JSON-RPC result, JSON-encoded verbatim.
   string result_json = 1;
+}
+
+message RelayStreamRequest {
+  string connection_id = 1;
+  string method = 2;
+  string params_json = 3; // same JSON-encoded-object convention as RelayRequest.params_json
+}
+
+message RelayStreamFrame {
+  // frame_json is one streamed JSON-RPC response frame's result,
+  // JSON-encoded verbatim (e.g. git.execStream's
+  // {type:'stream.chunk',line,source?} / {type:'stream.end',exitCode}) —
+  // git-gateway-service's grpcclient adapter decodes this into a
+  // domain.GitProgressLine, this RPC itself stays method-agnostic like Relay.
+  string frame_json = 1;
 }
 
 message CreateSshTargetRequest {

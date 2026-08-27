@@ -29,6 +29,8 @@ type Server struct {
 	commit                *usecase.Commit
 	push                  *usecase.Push
 	pull                  *usecase.Pull
+	pushStream            *usecase.PushStream
+	pullStream            *usecase.PullStream
 	generateCommitMessage *usecase.GenerateCommitMessage
 
 	stage   *usecase.Stage
@@ -113,6 +115,8 @@ func New(
 	commit *usecase.Commit,
 	push *usecase.Push,
 	pull *usecase.Pull,
+	pushStream *usecase.PushStream,
+	pullStream *usecase.PullStream,
 	generateCommitMessage *usecase.GenerateCommitMessage,
 	stage *usecase.Stage,
 	unstage *usecase.Unstage,
@@ -181,6 +185,8 @@ func New(
 		commit:                      commit,
 		push:                        push,
 		pull:                        pull,
+		pushStream:                  pushStream,
+		pullStream:                  pullStream,
 		generateCommitMessage:       generateCommitMessage,
 		stage:                       stage,
 		unstage:                     unstage,
@@ -300,6 +306,48 @@ func (s *Server) Pull(ctx context.Context, req *gitgatewayv1.PullRequest) (*gitg
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.PullResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+// PushStream is Push's incremental-progress counterpart (TASK-PW-03-08,
+// SOL-PW-03) — forwards usecase.PushStream's sink callback frames via
+// stream.Send, one GitProgressEvent per domain.GitProgressLine.
+func (s *Server) PushStream(req *gitgatewayv1.PushRequest, stream gitgatewayv1.GitGatewayService_PushStreamServer) error {
+	err := s.pushStream.Execute(stream.Context(), usecase.PushInputStream{
+		WorktreeID: req.GetWorktreeId(),
+		Remote:     req.GetRemote(),
+		Branch:     req.GetBranch(),
+	}, func(line domain.GitProgressLine) error {
+		return stream.Send(toProtoGitProgressEvent(line))
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	return nil
+}
+
+// PullStream is Pull's incremental-progress counterpart — see PushStream's
+// doc comment.
+func (s *Server) PullStream(req *gitgatewayv1.PullRequest, stream gitgatewayv1.GitGatewayService_PullStreamServer) error {
+	err := s.pullStream.Execute(stream.Context(), usecase.PullInputStream{
+		WorktreeID: req.GetWorktreeId(),
+	}, func(line domain.GitProgressLine) error {
+		return stream.Send(toProtoGitProgressEvent(line))
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	return nil
+}
+
+// toProtoGitProgressEvent mirrors domain.GitProgressLine 1:1 onto
+// gitgatewayv1.GitProgressEvent.
+func toProtoGitProgressEvent(line domain.GitProgressLine) *gitgatewayv1.GitProgressEvent {
+	return &gitgatewayv1.GitProgressEvent{
+		Line:     line.Line,
+		Source:   line.Source,
+		IsFinal:  line.IsFinal,
+		ExitCode: line.ExitCode,
+	}
 }
 
 // GenerateCommitMessage relays the worktree's staged diff to the Dev Server

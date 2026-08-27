@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -79,6 +80,96 @@ func (r *RelayExecutor) relay(ctx context.Context, connectionID, method string, 
 		return fmt.Errorf("grpcclient: unmarshal %s result: %w", method, err)
 	}
 	return nil
+}
+
+// relayStream is relay's server-streaming counterpart (TASK-PW-03-08,
+// SOL-PW-03) — calls infra-fleet-service's RelayStream RPC and forwards
+// each decoded frame to sink until a stream.end-typed frame is observed (or
+// the stream ends without one, treated as a clean nil-error completion —
+// mirrors devserveragent.Client.ExecStream's own "channel closed = done"
+// contract on this method's other end of the relay).
+func (r *RelayExecutor) relayStream(ctx context.Context, connectionID, method string, params map[string]any, sink func(domain.GitProgressLine) error) error {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return err
+	}
+
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("grpcclient: marshal params for %s: %w", method, err)
+	}
+
+	stream, err := r.client.RelayStream(ctx, &infrafleetv1.RelayStreamRequest{
+		ConnectionId: connectionID,
+		Method:       method,
+		ParamsJson:   string(paramsJSON),
+	})
+	if err != nil {
+		return fmt.Errorf("grpcclient: relay stream %s: %w", method, err)
+	}
+
+	for {
+		frame, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("grpcclient: relay stream %s: %w", method, err)
+		}
+		var raw map[string]any
+		if err := json.Unmarshal([]byte(frame.GetFrameJson()), &raw); err != nil {
+			continue // malformed frame — skip rather than abort the whole stream
+		}
+		line := decodeGitProgressFrame(raw)
+		if err := sink(line); err != nil {
+			return err
+		}
+		if line.IsFinal {
+			return nil
+		}
+	}
+}
+
+// decodeGitProgressFrame decodes one RelayStreamFrame.frame_json payload —
+// the agent's git.execStream shape ({type:'stream.chunk',line,source?} /
+// {type:'stream.end',exitCode}, specs/agent/api/agent-rpc-catalog-git-fs.md)
+// — into domain.GitProgressLine. Any frame not typed "stream.end" is
+// treated as a stream.chunk line, matching devserveragent.Client.ExecStream's
+// own best-effort tolerance for the FLAGGED/unconfirmed exact field names.
+func decodeGitProgressFrame(raw map[string]any) domain.GitProgressLine {
+	frameType, _ := raw["type"].(string)
+	if frameType != "stream.end" {
+		line, _ := raw["line"].(string)
+		source, _ := raw["source"].(string)
+		return domain.GitProgressLine{Line: line, Source: source}
+	}
+	exitCode, _ := raw["exitCode"].(float64)
+	return domain.GitProgressLine{
+		IsFinal:  true,
+		ExitCode: int32(exitCode),
+		Success:  exitCode == 0,
+	}
+}
+
+// ── usecase.StreamingGitExecutor ─────────────────────────────────────────
+
+// PushStream relays to the agent's git.execStream with a `git push`
+// argv — same remote/branch argument-building rule as Push above, plus the
+// same pushTarget shape limitation noted there.
+func (r *RelayExecutor) PushStream(ctx context.Context, repoPath, remote, branch string, sink func(domain.GitProgressLine) error) error {
+	args := []string{"push"}
+	if remote != "" {
+		args = append(args, remote)
+		if branch != "" {
+			args = append(args, branch)
+		}
+	}
+	return r.relayStream(ctx, repoPath, "git.execStream", map[string]any{"args": args, "cwd": repoPath}, sink)
+}
+
+// PullStream relays to the agent's git.execStream with a `git pull` argv.
+func (r *RelayExecutor) PullStream(ctx context.Context, repoPath string, sink func(domain.GitProgressLine) error) error {
+	return r.relayStream(ctx, repoPath, "git.execStream", map[string]any{"args": []string{"pull"}, "cwd": repoPath}, sink)
 }
 
 // ── usecase.GitExecutor ───────────────────────────────────────────────────

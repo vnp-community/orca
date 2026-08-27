@@ -255,6 +255,28 @@ type GitExecutor interface {
 	DeleteBranch(ctx context.Context, repoPath, branch string) error // soft; ForceDeleteBranch (existing) stays the -D path
 }
 
+// StreamingGitExecutor performs push/pull with incremental progress
+// (TASK-PW-03-08, SOL-PW-03) — a separate port from GitExecutor rather than
+// two more methods bolted onto that already-large interface, since only
+// PushStream/PullStream need it and only two of GitExecutor's two
+// implementations have a real streaming story:
+//   - internal/adapter/localgit: os/exec's Stdout/Stderr piped line-by-line
+//     as they arrive, via a real `git push`/`git pull` subprocess.
+//   - internal/adapter/grpcclient: relays to infra-fleet-service's
+//     RelayStream RPC, which relays to the agent's git.execStream — see
+//     usecase.PushStream/PullStream's doc comments for the relay-ssh
+//     restriction this port's callers must check BEFORE calling either
+//     method below (RelayStream itself does not re-check connection mode).
+//
+// sink is called once per line, in order; the final call always has
+// IsFinal=true and carries the unary-equivalent outcome. Returning a
+// non-nil error from sink aborts the operation (mirrors
+// usecase.RelayStream.Execute's own sink-abort contract).
+type StreamingGitExecutor interface {
+	PushStream(ctx context.Context, repoPath, remote, branch string, sink func(domain.GitProgressLine) error) error
+	PullStream(ctx context.Context, repoPath string, sink func(domain.GitProgressLine) error) error
+}
+
 // DevServerReachability resolves whether devServerID is a live,
 // agent-reachable remote host (relay branch) or this service should
 // operate on its own filesystem (local branch) — used only by Clone/
