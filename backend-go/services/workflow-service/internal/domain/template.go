@@ -69,6 +69,9 @@ var (
 	// ErrTemplateInvalidRemoveSteps guards RemoveStepsJSON against malformed
 	// JSON at construction time.
 	ErrTemplateInvalidRemoveSteps = errors.New("domain: remove_steps must be valid JSON")
+	// ErrTemplateInvalidVisibility guards Visibility against anything
+	// outside the closed private|team|company|public enum.
+	ErrTemplateInvalidVisibility = errors.New("domain: invalid visibility")
 )
 
 // WorkflowTemplate is a reusable, named DAG definition — see
@@ -108,6 +111,30 @@ type WorkflowTemplate struct {
 	// deliberately has no live ParentTemplateID) — never walked by
 	// ResolveChain, never affects resolution.
 	ClonedFromTemplateID string
+
+	// Visibility is the sharing tier BUG-WF-03's escalate-forward publish
+	// state machine governs — see Visibility.CanEscalateTo. Defaults to
+	// VisibilityPrivate at construction.
+	Visibility Visibility
+	// ShareToken is set once Visibility reaches VisibilityPublic (empty
+	// otherwise) — see usecase.PublishTemplate/GetShareLinkPreview.
+	ShareToken string
+	// RatingSum/RatingCount back AverageRating — the average itself is a
+	// derived value, never stored (matches rating_sum/rating_count's
+	// migration comment: "average computed at read time, not stored").
+	RatingSum   int32
+	RatingCount int32
+}
+
+// AverageRating is a derived value, not a stored field — matches
+// rating_sum/rating_count's "don't persist a derived value" posture. 0
+// when RatingCount is 0 (no divide-by-zero panic), which is also the
+// correct "no ratings yet" answer.
+func (t WorkflowTemplate) AverageRating() float64 {
+	if t.RatingCount == 0 {
+		return 0
+	}
+	return float64(t.RatingSum) / float64(t.RatingCount)
 }
 
 // NewWorkflowTemplate constructs a WorkflowTemplate, enforcing the
@@ -147,6 +174,7 @@ func NewWorkflowTemplate(id, tenantID, name, dagJSON string, scope Scope, parent
 		ParentTemplateID: parentTemplateID,
 		Version:          1,
 		OwnerID:          ownerID,
+		Visibility:       VisibilityPrivate,
 	}
 	for _, opt := range opts {
 		if err := opt(&t); err != nil {
@@ -206,6 +234,41 @@ func WithUsageCount(usageCount int32) TemplateOption {
 func WithClonedFrom(clonedFromTemplateID string) TemplateOption {
 	return func(t *WorkflowTemplate) error {
 		t.ClonedFromTemplateID = clonedFromTemplateID
+		return nil
+	}
+}
+
+// WithVisibility overrides the default VisibilityPrivate — used by
+// adapter/postgres when reconstructing a persisted row (visibility may
+// already have been escalated) rather than by CreateTemplate, which always
+// starts a new template at VisibilityPrivate (see usecase.PublishTemplate
+// for the only path that changes it after creation).
+func WithVisibility(visibility Visibility) TemplateOption {
+	return func(t *WorkflowTemplate) error {
+		if !visibility.Valid() {
+			return ErrTemplateInvalidVisibility
+		}
+		t.Visibility = visibility
+		return nil
+	}
+}
+
+// WithShareToken sets the share token — non-empty only once Visibility has
+// reached VisibilityPublic (see usecase.PublishTemplate).
+func WithShareToken(shareToken string) TemplateOption {
+	return func(t *WorkflowTemplate) error {
+		t.ShareToken = shareToken
+		return nil
+	}
+}
+
+// WithRating sets the aggregate rating fields — used by adapter/postgres
+// when reconstructing a persisted row; RateTemplate mutates these via a
+// direct SQL increment, not through this constructor path.
+func WithRating(sum, count int32) TemplateOption {
+	return func(t *WorkflowTemplate) error {
+		t.RatingSum = sum
+		t.RatingCount = count
 		return nil
 	}
 }
