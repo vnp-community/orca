@@ -62,6 +62,9 @@ type Server struct {
 
 	importFleetInventory *usecase.ImportFleetInventory
 	bulkProvisionFleet   *usecase.BulkProvisionFleet
+
+	detectDevServerAgents   *usecase.DetectDevServerAgents
+	checkDevServerPreflight *usecase.CheckDevServerPreflight
 }
 
 func New(
@@ -94,6 +97,8 @@ func New(
 	getHostCapabilities *usecase.GetHostCapabilities,
 	importFleetInventory *usecase.ImportFleetInventory,
 	bulkProvisionFleet *usecase.BulkProvisionFleet,
+	detectDevServerAgents *usecase.DetectDevServerAgents,
+	checkDevServerPreflight *usecase.CheckDevServerPreflight,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -125,6 +130,9 @@ func New(
 		getHostCapabilities:    getHostCapabilities,
 		importFleetInventory:   importFleetInventory,
 		bulkProvisionFleet:     bulkProvisionFleet,
+
+		detectDevServerAgents:   detectDevServerAgents,
+		checkDevServerPreflight: checkDevServerPreflight,
 	}
 }
 
@@ -306,6 +314,40 @@ func (s *Server) BulkProvisionFleet(ctx context.Context, req *infrafleetv1.BulkP
 		})
 	}
 	return resp, nil
+}
+
+// DetectDevServerAgents closes BL-FLEET-04 Step 3 — see
+// usecase.DetectDevServerAgents's doc comment.
+func (s *Server) DetectDevServerAgents(ctx context.Context, req *infrafleetv1.DetectDevServerAgentsRequest) (*infrafleetv1.DetectDevServerAgentsResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err))
+	}
+	result, err := s.detectDevServerAgents.Execute(ctx, tenantID, req.GetDevServerId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.DetectDevServerAgentsResponse{Agents: result.Agents, Platform: result.Platform}, nil
+}
+
+// CheckDevServerPreflight closes BL-FLEET-04 Step 4 — see
+// usecase.CheckDevServerPreflight's doc comment.
+func (s *Server) CheckDevServerPreflight(ctx context.Context, req *infrafleetv1.CheckDevServerPreflightRequest) (*infrafleetv1.CheckDevServerPreflightResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err))
+	}
+	result, err := s.checkDevServerPreflight.Execute(ctx, tenantID, req.GetDevServerId(), req.GetProbePort())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CheckDevServerPreflightResponse{
+		Git:  &infrafleetv1.CheckResult{Installed: result.Git.Installed, Version: result.Git.Version, MeetsMin: result.Git.MeetsMin},
+		Node: &infrafleetv1.CheckResult{Installed: result.Node.Installed, Version: result.Node.Version, MeetsMin: result.Node.MeetsMin},
+		Disk: &infrafleetv1.DiskCheckResult{FreeGb: result.Disk.FreeGB, MeetsMin: result.Disk.MeetsMin},
+		Port: &infrafleetv1.PortCheckResult{Port: result.Port.Port, Available: result.Port.Available},
+		Gh:   &infrafleetv1.CheckResult{Installed: result.GH.Installed, Version: result.GH.Version, MeetsMin: result.GH.MeetsMin},
+	}, nil
 }
 
 func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error) {

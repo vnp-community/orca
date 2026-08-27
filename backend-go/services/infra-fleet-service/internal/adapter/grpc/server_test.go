@@ -166,3 +166,122 @@ func TestServer_BulkProvisionFleet_UsecaseErrorMapsToGRPCStatus(t *testing.T) {
 		t.Errorf("expected codes.Unauthenticated, got %v", st.Code())
 	}
 }
+
+// fakeDevServerAgent is a minimal usecase.DevServerAgentClient fake for
+// this package's DetectDevServerAgents/CheckDevServerPreflight
+// gRPC-level marshaling tests — only Exec matters for either usecase, the
+// rest satisfy the interface unused.
+type fakeDevServerAgent struct {
+	execResult map[string]any
+	execErr    error
+}
+
+func (f *fakeDevServerAgent) Exec(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (map[string]any, error) {
+	if f.execErr != nil {
+		return nil, f.execErr
+	}
+	return f.execResult, nil
+}
+func (f *fakeDevServerAgent) Health(ctx context.Context, devServer domain.DevServer) (bool, error) {
+	return true, nil
+}
+func (f *fakeDevServerAgent) LastHandshakeInfo(devServerID string) (usecase.HandshakeInfo, bool) {
+	return usecase.HandshakeInfo{}, false
+}
+func (f *fakeDevServerAgent) SpawnPty(ctx context.Context, devServer domain.DevServer, in usecase.SpawnPtyInput) (usecase.SpawnPtyResult, error) {
+	return usecase.SpawnPtyResult{}, nil
+}
+func (f *fakeDevServerAgent) WritePty(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error {
+	return nil
+}
+func (f *fakeDevServerAgent) ResizePty(ctx context.Context, devServer domain.DevServer, ptyID string, cols, rows int32) error {
+	return nil
+}
+func (f *fakeDevServerAgent) KillPty(ctx context.Context, devServer domain.DevServer, ptyID string, graceful bool) error {
+	return nil
+}
+func (f *fakeDevServerAgent) SendSignal(ctx context.Context, devServer domain.DevServer, ptyID string, signal string) error {
+	return nil
+}
+func (f *fakeDevServerAgent) StreamPty(ctx context.Context, devServer domain.DevServer, ptyID string) (<-chan usecase.PtyEvent, func(), error) {
+	return nil, func() {}, nil
+}
+func (f *fakeDevServerAgent) AgentStatus(ctx context.Context, devServer domain.DevServer, ptyID string) (usecase.AgentStatusResult, error) {
+	return usecase.AgentStatusResult{}, nil
+}
+func (f *fakeDevServerAgent) InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (usecase.InspectProcessResult, error) {
+	return usecase.InspectProcessResult{}, nil
+}
+
+func TestServer_DetectDevServerAgents_RequestToResponseMarshaling(t *testing.T) {
+	agent := &fakeDevServerAgent{execResult: map[string]any{"agents": []any{"claude"}, "platform": "linux"}}
+	s := &Server{detectDevServerAgents: usecase.NewDetectDevServerAgents(&fakeDevServerRepo{}, agent)}
+
+	ctx := tenant.WithTenantID(context.Background(), "t1")
+	resp, err := s.DetectDevServerAgents(ctx, &infrafleetv1.DetectDevServerAgentsRequest{DevServerId: "ds1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetAgents()) != 1 || resp.GetAgents()[0] != "claude" || resp.GetPlatform() != "linux" {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestServer_DetectDevServerAgents_NoTenantMapsToGRPCStatus(t *testing.T) {
+	agent := &fakeDevServerAgent{execResult: map[string]any{}}
+	s := &Server{detectDevServerAgents: usecase.NewDetectDevServerAgents(&fakeDevServerRepo{}, agent)}
+
+	_, err := s.DetectDevServerAgents(context.Background(), &infrafleetv1.DetectDevServerAgentsRequest{DevServerId: "ds1"})
+	if err == nil {
+		t.Fatal("expected an error when no tenant is present in the request context")
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected a gRPC status error, got %v", err)
+	}
+	if st.Code() != codes.Unauthenticated {
+		t.Errorf("expected codes.Unauthenticated, got %v", st.Code())
+	}
+}
+
+func TestServer_CheckDevServerPreflight_RequestToResponseMarshaling(t *testing.T) {
+	agent := &fakeDevServerAgent{execResult: map[string]any{
+		"stdout": "GIT:git version 2.39.2\nNODE:v22.3.0\nDISK:10485760\nGH:gh version 2.40.0\nPORT:FREE\n",
+	}}
+	s := &Server{checkDevServerPreflight: usecase.NewCheckDevServerPreflight(&fakeDevServerRepo{}, agent)}
+
+	ctx := tenant.WithTenantID(context.Background(), "t1")
+	resp, err := s.CheckDevServerPreflight(ctx, &infrafleetv1.CheckDevServerPreflightRequest{DevServerId: "ds1", ProbePort: 3000})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetGit().GetMeetsMin() || !resp.GetNode().GetMeetsMin() {
+		t.Errorf("expected git/node MeetsMin=true, got %+v", resp)
+	}
+	if !resp.GetDisk().GetMeetsMin() || resp.GetDisk().GetFreeGb() != 10 {
+		t.Errorf("expected disk MeetsMin=true with 10GB free, got %+v", resp.GetDisk())
+	}
+	if !resp.GetPort().GetAvailable() || resp.GetPort().GetPort() != 3000 {
+		t.Errorf("expected port available=true port=3000, got %+v", resp.GetPort())
+	}
+	if !resp.GetGh().GetInstalled() {
+		t.Errorf("expected gh installed=true, got %+v", resp.GetGh())
+	}
+}
+
+func TestServer_CheckDevServerPreflight_NoTenantMapsToGRPCStatus(t *testing.T) {
+	agent := &fakeDevServerAgent{execResult: map[string]any{}}
+	s := &Server{checkDevServerPreflight: usecase.NewCheckDevServerPreflight(&fakeDevServerRepo{}, agent)}
+
+	_, err := s.CheckDevServerPreflight(context.Background(), &infrafleetv1.CheckDevServerPreflightRequest{DevServerId: "ds1"})
+	if err == nil {
+		t.Fatal("expected an error when no tenant is present in the request context")
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected a gRPC status error, got %v", err)
+	}
+	if st.Code() != codes.Unauthenticated {
+		t.Errorf("expected codes.Unauthenticated, got %v", st.Code())
+	}
+}

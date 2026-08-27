@@ -184,6 +184,8 @@ func run() error {
 
 	importFleetInventoryUC := usecase.NewImportFleetInventory(sshTargetStore)
 	bulkProvisionFleetUC := usecase.NewBulkProvisionFleet(sshTargetStore, repo, bulkProvisioner)
+	detectDevServerAgentsUC := usecase.NewDetectDevServerAgents(repo, agentClient)
+	checkDevServerPreflightUC := usecase.NewCheckDevServerPreflight(repo, agentClient)
 
 	// --- Fleet health polling (SOL-FLEET-03) ---------------------------
 	// Transactional-outbox relay for dev_server.health_degraded — same
@@ -260,6 +262,8 @@ func run() error {
 		getHostCapabilitiesUC,
 		importFleetInventoryUC,
 		bulkProvisionFleetUC,
+		detectDevServerAgentsUC,
+		checkDevServerPreflightUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

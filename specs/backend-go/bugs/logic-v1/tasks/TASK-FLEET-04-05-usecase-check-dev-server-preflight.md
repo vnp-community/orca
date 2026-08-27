@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/check_dev_server_preflight.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — implemented CheckDevServerPreflight + parsePreflightOutput. Corrections: used apperrors.KindInternal (KindUnavailable doesn't exist, same fix as TASK-FLEET-04-04); parsePreflightOutput takes probePort as a second param (the script's PORT:FREE/BUSY output never echoes the port number itself, so it can't otherwise populate PortCheckResult.Port); version-compare logic duplicated in miniature (preflightVersion type) rather than importing adapter/sshrelay, per Dependency Inversion. Tests cover exact 2.39.2/2.20.0 Git threshold boundary, PORT:FREE/BUSY, GH installed-only semantics, and malformed-input-never-panics with MeetsMin always false on unparseable content. All pass under `-race`.
 
 ---
 
