@@ -7,10 +7,17 @@ import {
   resolveLocalhostHttpLinkDisplayUrl
 } from './http-link-routing'
 
-const openUrlMock = vi.fn()
+// Why: vi.mock factories are hoisted above all top-level code, including
+// const declarations — vi.hoisted() lets the shell-wrapper mock below
+// reference this without hitting a temporal-dead-zone ReferenceError.
+const { openUrlMock } = vi.hoisted(() => ({ openUrlMock: vi.fn() }))
 const registerLocalhostLabelMock = vi.fn()
 const setActiveWorktreeMock = vi.fn()
 const createBrowserTabMock = vi.fn()
+
+vi.mock('@/runtime/runtime-shell-client', () => ({
+  shellOpenUrl: openUrlMock
+}))
 
 const storeState = {
   settings: undefined as
@@ -43,9 +50,6 @@ beforeEach(() => {
   registerHttpLinkStoreAccessor(() => storeState)
   vi.stubGlobal('window', {
     api: {
-      shell: {
-        openUrl: openUrlMock
-      },
       localhostWorktreeLabels: {
         register: registerLocalhostLabelMock
       }

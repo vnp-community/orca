@@ -7,6 +7,7 @@ import {
   encodeKeepAliveFrame,
   parseJsonRpcMessage,
   KEEPALIVE_SEND_MS,
+  TIMEOUT_MS,
   type DecodedFrame,
   type JsonRpcRequest,
   type JsonRpcNotification,
@@ -53,6 +54,11 @@ type RelayClient = {
   highestReceivedSeq: number
   generation: number
   closed: boolean
+  /** Wall-clock time of the last successfully-decoded frame (data or
+   * keepalive) from this client — see startKeepalive()'s idle-timeout check
+   * and specs/agent/api/gaps-and-findings.md #8 (TIMEOUT_MS was declared but
+   * never enforced). */
+  lastFrameReceivedAt: number
 }
 
 type PendingRelayRequest = {
@@ -146,10 +152,28 @@ export class RelayDispatcher {
   }
 
   onRequest(method: string, handler: MethodHandler): void {
+    // Why: a silent last-registration-wins overwrite here previously let one
+    // handler class shadow another's `git.clone` registration with a
+    // completely different (and unvalidated) param contract — see
+    // specs/agent/api/gaps-and-findings.md #3. Warn loudly so a future
+    // duplicate registration is caught at wiring time instead of surfacing
+    // as a confusing runtime param-shape mismatch.
+    if (this.requestHandlers.has(method)) {
+      process.stderr.write(
+        `[relay] WARNING: duplicate onRequest registration for '${method}' — ` +
+        `the earlier handler is being silently replaced.\n`
+      )
+    }
     this.requestHandlers.set(method, handler)
   }
 
   onNotification(method: string, handler: NotificationHandler): void {
+    if (this.notificationHandlers.has(method)) {
+      process.stderr.write(
+        `[relay] WARNING: duplicate onNotification registration for '${method}' — ` +
+        `the earlier handler is being silently replaced.\n`
+      )
+    }
     this.notificationHandlers.set(method, handler)
   }
 
@@ -361,7 +385,8 @@ export class RelayDispatcher {
       nextOutgoingSeq: 1,
       highestReceivedSeq: 0,
       generation: 0,
-      closed: false
+      closed: false,
+      lastFrameReceivedAt: Date.now()
     }
     return client
   }
@@ -372,9 +397,11 @@ export class RelayDispatcher {
     client.decoder.reset()
     client.generation++
     client.closed = false
+    client.lastFrameReceivedAt = Date.now()
   }
 
   private handleFrame(client: RelayClient, frame: DecodedFrame): void {
+    client.lastFrameReceivedAt = Date.now()
     if (frame.id > client.highestReceivedSeq) {
       client.highestReceivedSeq = frame.id
     }
@@ -515,9 +542,34 @@ export class RelayDispatcher {
       if (this.disposed) {
         return
       }
-      for (const client of this.clients.values()) {
+      const now = Date.now()
+      // Why: TIMEOUT_MS ("if no frame received in 20000ms → close
+      // connection") was declared in protocol.ts but never enforced anywhere
+      // — see specs/agent/api/gaps-and-findings.md #8. Snapshot into an array
+      // since detachClient() below mutates this.clients mid-loop.
+      for (const client of Array.from(this.clients.values())) {
         if (client.closed) {
           continue
+        }
+        const idleMs = now - client.lastFrameReceivedAt
+        if (idleMs >= TIMEOUT_MS) {
+          if (client !== this.primaryClient) {
+            // Non-primary attached clients already have a well-defined
+            // removal path — reclaim a silently-dead one (e.g. a
+            // synced-workspace client whose socket died without a clean
+            // close) instead of leaking it forever.
+            process.stderr.write(
+              `[relay] Idle timeout: client ${client.id} silent for ${idleMs}ms — detaching.\n`
+            )
+            this.detachClient(client.id)
+            continue
+          }
+          // The primary client's lifecycle (SSH exec channel / stdout) is
+          // managed externally (setWrite() on reconnect) — force-closing it
+          // here could race with that flow, so only warn for now.
+          process.stderr.write(
+            `[relay] WARNING: primary client silent for ${idleMs}ms (limit ${TIMEOUT_MS}ms).\n`
+          )
         }
         const seq = client.nextOutgoingSeq++
         const frame = encodeKeepAliveFrame(seq, client.highestReceivedSeq)

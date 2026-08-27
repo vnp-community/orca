@@ -57,6 +57,14 @@ export type OrcaTask = {
   /** Template string with ${task.*} interpolation for agent prompt */
   promptTemplate?: string
   dueDate?: Date
+  /**
+   * TaskRow.id in OrchestrationDb while this task runs via the complex
+   * (multi-agent coordinator) path — null once the run converges.
+   * Migration 0016 (docs/guides/task-automation-orchestration-integration.md §9.4.2).
+   */
+  activeExecutionTaskId?: string | null
+  /** agent.spawn session id while/after this task runs via the simple (single-agent) path. */
+  agentSessionId?: string | null
   createdAt: Date
   updatedAt: Date
 }

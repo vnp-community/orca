@@ -22,12 +22,13 @@ describe('settings setup guide progress', () => {
       ready: true,
       doneCount: 0,
       total: FEATURE_WALL_SETUP_STEPS.length,
-      firstIncompleteStepId: 'notifications'
+      firstIncompleteStepId: 'connect-dev-server'
     })
   })
 
   it('does not mark Settings complete when only the old setup subset is done', () => {
     const stepDone = {
+      'connect-dev-server': true,
       'two-worktrees': true,
       notifications: true,
       'default-agent': true,
@@ -36,7 +37,7 @@ describe('settings setup guide progress', () => {
 
     expect(getSettingsSetupGuideProgress({ ready: true, stepDone })).toEqual({
       ready: true,
-      doneCount: 4,
+      doneCount: 5,
       total: FEATURE_WALL_SETUP_STEPS.length,
       firstIncompleteStepId: 'agent-capabilities'
     })

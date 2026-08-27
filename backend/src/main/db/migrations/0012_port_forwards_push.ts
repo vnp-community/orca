@@ -31,8 +31,8 @@ export const migration0012PortForwardsPush: Migration = {
         remote_port   INTEGER NOT NULL,
         label         TEXT    NOT NULL DEFAULT '',
         active        INTEGER NOT NULL DEFAULT 1,
-        created_at    INTEGER NOT NULL,
-        closed_at     INTEGER
+        created_at    BIGINT NOT NULL,
+        closed_at     BIGINT
       )
     `)
 
@@ -56,7 +56,7 @@ export const migration0012PortForwardsPush: Migration = {
         endpoint   TEXT    NOT NULL PRIMARY KEY,
         auth       TEXT    NOT NULL,
         p256dh     TEXT    NOT NULL,
-        updated_at INTEGER NOT NULL
+        updated_at BIGINT NOT NULL
       )
     `)
 

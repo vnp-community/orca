@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { requiredString } from '../schemas'
+import { getRemotePtyProvider } from '../../../ipc/pty'
+import { buildPosixShellCommand } from '../../../../shared/posix-shell-quote'
 
 // Why: GitLab CLI (glab) auth works the same way as gh — interactive Device Flow
 // in a PTY. Spawning on the Dev Server relay ensures credentials are stored
@@ -32,31 +34,37 @@ export const GITLAB_AUTH_METHODS: RpcMethod[] = [
           'gitlab.startAuthLogin requires Web Server mode (devServerManager not available)'
         )
       }
-      const relay = ctx.devServerManager.getRelay(params.devServerId)
-      if (!relay) {
+      // Why routed through the IPtyProvider registry instead of a raw
+      // relay.call('pty.spawn', ...): 'pty.spawn' only exists on relay-ssh
+      // dev servers — direct-websocket/relay-websocket (the default
+      // connection mode) only register 'pty.create', which this bypassed
+      // entirely, throwing MethodNotFound. getRemotePtyProvider() resolves
+      // to whichever provider (SshPtyProvider/DevServerPtyProvider) the
+      // connection type actually supports, and both now forward `command`/
+      // `commandDelivery`/`userId` correctly. See
+      // specs/agent/api/gaps-and-findings.md #5.
+      const provider = getRemotePtyProvider(params.devServerId)
+      if (!provider) {
         throw new Error(
           `Dev server '${params.devServerId}' relay is not connected. ` +
           `Connect to the dev server first.`
         )
       }
 
-      const args = ['auth', 'login']
-      if (params.host) {
-        args.push('--hostname', params.host)
-      }
-
       // FIX BUG-BE-HLD-005: forward the authenticated user so the Agent can
       // namespace GLAB_CONFIG_DIR per user (see external-api-connector.ts buildGlabEnv).
-      const ptyId = await relay.call<string>('pty.spawn', {
-        command: 'glab',
-        args,
-        env: {},
-        userId: ctx.userId,
+      const result = await provider.spawn({
         cols: 120,
-        rows: 30
+        rows: 30,
+        command: buildPosixShellCommand([
+          'glab', 'auth', 'login',
+          ...(params.host ? ['--hostname', params.host] : [])
+        ]),
+        commandDelivery: 'provider',
+        ...(ctx.userId ? { userId: ctx.userId } : {})
       })
 
-      return { ptyId, devServerId: params.devServerId }
+      return { ptyId: result.id, devServerId: params.devServerId }
     }
   }),
 
@@ -73,28 +81,26 @@ export const GITLAB_AUTH_METHODS: RpcMethod[] = [
           'gitlab.revokeAuth requires Web Server mode (devServerManager not available)'
         )
       }
-      const relay = ctx.devServerManager.getRelay(params.devServerId)
-      if (!relay) {
+      const provider = getRemotePtyProvider(params.devServerId)
+      if (!provider) {
         throw new Error(
           `Dev server '${params.devServerId}' relay is not connected.`
         )
       }
 
-      const args = params.host
-        ? ['auth', 'logout', '--hostname', params.host]
-        : ['auth', 'logout']
-
       // FIX BUG-BE-HLD-005: same per-user GLAB_CONFIG_DIR namespacing as startAuthLogin.
-      const ptyId = await relay.call<string>('pty.spawn', {
-        command: 'glab',
-        args,
-        env: {},
-        userId: ctx.userId,
+      const result = await provider.spawn({
         cols: 80,
-        rows: 10
+        rows: 10,
+        command: buildPosixShellCommand([
+          'glab', 'auth', 'logout',
+          ...(params.host ? ['--hostname', params.host] : [])
+        ]),
+        commandDelivery: 'provider',
+        ...(ctx.userId ? { userId: ctx.userId } : {})
       })
 
-      return { ptyId, devServerId: params.devServerId }
+      return { ptyId: result.id, devServerId: params.devServerId }
     }
   })
 ]

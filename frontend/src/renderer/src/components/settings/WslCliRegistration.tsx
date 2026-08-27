@@ -16,6 +16,7 @@ import {
 import { Label } from '../ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeWslCliInstallStatus, installRuntimeWslCli, removeRuntimeWslCli } from '@/runtime/runtime-cli-client'
 
 type WslCliRegistrationProps = {
   currentPlatform: string
@@ -35,7 +36,7 @@ export function WslCliRegistration({
   const refreshStatus = useCallback(async (): Promise<void> => {
     setLoading(true)
     try {
-      const next = await window.api.cli.getWslInstallStatus()
+      const next = await getRuntimeWslCliInstallStatus()
       if (mountedRef.current) {
         setStatus(next)
       }
@@ -74,7 +75,7 @@ export function WslCliRegistration({
   const handleInstall = async (): Promise<void> => {
     setBusyAction('install')
     try {
-      const next = await window.api.cli.installWsl()
+      const next = await installRuntimeWslCli()
       if (!mountedRef.current) {
         return
       }
@@ -109,7 +110,7 @@ export function WslCliRegistration({
   const handleRemove = async (): Promise<void> => {
     setBusyAction('remove')
     try {
-      const next = await window.api.cli.removeWsl()
+      const next = await removeRuntimeWslCli()
       if (!mountedRef.current) {
         return
       }

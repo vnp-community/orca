@@ -1,6 +1,13 @@
 // FIX TASK-AT-001: Removed 'electron' import — use RendererBridge interface instead.
 // AutomationService now works in server mode (ORCA_MULTI_USER=1) without Electron.
-import type { Store } from '../persistence'
+// ADR-021 Phase 1: narrowed from the concrete `Store` type to the exact
+// methods used, so a future Postgres-backed store can satisfy this interface
+// without AutomationService depending on persistence.ts's Store at all — see
+// automation-store-dependency.ts's module doc comment. Every store call below
+// is `await`ed because the interface is async (Postgres-backed implementations
+// need real I/O) even though `wrapStoreAsAutomationStoreDependency()` resolves
+// instantly for the Electron-desktop `Store` case.
+import type { AutomationStoreDependency } from './automation-store-dependency'
 import {
   isFinalAutomationRunStatus,
   type Automation,
@@ -30,7 +37,7 @@ type RendererBridge = {
 }
 
 export class AutomationService {
-  private readonly store: Store
+  private readonly store: AutomationStoreDependency
   private readonly tickMs: number
   private timer: ReturnType<typeof setInterval> | null = null
   private webContents: RendererBridge | null = null
@@ -42,7 +49,7 @@ export class AutomationService {
   private readonly headlessDispatcher: HeadlessAutomationDispatcher | null
 
   constructor(
-    store: Store,
+    store: AutomationStoreDependency,
     opts: {
       tickMs?: number
       claudeUsage?: ClaudeUsageStore
@@ -93,27 +100,30 @@ export class AutomationService {
   }
 
   async runNow(automationId: string): Promise<AutomationRun> {
-    const automation = this.store.listAutomations().find((entry) => entry.id === automationId)
+    const automations = await this.store.listAutomations()
+    const automation = automations.find((entry) => entry.id === automationId)
     if (!automation) {
       throw new Error('Automation not found.')
     }
-    const run = this.store.createAutomationRun(automation, Date.now(), 'manual')
+    const run = await this.store.createAutomationRun(automation, Date.now(), 'manual')
     return await this.requestDispatch(automation, run)
   }
 
   async runPrecheck(automationId: string, runId: string): Promise<AutomationPrecheckResult | null> {
-    const automation = this.store.listAutomations().find((entry) => entry.id === automationId)
+    const automations = await this.store.listAutomations()
+    const automation = automations.find((entry) => entry.id === automationId)
     if (!automation) {
       throw new Error('Automation not found.')
     }
-    const run = this.store.listAutomationRuns(automationId).find((entry) => entry.id === runId)
+    const runs = await this.store.listAutomationRuns(automationId)
+    const run = runs.find((entry) => entry.id === runId)
     if (!run) {
       throw new Error('Automation run not found.')
     }
     if (run.trigger !== 'scheduled' || !automation.precheck) {
       return null
     }
-    const target = resolveAutomationRunTarget(this.store, automation, {
+    const target = await resolveAutomationRunTarget(this.store, automation, {
       allowRemoteHostScheduling: this.allowRemoteHostScheduling
     })
     if (!target.ok) {
@@ -141,7 +151,7 @@ export class AutomationService {
   }
 
   async markDispatchResult(result: AutomationDispatchResult): Promise<AutomationRun> {
-    const run = this.store.updateAutomationRun(result)
+    const run = await this.store.updateAutomationRun(result)
     clearAutomationDispatchTokens(run.automationId, run.id)
     if (!isFinalAutomationRunStatus(run.status)) {
       return run
@@ -153,18 +163,20 @@ export class AutomationService {
     if (run.usage) {
       return run
     }
+    const automations = await this.store.listAutomations()
     const usage = await collectAutomationRunUsage({
-      automation: this.store.listAutomations().find((entry) => entry.id === run.automationId),
+      automation: automations.find((entry) => entry.id === run.automationId),
       run,
       claudeUsage: this.claudeUsage,
       codexUsage: this.codexUsage
     })
     // Why: the run is final during the await above, so a concurrent create-time
     // retention prune may have evicted it — the usage write must not throw then.
-    if (!this.store.listAutomationRuns(run.automationId).some((entry) => entry.id === run.id)) {
+    const runsAfterUsageCollection = await this.store.listAutomationRuns(run.automationId)
+    if (!runsAfterUsageCollection.some((entry) => entry.id === run.id)) {
       return run
     }
-    return this.store.updateAutomationRun({
+    return await this.store.updateAutomationRun({
       runId: run.id,
       status: run.status,
       workspaceId: run.workspaceId,
@@ -181,7 +193,8 @@ export class AutomationService {
     this.evaluating = true
     try {
       const now = Date.now()
-      for (const automation of this.store.listAutomations()) {
+      const automations = await this.store.listAutomations()
+      for (const automation of automations) {
         if (!automation.enabled || automation.nextRunAt > now) {
           continue
         }
@@ -195,35 +208,35 @@ export class AutomationService {
   private async evaluateAutomation(automation: Automation, now: number): Promise<void> {
     const scheduledFor = this.store.getLatestAutomationOccurrence(automation, now)
     if (scheduledFor === null) {
-      this.store.advanceAutomationNextRun(automation.id, now)
+      await this.store.advanceAutomationNextRun(automation.id, now)
       return
     }
-    const run = this.store.createAutomationRun(automation, scheduledFor)
+    const run = await this.store.createAutomationRun(automation, scheduledFor)
     const graceMs = automation.missedRunGraceMinutes * 60 * 1000
     if (now - scheduledFor > graceMs) {
-      this.store.updateAutomationRun({
+      await this.store.updateAutomationRun({
         runId: run.id,
         status: 'skipped_missed',
         workspaceId: automation.workspaceId,
         error: 'Orca was unavailable during the missed-run grace window.'
       })
-      this.store.advanceAutomationNextRun(automation.id, now)
+      await this.store.advanceAutomationNextRun(automation.id, now)
       return
     }
 
     await this.requestDispatch(automation, run)
-    this.store.advanceAutomationNextRun(automation.id, now)
+    await this.store.advanceAutomationNextRun(automation.id, now)
   }
 
   private async requestDispatch(
     automation: Automation,
     run: AutomationRun
   ): Promise<AutomationRun> {
-    const target = resolveAutomationRunTarget(this.store, automation, {
+    const target = await resolveAutomationRunTarget(this.store, automation, {
       allowRemoteHostScheduling: this.allowRemoteHostScheduling
     })
     if (!target.ok) {
-      return this.store.updateAutomationRun({
+      return await this.store.updateAutomationRun({
         runId: run.id,
         status: 'skipped_unavailable',
         workspaceId: automation.workspaceId,
@@ -235,14 +248,14 @@ export class AutomationService {
       if (this.headlessDispatcher) {
         return await this.requestHeadlessDispatch(automation, run, target)
       }
-      return this.store.updateAutomationRun({
+      return await this.store.updateAutomationRun({
         runId: run.id,
         status: 'skipped_unavailable',
         workspaceId: automation.workspaceId,
         error: 'No Orca window was available to launch the automation.'
       })
     }
-    const updated = this.store.updateAutomationRun({
+    const updated = await this.store.updateAutomationRun({
       runId: run.id,
       status: 'dispatching',
       workspaceId: automation.workspaceId,
@@ -267,7 +280,7 @@ export class AutomationService {
         ? await this.runPrecheck(automation.id, run.id)
         : null
     if (precheckResult && !didAutomationPrecheckPass(precheckResult)) {
-      return this.store.updateAutomationRun({
+      return await this.store.updateAutomationRun({
         runId: run.id,
         status: 'skipped_precheck',
         workspaceId: automation.workspaceId,
@@ -284,7 +297,7 @@ export class AutomationService {
         terminalPaneKey: launch.terminalPaneKey ?? null,
         terminalPtyId: launch.terminalPtyId ?? null
       }
-      const updated = this.store.updateAutomationRun({
+      const updated = await this.store.updateAutomationRun({
         runId: run.id,
         status: 'dispatched',
         ...launchRunTarget,
@@ -313,7 +326,7 @@ export class AutomationService {
       }
       return updated
     } catch (error) {
-      return this.store.updateAutomationRun({
+      return await this.store.updateAutomationRun({
         runId: run.id,
         status: 'dispatch_failed',
         workspaceId: automation.workspaceId,

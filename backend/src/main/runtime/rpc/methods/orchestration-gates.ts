@@ -1,7 +1,11 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
-import type { GateStatus } from '../../orchestration/db'
+// ADR-021 — "chỉ dùng 1 database": OrchestrationDb (SQLite) → PgOrchestrationDb
+// (async) — every handler below is now `async` and awaits its db.* calls.
+// GateStatus is dialect-agnostic (runtime/orchestration/types.ts) so it's
+// imported directly rather than via either db implementation.
+import type { GateStatus } from '../../orchestration/types'
 import { Coordinator } from '../../orchestration/coordinator'
 
 // Why: the coordinator instance is stored at module scope so orchestration.runStop
@@ -43,10 +47,10 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.run',
     params: RunParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
 
-      const existing = db.getActiveCoordinatorRun()
+      const existing = await db.getActiveCoordinatorRun()
       if (existing) {
         throw new Error(`Coordinator already running: ${existing.id}`)
       }
@@ -62,7 +66,7 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
 
       activeCoordinator = coordinator
 
-      const run = db.createCoordinatorRun({
+      const run = await db.createCoordinatorRun({
         spec: params.spec,
         coordinatorHandle,
         pollIntervalMs: params.pollIntervalMs
@@ -84,9 +88,9 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.runStop',
     params: RunStopParams,
-    handler: (_params, { runtime }) => {
+    handler: async (_params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
-      const run = db.getActiveCoordinatorRun()
+      const run = await db.getActiveCoordinatorRun()
       if (!run) {
         throw new Error('No active coordinator run')
       }
@@ -103,7 +107,7 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.gateCreate',
     params: GateCreateParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
       let options: string[] | undefined
       if (params.options) {
@@ -117,7 +121,7 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
           throw new Error('Invalid --options: must be a JSON array of strings')
         }
       }
-      const gate = db.createGate({
+      const gate = await db.createGate({
         taskId: params.task,
         question: params.question,
         options
@@ -129,9 +133,9 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.gateResolve',
     params: GateResolveParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
-      const gate = db.resolveGate(params.id, params.resolution)
+      const gate = await db.resolveGate(params.id, params.resolution)
       if (!gate) {
         throw new Error(`Gate not found: ${params.id}`)
       }
@@ -142,9 +146,9 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.gateList',
     params: GateListParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
-      const gates = db.listGates({
+      const gates = await db.listGates({
         taskId: params.task,
         status: params.status as GateStatus
       })

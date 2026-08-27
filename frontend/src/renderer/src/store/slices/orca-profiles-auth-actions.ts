@@ -9,6 +9,13 @@ import type {
   SignOutCurrentOrcaProfileResult
 } from '../../../../shared/orca-profiles'
 import type { AppState } from '../types'
+import {
+  createRuntimeCloudLinkedOrcaProfile,
+  connectRuntimeCurrentOrcaProfile,
+  refreshRuntimeCurrentOrcaProfileAuth,
+  signOutRuntimeCurrentOrcaProfile,
+  selectRuntimeOrcaProfileOrg
+} from '../../runtime/runtime-orca-profiles-client'
 
 export type OrcaProfilesAuthActions = {
   createCloudLinkedOrcaProfile: (args: {
@@ -32,7 +39,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
 > = (set, get) => ({
   createCloudLinkedOrcaProfile: async (args) => {
     try {
-      const result = await window.api.orcaProfiles.createCloudLinked(args)
+      const result = await createRuntimeCloudLinkedOrcaProfile(get().settings, args)
       set({
         orcaProfileAuthStatus: result.auth,
         ...(result.status === 'created'
@@ -75,7 +82,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
     }
     set({ orcaProfileConnecting: true })
     try {
-      const result = await window.api.orcaProfiles.connectCurrent()
+      const result = await connectRuntimeCurrentOrcaProfile(get().settings)
       set({
         orcaProfileConnecting: false,
         orcaProfileAuthStatus: result.auth,
@@ -120,7 +127,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
 
   refreshCurrentOrcaProfileAuth: async () => {
     try {
-      const result = await window.api.orcaProfiles.refreshAuth()
+      const result = await refreshRuntimeCurrentOrcaProfileAuth(get().settings)
       set({
         orcaProfileAuthStatus: result.auth,
         ...(result.status === 'refreshed'
@@ -155,7 +162,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
 
   signOutCurrentOrcaProfile: async () => {
     try {
-      const result = await window.api.orcaProfiles.signOutCurrent()
+      const result = await signOutRuntimeCurrentOrcaProfile(get().settings)
       set({
         activeOrcaProfileId: result.activeProfileId,
         orcaProfiles: result.profiles,
@@ -176,7 +183,7 @@ export const createOrcaProfilesAuthActions: StateCreator<
 
   selectOrcaProfileOrg: async (orgId) => {
     try {
-      const result = await window.api.orcaProfiles.selectOrg({ orgId })
+      const result = await selectRuntimeOrcaProfileOrg(get().settings, { orgId })
       set({
         orcaProfileAuthStatus: result.auth,
         ...(result.status === 'selected'

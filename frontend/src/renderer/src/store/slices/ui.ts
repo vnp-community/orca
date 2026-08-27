@@ -116,7 +116,10 @@ import {
 import { buildAgentNotificationId } from '../../../../shared/agent-notification-id'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { translate } from '@/i18n/i18n'
+import { updaterDismissNudge } from '@/runtime/runtime-updater-client'
+import { deleteRuntimePetFile } from '@/runtime/runtime-pet-client'
 
+import { uiRecordFeatureInteraction, uiSet } from '@/runtime/runtime-ui-client'
 export type PendingSidebarWorktreeReveal = {
   worktreeId: string
   behavior: 'auto' | 'smooth'
@@ -507,7 +510,8 @@ const TOP_LEVEL_VIEW_LOOKUP: Record<TopLevelView, true> = {
   automations: true,
   space: true,
   skills: true,
-  mobile: true
+  mobile: true,
+  workspace: true
 }
 const KNOWN_TOP_LEVEL_VIEWS = new Set<string>(Object.keys(TOP_LEVEL_VIEW_LOOKUP))
 
@@ -631,6 +635,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeSettings:
     | 'terminal'
     | 'tasks'
@@ -639,6 +644,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeActivity:
     | 'terminal'
     | 'settings'
@@ -647,6 +653,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeAutomations:
     | 'terminal'
     | 'settings'
@@ -655,6 +662,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeSpace:
     | 'terminal'
     | 'settings'
@@ -663,6 +671,7 @@ export type UISlice = {
     | 'automations'
     | 'skills'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeSkills:
     | 'terminal'
     | 'settings'
@@ -671,6 +680,7 @@ export type UISlice = {
     | 'automations'
     | 'space'
     | 'mobile'
+    | 'workspace'
   previousViewBeforeMobile:
     | 'terminal'
     | 'settings'
@@ -679,6 +689,7 @@ export type UISlice = {
     | 'automations'
     | 'space'
     | 'skills'
+    | 'workspace'
   setActiveView: (view: UISlice['activeView']) => void
   taskPageData: {
     preselectedRepoId?: string
@@ -1396,7 +1407,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setTaskResumeState: (updates) =>
     set((s) => {
       const next = { ...s.taskResumeState, ...updates }
-      window.api.ui.set({ taskResumeState: next }).catch(console.error)
+      uiSet({ taskResumeState: next }).catch(console.error)
       return { taskResumeState: next }
     }),
   setGithubTaskDrawerWorkItem: (item) => set({ githubTaskDrawerWorkItem: item }),
@@ -1567,7 +1578,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         return s
       }
       const next = [...current]
-      window.api.ui.set({ featureTipsSeenIds: next }).catch(console.error)
+      uiSet({ featureTipsSeenIds: next }).catch(console.error)
       return { featureTipsSeenIds: next }
     }),
   featureInteractions: {},
@@ -1588,7 +1599,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         }
       }
       if (typeof window !== 'undefined') {
-        const recordInteraction = window.api.ui.recordFeatureInteraction
+        const recordInteraction = uiRecordFeatureInteraction
         const persist = recordInteraction
           ? recordInteraction(id).then((ui) => {
               set((current) => ({
@@ -1602,7 +1613,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
                 )
               }))
             })
-          : window.api.ui.set({ featureInteractions: next })
+          : uiSet({ featureInteractions: next })
         persistPromise = persist.catch(console.error)
       }
       if (tourProgression === 'reveal-sidebar-and-advance') {
@@ -1642,7 +1653,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         return s
       }
       if (typeof window !== 'undefined') {
-        window.api.ui.set({ contextualToursAutoEligible: eligible }).catch(console.error)
+        uiSet({ contextualToursAutoEligible: eligible }).catch(console.error)
       }
       return { contextualToursAutoEligible: eligible }
     }),
@@ -1842,7 +1853,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       }
       const next = [...current]
       if (typeof window !== 'undefined') {
-        window.api.ui.set({ contextualToursSeenIds: next }).catch(console.error)
+        uiSet({ contextualToursSeenIds: next }).catch(console.error)
       }
       return { contextualToursSeenIds: next }
     }),
@@ -1859,7 +1870,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         [kind]: { contentHash, approvedAt: Date.now() }
       }
       const next = { ...s.trustedOrcaHooks, [repoId]: nextRepo }
-      window.api.ui.set({ trustedOrcaHooks: next }).catch(console.error)
+      uiSet({ trustedOrcaHooks: next }).catch(console.error)
       return { trustedOrcaHooks: next }
     }),
   markOrcaHookRepoAlwaysTrusted: (repoId) =>
@@ -1875,7 +1886,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
           all: { approvedAt: Date.now() }
         }
       }
-      window.api.ui.set({ trustedOrcaHooks: next }).catch(console.error)
+      uiSet({ trustedOrcaHooks: next }).catch(console.error)
       return { trustedOrcaHooks: next }
     }),
   clearOrcaHookTrustForRepo: (repoId) =>
@@ -1885,7 +1896,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       }
       const next = { ...s.trustedOrcaHooks }
       delete next[repoId]
-      window.api.ui.set({ trustedOrcaHooks: next }).catch(console.error)
+      uiSet({ trustedOrcaHooks: next }).catch(console.error)
       return { trustedOrcaHooks: next }
     }),
   setupScriptPromptDismissedRepoIds: [],
@@ -1896,7 +1907,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         return s
       }
       const next = [...s.setupScriptPromptDismissedRepoIds, dismissalKey]
-      window.api.ui.set({ setupScriptPromptDismissedRepoIds: next }).catch(console.error)
+      uiSet({ setupScriptPromptDismissedRepoIds: next }).catch(console.error)
       return { setupScriptPromptDismissedRepoIds: next }
     }),
   setupGuideSidebarDismissed: false,
@@ -1905,7 +1916,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       if (s.setupGuideSidebarDismissed === dismissed) {
         return s
       }
-      window.api.ui.set({ setupGuideSidebarDismissed: dismissed }).catch(console.error)
+      uiSet({ setupGuideSidebarDismissed: dismissed }).catch(console.error)
       return { setupGuideSidebarDismissed: dismissed }
     }),
   setupGuideBrowserMilestoneMigrated: true,
@@ -1922,7 +1933,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         setupGuideBrowserMilestoneMigrated: true,
         setupGuideBrowserMilestoneLegacyComplete: legacyComplete
       }
-      window.api.ui.set(updates).catch(console.error)
+      uiSet(updates).catch(console.error)
       return updates
     }),
   browserImportHintHidden: false,
@@ -1931,7 +1942,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       if (s.browserImportHintHidden === hidden) {
         return s
       }
-      window.api.ui.set({ browserImportHintHidden: hidden }).catch(console.error)
+      uiSet({ browserImportHintHidden: hidden }).catch(console.error)
       return { browserImportHintHidden: hidden }
     }),
   mobileEmulatorTabIntroDismissed: false,
@@ -1940,7 +1951,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       if (s.mobileEmulatorTabIntroDismissed) {
         return s
       }
-      window.api.ui.set({ mobileEmulatorTabIntroDismissed: true }).catch(console.error)
+      uiSet({ mobileEmulatorTabIntroDismissed: true }).catch(console.error)
       return { mobileEmulatorTabIntroDismissed: true }
     }),
   mobileEmulatorAgentSetupDismissed: false,
@@ -1949,7 +1960,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       if (s.mobileEmulatorAgentSetupDismissed) {
         return s
       }
-      window.api.ui.set({ mobileEmulatorAgentSetupDismissed: true }).catch(console.error)
+      uiSet({ mobileEmulatorAgentSetupDismissed: true }).catch(console.error)
       return { mobileEmulatorAgentSetupDismissed: true }
     }),
   projectOrderManualDefaultNoticeDismissed: true,
@@ -1958,7 +1969,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       if (s.projectOrderManualDefaultNoticeDismissed) {
         return s
       }
-      window.api.ui.set({ projectOrderManualDefaultNoticeDismissed: true }).catch(console.error)
+      uiSet({ projectOrderManualDefaultNoticeDismissed: true }).catch(console.error)
       return { projectOrderManualDefaultNoticeDismissed: true }
     }),
   // Why: defaults true so pre-hydration / brand-new sessions never flash the
@@ -1969,7 +1980,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       if (s.usagePercentageDisplayChangeNoticeDismissed) {
         return s
       }
-      window.api.ui.set({ usagePercentageDisplayChangeNoticeDismissed: true }).catch(console.error)
+      uiSet({ usagePercentageDisplayChangeNoticeDismissed: true }).catch(console.error)
       return { usagePercentageDisplayChangeNoticeDismissed: true }
     }),
   usageEmptyStateDismissed: false,
@@ -1978,7 +1989,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       if (s.usageEmptyStateDismissed) {
         return s
       }
-      window.api.ui.set({ usageEmptyStateDismissed: true }).catch(console.error)
+      uiSet({ usageEmptyStateDismissed: true }).catch(console.error)
       return { usageEmptyStateDismissed: true }
     }),
 
@@ -1987,7 +1998,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   // collapsed state from one mode is meaningless in another. Clearing
   // also prevents unbounded accumulation of stale keys across mode switches.
   setGroupBy: (g) => {
-    window.api.ui.set({ groupBy: g, collapsedGroups: [] }).catch(console.error)
+    uiSet({ groupBy: g, collapsedGroups: [] }).catch(console.error)
     set({ groupBy: g, collapsedGroups: new Set<string>() })
   },
 
@@ -1995,7 +2006,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setSortBy: (s) => set({ sortBy: s }),
 
   // Why: like setSortBy, this is a bare set — it persists only via the
-  // debounced window.api.ui.set writer in App.tsx, not on its own.
+  // debounced uiSet writer in App.tsx, not on its own.
   projectOrderBy: 'manual',
   setProjectOrderBy: (p) => set({ projectOrderBy: p }),
 
@@ -2012,9 +2023,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     const normalized = normalizeExecutionHostScope(scope)
     const visibleWorkspaceHostIds = normalized === 'all' ? null : [normalized]
     set({ workspaceHostScope: normalized, visibleWorkspaceHostIds })
-    window.api.ui
-      .set({ workspaceHostScope: normalized, visibleWorkspaceHostIds })
-      .catch(console.error)
+    uiSet({ workspaceHostScope: normalized, visibleWorkspaceHostIds }).catch(console.error)
   },
   visibleWorkspaceHostIds: null,
   setVisibleWorkspaceHostIds: (ids) => {
@@ -2028,15 +2037,13 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       workspaceHostScope = normalized[0]
     }
     set({ visibleWorkspaceHostIds: normalized, workspaceHostScope })
-    window.api.ui
-      .set({ visibleWorkspaceHostIds: normalized, workspaceHostScope })
-      .catch(console.error)
+    uiSet({ visibleWorkspaceHostIds: normalized, workspaceHostScope }).catch(console.error)
   },
   workspaceHostOrder: [],
   setWorkspaceHostOrder: (ids) => {
     const workspaceHostOrder = normalizeExecutionHostOrder(ids)
     set({ workspaceHostOrder })
-    window.api.ui.set({ workspaceHostOrder }).catch(console.error)
+    uiSet({ workspaceHostOrder }).catch(console.error)
   },
 
   hideDefaultBranchWorkspace: false,
@@ -2090,7 +2097,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       } else {
         next.add(key)
       }
-      window.api.ui.set({ collapsedGroups: [...next] }).catch(console.error)
+      uiSet({ collapsedGroups: [...next] }).catch(console.error)
       return { collapsedGroups: next }
     }),
 
@@ -2109,47 +2116,47 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
           set({ settings: nextSettings })
         }
       }),
-      window.api.ui.set(updates.ui)
+      uiSet(updates.ui)
     ]).catch(console.error)
   },
   setWorktreeCardProperties: (properties) => {
     const normalized = normalizeWorktreeCardProperties(properties)
     set({ worktreeCardProperties: normalized, _worktreeCardModeDefaulted: false })
-    window.api.ui
-      .set({ worktreeCardProperties: normalized, _worktreeCardModeDefaulted: false })
-      .catch(console.error)
+    uiSet({ worktreeCardProperties: normalized, _worktreeCardModeDefaulted: false }).catch(
+      console.error
+    )
   },
   agentActivityDisplayMode: DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE,
   setAgentActivityDisplayMode: (mode) => {
     const normalized = normalizeAgentActivityDisplayMode(mode)
-    window.api.ui.set({ agentActivityDisplayMode: normalized }).catch(console.error)
+    uiSet({ agentActivityDisplayMode: normalized }).catch(console.error)
     set({ agentActivityDisplayMode: normalized })
   },
 
   workspaceStatuses: cloneDefaultWorkspaceStatuses(),
   setWorkspaceStatuses: (statuses) => {
     const normalized = normalizeWorkspaceStatuses(statuses)
-    window.api.ui.set({ workspaceStatuses: normalized }).catch(console.error)
+    uiSet({ workspaceStatuses: normalized }).catch(console.error)
     set({ workspaceStatuses: normalized })
   },
 
   workspaceBoardOpacity: 1,
   setWorkspaceBoardOpacity: (opacity) => {
     const clamped = clampWorkspaceBoardOpacity(opacity)
-    window.api.ui.set({ workspaceBoardOpacity: clamped }).catch(console.error)
+    uiSet({ workspaceBoardOpacity: clamped }).catch(console.error)
     set({ workspaceBoardOpacity: clamped })
   },
 
   workspaceBoardColumnWidth: WORKSPACE_BOARD_COLUMN_WIDTH_DEFAULT,
   setWorkspaceBoardColumnWidth: (width) => {
     const clamped = clampWorkspaceBoardColumnWidth(width)
-    window.api.ui.set({ workspaceBoardColumnWidth: clamped }).catch(console.error)
+    uiSet({ workspaceBoardColumnWidth: clamped }).catch(console.error)
     set({ workspaceBoardColumnWidth: clamped })
   },
 
   syncTaskStatusFromWorkspaceBoard: false,
   setSyncTaskStatusFromWorkspaceBoard: (enabled) => {
-    window.api.ui.set({ syncTaskStatusFromWorkspaceBoard: enabled }).catch(console.error)
+    uiSet({ syncTaskStatusFromWorkspaceBoard: enabled }).catch(console.error)
     set({ syncTaskStatusFromWorkspaceBoard: enabled })
   },
 
@@ -2160,13 +2167,13 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       const updated = current.includes(item)
         ? current.filter((i) => i !== item)
         : [...current, item]
-      window.api.ui.set({ statusBarItems: updated }).catch(console.error)
+      uiSet({ statusBarItems: updated }).catch(console.error)
       return { statusBarItems: updated }
     }),
 
   statusBarVisible: true,
   setStatusBarVisible: (v) => {
-    window.api.ui.set({ statusBarVisible: v }).catch(console.error)
+    uiSet({ statusBarVisible: v }).catch(console.error)
     set({ statusBarVisible: v })
   },
   usagePercentageDisplay: DEFAULT_USAGE_PERCENTAGE_DISPLAY,
@@ -2174,12 +2181,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     const normalized = normalizeUsagePercentageDisplay(display)
     // Why: changing the control is the discovery path; permanently dismiss the
     // one-time change notice so it does not reappear after the user adapted.
-    window.api.ui
-      .set({
-        usagePercentageDisplay: normalized,
-        usagePercentageDisplayChangeNoticeDismissed: true
-      })
-      .catch(console.error)
+    uiSet({
+      usagePercentageDisplay: normalized,
+      usagePercentageDisplayChangeNoticeDismissed: true
+    }).catch(console.error)
     set({
       usagePercentageDisplay: normalized,
       usagePercentageDisplayChangeNoticeDismissed: true
@@ -2261,20 +2266,20 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   // to false; the value is persisted via the standard PersistedUIState pipeline.
   petVisible: true,
   setPetVisible: (v) => {
-    window.api.ui.set({ petVisible: v }).catch(console.error)
+    uiSet({ petVisible: v }).catch(console.error)
     set({ petVisible: v })
   },
 
   petId: DEFAULT_PET_ID,
   setPetId: (id) => {
-    window.api.ui.set({ petId: id }).catch(console.error)
+    uiSet({ petId: id }).catch(console.error)
     set({ petId: id })
   },
 
   petSize: PET_SIZE_DEFAULT,
   setPetSize: (size) => {
     const clamped = clampPetSize(size)
-    window.api.ui.set({ petSize: clamped }).catch(console.error)
+    uiSet({ petSize: clamped }).catch(console.error)
     set({ petSize: clamped })
   },
 
@@ -2282,7 +2287,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   addCustomPet: (model) =>
     set((s) => {
       const next = [...s.customPets.filter((m) => m.id !== model.id), model]
-      window.api.ui.set({ customPets: next }).catch(console.error)
+      uiSet({ customPets: next }).catch(console.error)
       return { customPets: next }
     }),
   removeCustomPet: (id) =>
@@ -2303,7 +2308,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       if (fallback !== s.petId) {
         ipcPayload.petId = fallback
       }
-      window.api.ui.set(ipcPayload).catch(console.error)
+      uiSet(ipcPayload).catch(console.error)
       // Why: revoke the cached blob: URL so the underlying Blob is released;
       // otherwise it stays in memory for the rest of the session.
       revokeCustomPetBlobUrl(id)
@@ -2311,7 +2316,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       // fails, the orphaned image stays in userData; each import uses a fresh
       // UUID so the file won't be hit again, and the renderer's metadata
       // index no longer references it.
-      window.api.pet.delete(id, target.fileName, target.kind).catch(console.error)
+      deleteRuntimePetFile(id, target.fileName, target.kind).catch(console.error)
       const partial: Partial<UISlice> = { customPets: next }
       if (fallback !== s.petId) {
         partial.petId = fallback
@@ -2399,16 +2404,14 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
           !ui._grokStatusBarDefaultAdded) &&
         typeof window !== 'undefined'
       ) {
-        window.api.ui
-          .set({
-            statusBarItems: statusBarItemsWithGrok,
-            _portsStatusBarDefaultAdded: true,
-            _kimiStatusBarDefaultAdded: true,
-            _minimaxStatusBarDefaultAdded: true,
-            _antigravityStatusBarDefaultAdded: true,
-            _grokStatusBarDefaultAdded: true
-          })
-          .catch(console.error)
+        uiSet({
+          statusBarItems: statusBarItemsWithGrok,
+          _portsStatusBarDefaultAdded: true,
+          _kimiStatusBarDefaultAdded: true,
+          _minimaxStatusBarDefaultAdded: true,
+          _antigravityStatusBarDefaultAdded: true,
+          _grokStatusBarDefaultAdded: true
+        }).catch(console.error)
       }
       const rightSidebarRoute = normalizeRightSidebarRoute(
         ui.rightSidebarTab,
@@ -2619,12 +2622,12 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       // Why: dismissing an update is user intent, not transient view state. Persist
       // the dismissed version so relaunching the app does not immediately re-show
       // the same reminder card until a newer release appears.
-      void window.api.ui.set({ dismissedUpdateVersion }).catch(console.error)
+      void uiSet({ dismissedUpdateVersion }).catch(console.error)
       // Why: only dismiss the main-process nudge campaign when the visible card
       // actually came from a nudge-driven update cycle. Ordinary update dismissals
       // must not consume the active campaign state.
       if (activeNudgeId) {
-        void window.api.updater.dismissNudge().catch(console.error)
+        void updaterDismissNudge().catch(console.error)
       }
       return { dismissedUpdateVersion, updateUserInitiatedCycle: false }
     }),
@@ -2632,31 +2635,31 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setUpdateCardCollapsed: (collapsed) => set({ updateCardCollapsed: collapsed }),
   updateReassuranceSeen: false,
   markUpdateReassuranceSeen: () => {
-    void window.api.ui.set({ updateReassuranceSeen: true }).catch(console.error)
+    void uiSet({ updateReassuranceSeen: true }).catch(console.error)
     set({ updateReassuranceSeen: true })
   },
   isFullScreen: false,
   setIsFullScreen: (v) => set({ isFullScreen: v }),
   browserDefaultUrl: null,
   setBrowserDefaultUrl: (url) => {
-    void window.api.ui.set({ browserDefaultUrl: url }).catch(console.error)
+    void uiSet({ browserDefaultUrl: url }).catch(console.error)
     set({ browserDefaultUrl: url })
   },
   browserDefaultSearchEngine: null,
   setBrowserDefaultSearchEngine: (engine) => {
-    void window.api.ui.set({ browserDefaultSearchEngine: engine }).catch(console.error)
+    void uiSet({ browserDefaultSearchEngine: engine }).catch(console.error)
     set({ browserDefaultSearchEngine: engine })
   },
   browserDefaultZoomLevel: DEFAULT_BROWSER_PAGE_ZOOM_LEVEL,
   setBrowserDefaultZoomLevel: (level) => {
     const normalized = normalizeBrowserPageZoomLevel(level)
-    void window.api.ui.set({ browserDefaultZoomLevel: normalized }).catch(console.error)
+    void uiSet({ browserDefaultZoomLevel: normalized }).catch(console.error)
     set({ browserDefaultZoomLevel: normalized })
   },
   browserKagiSessionLink: null,
   setBrowserKagiSessionLink: (link) => {
     const normalized = link ? normalizeKagiSessionLink(link) : null
-    void window.api.ui.set({ browserKagiSessionLink: normalized }).catch(console.error)
+    void uiSet({ browserKagiSessionLink: normalized }).catch(console.error)
     set({ browserKagiSessionLink: normalized })
   }
 })

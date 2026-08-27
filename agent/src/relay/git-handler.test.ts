@@ -2045,6 +2045,37 @@ describe('GitHandler', () => {
     )
   })
 
+  // Why: backend/src/main/workspace/WorkspaceService.ts calls 'git.worktree.list'
+  // with { cwd } and reads result.worktrees — a name+shape adapter onto
+  // listWorktrees(), not a bare alias. See specs/agent/api/gaps-and-findings.md #4.
+  describe('git.worktree.list (Part A name alias)', () => {
+    it('accepts { cwd } and returns { worktrees: [...] }', async () => {
+      gitInit(tmpDir)
+      writeFileSync(path.join(tmpDir, 'file.txt'), 'hello')
+      gitCommit(tmpDir, 'initial')
+
+      const result = (await dispatcher.callRequest('git.worktree.list', {
+        cwd: tmpDir
+      })) as { worktrees: Record<string, unknown>[] }
+
+      expect(result.worktrees.length).toBeGreaterThanOrEqual(1)
+      expect(result.worktrees[0].isMainWorktree).toBe(true)
+    })
+
+    it('prefers repoPath over cwd when both are present', async () => {
+      gitInit(tmpDir)
+      writeFileSync(path.join(tmpDir, 'file.txt'), 'hello')
+      gitCommit(tmpDir, 'initial')
+
+      const result = (await dispatcher.callRequest('git.worktree.list', {
+        repoPath: tmpDir,
+        cwd: '/nonexistent'
+      })) as { worktrees: Record<string, unknown>[] }
+
+      expect(result.worktrees.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
   describe('worktreeIsClean', () => {
     it('can ignore untracked files', async () => {
       gitInit(tmpDir)
@@ -2708,6 +2739,54 @@ describe('GitHandler', () => {
         ['rev-parse', '--verify', '--quiet', 'refs/heads/main^{commit}'],
         ['worktree', 'add', '--no-track', '-b', 'feature/fail', '/relay/wt', 'main']
       ])
+    })
+  })
+
+  // Why: 'git.clone' used to have two independently-registered handlers with
+  // incompatible param shapes — RelayDispatcher.onRequest is
+  // last-registration-wins with no duplicate check, so the second
+  // registration silently shadowed the first (specs/agent/api/gaps-and-findings.md
+  // #3). This coverage locks in both shapes now being routed and validated
+  // by the single merged GitHandler.handleClone dispatch.
+  describe('git.clone (merged shapes)', () => {
+    it('clones via the { url, targetPath } shape (repo.cloneRemote)', async () => {
+      const sourceDir = path.join(tmpDir, 'source')
+      mkdirSync(sourceDir)
+      gitInit(sourceDir)
+      writeFileSync(path.join(sourceDir, 'file.txt'), 'hello\n')
+      gitCommit(sourceDir, 'initial')
+
+      const targetPath = path.join(tmpDir, 'cloned')
+      const result = await dispatcher.callRequest('git.clone', {
+        url: sourceDir,
+        targetPath
+      })
+      expect(result).toEqual({ path: targetPath })
+      expect(await fs.readFile(path.join(targetPath, 'file.txt'), 'utf-8')).toBe('hello\n')
+    })
+
+    it('rejects a leading "-" in url (argv injection guard)', async () => {
+      await expect(
+        dispatcher.callRequest('git.clone', {
+          url: '--upload-pack=evil',
+          targetPath: path.join(tmpDir, 'x')
+        })
+      ).rejects.toThrow('invalid url')
+    })
+
+    it('rejects a leading "-" in targetPath (argv injection guard)', async () => {
+      await expect(
+        dispatcher.callRequest('git.clone', {
+          url: 'https://example.com/repo.git',
+          targetPath: '-evil'
+        })
+      ).rejects.toThrow('invalid targetPath')
+    })
+
+    it('rejects a shape that matches neither the args-based nor url-based contract', async () => {
+      await expect(dispatcher.callRequest('git.clone', { foo: 'bar' })).rejects.toThrow(
+        'expected either'
+      )
     })
   })
 })

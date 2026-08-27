@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeWorktreeName } from '../../../../main/ipc/worktree-logic'
+import { sanitizeWorktreeName } from '@/lib/worktree-naming'
 import { MARINE_CREATURES } from '@/constants/marine-creatures'
 import {
   getSuggestedCreatureName,

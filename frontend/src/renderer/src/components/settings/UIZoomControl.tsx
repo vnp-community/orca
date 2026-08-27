@@ -5,6 +5,7 @@ import { applyUIZoom } from '@/lib/ui-zoom'
 import { ZOOM_STEP, ZOOM_MIN, ZOOM_MAX, zoomLevelToPercent } from './SettingsConstants'
 import { translate } from '@/i18n/i18n'
 
+import { uiSet } from '@/runtime/runtime-ui-client'
 export function UIZoomControl(): React.JSX.Element {
   const [zoomLevel, setZoomLevel] = useState(() => window.api.ui.getZoomLevel())
 
@@ -18,7 +19,7 @@ export function UIZoomControl(): React.JSX.Element {
     const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, level))
     applyUIZoom(clamped)
     setZoomLevel(clamped)
-    window.api.ui.set({ uiZoomLevel: clamped })
+    uiSet({ uiZoomLevel: clamped })
   }, [])
 
   const percent = zoomLevelToPercent(zoomLevel)

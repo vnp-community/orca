@@ -267,6 +267,10 @@ export function createSession(
           log.warn('Received malformed frame (too short) — ignoring')
           return
         }
+        // TEMP DIAG BUG-FE-PTY-001
+        log.info(
+          `[DIAG BUG-FE-PTY-001] recv frame type=${frame.type} seq=${frame.seq} ack=${frame.ack} len=${frame.length} readyState=${ws.readyState} t=${Date.now()}`
+        )
 
         // Respond to KeepAlive frames immediately to maintain ACK progress
         if (frame.type === MessageType.KeepAlive) {
@@ -313,7 +317,20 @@ export function createSession(
 
         // Post-handshake: dispatch JSON-RPC request
         if (typeof rpc.method === 'string') {
-          void dispatcher.dispatch(ws, wireState, rpc as JsonRpcRequest)
+          // TEMP DIAG BUG-FE-PTY-001: dispatch() is fire-and-forget (void) —
+          // if it ever rejects, that's an unhandled rejection with no other
+          // visibility. Wrap it here so a throw is at least logged with which
+          // request triggered it, in addition to the process-level handler
+          // in agent-entry.ts.
+          log.info(`[DIAG BUG-FE-PTY-001] dispatch start id=${rpc.id} method=${rpc.method} t=${Date.now()}`)
+          dispatcher
+            .dispatch(ws, wireState, rpc as JsonRpcRequest)
+            .then(() => {
+              log.info(`[DIAG BUG-FE-PTY-001] dispatch done id=${rpc.id} method=${rpc.method} readyState=${ws.readyState} t=${Date.now()}`)
+            })
+            .catch((err: unknown) => {
+              log.error(`[DIAG BUG-FE-PTY-001] dispatch THREW id=${rpc.id} method=${rpc.method}: ${err instanceof Error ? err.stack : String(err)}`)
+            })
         }
       })
 

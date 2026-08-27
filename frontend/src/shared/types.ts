@@ -3311,6 +3311,12 @@ export type TopLevelView =
   | 'space'
   | 'skills'
   | 'mobile'
+  // Giai đoạn 2c (F38): additive-only entry point for the OrcaProject
+  // Workspace feature. Reachable via a plain setActiveView() call from the
+  // sidebar — unlike the overlay-style views above, it has no
+  // previousViewBeforeX return-tracking; it does not replace the existing
+  // Project/Repo sidebar flow.
+  | 'workspace'
 
 export type PersistedUIState = {
   lastActiveRepoId: string | null

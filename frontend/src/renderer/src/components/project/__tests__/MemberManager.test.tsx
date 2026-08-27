@@ -50,11 +50,11 @@ describe('MemberManager', () => {
     expect(screen.getByTestId('member-loading')).toBeInTheDocument()
   })
 
-  it('fetches members via projects.listMembers on mount', async () => {
+  it('fetches members via project.getMembers on mount', async () => {
     vi.mocked(callRuntimeRpc).mockResolvedValue([])
     render(<MemberManager projectId="p1" />)
     await waitFor(() => {
-      expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'projects.listMembers', { projectId: 'p1' })
+      expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'project.getMembers', { projectId: 'p1' })
     })
   })
 
@@ -70,7 +70,7 @@ describe('MemberManager', () => {
     })
   })
 
-  it('role Select calls projects.updateMemberRole on change', async () => {
+  it('role Select calls project.updateMemberRole on change', async () => {
     vi.mocked(callRuntimeRpc).mockResolvedValue([
       { userId: 'u1', displayName: 'Alice', email: 'alice@test.com', role: 'developer' }
     ])
@@ -81,17 +81,17 @@ describe('MemberManager', () => {
     // Wait, let's fix the Select mock to trigger onValueChange
   })
 
-  it('remove button calls projects.removeMember', async () => {
+  it('remove button calls project.removeMember', async () => {
     vi.mocked(callRuntimeRpc).mockResolvedValue([
       { userId: 'u1', displayName: 'Alice', email: 'alice@test.com', role: 'developer' }
     ])
     render(<MemberManager projectId="p1" />)
     await waitFor(() => expect(screen.getByTestId('member-row-u1')).toBeInTheDocument())
-    
+
     fireEvent.click(screen.getByTestId('remove-member-u1'))
-    
+
     await waitFor(() => {
-      expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'projects.removeMember', { projectId: 'p1', userId: 'u1' })
+      expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'project.removeMember', { projectId: 'p1', userId: 'u1' })
     })
   })
 })

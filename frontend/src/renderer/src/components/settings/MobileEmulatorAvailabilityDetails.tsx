@@ -1,9 +1,14 @@
 import { CheckCircle2, CircleAlert, FolderOpen, X } from 'lucide-react'
 import type React from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '../../lib/web-client-location'
+import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { DevServerFilePickerDialog } from '../remote-browser/DevServerFilePickerDialog'
 
+import { shellOpenUrl, shellPickDirectory } from '../../runtime/runtime-shell-client'
 type EmulatorAvailability = {
   platform: string
   simctl: { ok: boolean; message?: string }
@@ -61,6 +66,9 @@ export function MobileEmulatorAvailabilityDetails({
   configuredPath,
   onSetAndroidSdkPath
 }: MobileEmulatorAvailabilityDetailsProps): React.JSX.Element | null {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const activeDevServer = useActiveDevServer()
+
   if (!availability) {
     return null
   }
@@ -68,13 +76,38 @@ export function MobileEmulatorAvailabilityDetails({
   const iosOk = Boolean(availability.simctl?.ok && availability.serveSim?.ok)
   const showIos = availability.platform === 'darwin'
 
-  const handleLocate = async (): Promise<void> => {
+  const applySdkPath = async (path: string): Promise<void> => {
     try {
-      const picked = await window.api.shell.pickDirectory({
+      await onSetAndroidSdkPath(path)
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : translate(
+              'auto.components.settings.MobileEmulatorSdkStatus.63fe73a1ea',
+              'Could not update Android SDK folder.'
+            )
+      )
+    }
+  }
+
+  const handleLocate = async (): Promise<void> => {
+    // Why: there is no OS-native folder dialog in server/web mode — browse the
+    // connected Dev Server's filesystem instead (see DevServerFilePickerDialog).
+    if (isWebClientLocation()) {
+      if (!activeDevServer) {
+        toast.error('Connect a Dev Server to browse its files.')
+        return
+      }
+      setPickerOpen(true)
+      return
+    }
+    try {
+      const picked = await shellPickDirectory({
         defaultPath: android.sdkPath ?? configuredPath ?? undefined
       })
       if (picked) {
-        await onSetAndroidSdkPath(picked)
+        await applySdkPath(picked)
       }
     } catch (error) {
       toast.error(
@@ -86,6 +119,11 @@ export function MobileEmulatorAvailabilityDetails({
             )
       )
     }
+  }
+
+  const handlePickerSelect = (path: string): void => {
+    setPickerOpen(false)
+    void applySdkPath(path)
   }
 
   const handleClear = async (): Promise<void> => {
@@ -141,7 +179,7 @@ export function MobileEmulatorAvailabilityDetails({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => void window.api.shell.openUrl(ANDROID_STUDIO_URL)}
+                  onClick={() => void shellOpenUrl(ANDROID_STUDIO_URL)}
                 >
                   {translate(
                     'auto.components.settings.MobileEmulatorSdkStatus.b94ff260e6',
@@ -201,6 +239,14 @@ export function MobileEmulatorAvailabilityDetails({
           />
         ) : null}
       </div>
+      <DevServerFilePickerDialog
+        open={pickerOpen}
+        mode="directory"
+        title="Locate Android SDK folder"
+        initialPath={android.sdkPath ?? configuredPath ?? undefined}
+        onSelect={handlePickerSelect}
+        onClose={() => setPickerOpen(false)}
+      />
     </div>
   )
 }

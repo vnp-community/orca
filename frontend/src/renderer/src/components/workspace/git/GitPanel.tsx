@@ -4,44 +4,42 @@ import { useWorkspace } from '../../../context/WorkspaceContext'
 import { useGit } from '../../../hooks/useGit'
 import { StagingArea } from './StagingArea'
 import { CommitForm } from './CommitForm'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
-import { useAppStore } from '@/store'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
-const GitHistory      = lazy(() => import('./GitHistory').then(m => ({ default: m.GitHistory })))
-const BranchManager   = lazy(() => import('./BranchManager').then(m => ({ default: m.BranchManager })))
-const DiffViewer      = lazy(() => import('./DiffViewer').then(m => ({ default: m.DiffViewer })))
-const PullRequestList = lazy(() => import('./PullRequestList').then(m => ({ default: m.PullRequestList })))
+const GitHistory = lazy(() => import('./GitHistory').then((m) => ({ default: m.GitHistory })))
+const BranchManager = lazy(() =>
+  import('./BranchManager').then((m) => ({ default: m.BranchManager }))
+)
+const DiffViewer = lazy(() => import('./DiffViewer').then((m) => ({ default: m.DiffViewer })))
+const PullRequestList = lazy(() =>
+  import('./PullRequestList').then((m) => ({ default: m.PullRequestList }))
+)
 
 type GitTab = 'changes' | 'history' | 'branches' | 'pullrequests'
 
 export function GitPanel() {
-  const { gitStatus, project, emit, refreshGitStatus } = useWorkspace()
-  const { getDiff } = useGit()
-  const [activeTab, setActiveTab]     = useState<GitTab>('changes')
+  const { gitStatus, project, currentWorktree, emit } = useWorkspace()
+  const { getDiff, push, isPushing } = useGit()
+  const [activeTab, setActiveTab] = useState<GitTab>('changes')
   const [selectedDiff, setSelectedDiff] = useState<string | null>(null)
-  const [isPushing, setIsPushing]     = useState(false)
-  const [pushOutput, setPushOutput]   = useState<string[]>([])
 
+  // Why (crash reported by user): this used to build its own callRuntimeRpc('git.push', …)
+  // call with a {projectId, branch, remote} shape the backend has never accepted
+  // (real schema: {worktree, publish?, pushTarget?, forceWithLease?} — see
+  // backend/src/main/runtime/rpc/methods/git-params.ts). useGit().push() already
+  // sends the correct worktree-scoped request (FIX BUG-FE-HLD-002) — reuse it
+  // instead of duplicating a second, broken push implementation.
   const handleSync = async () => {
-    if (!project || !gitStatus) {return}
-    setIsPushing(true)
-    setPushOutput([])
+    if (!project || !gitStatus || !currentWorktree) {
+      return
+    }
     try {
-      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      await callRuntimeRpc(target, 'git.push', {
-        projectId: project.id,
-        branch: gitStatus.branch ?? 'main',
-        remote: 'origin',
-      })
-      await refreshGitStatus()
+      await push(gitStatus.branch ?? 'main')
       emit('git.push', { branch: gitStatus.branch ?? 'main' })
       toast.success('Push complete')
-    } catch (err: any) {
-      toast.error(`Push failed: ${  err.message}`)
-    } finally {
-      setIsPushing(false)
+    } catch (err: unknown) {
+      toast.error(`Push failed: ${err instanceof Error ? err.message : 'unknown error'}`)
     }
   }
 
@@ -54,16 +52,14 @@ export function GitPanel() {
     { id: 'changes', label: 'Changes' },
     { id: 'history', label: 'History' },
     { id: 'branches', label: 'Branches' },
-    { id: 'pullrequests', label: 'Pull Requests' },
+    { id: 'pullrequests', label: 'Pull Requests' }
   ]
 
   return (
     <div className="git-panel flex flex-col h-full" data-testid="git-panel">
       {/* Header: branch info + sync */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30 text-sm">
-        <span className="font-mono text-xs font-medium">
-          {gitStatus?.branch ?? '(no branch)'}
-        </span>
+        <span className="font-mono text-xs font-medium">{gitStatus?.branch ?? '(no branch)'}</span>
         {gitStatus && (
           <span className="text-xs text-muted-foreground">
             &uarr;{gitStatus.aheadBy ?? 0} &darr;{gitStatus.behindBy ?? 0}
@@ -82,7 +78,7 @@ export function GitPanel() {
 
       {/* Tab bar */}
       <div className="flex border-b text-sm shrink-0">
-        {TABS.map(tab => (
+        {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -112,16 +108,19 @@ export function GitPanel() {
               )}
             </div>
           )}
-          {activeTab === 'history'      && <GitHistory />}
-          {activeTab === 'branches'     && <BranchManager />}
+          {activeTab === 'history' && <GitHistory />}
+          {activeTab === 'branches' && <BranchManager />}
           {activeTab === 'pullrequests' && <PullRequestList />}
         </Suspense>
       </div>
 
       {/* Push progress output */}
       {isPushing && (
-        <div className="push-progress px-3 py-2 bg-muted border-t text-xs font-mono overflow-auto max-h-24" data-testid="push-progress">
-          {pushOutput.length > 0 ? pushOutput.slice(-5).join('\n') : 'Pushing...'}
+        <div
+          className="push-progress px-3 py-2 bg-muted border-t text-xs font-mono overflow-auto max-h-24"
+          data-testid="push-progress"
+        >
+          Pushing...
         </div>
       )}
     </div>

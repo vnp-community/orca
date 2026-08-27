@@ -38,6 +38,29 @@ import { GITHUB_AUTH_METHODS } from './github-auth'
 import { GITLAB_AUTH_METHODS } from './gitlab-auth'
 import { CREDENTIAL_METHODS } from './credentials'
 import { DEV_SERVER_METHODS } from './dev-server'
+import { ANNOTATION_METHODS } from './annotation'
+import { FLEET_METHODS } from './fleet'
+import { RATE_LIMIT_METHODS } from './rate-limits'
+import { ONBOARDING_METHODS } from './onboarding'
+import { CRASH_REPORT_METHODS } from './crash-reports'
+import { TELEMETRY_METHODS } from './telemetry'
+import { CLAUDE_USAGE_METHODS } from './claude-usage'
+import { CODEX_USAGE_METHODS } from './codex-usage'
+import { OPEN_CODE_USAGE_METHODS } from './opencode-usage'
+import { STAR_NAG_METHODS } from './star-nag'
+import { CACHE_METHODS } from './cache'
+import { MEMORY_METHODS } from './memory'
+import { PLATFORM_METHODS } from './platform'
+import { FEEDBACK_METHODS } from './feedback'
+import { SPARSE_PRESET_METHODS } from './sparse-presets'
+import { DIAGNOSTICS_CRASH_BUNDLE_METHODS } from './diagnostics-crash-bundle'
+import { CLI_METHODS } from './cli'
+import { AGENT_STATUS_METHODS } from './agent-status'
+import { WORKSPACE_CLEANUP_METHODS } from './workspace-cleanup'
+import { AGENT_TRUST_METHODS } from './agent-trust'
+import { WORKSPACE_SPACE_METHODS } from './workspace-space'
+import { GROK_ACCOUNTS_METHODS } from './grok-accounts'
+import { MINIMAX_CREDENTIALS_METHODS } from './minimax-credentials'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -81,5 +104,28 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...GITHUB_AUTH_METHODS,
   ...GITLAB_AUTH_METHODS,
   ...CREDENTIAL_METHODS,
-  ...DEV_SERVER_METHODS
+  ...DEV_SERVER_METHODS,
+  ...ANNOTATION_METHODS,
+  ...FLEET_METHODS,
+  ...RATE_LIMIT_METHODS,
+  ...ONBOARDING_METHODS,
+  ...CRASH_REPORT_METHODS,
+  ...TELEMETRY_METHODS,
+  ...CLAUDE_USAGE_METHODS,
+  ...CODEX_USAGE_METHODS,
+  ...OPEN_CODE_USAGE_METHODS,
+  ...STAR_NAG_METHODS,
+  ...CACHE_METHODS,
+  ...MEMORY_METHODS,
+  ...PLATFORM_METHODS,
+  ...FEEDBACK_METHODS,
+  ...SPARSE_PRESET_METHODS,
+  ...DIAGNOSTICS_CRASH_BUNDLE_METHODS,
+  ...CLI_METHODS,
+  ...AGENT_STATUS_METHODS,
+  ...WORKSPACE_CLEANUP_METHODS,
+  ...AGENT_TRUST_METHODS,
+  ...WORKSPACE_SPACE_METHODS,
+  ...GROK_ACCOUNTS_METHODS,
+  ...MINIMAX_CREDENTIALS_METHODS
 ]

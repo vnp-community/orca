@@ -16,6 +16,8 @@ import type { GitHubProjectViewError } from '@/../../shared/github-project-types
 import type { GhAuthDiagnostic } from '@/../../shared/github-auth-types'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 type AuthErrorKind = 'auth_required' | 'scope_missing'
 
 const REFRESH_CMD = 'gh auth refresh -s project -s read:org -s repo'
@@ -81,12 +83,12 @@ function openExternal(url: string): void {
   // In Electron renderers, raw `window.open` doesn't reliably route to the
   // user's default browser. Use the same shell IPC the rest of the app
   // uses (see SidebarToolbar.openExternalUrl).
-  void window.api.shell.openUrl(url)
+  void shellOpenUrl(url)
 }
 
 async function copyToClipboard(text: string): Promise<void> {
   try {
-    await window.api.ui.writeClipboardText(text)
+    await uiWriteClipboardText(text)
     toast.success(
       translate('auto.components.github.project.GhAuthErrorHelp.224c9d0ae8', 'Copied to clipboard')
     )

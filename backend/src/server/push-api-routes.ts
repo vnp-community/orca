@@ -32,8 +32,21 @@ export function registerPushApiRoutes(server: Server, pushManager: WebPushManage
     // The client must have this key before calling pushManager.subscribe().
 
     if (req.method === 'GET' && url === '/api/vapid-public-key') {
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ publicKey: pushManager.getPublicKey() }))
+      // ADR-021 Phase 1: WebPushManager's methods are async now (see its
+      // WebPushStoreDependency doc comment) — this handler itself stays a
+      // plain (non-async) listener callback, so the async work runs as a
+      // detached promise chain with its own .catch(), same pattern already
+      // used below for the subscribe/unsubscribe routes.
+      pushManager
+        .getPublicKey()
+        .then((publicKey) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ publicKey }))
+        })
+        .catch(() => {
+          res.writeHead(500, { 'Content-Type': 'text/plain' })
+          res.end('Failed to load VAPID public key')
+        })
       return
     }
 
@@ -43,14 +56,14 @@ export function registerPushApiRoutes(server: Server, pushManager: WebPushManage
 
     if (req.method === 'POST' && url === '/api/push-subscribe') {
       readBody(req)
-        .then((body) => {
+        .then(async (body) => {
           const parsed = JSON.parse(body) as { subscription?: unknown }
           if (!parsed.subscription || typeof parsed.subscription !== 'object') {
             res.writeHead(400, { 'Content-Type': 'text/plain' })
             res.end('Missing subscription field')
             return
           }
-          const record = pushManager.saveSubscription(
+          const record = await pushManager.saveSubscription(
             parsed.subscription as PushSubscriptionJSON,
             { userAgent: req.headers['user-agent'] }
           )
@@ -70,14 +83,14 @@ export function registerPushApiRoutes(server: Server, pushManager: WebPushManage
 
     if (req.method === 'POST' && url === '/api/push-unsubscribe') {
       readBody(req)
-        .then((body) => {
+        .then(async (body) => {
           const parsed = JSON.parse(body) as { endpoint?: unknown }
           if (typeof parsed.endpoint !== 'string') {
             res.writeHead(400, { 'Content-Type': 'text/plain' })
             res.end('Missing endpoint field')
             return
           }
-          pushManager.removeSubscription(parsed.endpoint)
+          await pushManager.removeSubscription(parsed.endpoint)
           res.writeHead(204)
           res.end()
         })

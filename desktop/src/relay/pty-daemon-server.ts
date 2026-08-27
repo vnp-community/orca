@@ -38,6 +38,7 @@ import {
   handlePtyDestroy,
   handlePtyScrollback,
   handlePtySendSignal,
+  handlePtyListProcesses,
   scheduleGracePeriodCleanup,
   cleanupAgentPtys,
   activePtyCount
@@ -84,6 +85,8 @@ async function dispatchDaemonRequest(
       return toDaemonOutcome(await handlePtyScrollback(null, params, log))
     case 'pty.sendSignal':
       return toDaemonOutcome(await handlePtySendSignal(null, params, log))
+    case 'pty.listProcesses':
+      return toDaemonOutcome(await handlePtyListProcesses(null, params, log))
     case 'daemon.ping':
       return { result: { ok: true, ptys: activePtyCount() } }
     case 'daemon.sessionClosed':

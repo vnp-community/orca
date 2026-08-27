@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { hasRemoteProviderRuntime } from '@/lib/provider-runtime-context'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 type JiraConnectDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -205,9 +206,7 @@ export function JiraConnectDialog({
                 type="button"
                 className="text-primary underline-offset-2 hover:underline"
                 onClick={() =>
-                  window.api.shell.openUrl(
-                    'https://id.atlassian.com/manage-profile/security/api-tokens'
-                  )
+                  shellOpenUrl('https://id.atlassian.com/manage-profile/security/api-tokens')
                 }
               >
                 {translate(

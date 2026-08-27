@@ -5,6 +5,7 @@ import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type MobilePairingQrSectionProps = {
   qrDataUrl: string | null
   pairingUrl: string | null
@@ -44,7 +45,7 @@ export function MobilePairingQrSection({
       return
     }
     try {
-      await window.api.ui.writeClipboardText(pairingUrl)
+      await uiWriteClipboardText(pairingUrl)
       if (!pairingCodeButtonMountedRef.current) {
         return
       }

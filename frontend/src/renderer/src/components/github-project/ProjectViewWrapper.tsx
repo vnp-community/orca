@@ -64,6 +64,7 @@ import {
 import { translate } from '@/i18n/i18n'
 import { buildTaskSourceContextFromRepo } from '../../../../shared/task-source-context'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 type Props = {
   selectedRepoIds: ReadonlySet<string>
 }
@@ -516,7 +517,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
 
   const openProjectRowUrlWithToast = useCallback((row: GitHubProjectRow, message: string) => {
     if (row.content.url) {
-      void window.api.shell.openUrl(row.content.url)
+      void shellOpenUrl(row.content.url)
     }
     toast.message(message)
   }, [])
@@ -530,7 +531,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
       if (!origin) {
         // Redacted / draft / missing slug — fall back to opening GitHub.
         if (row.content.url) {
-          void window.api.shell.openUrl(row.content.url)
+          void shellOpenUrl(row.content.url)
         }
         return
       }
@@ -672,7 +673,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
           // or agent detection fails), fall back to opening the URL so the
           // user keeps a path forward rather than a silent no-op.
           if (row.content.url) {
-            void window.api.shell.openUrl(row.content.url)
+            void shellOpenUrl(row.content.url)
           }
         }
       })
@@ -830,7 +831,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
                 variant="outline"
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => void window.api.shell.openUrl(selectedViewUrl)}
+                onClick={() => void shellOpenUrl(selectedViewUrl)}
                 aria-label={translate(
                   'auto.components.github.project.ProjectViewWrapper.fd15491034',
                   'Open view in GitHub'
@@ -925,7 +926,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
           totalCount={error.totalCount}
           onOpenInGitHub={() => {
             if (selectedViewUrl) {
-              void window.api.shell.openUrl(selectedViewUrl)
+              void shellOpenUrl(selectedViewUrl)
             }
           }}
         />
@@ -952,7 +953,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
               telemetrySource: 'sidebar',
               openModalFallback: () => {
                 if (item.url) {
-                  void window.api.shell.openUrl(item.url)
+                  void shellOpenUrl(item.url)
                 }
               }
             })
@@ -969,7 +970,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
           onEditIssueType={(row, issueType) => void handleEditIssueType(row, issueType)}
           onOpenInBrowser={(row) => {
             if (row.content.url) {
-              void window.api.shell.openUrl(row.content.url)
+              void shellOpenUrl(row.content.url)
             }
           }}
           onStartWork={handleStartWork}
@@ -1023,7 +1024,7 @@ export default function ProjectViewWrapper({ selectedRepoIds }: Props): React.JS
                 variant="outline"
                 onClick={() => {
                   if (resolvedMissingRepoDialogs.repoNotInOrca?.url) {
-                    void window.api.shell.openUrl(resolvedMissingRepoDialogs.repoNotInOrca.url)
+                    void shellOpenUrl(resolvedMissingRepoDialogs.repoNotInOrca.url)
                   }
                   setRepoNotInOrca(null)
                 }}
@@ -1276,7 +1277,7 @@ function ViewTabStrip({
                   type="button"
                   size="xs"
                   variant="outline"
-                  onClick={() => void window.api.shell.openUrl(ORCA_FEATURE_REQUEST_URL)}
+                  onClick={() => void shellOpenUrl(ORCA_FEATURE_REQUEST_URL)}
                 >
                   {translate(
                     'auto.components.github.project.ProjectViewWrapper.4d2a77a119',

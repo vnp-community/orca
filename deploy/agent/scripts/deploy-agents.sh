@@ -48,7 +48,9 @@ fi
 # ── Defaults ──────────────────────────────────────────────────
 SSH_KEY="${AGENT_SSH_KEY:-${SERVER_KEY:-${HOME}/.ssh/id_ed25519}}"
 ORCA_HTTP_HOST="${SERVER_HOST:-172.20.2.39}"
-ORCA_HTTP_PORT_VAL="${ORCA_HTTP_PORT:-6769}"
+# 6768 = backend-go api-gateway's public port (deploy/dev/.env
+# API_GATEWAY_PUBLIC_PORT) — NOT 6769, which is the frontend/nginx port.
+ORCA_HTTP_PORT_VAL="${ORCA_HTTP_PORT:-6768}"
 AGENT_ORCA_URL="${AGENT_ORCA_URL:-wss://b15.openledger.vn/agent}"
 AGENT_DEPLOY_TIMEOUT="${AGENT_DEPLOY_TIMEOUT:-120}"
 AUTH_HDR=""

@@ -11,6 +11,10 @@ import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { isMacUserAgent } from '../terminal-pane/pane-helpers'
 import { translate } from '@/i18n/i18n'
+import {
+  getRuntimeDeveloperPermissionStatus,
+  requestRuntimeDeveloperPermission
+} from '@/runtime/runtime-developer-permissions-client'
 
 type FullDiskAccessStatusState = {
   status: DeveloperPermissionStatus | undefined
@@ -112,11 +116,14 @@ function useFullDiskAccessStatus(): FullDiskAccessStatusState & { refresh: () =>
       setState((current) => (current.checking ? current : { ...current, checking: true }))
     }
     const refreshId = ++refreshSequenceRef.current
-    window.api.developerPermissions
-      .getStatus()
+    getRuntimeDeveloperPermissionStatus()
       .then((states) => {
         if (refreshId === refreshSequenceRef.current) {
-          finishRefresh(getFullDiskAccessStatus(states))
+          // Why: the wrapper returns null on web (gated to desktop), but web's
+          // own preload stub always resolves an empty array -- normalize back
+          // to that shape so this prompt's behavior is unchanged on both
+          // platforms.
+          finishRefresh(getFullDiskAccessStatus(states ?? []))
         }
       })
       .catch(() => {
@@ -157,9 +164,13 @@ export function FullDiskAccessSetupPrompt(): React.JSX.Element | null {
   const handleOpenFullDiskAccess = useCallback(async (): Promise<void> => {
     setRequesting(true)
     try {
-      const result = await window.api.developerPermissions.request({
-        id: FULL_DISK_ACCESS_PERMISSION_ID
-      })
+      // Why: mirror web's own "unsupported" preload stub result when the
+      // wrapper no-ops to null (web is gated out of the desktop-only RPC path).
+      const result = (await requestRuntimeDeveloperPermission(FULL_DISK_ACCESS_PERMISSION_ID)) ?? {
+        id: FULL_DISK_ACCESS_PERMISSION_ID,
+        status: 'unsupported' as const,
+        openedSystemSettings: false
+      }
       if (!mountedRef.current) {
         return
       }
