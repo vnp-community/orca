@@ -146,3 +146,56 @@ func (t *templateTx) IncrementUsageCount(ctx context.Context, templateID string)
 	}
 	return nil
 }
+
+// UpsertRating implements usecase.TemplateRepositoryTx.UpsertRating — see
+// that method's doc comment. Three steps, one transaction: (1) lock and
+// read the caller's PRIOR rating for this template, if any (FOR UPDATE —
+// this read-then-write needs the row locked against a concurrent rating
+// from the same user landing between the read and the aggregate update
+// below); (2) upsert the ratings row; (3) apply the delta (new-old stars,
+// and +1 to rating_count only for a genuinely new rating) to
+// templates.rating_sum/rating_count in the same statement, RETURNING the
+// post-write aggregate.
+func (t *templateTx) UpsertRating(ctx context.Context, templateID, userID string, stars int32) (usecase.RateTemplateResult, error) {
+	var oldStars int32
+	err := t.tx.QueryRow(ctx, `
+		SELECT stars FROM workflow.ratings WHERE template_id = $1 AND user_id = $2 FOR UPDATE
+	`, templateID, userID).Scan(&oldStars)
+	isNew := errors.Is(err, pgx.ErrNoRows)
+	if err != nil && !isNew {
+		return usecase.RateTemplateResult{}, fmt.Errorf("postgres: query existing rating: %w", err)
+	}
+
+	_, err = t.tx.Exec(ctx, `
+		INSERT INTO workflow.ratings (template_id, user_id, stars)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (template_id, user_id) DO UPDATE SET stars = EXCLUDED.stars, updated_at = now()
+	`, templateID, userID, stars)
+	if err != nil {
+		return usecase.RateTemplateResult{}, fmt.Errorf("postgres: upsert rating: %w", err)
+	}
+
+	sumDelta := stars
+	var countDelta int32
+	if isNew {
+		countDelta = 1
+	} else {
+		sumDelta = stars - oldStars
+	}
+
+	row := t.tx.QueryRow(ctx, `
+		UPDATE workflow.templates
+		SET rating_sum = rating_sum + $1, rating_count = rating_count + $2, updated_at = now()
+		WHERE id = $3
+		RETURNING rating_sum, rating_count
+	`, sumDelta, countDelta, templateID)
+
+	var result usecase.RateTemplateResult
+	if err := row.Scan(&result.RatingSum, &result.RatingCount); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return usecase.RateTemplateResult{}, domain.ErrTemplateNotFound
+		}
+		return usecase.RateTemplateResult{}, fmt.Errorf("postgres: update template rating aggregate: %w", err)
+	}
+	return result, nil
+}

@@ -41,6 +41,7 @@ type Server struct {
 	generateShareLink     *usecase.GenerateShareLink
 	previewSharedTemplate *usecase.PreviewSharedTemplate
 	importSharedTemplate  *usecase.ImportSharedTemplate
+	rateTemplate          *usecase.RateTemplate
 }
 
 func New(
@@ -62,6 +63,7 @@ func New(
 	generateShareLink *usecase.GenerateShareLink,
 	previewSharedTemplate *usecase.PreviewSharedTemplate,
 	importSharedTemplate *usecase.ImportSharedTemplate,
+	rateTemplate *usecase.RateTemplate,
 ) *Server {
 	return &Server{
 		createTemplate:        createTemplate,
@@ -82,6 +84,7 @@ func New(
 		generateShareLink:     generateShareLink,
 		previewSharedTemplate: previewSharedTemplate,
 		importSharedTemplate:  importSharedTemplate,
+		rateTemplate:          rateTemplate,
 	}
 }
 
@@ -167,6 +170,9 @@ func (s *Server) CancelExecution(ctx context.Context, req *workflowv1.CancelExec
 func (s *Server) ListTemplates(ctx context.Context, req *workflowv1.ListTemplatesRequest) (*workflowv1.ListTemplatesResponse, error) {
 	out, err := s.listTemplates.Execute(ctx, usecase.ListTemplatesInput{
 		Scope:     req.GetScope(),
+		Query:     req.GetQuery(),
+		Tags:      req.GetTags(),
+		Sort:      req.GetSort(),
 		PageToken: req.GetPageToken(),
 		PageSize:  req.GetPageSize(),
 	})
@@ -300,6 +306,14 @@ func (s *Server) ImportSharedTemplate(ctx context.Context, req *workflowv1.Impor
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return toProtoTemplate(tmpl), nil
+}
+
+func (s *Server) RateTemplate(ctx context.Context, req *workflowv1.RateTemplateRequest) (*workflowv1.RateTemplateResponse, error) {
+	result, err := s.rateTemplate.Execute(ctx, req.GetTemplateId(), req.GetStars())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.RateTemplateResponse{RatingSum: result.RatingSum, RatingCount: result.RatingCount}, nil
 }
 
 func toDomainStepType(t workflowv1.StepType) domain.StepType {

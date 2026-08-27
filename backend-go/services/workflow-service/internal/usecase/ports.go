@@ -20,11 +20,18 @@ type TemplateRepository interface {
 	// GetTemplate returns domain.ErrTemplateNotFound (wrapped) if no
 	// matching row exists for tenantID/id.
 	GetTemplate(ctx context.Context, tenantID, id string) (domain.WorkflowTemplate, error)
-	// ListTemplates keyset-paginates tenantID's templates, optionally
-	// filtered by scope (empty = all scopes) — same page_token/next-token
-	// convention as annotation-service's ListAnnotations (opaque token =
-	// last-seen id, ORDER BY id).
-	ListTemplates(ctx context.Context, tenantID, scope, pageToken string, pageSize int32) ([]domain.WorkflowTemplate, string, error)
+	// ListTemplates keyset-paginates tenantID's templates — optionally
+	// filtered by scope (empty = all scopes), full-text query (against
+	// name/description, idx_templates_fts) and tags (AND-filter: every
+	// listed tag must be present, GIN-indexed) — and sorted by sort
+	// ("" = default id order, matching annotation-service's ListAnnotations
+	// convention; "trending" = usage_count DESC, rating_sum DESC;
+	// "recent" = updated_at DESC). page_token is opaque regardless of
+	// sort, but its ENCODING differs per sort (a bare last-seen id doesn't
+	// carry enough information to resume a non-id ORDER BY) — see
+	// adapter/postgres's encodeListCursor/decodeListCursor doc comment for
+	// why and how; usecase/grpc layers never decode it themselves.
+	ListTemplates(ctx context.Context, tenantID, scope, query string, tags []string, sort, pageToken string, pageSize int32) ([]domain.WorkflowTemplate, string, error)
 	// ResolveChain returns templateID's parent_template_id chain,
 	// root-first (index 0 = topmost ancestor, last = templateID itself),
 	// depth-capped at maxDepth (workflow-service.md §6: 5) — see
@@ -93,6 +100,22 @@ type TemplateRepositoryTx interface {
 	// "this template was actually executed" and "an execution row exists"
 	// can never disagree.
 	IncrementUsageCount(ctx context.Context, templateID string) error
+	// UpsertRating records userID's stars rating for templateID — one
+	// rating per (user, template), enforced by workflow.ratings'
+	// (template_id, user_id) UNIQUE constraint (a second call from the
+	// SAME user UPDATES their prior rating, never duplicates it) — and
+	// atomically recomputes templates.rating_sum/rating_count as a delta
+	// against whatever the prior value was (0 for a first-time rating,
+	// the old star count for an update), in the SAME transaction as the
+	// ratings-table write, per TASK-WF-03-07.
+	UpsertRating(ctx context.Context, templateID, userID string, stars int32) (RateTemplateResult, error)
+}
+
+// RateTemplateResult is UpsertRating's result — the template's aggregate
+// rating AFTER this call's write, for RateTemplate's response.
+type RateTemplateResult struct {
+	RatingSum   int32
+	RatingCount int32
 }
 
 // ApprovalRepositoryTx is the tx-scoped subset of approval writes

@@ -137,7 +137,7 @@ func TestRepository_ListTemplates_KeysetPagination(t *testing.T) {
 		}
 	}
 
-	firstPage, next, err := repo.ListTemplates(ctx, tenantID, "", "", 2)
+	firstPage, next, err := repo.ListTemplates(ctx, tenantID, "", "", nil, "", "", 2)
 	if err != nil {
 		t.Fatalf("list templates (page 1): %v", err)
 	}
@@ -145,7 +145,7 @@ func TestRepository_ListTemplates_KeysetPagination(t *testing.T) {
 		t.Fatalf("expected a full first page with a next token, got %d rows, next=%q", len(firstPage), next)
 	}
 
-	secondPage, next2, err := repo.ListTemplates(ctx, tenantID, "", next, 2)
+	secondPage, next2, err := repo.ListTemplates(ctx, tenantID, "", "", nil, "", next, 2)
 	if err != nil {
 		t.Fatalf("list templates (page 2): %v", err)
 	}
