@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `backend-go/services/auth-service/internal/domain/pairing_session.go`, `backend-go/services/auth-service/internal/domain/paired_device.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `PairingSession`/`PairedDevice` domain types added with BR-MB-01/02/03 invariants; `go build`/`go vet ./services/auth-service/...` clean.
 
 ---
 

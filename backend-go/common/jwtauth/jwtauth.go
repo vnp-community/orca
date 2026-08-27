@@ -28,4 +28,10 @@ const Algorithm = jose.RS256
 type Claims struct {
 	jwt.Claims
 	TenantID string `json:"tenant_id,omitempty"`
+	// DeviceID is set only for a JWT minted through the mobile-pairing
+	// handshake (auth-service's CompleteDevicePairing) — it's how
+	// wscompat.Identity.DeviceID (TASK-MB-03/04) knows which paired device
+	// issued a given request, for E2E-payload routing. Empty for every
+	// other token this system issues.
+	DeviceID string `json:"device_id,omitempty"`
 }

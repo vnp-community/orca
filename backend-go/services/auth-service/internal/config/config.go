@@ -24,6 +24,18 @@ type Config struct {
 	// valid before "exp" — see internal/usecase/issue_service_token.go.
 	ServiceTokenTTL time.Duration
 
+	// DeviceAccessTokenTTL is how long the access JWT CompleteDevicePairing
+	// mints stays valid before "exp" — see
+	// internal/usecase/complete_device_pairing.go.
+	DeviceAccessTokenTTL time.Duration
+
+	// ServerAddress is api-gateway's public base URL, echoed back in
+	// InitiateDevicePairingResponse so the mobile client knows where to
+	// dial CompleteDevicePairing — see SOL-MB-01's "server-mode adaptation"
+	// rationale (this desktop-originated pairing flow has no LAN-discovery
+	// step to fall back on).
+	ServerAddress string
+
 	// OPABundlePath points requireAdminActor's OPA client
 	// (internal/adapter/opaclient, via common/policy.Evaluator) at the
 	// orca-authz Rego bundle on disk. Defaults to the bundle's location
@@ -66,11 +78,21 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	// DefaultDeviceAccessTokenTTL mirrors SessionTTL's default — a paired
+	// mobile device is a long-lived client, not a short-lived
+	// service-to-service call (unlike ServiceTokenTTL's 15m default).
+	deviceAccessTokenTTL, err := durationEnv("DEVICE_ACCESS_TOKEN_TTL", 24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		Base:                   base,
 		BcryptCost:             bcryptCost,
 		SessionTTL:             sessionTTL,
 		ServiceTokenTTL:        serviceTokenTTL,
+		DeviceAccessTokenTTL:   deviceAccessTokenTTL,
+		ServerAddress:          commonconfig.StringEnv("SERVER_ADDRESS", ""),
 		OPABundlePath:          commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		BootstrapTenantID:      os.Getenv("BOOTSTRAP_TENANT_ID"),
 		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),

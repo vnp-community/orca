@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `backend-go/proto/orca/auth/v1/auth.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — RPCs/messages added to auth.proto, `buf generate`/`buf breaking --against origin/main` clean (additive-only), `go build ./proto/...` clean.
 
 ---
 

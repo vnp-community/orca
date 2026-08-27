@@ -30,6 +30,7 @@ import (
 
 	authbcrypt "github.com/stablyai/orca-go/services/auth-service/internal/adapter/bcrypt"
 	authgrpc "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpc"
+	authnacl "github.com/stablyai/orca-go/services/auth-service/internal/adapter/nacl"
 	authopaclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/opaclient"
 	authpolicypublisher "github.com/stablyai/orca-go/services/auth-service/internal/adapter/policypublisher"
 	authpostgres "github.com/stablyai/orca-go/services/auth-service/internal/adapter/postgres"
@@ -98,6 +99,14 @@ func run() error {
 		return fmt.Errorf("ensuring jwt-signing transit key: %w", err)
 	}
 
+	sharedSecretSealer := authvault.NewSharedSecretSealer(vaultClient)
+	// Same fail-loudly contract as tokenSigner.Ensure above — every paired
+	// device's shared secret depends on this Transit key existing.
+	if err := sharedSecretSealer.Ensure(ctx); err != nil {
+		return fmt.Errorf("ensuring device-shared-secret transit key: %w", err)
+	}
+	keyExchanger := authnacl.New()
+
 	// opaEvaluator loads/compiles the orca-authz bundle once per distinct
 	// query string (common/policy.Evaluator's own cache) and is shared by
 	// every requireAdminActor call for this process's lifetime.
@@ -131,6 +140,14 @@ func run() error {
 	deleteAccessPolicyUC := usecase.NewDeleteAccessPolicy(repo, repo, opaClient)
 	getAdminStatsUC := usecase.NewGetAdminStats(repo, repo, repo, clock, opaClient)
 
+	pairingSessions := authpostgres.NewPairingSessionStore(pool)
+	pairedDevices := authpostgres.NewPairedDeviceStore(pool)
+	initiateDevicePairingUC := usecase.NewInitiateDevicePairing(pairingSessions, keyExchanger, sharedSecretSealer, clock, cfg.ServerAddress)
+	completeDevicePairingUC := usecase.NewCompleteDevicePairing(pairingSessions, pairedDevices, keyExchanger, sharedSecretSealer, tokenSigner, clock, cfg.DeviceAccessTokenTTL)
+	listPairedDevicesUC := usecase.NewListPairedDevices(pairedDevices)
+	unpairDeviceUC := usecase.NewUnpairDevice(pairedDevices)
+	resolveDeviceSharedSecretUC := usecase.NewResolveDeviceSharedSecret(pairedDevices, sharedSecretSealer, clock)
+
 	// Runs once, before the server starts accepting traffic — see
 	// internal/usecase/bootstrap.go's doc comment for why this isn't an
 	// RPC. No-op unless BOOTSTRAP_TENANT_ID/BOOTSTRAP_ADMIN_EMAIL are set
@@ -160,6 +177,7 @@ func run() error {
 		deactivateUserUC, reactivateUserUC, listSessionsForUserUC, forceRevokeAllSessionsForUserUC,
 		createAccessPolicyUC, getAccessPolicyUC, listAccessPoliciesUC, updateAccessPolicyUC, deleteAccessPolicyUC,
 		getAdminStatsUC,
+		initiateDevicePairingUC, completeDevicePairingUC, listPairedDevicesUC, unpairDeviceUC, resolveDeviceSharedSecretUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

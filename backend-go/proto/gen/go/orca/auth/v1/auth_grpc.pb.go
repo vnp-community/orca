@@ -40,6 +40,11 @@ const (
 	AuthService_UpdateAccessPolicy_FullMethodName            = "/orca.auth.v1.AuthService/UpdateAccessPolicy"
 	AuthService_DeleteAccessPolicy_FullMethodName            = "/orca.auth.v1.AuthService/DeleteAccessPolicy"
 	AuthService_GetAdminStats_FullMethodName                 = "/orca.auth.v1.AuthService/GetAdminStats"
+	AuthService_InitiateDevicePairing_FullMethodName         = "/orca.auth.v1.AuthService/InitiateDevicePairing"
+	AuthService_CompleteDevicePairing_FullMethodName         = "/orca.auth.v1.AuthService/CompleteDevicePairing"
+	AuthService_ListPairedDevices_FullMethodName             = "/orca.auth.v1.AuthService/ListPairedDevices"
+	AuthService_UnpairDevice_FullMethodName                  = "/orca.auth.v1.AuthService/UnpairDevice"
+	AuthService_ResolveDeviceSharedSecret_FullMethodName     = "/orca.auth.v1.AuthService/ResolveDeviceSharedSecret"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -74,6 +79,24 @@ type AuthServiceClient interface {
 	UpdateAccessPolicy(ctx context.Context, in *UpdateAccessPolicyRequest, opts ...grpc.CallOption) (*AccessPolicy, error)
 	DeleteAccessPolicy(ctx context.Context, in *DeleteAccessPolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetAdminStats(ctx context.Context, in *GetAdminStatsRequest, opts ...grpc.CallOption) (*GetAdminStatsResponse, error)
+	// ── Mobile device pairing (BL-MB-01) ──────────────────────────────────
+	// InitiateDevicePairing requires an authenticated caller (browser session
+	// or an already-issued desktop JWT) — "my account wants to pair a new
+	// device," never anonymous.
+	InitiateDevicePairing(ctx context.Context, in *InitiateDevicePairingRequest, opts ...grpc.CallOption) (*InitiateDevicePairingResponse, error)
+	// CompleteDevicePairing is the ONE unauthenticated RPC on this service's
+	// entire surface — guarded solely by pairing_token possession +
+	// one-time-use + 5-minute expiry. api-gateway routes it through a
+	// dedicated, rate-limited, unauthenticated REST path (TASK-MB-01-08).
+	CompleteDevicePairing(ctx context.Context, in *CompleteDevicePairingRequest, opts ...grpc.CallOption) (*CompleteDevicePairingResponse, error)
+	ListPairedDevices(ctx context.Context, in *ListPairedDevicesRequest, opts ...grpc.CallOption) (*ListPairedDevicesResponse, error)
+	UnpairDevice(ctx context.Context, in *UnpairDeviceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Internal-only (mesh ingress, never routed by api-gateway's REST facade)
+	// — the ONE path any other service uses to obtain a device's raw shared
+	// secret for E2E encrypt/decrypt. Mirrors credential-broker-service's
+	// "mediator hands back decrypted material on demand, never persists it"
+	// pattern.
+	ResolveDeviceSharedSecret(ctx context.Context, in *ResolveDeviceSharedSecretRequest, opts ...grpc.CallOption) (*ResolveDeviceSharedSecretResponse, error)
 }
 
 type authServiceClient struct {
@@ -284,6 +307,56 @@ func (c *authServiceClient) GetAdminStats(ctx context.Context, in *GetAdminStats
 	return out, nil
 }
 
+func (c *authServiceClient) InitiateDevicePairing(ctx context.Context, in *InitiateDevicePairingRequest, opts ...grpc.CallOption) (*InitiateDevicePairingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitiateDevicePairingResponse)
+	err := c.cc.Invoke(ctx, AuthService_InitiateDevicePairing_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) CompleteDevicePairing(ctx context.Context, in *CompleteDevicePairingRequest, opts ...grpc.CallOption) (*CompleteDevicePairingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteDevicePairingResponse)
+	err := c.cc.Invoke(ctx, AuthService_CompleteDevicePairing_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListPairedDevices(ctx context.Context, in *ListPairedDevicesRequest, opts ...grpc.CallOption) (*ListPairedDevicesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPairedDevicesResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListPairedDevices_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) UnpairDevice(ctx context.Context, in *UnpairDeviceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AuthService_UnpairDevice_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ResolveDeviceSharedSecret(ctx context.Context, in *ResolveDeviceSharedSecretRequest, opts ...grpc.CallOption) (*ResolveDeviceSharedSecretResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveDeviceSharedSecretResponse)
+	err := c.cc.Invoke(ctx, AuthService_ResolveDeviceSharedSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -316,6 +389,24 @@ type AuthServiceServer interface {
 	UpdateAccessPolicy(context.Context, *UpdateAccessPolicyRequest) (*AccessPolicy, error)
 	DeleteAccessPolicy(context.Context, *DeleteAccessPolicyRequest) (*emptypb.Empty, error)
 	GetAdminStats(context.Context, *GetAdminStatsRequest) (*GetAdminStatsResponse, error)
+	// ── Mobile device pairing (BL-MB-01) ──────────────────────────────────
+	// InitiateDevicePairing requires an authenticated caller (browser session
+	// or an already-issued desktop JWT) — "my account wants to pair a new
+	// device," never anonymous.
+	InitiateDevicePairing(context.Context, *InitiateDevicePairingRequest) (*InitiateDevicePairingResponse, error)
+	// CompleteDevicePairing is the ONE unauthenticated RPC on this service's
+	// entire surface — guarded solely by pairing_token possession +
+	// one-time-use + 5-minute expiry. api-gateway routes it through a
+	// dedicated, rate-limited, unauthenticated REST path (TASK-MB-01-08).
+	CompleteDevicePairing(context.Context, *CompleteDevicePairingRequest) (*CompleteDevicePairingResponse, error)
+	ListPairedDevices(context.Context, *ListPairedDevicesRequest) (*ListPairedDevicesResponse, error)
+	UnpairDevice(context.Context, *UnpairDeviceRequest) (*emptypb.Empty, error)
+	// Internal-only (mesh ingress, never routed by api-gateway's REST facade)
+	// — the ONE path any other service uses to obtain a device's raw shared
+	// secret for E2E encrypt/decrypt. Mirrors credential-broker-service's
+	// "mediator hands back decrypted material on demand, never persists it"
+	// pattern.
+	ResolveDeviceSharedSecret(context.Context, *ResolveDeviceSharedSecretRequest) (*ResolveDeviceSharedSecretResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -385,6 +476,21 @@ func (UnimplementedAuthServiceServer) DeleteAccessPolicy(context.Context, *Delet
 }
 func (UnimplementedAuthServiceServer) GetAdminStats(context.Context, *GetAdminStatsRequest) (*GetAdminStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAdminStats not implemented")
+}
+func (UnimplementedAuthServiceServer) InitiateDevicePairing(context.Context, *InitiateDevicePairingRequest) (*InitiateDevicePairingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InitiateDevicePairing not implemented")
+}
+func (UnimplementedAuthServiceServer) CompleteDevicePairing(context.Context, *CompleteDevicePairingRequest) (*CompleteDevicePairingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteDevicePairing not implemented")
+}
+func (UnimplementedAuthServiceServer) ListPairedDevices(context.Context, *ListPairedDevicesRequest) (*ListPairedDevicesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPairedDevices not implemented")
+}
+func (UnimplementedAuthServiceServer) UnpairDevice(context.Context, *UnpairDeviceRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnpairDevice not implemented")
+}
+func (UnimplementedAuthServiceServer) ResolveDeviceSharedSecret(context.Context, *ResolveDeviceSharedSecretRequest) (*ResolveDeviceSharedSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveDeviceSharedSecret not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -767,6 +873,96 @@ func _AuthService_GetAdminStats_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_InitiateDevicePairing_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateDevicePairingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).InitiateDevicePairing(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_InitiateDevicePairing_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).InitiateDevicePairing(ctx, req.(*InitiateDevicePairingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_CompleteDevicePairing_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteDevicePairingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).CompleteDevicePairing(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_CompleteDevicePairing_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).CompleteDevicePairing(ctx, req.(*CompleteDevicePairingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListPairedDevices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPairedDevicesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListPairedDevices(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListPairedDevices_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListPairedDevices(ctx, req.(*ListPairedDevicesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_UnpairDevice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnpairDeviceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).UnpairDevice(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_UnpairDevice_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).UnpairDevice(ctx, req.(*UnpairDeviceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ResolveDeviceSharedSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveDeviceSharedSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ResolveDeviceSharedSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ResolveDeviceSharedSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ResolveDeviceSharedSecret(ctx, req.(*ResolveDeviceSharedSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -853,6 +1049,26 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAdminStats",
 			Handler:    _AuthService_GetAdminStats_Handler,
+		},
+		{
+			MethodName: "InitiateDevicePairing",
+			Handler:    _AuthService_InitiateDevicePairing_Handler,
+		},
+		{
+			MethodName: "CompleteDevicePairing",
+			Handler:    _AuthService_CompleteDevicePairing_Handler,
+		},
+		{
+			MethodName: "ListPairedDevices",
+			Handler:    _AuthService_ListPairedDevices_Handler,
+		},
+		{
+			MethodName: "UnpairDevice",
+			Handler:    _AuthService_UnpairDevice_Handler,
+		},
+		{
+			MethodName: "ResolveDeviceSharedSecret",
+			Handler:    _AuthService_ResolveDeviceSharedSecret_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

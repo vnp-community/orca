@@ -2180,6 +2180,527 @@ func (x *GetAdminStatsResponse) GetTotalPolicies() int32 {
 	return 0
 }
 
+type InitiateDevicePairingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InitiateDevicePairingRequest) Reset() {
+	*x = InitiateDevicePairingRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitiateDevicePairingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitiateDevicePairingRequest) ProtoMessage() {}
+
+func (x *InitiateDevicePairingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitiateDevicePairingRequest.ProtoReflect.Descriptor instead.
+func (*InitiateDevicePairingRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{40}
+}
+
+type InitiateDevicePairingResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	PairingToken     string                 `protobuf:"bytes,1,opt,name=pairing_token,json=pairingToken,proto3" json:"pairing_token,omitempty"`               // opaque, high-entropy; hashed at rest (mirrors sessions.id)
+	DesktopPublicKey []byte                 `protobuf:"bytes,2,opt,name=desktop_public_key,json=desktopPublicKey,proto3" json:"desktop_public_key,omitempty"` // this pairing session's ephemeral X25519 public key
+	ServerAddress    string                 `protobuf:"bytes,3,opt,name=server_address,json=serverAddress,proto3" json:"server_address,omitempty"`            // api-gateway's public base URL (server-mode adaptation, see SOL-MB-01 rationale)
+	ExpiresAtUnixMs  int64                  `protobuf:"varint,4,opt,name=expires_at_unix_ms,json=expiresAtUnixMs,proto3" json:"expires_at_unix_ms,omitempty"` // BR-MB-01: now + 5 minutes
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *InitiateDevicePairingResponse) Reset() {
+	*x = InitiateDevicePairingResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitiateDevicePairingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitiateDevicePairingResponse) ProtoMessage() {}
+
+func (x *InitiateDevicePairingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitiateDevicePairingResponse.ProtoReflect.Descriptor instead.
+func (*InitiateDevicePairingResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *InitiateDevicePairingResponse) GetPairingToken() string {
+	if x != nil {
+		return x.PairingToken
+	}
+	return ""
+}
+
+func (x *InitiateDevicePairingResponse) GetDesktopPublicKey() []byte {
+	if x != nil {
+		return x.DesktopPublicKey
+	}
+	return nil
+}
+
+func (x *InitiateDevicePairingResponse) GetServerAddress() string {
+	if x != nil {
+		return x.ServerAddress
+	}
+	return ""
+}
+
+func (x *InitiateDevicePairingResponse) GetExpiresAtUnixMs() int64 {
+	if x != nil {
+		return x.ExpiresAtUnixMs
+	}
+	return 0
+}
+
+type CompleteDevicePairingRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	PairingToken    string                 `protobuf:"bytes,1,opt,name=pairing_token,json=pairingToken,proto3" json:"pairing_token,omitempty"`
+	MobilePublicKey []byte                 `protobuf:"bytes,2,opt,name=mobile_public_key,json=mobilePublicKey,proto3" json:"mobile_public_key,omitempty"` // mobile's own ephemeral X25519 public key
+	DeviceLabel     string                 `protobuf:"bytes,3,opt,name=device_label,json=deviceLabel,proto3" json:"device_label,omitempty"`               // e.g. "Sam's iPhone" — user-facing, not trusted for anything security-relevant
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CompleteDevicePairingRequest) Reset() {
+	*x = CompleteDevicePairingRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteDevicePairingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteDevicePairingRequest) ProtoMessage() {}
+
+func (x *CompleteDevicePairingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteDevicePairingRequest.ProtoReflect.Descriptor instead.
+func (*CompleteDevicePairingRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *CompleteDevicePairingRequest) GetPairingToken() string {
+	if x != nil {
+		return x.PairingToken
+	}
+	return ""
+}
+
+func (x *CompleteDevicePairingRequest) GetMobilePublicKey() []byte {
+	if x != nil {
+		return x.MobilePublicKey
+	}
+	return nil
+}
+
+func (x *CompleteDevicePairingRequest) GetDeviceLabel() string {
+	if x != nil {
+		return x.DeviceLabel
+	}
+	return ""
+}
+
+type CompleteDevicePairingResponse struct {
+	state                        protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId                     string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	DesktopPublicKeyConfirmation []byte                 `protobuf:"bytes,2,opt,name=desktop_public_key_confirmation,json=desktopPublicKeyConfirmation,proto3" json:"desktop_public_key_confirmation,omitempty"` // echoes InitiateDevicePairingResponse.desktop_public_key
+	AccessToken                  string                 `protobuf:"bytes,3,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`                                                        // BR-MB-01: JWT issued immediately after a successful handshake
+	RefreshToken                 string                 `protobuf:"bytes,4,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
+}
+
+func (x *CompleteDevicePairingResponse) Reset() {
+	*x = CompleteDevicePairingResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteDevicePairingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteDevicePairingResponse) ProtoMessage() {}
+
+func (x *CompleteDevicePairingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteDevicePairingResponse.ProtoReflect.Descriptor instead.
+func (*CompleteDevicePairingResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *CompleteDevicePairingResponse) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *CompleteDevicePairingResponse) GetDesktopPublicKeyConfirmation() []byte {
+	if x != nil {
+		return x.DesktopPublicKeyConfirmation
+	}
+	return nil
+}
+
+func (x *CompleteDevicePairingResponse) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *CompleteDevicePairingResponse) GetRefreshToken() string {
+	if x != nil {
+		return x.RefreshToken
+	}
+	return ""
+}
+
+type ListPairedDevicesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPairedDevicesRequest) Reset() {
+	*x = ListPairedDevicesRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPairedDevicesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPairedDevicesRequest) ProtoMessage() {}
+
+func (x *ListPairedDevicesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPairedDevicesRequest.ProtoReflect.Descriptor instead.
+func (*ListPairedDevicesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{44}
+}
+
+type ListPairedDevicesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Devices       []*PairedDevice        `protobuf:"bytes,1,rep,name=devices,proto3" json:"devices,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPairedDevicesResponse) Reset() {
+	*x = ListPairedDevicesResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPairedDevicesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPairedDevicesResponse) ProtoMessage() {}
+
+func (x *ListPairedDevicesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPairedDevicesResponse.ProtoReflect.Descriptor instead.
+func (*ListPairedDevicesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ListPairedDevicesResponse) GetDevices() []*PairedDevice {
+	if x != nil {
+		return x.Devices
+	}
+	return nil
+}
+
+type PairedDevice struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	DeviceLabel      string                 `protobuf:"bytes,2,opt,name=device_label,json=deviceLabel,proto3" json:"device_label,omitempty"`
+	PairedAtUnixMs   int64                  `protobuf:"varint,3,opt,name=paired_at_unix_ms,json=pairedAtUnixMs,proto3" json:"paired_at_unix_ms,omitempty"`
+	LastUsedAtUnixMs int64                  `protobuf:"varint,4,opt,name=last_used_at_unix_ms,json=lastUsedAtUnixMs,proto3" json:"last_used_at_unix_ms,omitempty"`
+	Status           string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"` // "active" | "revoked"
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *PairedDevice) Reset() {
+	*x = PairedDevice{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PairedDevice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PairedDevice) ProtoMessage() {}
+
+func (x *PairedDevice) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PairedDevice.ProtoReflect.Descriptor instead.
+func (*PairedDevice) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *PairedDevice) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PairedDevice) GetDeviceLabel() string {
+	if x != nil {
+		return x.DeviceLabel
+	}
+	return ""
+}
+
+func (x *PairedDevice) GetPairedAtUnixMs() int64 {
+	if x != nil {
+		return x.PairedAtUnixMs
+	}
+	return 0
+}
+
+func (x *PairedDevice) GetLastUsedAtUnixMs() int64 {
+	if x != nil {
+		return x.LastUsedAtUnixMs
+	}
+	return 0
+}
+
+func (x *PairedDevice) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type UnpairDeviceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnpairDeviceRequest) Reset() {
+	*x = UnpairDeviceRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnpairDeviceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnpairDeviceRequest) ProtoMessage() {}
+
+func (x *UnpairDeviceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnpairDeviceRequest.ProtoReflect.Descriptor instead.
+func (*UnpairDeviceRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *UnpairDeviceRequest) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+// Internal-only — never exposed over the REST facade.
+type ResolveDeviceSharedSecretRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveDeviceSharedSecretRequest) Reset() {
+	*x = ResolveDeviceSharedSecretRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveDeviceSharedSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveDeviceSharedSecretRequest) ProtoMessage() {}
+
+func (x *ResolveDeviceSharedSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveDeviceSharedSecretRequest.ProtoReflect.Descriptor instead.
+func (*ResolveDeviceSharedSecretRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *ResolveDeviceSharedSecretRequest) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+type ResolveDeviceSharedSecretResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SharedSecret  []byte                 `protobuf:"bytes,1,opt,name=shared_secret,json=sharedSecret,proto3" json:"shared_secret,omitempty"` // raw 32-byte NaCl box shared secret; caller must not persist it
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveDeviceSharedSecretResponse) Reset() {
+	*x = ResolveDeviceSharedSecretResponse{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveDeviceSharedSecretResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveDeviceSharedSecretResponse) ProtoMessage() {}
+
+func (x *ResolveDeviceSharedSecretResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveDeviceSharedSecretResponse.ProtoReflect.Descriptor instead.
+func (*ResolveDeviceSharedSecretResponse) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *ResolveDeviceSharedSecretResponse) GetSharedSecret() []byte {
+	if x != nil {
+		return x.SharedSecret
+	}
+	return nil
+}
+
 var File_orca_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_orca_auth_v1_auth_proto_rawDesc = "" +
@@ -2321,12 +2842,42 @@ const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"\vtotal_users\x18\x01 \x01(\x05R\n" +
 	"totalUsers\x12'\n" +
 	"\x0factive_sessions\x18\x02 \x01(\x05R\x0eactiveSessions\x12%\n" +
-	"\x0etotal_policies\x18\x03 \x01(\x05R\rtotalPolicies*;\n" +
+	"\x0etotal_policies\x18\x03 \x01(\x05R\rtotalPolicies\"\x1e\n" +
+	"\x1cInitiateDevicePairingRequest\"\xc6\x01\n" +
+	"\x1dInitiateDevicePairingResponse\x12#\n" +
+	"\rpairing_token\x18\x01 \x01(\tR\fpairingToken\x12,\n" +
+	"\x12desktop_public_key\x18\x02 \x01(\fR\x10desktopPublicKey\x12%\n" +
+	"\x0eserver_address\x18\x03 \x01(\tR\rserverAddress\x12+\n" +
+	"\x12expires_at_unix_ms\x18\x04 \x01(\x03R\x0fexpiresAtUnixMs\"\x92\x01\n" +
+	"\x1cCompleteDevicePairingRequest\x12#\n" +
+	"\rpairing_token\x18\x01 \x01(\tR\fpairingToken\x12*\n" +
+	"\x11mobile_public_key\x18\x02 \x01(\fR\x0fmobilePublicKey\x12!\n" +
+	"\fdevice_label\x18\x03 \x01(\tR\vdeviceLabel\"\xcb\x01\n" +
+	"\x1dCompleteDevicePairingResponse\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12E\n" +
+	"\x1fdesktop_public_key_confirmation\x18\x02 \x01(\fR\x1cdesktopPublicKeyConfirmation\x12!\n" +
+	"\faccess_token\x18\x03 \x01(\tR\vaccessToken\x12#\n" +
+	"\rrefresh_token\x18\x04 \x01(\tR\frefreshToken\"\x1a\n" +
+	"\x18ListPairedDevicesRequest\"Q\n" +
+	"\x19ListPairedDevicesResponse\x124\n" +
+	"\adevices\x18\x01 \x03(\v2\x1a.orca.auth.v1.PairedDeviceR\adevices\"\xb4\x01\n" +
+	"\fPairedDevice\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fdevice_label\x18\x02 \x01(\tR\vdeviceLabel\x12)\n" +
+	"\x11paired_at_unix_ms\x18\x03 \x01(\x03R\x0epairedAtUnixMs\x12.\n" +
+	"\x14last_used_at_unix_ms\x18\x04 \x01(\x03R\x10lastUsedAtUnixMs\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\"2\n" +
+	"\x13UnpairDeviceRequest\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\"?\n" +
+	" ResolveDeviceSharedSecretRequest\x12\x1b\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\"H\n" +
+	"!ResolveDeviceSharedSecretResponse\x12#\n" +
+	"\rshared_secret\x18\x01 \x01(\fR\fsharedSecret*;\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tROLE_USER\x10\x01\x12\x0e\n" +
 	"\n" +
-	"ROLE_ADMIN\x10\x022\xa8\x0e\n" +
+	"ROLE_ADMIN\x10\x022\xbb\x12\n" +
 	"\vAuthService\x12@\n" +
 	"\x05Login\x12\x1a.orca.auth.v1.LoginRequest\x1a\x1b.orca.auth.v1.LoginResponse\x12C\n" +
 	"\x06Logout\x12\x1b.orca.auth.v1.LogoutRequest\x1a\x1c.orca.auth.v1.LogoutResponse\x12^\n" +
@@ -2348,7 +2899,12 @@ const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"\x12ListAccessPolicies\x12'.orca.auth.v1.ListAccessPoliciesRequest\x1a(.orca.auth.v1.ListAccessPoliciesResponse\x12Y\n" +
 	"\x12UpdateAccessPolicy\x12'.orca.auth.v1.UpdateAccessPolicyRequest\x1a\x1a.orca.auth.v1.AccessPolicy\x12U\n" +
 	"\x12DeleteAccessPolicy\x12'.orca.auth.v1.DeleteAccessPolicyRequest\x1a\x16.google.protobuf.Empty\x12X\n" +
-	"\rGetAdminStats\x12\".orca.auth.v1.GetAdminStatsRequest\x1a#.orca.auth.v1.GetAdminStatsResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1;authv1b\x06proto3"
+	"\rGetAdminStats\x12\".orca.auth.v1.GetAdminStatsRequest\x1a#.orca.auth.v1.GetAdminStatsResponse\x12p\n" +
+	"\x15InitiateDevicePairing\x12*.orca.auth.v1.InitiateDevicePairingRequest\x1a+.orca.auth.v1.InitiateDevicePairingResponse\x12p\n" +
+	"\x15CompleteDevicePairing\x12*.orca.auth.v1.CompleteDevicePairingRequest\x1a+.orca.auth.v1.CompleteDevicePairingResponse\x12d\n" +
+	"\x11ListPairedDevices\x12&.orca.auth.v1.ListPairedDevicesRequest\x1a'.orca.auth.v1.ListPairedDevicesResponse\x12I\n" +
+	"\fUnpairDevice\x12!.orca.auth.v1.UnpairDeviceRequest\x1a\x16.google.protobuf.Empty\x12|\n" +
+	"\x19ResolveDeviceSharedSecret\x12..orca.auth.v1.ResolveDeviceSharedSecretRequest\x1a/.orca.auth.v1.ResolveDeviceSharedSecretResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1;authv1b\x06proto3"
 
 var (
 	file_orca_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -2363,7 +2919,7 @@ func file_orca_auth_v1_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_auth_v1_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_orca_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_orca_auth_v1_auth_proto_goTypes = []any{
 	(Role)(0),                                     // 0: orca.auth.v1.Role
 	(*User)(nil),                                  // 1: orca.auth.v1.User
@@ -2406,76 +2962,97 @@ var file_orca_auth_v1_auth_proto_goTypes = []any{
 	(*DeleteAccessPolicyRequest)(nil),             // 38: orca.auth.v1.DeleteAccessPolicyRequest
 	(*GetAdminStatsRequest)(nil),                  // 39: orca.auth.v1.GetAdminStatsRequest
 	(*GetAdminStatsResponse)(nil),                 // 40: orca.auth.v1.GetAdminStatsResponse
-	(*timestamppb.Timestamp)(nil),                 // 41: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                         // 42: google.protobuf.Empty
+	(*InitiateDevicePairingRequest)(nil),          // 41: orca.auth.v1.InitiateDevicePairingRequest
+	(*InitiateDevicePairingResponse)(nil),         // 42: orca.auth.v1.InitiateDevicePairingResponse
+	(*CompleteDevicePairingRequest)(nil),          // 43: orca.auth.v1.CompleteDevicePairingRequest
+	(*CompleteDevicePairingResponse)(nil),         // 44: orca.auth.v1.CompleteDevicePairingResponse
+	(*ListPairedDevicesRequest)(nil),              // 45: orca.auth.v1.ListPairedDevicesRequest
+	(*ListPairedDevicesResponse)(nil),             // 46: orca.auth.v1.ListPairedDevicesResponse
+	(*PairedDevice)(nil),                          // 47: orca.auth.v1.PairedDevice
+	(*UnpairDeviceRequest)(nil),                   // 48: orca.auth.v1.UnpairDeviceRequest
+	(*ResolveDeviceSharedSecretRequest)(nil),      // 49: orca.auth.v1.ResolveDeviceSharedSecretRequest
+	(*ResolveDeviceSharedSecretResponse)(nil),     // 50: orca.auth.v1.ResolveDeviceSharedSecretResponse
+	(*timestamppb.Timestamp)(nil),                 // 51: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                         // 52: google.protobuf.Empty
 }
 var file_orca_auth_v1_auth_proto_depIdxs = []int32{
 	0,  // 0: orca.auth.v1.User.role:type_name -> orca.auth.v1.Role
-	41, // 1: orca.auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	51, // 1: orca.auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: orca.auth.v1.LoginResponse.user:type_name -> orca.auth.v1.User
 	1,  // 3: orca.auth.v1.ValidateSessionResponse.user:type_name -> orca.auth.v1.User
-	41, // 4: orca.auth.v1.IssueServiceTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
+	51, // 4: orca.auth.v1.IssueServiceTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 5: orca.auth.v1.CreateUserRequest.role:type_name -> orca.auth.v1.Role
 	1,  // 6: orca.auth.v1.CreateUserResponse.user:type_name -> orca.auth.v1.User
 	1,  // 7: orca.auth.v1.ListUsersResponse.users:type_name -> orca.auth.v1.User
 	0,  // 8: orca.auth.v1.UpdateUserRoleRequest.role:type_name -> orca.auth.v1.Role
 	1,  // 9: orca.auth.v1.UpdateUserRoleResponse.user:type_name -> orca.auth.v1.User
-	41, // 10: orca.auth.v1.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
-	41, // 11: orca.auth.v1.QueryAuditLogRequest.since:type_name -> google.protobuf.Timestamp
+	51, // 10: orca.auth.v1.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
+	51, // 11: orca.auth.v1.QueryAuditLogRequest.since:type_name -> google.protobuf.Timestamp
 	20, // 12: orca.auth.v1.QueryAuditLogResponse.entries:type_name -> orca.auth.v1.AuditEntry
 	1,  // 13: orca.auth.v1.DeactivateUserResponse.user:type_name -> orca.auth.v1.User
 	1,  // 14: orca.auth.v1.ReactivateUserResponse.user:type_name -> orca.auth.v1.User
 	29, // 15: orca.auth.v1.ListSessionsForUserResponse.sessions:type_name -> orca.auth.v1.Session
-	41, // 16: orca.auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	41, // 17: orca.auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	41, // 18: orca.auth.v1.Session.last_seen_at:type_name -> google.protobuf.Timestamp
-	41, // 19: orca.auth.v1.AccessPolicy.updated_at:type_name -> google.protobuf.Timestamp
+	51, // 16: orca.auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	51, // 17: orca.auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	51, // 18: orca.auth.v1.Session.last_seen_at:type_name -> google.protobuf.Timestamp
+	51, // 19: orca.auth.v1.AccessPolicy.updated_at:type_name -> google.protobuf.Timestamp
 	32, // 20: orca.auth.v1.ListAccessPoliciesResponse.policies:type_name -> orca.auth.v1.AccessPolicy
-	2,  // 21: orca.auth.v1.AuthService.Login:input_type -> orca.auth.v1.LoginRequest
-	4,  // 22: orca.auth.v1.AuthService.Logout:input_type -> orca.auth.v1.LogoutRequest
-	6,  // 23: orca.auth.v1.AuthService.ValidateSession:input_type -> orca.auth.v1.ValidateSessionRequest
-	8,  // 24: orca.auth.v1.AuthService.IssueServiceToken:input_type -> orca.auth.v1.IssueServiceTokenRequest
-	10, // 25: orca.auth.v1.AuthService.GetJWKS:input_type -> orca.auth.v1.GetJWKSRequest
-	12, // 26: orca.auth.v1.AuthService.CreateUser:input_type -> orca.auth.v1.CreateUserRequest
-	14, // 27: orca.auth.v1.AuthService.ListUsers:input_type -> orca.auth.v1.ListUsersRequest
-	16, // 28: orca.auth.v1.AuthService.UpdateUserRole:input_type -> orca.auth.v1.UpdateUserRoleRequest
-	18, // 29: orca.auth.v1.AuthService.RevokeSession:input_type -> orca.auth.v1.RevokeSessionRequest
-	21, // 30: orca.auth.v1.AuthService.QueryAuditLog:input_type -> orca.auth.v1.QueryAuditLogRequest
-	23, // 31: orca.auth.v1.AuthService.DeactivateUser:input_type -> orca.auth.v1.DeactivateUserRequest
-	25, // 32: orca.auth.v1.AuthService.ReactivateUser:input_type -> orca.auth.v1.ReactivateUserRequest
-	27, // 33: orca.auth.v1.AuthService.ListSessionsForUser:input_type -> orca.auth.v1.ListSessionsForUserRequest
-	30, // 34: orca.auth.v1.AuthService.ForceRevokeAllSessionsForUser:input_type -> orca.auth.v1.ForceRevokeAllSessionsForUserRequest
-	33, // 35: orca.auth.v1.AuthService.CreateAccessPolicy:input_type -> orca.auth.v1.CreateAccessPolicyRequest
-	34, // 36: orca.auth.v1.AuthService.GetAccessPolicy:input_type -> orca.auth.v1.GetAccessPolicyRequest
-	35, // 37: orca.auth.v1.AuthService.ListAccessPolicies:input_type -> orca.auth.v1.ListAccessPoliciesRequest
-	37, // 38: orca.auth.v1.AuthService.UpdateAccessPolicy:input_type -> orca.auth.v1.UpdateAccessPolicyRequest
-	38, // 39: orca.auth.v1.AuthService.DeleteAccessPolicy:input_type -> orca.auth.v1.DeleteAccessPolicyRequest
-	39, // 40: orca.auth.v1.AuthService.GetAdminStats:input_type -> orca.auth.v1.GetAdminStatsRequest
-	3,  // 41: orca.auth.v1.AuthService.Login:output_type -> orca.auth.v1.LoginResponse
-	5,  // 42: orca.auth.v1.AuthService.Logout:output_type -> orca.auth.v1.LogoutResponse
-	7,  // 43: orca.auth.v1.AuthService.ValidateSession:output_type -> orca.auth.v1.ValidateSessionResponse
-	9,  // 44: orca.auth.v1.AuthService.IssueServiceToken:output_type -> orca.auth.v1.IssueServiceTokenResponse
-	11, // 45: orca.auth.v1.AuthService.GetJWKS:output_type -> orca.auth.v1.GetJWKSResponse
-	13, // 46: orca.auth.v1.AuthService.CreateUser:output_type -> orca.auth.v1.CreateUserResponse
-	15, // 47: orca.auth.v1.AuthService.ListUsers:output_type -> orca.auth.v1.ListUsersResponse
-	17, // 48: orca.auth.v1.AuthService.UpdateUserRole:output_type -> orca.auth.v1.UpdateUserRoleResponse
-	19, // 49: orca.auth.v1.AuthService.RevokeSession:output_type -> orca.auth.v1.RevokeSessionResponse
-	22, // 50: orca.auth.v1.AuthService.QueryAuditLog:output_type -> orca.auth.v1.QueryAuditLogResponse
-	24, // 51: orca.auth.v1.AuthService.DeactivateUser:output_type -> orca.auth.v1.DeactivateUserResponse
-	26, // 52: orca.auth.v1.AuthService.ReactivateUser:output_type -> orca.auth.v1.ReactivateUserResponse
-	28, // 53: orca.auth.v1.AuthService.ListSessionsForUser:output_type -> orca.auth.v1.ListSessionsForUserResponse
-	31, // 54: orca.auth.v1.AuthService.ForceRevokeAllSessionsForUser:output_type -> orca.auth.v1.ForceRevokeAllSessionsForUserResponse
-	32, // 55: orca.auth.v1.AuthService.CreateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
-	32, // 56: orca.auth.v1.AuthService.GetAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
-	36, // 57: orca.auth.v1.AuthService.ListAccessPolicies:output_type -> orca.auth.v1.ListAccessPoliciesResponse
-	32, // 58: orca.auth.v1.AuthService.UpdateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
-	42, // 59: orca.auth.v1.AuthService.DeleteAccessPolicy:output_type -> google.protobuf.Empty
-	40, // 60: orca.auth.v1.AuthService.GetAdminStats:output_type -> orca.auth.v1.GetAdminStatsResponse
-	41, // [41:61] is the sub-list for method output_type
-	21, // [21:41] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	47, // 21: orca.auth.v1.ListPairedDevicesResponse.devices:type_name -> orca.auth.v1.PairedDevice
+	2,  // 22: orca.auth.v1.AuthService.Login:input_type -> orca.auth.v1.LoginRequest
+	4,  // 23: orca.auth.v1.AuthService.Logout:input_type -> orca.auth.v1.LogoutRequest
+	6,  // 24: orca.auth.v1.AuthService.ValidateSession:input_type -> orca.auth.v1.ValidateSessionRequest
+	8,  // 25: orca.auth.v1.AuthService.IssueServiceToken:input_type -> orca.auth.v1.IssueServiceTokenRequest
+	10, // 26: orca.auth.v1.AuthService.GetJWKS:input_type -> orca.auth.v1.GetJWKSRequest
+	12, // 27: orca.auth.v1.AuthService.CreateUser:input_type -> orca.auth.v1.CreateUserRequest
+	14, // 28: orca.auth.v1.AuthService.ListUsers:input_type -> orca.auth.v1.ListUsersRequest
+	16, // 29: orca.auth.v1.AuthService.UpdateUserRole:input_type -> orca.auth.v1.UpdateUserRoleRequest
+	18, // 30: orca.auth.v1.AuthService.RevokeSession:input_type -> orca.auth.v1.RevokeSessionRequest
+	21, // 31: orca.auth.v1.AuthService.QueryAuditLog:input_type -> orca.auth.v1.QueryAuditLogRequest
+	23, // 32: orca.auth.v1.AuthService.DeactivateUser:input_type -> orca.auth.v1.DeactivateUserRequest
+	25, // 33: orca.auth.v1.AuthService.ReactivateUser:input_type -> orca.auth.v1.ReactivateUserRequest
+	27, // 34: orca.auth.v1.AuthService.ListSessionsForUser:input_type -> orca.auth.v1.ListSessionsForUserRequest
+	30, // 35: orca.auth.v1.AuthService.ForceRevokeAllSessionsForUser:input_type -> orca.auth.v1.ForceRevokeAllSessionsForUserRequest
+	33, // 36: orca.auth.v1.AuthService.CreateAccessPolicy:input_type -> orca.auth.v1.CreateAccessPolicyRequest
+	34, // 37: orca.auth.v1.AuthService.GetAccessPolicy:input_type -> orca.auth.v1.GetAccessPolicyRequest
+	35, // 38: orca.auth.v1.AuthService.ListAccessPolicies:input_type -> orca.auth.v1.ListAccessPoliciesRequest
+	37, // 39: orca.auth.v1.AuthService.UpdateAccessPolicy:input_type -> orca.auth.v1.UpdateAccessPolicyRequest
+	38, // 40: orca.auth.v1.AuthService.DeleteAccessPolicy:input_type -> orca.auth.v1.DeleteAccessPolicyRequest
+	39, // 41: orca.auth.v1.AuthService.GetAdminStats:input_type -> orca.auth.v1.GetAdminStatsRequest
+	41, // 42: orca.auth.v1.AuthService.InitiateDevicePairing:input_type -> orca.auth.v1.InitiateDevicePairingRequest
+	43, // 43: orca.auth.v1.AuthService.CompleteDevicePairing:input_type -> orca.auth.v1.CompleteDevicePairingRequest
+	45, // 44: orca.auth.v1.AuthService.ListPairedDevices:input_type -> orca.auth.v1.ListPairedDevicesRequest
+	48, // 45: orca.auth.v1.AuthService.UnpairDevice:input_type -> orca.auth.v1.UnpairDeviceRequest
+	49, // 46: orca.auth.v1.AuthService.ResolveDeviceSharedSecret:input_type -> orca.auth.v1.ResolveDeviceSharedSecretRequest
+	3,  // 47: orca.auth.v1.AuthService.Login:output_type -> orca.auth.v1.LoginResponse
+	5,  // 48: orca.auth.v1.AuthService.Logout:output_type -> orca.auth.v1.LogoutResponse
+	7,  // 49: orca.auth.v1.AuthService.ValidateSession:output_type -> orca.auth.v1.ValidateSessionResponse
+	9,  // 50: orca.auth.v1.AuthService.IssueServiceToken:output_type -> orca.auth.v1.IssueServiceTokenResponse
+	11, // 51: orca.auth.v1.AuthService.GetJWKS:output_type -> orca.auth.v1.GetJWKSResponse
+	13, // 52: orca.auth.v1.AuthService.CreateUser:output_type -> orca.auth.v1.CreateUserResponse
+	15, // 53: orca.auth.v1.AuthService.ListUsers:output_type -> orca.auth.v1.ListUsersResponse
+	17, // 54: orca.auth.v1.AuthService.UpdateUserRole:output_type -> orca.auth.v1.UpdateUserRoleResponse
+	19, // 55: orca.auth.v1.AuthService.RevokeSession:output_type -> orca.auth.v1.RevokeSessionResponse
+	22, // 56: orca.auth.v1.AuthService.QueryAuditLog:output_type -> orca.auth.v1.QueryAuditLogResponse
+	24, // 57: orca.auth.v1.AuthService.DeactivateUser:output_type -> orca.auth.v1.DeactivateUserResponse
+	26, // 58: orca.auth.v1.AuthService.ReactivateUser:output_type -> orca.auth.v1.ReactivateUserResponse
+	28, // 59: orca.auth.v1.AuthService.ListSessionsForUser:output_type -> orca.auth.v1.ListSessionsForUserResponse
+	31, // 60: orca.auth.v1.AuthService.ForceRevokeAllSessionsForUser:output_type -> orca.auth.v1.ForceRevokeAllSessionsForUserResponse
+	32, // 61: orca.auth.v1.AuthService.CreateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	32, // 62: orca.auth.v1.AuthService.GetAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	36, // 63: orca.auth.v1.AuthService.ListAccessPolicies:output_type -> orca.auth.v1.ListAccessPoliciesResponse
+	32, // 64: orca.auth.v1.AuthService.UpdateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	52, // 65: orca.auth.v1.AuthService.DeleteAccessPolicy:output_type -> google.protobuf.Empty
+	40, // 66: orca.auth.v1.AuthService.GetAdminStats:output_type -> orca.auth.v1.GetAdminStatsResponse
+	42, // 67: orca.auth.v1.AuthService.InitiateDevicePairing:output_type -> orca.auth.v1.InitiateDevicePairingResponse
+	44, // 68: orca.auth.v1.AuthService.CompleteDevicePairing:output_type -> orca.auth.v1.CompleteDevicePairingResponse
+	46, // 69: orca.auth.v1.AuthService.ListPairedDevices:output_type -> orca.auth.v1.ListPairedDevicesResponse
+	52, // 70: orca.auth.v1.AuthService.UnpairDevice:output_type -> google.protobuf.Empty
+	50, // 71: orca.auth.v1.AuthService.ResolveDeviceSharedSecret:output_type -> orca.auth.v1.ResolveDeviceSharedSecretResponse
+	47, // [47:72] is the sub-list for method output_type
+	22, // [22:47] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_orca_auth_v1_auth_proto_init() }
@@ -2489,7 +3066,7 @@ func file_orca_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_auth_v1_auth_proto_rawDesc), len(file_orca_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   40,
+			NumMessages:   50,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
