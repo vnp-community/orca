@@ -32,6 +32,13 @@ const (
 	WorkflowService_HasActiveExecutions_FullMethodName   = "/orca.workflow.v1.WorkflowService/HasActiveExecutions"
 	WorkflowService_CloneTemplate_FullMethodName         = "/orca.workflow.v1.WorkflowService/CloneTemplate"
 	WorkflowService_StreamExecutionEvents_FullMethodName = "/orca.workflow.v1.WorkflowService/StreamExecutionEvents"
+	WorkflowService_PublishTemplate_FullMethodName       = "/orca.workflow.v1.WorkflowService/PublishTemplate"
+	WorkflowService_ListPendingApprovals_FullMethodName  = "/orca.workflow.v1.WorkflowService/ListPendingApprovals"
+	WorkflowService_ResolveApproval_FullMethodName       = "/orca.workflow.v1.WorkflowService/ResolveApproval"
+	WorkflowService_GenerateShareLink_FullMethodName     = "/orca.workflow.v1.WorkflowService/GenerateShareLink"
+	WorkflowService_PreviewSharedTemplate_FullMethodName = "/orca.workflow.v1.WorkflowService/PreviewSharedTemplate"
+	WorkflowService_ImportSharedTemplate_FullMethodName  = "/orca.workflow.v1.WorkflowService/ImportSharedTemplate"
+	WorkflowService_RateTemplate_FullMethodName          = "/orca.workflow.v1.WorkflowService/RateTemplate"
 )
 
 // WorkflowServiceClient is the client API for WorkflowService service.
@@ -85,6 +92,28 @@ type WorkflowServiceClient interface {
 	// (or already-completed, for replay) execution — BUG-WF-02's live
 	// execution streaming gap.
 	StreamExecutionEvents(ctx context.Context, in *StreamExecutionEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecutionEvent], error)
+	// PublishTemplate escalates/de-escalates a template's Visibility — see
+	// domain.Visibility.CanEscalateTo. Escalating to company/public may land
+	// the template in a pending Approval instead of taking effect
+	// immediately (BUG-WF-03).
+	PublishTemplate(ctx context.Context, in *PublishTemplateRequest, opts ...grpc.CallOption) (*WorkflowTemplate, error)
+	// ListPendingApprovals lists this tenant's pending publish-approval gates.
+	ListPendingApprovals(ctx context.Context, in *ListPendingApprovalsRequest, opts ...grpc.CallOption) (*ListPendingApprovalsResponse, error)
+	// ResolveApproval approves or rejects a pending approval — an admin-only
+	// operation (enforced at the usecase layer).
+	ResolveApproval(ctx context.Context, in *ResolveApprovalRequest, opts ...grpc.CallOption) (*Approval, error)
+	// GenerateShareLink mints (or returns the existing) share_token for a
+	// public template.
+	GenerateShareLink(ctx context.Context, in *GenerateShareLinkRequest, opts ...grpc.CallOption) (*GenerateShareLinkResponse, error)
+	// PreviewSharedTemplate returns a read-only preview of a shared
+	// template by its share_token — no auth required beyond knowing the
+	// token (matches a typical "anyone with the link" share model).
+	PreviewSharedTemplate(ctx context.Context, in *PreviewSharedTemplateRequest, opts ...grpc.CallOption) (*SharedTemplatePreview, error)
+	// ImportSharedTemplate clones a shared template (by share_token) into
+	// the caller's own tenant as a new, disconnected root template.
+	ImportSharedTemplate(ctx context.Context, in *ImportSharedTemplateRequest, opts ...grpc.CallOption) (*WorkflowTemplate, error)
+	// RateTemplate records (or updates) the caller's 1-5 star rating.
+	RateTemplate(ctx context.Context, in *RateTemplateRequest, opts ...grpc.CallOption) (*RateTemplateResponse, error)
 }
 
 type workflowServiceClient struct {
@@ -234,6 +263,76 @@ func (c *workflowServiceClient) StreamExecutionEvents(ctx context.Context, in *S
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkflowService_StreamExecutionEventsClient = grpc.ServerStreamingClient[ExecutionEvent]
 
+func (c *workflowServiceClient) PublishTemplate(ctx context.Context, in *PublishTemplateRequest, opts ...grpc.CallOption) (*WorkflowTemplate, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkflowTemplate)
+	err := c.cc.Invoke(ctx, WorkflowService_PublishTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) ListPendingApprovals(ctx context.Context, in *ListPendingApprovalsRequest, opts ...grpc.CallOption) (*ListPendingApprovalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPendingApprovalsResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ListPendingApprovals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) ResolveApproval(ctx context.Context, in *ResolveApprovalRequest, opts ...grpc.CallOption) (*Approval, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Approval)
+	err := c.cc.Invoke(ctx, WorkflowService_ResolveApproval_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) GenerateShareLink(ctx context.Context, in *GenerateShareLinkRequest, opts ...grpc.CallOption) (*GenerateShareLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateShareLinkResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_GenerateShareLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) PreviewSharedTemplate(ctx context.Context, in *PreviewSharedTemplateRequest, opts ...grpc.CallOption) (*SharedTemplatePreview, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SharedTemplatePreview)
+	err := c.cc.Invoke(ctx, WorkflowService_PreviewSharedTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) ImportSharedTemplate(ctx context.Context, in *ImportSharedTemplateRequest, opts ...grpc.CallOption) (*WorkflowTemplate, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkflowTemplate)
+	err := c.cc.Invoke(ctx, WorkflowService_ImportSharedTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *workflowServiceClient) RateTemplate(ctx context.Context, in *RateTemplateRequest, opts ...grpc.CallOption) (*RateTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RateTemplateResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_RateTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkflowServiceServer is the server API for WorkflowService service.
 // All implementations must embed UnimplementedWorkflowServiceServer
 // for forward compatibility.
@@ -285,6 +384,28 @@ type WorkflowServiceServer interface {
 	// (or already-completed, for replay) execution — BUG-WF-02's live
 	// execution streaming gap.
 	StreamExecutionEvents(*StreamExecutionEventsRequest, grpc.ServerStreamingServer[ExecutionEvent]) error
+	// PublishTemplate escalates/de-escalates a template's Visibility — see
+	// domain.Visibility.CanEscalateTo. Escalating to company/public may land
+	// the template in a pending Approval instead of taking effect
+	// immediately (BUG-WF-03).
+	PublishTemplate(context.Context, *PublishTemplateRequest) (*WorkflowTemplate, error)
+	// ListPendingApprovals lists this tenant's pending publish-approval gates.
+	ListPendingApprovals(context.Context, *ListPendingApprovalsRequest) (*ListPendingApprovalsResponse, error)
+	// ResolveApproval approves or rejects a pending approval — an admin-only
+	// operation (enforced at the usecase layer).
+	ResolveApproval(context.Context, *ResolveApprovalRequest) (*Approval, error)
+	// GenerateShareLink mints (or returns the existing) share_token for a
+	// public template.
+	GenerateShareLink(context.Context, *GenerateShareLinkRequest) (*GenerateShareLinkResponse, error)
+	// PreviewSharedTemplate returns a read-only preview of a shared
+	// template by its share_token — no auth required beyond knowing the
+	// token (matches a typical "anyone with the link" share model).
+	PreviewSharedTemplate(context.Context, *PreviewSharedTemplateRequest) (*SharedTemplatePreview, error)
+	// ImportSharedTemplate clones a shared template (by share_token) into
+	// the caller's own tenant as a new, disconnected root template.
+	ImportSharedTemplate(context.Context, *ImportSharedTemplateRequest) (*WorkflowTemplate, error)
+	// RateTemplate records (or updates) the caller's 1-5 star rating.
+	RateTemplate(context.Context, *RateTemplateRequest) (*RateTemplateResponse, error)
 	mustEmbedUnimplementedWorkflowServiceServer()
 }
 
@@ -333,6 +454,27 @@ func (UnimplementedWorkflowServiceServer) CloneTemplate(context.Context, *CloneT
 }
 func (UnimplementedWorkflowServiceServer) StreamExecutionEvents(*StreamExecutionEventsRequest, grpc.ServerStreamingServer[ExecutionEvent]) error {
 	return status.Error(codes.Unimplemented, "method StreamExecutionEvents not implemented")
+}
+func (UnimplementedWorkflowServiceServer) PublishTemplate(context.Context, *PublishTemplateRequest) (*WorkflowTemplate, error) {
+	return nil, status.Error(codes.Unimplemented, "method PublishTemplate not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ListPendingApprovals(context.Context, *ListPendingApprovalsRequest) (*ListPendingApprovalsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPendingApprovals not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ResolveApproval(context.Context, *ResolveApprovalRequest) (*Approval, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveApproval not implemented")
+}
+func (UnimplementedWorkflowServiceServer) GenerateShareLink(context.Context, *GenerateShareLinkRequest) (*GenerateShareLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateShareLink not implemented")
+}
+func (UnimplementedWorkflowServiceServer) PreviewSharedTemplate(context.Context, *PreviewSharedTemplateRequest) (*SharedTemplatePreview, error) {
+	return nil, status.Error(codes.Unimplemented, "method PreviewSharedTemplate not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ImportSharedTemplate(context.Context, *ImportSharedTemplateRequest) (*WorkflowTemplate, error) {
+	return nil, status.Error(codes.Unimplemented, "method ImportSharedTemplate not implemented")
+}
+func (UnimplementedWorkflowServiceServer) RateTemplate(context.Context, *RateTemplateRequest) (*RateTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RateTemplate not implemented")
 }
 func (UnimplementedWorkflowServiceServer) mustEmbedUnimplementedWorkflowServiceServer() {}
 func (UnimplementedWorkflowServiceServer) testEmbeddedByValue()                         {}
@@ -582,6 +724,132 @@ func _WorkflowService_StreamExecutionEvents_Handler(srv interface{}, stream grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type WorkflowService_StreamExecutionEventsServer = grpc.ServerStreamingServer[ExecutionEvent]
 
+func _WorkflowService_PublishTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).PublishTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_PublishTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).PublishTemplate(ctx, req.(*PublishTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_ListPendingApprovals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPendingApprovalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ListPendingApprovals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ListPendingApprovals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ListPendingApprovals(ctx, req.(*ListPendingApprovalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_ResolveApproval_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveApprovalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ResolveApproval(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ResolveApproval_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ResolveApproval(ctx, req.(*ResolveApprovalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_GenerateShareLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateShareLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).GenerateShareLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_GenerateShareLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).GenerateShareLink(ctx, req.(*GenerateShareLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_PreviewSharedTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreviewSharedTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).PreviewSharedTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_PreviewSharedTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).PreviewSharedTemplate(ctx, req.(*PreviewSharedTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_ImportSharedTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportSharedTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ImportSharedTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ImportSharedTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ImportSharedTemplate(ctx, req.(*ImportSharedTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WorkflowService_RateTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RateTemplateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).RateTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_RateTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).RateTemplate(ctx, req.(*RateTemplateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkflowService_ServiceDesc is the grpc.ServiceDesc for WorkflowService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -636,6 +904,34 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CloneTemplate",
 			Handler:    _WorkflowService_CloneTemplate_Handler,
+		},
+		{
+			MethodName: "PublishTemplate",
+			Handler:    _WorkflowService_PublishTemplate_Handler,
+		},
+		{
+			MethodName: "ListPendingApprovals",
+			Handler:    _WorkflowService_ListPendingApprovals_Handler,
+		},
+		{
+			MethodName: "ResolveApproval",
+			Handler:    _WorkflowService_ResolveApproval_Handler,
+		},
+		{
+			MethodName: "GenerateShareLink",
+			Handler:    _WorkflowService_GenerateShareLink_Handler,
+		},
+		{
+			MethodName: "PreviewSharedTemplate",
+			Handler:    _WorkflowService_PreviewSharedTemplate_Handler,
+		},
+		{
+			MethodName: "ImportSharedTemplate",
+			Handler:    _WorkflowService_ImportSharedTemplate_Handler,
+		},
+		{
+			MethodName: "RateTemplate",
+			Handler:    _WorkflowService_RateTemplate_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
