@@ -182,3 +182,27 @@ type AICompleter interface {
 type TxRunner interface {
 	RunInTx(ctx context.Context, fn func(ctx context.Context, tasks TaskRepository, edges EdgeRepository) error) error
 }
+
+// ProfileResolver is the outbound port toward tenant-service.GetResolvedProfile
+// — task-service.md §7 already lists a task --> tenant edge (TeamScopeResolver
+// dials it, albeit stubbed); this is a second, independent use of that same
+// dependency, not a new service edge.
+type ProfileResolver interface {
+	GetResolvedProfile(ctx context.Context, userID string) (map[string]any, error)
+}
+
+// ProjectContextResolver is the outbound port toward
+// project-service.GetProjectContext (TASK-PRF-04-01/02) — a NEW dial
+// (task-service has no project-service client today; ProjectExecutionResolver
+// goes through infra-fleet-service instead, see its own doc comment).
+type ProjectContextResolver interface {
+	GetProjectContext(ctx context.Context, projectID string) (ProjectContext, error)
+}
+
+// ProjectContext mirrors workflow-service's own copy of this struct —
+// deliberate per-service duplication, same rationale as
+// domain/agent_environment.go's (TASK-PRF-04-04).
+type ProjectContext struct {
+	ProjectID, ProjectName, Description     string
+	RepoURL, DevServerID, DevServerHostname string
+}

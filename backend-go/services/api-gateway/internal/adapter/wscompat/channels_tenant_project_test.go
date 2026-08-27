@@ -383,6 +383,33 @@ func TestProjectCreateChannel_Success(t *testing.T) {
 	}
 }
 
+// TestProjectCreateChannel_ThreadsDevServerIDAndRepoPath is the regression
+// guard for BUG-PRF-03: project.create decoded devServerId off the wire but
+// silently dropped it (never set on CreateProjectRequest), and repoPath was
+// never decoded at all. See TASK-PRF-03-07's Context.
+func TestProjectCreateChannel_ThreadsDevServerIDAndRepoPath(t *testing.T) {
+	var gotReq *projectv1.CreateProjectRequest
+	fake := &fakeProjectServiceClient2{
+		createProjectFunc: func(ctx context.Context, in *projectv1.CreateProjectRequest) (*projectv1.CreateProjectResponse, error) {
+			gotReq = in
+			return &projectv1.CreateProjectResponse{Project: &projectv1.Project{Id: "p1", TenantId: in.GetTenantId()}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerProjectChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"name": "My Project", "devServerId": "ds-1", "repoPath": "/srv/repo"})
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "project.create", args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetDevServerId() != "ds-1" {
+		t.Errorf("want DevServerId=ds-1, got %q", gotReq.GetDevServerId())
+	}
+	if gotReq.GetRepoPath() != "/srv/repo" {
+		t.Errorf("want RepoPath=/srv/repo, got %q", gotReq.GetRepoPath())
+	}
+}
+
 func TestProjectGetChannel_Success(t *testing.T) {
 	fake := &fakeProjectServiceClient2{
 		getProjectFunc: func(ctx context.Context, in *projectv1.GetProjectRequest) (*projectv1.GetProjectResponse, error) {

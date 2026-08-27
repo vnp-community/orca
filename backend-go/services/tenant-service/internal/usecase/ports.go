@@ -44,6 +44,10 @@ type DepartmentRepository interface {
 	// id) — a department_id from another company resolves as not-found,
 	// same isolation rule as Get. Returns found=false if no match.
 	Update(ctx context.Context, companyID, id string, patch domain.DepartmentSettingsPatch) (domain.Department, bool, error)
+	// ExistsByName backs CreateDepartment's name-uniqueness check — scoped by
+	// companyID, same isolation posture as every other DepartmentRepository
+	// method (tenant-service.md §9). NEW.
+	ExistsByName(ctx context.Context, companyID, name string) (bool, error)
 }
 
 // UserProfileRepository persists the per-user profile-override row
@@ -111,4 +115,25 @@ type ProfileCache interface {
 // back to today's TTL-bounded staleness.
 type CacheInvalidationPublisher interface {
 	PublishProfileInvalidated(ctx context.Context, tenantID, userID string) error
+}
+
+// OPAClient is the authorization port UpdateCompany/UpdateDepartment/
+// CreateDepartment use for the "does this caller_role/same_department
+// authorize this action" decision — implemented by internal/adapter/
+// opaclient against the shared embedded OPA evaluator (common/policy),
+// consuming backend-go/policy/orca-authz/tenant.rego's
+// data.orca.authz.tenant.allow rule. Mirrors project-service's own
+// OPAClient port shape.
+type OPAClient interface {
+	Decision(ctx context.Context, callerRole, action string, sameDepartment bool) (bool, error)
+}
+
+// AuditPublisher is the outbound port UpdateCompany/UpdateDepartment/
+// CreateDepartment call after a successful write to emit a security-relevant
+// audit event — outbox pattern, not a synchronous call to auth-service (see
+// internal/adapter/eventbus.Publisher.PublishAuditEvent's doc comment). A
+// nil AuditPublisher is valid — callers must nil-check, same convention as
+// CacheInvalidationPublisher above.
+type AuditPublisher interface {
+	PublishAuditEvent(ctx context.Context, tenantID, actorID, action, target string) error
 }

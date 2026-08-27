@@ -5,7 +5,7 @@
 **Service:** `project-service` + `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_tenant_project.go`
 **Depends on:** TASK-PRF-03-04, TASK-PRF-03-05, TASK-PRF-03-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — not in original task list but implemented anyway to keep the workspace build green (PRF-03-04/05/06 changed constructor signatures main.go must compile against); wscompat devServerId/repoPath threading + grpc handler + main.go wiring all done; go build ./... clean, wscompat regression test added
 
 ---
 

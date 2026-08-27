@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/adapter/grpcclient/simple_executor.go`
 **Depends on:** TASK-PRF-04-04, TASK-PRF-04-07
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — TrustPreset/Model/Env/InitFile added to agentExecPromptParams; profile-aware injection wired using tenant.UserID(ctx) fallback (domain.Task has no AssigneeID field, confirmed); main.go wired; full task-service suite green, 18/18 grpcclient tests pass
 
 ---
 

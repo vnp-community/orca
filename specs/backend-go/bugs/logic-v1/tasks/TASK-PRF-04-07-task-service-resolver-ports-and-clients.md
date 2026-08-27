@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/ports.go`
 **Depends on:** TASK-PRF-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ProfileResolver/ProjectContextResolver ports + grpcclient adapters added (same identity-forwarding approach as workflow-service); TenantServiceAddr/ProjectServiceAddr config added; go build clean
 
 ---
 

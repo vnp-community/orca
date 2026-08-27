@@ -101,6 +101,47 @@ func TestDepartmentRepository_GetIsScopedByCompanyID(t *testing.T) {
 	}
 }
 
+func TestDepartmentRepository_ExistsByNameIsScopedByCompanyID(t *testing.T) {
+	pool := setupPool(t)
+	companies := NewCompanyRepository(pool)
+	departments := NewDepartmentRepository(pool)
+	ctx := context.Background()
+
+	companyA, _ := domain.NewCompany("44444444-4444-4444-4444-444444444444", "Company A", nil)
+	companyB, _ := domain.NewCompany("55555555-5555-5555-5555-555555555555", "Company B", nil)
+	_, _ = companies.Create(ctx, companyA)
+	_, _ = companies.Create(ctx, companyB)
+
+	dept, _ := domain.NewDepartment("66666666-6666-6666-6666-666666666666", companyA.ID, "Engineering", nil)
+	if _, err := departments.Create(ctx, dept); err != nil {
+		t.Fatalf("create department: %v", err)
+	}
+
+	exists, err := departments.ExistsByName(ctx, companyA.ID, "Engineering")
+	if err != nil {
+		t.Fatalf("exists by name: %v", err)
+	}
+	if !exists {
+		t.Error("expected ExistsByName to find the department within its own company")
+	}
+
+	exists, err = departments.ExistsByName(ctx, companyB.ID, "Engineering")
+	if err != nil {
+		t.Fatalf("exists by name: %v", err)
+	}
+	if exists {
+		t.Error("expected ExistsByName to be scoped by company_id, not find a same-named department in a different company")
+	}
+
+	exists, err = departments.ExistsByName(ctx, companyA.ID, "Sales")
+	if err != nil {
+		t.Fatalf("exists by name: %v", err)
+	}
+	if exists {
+		t.Error("expected ExistsByName to return false for a name that doesn't exist")
+	}
+}
+
 func TestTeamRepository_ListUserTeamLayers(t *testing.T) {
 	pool := setupPool(t)
 	companies := NewCompanyRepository(pool)

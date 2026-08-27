@@ -42,6 +42,12 @@ type fakeProjectRepository struct {
 	// TestRemoveMember_RejectsWhenWouldBeOwnerless's doc comment.
 	removeMemberCalled     bool
 	updateMemberRoleCalled bool
+
+	// listForMemberCalls counts ListForMember invocations — lets tests
+	// assert role-based short-circuiting (e.g. admin/lead skip the
+	// ProfileResolver visibility filter but ListForMember itself is always
+	// called).
+	listForMemberCalls int
 }
 
 func newFakeProjectRepository() *fakeProjectRepository {
@@ -68,6 +74,26 @@ func (f *fakeProjectRepository) List(ctx context.Context, tenantID, pageToken st
 	var out []domain.Project
 	for _, p := range f.projects {
 		if p.TenantID == tenantID {
+			out = append(out, p)
+		}
+	}
+	return out, "", nil
+}
+
+// ListForMember returns only projects userID has a membership row for,
+// within tenantID — driven off f.members, same source of truth AddMember
+// writes to.
+func (f *fakeProjectRepository) ListForMember(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
+	f.listForMemberCalls++
+	memberProjectIDs := map[string]bool{}
+	for _, m := range f.members {
+		if m.UserID == userID {
+			memberProjectIDs[m.ProjectID] = true
+		}
+	}
+	var out []domain.Project
+	for _, p := range f.projects {
+		if p.TenantID == tenantID && memberProjectIDs[p.ID] {
 			out = append(out, p)
 		}
 	}
@@ -688,6 +714,13 @@ func withTenantAndUser(ctx context.Context, tenantID, userID string) context.Con
 	return tenant.WithUserID(tenant.WithTenantID(ctx, tenantID), userID)
 }
 
+// withRole attaches the caller's role claim — see common/tenant.Role's doc
+// comment for the (currently unpopulated in production) upstream gap this
+// simulates for tests. Used by ListProjects's admin/lead/developer tests.
+func withRole(ctx context.Context, role string) context.Context {
+	return tenant.WithRole(ctx, role)
+}
+
 // assertAppError asserts err is an *apperrors.AppError with the given Kind
 // and Code.
 func assertAppError(t *testing.T, err error, kind apperrors.Kind, code string) {
@@ -884,4 +917,100 @@ func (f *fakeDevServerLister) Exists(ctx context.Context, tenantID, devServerID 
 		return false, f.err
 	}
 	return f.exists, nil
+}
+
+// fakeDevServerHealthChecker is an in-memory usecase.DevServerHealthChecker.
+type fakeDevServerHealthChecker struct {
+	reachable bool
+	err       error
+	calls     []string // devServerIDs, in call order
+}
+
+func (f *fakeDevServerHealthChecker) IsReachable(ctx context.Context, tenantID, devServerID string) (bool, error) {
+	f.calls = append(f.calls, devServerID)
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.reachable, nil
+}
+
+// fakeProjectAuditPublisher is an in-memory usecase.AuditPublisher for
+// project-service (mirrors tenant-service's own fakeAuditPublisher shape).
+type fakeProjectAuditEvent struct {
+	tenantID, actorID, action, target string
+}
+
+type fakeProjectAuditPublisher struct {
+	calls []fakeProjectAuditEvent
+	err   error
+}
+
+func (f *fakeProjectAuditPublisher) PublishAuditEvent(ctx context.Context, tenantID, actorID, action, target string) error {
+	f.calls = append(f.calls, fakeProjectAuditEvent{tenantID: tenantID, actorID: actorID, action: action, target: target})
+	return f.err
+}
+
+// fakeMemberNotifier is an in-memory usecase.MemberNotifier.
+type fakeMemberNotifierCall struct {
+	tenantID                        string
+	userIDs                         []string
+	projectID, oldDevServer, newDev string
+}
+
+type fakeMemberNotifier struct {
+	calls []fakeMemberNotifierCall
+	err   error
+}
+
+func (f *fakeMemberNotifier) NotifyDevServerChanged(ctx context.Context, tenantID string, userIDs []string, projectID, oldDevServerID, newDevServerID string) error {
+	f.calls = append(f.calls, fakeMemberNotifierCall{tenantID: tenantID, userIDs: userIDs, projectID: projectID, oldDevServer: oldDevServerID, newDev: newDevServerID})
+	return f.err
+}
+
+// fakeProfileResolver is an in-memory usecase.ProfileResolver.
+type fakeProfileResolver struct {
+	allowedTags       []string
+	hasRestriction    bool
+	resolveErr        error
+	devServerTags     map[string][]string // devServerID -> tags
+	devServerTagsErr  error
+	resolveCalls      int
+	devServerTagCalls []string // devServerIDs, in call order
+}
+
+func newFakeProfileResolver() *fakeProfileResolver {
+	return &fakeProfileResolver{devServerTags: map[string][]string{}}
+}
+
+func (f *fakeProfileResolver) GetResolvedProfile(ctx context.Context, tenantID, userID string) (ResolvedProfileView, error) {
+	f.resolveCalls++
+	if f.resolveErr != nil {
+		return ResolvedProfileView{}, f.resolveErr
+	}
+	return NewResolvedProfileView(f.allowedTags, f.hasRestriction), nil
+}
+
+func (f *fakeProfileResolver) DevServerTags(ctx context.Context, tenantID, devServerID string) ([]string, error) {
+	f.devServerTagCalls = append(f.devServerTagCalls, devServerID)
+	if f.devServerTagsErr != nil {
+		return nil, f.devServerTagsErr
+	}
+	return f.devServerTags[devServerID], nil
+}
+
+// fakeDevServerHostnameResolver is an in-memory usecase.DevServerHostnameResolver.
+type fakeDevServerHostnameResolver struct {
+	hostnames map[string]string // devServerID -> hostname
+	err       error
+}
+
+func newFakeDevServerHostnameResolver() *fakeDevServerHostnameResolver {
+	return &fakeDevServerHostnameResolver{hostnames: map[string]string{}}
+}
+
+func (f *fakeDevServerHostnameResolver) Hostname(ctx context.Context, tenantID, devServerID string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.hostnames[devServerID], nil
 }

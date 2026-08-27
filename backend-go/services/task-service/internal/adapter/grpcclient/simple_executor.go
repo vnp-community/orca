@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
@@ -100,10 +101,12 @@ type SimpleExecutor struct {
 	tasks    usecase.TaskRepository
 	resolver usecase.ProjectExecutionResolver
 	relay    infrafleetv1.InfraFleetServiceClient
+	profiles usecase.ProfileResolver        // NEW
+	projects usecase.ProjectContextResolver // NEW
 }
 
-func NewSimpleExecutor(tasks usecase.TaskRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient) *SimpleExecutor {
-	return &SimpleExecutor{tasks: tasks, resolver: resolver, relay: relay}
+func NewSimpleExecutor(tasks usecase.TaskRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient, profiles usecase.ProfileResolver, projects usecase.ProjectContextResolver) *SimpleExecutor {
+	return &SimpleExecutor{tasks: tasks, resolver: resolver, relay: relay, profiles: profiles, projects: projects}
 }
 
 // agentExecPromptParams mirrors agent-print-mode-exec.ts's handled fields —
@@ -113,10 +116,18 @@ func NewSimpleExecutor(tasks usecase.TaskRepository, resolver usecase.ProjectExe
 // note), and an empty stepId/trustPreset should vanish from the JSON the
 // same way StepExecutors.ts's spread omits accountId/model, not be sent as
 // an explicit empty string.
+//
+// TrustPreset/Model/Env/InitFile are NEW (TASK-PRF-04-08) — same
+// profile-aware env injection as workflow-service's AgentExecutor; see
+// domain/agent_environment.go's BuildAgentEnv/BuildProjectContext.
 type agentExecPromptParams struct {
-	Prompt       string `json:"prompt"`
-	WorktreePath string `json:"worktreePath"`
-	StepID       string `json:"stepId,omitempty"`
+	Prompt       string            `json:"prompt"`
+	WorktreePath string            `json:"worktreePath"`
+	StepID       string            `json:"stepId,omitempty"`
+	TrustPreset  string            `json:"trustPreset,omitempty"` // NEW
+	Model        string            `json:"model,omitempty"`       // NEW
+	Env          map[string]string `json:"env,omitempty"`         // NEW
+	InitFile     string            `json:"initFile,omitempty"`    // NEW — see workflow-service's agent_step_executor.go for the same field-name caveat
 }
 
 // agentExecPromptResult mirrors agent-print-mode-exec.ts's real
@@ -154,11 +165,36 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 		return "", apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_WORKTREE_PATH", "task's connected dev server has no worktree path recorded", nil)
 	}
 
-	paramsJSON, err := json.Marshal(agentExecPromptParams{
-		Prompt:       buildExecutePrompt(task),
-		WorktreePath: worktreePath,
-		StepID:       requestID,
-	})
+	params := agentExecPromptParams{Prompt: buildExecutePrompt(task), WorktreePath: worktreePath, StepID: requestID}
+
+	// userID: task-service's domain.Task carries no per-task assignee field
+	// (confirmed against the real domain.Task shape — see this task's
+	// Context open question) — fall back to the request-context caller.
+	userID, _ := tenant.UserID(ctx)
+	if userID != "" {
+		userCtx := tenant.WithUserID(ctx, userID) // explicit, for the resolvers' outbound-metadata forwarding below
+		resolved, err := s.profiles.GetResolvedProfile(userCtx, userID)
+		if err == nil { // best-effort — a profile-resolve failure degrades to the legacy bare passthrough, never blocks task execution
+			if agent, ok := resolved["agent"].(map[string]any); ok {
+				if model, ok := agent["preferredModel"].(string); ok {
+					params.Model = model
+				}
+			}
+			env := domain.BuildAgentEnv(resolved, userID, task.ProjectID, "", "")
+			if task.ProjectID != "" {
+				if pctx, err := s.projects.GetProjectContext(userCtx, task.ProjectID); err == nil {
+					env["ORCA_PROJECT_NAME"] = pctx.ProjectName
+					params.InitFile = domain.BuildProjectContext(domain.PreambleInput{
+						ProjectName: pctx.ProjectName, Description: pctx.Description, RepoURL: pctx.RepoURL,
+						WorktreePath: worktreePath, DevServerHostname: pctx.DevServerHostname,
+					})
+				}
+			}
+			params.Env = env
+		}
+	}
+
+	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: marshal params: %w", err)
 	}

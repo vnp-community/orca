@@ -17,6 +17,7 @@ type contextKey struct{ name string }
 var (
 	tenantIDKey = &contextKey{"tenant_id"}
 	userIDKey   = &contextKey{"user_id"}
+	roleKey     = &contextKey{"role"} // NEW
 )
 
 // ErrNoTenant is returned by RequireTenantID when the context carries no
@@ -44,6 +45,24 @@ func TenantID(ctx context.Context) (string, bool) {
 // UserID returns the acting user ID and whether one was present.
 func UserID(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(userIDKey).(string)
+	return v, ok && v != ""
+}
+
+// WithRole attaches the caller's role claim to ctx — populated by the
+// inbound gRPC interceptor once JWT-role-claim propagation from api-gateway
+// lands (tracked at project-service/internal/usecase/authorization.go's
+// callerGlobalRole stub). Not called anywhere in this codebase yet — see
+// Role's doc comment.
+func WithRole(ctx context.Context, role string) context.Context {
+	return context.WithValue(ctx, roleKey, role)
+}
+
+// Role returns the caller's role and whether one was present. Returns
+// ("", false) until the upstream role-claim-propagation gap closes (see
+// WithRole's doc comment) — every caller of this function must treat that
+// as "unknown role" and fail closed (deny), never as an implicit grant.
+func Role(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(roleKey).(string)
 	return v, ok && v != ""
 }
 

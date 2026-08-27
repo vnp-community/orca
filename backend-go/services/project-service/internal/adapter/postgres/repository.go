@@ -103,6 +103,43 @@ func (r *Repository) List(ctx context.Context, tenantID, pageToken string, pageS
 	return out, next, nil
 }
 
+// ListForMember is List's membership-scoped counterpart — a join against
+// project.project_members instead of List's bare tenant_id filter. See
+// usecase.ProjectRepository.ListForMember's doc comment for why List alone
+// is meaningless as ListProjects's visibility-filter input.
+func (r *Repository) ListForMember(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+projectColumns+`
+		FROM project.projects p
+		JOIN project.project_members m ON m.project_id = p.id
+		WHERE p.tenant_id = $1 AND m.user_id = $2 AND p.id > $3
+		ORDER BY p.id
+		LIMIT $4
+	`, tenantID, userID, pageToken, pageSize)
+	if err != nil {
+		return nil, "", fmt.Errorf("postgres: query member projects: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Project
+	for rows.Next() {
+		p, err := scanProject(rows)
+		if err != nil {
+			return nil, "", fmt.Errorf("postgres: scan project row: %w", err)
+		}
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("postgres: iterate member project rows: %w", err)
+	}
+
+	next := ""
+	if int32(len(out)) == pageSize && len(out) > 0 {
+		next = out[len(out)-1].ID
+	}
+	return out, next, nil
+}
+
 func (r *Repository) AddMember(ctx context.Context, m domain.ProjectMember) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO project.project_members (project_id, user_id, role)

@@ -54,6 +54,11 @@ type ProjectRepository interface {
 	// CountOwners is the read RemoveMember/UpdateMemberRole use to enforce
 	// the "≥1 owner" invariant before mutating.
 	CountOwners(ctx context.Context, projectID string) (int, error)
+	// ListForMember returns only projects userID is a member of, within
+	// tenantID — unlike List, which returns every tenant project regardless
+	// of caller membership (a pre-existing gap this closes; ListProjects's
+	// visibility filter is meaningless layered over an unscoped list). NEW.
+	ListForMember(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error)
 }
 
 // MembershipRepository is the read-only subset of ProjectRepository that
@@ -258,4 +263,75 @@ type FolderWorkspaceRepository interface {
 	// Update/Delete's ownership check (usecase.FolderWorkspaceUseCase) to
 	// load the caller's added_by before mutating.
 	Get(ctx context.Context, id string) (*domain.FolderWorkspace, error)
+}
+
+// DevServerHealthChecker is the outbound port toward infra-fleet-service's
+// GetFleetHealth RPC — CreateProject/RebindDevServer's online/health guard.
+// Genuinely new: infra-fleet-service.md §1 already documents fleet health
+// monitoring, but no caller in this service used it before this task.
+type DevServerHealthChecker interface {
+	// IsReachable fails closed on error — a health-check outage must never
+	// silently bind/rebind to a server that might be down.
+	IsReachable(ctx context.Context, tenantID, devServerID string) (bool, error)
+}
+
+// AuditPublisher is the outbound port RebindDevServer calls after a
+// successful rebind to emit a security-relevant audit event — outbox
+// pattern (05-data-architecture.md), not a synchronous call to another
+// service. A nil AuditPublisher is valid — callers must nil-check, same
+// convention as tenant-service's CacheInvalidationPublisher.
+type AuditPublisher interface {
+	PublishAuditEvent(ctx context.Context, tenantID, actorID, action, target string) error
+}
+
+// MemberNotifier is the outbound port RebindDevServer calls after a
+// successful rebind to notify every project member — best-effort, same
+// outbox posture as AuditPublisher. A nil MemberNotifier is valid.
+type MemberNotifier interface {
+	NotifyDevServerChanged(ctx context.Context, tenantID string, userIDs []string, projectID, oldDevServerID, newDevServerID string) error
+}
+
+// ProfileResolver is the outbound port ListProjects uses to resolve the
+// caller's ResolvedProfile for the fleet.allowedServerTags visibility
+// filter — a NEW outbound edge from project-service to tenant-service
+// (tenant-service.md §3/§7 already documents GetResolvedProfile as callable
+// by any service, just not exercised by project-service before this task).
+// DevServerTags resolves a dev server's tags via infra-fleet-service.ListDevServers.
+type ProfileResolver interface {
+	GetResolvedProfile(ctx context.Context, tenantID, userID string) (ResolvedProfileView, error)
+	DevServerTags(ctx context.Context, tenantID, devServerID string) ([]string, error)
+}
+
+// ResolvedProfileView is the subset of tenant-service's ResolvedProfile this
+// service actually reads — decoded from GetResolvedProfileResponse's
+// resolved_settings_json by the adapter, not the raw JSON map, so usecase/
+// code never touches encoding/json directly.
+type ResolvedProfileView struct {
+	allowedServerTags []string
+	hasRestriction    bool
+}
+
+// NewResolvedProfileView constructs a ResolvedProfileView — called by
+// internal/adapter/infrafleetclient.ProfileResolver's implementation (or
+// wherever the JSON is decoded) after reading fleet.allowedServerTags out of
+// the decoded resolved_settings_json. hasRestriction distinguishes "key
+// absent" (false, unrestricted) from "key present, possibly empty" (true) —
+// see domain/profile_resolution.go's mergeAllowedServerTags doc comment
+// (tenant-service, SOL-PRF-02) for why this distinction must survive.
+func NewResolvedProfileView(tags []string, hasRestriction bool) ResolvedProfileView {
+	return ResolvedProfileView{allowedServerTags: tags, hasRestriction: hasRestriction}
+}
+
+// AllowedServerTags returns the tag allowlist and whether one is defined at
+// all (false = unrestricted, filter nothing).
+func (v ResolvedProfileView) AllowedServerTags() ([]string, bool) {
+	return v.allowedServerTags, v.hasRestriction
+}
+
+// DevServerHostnameResolver resolves a dev server id to its host string via
+// infra-fleet-service.ListDevServers — best-effort, used only by
+// GetProjectContext's display-only dev_server_hostname field. A lookup
+// failure never fails the whole GetProjectContext read.
+type DevServerHostnameResolver interface {
+	Hostname(ctx context.Context, tenantID, devServerID string) (string, error)
 }

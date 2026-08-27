@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/services/tenant-service/internal/usecase/update_company.go`
 **Depends on:** TASK-PRF-01-01, TASK-PRF-01-03, TASK-PRF-01-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — UpdateCompany wired with requireCompanyAdmin + ValidateCompanySettings + audit emit; full test suite green
 
 ---
 

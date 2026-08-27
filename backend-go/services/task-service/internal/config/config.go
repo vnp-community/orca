@@ -24,6 +24,14 @@ type Config struct {
 	// AIProviderServiceAddr is where AIDecompose's AIProviderContextResolver
 	// dials ai-provider-service's ResolveProvider RPC.
 	AIProviderServiceAddr string
+	// TenantServiceAddr is ProfileResolver's dependency (SimpleExecutor's
+	// profile-aware env injection, TASK-PRF-04-07/08) — a NEW dial;
+	// StubTeamScopeResolver documents the same task-->tenant edge but
+	// doesn't itself dial anything yet.
+	TenantServiceAddr string
+	// ProjectServiceAddr is ProjectContextResolver's dependency
+	// (GetProjectContext) — also new.
+	ProjectServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -36,5 +44,7 @@ func Load() (Config, error) {
 		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
+		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
+		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 	}, nil
 }

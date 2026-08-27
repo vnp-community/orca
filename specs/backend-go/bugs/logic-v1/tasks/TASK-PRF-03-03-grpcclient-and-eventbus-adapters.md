@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/adapter/grpcclient/dev_server_health_checker.go`
 **Depends on:** TASK-PRF-03-01, TASK-PRF-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — InfraFleetHealthChecker (adapted to real GetFleetHealthRequest{tenant_id}/statuses[] shape) + TenantProfileResolver + adapter/eventbus package added; go build clean; publisher_test.go payload-shape tests pass
 
 ---
 

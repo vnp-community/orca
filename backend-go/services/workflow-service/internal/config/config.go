@@ -27,9 +27,15 @@ type Config struct {
 	// (internal/usecase.CleanupWorktreesStepExecutor, BL-AT-04) dials to
 	// list candidate worktrees, delete them, and write the audit report —
 	// three new outbound dependency edges this service didn't have before.
+	// ProjectServiceAddr doubles as ProjectContextResolver's dependency
+	// (GetProjectContext, TASK-PRF-04-01/02).
 	ProjectServiceAddr    string
 	GitGatewayServiceAddr string
 	AutomationServiceAddr string
+	// TenantServiceAddr is ProfileResolver's dependency — a NEW dial, this
+	// service never called tenant-service before this task (closes the
+	// prose/graph gap tenant-service.md §7 already documented).
+	TenantServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -44,6 +50,7 @@ func Load() (Config, error) {
 		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 		GitGatewayServiceAddr: commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
 		AutomationServiceAddr: commonconfig.StringEnv("AUTOMATION_SERVICE_ADDR", "automation-service:9090"),
+		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 	}, nil
 }
 

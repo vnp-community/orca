@@ -94,10 +94,11 @@ type DevServer struct {
 	// (SOL-FLEET-04) — the same columns SOL-FLEET-02's BulkProvisionFleet
 	// also persists into (domain.DevServer), see
 	// usecase.DevServerRepository.UpdateProvisionResult.
-	Platform      string `protobuf:"bytes,7,opt,name=platform,proto3" json:"platform,omitempty"`
-	Arch          string `protobuf:"bytes,8,opt,name=arch,proto3" json:"arch,omitempty"`
-	NodeVersion   string `protobuf:"bytes,9,opt,name=node_version,json=nodeVersion,proto3" json:"node_version,omitempty"`
-	AgentVersion  string `protobuf:"bytes,10,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
+	Platform      string   `protobuf:"bytes,7,opt,name=platform,proto3" json:"platform,omitempty"`
+	Arch          string   `protobuf:"bytes,8,opt,name=arch,proto3" json:"arch,omitempty"`
+	NodeVersion   string   `protobuf:"bytes,9,opt,name=node_version,json=nodeVersion,proto3" json:"node_version,omitempty"`
+	AgentVersion  string   `protobuf:"bytes,10,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
+	Tags          []string `protobuf:"bytes,11,rep,name=tags,proto3" json:"tags,omitempty"` // BL-PRF-03's allowedServerTags match target
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -202,6 +203,13 @@ func (x *DevServer) GetAgentVersion() string {
 	return ""
 }
 
+func (x *DevServer) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type RegisterDevServerRequest struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	TenantId    string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -210,7 +218,8 @@ type RegisterDevServerRequest struct {
 	SshTargetId string                 `protobuf:"bytes,4,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"` // required when mode=CONNECTION_MODE_RELAY_SSH
 	// relay_port: 0 = no daemon port — foreground stdio session, honest
 	// placeholder until agent/ gains a daemon (see TASK-FLEET-02-08).
-	RelayPort     int32 `protobuf:"varint,5,opt,name=relay_port,json=relayPort,proto3" json:"relay_port,omitempty"`
+	RelayPort     int32    `protobuf:"varint,5,opt,name=relay_port,json=relayPort,proto3" json:"relay_port,omitempty"`
+	Tags          []string `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"` // BL-PRF-03's allowedServerTags match target
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -278,6 +287,13 @@ func (x *RegisterDevServerRequest) GetRelayPort() int32 {
 		return x.RelayPort
 	}
 	return 0
+}
+
+func (x *RegisterDevServerRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
 }
 
 type RegisterDevServerResponse struct {
@@ -6359,7 +6375,7 @@ var File_orca_infrafleet_v1_infrafleet_proto protoreflect.FileDescriptor
 
 const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\n" +
-	"#orca/infrafleet/v1/infrafleet.proto\x12\x12orca.infrafleet.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb8\x02\n" +
+	"#orca/infrafleet/v1/infrafleet.proto\x12\x12orca.infrafleet.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcc\x02\n" +
 	"\tDevServer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -6371,14 +6387,16 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x04arch\x18\b \x01(\tR\x04arch\x12!\n" +
 	"\fnode_version\x18\t \x01(\tR\vnodeVersion\x12#\n" +
 	"\ragent_version\x18\n" +
-	" \x01(\tR\fagentVersion\"\xc6\x01\n" +
+	" \x01(\tR\fagentVersion\x12\x12\n" +
+	"\x04tags\x18\v \x03(\tR\x04tags\"\xda\x01\n" +
 	"\x18RegisterDevServerRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x126\n" +
 	"\x04mode\x18\x03 \x01(\x0e2\".orca.infrafleet.v1.ConnectionModeR\x04mode\x12\"\n" +
 	"\rssh_target_id\x18\x04 \x01(\tR\vsshTargetId\x12\x1d\n" +
 	"\n" +
-	"relay_port\x18\x05 \x01(\x05R\trelayPort\"Y\n" +
+	"relay_port\x18\x05 \x01(\x05R\trelayPort\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\"Y\n" +
 	"\x19RegisterDevServerResponse\x12<\n" +
 	"\n" +
 	"dev_server\x18\x01 \x01(\v2\x1d.orca.infrafleet.v1.DevServerR\tdevServer\"\x84\x01\n" +

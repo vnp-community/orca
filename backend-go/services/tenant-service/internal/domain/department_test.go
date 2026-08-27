@@ -28,3 +28,27 @@ func TestNewDepartment_ValidatesInvariants(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateDepartmentSettings(t *testing.T) {
+	tests := []struct {
+		name    string
+		s       Settings
+		wantErr error
+	}{
+		{"no security key", Settings{"shell": Settings{}}, nil},
+		{"absent fields no-op", Settings{}, nil},
+		{"security key rejected", Settings{"security": Settings{"sessionTimeoutHours": float64(24)}}, ErrSecurityLockedToCompany},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDepartmentSettings(tt.s)
+			if tt.wantErr == nil && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if tt.wantErr != nil && err != tt.wantErr {
+				t.Fatalf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}

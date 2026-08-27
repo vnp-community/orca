@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/list_projects.go`
 **Depends on:** TASK-PRF-03-02, TASK-PRF-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ListForMember (postgres join) + allowedServerTags visibility filter wired; admin/lead short-circuit verified; tests pass
 
 ---
 

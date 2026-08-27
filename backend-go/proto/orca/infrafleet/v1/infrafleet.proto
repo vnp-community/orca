@@ -195,6 +195,7 @@ message DevServer {
   string arch = 8;
   string node_version = 9;
   string agent_version = 10;
+  repeated string tags = 11; // BL-PRF-03's allowedServerTags match target
 }
 
 message RegisterDevServerRequest {
@@ -205,6 +206,7 @@ message RegisterDevServerRequest {
   // relay_port: 0 = no daemon port — foreground stdio session, honest
   // placeholder until agent/ gains a daemon (see TASK-FLEET-02-08).
   int32 relay_port = 5;
+  repeated string tags = 6; // BL-PRF-03's allowedServerTags match target
 }
 
 message RegisterDevServerResponse {

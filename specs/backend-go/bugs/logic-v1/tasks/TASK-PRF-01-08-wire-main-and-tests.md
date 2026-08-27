@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/services/tenant-service/cmd/server/main.go`
 **Depends on:** TASK-PRF-01-03, TASK-PRF-01-04, TASK-PRF-01-05, TASK-PRF-01-06, TASK-PRF-01-07
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — OPABundlePath config + OPA evaluator + auditPublisher wired into main.go; go build/vet clean; go test ./services/tenant-service/... all green; opa test policy/orca-authz/ 34/34
 
 ---
 

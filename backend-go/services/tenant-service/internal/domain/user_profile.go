@@ -1,5 +1,7 @@
 package domain
 
+import "errors"
+
 // UserProfile is the per-user profile-override row — 1:1 with a user
 // (logical FK to auth-service), holding the department assignment and the
 // user's own Settings override layer, the highest-priority layer in
@@ -30,4 +32,22 @@ func NewUserProfile(userID, companyID, departmentID string, settings Settings) (
 		DepartmentID: departmentID,
 		Settings:     emptySettings(settings),
 	}, nil
+}
+
+// ErrIntegrationsGithubOrgLocked mirrors ErrSecurityLockedToCompany for the
+// one additional User-layer restriction BL-PRF-01 §4 names explicitly
+// ("cannot set security.* or integrations.githubOrg").
+var ErrIntegrationsGithubOrgLocked = errors.New("domain: integrations.githubOrg cannot be set at user level")
+
+// ValidateUserSettings rejects "security" and "integrations.githubOrg".
+func ValidateUserSettings(s Settings) error {
+	if _, present := s["security"]; present {
+		return ErrSecurityLockedToCompany
+	}
+	if integ, ok := asMap(s["integrations"]); ok {
+		if _, present := integ["githubOrg"]; present {
+			return ErrIntegrationsGithubOrgLocked
+		}
+	}
+	return nil
 }

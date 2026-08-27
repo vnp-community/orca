@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/adapter/infrafleetclient/agent_step_executor.go`
 **Depends on:** TASK-PRF-04-03, TASK-PRF-04-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — agent.exec -> agent.execPrompt fixed + profile-aware env injection wired; AgentStepConfig gains UserID/ProjectID; main.go wired (tenant-service+project-service dials); full workflow-service suite green
 
 ---
 

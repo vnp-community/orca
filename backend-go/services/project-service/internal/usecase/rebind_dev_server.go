@@ -24,10 +24,14 @@ type RebindDevServer struct {
 	workflowChecker WorkflowExecutionChecker
 	taskChecker     TaskExecutionChecker
 	opa             OPAClient
+	devServers      DevServerLister        // NEW
+	health          DevServerHealthChecker // NEW
+	audit           AuditPublisher         // NEW
+	notifier        MemberNotifier         // NEW
 }
 
-func NewRebindDevServer(repo ProjectRepository, workflowChecker WorkflowExecutionChecker, taskChecker TaskExecutionChecker, opa OPAClient) *RebindDevServer {
-	return &RebindDevServer{repo: repo, workflowChecker: workflowChecker, taskChecker: taskChecker, opa: opa}
+func NewRebindDevServer(repo ProjectRepository, workflowChecker WorkflowExecutionChecker, taskChecker TaskExecutionChecker, opa OPAClient, devServers DevServerLister, health DevServerHealthChecker, audit AuditPublisher, notifier MemberNotifier) *RebindDevServer {
+	return &RebindDevServer{repo: repo, workflowChecker: workflowChecker, taskChecker: taskChecker, opa: opa, devServers: devServers, health: health, audit: audit, notifier: notifier}
 }
 
 // Execute requires the caller's project role to be owner, or global admin —
@@ -43,6 +47,23 @@ func (uc *RebindDevServer) Execute(ctx context.Context, in RebindDevServerInput)
 	}
 	if err := requireProjectAccess(ctx, uc.repo, uc.opa, in.ProjectID, projectActionOwnerOnly); err != nil {
 		return domain.Project{}, err
+	}
+
+	// NEW — existence + health, cheapest checks first, before the
+	// (unchanged) active-execution guard below.
+	exists, err := uc.devServers.Exists(ctx, tenantID, in.NewDevServerID)
+	if err != nil {
+		return domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_DEV_SERVER_LOOKUP_FAILED", "failed to validate new dev server", err)
+	}
+	if !exists {
+		return domain.Project{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_DEV_SERVER_NOT_FOUND", "new dev server does not exist", nil)
+	}
+	reachable, err := uc.health.IsReachable(ctx, tenantID, in.NewDevServerID)
+	if err != nil {
+		return domain.Project{}, apperrors.New(apperrors.KindFailedPrecondition, "PROJECT_DEV_SERVER_HEALTH_CHECK_FAILED", "failed to verify new dev server is online, failing closed", err)
+	}
+	if !reachable {
+		return domain.Project{}, apperrors.New(apperrors.KindFailedPrecondition, "PROJECT_DEV_SERVER_UNREACHABLE", "new dev server is not online", nil)
 	}
 
 	// Both checks are synchronous gRPC calls per project-service.md §3 (saga
@@ -62,9 +83,29 @@ func (uc *RebindDevServer) Execute(ctx context.Context, in RebindDevServerInput)
 		return domain.Project{}, apperrors.New(apperrors.KindFailedPrecondition, "PROJECT_HAS_ACTIVE_WORKFLOWS", "project has active workflow or task executions", nil)
 	}
 
+	before, err := uc.repo.Get(ctx, tenantID, in.ProjectID) // NEW — for the old dev server id in the notify payload
+	if err != nil {
+		return domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_LOOKUP_FAILED", "failed to look up project before rebind", err)
+	}
 	updated, err := uc.repo.UpdateDevServerID(ctx, tenantID, in.ProjectID, in.NewDevServerID)
 	if err != nil {
 		return domain.Project{}, apperrors.New(apperrors.KindInternal, "PROJECT_REBIND_FAILED", "failed to update dev server binding", err)
+	}
+
+	// NEW — both best-effort, after the authoritative write succeeds.
+	actorID, _ := tenant.UserID(ctx)
+	if uc.audit != nil {
+		_ = uc.audit.PublishAuditEvent(ctx, tenantID, actorID, "project.devserver.changed", in.ProjectID)
+	}
+	if uc.notifier != nil {
+		members, err := uc.repo.ListMembers(ctx, in.ProjectID)
+		if err == nil {
+			ids := make([]string, 0, len(members))
+			for _, m := range members {
+				ids = append(ids, m.UserID)
+			}
+			_ = uc.notifier.NotifyDevServerChanged(ctx, tenantID, ids, in.ProjectID, before.DevServerID, in.NewDevServerID)
+		}
 	}
 	return updated, nil
 }
