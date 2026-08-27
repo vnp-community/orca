@@ -261,6 +261,7 @@ message Worktree {
   optional string idempotency_key = 7; // BR-CLI-01: caller-supplied dedupe key, unset when not set
   optional string linked_issue_provider = 8;  // "github" | "gitlab" | "jira" | "linear"
   optional string linked_issue_ref = 9;       // provider-native ref: "owner/repo#123" or "ENG-123"
+  string status = 10; // NEW — "active" | "completed" | "error" | "stopped"; orthogonal to activation_state (the `active` field above)
 }
 
 message RecordWorktreeCreatedRequest {
@@ -301,6 +302,8 @@ message WorktreeLifecycleEvent {
 
 message ListWorktreesRequest {
   string project_id = 1;
+  repeated string status_in = 2;             // NEW — optional; unset = no filtering
+  google.protobuf.Timestamp older_than = 3;  // NEW — optional; created_at cutoff
 }
 
 message ListWorktreesResponse {

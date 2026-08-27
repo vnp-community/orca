@@ -149,7 +149,6 @@ func run() error {
 	stageUC := usecase.NewStage(resolver, local, relay)
 	unstageUC := usecase.NewUnstage(resolver, local, relay)
 
-
 	checkIgnoredUC := usecase.NewCheckIgnored(resolver, local, relay)
 	forkSyncUC := usecase.NewForkSync(resolver, local, relay)
 	upstreamStatusUC := usecase.NewUpstreamStatus(resolver, local, relay)
@@ -197,7 +196,7 @@ func run() error {
 	scrollbackCleaner := grpcclient.NewScrollbackCleaner(infraFleetClient)
 
 	createWorktreeUC := usecase.NewCreateWorktree(resolver, projectClient, local, relay)
-	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, scrollbackCleaner, local, relay)
+	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, scrollbackCleaner, scmClient, local, relay)
 	forceDeleteBranchUC := usecase.NewForceDeleteBranch(resolver, local, relay)
 	detectWorktreesUC := usecase.NewDetectWorktrees(resolver, projectClient, local, relay)
 	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)

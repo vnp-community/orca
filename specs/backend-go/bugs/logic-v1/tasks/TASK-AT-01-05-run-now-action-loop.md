@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/usecase/run_now.go`, `backend-go/services/automation-service/internal/domain/automation_run.go`
 **Depends on:** TASK-AT-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — automation_run.go gained ActionResult/ActionResults; run_now.go loops automation.Actions honoring OnFailure, per-action request_id suffix; run_now_test.go covers stop/continue.
 
 ---
 

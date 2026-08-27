@@ -6,6 +6,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
@@ -138,7 +139,10 @@ type WorktreeRepository interface {
 	// so there is no reporting/audit need for a tombstone row here. See
 	// this service's README for the explicit decision record.
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
-	ListWorktrees(ctx context.Context, projectID string) ([]domain.Worktree, error)
+	// ListWorktrees returns projectID's worktrees, optionally filtered by
+	// statusIn (nil/empty = no filter) and olderThan (nil = no filter) —
+	// BL-AT-04's cleanup_worktrees step candidate query.
+	ListWorktrees(ctx context.Context, projectID string, statusIn []string, olderThan *time.Time) ([]domain.Worktree, error)
 	SetWorktreeActivation(ctx context.Context, worktreeID string, active bool) (domain.Worktree, error)
 	RenameWorktree(ctx context.Context, worktreeID, branch string) (domain.Worktree, error)
 	// FindWorktreeByIdempotencyKey backs BR-CLI-01 — see

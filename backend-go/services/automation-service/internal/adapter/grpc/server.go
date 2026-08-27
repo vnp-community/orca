@@ -30,6 +30,7 @@ type Server struct {
 	listAutomations       *usecase.ListAutomations
 	updateAutomation      *usecase.UpdateAutomation
 	deleteAutomation      *usecase.DeleteAutomation
+	writeCleanupReport    *usecase.WriteCleanupReport
 }
 
 func New(
@@ -40,6 +41,7 @@ func New(
 	listAutomations *usecase.ListAutomations,
 	updateAutomation *usecase.UpdateAutomation,
 	deleteAutomation *usecase.DeleteAutomation,
+	writeCleanupReport *usecase.WriteCleanupReport,
 ) *Server {
 	return &Server{
 		createAutomation:      create,
@@ -49,6 +51,7 @@ func New(
 		listAutomations:       listAutomations,
 		updateAutomation:      updateAutomation,
 		deleteAutomation:      deleteAutomation,
+		writeCleanupReport:    writeCleanupReport,
 	}
 }
 
@@ -175,6 +178,20 @@ func (s *Server) DeleteAutomation(ctx context.Context, req *automationv1.DeleteA
 	return &emptypb.Empty{}, nil
 }
 
+// WriteCleanupReport is a reverse-direction call — workflow-service ->
+// automation-service — from CleanupWorktreesStepExecutor after a bulk
+// worktree-delete run, recording BR-AT-14's per-worktree audit trail.
+func (s *Server) WriteCleanupReport(ctx context.Context, req *automationv1.WriteCleanupReportRequest) (*emptypb.Empty, error) {
+	entries := make([]domain.CleanupLogEntry, 0, len(req.GetEntries()))
+	for _, e := range req.GetEntries() {
+		entries = append(entries, domain.CleanupLogEntry{WorktreeID: e.GetWorktreeId(), Action: e.GetAction(), Reason: e.GetReason()})
+	}
+	if err := s.writeCleanupReport.Execute(ctx, usecase.WriteCleanupReportInput{RunID: req.GetRunId(), Entries: entries}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
 func toProtoAutomation(a domain.Automation) *automationv1.Automation {
 	return &automationv1.Automation{
 		Id:             a.ID,
@@ -215,6 +232,8 @@ func toProtoStepType(s domain.StepType) workflowv1.StepType {
 		return workflowv1.StepType_STEP_TYPE_WEBHOOK
 	case domain.StepTypeCondition:
 		return workflowv1.StepType_STEP_TYPE_CONDITION
+	case domain.StepTypeCleanupWorktrees:
+		return workflowv1.StepType_STEP_TYPE_CLEANUP_WORKTREES
 	default:
 		return workflowv1.StepType_STEP_TYPE_UNSPECIFIED
 	}
@@ -232,6 +251,8 @@ func fromProtoStepType(s workflowv1.StepType) domain.StepType {
 		return domain.StepTypeWebhook
 	case workflowv1.StepType_STEP_TYPE_CONDITION:
 		return domain.StepTypeCondition
+	case workflowv1.StepType_STEP_TYPE_CLEANUP_WORKTREES:
+		return domain.StepTypeCleanupWorktrees
 	default:
 		return domain.StepTypeUnspecified
 	}

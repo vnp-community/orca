@@ -665,7 +665,8 @@ message CreateWorktreeFromIssueResponse {
 
 message RemoveWorktreeRequest {
   string worktree_id = 1;
-  bool   force = 2;       // maps to `git worktree remove --force` (uncommitted changes present)
+  bool   force = 2;          // maps to `git worktree remove --force` (uncommitted changes present); BR-AT-11
+  bool   allow_open_pr = 3;  // NEW — separate, explicit override for BR-AT-12; NEVER set true by the cleanup_worktrees path
 }
 
 message ForceDeleteBranchRequest {

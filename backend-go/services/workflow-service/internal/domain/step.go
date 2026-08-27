@@ -20,12 +20,15 @@ const (
 	StepTypeNotification StepType = "notification"
 	StepTypeWebhook      StepType = "webhook"
 	StepTypeCondition    StepType = "condition"
+	// StepTypeCleanupWorktrees is BL-AT-04's bulk policy-delete step — see
+	// internal/usecase.CleanupWorktreesStepExecutor.
+	StepTypeCleanupWorktrees StepType = "cleanup_worktrees"
 )
 
-// Valid reports whether t is one of the five known step types.
+// Valid reports whether t is one of the known step types.
 func (t StepType) Valid() bool {
 	switch t {
-	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition:
+	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeCleanupWorktrees:
 		return true
 	default:
 		return false

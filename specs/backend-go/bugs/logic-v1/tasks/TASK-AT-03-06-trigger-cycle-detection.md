@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/usecase/create_automation.go`, `backend-go/services/automation-service/internal/usecase/update_automation.go`, `backend-go/services/automation-service/internal/usecase/trigger_cycle.go` (new)
 **Depends on:** TASK-AT-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — usecase/trigger_cycle.go: DetectTriggerCycle (Kahn's-algorithm findCycle) + ListEventTriggered; wired into Create/UpdateAutomation for trigger_type=event; actionToEvents limited to the real closed StepType set (documented deviation from the task's illustrative create_worktree/create_pr step types, which don't exist in this service's StepType enum).
 
 ---
 

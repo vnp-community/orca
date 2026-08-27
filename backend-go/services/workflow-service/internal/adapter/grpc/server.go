@@ -193,6 +193,8 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 		return domain.StepTypeWebhook
 	case workflowv1.StepType_STEP_TYPE_CONDITION:
 		return domain.StepTypeCondition
+	case workflowv1.StepType_STEP_TYPE_CLEANUP_WORKTREES:
+		return domain.StepTypeCleanupWorktrees
 	default:
 		return domain.StepTypeUnspecified
 	}

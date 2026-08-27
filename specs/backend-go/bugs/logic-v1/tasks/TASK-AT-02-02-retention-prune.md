@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/adapter/postgres/repository.go`, `backend-go/services/automation-service/internal/usecase/ports.go`, `backend-go/services/automation-service/internal/usecase/run_now.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — PruneOldRuns added to port+repository+fake, called best-effort after every terminal RunNow dispatch (keepRuns=30); integration-tested.
 
 ---
 

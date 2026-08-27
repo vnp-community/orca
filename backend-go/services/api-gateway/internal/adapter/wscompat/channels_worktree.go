@@ -111,13 +111,18 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 		type rmArgs struct {
 			WorktreeID string `json:"worktreeId"`
 			Force      bool   `json:"force"`
+			// AllowOpenPR defaults to false when absent — BR-AT-12's
+			// open-PR safety check protects every existing manual-delete
+			// caller by default; an intentional behavior change from
+			// before this check existed.
+			AllowOpenPR bool `json:"allowOpenPr"`
 		}
 		in, err := decodeArg[rmArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		if _, err := gitClient.RemoveWorktree(ctx, &gitgatewayv1.RemoveWorktreeRequest{WorktreeId: in.WorktreeID, Force: in.Force}); err != nil {
+		if _, err := gitClient.RemoveWorktree(ctx, &gitgatewayv1.RemoveWorktreeRequest{WorktreeId: in.WorktreeID, Force: in.Force, AllowOpenPr: in.AllowOpenPR}); err != nil {
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil

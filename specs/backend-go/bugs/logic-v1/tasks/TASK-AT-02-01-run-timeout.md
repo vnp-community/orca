@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/usecase/run_now.go`
 **Depends on:** none (assumes SOL-AT-01's action-loop shape from TASK-AT-01-05 already exists; if not yet merged, apply the timeout wrap around the existing single `ExecuteAdHocStep` call instead)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — run_now.go wraps the action loop in context.WithTimeout(runTimeout=2h, overridable via uc.timeout); AUTOMATION_RUN_TIMEOUT (new apperrors.KindDeadlineExceeded) on expiry.
 
 ---
 

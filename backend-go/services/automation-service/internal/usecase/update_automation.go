@@ -22,6 +22,20 @@ type UpdateAutomationInput struct {
 	Enabled        *bool
 	Dtstart        *time.Time
 	Timezone       *string
+	ProjectID      *string
+	// Actions replaces the automation's whole action chain when non-empty.
+	// An empty Actions leaves the existing chain unchanged — mirrors
+	// UpdateAutomationRequest's "empty = no change" convention
+	// (automation.proto); a chain can never be updated to empty (BR-AT-01
+	// requires at least one action, so "empty" is unambiguous as "no
+	// change").
+	Actions      []domain.AutomationAction
+	TriggerType  *domain.TriggerType
+	TriggerEvent *domain.EventName
+	// TriggerFilterJSON mirrors the wire's StringValue: nil = no change,
+	// "" = clear the filter, non-empty = replace it (parsed via
+	// domain.ParseTriggerFilter).
+	TriggerFilterJSON *string
 }
 
 // UpdateAutomation persists a partial edit of an existing Automation.
@@ -68,21 +82,81 @@ func (uc *UpdateAutomation) Execute(ctx context.Context, in UpdateAutomationInpu
 	if in.Timezone != nil {
 		next.Timezone = *in.Timezone
 	}
+	if in.ProjectID != nil {
+		next.ProjectID = *in.ProjectID
+	}
+	switch {
+	case len(in.Actions) > 0:
+		next.Actions = in.Actions
+	case in.StepType != nil || in.StepConfigJSON != nil:
+		// Legacy single-step update path: StepType/StepConfigJSON are the
+		// deprecated mirror of Actions[0] (see domain.NewAutomation) — a
+		// caller not yet updated to the chain shape edits them directly,
+		// so replace the first action to match rather than leaving it
+		// silently stale.
+		onFailure := domain.OnFailureStop
+		if len(next.Actions) > 0 {
+			onFailure = next.Actions[0].OnFailure
+		}
+		next.Actions = []domain.AutomationAction{{StepType: next.StepType, StepConfigJSON: next.StepConfigJSON, OnFailure: onFailure}}
+	}
+	if in.TriggerType != nil {
+		next.TriggerType = *in.TriggerType
+	}
+	if in.TriggerEvent != nil {
+		next.TriggerEvent = *in.TriggerEvent
+	}
+	if in.TriggerFilterJSON != nil {
+		filter, err := domain.ParseTriggerFilter(*in.TriggerFilterJSON)
+		if err != nil {
+			return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID_TRIGGER_FILTER", "trigger_filter_json is not valid JSON", err)
+		}
+		next.TriggerFilter = filter
+	}
 	// domain.Automation has no standalone Validate method — reuse
-	// NewAutomation's invariant checks (non-empty name/rrule/step config,
-	// rrule parses as RFC 5545) by rebuilding from the merged fields. A
-	// syntactically valid-at-create rule doesn't stay valid-by-construction
-	// after an in-place field edit, so this re-validates on every update.
-	rebuilt, err := domain.NewAutomation(next.ID, next.TenantID, next.Name, next.RRule, next.StepType, next.StepConfigJSON, next.DTStart, next.Timezone, next.Enabled, next.CreatedAt)
+	// NewAutomation's invariant checks (non-empty name/rrule/actions,
+	// rrule parses as RFC 5545, trigger fields consistent) by rebuilding
+	// from the merged fields. A syntactically valid-at-create rule doesn't
+	// stay valid-by-construction after an in-place field edit, so this
+	// re-validates on every update.
+	rebuilt, err := domain.NewAutomation(domain.NewAutomationParams{
+		ID:             next.ID,
+		TenantID:       next.TenantID,
+		ProjectID:      next.ProjectID,
+		Name:           next.Name,
+		RRule:          next.RRule,
+		Actions:        next.Actions,
+		StepType:       next.StepType,
+		StepConfigJSON: next.StepConfigJSON,
+		DTStart:        next.DTStart,
+		Timezone:       next.Timezone,
+		Enabled:        next.Enabled,
+		CreatedAt:      next.CreatedAt,
+		TriggerType:    next.TriggerType,
+		TriggerEvent:   next.TriggerEvent,
+		TriggerFilter:  next.TriggerFilter,
+	})
 	if err != nil {
 		return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID", err.Error(), err)
 	}
-	// NewAutomation defaults an unspecified/invalid StepType and empty
-	// Timezone — carry those defaults forward, but keep next's own
-	// NextRunAt/UpdatedAt (NewAutomation always returns them zero/reset,
-	// and this usecase intentionally leaves scheduling fields untouched).
+	// NewAutomation defaults an unspecified/invalid StepType, empty
+	// Timezone, unspecified TriggerType, and normalizes Actions — carry
+	// those defaults forward, but keep next's own NextRunAt/UpdatedAt
+	// (NewAutomation always returns them zero/reset, and this usecase
+	// intentionally leaves scheduling fields untouched).
 	next.StepType = rebuilt.StepType
+	next.StepConfigJSON = rebuilt.StepConfigJSON
+	next.Actions = rebuilt.Actions
 	next.Timezone = rebuilt.Timezone
+	next.TriggerType = rebuilt.TriggerType
+
+	// BR-AT-10/BR-AT-04 — reject an update that would introduce a cycle in
+	// the event-triggered automation graph.
+	if next.TriggerType == domain.TriggerTypeEvent {
+		if err := DetectTriggerCycle(ctx, uc.repo, in.TenantID, next); err != nil {
+			return domain.Automation{}, err
+		}
+	}
 
 	if err := uc.repo.Update(ctx, in.TenantID, next); err != nil {
 		return domain.Automation{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_UPDATE_FAILED", "failed to persist update", err)

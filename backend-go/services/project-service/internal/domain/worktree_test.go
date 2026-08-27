@@ -39,6 +39,9 @@ func TestNewWorktree_StartsActive(t *testing.T) {
 	if !wt.Active {
 		t.Error("expected a freshly recorded worktree to start active")
 	}
+	if wt.Status != WorktreeStatusActive {
+		t.Errorf("expected a freshly recorded worktree to start with status=active, got %v", wt.Status)
+	}
 }
 
 func TestNewWorktree_IdempotencyKey_EmptyIsNil(t *testing.T) {

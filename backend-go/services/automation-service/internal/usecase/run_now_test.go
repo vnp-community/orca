@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sort"
 	"testing"
 	"time"
 
@@ -58,6 +59,36 @@ func (f *fakeAutomationRepository) Delete(ctx context.Context, tenantID, id stri
 	return nil
 }
 
+func (f *fakeAutomationRepository) CountByProject(ctx context.Context, tenantID, projectID string) (int, error) {
+	count := 0
+	for _, a := range f.byID {
+		if a.TenantID == tenantID && a.ProjectID == projectID {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (f *fakeAutomationRepository) ListByTrigger(ctx context.Context, tenantID string, eventName domain.EventName) ([]domain.Automation, error) {
+	var out []domain.Automation
+	for _, a := range f.byID {
+		if a.TenantID == tenantID && a.TriggerType == domain.TriggerTypeEvent && a.TriggerEvent == eventName && a.Enabled {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeAutomationRepository) ListEventTriggered(ctx context.Context, tenantID string) ([]domain.Automation, error) {
+	var out []domain.Automation
+	for _, a := range f.byID {
+		if a.TenantID == tenantID && a.TriggerType == domain.TriggerTypeEvent {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
 // fakeAutomationRunRepository is an in-memory AutomationRunRepository.
 type fakeAutomationRunRepository struct {
 	byID    map[string]domain.AutomationRun
@@ -83,7 +114,17 @@ func (f *fakeAutomationRunRepository) FindByRequestID(ctx context.Context, tenan
 	return domain.AutomationRun{}, false, nil
 }
 
+// UpdateStatus emulates idx_automation_runs_one_running's partial unique
+// index — see repository.go's real UpdateStatus for the Postgres
+// equivalent (TASK-AT-02-03/BR-AT-08).
 func (f *fakeAutomationRunRepository) UpdateStatus(ctx context.Context, run domain.AutomationRun) error {
+	if run.Status == domain.RunStatusRunning {
+		for id, r := range f.byID {
+			if id != run.ID && r.AutomationID == run.AutomationID && r.Status == domain.RunStatusRunning {
+				return ErrConcurrentRunActive
+			}
+		}
+	}
 	f.byID[run.ID] = run
 	return nil
 }
@@ -96,6 +137,40 @@ func (f *fakeAutomationRunRepository) ListByAutomation(ctx context.Context, tena
 		}
 	}
 	return out, "", nil
+}
+
+func (f *fakeAutomationRunRepository) FindRunning(ctx context.Context, tenantID, automationID string) (domain.AutomationRun, bool, error) {
+	for _, r := range f.byID {
+		if r.TenantID == tenantID && r.AutomationID == automationID && r.Status == domain.RunStatusRunning {
+			return r, true, nil
+		}
+	}
+	return domain.AutomationRun{}, false, nil
+}
+
+func (f *fakeAutomationRunRepository) PruneOldRuns(ctx context.Context, tenantID, automationID string, keep int) error {
+	type idAt struct {
+		id string
+		at time.Time
+	}
+	var mine []idAt
+	for id, r := range f.byID {
+		if r.TenantID == tenantID && r.AutomationID == automationID {
+			mine = append(mine, idAt{id, r.CreatedAt})
+		}
+	}
+	if len(mine) <= keep {
+		return nil
+	}
+	sort.Slice(mine, func(i, j int) bool { return mine[i].at.After(mine[j].at) })
+	for _, m := range mine[keep:] {
+		delete(f.byID, m.id)
+	}
+	return nil
+}
+
+func (f *fakeAutomationRunRepository) WriteCleanupReport(ctx context.Context, tenantID, runID string, entries []domain.CleanupLogEntry) error {
+	return nil
 }
 
 // fakeWorkflowStepExecutor is a fake WorkflowStepExecutor — RunNow's tests
@@ -127,7 +202,10 @@ func seedAutomation(t *testing.T, repo *fakeAutomationRepository, tenantID, id, 
 func seedAutomationWithStepType(t *testing.T, repo *fakeAutomationRepository, tenantID, id string, stepType domain.StepType, stepConfigJSON string) domain.Automation {
 	t.Helper()
 	now := time.Now().UTC()
-	a, err := domain.NewAutomation(id, tenantID, "nightly-report", "FREQ=DAILY;INTERVAL=1", stepType, stepConfigJSON, now, "UTC", true, now)
+	a, err := domain.NewAutomation(domain.NewAutomationParams{
+		ID: id, TenantID: tenantID, Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: stepType, StepConfigJSON: stepConfigJSON, DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	})
 	if err != nil {
 		t.Fatalf("building automation: %v", err)
 	}
@@ -163,11 +241,14 @@ func TestRunNow_CallsWorkflowStepExecutorWithStepConfig(t *testing.T) {
 	if call.StepType != domain.StepTypeAgent {
 		t.Errorf("expected step_type=agent parsed from step_config_json, got %v", call.StepType)
 	}
+	// RequestID carries a per-action suffix (SOL-AT-01's action loop, since
+	// each action gets its own workflow-service idempotency key) —
+	// "req-1:0" for this single-action automation's only action.
+	if call.RequestID != "req-1:0" {
+		t.Errorf("expected request_id=req-1:0, got %v", call.RequestID)
+	}
 	if call.TenantID != "tenant-1" {
 		t.Errorf("expected tenant_id=tenant-1, got %v", call.TenantID)
-	}
-	if call.RequestID != "req-1" {
-		t.Errorf("expected request_id=req-1, got %v", call.RequestID)
 	}
 }
 

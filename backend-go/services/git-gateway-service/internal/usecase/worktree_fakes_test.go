@@ -112,6 +112,11 @@ type fakeSCMClient struct {
 	mrBaseSHA       string
 	mrBaseErr       error
 	calledGetMRBase bool
+
+	prForBranch          PullRequestInfo
+	prForBranchFound     bool
+	prForBranchErr       error
+	calledGetPRForBranch bool
 }
 
 func (f *fakeSCMClient) GetPullRequestBase(ctx context.Context, repoID string, prNumber int32) (string, string, error) {
@@ -128,4 +133,12 @@ func (f *fakeSCMClient) GetMergeRequestBase(ctx context.Context, repoID string, 
 		return "", "", f.mrBaseErr
 	}
 	return f.mrBaseBranch, f.mrBaseSHA, nil
+}
+
+func (f *fakeSCMClient) GetPullRequestForBranch(ctx context.Context, tenantID, branch string) (PullRequestInfo, bool, error) {
+	f.calledGetPRForBranch = true
+	if f.prForBranchErr != nil {
+		return PullRequestInfo{}, false, f.prForBranchErr
+	}
+	return f.prForBranch, f.prForBranchFound, nil
 }

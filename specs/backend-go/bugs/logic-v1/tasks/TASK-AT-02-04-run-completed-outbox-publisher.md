@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/adapter/eventbus/publisher.go` (new), `backend-go/services/automation-service/internal/adapter/postgres/repository.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — adapter/eventbus/publisher.go + migration 0007_outbox; UpdateStatus now tx-wrapped, writes the outbox row only on Terminal(); integration-tested (0 rows non-terminal, 1 row terminal).
 
 ---
 

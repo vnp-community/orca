@@ -5420,7 +5420,8 @@ func (x *CreateWorktreeFromIssueResponse) GetStatusUpdateEnqueued() bool {
 type RemoveWorktreeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
-	Force         bool                   `protobuf:"varint,2,opt,name=force,proto3" json:"force,omitempty"` // maps to `git worktree remove --force` (uncommitted changes present)
+	Force         bool                   `protobuf:"varint,2,opt,name=force,proto3" json:"force,omitempty"`                                  // maps to `git worktree remove --force` (uncommitted changes present); BR-AT-11
+	AllowOpenPr   bool                   `protobuf:"varint,3,opt,name=allow_open_pr,json=allowOpenPr,proto3" json:"allow_open_pr,omitempty"` // NEW — separate, explicit override for BR-AT-12; NEVER set true by the cleanup_worktrees path
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5465,6 +5466,13 @@ func (x *RemoveWorktreeRequest) GetWorktreeId() string {
 func (x *RemoveWorktreeRequest) GetForce() bool {
 	if x != nil {
 		return x.Force
+	}
+	return false
+}
+
+func (x *RemoveWorktreeRequest) GetAllowOpenPr() bool {
+	if x != nil {
+		return x.AllowOpenPr
 	}
 	return false
 }
@@ -7430,11 +7438,12 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"branchName\x12(\n" +
 	"\x10agent_session_id\x18\x05 \x01(\tR\x0eagentSessionId\x12*\n" +
 	"\x11agent_start_error\x18\x06 \x01(\tR\x0fagentStartError\x124\n" +
-	"\x16status_update_enqueued\x18\a \x01(\bR\x14statusUpdateEnqueued\"N\n" +
+	"\x16status_update_enqueued\x18\a \x01(\bR\x14statusUpdateEnqueued\"r\n" +
 	"\x15RemoveWorktreeRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x14\n" +
-	"\x05force\x18\x02 \x01(\bR\x05force\"S\n" +
+	"\x05force\x18\x02 \x01(\bR\x05force\x12\"\n" +
+	"\rallow_open_pr\x18\x03 \x01(\bR\vallowOpenPr\"S\n" +
 	"\x18ForceDeleteBranchRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x16\n" +

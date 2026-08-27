@@ -724,7 +724,7 @@ func toDomainIssueRef(req *gitgatewayv1.CreateWorktreeFromIssueRequest) (domain.
 }
 
 func (s *Server) RemoveWorktree(ctx context.Context, req *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error) {
-	if err := s.removeWorktree.Execute(ctx, req.GetWorktreeId(), req.GetForce()); err != nil {
+	if err := s.removeWorktree.Execute(ctx, req.GetWorktreeId(), req.GetForce(), req.GetAllowOpenPr()); err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &emptypb.Empty{}, nil

@@ -21,6 +21,7 @@ import (
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 )
 
 type Client struct {
@@ -39,4 +40,17 @@ func (c *Client) GetPullRequestBase(ctx context.Context, repoID string, prNumber
 func (c *Client) GetMergeRequestBase(ctx context.Context, repoID string, mrNumber int32) (string, string, error) {
 	return "", "", apperrors.New(apperrors.KindInternal, "WORKTREE_SCM_GET_MR_BASE_UNIMPLEMENTED",
 		"scm-integration-service has no RPC to resolve a single MR's base branch yet", nil)
+}
+
+// GetPullRequestForBranch has the same KNOWN GAP as GetPullRequestBase/
+// GetMergeRequestBase above: scm-integration-service's ListPullRequests
+// RPC has no branch field on ListPullRequestsRequest or PullRequest (see
+// proto/orca/scmintegration/v1/scmintegration.proto) to filter/match by
+// branch — there is no way to answer "does branch have an open PR" against
+// the current wire contract. Returns a typed error so RemoveWorktree's
+// BR-AT-12 check fails OPEN (proceeds with deletion) rather than blocking
+// on an out-of-scope proto addition.
+func (c *Client) GetPullRequestForBranch(ctx context.Context, tenantID, branch string) (usecase.PullRequestInfo, bool, error) {
+	return usecase.PullRequestInfo{}, false, apperrors.New(apperrors.KindInternal, "WORKTREE_SCM_GET_PR_FOR_BRANCH_UNIMPLEMENTED",
+		"scm-integration-service has no RPC to look up a pull request by branch yet", nil)
 }

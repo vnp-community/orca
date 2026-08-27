@@ -16,6 +16,28 @@ var (
 	ErrWorktreeNotFound = errors.New("domain: worktree not found")
 )
 
+// WorktreeStatus is a worktree's lifecycle status — orthogonal to Active
+// (activation_state): a worktree can be "completed" yet still Active, or
+// "active" yet deactivated. BL-AT-04's cleanup_worktrees step filters on
+// this, not on Active.
+type WorktreeStatus string
+
+const (
+	WorktreeStatusActive    WorktreeStatus = "active"
+	WorktreeStatusCompleted WorktreeStatus = "completed"
+	WorktreeStatusError     WorktreeStatus = "error"
+	WorktreeStatusStopped   WorktreeStatus = "stopped"
+)
+
+func (s WorktreeStatus) Valid() bool {
+	switch s {
+	case WorktreeStatusActive, WorktreeStatusCompleted, WorktreeStatusError, WorktreeStatusStopped:
+		return true
+	default:
+		return false
+	}
+}
+
 // Worktree is metadata about a git worktree — explicitly NOT authoritative
 // for whether it still exists on disk. git-gateway-service performs the
 // real `git worktree add/remove` on the Dev Server Agent and writes this
@@ -37,13 +59,17 @@ type Worktree struct {
 	// events (SOL-PI-03) — empty means "no linked issue".
 	LinkedIssueProvider string
 	LinkedIssueRef      string
+
+	// Status is orthogonal to Active — see WorktreeStatus's doc comment.
+	Status WorktreeStatus
 }
 
 // NewWorktree constructs a Worktree, enforcing the invariants a metadata
 // record must satisfy to be meaningful. A freshly recorded worktree starts
-// Active — RecordWorktreeCreated is only ever called after the real `git
-// worktree add` already succeeded, so there is no "created but inactive"
-// state to represent at construction time.
+// Active and WorktreeStatusActive — RecordWorktreeCreated is only ever
+// called after the real `git worktree add` already succeeded, so there is
+// no "created but inactive"/"created but not yet active-status" state to
+// represent at construction time.
 func NewWorktree(id, projectID, repoID, path, branch, idempotencyKey string) (Worktree, error) {
 	if projectID == "" {
 		return Worktree{}, ErrEmptyProjectID
@@ -60,6 +86,7 @@ func NewWorktree(id, projectID, repoID, path, branch, idempotencyKey string) (Wo
 	return Worktree{
 		ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true,
 		IdempotencyKey: nonEmptyPtr(idempotencyKey),
+		Status:         WorktreeStatusActive,
 	}, nil
 }
 

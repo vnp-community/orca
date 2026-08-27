@@ -353,7 +353,12 @@ func (s *Server) RecordWorktreeRemoved(ctx context.Context, req *projectv1.Recor
 }
 
 func (s *Server) ListWorktrees(ctx context.Context, req *projectv1.ListWorktreesRequest) (*projectv1.ListWorktreesResponse, error) {
-	worktrees, err := s.listWorktrees.Execute(ctx, usecase.ListWorktreesInput{ProjectID: req.GetProjectId()})
+	in := usecase.ListWorktreesInput{ProjectID: req.GetProjectId(), StatusIn: req.GetStatusIn()}
+	if req.GetOlderThan() != nil {
+		t := req.GetOlderThan().AsTime()
+		in.OlderThan = &t
+	}
+	worktrees, err := s.listWorktrees.Execute(ctx, in)
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -605,6 +610,7 @@ func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 		Branch:         wt.Branch,
 		Active:         wt.Active,
 		IdempotencyKey: wt.IdempotencyKey,
+		Status:         string(wt.Status),
 	}
 	if wt.LinkedIssueProvider != "" {
 		out.LinkedIssueProvider = &wt.LinkedIssueProvider

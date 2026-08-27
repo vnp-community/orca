@@ -9,15 +9,20 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/common/testutil"
+	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
+	"github.com/stablyai/orca-go/services/automation-service/internal/usecase"
 )
 
 func setupRepositories(t *testing.T) (*AutomationRepository, *AutomationRunRepository) {
@@ -44,7 +49,25 @@ func setupRepositories(t *testing.T) (*AutomationRepository, *AutomationRunRepos
 	}
 	t.Cleanup(pool.Close)
 
-	return NewAutomationRepository(pool), NewAutomationRunRepository(pool)
+	return NewAutomationRepository(pool), NewAutomationRunRepository(pool, eventbus.NewRunCompletedPublisher())
+}
+
+func newAutomation(t *testing.T, id, tenantID string, opts ...func(*domain.NewAutomationParams)) domain.Automation {
+	t.Helper()
+	now := time.Now().UTC().Truncate(time.Second)
+	p := domain.NewAutomationParams{
+		ID: id, TenantID: tenantID, Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: domain.StepTypeAgent, StepConfigJSON: `{"prompt":"summarize"}`,
+		DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	}
+	for _, opt := range opts {
+		opt(&p)
+	}
+	a, err := domain.NewAutomation(p)
+	if err != nil {
+		t.Fatalf("building automation: %v", err)
+	}
+	return a
 }
 
 func TestAutomationRepository_CreateAndGet(t *testing.T) {
@@ -52,7 +75,11 @@ func TestAutomationRepository_CreateAndGet(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC().Truncate(time.Second)
 
-	a, err := domain.NewAutomation("00000000-0000-0000-0000-000000000001", "11111111-1111-1111-1111-111111111111", "nightly-report", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{"prompt":"summarize"}`, now, "UTC", true, now)
+	a, err := domain.NewAutomation(domain.NewAutomationParams{
+		ID: "00000000-0000-0000-0000-000000000001", TenantID: "11111111-1111-1111-1111-111111111111",
+		Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1", StepType: domain.StepTypeAgent, StepConfigJSON: `{"prompt":"summarize"}`,
+		DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	})
 	if err != nil {
 		t.Fatalf("building automation: %v", err)
 	}
@@ -163,11 +190,7 @@ func TestAutomationRepository_ClaimDue_SkipsRowsLockedByAnotherClaim(t *testing.
 
 func mustNewAutomation(t *testing.T, id, tenantID string, nextRunAt time.Time) domain.Automation {
 	t.Helper()
-	now := time.Now().UTC().Truncate(time.Second)
-	a, err := domain.NewAutomation(id, tenantID, "nightly-report", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{"prompt":"summarize"}`, now, "UTC", true, now)
-	if err != nil {
-		t.Fatalf("building automation: %v", err)
-	}
+	a := newAutomation(t, id, tenantID)
 	a.NextRunAt = nextRunAt
 	return a
 }
@@ -177,7 +200,7 @@ func TestAutomationRunRepository_FindByRequestID_IsIdempotencyBackstop(t *testin
 	ctx := context.Background()
 	now := time.Now().UTC().Truncate(time.Second)
 
-	a, _ := domain.NewAutomation("00000000-0000-0000-0000-000000000001", "11111111-1111-1111-1111-111111111111", "nightly-report", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{"prompt":"summarize"}`, now, "UTC", true, now)
+	a := newAutomation(t, "00000000-0000-0000-0000-000000000001", "11111111-1111-1111-1111-111111111111")
 	if err := automations.Create(ctx, a); err != nil {
 		t.Fatalf("create automation: %v", err)
 	}
@@ -341,13 +364,266 @@ func TestAutomationRepository_Delete_CascadesToRunsAndFailsForWrongTenant(t *tes
 
 func mustCreateAutomation(t *testing.T, repo *AutomationRepository, id, tenantID string) domain.Automation {
 	t.Helper()
-	now := time.Now().UTC().Truncate(time.Second)
-	a, err := domain.NewAutomation(id, tenantID, "nightly-report", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{"prompt":"summarize"}`, now, "UTC", true, now)
-	if err != nil {
-		t.Fatalf("building automation: %v", err)
-	}
+	a := newAutomation(t, id, tenantID)
 	if err := repo.Create(context.Background(), a); err != nil {
 		t.Fatalf("create automation %s: %v", id, err)
 	}
 	return a
+}
+
+func mustCreateAutomationWithProject(t *testing.T, repo *AutomationRepository, id, tenantID, projectID string) domain.Automation {
+	t.Helper()
+	a := newAutomation(t, id, tenantID, func(p *domain.NewAutomationParams) { p.ProjectID = projectID })
+	if err := repo.Create(context.Background(), a); err != nil {
+		t.Fatalf("create automation %s: %v", id, err)
+	}
+	return a
+}
+
+func TestAutomationRepository_CountByProject_ScopesPerProjectNoLeakage(t *testing.T) {
+	automations, _ := setupRepositories(t)
+	tenantID := "11111111-1111-1111-1111-111111111111"
+	projectA := "aaaaaaaa-0000-0000-0000-000000000001"
+	projectB := "bbbbbbbb-0000-0000-0000-000000000002"
+
+	mustCreateAutomationWithProject(t, automations, "00000000-0000-0000-0000-0000000000e1", tenantID, projectA)
+	mustCreateAutomationWithProject(t, automations, "00000000-0000-0000-0000-0000000000e2", tenantID, projectA)
+	mustCreateAutomationWithProject(t, automations, "00000000-0000-0000-0000-0000000000e3", tenantID, projectB)
+	mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000e4", tenantID) // unscoped, project_id NULL
+
+	count, err := automations.CountByProject(context.Background(), tenantID, projectA)
+	if err != nil {
+		t.Fatalf("count by project: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 automations for project A, got %d", count)
+	}
+
+	countB, err := automations.CountByProject(context.Background(), tenantID, projectB)
+	if err != nil {
+		t.Fatalf("count by project B: %v", err)
+	}
+	if countB != 1 {
+		t.Errorf("expected 1 automation for project B (no cross-project leakage), got %d", countB)
+	}
+}
+
+func TestAutomationRepository_ListByTrigger_ReturnsOnlyEnabledMatchingEvent(t *testing.T) {
+	automations, _ := setupRepositories(t)
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	matching := newAutomation(t, "00000000-0000-0000-0000-0000000000f1", tenantID, func(p *domain.NewAutomationParams) {
+		p.TriggerType = domain.TriggerTypeEvent
+		p.TriggerEvent = domain.EventAgentCompleted
+	})
+	disabled := newAutomation(t, "00000000-0000-0000-0000-0000000000f2", tenantID, func(p *domain.NewAutomationParams) {
+		p.TriggerType = domain.TriggerTypeEvent
+		p.TriggerEvent = domain.EventAgentCompleted
+		p.Enabled = false
+	})
+	otherEvent := newAutomation(t, "00000000-0000-0000-0000-0000000000f3", tenantID, func(p *domain.NewAutomationParams) {
+		p.TriggerType = domain.TriggerTypeEvent
+		p.TriggerEvent = domain.EventAgentError
+	})
+	cronAutomation := newAutomation(t, "00000000-0000-0000-0000-0000000000f4", tenantID)
+
+	for _, a := range []domain.Automation{matching, disabled, otherEvent, cronAutomation} {
+		if err := automations.Create(context.Background(), a); err != nil {
+			t.Fatalf("create automation %s: %v", a.ID, err)
+		}
+	}
+
+	got, err := automations.ListByTrigger(context.Background(), tenantID, domain.EventAgentCompleted)
+	if err != nil {
+		t.Fatalf("list by trigger: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != matching.ID {
+		t.Fatalf("expected only the enabled, matching-event automation, got %+v", got)
+	}
+}
+
+func TestAutomationRunRepository_PruneOldRuns_KeepsMostRecentN(t *testing.T) {
+	automations, runs := setupRepositories(t)
+	ctx := context.Background()
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	a := mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000a1", tenantID)
+
+	base := time.Now().UTC().Truncate(time.Second).Add(-time.Hour)
+	for i := 0; i < 31; i++ {
+		run, err := domain.NewPendingRun(
+			uuid.NewString(),
+			a.ID, tenantID, fmt.Sprintf("req-prune-%d", i), domain.StepTypeAgent, domain.RunTriggerManual, a.StepConfigJSON,
+			base.Add(time.Duration(i)*time.Minute),
+		)
+		if err != nil {
+			t.Fatalf("building run %d: %v", i, err)
+		}
+		if err := runs.Create(ctx, run); err != nil {
+			t.Fatalf("create run %d: %v", i, err)
+		}
+	}
+
+	if err := runs.PruneOldRuns(ctx, tenantID, a.ID, 30); err != nil {
+		t.Fatalf("prune old runs: %v", err)
+	}
+
+	page, _, err := runs.ListByAutomation(ctx, tenantID, a.ID, "", 100)
+	if err != nil {
+		t.Fatalf("list by automation: %v", err)
+	}
+	if len(page) != 30 {
+		t.Errorf("expected exactly 30 runs retained, got %d", len(page))
+	}
+}
+
+func TestAutomationRunRepository_OneRunningPartialUniqueIndex(t *testing.T) {
+	automations, runs := setupRepositories(t)
+	ctx := context.Background()
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	a := mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000b1", tenantID)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	first, err := domain.NewPendingRun("00000000-0000-0000-0000-00000000b101", a.ID, tenantID, "req-q1", domain.StepTypeAgent, domain.RunTriggerManual, a.StepConfigJSON, now)
+	if err != nil {
+		t.Fatalf("building first run: %v", err)
+	}
+	if err := runs.Create(ctx, first); err != nil {
+		t.Fatalf("create first run: %v", err)
+	}
+	firstRunning, err := first.MarkRunning(now)
+	if err != nil {
+		t.Fatalf("mark first running: %v", err)
+	}
+	if err := runs.UpdateStatus(ctx, firstRunning); err != nil {
+		t.Fatalf("update first status to running: %v", err)
+	}
+
+	second, err := domain.NewPendingRun("00000000-0000-0000-0000-00000000b102", a.ID, tenantID, "req-q2", domain.StepTypeAgent, domain.RunTriggerManual, a.StepConfigJSON, now)
+	if err != nil {
+		t.Fatalf("building second run: %v", err)
+	}
+	if err := runs.Create(ctx, second); err != nil {
+		t.Fatalf("create second run: %v", err)
+	}
+	secondRunning, err := second.MarkRunning(now)
+	if err != nil {
+		t.Fatalf("mark second running: %v", err)
+	}
+
+	// A second 'running' row for the SAME automation must violate
+	// idx_automation_runs_one_running (BR-AT-08).
+	err = runs.UpdateStatus(ctx, secondRunning)
+	if err == nil {
+		t.Fatal("expected the partial unique index to reject a second concurrent running row")
+	}
+	if !errors.Is(err, usecase.ErrConcurrentRunActive) {
+		t.Errorf("expected usecase.ErrConcurrentRunActive, got %v", err)
+	}
+
+	found, ok, err := runs.FindRunning(ctx, tenantID, a.ID)
+	if err != nil {
+		t.Fatalf("find running: %v", err)
+	}
+	if !ok || found.ID != first.ID {
+		t.Errorf("expected to find the first run as the sole running run, got %+v ok=%v", found, ok)
+	}
+
+	// Once the first run reaches a terminal status, the slot frees up and a
+	// second running row no longer conflicts.
+	firstSucceeded, err := firstRunning.MarkSucceeded(now, `{}`)
+	if err != nil {
+		t.Fatalf("mark first succeeded: %v", err)
+	}
+	if err := runs.UpdateStatus(ctx, firstSucceeded); err != nil {
+		t.Fatalf("update first status to succeeded: %v", err)
+	}
+	if err := runs.UpdateStatus(ctx, secondRunning); err != nil {
+		t.Errorf("expected the second run to transition to running once the first is terminal, got %v", err)
+	}
+}
+
+func TestAutomationRunRepository_UpdateStatus_WritesOutboxOnlyForTerminalTransitions(t *testing.T) {
+	automations, runs := setupRepositories(t)
+	ctx := context.Background()
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	a := mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000c1", tenantID)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	pending, err := domain.NewPendingRun("00000000-0000-0000-0000-00000000c101", a.ID, tenantID, "req-r1", domain.StepTypeAgent, domain.RunTriggerManual, a.StepConfigJSON, now)
+	if err != nil {
+		t.Fatalf("building run: %v", err)
+	}
+	if err := runs.Create(ctx, pending); err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+
+	running, err := pending.MarkRunning(now)
+	if err != nil {
+		t.Fatalf("mark running: %v", err)
+	}
+	if err := runs.UpdateStatus(ctx, running); err != nil {
+		t.Fatalf("update status to running: %v", err)
+	}
+	if count := countOutboxRows(t, automations, tenantID); count != 0 {
+		t.Errorf("expected 0 outbox rows after a non-terminal transition, got %d", count)
+	}
+
+	succeeded, err := running.MarkSucceeded(now, `{"ok":true}`)
+	if err != nil {
+		t.Fatalf("mark succeeded: %v", err)
+	}
+	if err := runs.UpdateStatus(ctx, succeeded); err != nil {
+		t.Fatalf("update status to succeeded: %v", err)
+	}
+	if count := countOutboxRows(t, automations, tenantID); count != 1 {
+		t.Errorf("expected exactly 1 outbox row after the terminal transition, got %d", count)
+	}
+}
+
+func countOutboxRows(t *testing.T, automations *AutomationRepository, tenantID string) int {
+	t.Helper()
+	var count int
+	if err := automations.pool.QueryRow(context.Background(),
+		`SELECT count(*) FROM automation.outbox_events WHERE tenant_id = $1 AND subject = $2`,
+		tenantID, eventbus.RunCompletedSubject,
+	).Scan(&count); err != nil {
+		t.Fatalf("querying outbox_events directly: %v", err)
+	}
+	return count
+}
+
+func TestAutomationRunRepository_WriteCleanupReport_RoundTrips(t *testing.T) {
+	automations, runs := setupRepositories(t)
+	ctx := context.Background()
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	a := mustCreateAutomation(t, automations, "00000000-0000-0000-0000-0000000000d1", tenantID)
+	now := time.Now().UTC().Truncate(time.Second)
+	run, err := domain.NewPendingRun("00000000-0000-0000-0000-00000000d101", a.ID, tenantID, "req-s1", domain.StepTypeAgent, domain.RunTriggerManual, a.StepConfigJSON, now)
+	if err != nil {
+		t.Fatalf("building run: %v", err)
+	}
+	if err := runs.Create(ctx, run); err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+
+	entries := []domain.CleanupLogEntry{
+		{WorktreeID: "wt-1", Action: "deleted"},
+		{WorktreeID: "wt-2", Action: "skipped", Reason: "uncommitted changes"},
+		{WorktreeID: "wt-3", Action: "would_delete"},
+	}
+	if err := runs.WriteCleanupReport(ctx, tenantID, run.ID, entries); err != nil {
+		t.Fatalf("write cleanup report: %v", err)
+	}
+
+	var count int
+	if err := automations.pool.QueryRow(ctx, `SELECT count(*) FROM automation.worktree_cleanup_log WHERE run_id = $1`, run.ID).Scan(&count); err != nil {
+		t.Fatalf("querying worktree_cleanup_log directly: %v", err)
+	}
+	if count != len(entries) {
+		t.Errorf("expected %d cleanup log rows, got %d", len(entries), count)
+	}
 }

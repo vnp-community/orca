@@ -145,6 +145,11 @@ type fakeGitExecutor struct {
 	removeWorktreeCallCount int
 	gotRemoveWorktreePath   string
 	gotRemoveWorktreeForce  bool
+
+	// getStatusResult overrides the default dirty-file GetStatus response
+	// below — used by remove_worktree_test.go's BR-AT-12 cases, which need
+	// a clean status (no BR-AT-11 short-circuit) to reach the PR check.
+	getStatusResult *domain.GitStatus
 }
 
 func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
@@ -158,6 +163,9 @@ func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domai
 	// (e.g. BR-CR-15's >50-file threshold) without a bespoke fake.
 	if f.statusResult.Files != nil {
 		return f.statusResult, nil
+	}
+	if f.getStatusResult != nil {
+		return *f.getStatusResult, nil
 	}
 	// One changed file so gatherFullDiff (used by GenerateCommitMessage /
 	// GeneratePullRequestFields) actually calls GetDiff below.

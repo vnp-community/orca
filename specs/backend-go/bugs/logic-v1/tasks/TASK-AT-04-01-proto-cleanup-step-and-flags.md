@@ -5,7 +5,7 @@
 **Service:** `workflow-service` / `git-gateway-service` / `project-service`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto`, `backend-go/proto/orca/gitgateway/v1/gitgateway.proto`, `backend-go/proto/orca/project/v1/project.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — STEP_TYPE_CLEANUP_WORKTREES added to workflow.proto; allow_open_pr added to RemoveWorktreeRequest (gitgateway.proto); status/ListWorktreesRequest filters added to project.proto; buf generate + go build clean.
 
 ---
 

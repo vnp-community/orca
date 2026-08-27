@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/usecase/handle_event_trigger.go` (new), `backend-go/services/automation-service/internal/domain/automation_run.go`
 **Depends on:** TASK-AT-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — RunTriggerEvent added; usecase/handle_event_trigger.go matches+filters+dispatches via RunNow with deterministic event:<id>:<automationID> request_id.
 
 ---
 

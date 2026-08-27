@@ -6,10 +6,18 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
 )
+
+// ErrConcurrentRunActive is returned by AutomationRunRepository.UpdateStatus
+// when a pending->running transition loses a race to the partial unique
+// index idx_automation_runs_one_running (BR-AT-08: at most one running run
+// per automation) — RunNow catches this via errors.Is and returns the
+// winning run instead of treating it as a real failure.
+var ErrConcurrentRunActive = errors.New("usecase: automation already has a running dispatch")
 
 // AutomationRepository is the persistence port for automation definitions.
 // Implemented by internal/adapter/postgres against automation-service's own
@@ -30,6 +38,17 @@ type AutomationRepository interface {
 	// (automation_runs.automation_id has ON DELETE CASCADE per
 	// migrations/0001_init.up.sql — no separate run-cleanup step needed).
 	Delete(ctx context.Context, tenantID, id string) error
+	// CountByProject returns the number of automations for tenantID scoped
+	// to projectID — backs BR-AT-02's per-project cap.
+	CountByProject(ctx context.Context, tenantID, projectID string) (int, error)
+	// ListByTrigger returns enabled automations for tenantID whose
+	// trigger_type is 'event' and trigger_event matches eventName — backs
+	// HandleEventTrigger's dispatch.
+	ListByTrigger(ctx context.Context, tenantID string, eventName domain.EventName) ([]domain.Automation, error)
+	// ListEventTriggered returns every event-triggered automation for
+	// tenantID (regardless of enabled) — backs DetectTriggerCycle's graph
+	// build (BR-AT-10).
+	ListEventTriggered(ctx context.Context, tenantID string) ([]domain.Automation, error)
 }
 
 // AutomationRunRepository is the persistence port for run bookkeeping.
@@ -48,6 +67,16 @@ type AutomationRunRepository interface {
 	// StartedAt/CompletedAt/OutputJSON/ErrorMessage changed).
 	UpdateStatus(ctx context.Context, run domain.AutomationRun) error
 	ListByAutomation(ctx context.Context, tenantID, automationID, pageToken string, pageSize int32) ([]domain.AutomationRun, string, error)
+	// FindRunning returns the currently-running run for automationID, if
+	// any — backed by idx_automation_runs_one_running, the partial unique
+	// index enforcing BR-AT-08's "at most one running run per automation".
+	FindRunning(ctx context.Context, tenantID, automationID string) (domain.AutomationRun, bool, error)
+	// PruneOldRuns deletes every automation_runs row for automationID
+	// beyond the `keep` most recent (by created_at DESC) — BR-AT-07.
+	PruneOldRuns(ctx context.Context, tenantID, automationID string, keep int) error
+	// WriteCleanupReport persists one worktree_cleanup_log row per entry —
+	// backs the WriteCleanupReport RPC workflow-service calls (BR-AT-14).
+	WriteCleanupReport(ctx context.Context, tenantID, runID string, entries []domain.CleanupLogEntry) error
 }
 
 // ExecuteAdHocStepInput mirrors workflow-service's ExecuteAdHocStepRequest
