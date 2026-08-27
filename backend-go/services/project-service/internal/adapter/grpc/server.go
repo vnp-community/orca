@@ -52,15 +52,17 @@ type Server struct {
 	listProjectGroups  *usecase.ListProjectGroups
 
 	folderWorkspaces *usecase.FolderWorkspaceUseCase
-	moveProject        *usecase.MoveProject
-	scanNested         *usecase.ScanNested
-	importNested       *usecase.ImportNested
+	moveProject      *usecase.MoveProject
+	scanNested       *usecase.ScanNested
+	importNested     *usecase.ImportNested
 
 	createHostSetup     *usecase.CreateHostSetup
 	listHostSetups      *usecase.ListHostSetups
 	updateHostSetup     *usecase.UpdateHostSetup
 	deleteHostSetup     *usecase.DeleteHostSetup
 	setupExistingFolder *usecase.SetupExistingFolder
+
+	getProjectContext *usecase.GetProjectContext
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
@@ -97,15 +99,17 @@ type Deps struct {
 	ListProjectGroups  *usecase.ListProjectGroups
 
 	FolderWorkspaces *usecase.FolderWorkspaceUseCase
-	MoveProject        *usecase.MoveProject
-	ScanNested         *usecase.ScanNested
-	ImportNested       *usecase.ImportNested
+	MoveProject      *usecase.MoveProject
+	ScanNested       *usecase.ScanNested
+	ImportNested     *usecase.ImportNested
 
 	CreateHostSetup     *usecase.CreateHostSetup
 	ListHostSetups      *usecase.ListHostSetups
 	UpdateHostSetup     *usecase.UpdateHostSetup
 	DeleteHostSetup     *usecase.DeleteHostSetup
 	SetupExistingFolder *usecase.SetupExistingFolder
+
+	GetProjectContext *usecase.GetProjectContext
 }
 
 func New(deps Deps) *Server {
@@ -140,15 +144,17 @@ func New(deps Deps) *Server {
 		listProjectGroups:  deps.ListProjectGroups,
 
 		folderWorkspaces: deps.FolderWorkspaces,
-		moveProject:        deps.MoveProject,
-		scanNested:         deps.ScanNested,
-		importNested:       deps.ImportNested,
+		moveProject:      deps.MoveProject,
+		scanNested:       deps.ScanNested,
+		importNested:     deps.ImportNested,
 
 		createHostSetup:     deps.CreateHostSetup,
 		listHostSetups:      deps.ListHostSetups,
 		updateHostSetup:     deps.UpdateHostSetup,
 		deleteHostSetup:     deps.DeleteHostSetup,
 		setupExistingFolder: deps.SetupExistingFolder,
+
+		getProjectContext: deps.GetProjectContext,
 	}
 }
 
@@ -163,6 +169,8 @@ func (s *Server) CreateProject(ctx context.Context, req *projectv1.CreateProject
 		Description:   req.GetDescription(),
 		DefaultBranch: req.GetDefaultBranch(),
 		Visibility:    req.GetVisibility(),
+		DevServerID:   req.GetDevServerId(), // NEW
+		RepoPath:      req.GetRepoPath(),    // NEW
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -651,6 +659,17 @@ func (s *Server) GetFolderWorkspacePathStatus(ctx context.Context, req *projectv
 	return &projectv1.GetFolderWorkspacePathStatusResponse{
 		Status:                    result.Status,
 		ExistingFolderWorkspaceId: result.ExistingID,
+	}, nil
+}
+
+func (s *Server) GetProjectContext(ctx context.Context, req *projectv1.GetProjectContextRequest) (*projectv1.ProjectContext, error) {
+	pc, err := s.getProjectContext.Execute(ctx, req.GetProjectId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.ProjectContext{
+		ProjectId: pc.ProjectID, ProjectName: pc.ProjectName, Description: pc.Description,
+		RepoUrl: pc.RepoURL, DevServerId: pc.DevServerID, DevServerHostname: pc.DevServerHostname,
 	}, nil
 }
 

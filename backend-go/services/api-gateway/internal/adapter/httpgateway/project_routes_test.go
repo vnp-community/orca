@@ -31,6 +31,10 @@ type fakeProjectServiceClient struct {
 	getProjectResp    *projectv1.GetProjectResponse
 	getProjectErr     error
 
+	lastGetProjectContextReq *projectv1.GetProjectContextRequest
+	getProjectContextResp    *projectv1.ProjectContext
+	getProjectContextErr     error
+
 	lastListProjectsReq *projectv1.ListProjectsRequest
 	listProjectsResp    *projectv1.ListProjectsResponse
 	listProjectsErr     error
@@ -131,9 +135,9 @@ type fakeProjectServiceClient struct {
 	lastGetFolderWorkspacePathStatusReq *projectv1.GetFolderWorkspacePathStatusRequest
 	getFolderWorkspacePathStatusResp    *projectv1.GetFolderWorkspacePathStatusResponse
 	getFolderWorkspacePathStatusErr     error
-	lastListMembersReq *projectv1.ListMembersRequest
-	listMembersResp    *projectv1.ListMembersResponse
-	listMembersErr     error
+	lastListMembersReq                  *projectv1.ListMembersRequest
+	listMembersResp                     *projectv1.ListMembersResponse
+	listMembersErr                      error
 
 	lastRemoveMemberReq *projectv1.RemoveMemberRequest
 	removeMemberResp    *projectv1.RemoveMemberResponse
@@ -470,6 +474,14 @@ func (f *fakeProjectServiceClient) SetupExistingFolder(_ context.Context, in *pr
 		return nil, f.setupExistingFolderErr
 	}
 	return f.setupExistingFolderResp, nil
+}
+
+func (f *fakeProjectServiceClient) GetProjectContext(_ context.Context, in *projectv1.GetProjectContextRequest, _ ...grpc.CallOption) (*projectv1.ProjectContext, error) {
+	f.lastGetProjectContextReq = in
+	if f.getProjectContextErr != nil {
+		return nil, f.getProjectContextErr
+	}
+	return f.getProjectContextResp, nil
 }
 
 var _ projectv1.ProjectServiceClient = (*fakeProjectServiceClient)(nil)

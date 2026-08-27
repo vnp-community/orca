@@ -21,6 +21,26 @@ func withTenant(ctx context.Context, companyID string) context.Context {
 	return tenant.WithTenantID(ctx, companyID)
 }
 
+// withActor attaches an authenticated user id — the actor authorization.go's
+// decide() requires before ever calling into OPA.
+func withActor(ctx context.Context, userID string) context.Context {
+	return tenant.WithUserID(ctx, userID)
+}
+
+// withRole attaches the caller's role claim — see common/tenant.Role's doc
+// comment for the (currently unpopulated in production) upstream gap this
+// simulates for tests.
+func withRole(ctx context.Context, role string) context.Context {
+	return tenant.WithRole(ctx, role)
+}
+
+// adminCtx is the common case for every non-authorization-focused test in
+// this package: an authenticated admin actor, so requireCompanyAdmin/
+// requireDepartmentAccess never block the behavior under test.
+func adminCtx(companyID string) context.Context {
+	return withRole(withActor(withTenant(context.Background(), companyID), "actor-1"), "admin")
+}
+
 // assertAppError asserts err is an *apperrors.AppError with the given Kind —
 // mirrors project-service/internal/usecase/fakes_test.go's helper of the
 // same name.
@@ -99,11 +119,14 @@ func (f *fakeCompanyRepository) Update(ctx context.Context, id string, patch dom
 type departmentKey struct{ companyID, id string }
 
 type fakeDepartmentRepository struct {
-	byKey     map[departmentKey]domain.Department
-	createErr error
-	getErr    error
-	listErr   error
-	updateErr error
+	byKey             map[departmentKey]domain.Department
+	createErr         error
+	getErr            error
+	listErr           error
+	updateErr         error
+	existsByName      bool
+	existsByNameErr   error
+	existsByNameCalls int
 }
 
 func newFakeDepartmentRepository() *fakeDepartmentRepository {
@@ -160,6 +183,22 @@ func (f *fakeDepartmentRepository) Update(ctx context.Context, companyID, id str
 	}
 	f.byKey[key] = d
 	return d, true, nil
+}
+
+func (f *fakeDepartmentRepository) ExistsByName(ctx context.Context, companyID, name string) (bool, error) {
+	f.existsByNameCalls++
+	if f.existsByNameErr != nil {
+		return false, f.existsByNameErr
+	}
+	if f.existsByName {
+		return true, nil
+	}
+	for key, d := range f.byKey {
+		if key.companyID == companyID && d.Name == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 type fakeUserProfileRepository struct {
@@ -370,6 +409,51 @@ func newFakeCacheInvalidationPublisher() *fakeCacheInvalidationPublisher {
 
 func (f *fakeCacheInvalidationPublisher) PublishProfileInvalidated(ctx context.Context, tenantID, userID string) error {
 	f.calls = append(f.calls, userID)
+	return f.err
+}
+
+// fakeOPADecisionCall records one Decision(...) call's arguments — lets a
+// test assert both the outcome AND what was actually sent to OPA (e.g.
+// "the resolved sameDepartment value was true").
+type fakeOPADecisionCall struct {
+	callerRole     string
+	action         string
+	sameDepartment bool
+}
+
+type fakeOPAClient struct {
+	allow bool
+	err   error
+	calls []fakeOPADecisionCall
+}
+
+func newFakeOPAClient(allow bool) *fakeOPAClient {
+	return &fakeOPAClient{allow: allow}
+}
+
+func (f *fakeOPAClient) Decision(ctx context.Context, callerRole, action string, sameDepartment bool) (bool, error) {
+	f.calls = append(f.calls, fakeOPADecisionCall{callerRole: callerRole, action: action, sameDepartment: sameDepartment})
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.allow, nil
+}
+
+type fakeAuditEvent struct {
+	tenantID, actorID, action, target string
+}
+
+type fakeAuditPublisher struct {
+	calls []fakeAuditEvent
+	err   error
+}
+
+func newFakeAuditPublisher() *fakeAuditPublisher {
+	return &fakeAuditPublisher{}
+}
+
+func (f *fakeAuditPublisher) PublishAuditEvent(ctx context.Context, tenantID, actorID, action, target string) error {
+	f.calls = append(f.calls, fakeAuditEvent{tenantID: tenantID, actorID: actorID, action: action, target: target})
 	return f.err
 }
 

@@ -122,6 +122,11 @@ var subjectRules = map[string]subjectRule{
 		Type: "decision_gate_opened", Title: "Needs your decision", Body: "A workflow is waiting on your decision.",
 		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
 	},
+	"orca.project.devserver.changed": {
+		Type: "project_devserver_changed", Title: "Dev server changed",
+		Body:     "This project's dev server binding was changed.",
+		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS},
+	},
 }
 
 // defaultRule is used for any subject not in subjectRules — WS-only,

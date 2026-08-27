@@ -98,3 +98,27 @@ var ErrStepExecutorNotRegistered = errors.New("usecase: no step executor registe
 type StepExecutorRegistry interface {
 	Resolve(stepType domain.StepType) (domain.StepExecutor, error)
 }
+
+// ProfileResolver is the outbound port toward tenant-service.GetResolvedProfile
+// — a NEW dependency edge (tenant-service.md §7 already documents this as
+// intended for task-service/workflow-service; workflow-service never
+// exercised it before this task). Returns the already-JSON-decoded
+// resolved_settings_json as a generic map, matching the shape
+// domain.BuildAgentEnv reads.
+type ProfileResolver interface {
+	GetResolvedProfile(ctx context.Context, userID string) (map[string]any, error)
+}
+
+// ProjectContextResolver is the outbound port toward
+// project-service.GetProjectContext (TASK-PRF-04-01/02).
+type ProjectContextResolver interface {
+	GetProjectContext(ctx context.Context, projectID string) (ProjectContext, error)
+}
+
+// ProjectContext is the subset of project-service's ProjectContext this
+// service's agent-spawn preamble needs — decoded from the gRPC response by
+// internal/adapter/infrafleetclient's ProjectContextResolver implementation.
+type ProjectContext struct {
+	ProjectID, ProjectName, Description     string
+	RepoURL, DevServerID, DevServerHostname string
+}

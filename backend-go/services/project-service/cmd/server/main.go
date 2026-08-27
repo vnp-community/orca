@@ -17,8 +17,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
@@ -27,13 +29,16 @@ import (
 
 	svcconfig "github.com/stablyai/orca-go/services/project-service/internal/config"
 
+	projecteventbus "github.com/stablyai/orca-go/services/project-service/internal/adapter/eventbus"
 	projectgrpc "github.com/stablyai/orca-go/services/project-service/internal/adapter/grpc"
 	projectgrpcclient "github.com/stablyai/orca-go/services/project-service/internal/adapter/grpcclient"
 	projectopaclient "github.com/stablyai/orca-go/services/project-service/internal/adapter/opaclient"
 	projectpostgres "github.com/stablyai/orca-go/services/project-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/project-service/internal/usecase"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -81,6 +86,13 @@ func run() error {
 	folderWorkspaceRepo := projectpostgres.NewFolderWorkspaceRepository(pool)
 	hostSetupRepo := projectpostgres.NewHostSetupRepository(pool)
 
+	healthSrv := health.New()
+	healthSrv.Register("postgres", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return pool.Ping(ctx)
+	})
+
 	// Real clients — Epic C (docs/execution-plan.md §10, 2026-08-17) closed
 	// the gap these were previously stubs for. Dialed lazily (doesn't block
 	// startup) — see internal/adapter/grpcclient's doc comments.
@@ -108,22 +120,71 @@ func run() error {
 	}
 	defer func() { _ = devServerLister.Close() }()
 
+	// A second infra-fleet-service dial for the health/hostname/tags
+	// lookups TASK-PRF-03/04 add — DevServerHealthChecker/
+	// InfraFleetHostnameResolver/ProfileResolver.DevServerTags all take an
+	// already-constructed client rather than dialing their own connection
+	// (unlike DevServerRelay/InfraFleetDevServerLister above), so one shared
+	// *grpc.ClientConn backs all three.
+	infraFleetConn, err := grpc.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dialing infra-fleet-service (health/hostname/tags): %w", err)
+	}
+	defer func() { _ = infraFleetConn.Close() }()
+	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
+
+	// NEW — tenant-service dial for ProfileResolver's GetResolvedProfile
+	// call (ListProjects's fleet.allowedServerTags visibility filter).
+	tenantConn, err := grpc.NewClient(cfg.TenantServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dialing tenant-service: %w", err)
+	}
+	defer func() { _ = tenantConn.Close() }()
+	tenantClient := tenantv1.NewTenantServiceClient(tenantConn)
+
+	healthChecker := projectgrpcclient.NewInfraFleetHealthChecker(infraFleetClient)
+	hostnameResolver := projectgrpcclient.NewInfraFleetHostnameResolver(infraFleetClient)
+	profileResolver := projectgrpcclient.NewTenantProfileResolver(tenantClient, infraFleetClient)
+
+	// Best-effort outbox publisher (audit events + dev-server-changed member
+	// notifications) — same non-fatal-if-NATS-unreachable posture as
+	// tenant-service's own eventbus.Connect/EnsureStream block; project-service
+	// has no other NATS use yet, so both ports stay nil (safe, nil-checked by
+	// their callers) until the stream is confirmed.
+	var auditPublisher usecase.AuditPublisher
+	var memberNotifier usecase.MemberNotifier
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, audit/member-notify events will not be published", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, projecteventbus.StreamName, []string{"orca.project.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			eventPublisher := projecteventbus.New(pub)
+			auditPublisher = eventPublisher
+			memberNotifier = eventPublisher
+			healthSrv.Register("nats", func() error { return nil })
+		}
+	}
+
 	// Shared embedded-OPA evaluator (common/policy) for project-role/
 	// global-admin authorization — mirrors auth-service/annotation-service/
 	// task-service's own composition-root wiring. One Evaluator, pointed at
 	// the same orca-authz bundle, shared by every OPA-gated usecase below.
 	opa := projectopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
 
-	createProjectUC := usecase.NewCreateProject(repo)
+	createProjectUC := usecase.NewCreateProject(repo, repoRepo, devServerLister, healthChecker, devServerRelay)
 	getProjectUC := usecase.NewGetProject(repo, opa)
-	listProjectsUC := usecase.NewListProjects(repo)
+	listProjectsUC := usecase.NewListProjects(repo, profileResolver)
 	addMemberUC := usecase.NewAddMember(repo, opa)
 	listMembersUC := usecase.NewListMembers(repo, opa)
 	removeMemberUC := usecase.NewRemoveMember(repo, opa)
 	updateMemberRoleUC := usecase.NewUpdateMemberRole(repo, opa)
-	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker, opa)
+	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker, opa, devServerLister, healthChecker, auditPublisher, memberNotifier)
 	updateProjectUC := usecase.NewUpdateProject(repo, opa)
 	deleteProjectUC := usecase.NewDeleteProject(repo, workflowChecker, taskChecker, opa)
+	getProjectContextUC := usecase.NewGetProjectContext(repo, repoRepo, hostnameResolver, opa)
 
 	// repo (usecase.ProjectRepository) satisfies usecase.MembershipRepository
 	// structurally — passed as the membership-lookup port to usecases whose
@@ -189,24 +250,19 @@ func run() error {
 		ListProjectGroups:  listProjectGroupsUC,
 
 		FolderWorkspaces: folderWorkspaceUC,
-		MoveProject:        moveProjectUC,
-		ScanNested:         scanNestedUC,
-		ImportNested:       importNestedUC,
+		MoveProject:      moveProjectUC,
+		ScanNested:       scanNestedUC,
+		ImportNested:     importNestedUC,
 
 		CreateHostSetup:     createHostSetupUC,
 		ListHostSetups:      listHostSetupsUC,
 		UpdateHostSetup:     updateHostSetupUC,
 		DeleteHostSetup:     deleteHostSetupUC,
 		SetupExistingFolder: setupExistingFolderUC,
+
+		GetProjectContext: getProjectContextUC,
 	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
-
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),

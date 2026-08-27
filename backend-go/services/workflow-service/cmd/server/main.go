@@ -35,6 +35,8 @@ import (
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 )
 
@@ -85,6 +87,28 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
 
+	// NEW — tenant-service/project-service dials for AgentExecutor's
+	// profile-aware env injection (TASK-PRF-04-05/06). infrafleetclient.Dial
+	// is reused (same insecure-transport-credentials dial helper, this
+	// package's only Dial func) rather than duplicating it per remote
+	// service.
+	tenantConn, err := infrafleetclient.Dial(cfg.TenantServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing tenant-service: %w", err)
+	}
+	defer func() { _ = tenantConn.Close() }()
+	tenantClient := tenantv1.NewTenantServiceClient(tenantConn)
+
+	projectConn, err := infrafleetclient.Dial(cfg.ProjectServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing project-service: %w", err)
+	}
+	defer func() { _ = projectConn.Close() }()
+	projectClient := projectv1.NewProjectServiceClient(projectConn)
+
+	profileResolver := infrafleetclient.NewProfileResolver(tenantClient)
+	projectContextResolver := infrafleetclient.NewProjectContextResolver(projectClient)
+
 	// StepExecutorRegistry wiring — all five step types, per
 	// workflow-service.md §4: Condition and Webhook are real, in-process
 	// implementations; Agent/Shell/Notification relay to infra-fleet-
@@ -94,7 +118,7 @@ func run() error {
 	registry := stepexecutors.NewRegistry()
 	registry.Register(domain.StepTypeCondition, stepexecutors.NewConditionExecutor())
 	registry.Register(domain.StepTypeWebhook, stepexecutors.NewWebhookExecutor(cfg.WebhookAllowlistHosts, &http.Client{Timeout: 30 * time.Second}))
-	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient))
+	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, profileResolver, projectContextResolver))
 	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient))
 	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient))
 

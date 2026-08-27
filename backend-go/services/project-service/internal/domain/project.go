@@ -126,3 +126,11 @@ func (p Project) Rebind(newDevServerID string) (Project, error) {
 	p.DevServerID = newDevServerID
 	return p, nil
 }
+
+// ProjectContext is GetProjectContext's read-only view — a subset of
+// Project plus a best-effort-resolved dev server hostname, per
+// project-service.md §2's Boundary decision.
+type ProjectContext struct {
+	ProjectID, ProjectName, Description     string
+	RepoURL, DevServerID, DevServerHostname string
+}

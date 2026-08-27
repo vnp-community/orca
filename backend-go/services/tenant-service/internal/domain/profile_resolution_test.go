@@ -269,6 +269,173 @@ func TestResolveProfile_NilDepartmentAndNoTeams_FallsThroughToCompanyAndUser(t *
 	}
 }
 
+func TestResolveProfile_ApprovedModelsFallback_PreferredModelApproved_Unchanged(t *testing.T) {
+	company := Settings{"agent": Settings{"approvedModels": []any{"claude-opus-4-5", "codex"}}}
+	user := Settings{"agent": Settings{"preferredModel": "codex"}}
+
+	got, err := ResolveProfile(company, nil, nil, user)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	agent := got.Settings["agent"].(Settings)
+	if agent["preferredModel"] != "codex" {
+		t.Errorf("expected preferredModel to stay %q, got %v", "codex", agent["preferredModel"])
+	}
+	if _, present := agent["_modelFallbackReason"]; present {
+		t.Errorf("expected no _modelFallbackReason when preferredModel is approved, got %v", agent["_modelFallbackReason"])
+	}
+	if got.Sources["agent.preferredModel"] != SourceUser {
+		t.Errorf("expected agent.preferredModel source to stay %q, got %q", SourceUser, got.Sources["agent.preferredModel"])
+	}
+}
+
+func TestResolveProfile_ApprovedModelsFallback_PreferredModelNotApproved_ForcedToFirst(t *testing.T) {
+	company := Settings{"agent": Settings{"approvedModels": []any{"claude-opus-4-5", "codex"}}}
+	user := Settings{"agent": Settings{"preferredModel": "gemini"}}
+
+	got, err := ResolveProfile(company, nil, nil, user)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	agent := got.Settings["agent"].(Settings)
+	if agent["preferredModel"] != "claude-opus-4-5" {
+		t.Errorf("expected preferredModel forced to approvedModels[0] %q, got %v", "claude-opus-4-5", agent["preferredModel"])
+	}
+	if agent["_modelFallbackReason"] == nil || agent["_modelFallbackReason"] == "" {
+		t.Error("expected _modelFallbackReason to be set")
+	}
+	if got.Sources["agent.preferredModel"] != SourceCompany {
+		t.Errorf("expected agent.preferredModel source overwritten to %q, got %q", SourceCompany, got.Sources["agent.preferredModel"])
+	}
+}
+
+func TestResolveProfile_ApprovedModelsFallback_CompanyListAbsentOrEmpty_NoFallback(t *testing.T) {
+	for _, company := range []Settings{
+		{},
+		{"agent": Settings{"approvedModels": []any{}}},
+	} {
+		user := Settings{"agent": Settings{"preferredModel": "anything-goes"}}
+		got, err := ResolveProfile(company, nil, nil, user)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		agent := got.Settings["agent"].(Settings)
+		if agent["preferredModel"] != "anything-goes" {
+			t.Errorf("expected no fallback when company approvedModels is absent/empty, got %v", agent["preferredModel"])
+		}
+	}
+}
+
+func TestResolveProfile_ApprovedModelsFallback_ResolvedAgentSectionAbsent_NoPanic(t *testing.T) {
+	company := Settings{"agent": Settings{"approvedModels": []any{"claude-opus-4-5"}}}
+
+	got, err := ResolveProfile(company, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// company's own agent section has no preferredModel key, so the resolved
+	// agent section exists (from the company layer) but has no
+	// preferredModel to fall back — must not panic, must not fabricate one.
+	agent, _ := got.Settings["agent"].(Settings)
+	if _, present := agent["preferredModel"]; present {
+		t.Errorf("expected no preferredModel key to be fabricated, got %v", agent["preferredModel"])
+	}
+}
+
+func TestResolveProfile_AllowedServerTags_Intersect_DepartmentNarrowsCompany(t *testing.T) {
+	company := Settings{"fleet": Settings{"allowedServerTags": []any{"gpu", "eu"}}}
+	department := Settings{"fleet": Settings{"allowedServerTags": []any{"gpu"}}}
+
+	got, err := ResolveProfile(company, department, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fleet := got.Settings["fleet"].(Settings)
+	tags := toStringSlice(fleet["allowedServerTags"])
+	if !reflect.DeepEqual(tags, []string{"gpu"}) {
+		t.Errorf("expected resolved allowedServerTags=[gpu], got %v", tags)
+	}
+}
+
+func TestResolveProfile_AllowedServerTags_UserCannotExpandCompanySet(t *testing.T) {
+	company := Settings{"fleet": Settings{"allowedServerTags": []any{"gpu", "eu"}}}
+	user := Settings{"fleet": Settings{"allowedServerTags": []any{"gpu", "asia"}}}
+
+	got, err := ResolveProfile(company, nil, nil, user)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fleet := got.Settings["fleet"].(Settings)
+	tags := toStringSlice(fleet["allowedServerTags"])
+	if !reflect.DeepEqual(tags, []string{"gpu"}) {
+		t.Errorf("expected resolved allowedServerTags=[gpu] (asia dropped, not a company-approved tag), got %v", tags)
+	}
+}
+
+func TestResolveProfile_AllowedServerTags_NoLayerDefines_KeyAbsent(t *testing.T) {
+	got, err := ResolveProfile(Settings{"agent": Settings{"model": "sonnet"}}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := got.Settings["fleet"]; ok {
+		t.Errorf("expected no fleet key at all when no layer defines allowedServerTags, got %v", got.Settings["fleet"])
+	}
+}
+
+func TestResolveProfile_AllowedServerTags_CompanyAbsent_DepartmentEstablishesBaseline(t *testing.T) {
+	department := Settings{"fleet": Settings{"allowedServerTags": []any{"gpu"}}}
+
+	got, err := ResolveProfile(nil, department, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fleet := got.Settings["fleet"].(Settings)
+	tags := toStringSlice(fleet["allowedServerTags"])
+	if !reflect.DeepEqual(tags, []string{"gpu"}) {
+		t.Errorf("expected resolved allowedServerTags=[gpu], got %v", tags)
+	}
+}
+
+func TestResolveProfile_AllowedServerTags_ExplicitEmptyIsLockout(t *testing.T) {
+	company := Settings{"fleet": Settings{"allowedServerTags": []any{"gpu"}}}
+	department := Settings{"fleet": Settings{"allowedServerTags": []any{}}}
+
+	got, err := ResolveProfile(company, department, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fleet := got.Settings["fleet"].(Settings)
+	tags := toStringSlice(fleet["allowedServerTags"])
+	if len(tags) != 0 {
+		t.Errorf("expected explicit empty allowedServerTags to lock out every tag, got %v", tags)
+	}
+}
+
+func TestResolveProfile_AllowedServerTags_DeterministicOrdering(t *testing.T) {
+	company := Settings{"fleet": Settings{"allowedServerTags": []any{"zeta", "alpha", "mid"}}}
+
+	got, err := ResolveProfile(company, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fleet := got.Settings["fleet"].(Settings)
+	tags := toStringSlice(fleet["allowedServerTags"])
+	if !reflect.DeepEqual(tags, []string{"alpha", "mid", "zeta"}) {
+		t.Errorf("expected deterministic sorted order, got %v", tags)
+	}
+}
+
+func toStringSlice(v any) []string {
+	items, _ := v.([]any)
+	out := make([]string, 0, len(items))
+	for _, it := range items {
+		if s, ok := it.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func assertSettingsEqual(t *testing.T, got, want Settings) {
 	t.Helper()
 	if !reflect.DeepEqual(got, want) {

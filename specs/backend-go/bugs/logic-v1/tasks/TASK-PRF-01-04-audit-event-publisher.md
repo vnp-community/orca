@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/services/tenant-service/internal/adapter/eventbus/publisher.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — AuditSubject/PublishAuditEvent + AuditPublisher port added; publisher_test.go payload-shape test passes
 
 ---
 

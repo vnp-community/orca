@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/rebind_dev_server.go`
 **Depends on:** TASK-PRF-03-01, TASK-PRF-03-02, TASK-PRF-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — health check + audit + member notify wired, cheapest-check-first ordering; new test cases pass
 
 ---
 

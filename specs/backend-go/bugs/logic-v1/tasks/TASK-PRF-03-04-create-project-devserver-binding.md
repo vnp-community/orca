@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/create_project.go`
 **Depends on:** TASK-PRF-03-01, TASK-PRF-03-02, TASK-PRF-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — DevServerID/RepoPath binding wired with health+repoPath checks before persist; new test cases pass
 
 ---
 

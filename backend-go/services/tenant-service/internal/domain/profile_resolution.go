@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -24,6 +25,14 @@ const (
 	mcpKey           = "mcp"
 	serversKey       = "servers"
 	nameKey          = "name"
+
+	agentKey          = "agent"                // NEW
+	preferredModelKey = "preferredModel"       // NEW
+	approvedModelsKey = "approvedModels"       // NEW
+	modelFallbackKey  = "_modelFallbackReason" // NEW
+
+	fleetKey             = "fleet"             // NEW
+	allowedServerTagsKey = "allowedServerTags" // NEW
 )
 
 // TeamSource builds the _sources label for a team layer, e.g. "team:t1".
@@ -98,6 +107,8 @@ func ResolveProfile(company, department Settings, teams []TeamSettingsLayer, use
 	lockSecurity(resolved, sources, company)
 	mergePathAdditions(resolved, sources, layers)
 	mergeMCPServers(resolved, sources, layers)
+	applyApprovedModelsFallback(resolved, sources, company) // NEW
+	mergeAllowedServerTags(resolved, sources, layers)       // NEW
 
 	return ResolvedProfile{Settings: resolved, Sources: sources}, nil
 }
@@ -269,4 +280,106 @@ func mergeMCPServers(resolved Settings, sources map[string]string, layers []prof
 	}
 	mcp[serversKey] = servers
 	resolved[mcpKey] = Settings(mcp)
+}
+
+// applyApprovedModelsFallback enforces BL-PRF-02 step 7 / Merge Rules
+// table's "agent.approvedModels: Company only — user/dept cannot expand
+// list" rule: if company defines a non-empty approvedModels list and the
+// resolved (post-merge, so possibly dept/team/user-overridden)
+// agent.preferredModel isn't in it, force it back to approvedModels[0] and
+// record why in agent._modelFallbackReason.
+func applyApprovedModelsFallback(resolved Settings, sources map[string]string, company Settings) {
+	companyAgent, ok := asMap(emptySettings(company)[agentKey])
+	if !ok {
+		return
+	}
+	rawModels, ok := companyAgent[approvedModelsKey].([]any)
+	if !ok || len(rawModels) == 0 {
+		return // no restriction configured — nothing to enforce
+	}
+	approved := make([]string, 0, len(rawModels))
+	allowed := map[string]bool{}
+	for _, m := range rawModels {
+		if name, ok := m.(string); ok && name != "" {
+			approved = append(approved, name)
+			allowed[name] = true
+		}
+	}
+	if len(approved) == 0 {
+		return
+	}
+
+	resolvedAgent, ok := asMap(resolved[agentKey])
+	if !ok {
+		return // no agent section at all in the resolved profile — nothing to fall back
+	}
+	preferred, _ := resolvedAgent[preferredModelKey].(string)
+	if preferred == "" || allowed[preferred] {
+		return // unset, or already approved — no fallback needed
+	}
+
+	resolvedAgent[preferredModelKey] = approved[0]
+	resolvedAgent[modelFallbackKey] = fmt.Sprintf("%q not in approved list", preferred)
+	resolved[agentKey] = Settings(resolvedAgent)
+	sources[agentKey+"."+preferredModelKey] = SourceCompany
+}
+
+// mergeAllowedServerTags enforces the Merge Rules table's "Intersect: user
+// subset ⊆ dept ⊆ company" rule — a lower layer can only NARROW the tag
+// set, never expand it, unlike the generic per-key merge's last-write-wins
+// replacement. Runs company-first through user-last; a layer that doesn't
+// define the field leaves the running set unchanged (doesn't reset to
+// unrestricted). Company-absent = unrestricted: if company never sets the
+// field but department does, department's set becomes the baseline
+// (first-definer-establishes-baseline) — this reading is this task's own
+// interpretation of an ambiguity BL-PRF-02 doesn't spell out explicitly.
+func mergeAllowedServerTags(resolved Settings, sources map[string]string, layers []profileLayer) {
+	var running map[string]bool // nil = unrestricted (no layer has defined the field yet)
+	var contributing []string
+	definedAny := false
+
+	for _, l := range layers {
+		fleet, ok := asMap(l.settings[fleetKey])
+		if !ok {
+			continue
+		}
+		items, ok := fleet[allowedServerTagsKey].([]any)
+		if !ok {
+			continue
+		}
+		definedAny = true
+		layerTags := map[string]bool{}
+		for _, it := range items {
+			if tag, ok := it.(string); ok && tag != "" {
+				layerTags[tag] = true
+			}
+		}
+		if running == nil {
+			running = layerTags // first layer to define it establishes the baseline
+		} else {
+			for tag := range running {
+				if !layerTags[tag] {
+					delete(running, tag) // intersect: drop anything the new layer doesn't also allow
+				}
+			}
+		}
+		contributing = append(contributing, l.source)
+	}
+	if !definedAny {
+		return // no layer restricts server tags — resolved profile has no fleet.allowedServerTags key, same as today
+	}
+
+	tags := make([]any, 0, len(running))
+	for tag := range running {
+		tags = append(tags, tag)
+	}
+	sort.Slice(tags, func(i, j int) bool { return tags[i].(string) < tags[j].(string) }) // deterministic output
+
+	fleet, ok := asMap(resolved[fleetKey])
+	if !ok {
+		fleet = map[string]any{}
+	}
+	fleet[allowedServerTagsKey] = tags
+	resolved[fleetKey] = Settings(fleet)
+	sources[fleetKey+"."+allowedServerTagsKey] = strings.Join(contributing, "+") // same multi-source convention as mergePathAdditions
 }

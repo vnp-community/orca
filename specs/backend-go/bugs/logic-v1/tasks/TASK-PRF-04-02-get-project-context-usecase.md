@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/get_project_context.go`
 **Depends on:** TASK-PRF-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — GetProjectContext usecase + grpc handler + main.go wiring (InfraFleetHostnameResolver adapter) added; membership-gated, best-effort hostname; tests pass
 
 ---
 

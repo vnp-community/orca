@@ -19,6 +19,10 @@ import (
 type Config struct {
 	commonconfig.Base
 	NATSURL string
+	// OPABundlePath points requireCompanyAdmin/requireDepartmentAccess's OPA
+	// client at policy/orca-authz — same convention as project-service's own
+	// OPABundlePath, for identical override behavior in every service.
+	OPABundlePath string
 }
 
 func Load() (Config, error) {
@@ -27,7 +31,8 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:    base,
-		NATSURL: commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		Base:          base,
+		NATSURL:       commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		OPABundlePath: commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 	}, nil
 }

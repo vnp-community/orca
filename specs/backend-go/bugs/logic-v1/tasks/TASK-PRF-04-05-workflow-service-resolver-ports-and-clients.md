@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/ports.go`
 **Depends on:** TASK-PRF-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ProfileResolver/ProjectContextResolver ports + infrafleetclient adapters added, both forwarding tenant/user identity via outbound gRPC metadata (deviates from literal spec sketch — required since tenant-service.GetResolvedProfile and project-service.GetProjectContext both call tenant.RequireTenantID/UserID server-side); TenantServiceAddr/ProjectServiceAddr config added; go build clean
 
 ---
 

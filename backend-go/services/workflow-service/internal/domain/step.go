@@ -66,6 +66,8 @@ type AgentStepConfig struct {
 	Prompt       string `json:"prompt"`
 	WorktreePath string `json:"worktreePath,omitempty"`
 	TrustPreset  string `json:"trustPreset,omitempty"`
+	UserID       string `json:"userId,omitempty"`    // NEW — whose profile to resolve; empty = legacy passthrough, see below
+	ProjectID    string `json:"projectId,omitempty"` // NEW — for GetProjectContext + ORCA_PROJECT_*
 }
 
 // ShellStepConfig is the Shell step type's config shape — a script relayed

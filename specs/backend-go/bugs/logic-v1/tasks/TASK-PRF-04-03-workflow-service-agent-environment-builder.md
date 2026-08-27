@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/domain/agent_environment.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — agent_environment.go added (ResolveAgentBinary/BuildAgentArgs/BuildAgentEnv/BuildProjectContext); spec-fidelity + exact-string tests pass
 
 ---
 

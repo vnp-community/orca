@@ -62,6 +62,18 @@ func (r *DepartmentRepository) Get(ctx context.Context, companyID, id string) (d
 	return d, true, nil
 }
 
+// ExistsByName backs CreateDepartment's name-uniqueness check.
+func (r *DepartmentRepository) ExistsByName(ctx context.Context, companyID, name string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM tenant.departments WHERE company_id = $1 AND name = $2)
+	`, companyID, name).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("postgres: check department name exists: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *DepartmentRepository) List(ctx context.Context, companyID string) ([]domain.Department, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, company_id, name, settings_json

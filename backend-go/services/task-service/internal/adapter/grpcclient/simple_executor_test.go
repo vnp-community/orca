@@ -9,8 +9,10 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
+	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 )
 
 // fakeInfraFleetServiceClient implements infrafleetv1.InfraFleetServiceClient
@@ -94,6 +96,45 @@ func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, te
 	return f.connectionID, f.worktreePath, f.connected, f.err
 }
 
+// fakeSimpleExecutorProfileResolver is an in-memory usecase.ProfileResolver.
+type fakeSimpleExecutorProfileResolver struct {
+	settings map[string]any
+	err      error
+	calls    []string // userIDs, in call order
+}
+
+func (f *fakeSimpleExecutorProfileResolver) GetResolvedProfile(ctx context.Context, userID string) (map[string]any, error) {
+	f.calls = append(f.calls, userID)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.settings, nil
+}
+
+// fakeSimpleExecutorProjectContextResolver is an in-memory
+// usecase.ProjectContextResolver.
+type fakeSimpleExecutorProjectContextResolver struct {
+	ctx   usecase.ProjectContext
+	err   error
+	calls []string // projectIDs, in call order
+}
+
+func (f *fakeSimpleExecutorProjectContextResolver) GetProjectContext(ctx context.Context, projectID string) (usecase.ProjectContext, error) {
+	f.calls = append(f.calls, projectID)
+	if f.err != nil {
+		return usecase.ProjectContext{}, f.err
+	}
+	return f.ctx, nil
+}
+
+// newTestSimpleExecutor builds a SimpleExecutor with fresh no-op profile/
+// project-context fakes — used by every test that doesn't care about the
+// profile-aware env injection path (no actor in context, so it never
+// fires).
+func newTestSimpleExecutor(tasks usecase.TaskRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient) *SimpleExecutor {
+	return NewSimpleExecutor(tasks, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{})
+}
+
 // TestSimpleExecutor_Execute_RelaysAgentExecPrompt locks in TASK-224 Gap 1's
 // fix: SimpleExecutor must call "agent.execPrompt" (prompt/worktreePath),
 // not "agent.exec" (binary/args/cwd) — see simple_executor.go's doc comment
@@ -104,7 +145,7 @@ func TestSimpleExecutor_Execute_RelaysAgentExecPrompt(t *testing.T) {
 	relay := &fakeInfraFleetServiceClient{
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
 	}
-	exec := NewSimpleExecutor(tasks, resolver, relay)
+	exec := newTestSimpleExecutor(tasks, resolver, relay)
 
 	ref, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1")
 	if err != nil {
@@ -136,7 +177,7 @@ func TestSimpleExecutor_Execute_RelaysAgentExecPrompt(t *testing.T) {
 func TestSimpleExecutor_NotConnected_ReturnsTypedError(t *testing.T) {
 	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
 	resolver := &fakeProjectExecutionResolver{connected: false}
-	exec := NewSimpleExecutor(tasks, resolver, &fakeInfraFleetServiceClient{})
+	exec := newTestSimpleExecutor(tasks, resolver, &fakeInfraFleetServiceClient{})
 
 	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1")
 	if err == nil {
@@ -154,7 +195,7 @@ func TestSimpleExecutor_NotConnected_ReturnsTypedError(t *testing.T) {
 func TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError(t *testing.T) {
 	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true, worktreePath: ""}
-	exec := NewSimpleExecutor(tasks, resolver, &fakeInfraFleetServiceClient{})
+	exec := newTestSimpleExecutor(tasks, resolver, &fakeInfraFleetServiceClient{})
 
 	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1")
 	if err == nil {
@@ -167,7 +208,7 @@ func TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError(t *testing.
 }
 
 func TestSimpleExecutor_TaskNotFound(t *testing.T) {
-	exec := NewSimpleExecutor(&fakeTaskRepository{tasks: map[string]domain.Task{}}, &fakeProjectExecutionResolver{}, &fakeInfraFleetServiceClient{})
+	exec := newTestSimpleExecutor(&fakeTaskRepository{tasks: map[string]domain.Task{}}, &fakeProjectExecutionResolver{}, &fakeInfraFleetServiceClient{})
 	if _, err := exec.Execute(context.Background(), "tenant-1", "does-not-exist", "req-1"); err == nil {
 		t.Fatal("expected an error for a nonexistent task")
 	}
@@ -177,7 +218,7 @@ func TestSimpleExecutor_RelayErrorPropagates(t *testing.T) {
 	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
 	relay := &fakeInfraFleetServiceClient{relayErr: errors.New("boom")}
-	exec := NewSimpleExecutor(tasks, resolver, relay)
+	exec := newTestSimpleExecutor(tasks, resolver, relay)
 
 	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
 		t.Fatal("expected an error when the relay call fails")
@@ -195,7 +236,7 @@ func TestSimpleExecutor_NonZeroExitCode_ReturnsError(t *testing.T) {
 	relay := &fakeInfraFleetServiceClient{
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"boom","exitCode":1,"timedOut":false}`},
 	}
-	exec := NewSimpleExecutor(tasks, resolver, relay)
+	exec := newTestSimpleExecutor(tasks, resolver, relay)
 
 	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
 		t.Fatal("expected an error for a non-zero agent.execPrompt exit code")
@@ -210,9 +251,109 @@ func TestSimpleExecutor_TimedOut_ReturnsError(t *testing.T) {
 	relay := &fakeInfraFleetServiceClient{
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":null,"timedOut":true}`},
 	}
-	exec := NewSimpleExecutor(tasks, resolver, relay)
+	exec := newTestSimpleExecutor(tasks, resolver, relay)
 
 	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
 		t.Fatal("expected an error for a timed-out agent.execPrompt run")
+	}
+}
+
+// TestSimpleExecutor_MethodStaysAgentExecPrompt_NoRegression confirms this
+// executor was already correct (unlike workflow-service's AgentExecutor)
+// and profile-aware env injection doesn't change the method string.
+func TestSimpleExecutor_MethodStaysAgentExecPrompt_NoRegression(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	profiles := &fakeSimpleExecutorProfileResolver{settings: map[string]any{"agent": map[string]any{"preferredModel": "claude-opus-4-5"}}}
+	exec := NewSimpleExecutor(tasks, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
+
+	ctx := tenant.WithUserID(context.Background(), "user-1")
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if relay.gotRelay.GetMethod() != "agent.execPrompt" {
+		t.Errorf("expected method=agent.execPrompt, got %q", relay.gotRelay.GetMethod())
+	}
+}
+
+// TestSimpleExecutor_ResolvableUserID_PopulatesEnvAndModel asserts the
+// profile-aware path: a resolvable actor id populates env/model.
+func TestSimpleExecutor_ResolvableUserID_PopulatesEnvAndModel(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	profiles := &fakeSimpleExecutorProfileResolver{settings: map[string]any{"agent": map[string]any{"preferredModel": "claude-opus-4-5"}}}
+	exec := NewSimpleExecutor(tasks, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
+
+	ctx := tenant.WithUserID(context.Background(), "user-1")
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(profiles.calls) != 1 || profiles.calls[0] != "user-1" {
+		t.Errorf("expected ProfileResolver called with user-1, got %v", profiles.calls)
+	}
+	var sentParams agentExecPromptParams
+	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
+		t.Fatalf("params_json didn't decode: %v", err)
+	}
+	if sentParams.Model != "claude-opus-4-5" {
+		t.Errorf("expected model claude-opus-4-5, got %q", sentParams.Model)
+	}
+	if len(sentParams.Env) == 0 {
+		t.Error("expected env to be populated")
+	}
+}
+
+// TestSimpleExecutor_ProfileResolverError_DegradesToLegacyPassthrough
+// asserts a ProfileResolver failure never blocks task execution.
+func TestSimpleExecutor_ProfileResolverError_DegradesToLegacyPassthrough(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	profiles := &fakeSimpleExecutorProfileResolver{err: errors.New("tenant-service unreachable")}
+	exec := NewSimpleExecutor(tasks, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
+
+	ctx := tenant.WithUserID(context.Background(), "user-1")
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1"); err != nil {
+		t.Fatalf("expected profile-resolve failure to degrade to legacy passthrough, got error: %v", err)
+	}
+	var sentParams agentExecPromptParams
+	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
+		t.Fatalf("params_json didn't decode: %v", err)
+	}
+	if sentParams.Model != "" || len(sentParams.Env) != 0 {
+		t.Errorf("expected no model/env on profile-resolve failure, got %+v", sentParams)
+	}
+}
+
+// TestSimpleExecutor_ProjectContextResolverError_SpawnStillProceeds asserts
+// the same best-effort posture for the project-context lookup.
+func TestSimpleExecutor_ProjectContextResolverError_SpawnStillProceeds(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	profiles := &fakeSimpleExecutorProfileResolver{settings: map[string]any{}}
+	projects := &fakeSimpleExecutorProjectContextResolver{err: errors.New("project-service unreachable")}
+	exec := NewSimpleExecutor(tasks, resolver, relay, profiles, projects)
+
+	ctx := tenant.WithUserID(context.Background(), "user-1")
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var sentParams agentExecPromptParams
+	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
+		t.Fatalf("params_json didn't decode: %v", err)
+	}
+	if sentParams.InitFile != "" {
+		t.Errorf("expected empty InitFile on project-context failure, got %q", sentParams.InitFile)
 	}
 }

@@ -5,7 +5,7 @@
 **Service:** `project-service` (+ `infra-fleet-service` proto)
 **File:** `backend-go/proto/orca/project/v1/project.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — CreateProjectRequest.dev_server_id/repo_path + DevServer/RegisterDevServerRequest.tags added; UpdateDevServerRequest doesn't exist in this proto (nothing to add there); buf generate + buf breaking against origin/main clean; full workspace go build clean
 
 ---
 

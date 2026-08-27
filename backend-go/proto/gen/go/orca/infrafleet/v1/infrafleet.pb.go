@@ -86,7 +86,8 @@ type DevServer struct {
 	// CONNECTION_MODE_RELAY_SSH, empty for the other two modes. Closes the
 	// "DevServer<->SshTarget linkage the domain model doesn't have yet" gap
 	// this service's README flagged (Epic A third pass).
-	SshTargetId   string `protobuf:"bytes,5,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"`
+	SshTargetId   string   `protobuf:"bytes,5,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"`
+	Tags          []string `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"` // NEW — BL-PRF-03's allowedServerTags match target
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -156,12 +157,20 @@ func (x *DevServer) GetSshTargetId() string {
 	return ""
 }
 
+func (x *DevServer) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type RegisterDevServerRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
 	Mode          ConnectionMode         `protobuf:"varint,3,opt,name=mode,proto3,enum=orca.infrafleet.v1.ConnectionMode" json:"mode,omitempty"`
 	SshTargetId   string                 `protobuf:"bytes,4,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"` // required when mode=CONNECTION_MODE_RELAY_SSH
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`                                    // NEW
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -222,6 +231,13 @@ func (x *RegisterDevServerRequest) GetSshTargetId() string {
 		return x.SshTargetId
 	}
 	return ""
+}
+
+func (x *RegisterDevServerRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
 }
 
 type RegisterDevServerResponse struct {
@@ -3963,18 +3979,20 @@ var File_orca_infrafleet_v1_infrafleet_proto protoreflect.FileDescriptor
 
 const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\n" +
-	"#orca/infrafleet/v1/infrafleet.proto\x12\x12orca.infrafleet.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa8\x01\n" +
+	"#orca/infrafleet/v1/infrafleet.proto\x12\x12orca.infrafleet.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbc\x01\n" +
 	"\tDevServer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x03 \x01(\tR\x04host\x126\n" +
 	"\x04mode\x18\x04 \x01(\x0e2\".orca.infrafleet.v1.ConnectionModeR\x04mode\x12\"\n" +
-	"\rssh_target_id\x18\x05 \x01(\tR\vsshTargetId\"\xa7\x01\n" +
+	"\rssh_target_id\x18\x05 \x01(\tR\vsshTargetId\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\"\xbb\x01\n" +
 	"\x18RegisterDevServerRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x126\n" +
 	"\x04mode\x18\x03 \x01(\x0e2\".orca.infrafleet.v1.ConnectionModeR\x04mode\x12\"\n" +
-	"\rssh_target_id\x18\x04 \x01(\tR\vsshTargetId\"Y\n" +
+	"\rssh_target_id\x18\x04 \x01(\tR\vsshTargetId\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\"Y\n" +
 	"\x19RegisterDevServerResponse\x12<\n" +
 	"\n" +
 	"dev_server\x18\x01 \x01(\v2\x1d.orca.infrafleet.v1.DevServerR\tdevServer\"\x84\x01\n" +

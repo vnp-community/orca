@@ -22,6 +22,13 @@ type Config struct {
 	// Agent/Shell/Notification step executors on the execution plane —
 	// mirrors git-gateway-service's identically-named config field.
 	InfraFleetServiceAddr string
+	// TenantServiceAddr is ProfileResolver's dependency — a NEW dial, this
+	// service never called tenant-service before this task (closes the
+	// prose/graph gap tenant-service.md §7 already documented).
+	TenantServiceAddr string
+	// ProjectServiceAddr is ProjectContextResolver's dependency
+	// (GetProjectContext, TASK-PRF-04-01/02) — also new.
+	ProjectServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -33,6 +40,8 @@ func Load() (Config, error) {
 		Base:                  base,
 		WebhookAllowlistHosts: splitCSV(commonconfig.StringEnv("WEBHOOK_ALLOWLIST_HOSTS", "")),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
+		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 	}, nil
 }
 

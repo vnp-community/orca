@@ -120,6 +120,7 @@ message DevServer {
   // "DevServer<->SshTarget linkage the domain model doesn't have yet" gap
   // this service's README flagged (Epic A third pass).
   string ssh_target_id = 5;
+  repeated string tags = 6; // NEW — BL-PRF-03's allowedServerTags match target
 }
 
 message RegisterDevServerRequest {
@@ -127,6 +128,7 @@ message RegisterDevServerRequest {
   string host = 2;
   ConnectionMode mode = 3;
   string ssh_target_id = 4; // required when mode=CONNECTION_MODE_RELAY_SSH
+  repeated string tags = 5; // NEW
 }
 
 message RegisterDevServerResponse {

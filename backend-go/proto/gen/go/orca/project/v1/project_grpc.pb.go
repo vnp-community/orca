@@ -56,6 +56,7 @@ const (
 	ProjectService_UpdateHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/UpdateHostSetup"
 	ProjectService_DeleteHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/DeleteHostSetup"
 	ProjectService_SetupExistingFolder_FullMethodName          = "/orca.project.v1.ProjectService/SetupExistingFolder"
+	ProjectService_GetProjectContext_FullMethodName            = "/orca.project.v1.ProjectService/GetProjectContext"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -122,6 +123,12 @@ type ProjectServiceClient interface {
 	UpdateHostSetup(ctx context.Context, in *UpdateHostSetupRequest, opts ...grpc.CallOption) (*UpdateHostSetupResponse, error)
 	DeleteHostSetup(ctx context.Context, in *DeleteHostSetupRequest, opts ...grpc.CallOption) (*DeleteHostSetupResponse, error)
 	SetupExistingFolder(ctx context.Context, in *SetupExistingFolderRequest, opts ...grpc.CallOption) (*SetupExistingFolderResponse, error)
+	// GetProjectContext is project-service.md §2's Boundary-decision RPC:
+	// the read-only project-context lookup workflow-service/task-service call
+	// to build an agent-spawn env/preamble — a two-step saga (resolve context
+	// here, then call the execution-owning service), not a synchronous
+	// cross-service execution call.
+	GetProjectContext(ctx context.Context, in *GetProjectContextRequest, opts ...grpc.CallOption) (*ProjectContext, error)
 }
 
 type projectServiceClient struct {
@@ -502,6 +509,16 @@ func (c *projectServiceClient) SetupExistingFolder(ctx context.Context, in *Setu
 	return out, nil
 }
 
+func (c *projectServiceClient) GetProjectContext(ctx context.Context, in *GetProjectContextRequest, opts ...grpc.CallOption) (*ProjectContext, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProjectContext)
+	err := c.cc.Invoke(ctx, ProjectService_GetProjectContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -566,6 +583,12 @@ type ProjectServiceServer interface {
 	UpdateHostSetup(context.Context, *UpdateHostSetupRequest) (*UpdateHostSetupResponse, error)
 	DeleteHostSetup(context.Context, *DeleteHostSetupRequest) (*DeleteHostSetupResponse, error)
 	SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error)
+	// GetProjectContext is project-service.md §2's Boundary-decision RPC:
+	// the read-only project-context lookup workflow-service/task-service call
+	// to build an agent-spawn env/preamble — a two-step saga (resolve context
+	// here, then call the execution-owning service), not a synchronous
+	// cross-service execution call.
+	GetProjectContext(context.Context, *GetProjectContextRequest) (*ProjectContext, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -686,6 +709,9 @@ func (UnimplementedProjectServiceServer) DeleteHostSetup(context.Context, *Delet
 }
 func (UnimplementedProjectServiceServer) SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetupExistingFolder not implemented")
+}
+func (UnimplementedProjectServiceServer) GetProjectContext(context.Context, *GetProjectContextRequest) (*ProjectContext, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetProjectContext not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -1374,6 +1400,24 @@ func _ProjectService_SetupExistingFolder_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_GetProjectContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProjectContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetProjectContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetProjectContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetProjectContext(ctx, req.(*GetProjectContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1528,6 +1572,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetupExistingFolder",
 			Handler:    _ProjectService_SetupExistingFolder_Handler,
+		},
+		{
+			MethodName: "GetProjectContext",
+			Handler:    _ProjectService_GetProjectContext_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

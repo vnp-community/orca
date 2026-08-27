@@ -35,7 +35,9 @@ import (
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
+	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -93,8 +95,28 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
 	projectExecutionResolver := taskgrpcclient.NewProjectExecutionResolver(infraFleetClient)
-	simpleExecutor := taskgrpcclient.NewSimpleExecutor(repo, projectExecutionResolver, infraFleetClient)
 	aiCompleter := taskgrpcclient.NewAICompleter(infraFleetClient)
+
+	// NEW — tenant-service/project-service dials for SimpleExecutor's
+	// profile-aware env injection (TASK-PRF-04-07/08).
+	tenantConn, err := taskgrpcclient.Dial(cfg.TenantServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing tenant-service: %w", err)
+	}
+	defer func() { _ = tenantConn.Close() }()
+	tenantClient := tenantv1.NewTenantServiceClient(tenantConn)
+
+	projectConn, err := taskgrpcclient.Dial(cfg.ProjectServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing project-service: %w", err)
+	}
+	defer func() { _ = projectConn.Close() }()
+	projectClient := projectv1.NewProjectServiceClient(projectConn)
+
+	profileResolver := taskgrpcclient.NewProfileResolver(tenantClient)
+	projectContextResolver := taskgrpcclient.NewProjectContextResolver(projectClient)
+
+	simpleExecutor := taskgrpcclient.NewSimpleExecutor(repo, projectExecutionResolver, infraFleetClient, profileResolver, projectContextResolver)
 
 	aiProviderConn, err := taskgrpcclient.Dial(cfg.AIProviderServiceAddr)
 	if err != nil {

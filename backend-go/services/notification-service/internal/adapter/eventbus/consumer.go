@@ -48,6 +48,7 @@ var Subjects = []SubjectBinding{
 	{StreamName: "AUTOMATION", Subject: "orca.automation.run.completed"},
 	{StreamName: "CREDENTIAL", Subject: "orca.credential.credential.rotated"},
 	{StreamName: "ORCHESTRATION", Subject: "orca.orchestration.decision_gate.opened"},
+	{StreamName: "PROJECT", Subject: "orca.project.devserver.changed"}, // NEW
 }
 
 // Consumer subscribes to every binding in Subjects and forwards each

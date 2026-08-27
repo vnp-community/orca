@@ -73,6 +73,13 @@ service ProjectService {
   rpc UpdateHostSetup(UpdateHostSetupRequest) returns (UpdateHostSetupResponse);
   rpc DeleteHostSetup(DeleteHostSetupRequest) returns (DeleteHostSetupResponse);
   rpc SetupExistingFolder(SetupExistingFolderRequest) returns (SetupExistingFolderResponse);
+
+  // GetProjectContext is project-service.md §2's Boundary-decision RPC:
+  // the read-only project-context lookup workflow-service/task-service call
+  // to build an agent-spawn env/preamble — a two-step saga (resolve context
+  // here, then call the execution-owning service), not a synchronous
+  // cross-service execution call.
+  rpc GetProjectContext(GetProjectContextRequest) returns (ProjectContext);
 }
 
 message Project {
@@ -94,6 +101,8 @@ message CreateProjectRequest {
   string description = 3;
   string default_branch = 4;
   string visibility = 5;
+  string dev_server_id = 6; // NEW — binds at creation time, per BL-PRF-03's flow
+  string repo_path = 7;     // NEW — absolute path on dev_server_id; becomes the project's first Repo
 }
 
 message CreateProjectResponse {
@@ -474,4 +483,17 @@ message SetupExistingFolderRequest {
 message SetupExistingFolderResponse {
   HostSetup setup = 1;  // status now "completed" or "failed"
   Project project = 2;  // set only on success
+}
+
+message GetProjectContextRequest {
+  string project_id = 1;
+}
+
+message ProjectContext {
+  string project_id = 1;
+  string project_name = 2;
+  string description = 3;
+  string repo_url = 4;            // from the project's primary Repo (position 0), if any
+  string dev_server_id = 5;
+  string dev_server_hostname = 6; // resolved via infra-fleet-service, best-effort — empty if unresolvable
 }
