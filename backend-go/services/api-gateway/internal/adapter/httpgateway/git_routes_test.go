@@ -369,6 +369,104 @@ func TestMountGitRoutes_GenerateCommitMessage_MapsUnimplementedTo501(t *testing.
 	}
 }
 
+func TestMountGitRoutes_CreateWorktree_SuccessRoundTrip(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeGitGatewayServiceClient{
+		t: t,
+		createWorktreeFunc: func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+			if in.GetProjectId() != "proj-1" || in.GetRepoId() != "repo-1" || in.GetBranch() != "feature-x" {
+				t.Fatalf("unexpected request: %+v", in)
+			}
+			if got := outgoingTenantID(t, ctx); got != identity.TenantID {
+				t.Fatalf("outgoing tenant id = %q, want %q", got, identity.TenantID)
+			}
+			return &gitgatewayv1.CreateWorktreeResponse{
+				WorktreeId: "wt-1",
+				Path:       "/worktrees/wt-1",
+				HeadSha:    "abc123",
+			}, nil
+		},
+	}
+	router := newTestGitRouter(client)
+
+	bodyJSON := `{"project_id":"proj-1","repo_id":"repo-1","branch":"feature-x","base_ref":"main"}`
+	req := withTestIdentity(
+		httptest.NewRequest(http.MethodPost, "/v1/worktrees", bytes.NewBufferString(bodyJSON)),
+		identity,
+	)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
+	}
+
+	var body struct {
+		WorktreeID string `json:"worktree_id"`
+		Path       string `json:"path"`
+		HeadSha    string `json:"head_sha"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding response: %v; body=%s", err, rec.Body.String())
+	}
+	if body.WorktreeID != "wt-1" || body.Path != "/worktrees/wt-1" || body.HeadSha != "abc123" {
+		t.Fatalf("unexpected response body: %+v", body)
+	}
+}
+
+// TestMountGitRoutes_CreateWorktree_MissingBranch_Returns400WithoutCallingClient
+// proves validation happens before the downstream call — the fake's
+// createWorktreeFunc is left nil, so any call to it fails the test via
+// f.t.Fatal.
+func TestMountGitRoutes_CreateWorktree_MissingBranch_Returns400WithoutCallingClient(t *testing.T) {
+	client := &fakeGitGatewayServiceClient{t: t}
+	router := newTestGitRouter(client)
+
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	bodyJSON := `{"project_id":"proj-1","repo_id":"repo-1"}`
+	req := withTestIdentity(
+		httptest.NewRequest(http.MethodPost, "/v1/worktrees", bytes.NewBufferString(bodyJSON)),
+		identity,
+	)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestMountGitRoutes_CreateWorktree_IdentitySuppliesTenantIDNotBody proves
+// tenant_id comes from the authenticated Identity, never from the JSON
+// request body — same guarantee as commit/push/pull's REST routes.
+func TestMountGitRoutes_CreateWorktree_IdentitySuppliesTenantIDNotBody(t *testing.T) {
+	identity := usecase.Identity{TenantID: "real-tenant", UserID: "real-user"}
+	var sawTenantID string
+	client := &fakeGitGatewayServiceClient{
+		t: t,
+		createWorktreeFunc: func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+			sawTenantID = outgoingTenantID(t, ctx)
+			return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-1"}, nil
+		},
+	}
+	router := newTestGitRouter(client)
+
+	bodyJSON := `{"project_id":"proj-1","repo_id":"repo-1","branch":"feature-x","tenant_id":"attacker-tenant"}`
+	req := withTestIdentity(
+		httptest.NewRequest(http.MethodPost, "/v1/worktrees", bytes.NewBufferString(bodyJSON)),
+		identity,
+	)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
+	}
+	if sawTenantID != identity.TenantID {
+		t.Fatalf("downstream saw tenant id %q, want %q (from identity, not body)", sawTenantID, identity.TenantID)
+	}
+}
+
 func TestMountGitRoutes_MissingWorktreeID_Returns400(t *testing.T) {
 	client := &fakeGitGatewayServiceClient{t: t}
 	router := newTestGitRouter(client)
