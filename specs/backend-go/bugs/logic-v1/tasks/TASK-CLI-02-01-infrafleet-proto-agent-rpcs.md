@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (proto)
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added `GetAgentTerminalSession`/`SendTerminalInput`/`GetTerminalScrollback` RPCs + messages, regenerated stubs; all three appear in `InfraFleetServiceClient`/`InfraFleetServiceServer`; `go build ./proto/... ./services/infra-fleet-service/...` clean. `buf breaking` unrunnable in this worktree (see TASK-CLI-01-01 note) but the change is purely additive.
 
 ---
 

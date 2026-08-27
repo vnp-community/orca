@@ -77,6 +77,43 @@ func mountAuthRoutes(mux chi.Router, authClient authv1.AuthServiceClient, cookie
 		writeJSON(w, http.StatusOK, toAuthUserResponse(resp.GetUser()))
 	})
 
+	// /auth/cli-token issues a bearer JWT instead of the HttpOnly session
+	// cookie /auth/local sets — CLI/CI callers can't use a cookie, and
+	// orca-cli stores this JWT itself (~/.config/orca/credentials.json,
+	// 0600). Deliberately not wrapped in authMiddleware, same as
+	// /auth/local — this route establishes identity, it doesn't assume it.
+	mux.Post("/auth/cli-token", func(w http.ResponseWriter, r *http.Request) {
+		var body loginRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "INVALID_BODY", "invalid request body")
+			return
+		}
+
+		loginResp, err := authClient.Login(r.Context(), &authv1.LoginRequest{
+			Email: body.Email, Password: body.Password,
+		})
+		if err != nil {
+			writeJSONError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "invalid email or password")
+			return
+		}
+
+		tokenResp, err := authClient.IssueServiceToken(r.Context(), &authv1.IssueServiceTokenRequest{
+			UserId: loginResp.GetUser().GetId(), Audience: "cli",
+		})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+
+		// No cookie set here — deliberate. A CLI/CI caller stores the JWT
+		// itself (orca-cli writes it to ~/.config/orca/credentials.json,
+		// 0600); a cookie would be silently dropped by any non-browser client.
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jwt": tokenResp.GetJwt(), "expires_at": tokenResp.GetExpiresAt(),
+			"user": toAuthUserResponse(loginResp.GetUser()),
+		})
+	})
+
 	mux.Get("/auth/me", func(w http.ResponseWriter, r *http.Request) {
 		id, err := cookieValidator.ValidateCookie(r.Context(), r)
 		if err != nil {

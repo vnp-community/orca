@@ -1,7 +1,9 @@
 package httpgateway
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -28,6 +30,133 @@ func mountInfraRoutes(r chi.Router, client infrafleetv1.InfraFleetServiceClient)
 		sub.Post("/workspaces/scan-ports", handleScanWorkspacePorts(client))
 		sub.Post("/relay", handleRelay(client))
 	})
+
+	r.Route("/v1/worktrees/{worktreeId}/agent", func(sub chi.Router) {
+		sub.Get("/status", handleGetAgentStatus(client))
+		sub.Post("/wait", handleWaitAgent(client))
+		sub.Post("/send", handleSendAgentInput(client))
+		sub.Get("/snapshot", handleGetAgentSnapshot(client))
+	})
+}
+
+// errNoActiveAgentSession is resolveAgentPtyID's sentinel for "no live
+// terminal session for this worktree" — a finished/never-started agent run
+// is expected state, not a bug, so it maps to 404 NOT_FOUND, distinct from
+// a genuine gRPC error (writeGRPCError's passthrough path).
+var errNoActiveAgentSession = errors.New("no active agent session for this worktree")
+
+// resolveAgentPtyID is the shared first step all four handlers below open
+// with.
+func resolveAgentPtyID(ctx context.Context, client infrafleetv1.InfraFleetServiceClient, worktreeID string) (string, error) {
+	resp, err := client.GetAgentTerminalSession(ctx, &infrafleetv1.GetAgentTerminalSessionRequest{WorktreeId: worktreeID})
+	if err != nil {
+		return "", err
+	}
+	if !resp.GetFound() {
+		return "", errNoActiveAgentSession
+	}
+	return resp.GetSession().GetPtyId(), nil
+}
+
+func writeAgentResolveError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errNoActiveAgentSession) {
+		writeJSONError(w, http.StatusNotFound, "NOT_FOUND", "no active agent session for this worktree — has an agent been started?")
+		return
+	}
+	writeGRPCError(w, err)
+}
+
+func handleGetAgentStatus(client infrafleetv1.InfraFleetServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		ptyID, err := resolveAgentPtyID(ctx, client, chi.URLParam(r, "worktreeId"))
+		if err != nil {
+			writeAgentResolveError(w, err)
+			return
+		}
+		resp, err := client.GetTerminalAgentStatus(ctx, &infrafleetv1.GetTerminalAgentStatusRequest{PtyId: ptyID})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+type waitAgentRequestBody struct {
+	TimeoutMs int32 `json:"timeout_ms"`
+}
+
+func handleWaitAgent(client infrafleetv1.InfraFleetServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		ptyID, err := resolveAgentPtyID(ctx, client, chi.URLParam(r, "worktreeId"))
+		if err != nil {
+			writeAgentResolveError(w, err)
+			return
+		}
+		var body waitAgentRequestBody
+		if !decodeJSONBody(w, r, &body) {
+			return
+		}
+		resp, err := client.WaitTerminalSession(ctx, &infrafleetv1.WaitTerminalSessionRequest{PtyId: ptyID, TimeoutMs: body.TimeoutMs})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+type sendAgentInputRequestBody struct {
+	Text string `json:"text"`
+}
+
+func handleSendAgentInput(client infrafleetv1.InfraFleetServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		ptyID, err := resolveAgentPtyID(ctx, client, chi.URLParam(r, "worktreeId"))
+		if err != nil {
+			writeAgentResolveError(w, err)
+			return
+		}
+		var body sendAgentInputRequestBody
+		if !decodeJSONBody(w, r, &body) {
+			return
+		}
+		if _, err := client.SendTerminalInput(ctx, &infrafleetv1.SendTerminalInputRequest{PtyId: ptyID, Data: []byte(body.Text)}); err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func handleGetAgentSnapshot(client infrafleetv1.InfraFleetServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		ptyID, err := resolveAgentPtyID(ctx, client, chi.URLParam(r, "worktreeId"))
+		if err != nil {
+			writeAgentResolveError(w, err)
+			return
+		}
+		resp, err := client.GetTerminalScrollback(ctx, &infrafleetv1.GetTerminalScrollbackRequest{PtyId: ptyID})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		// BR-CLI-06's "flat scrollback file" — text/plain, not JSON, so
+		// `orca snapshot --output result.txt` is a literal body copy.
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		if resp.GetTruncated() {
+			w.Header().Set("X-Orca-Snapshot-Truncated", "true")
+		}
+		_, _ = w.Write([]byte(resp.GetText()))
+	}
 }
 
 // registerDevServerRequestBody is the REST request shape for POST

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/get_agent_terminal_session.go`
 **Depends on:** TASK-CLI-02-01
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `GetAgentTerminalSession` usecase added, wired into `cmd/server/main.go`; all 4 verify-listed test cases pass (exact match, subdirectory non-match, latest-`LastActiveAt` tie-break, no-connection-resolved).
 
 ---
 

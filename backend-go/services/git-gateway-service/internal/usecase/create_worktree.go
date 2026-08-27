@@ -9,7 +9,7 @@ import (
 )
 
 type CreateWorktreeInput struct {
-	ProjectID, RepoID, Branch, BaseRef string
+	ProjectID, RepoID, Branch, BaseRef, IdempotencyKey string
 }
 
 // CreateWorktree is the saga: resolve host, run `git worktree add`, then
@@ -38,6 +38,21 @@ func NewCreateWorktree(resolver ConnectionResolver, projects ProjectClient, loca
 }
 
 func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (domain.WorktreeResult, error) {
+	if in.IdempotencyKey != "" {
+		if existing, found, err := uc.projects.FindWorktreeByIdempotencyKey(ctx, in.ProjectID, in.IdempotencyKey); err != nil {
+			return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_IDEMPOTENCY_LOOKUP_FAILED", "failed to check for existing worktree", err)
+		} else if found {
+			// BR-CLI-01: same (project_id, idempotency_key) -> return the
+			// existing worktree, not a second `git worktree add` attempt.
+			// HeadSHA is not stored on the bookkeeping record (project-service's
+			// Worktree message has no head_sha field) — left empty here rather
+			// than re-resolving it with an extra GetStatus call the caller
+			// didn't ask for; orca-cli's Result.HeadSHA is therefore only
+			// populated on a genuinely fresh create.
+			return domain.WorktreeResult{WorktreeID: existing.ID, Path: existing.Path}, nil
+		}
+	}
+
 	repo, err := uc.projects.GetRepo(ctx, in.RepoID)
 	if err != nil {
 		return domain.WorktreeResult{}, apperrors.New(apperrors.KindNotFound, "WORKTREE_REPO_NOT_FOUND", "repo does not exist", err)

@@ -44,6 +44,9 @@ const (
 	InfraFleetService_SaveTerminalScrollbackSnapshot_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SaveTerminalScrollbackSnapshot"
 	InfraFleetService_GetTerminalScrollbackSnapshot_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetTerminalScrollbackSnapshot"
 	InfraFleetService_DeleteTerminalScrollbackSnapshots_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/DeleteTerminalScrollbackSnapshots"
+	InfraFleetService_GetAgentTerminalSession_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/GetAgentTerminalSession"
+	InfraFleetService_SendTerminalInput_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/SendTerminalInput"
+	InfraFleetService_GetTerminalScrollback_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/GetTerminalScrollback"
 	InfraFleetService_AttachPty_FullMethodName                         = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
 	InfraFleetService_ListBrowserProfiles_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
 	InfraFleetService_CreateBrowserProfile_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
@@ -118,6 +121,20 @@ type InfraFleetServiceClient interface {
 	// Called by git-gateway-service's RemoveWorktree on hard worktree deletion
 	// — cleanup, not part of the save/restore flow itself.
 	DeleteTerminalScrollbackSnapshots(ctx context.Context, in *DeleteTerminalScrollbackSnapshotsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetAgentTerminalSession resolves worktree_id -> the live TerminalSession
+	// whose cwd matches that worktree's path, if one exists. Composes
+	// ResolveConnection + ListTerminalSessions server-side so no caller
+	// re-derives the match/tie-break logic itself.
+	GetAgentTerminalSession(ctx context.Context, in *GetAgentTerminalSessionRequest, opts ...grpc.CallOption) (*GetAgentTerminalSessionResponse, error)
+	// SendTerminalInput writes directly to the pty's input, bypassing
+	// AttachPty's stream — for stateless (REST/CLI) callers that never
+	// attach. GUI callers keep using terminal.send/AttachPty for lower
+	// latency; this is not a replacement for that path.
+	SendTerminalInput(ctx context.Context, in *SendTerminalInputRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetTerminalScrollback returns a flat-text capture of a pty's recent
+	// output, for callers that want a redirectable string, not multiplex
+	// frames.
+	GetTerminalScrollback(ctx context.Context, in *GetTerminalScrollbackRequest, opts ...grpc.CallOption) (*GetTerminalScrollbackResponse, error)
 	// --- Terminal/PTY I/O ---
 	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
 	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -410,6 +427,36 @@ func (c *infraFleetServiceClient) DeleteTerminalScrollbackSnapshots(ctx context.
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) GetAgentTerminalSession(ctx context.Context, in *GetAgentTerminalSessionRequest, opts ...grpc.CallOption) (*GetAgentTerminalSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAgentTerminalSessionResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetAgentTerminalSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) SendTerminalInput(ctx context.Context, in *SendTerminalInputRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_SendTerminalInput_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetTerminalScrollback(ctx context.Context, in *GetTerminalScrollbackRequest, opts ...grpc.CallOption) (*GetTerminalScrollbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTerminalScrollbackResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetTerminalScrollback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_AttachPty_FullMethodName, cOpts...)
@@ -602,6 +649,20 @@ type InfraFleetServiceServer interface {
 	// Called by git-gateway-service's RemoveWorktree on hard worktree deletion
 	// — cleanup, not part of the save/restore flow itself.
 	DeleteTerminalScrollbackSnapshots(context.Context, *DeleteTerminalScrollbackSnapshotsRequest) (*emptypb.Empty, error)
+	// GetAgentTerminalSession resolves worktree_id -> the live TerminalSession
+	// whose cwd matches that worktree's path, if one exists. Composes
+	// ResolveConnection + ListTerminalSessions server-side so no caller
+	// re-derives the match/tie-break logic itself.
+	GetAgentTerminalSession(context.Context, *GetAgentTerminalSessionRequest) (*GetAgentTerminalSessionResponse, error)
+	// SendTerminalInput writes directly to the pty's input, bypassing
+	// AttachPty's stream — for stateless (REST/CLI) callers that never
+	// attach. GUI callers keep using terminal.send/AttachPty for lower
+	// latency; this is not a replacement for that path.
+	SendTerminalInput(context.Context, *SendTerminalInputRequest) (*emptypb.Empty, error)
+	// GetTerminalScrollback returns a flat-text capture of a pty's recent
+	// output, for callers that want a redirectable string, not multiplex
+	// frames.
+	GetTerminalScrollback(context.Context, *GetTerminalScrollbackRequest) (*GetTerminalScrollbackResponse, error)
 	// --- Terminal/PTY I/O ---
 	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
 	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -725,6 +786,15 @@ func (UnimplementedInfraFleetServiceServer) GetTerminalScrollbackSnapshot(contex
 }
 func (UnimplementedInfraFleetServiceServer) DeleteTerminalScrollbackSnapshots(context.Context, *DeleteTerminalScrollbackSnapshotsRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteTerminalScrollbackSnapshots not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetAgentTerminalSession(context.Context, *GetAgentTerminalSessionRequest) (*GetAgentTerminalSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAgentTerminalSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SendTerminalInput(context.Context, *SendTerminalInputRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendTerminalInput not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetTerminalScrollback(context.Context, *GetTerminalScrollbackRequest) (*GetTerminalScrollbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTerminalScrollback not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) AttachPty(grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]) error {
 	return status.Error(codes.Unimplemented, "method AttachPty not implemented")
@@ -1218,6 +1288,60 @@ func _InfraFleetService_DeleteTerminalScrollbackSnapshots_Handler(srv interface{
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_GetAgentTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentTerminalSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetAgentTerminalSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetAgentTerminalSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetAgentTerminalSession(ctx, req.(*GetAgentTerminalSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_SendTerminalInput_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendTerminalInputRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SendTerminalInput(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SendTerminalInput_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SendTerminalInput(ctx, req.(*SendTerminalInputRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetTerminalScrollback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTerminalScrollbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetTerminalScrollback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetTerminalScrollback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetTerminalScrollback(ctx, req.(*GetTerminalScrollbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InfraFleetService_AttachPty_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(InfraFleetServiceServer).AttachPty(&grpc.GenericServerStream[PtyClientFrame, PtyServerFrame]{ServerStream: stream})
 }
@@ -1543,6 +1667,18 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteTerminalScrollbackSnapshots",
 			Handler:    _InfraFleetService_DeleteTerminalScrollbackSnapshots_Handler,
+		},
+		{
+			MethodName: "GetAgentTerminalSession",
+			Handler:    _InfraFleetService_GetAgentTerminalSession_Handler,
+		},
+		{
+			MethodName: "SendTerminalInput",
+			Handler:    _InfraFleetService_SendTerminalInput_Handler,
+		},
+		{
+			MethodName: "GetTerminalScrollback",
+			Handler:    _InfraFleetService_GetTerminalScrollback_Handler,
 		},
 		{
 			MethodName: "ListBrowserProfiles",

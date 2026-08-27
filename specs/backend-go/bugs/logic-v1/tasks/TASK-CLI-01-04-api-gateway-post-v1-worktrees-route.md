@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/git_routes.go`
 **Depends on:** TASK-CLI-01-01 (proto field), TASK-CLI-01-03 (usecase forwards it)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added `POST /v1/worktrees` handler + 3 new tests in `git_routes_test.go`; `go build ./services/api-gateway/...` and `go test ./services/api-gateway/internal/adapter/httpgateway/... -run TestMountGitRoutes -v` all pass.
 
 ---
 

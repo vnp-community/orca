@@ -39,6 +39,7 @@ const (
 	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
 	ProjectService_SetWorktreeActivation_FullMethodName        = "/orca.project.v1.ProjectService/SetWorktreeActivation"
 	ProjectService_RenameWorktree_FullMethodName               = "/orca.project.v1.ProjectService/RenameWorktree"
+	ProjectService_GetWorktreeByIdempotencyKey_FullMethodName  = "/orca.project.v1.ProjectService/GetWorktreeByIdempotencyKey"
 	ProjectService_CreateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/CreateProjectGroup"
 	ProjectService_UpdateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/UpdateProjectGroup"
 	ProjectService_DeleteProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/DeleteProjectGroup"
@@ -93,6 +94,10 @@ type ProjectServiceClient interface {
 	ListWorktrees(ctx context.Context, in *ListWorktreesRequest, opts ...grpc.CallOption) (*ListWorktreesResponse, error)
 	SetWorktreeActivation(ctx context.Context, in *SetWorktreeActivationRequest, opts ...grpc.CallOption) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(ctx context.Context, in *RenameWorktreeRequest, opts ...grpc.CallOption) (*RenameWorktreeResponse, error)
+	// GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
+	// CreateWorktree saga calls this before running `git worktree add`.
+	// found=false means "no dedupe match yet", not an error.
+	GetWorktreeByIdempotencyKey(ctx context.Context, in *GetWorktreeByIdempotencyKeyRequest, opts ...grpc.CallOption) (*GetWorktreeByIdempotencyKeyResponse, error)
 	// ProjectGroup surface — self-referential tree via parent_group_id, per
 	// project-service.md §4.
 	CreateProjectGroup(ctx context.Context, in *CreateProjectGroupRequest, opts ...grpc.CallOption) (*CreateProjectGroupResponse, error)
@@ -332,6 +337,16 @@ func (c *projectServiceClient) RenameWorktree(ctx context.Context, in *RenameWor
 	return out, nil
 }
 
+func (c *projectServiceClient) GetWorktreeByIdempotencyKey(ctx context.Context, in *GetWorktreeByIdempotencyKeyRequest, opts ...grpc.CallOption) (*GetWorktreeByIdempotencyKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetWorktreeByIdempotencyKeyResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetWorktreeByIdempotencyKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *projectServiceClient) CreateProjectGroup(ctx context.Context, in *CreateProjectGroupRequest, opts ...grpc.CallOption) (*CreateProjectGroupResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateProjectGroupResponse)
@@ -537,6 +552,10 @@ type ProjectServiceServer interface {
 	ListWorktrees(context.Context, *ListWorktreesRequest) (*ListWorktreesResponse, error)
 	SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error)
+	// GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
+	// CreateWorktree saga calls this before running `git worktree add`.
+	// found=false means "no dedupe match yet", not an error.
+	GetWorktreeByIdempotencyKey(context.Context, *GetWorktreeByIdempotencyKeyRequest) (*GetWorktreeByIdempotencyKeyResponse, error)
 	// ProjectGroup surface — self-referential tree via parent_group_id, per
 	// project-service.md §4.
 	CreateProjectGroup(context.Context, *CreateProjectGroupRequest) (*CreateProjectGroupResponse, error)
@@ -635,6 +654,9 @@ func (UnimplementedProjectServiceServer) SetWorktreeActivation(context.Context, 
 }
 func (UnimplementedProjectServiceServer) RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RenameWorktree not implemented")
+}
+func (UnimplementedProjectServiceServer) GetWorktreeByIdempotencyKey(context.Context, *GetWorktreeByIdempotencyKeyRequest) (*GetWorktreeByIdempotencyKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorktreeByIdempotencyKey not implemented")
 }
 func (UnimplementedProjectServiceServer) CreateProjectGroup(context.Context, *CreateProjectGroupRequest) (*CreateProjectGroupResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateProjectGroup not implemented")
@@ -1068,6 +1090,24 @@ func _ProjectService_RenameWorktree_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_GetWorktreeByIdempotencyKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorktreeByIdempotencyKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetWorktreeByIdempotencyKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetWorktreeByIdempotencyKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetWorktreeByIdempotencyKey(ctx, req.(*GetWorktreeByIdempotencyKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProjectService_CreateProjectGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateProjectGroupRequest)
 	if err := dec(in); err != nil {
@@ -1460,6 +1500,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RenameWorktree",
 			Handler:    _ProjectService_RenameWorktree_Handler,
+		},
+		{
+			MethodName: "GetWorktreeByIdempotencyKey",
+			Handler:    _ProjectService_GetWorktreeByIdempotencyKey_Handler,
 		},
 		{
 			MethodName: "CreateProjectGroup",

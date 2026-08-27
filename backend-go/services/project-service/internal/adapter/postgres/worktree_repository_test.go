@@ -133,3 +133,50 @@ func TestWorktreeRepository_CascadesOnProjectDelete(t *testing.T) {
 		t.Errorf("expected worktrees to cascade-delete with project, got %+v", worktrees)
 	}
 }
+
+func TestWorktreeRepository_FindWorktreeByIdempotencyKey_RoundTrips(t *testing.T) {
+	pool := setupPool(t)
+	projectRepo := New(pool)
+	repoRepo := NewRepoRepository(pool)
+	worktreeRepo := NewWorktreeRepository(pool)
+	ctx := context.Background()
+
+	project, repo := setupRepoForWorktree(t, projectRepo, repoRepo)
+	key := "sha256-abc"
+	created, err := worktreeRepo.RecordWorktreeCreated(ctx, domain.Worktree{
+		ID: uuid.NewString(), ProjectID: project.ID, RepoID: repo.ID, Path: "/srv/w1", Branch: "main", Active: true,
+		IdempotencyKey: &key,
+	})
+	if err != nil {
+		t.Fatalf("record worktree created: %v", err)
+	}
+
+	found, ok, err := worktreeRepo.FindWorktreeByIdempotencyKey(ctx, project.ID, key)
+	if err != nil {
+		t.Fatalf("find worktree by idempotency key: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected found=true")
+	}
+	if found.ID != created.ID {
+		t.Errorf("expected to find worktree %q, got %q", created.ID, found.ID)
+	}
+}
+
+func TestWorktreeRepository_FindWorktreeByIdempotencyKey_NoMatchReturnsFoundFalse(t *testing.T) {
+	pool := setupPool(t)
+	projectRepo := New(pool)
+	repoRepo := NewRepoRepository(pool)
+	worktreeRepo := NewWorktreeRepository(pool)
+	ctx := context.Background()
+
+	project, _ := setupRepoForWorktree(t, projectRepo, repoRepo)
+
+	_, ok, err := worktreeRepo.FindWorktreeByIdempotencyKey(ctx, project.ID, "no-such-key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Error("expected found=false for a non-matching idempotency key")
+	}
+}

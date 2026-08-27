@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/migrations/0010_worktree_idempotency_key.up.sql`
 **Depends on:** none (proto-independent — this is project-service's own storage + RPC surface)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — migration `0009_worktree_idempotency_key.{up,down}.sql` (repo had no lineage migrations yet, so this is 0009 not 0010 as drafted), domain/repo/usecase/RPC surface added; `TestWorktreeRepository_FindWorktreeByIdempotencyKey_{RoundTrips,NoMatchReturnsFoundFalse}` pass against a real testcontainers Postgres.
 
 ---
 

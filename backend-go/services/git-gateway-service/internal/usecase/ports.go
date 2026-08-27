@@ -342,6 +342,9 @@ type ProjectClient interface {
 	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
 	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error)
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
+	// FindWorktreeByIdempotencyKey backs BR-CLI-01 — see CreateWorktree.Execute.
+	// found=false, err=nil means "no match yet".
+	FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.WorktreeRecord, bool, error)
 }
 
 // ScrollbackCleaner wraps infra-fleet-service's DeleteTerminalScrollbackSnapshots

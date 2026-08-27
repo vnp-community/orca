@@ -108,6 +108,39 @@ func TestCreateWorktree_GitCreateFails_NoBookkeepingOrCompensationAttempted(t *t
 	}
 }
 
+func TestCreateWorktree_IdempotencyKeyMatch_ReturnsExistingWithoutExecutorCall(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{
+		findByIdempotencyKeyFound:  true,
+		findByIdempotencyKeyResult: domain.WorktreeRecord{ID: "wt-existing", Path: "/repo-feature", Branch: "feature"},
+	}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	got, err := uc.Execute(context.Background(), CreateWorktreeInput{
+		ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", IdempotencyKey: "dedupe-key",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.WorktreeID != "wt-existing" || got.Path != "/repo-feature" {
+		t.Errorf("expected the existing worktree to be returned, got %+v", got)
+	}
+	if !projects.calledFindByIdempotencyKey {
+		t.Error("expected FindWorktreeByIdempotencyKey to be called")
+	}
+	if projects.calledGetRepo {
+		t.Error("expected GetRepo NOT to be called on an idempotency match")
+	}
+	if local.calledCreateWorktree || relay.calledCreateWorktree {
+		t.Error("expected no GitExecutor method to be called on an idempotency match")
+	}
+	if projects.calledRecordCreated {
+		t.Error("expected RecordWorktreeCreated NOT to be called on an idempotency match")
+	}
+}
+
 func TestCreateWorktree_RepoNotFound_NoExecutorCallAtAll(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
 	local := &fakeGitExecutor{}

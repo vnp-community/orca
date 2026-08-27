@@ -3,6 +3,7 @@ go 1.25.0
 use (
 	./common
 	./proto
+	./cmd/orca-cli
 	./services/ai-provider-service
 	./services/annotation-service
 	./services/api-gateway

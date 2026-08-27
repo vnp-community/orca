@@ -312,6 +312,10 @@ func (f *fakeProjectServiceClient) RenameWorktree(_ context.Context, in *project
 	return f.renameWorktreeResp, nil
 }
 
+func (f *fakeProjectServiceClient) GetWorktreeByIdempotencyKey(_ context.Context, in *projectv1.GetWorktreeByIdempotencyKeyRequest, _ ...grpc.CallOption) (*projectv1.GetWorktreeByIdempotencyKeyResponse, error) {
+	return &projectv1.GetWorktreeByIdempotencyKeyResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) CreateProjectGroup(_ context.Context, in *projectv1.CreateProjectGroupRequest, _ ...grpc.CallOption) (*projectv1.CreateProjectGroupResponse, error) {
 	f.lastCreateProjectGroupReq = in
 	if f.createProjectGroupErr != nil {

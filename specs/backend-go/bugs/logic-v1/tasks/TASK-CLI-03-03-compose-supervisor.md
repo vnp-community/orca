@@ -5,7 +5,7 @@
 **Service:** `orca-cli`
 **File:** `backend-go/cmd/orca-cli/internal/localdaemon/compose_supervisor.go`
 **Depends on:** TASK-CLI-03-02
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added compose_supervisor.go with a `runComposeCmd` injectable command-runner seam (never shells to real docker in tests) + compose_supervisor_test.go (refuses-second-start-no-extra-invoke, stale-pidfile-allows-restart, stop-removes-pidfile-on-failure, missing-compose-file-fails-fast-no-invoke); confirmed `backend-go/docker-compose.yml` exists (not repo-root — path resolution is TASK-CLI-03-04/05's job, unaffected here); `go test ./cmd/orca-cli/internal/localdaemon/... -run TestComposeSupervisor -v` passes.
 
 ---
 

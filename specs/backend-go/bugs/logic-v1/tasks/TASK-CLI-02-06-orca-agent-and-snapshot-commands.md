@@ -5,7 +5,7 @@
 **Service:** `orca-cli`
 **File:** `backend-go/cmd/orca-cli/internal/apiclient/agent.go`
 **Depends on:** TASK-CLI-02-05, TASK-CLI-01-06/07 (scaffold + `apiclient.Client`/`output`/cobra tree from SOL-CLI-01)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added apiclient/agent.go + command/{agent_status,agent_wait,agent_send,snapshot}.go, registered `agent status|wait|send` and `snapshot` under root.go's cobra tree; added agent_wait_test.go/snapshot_test.go/agent_status_test.go/agent_send_test.go (timeout->exit 2 decided from response body not client timer, byte-for-byte --output, missing-flag exit-2-no-HTTP guards); `go build ./cmd/orca-cli/...` and targeted `go test` all pass.
 
 ---
 

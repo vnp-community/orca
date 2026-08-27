@@ -163,6 +163,11 @@ func run() error {
 	getTerminalScrollbackSnapshotUC := usecase.NewGetTerminalScrollbackSnapshot(scrollbackStore)
 	deleteTerminalScrollbackSnapshotsUC := usecase.NewDeleteTerminalScrollbackSnapshots(scrollbackStore)
 
+	// --- CLI agent access (BUG-CLI-02) ---
+	getAgentTerminalSessionUC := usecase.NewGetAgentTerminalSession(repo, terminalSessionStore)
+	sendTerminalInputUC := usecase.NewSendTerminalInput(terminalSessionStore, repo, agentClient)
+	getTerminalScrollbackUC := usecase.NewGetTerminalScrollback(terminalSessionStore, repo, agentClient)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -195,6 +200,9 @@ func run() error {
 		saveTerminalScrollbackSnapshotUC,
 		getTerminalScrollbackSnapshotUC,
 		deleteTerminalScrollbackSnapshotsUC,
+		getAgentTerminalSessionUC,
+		sendTerminalInputUC,
+		getTerminalScrollbackUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

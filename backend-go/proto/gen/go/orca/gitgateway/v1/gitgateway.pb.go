@@ -4946,13 +4946,20 @@ func (x *ScanSetupScriptImportsResponse) GetImportedPaths() []string {
 }
 
 type CreateWorktreeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	RepoId        string                 `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
-	Branch        string                 `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`                  // new branch name for the worktree
-	BaseRef       string                 `protobuf:"bytes,4,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"` // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	RepoId    string                 `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	Branch    string                 `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`                  // new branch name for the worktree
+	BaseRef   string                 `protobuf:"bytes,4,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"` // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
+	// idempotency_key: caller-supplied dedupe key (BR-CLI-01). orca-cli
+	// defaults to sha256(project_id|repo_id|branch) when the user passes
+	// none. A second CreateWorktree call with the same (project_id,
+	// idempotency_key) returns the existing worktree instead of re-running
+	// `git worktree add`. Empty means "no dedupe requested" — every existing
+	// caller (wscompat's worktree.create) keeps working unchanged.
+	IdempotencyKey *string `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3,oneof" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateWorktreeRequest) Reset() {
@@ -5009,6 +5016,13 @@ func (x *CreateWorktreeRequest) GetBranch() string {
 func (x *CreateWorktreeRequest) GetBaseRef() string {
 	if x != nil {
 		return x.BaseRef
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetIdempotencyKey() string {
+	if x != nil && x.IdempotencyKey != nil {
+		return *x.IdempotencyKey
 	}
 	return ""
 }
@@ -7046,13 +7060,15 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\"G\n" +
 	"\x1eScanSetupScriptImportsResponse\x12%\n" +
-	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\x82\x01\n" +
+	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\xc4\x01\n" +
 	"\x15CreateWorktreeRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x17\n" +
 	"\arepo_id\x18\x02 \x01(\tR\x06repoId\x12\x16\n" +
 	"\x06branch\x18\x03 \x01(\tR\x06branch\x12\x19\n" +
-	"\bbase_ref\x18\x04 \x01(\tR\abaseRef\"h\n" +
+	"\bbase_ref\x18\x04 \x01(\tR\abaseRef\x12,\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tH\x00R\x0eidempotencyKey\x88\x01\x01B\x12\n" +
+	"\x10_idempotency_key\"h\n" +
 	"\x16CreateWorktreeResponse\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x12\n" +
@@ -7518,6 +7534,7 @@ func file_orca_gitgateway_v1_gitgateway_proto_init() {
 	if File_orca_gitgateway_v1_gitgateway_proto != nil {
 		return
 	}
+	file_orca_gitgateway_v1_gitgateway_proto_msgTypes[89].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

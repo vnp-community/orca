@@ -65,6 +65,23 @@ service InfraFleetService {
   // — cleanup, not part of the save/restore flow itself.
   rpc DeleteTerminalScrollbackSnapshots(DeleteTerminalScrollbackSnapshotsRequest) returns (google.protobuf.Empty);
 
+  // GetAgentTerminalSession resolves worktree_id -> the live TerminalSession
+  // whose cwd matches that worktree's path, if one exists. Composes
+  // ResolveConnection + ListTerminalSessions server-side so no caller
+  // re-derives the match/tie-break logic itself.
+  rpc GetAgentTerminalSession(GetAgentTerminalSessionRequest) returns (GetAgentTerminalSessionResponse);
+
+  // SendTerminalInput writes directly to the pty's input, bypassing
+  // AttachPty's stream — for stateless (REST/CLI) callers that never
+  // attach. GUI callers keep using terminal.send/AttachPty for lower
+  // latency; this is not a replacement for that path.
+  rpc SendTerminalInput(SendTerminalInputRequest) returns (google.protobuf.Empty);
+
+  // GetTerminalScrollback returns a flat-text capture of a pty's recent
+  // output, for callers that want a redirectable string, not multiplex
+  // frames.
+  rpc GetTerminalScrollback(GetTerminalScrollbackRequest) returns (GetTerminalScrollbackResponse);
+
   // --- Terminal/PTY I/O ---
   // The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
   // names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -371,6 +388,22 @@ message GetTerminalAgentStatusResponse {
   bool   agent_running = 1;     // answers both terminal.agentStatus and terminal.isRunningAgent
   string agent_kind = 2;        // best-effort, e.g. "claude" | "codex" | "" if unknown
   bool   ready_for_input = 3;   // agentStatus's richer question: is it idle-and-ready, not just alive
+}
+
+message GetAgentTerminalSessionRequest  { string worktree_id = 1; }
+message GetAgentTerminalSessionResponse {
+  bool found = 1;
+  TerminalSession session = 2; // unset when found=false
+}
+
+message SendTerminalInputRequest { string pty_id = 1; bytes data = 2; }
+
+message GetTerminalScrollbackRequest  { string pty_id = 1; }
+message GetTerminalScrollbackResponse {
+  string text = 1;
+  bool   truncated = 2; // true if the retention bound already dropped
+                         // earlier output — an honest signal, not silently
+                         // partial data
 }
 
 message InspectTerminalProcessRequest  { string pty_id = 1; }

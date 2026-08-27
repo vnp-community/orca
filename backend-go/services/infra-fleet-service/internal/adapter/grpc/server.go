@@ -64,6 +64,11 @@ type Server struct {
 	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
 	emulatorRelay       *usecase.EmulatorRelay
 	getHostCapabilities *usecase.GetHostCapabilities
+
+	// --- CLI agent access (BUG-CLI-02) ---
+	getAgentTerminalSession *usecase.GetAgentTerminalSession
+	sendTerminalInput       *usecase.SendTerminalInput
+	getTerminalScrollback   *usecase.GetTerminalScrollback
 }
 
 func New(
@@ -97,6 +102,9 @@ func New(
 	saveTerminalScrollbackSnapshot *usecase.SaveTerminalScrollbackSnapshot,
 	getTerminalScrollbackSnapshot *usecase.GetTerminalScrollbackSnapshot,
 	deleteTerminalScrollbackSnapshots *usecase.DeleteTerminalScrollbackSnapshots,
+	getAgentTerminalSession *usecase.GetAgentTerminalSession,
+	sendTerminalInput *usecase.SendTerminalInput,
+	getTerminalScrollback *usecase.GetTerminalScrollback,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -130,6 +138,10 @@ func New(
 		saveTerminalScrollbackSnapshot:    saveTerminalScrollbackSnapshot,
 		getTerminalScrollbackSnapshot:     getTerminalScrollbackSnapshot,
 		deleteTerminalScrollbackSnapshots: deleteTerminalScrollbackSnapshots,
+
+		getAgentTerminalSession: getAgentTerminalSession,
+		sendTerminalInput:       sendTerminalInput,
+		getTerminalScrollback:   getTerminalScrollback,
 	}
 }
 
@@ -456,6 +468,33 @@ func (s *Server) GetTerminalAgentStatus(ctx context.Context, req *infrafleetv1.G
 		AgentKind:     result.AgentKind,
 		ReadyForInput: result.ReadyForInput,
 	}, nil
+}
+
+func (s *Server) GetAgentTerminalSession(ctx context.Context, req *infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+	session, found, err := s.getAgentTerminalSession.Execute(ctx, req.GetWorktreeId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.GetAgentTerminalSessionResponse{Found: found}
+	if found {
+		resp.Session = toProtoTerminalSession(session)
+	}
+	return resp, nil
+}
+
+func (s *Server) SendTerminalInput(ctx context.Context, req *infrafleetv1.SendTerminalInputRequest) (*emptypb.Empty, error) {
+	if err := s.sendTerminalInput.Execute(ctx, req.GetPtyId(), req.GetData()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetTerminalScrollback(ctx context.Context, req *infrafleetv1.GetTerminalScrollbackRequest) (*infrafleetv1.GetTerminalScrollbackResponse, error) {
+	result, err := s.getTerminalScrollback.Execute(ctx, req.GetPtyId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.GetTerminalScrollbackResponse{Text: result.Text, Truncated: result.Truncated}, nil
 }
 
 func (s *Server) InspectTerminalProcess(ctx context.Context, req *infrafleetv1.InspectTerminalProcessRequest) (*infrafleetv1.InspectTerminalProcessResponse, error) {

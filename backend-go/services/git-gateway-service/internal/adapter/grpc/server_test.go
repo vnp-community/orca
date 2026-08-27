@@ -274,6 +274,10 @@ func (fakeProjectClient) RecordWorktreeRemoved(context.Context, string) error {
 	return nil
 }
 
+func (fakeProjectClient) FindWorktreeByIdempotencyKey(context.Context, string, string) (domain.WorktreeRecord, bool, error) {
+	return domain.WorktreeRecord{}, false, nil
+}
+
 // fakeScrollbackCleaner is a usecase.ScrollbackCleaner stub — this file's
 // tests exercise the gRPC wire<->usecase translation, not RemoveWorktree's
 // best-effort cleanup call itself (that's internal/usecase's own test
