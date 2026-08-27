@@ -324,12 +324,12 @@ func TestProvision_SucceedsAgainstFakeServer(t *testing.T) {
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
 	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
 
-	target, err := domain.NewSshTarget("ssht-1", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-1", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "")
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-1": target}}
-	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
 	})
@@ -360,12 +360,12 @@ func TestProvision_FailsOnChecksumMismatch(t *testing.T) {
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", true) // badChecksum
 	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
 
-	target, err := domain.NewSshTarget("ssht-2", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-2", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "")
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-2": target}}
-	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
 	})
@@ -390,12 +390,12 @@ func TestProvision_FailsWhenBundlePathNotConfigured(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
 
-	target, err := domain.NewSshTarget("ssht-3", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-3", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "")
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-3": target}}
-	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{HandshakeTimeout: 5 * time.Second}) // no BundlePath
 
 	devServer, err := domain.NewDevServer("ds-3", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-3")
@@ -413,7 +413,7 @@ func TestProvision_FailsWhenBundlePathNotConfigured(t *testing.T) {
 
 func TestProvision_FailsWhenSshTargetUnresolvable(t *testing.T) {
 	resolver := &fakeSshTargetResolver{err: fmt.Errorf("postgres: ssh target not found")}
-	connector := sshconn.NewConnector(&fakeIssuer{}, sshconn.Config{})
+	connector := sshconn.NewConnector(&fakeIssuer{}, nil, sshconn.Config{}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{BundlePath: "/nonexistent", HandshakeTimeout: time.Second})
 
 	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-missing")

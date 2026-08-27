@@ -134,10 +134,14 @@ func NewSshTargetStore(pool *pgxpool.Pool) *SshTargetStore {
 
 // Create inserts a new SSH target and returns the persisted row.
 func (s *SshTargetStore) Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error) {
+	var jumpHostID *string
+	if target.JumpHostTargetID != "" {
+		jumpHostID = &target.JumpHostTargetID
+	}
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO infra.ssh_targets (id, tenant_id, host, user_name, vault_ssh_role)
-		VALUES ($1, $2, $3, $4, $5)
-	`, target.ID, target.TenantID, target.Host, target.UserName, target.VaultSSHRole)
+		INSERT INTO infra.ssh_targets (id, tenant_id, host, port, user_name, vault_ssh_role, known_hosts_fingerprint, jump_host_target_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, target.ID, target.TenantID, target.Host, target.Port, target.UserName, target.VaultSSHRole, target.KnownHostsFingerprint, jumpHostID)
 	if err != nil {
 		return domain.SshTarget{}, fmt.Errorf("postgres: insert ssh target: %w", err)
 	}
@@ -147,7 +151,7 @@ func (s *SshTargetStore) Create(ctx context.Context, target domain.SshTarget) (d
 // List returns every SSH target registered for tenantID.
 func (s *SshTargetStore) List(ctx context.Context, tenantID string) ([]domain.SshTarget, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, tenant_id, host, user_name, vault_ssh_role
+		SELECT id, tenant_id, host, port, user_name, vault_ssh_role, known_hosts_fingerprint, jump_host_target_id
 		FROM infra.ssh_targets
 		WHERE tenant_id = $1
 		ORDER BY host
@@ -160,8 +164,12 @@ func (s *SshTargetStore) List(ctx context.Context, tenantID string) ([]domain.Ss
 	var out []domain.SshTarget
 	for rows.Next() {
 		var t domain.SshTarget
-		if err := rows.Scan(&t.ID, &t.TenantID, &t.Host, &t.UserName, &t.VaultSSHRole); err != nil {
+		var jumpHostID *string
+		if err := rows.Scan(&t.ID, &t.TenantID, &t.Host, &t.Port, &t.UserName, &t.VaultSSHRole, &t.KnownHostsFingerprint, &jumpHostID); err != nil {
 			return nil, fmt.Errorf("postgres: scan ssh target row: %w", err)
+		}
+		if jumpHostID != nil {
+			t.JumpHostTargetID = *jumpHostID
 		}
 		out = append(out, t)
 	}
@@ -177,18 +185,22 @@ func (s *SshTargetStore) List(ctx context.Context, tenantID string) ([]domain.Ss
 // before dialing via sshconn.Connector for relay-ssh mode).
 func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error) {
 	row := s.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, host, user_name, vault_ssh_role
+		SELECT id, tenant_id, host, port, user_name, vault_ssh_role, known_hosts_fingerprint, jump_host_target_id
 		FROM infra.ssh_targets
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
 	var target domain.SshTarget
-	err := row.Scan(&target.ID, &target.TenantID, &target.Host, &target.UserName, &target.VaultSSHRole)
+	var jumpHostID *string
+	err := row.Scan(&target.ID, &target.TenantID, &target.Host, &target.Port, &target.UserName, &target.VaultSSHRole, &target.KnownHostsFingerprint, &jumpHostID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.SshTarget{}, fmt.Errorf("postgres: ssh target %q not found for tenant: %w", id, err)
 	}
 	if err != nil {
 		return domain.SshTarget{}, fmt.Errorf("postgres: query ssh target: %w", err)
+	}
+	if jumpHostID != nil {
+		target.JumpHostTargetID = *jumpHostID
 	}
 	return target, nil
 }

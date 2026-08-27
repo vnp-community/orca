@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshconn/pool.go` (new)
 **Depends on:** TASK-SSH-01-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — sshconn.Cap (pool.go) wired into Connector.Connect and main.go; TestCap_* pass`
 
 ---
 

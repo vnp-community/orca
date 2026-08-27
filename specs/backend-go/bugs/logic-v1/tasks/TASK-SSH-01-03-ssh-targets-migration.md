@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/migrations/0007_ssh_targets_port_knownhosts_jumphost.up.sql`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — 0007_ssh_targets_port_knownhosts_jumphost up/down migration added, integration round-trip test passes`
 
 ---
 

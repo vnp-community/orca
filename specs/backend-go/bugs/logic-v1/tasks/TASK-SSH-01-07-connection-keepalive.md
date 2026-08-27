@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshconn/connector.go`
 **Depends on:** TASK-SSH-01-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — Connection.keepAlive/StartKeepAlive + closeCh wired, Provisioner.Provision starts it after Connect; TestKeepAlive_SendsRequestsAtInterval passes`
 
 ---
 

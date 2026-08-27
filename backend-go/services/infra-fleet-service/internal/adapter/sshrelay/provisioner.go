@@ -92,6 +92,10 @@ func (p *Provisioner) Provision(ctx context.Context, devServer domain.DevServer)
 	if err != nil {
 		return nil, devserveragent.HandshakeInfo{}, fmt.Errorf("sshrelay: dialing ssh target %q: %w", devServer.SSHTargetID, err)
 	}
+	// BR-SSH-03: a plain SSH transport keepalive so a silently-dropped TCP
+	// connection is detected promptly. Started against a Provisioner-lifetime
+	// context (not ctx) since conn outlives this Provision call.
+	conn.StartKeepAlive(context.Background(), 30*time.Second)
 
 	remoteDir, err := deploy(ctx, conn, p.cfg)
 	if err != nil {

@@ -109,7 +109,8 @@ func run() error {
 	if err != nil {
 		logger.Warn("failed to construct Vault client — relay-ssh mode will report ErrConnectionModeNotImplemented", slog.Any("error", err))
 	} else {
-		sshConnector := infrasshconn.NewConnector(vaultClient, infrasshconn.LoadConfigFromEnv())
+		sshConnectionCap := infrasshconn.NewCap()
+		sshConnector := infrasshconn.NewConnector(vaultClient, sshTargetStore, infrasshconn.LoadConfigFromEnv(), sshConnectionCap)
 		sshRelayCfg := infrasshrelay.LoadConfigFromEnv(agentCfg.OrcaVersion)
 		if sshRelayCfg.BundlePath == "" {
 			logger.Warn("ORCA_RELAY_BUNDLE_PATH is not set — relay-ssh dev servers will fail to provision until it points at a built agent/out/agent.js")

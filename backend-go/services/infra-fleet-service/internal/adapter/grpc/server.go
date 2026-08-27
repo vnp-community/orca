@@ -211,9 +211,12 @@ func (s *Server) Relay(ctx context.Context, req *infrafleetv1.RelayRequest) (*in
 
 func (s *Server) CreateSshTarget(ctx context.Context, req *infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error) {
 	target, err := s.createSshTarget.Execute(ctx, usecase.CreateSshTargetInput{
-		Host:         req.GetHost(),
-		UserName:     req.GetUser(),
-		VaultSSHRole: req.GetVaultSshRole(),
+		Host:                  req.GetHost(),
+		Port:                  int(req.GetPort()),
+		UserName:              req.GetUser(),
+		VaultSSHRole:          req.GetVaultSshRole(),
+		KnownHostsFingerprint: req.GetKnownHostsFingerprint(),
+		JumpHostTargetID:      req.GetJumpHostTargetId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -252,7 +255,14 @@ func (s *Server) ListSshTargets(ctx context.Context, req *infrafleetv1.ListSshTa
 	out := make([]*infrafleetv1.SshTarget, 0, len(targets))
 	for _, t := range targets {
 		out = append(out, &infrafleetv1.SshTarget{
-			Id: t.ID, TenantId: t.TenantID, Host: t.Host, User: t.UserName, VaultSshRole: t.VaultSSHRole,
+			Id:                    t.ID,
+			TenantId:              t.TenantID,
+			Host:                  t.Host,
+			Port:                  int32(t.Port),
+			User:                  t.UserName,
+			VaultSshRole:          t.VaultSSHRole,
+			KnownHostsFingerprint: t.KnownHostsFingerprint,
+			JumpHostTargetId:      t.JumpHostTargetID,
 		})
 	}
 	return &infrafleetv1.ListSshTargetsResponse{SshTargets: out}, nil

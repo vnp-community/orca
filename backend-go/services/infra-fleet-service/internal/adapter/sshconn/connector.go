@@ -10,19 +10,12 @@
 // connection — see that package's doc comment for the rest of relay-ssh
 // mode, which this package only establishes the transport for.
 //
-// Known, deliberate gaps carried forward from this pass (not silently
-// matched — flagged here and at each call site below):
-//   - Host-key verification: HostKeyCallback is ssh.InsecureIgnoreHostKey().
-//     This is NOT a security fix over the TS reference, which also performs
-//     no host-key verification (confirmed by research on the TS system this
-//     service replaces) — it is the same gap, carried forward on purpose
-//     rather than silently matched without comment. A real fix needs a
-//     known-hosts fingerprint on domain.SshTarget plus a verification
-//     policy, out of scope for this pass.
-//   - Port: domain.SshTarget has no port field in this scaffold (see
-//     ssh_target.go's doc comment) — Connect always dials target.Host on
-//     port 22 (defaultSSHPort below). A per-target port needs a
-//     domain/migration change, not invented here.
+// Connect resolves target.JumpHostTargetID into a full hop chain (jumphost.go)
+// and dials through each bastion in turn; host-key verification uses
+// target.KnownHostsFingerprint when set, falling back to
+// ssh.InsecureIgnoreHostKey() (documented, opt-in degrade) when not — see
+// hostKeyCallback. Per-target Port (domain.SshTarget.Port) is honored,
+// defaulting to defaultSSHPort when zero.
 package sshconn
 
 import (
@@ -35,6 +28,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -43,12 +37,8 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
-// defaultSSHPort is Config.Port's default. domain.SshTarget carries no port
-// field in this scaffold (see ssh_target.go's doc comment), so every target
-// dials this same port unless Config.Port is overridden — a real, deliberate
-// gap (see package doc comment), not an oversight. Config.Port exists mainly
-// so tests can point Connect at a local fake server on an OS-assigned port;
-// a real per-target port needs a domain/migration change, not invented here.
+// defaultSSHPort is the fallback dial port when neither the target nor
+// Config specifies one.
 const defaultSSHPort = 22
 
 // SSHCertIssuer is the narrow port sshconn needs from common/secrets —
@@ -69,14 +59,10 @@ type SSHCertIssuer interface {
 // convention (see config.go there) rather than hardcoding magic numbers.
 type Config struct {
 	// DialTimeout bounds TCP connect plus the SSH handshake (key exchange +
-	// certificate auth) to the target host.
+	// certificate auth) to each hop.
 	DialTimeout time.Duration
-	// Port is the TCP port Connect dials on target.Host. Defaults to 22
-	// (defaultSSHPort) via DefaultConfig — domain.SshTarget has no port
-	// field in this scaffold, so this is the one knob standing in for it
-	// until a real per-target port lands (domain/migration change, out of
-	// scope here). Mainly exists so tests can point Connect at a local fake
-	// server on an OS-assigned port instead of the real port 22.
+	// Port is the fallback TCP port used when a target's own Port field is
+	// zero. Defaults to 22 (defaultSSHPort) via DefaultConfig.
 	Port int
 }
 
@@ -91,9 +77,6 @@ func DefaultConfig() Config {
 
 // LoadConfigFromEnv reads SSHCONN_DIAL_TIMEOUT_MS on top of DefaultConfig —
 // same override-one-knob-via-env shape as devserveragent.LoadConfigFromEnv.
-// Port is deliberately not env-configurable: it's a per-target concern that
-// belongs on domain.SshTarget once that field exists, not a deployment-wide
-// setting.
 func LoadConfigFromEnv() Config {
 	cfg := DefaultConfig()
 	if v := os.Getenv("SSHCONN_DIAL_TIMEOUT_MS"); v != "" {
@@ -108,33 +91,95 @@ func LoadConfigFromEnv() Config {
 // authenticating with an ephemeral keypair + Vault-signed certificate —
 // never a stored or reused private key. See package doc comment for scope.
 type Connector struct {
-	issuer SSHCertIssuer
-	cfg    Config
+	issuer   SSHCertIssuer
+	resolver SshTargetResolver
+	cfg      Config
+	cap      *Cap // nil = no concurrent-connection cap (e.g. in tests)
 }
 
 // NewConnector builds a Connector. issuer is typically a *secrets.Client
 // (common/secrets), narrowed to the SSHCertIssuer port here per this
-// codebase's Dependency Inversion convention. A zero-value cfg.Port defaults
-// to defaultSSHPort (22), same as DefaultConfig().
-func NewConnector(issuer SSHCertIssuer, cfg Config) *Connector {
+// codebase's Dependency Inversion convention. resolver resolves jump-host
+// chains (typically postgres.SshTargetStore); cap is the shared
+// concurrent-connection cap (nil disables the cap, e.g. in tests). A
+// zero-value cfg.Port defaults to defaultSSHPort (22), same as
+// DefaultConfig().
+func NewConnector(issuer SSHCertIssuer, resolver SshTargetResolver, cfg Config, cap *Cap) *Connector {
 	if cfg.Port == 0 {
 		cfg.Port = defaultSSHPort
 	}
-	return &Connector{issuer: issuer, cfg: cfg}
+	return &Connector{issuer: issuer, resolver: resolver, cfg: cfg, cap: cap}
 }
 
-// Connect establishes a real SSH connection to target:
+// Connect establishes a real SSH connection to target, walking through any
+// jump-host chain (target.JumpHostTargetID) via c.resolver, dialing each hop
+// through the previous one (bastion-first order — see resolveJumpChain).
+// Each hop:
 //  1. generates an ephemeral ed25519 keypair in-memory (never persisted,
 //     never logged);
-//  2. requests issuer.SSHSignPublicKey(ctx, target.VaultSSHRole, <marshaled
+//  2. requests issuer.SSHSignPublicKey(ctx, hop.VaultSSHRole, <marshaled
 //     pubkey>) to get a short-lived certificate;
 //  3. builds an ssh.ClientConfig using ssh.NewCertSigner over the ephemeral
-//     private key + signed cert;
-//  4. dials target.Host:<c.cfg.Port> (defaults to 22 — see package doc
-//     comment: no per-target port on domain.SshTarget, no host-key
-//     verification — both deliberate, documented gaps this pass doesn't
-//     address).
+//     private key + signed cert, with host-key verification via
+//     hop.KnownHostsFingerprint when set (InsecureIgnoreHostKey otherwise —
+//     documented, opt-in degrade);
+//  4. dials hop.Host:hop.Port (defaults to c.cfg.Port/22 when hop.Port is 0).
+//
+// If c.cap is set, Connect first acquires a (tenantID, host) slot — see
+// pool.go — rejecting the 11th concurrent connection to the same host
+// before ever dialing.
 func (c *Connector) Connect(ctx context.Context, target domain.SshTarget) (*Connection, error) {
+	if c.cap != nil {
+		release, err := c.cap.Acquire(target.TenantID, target.Host)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
+	}
+
+	hops, err := resolveJumpChain(ctx, c.resolver, target.TenantID, target)
+	if err != nil {
+		return nil, err
+	}
+
+	var current *ssh.Client
+	for i, hop := range hops {
+		clientConfig, err := c.buildClientConfig(ctx, hop)
+		if err != nil {
+			return nil, err
+		}
+		addr := targetAddr(hop)
+		if current == nil {
+			dialer := &net.Dialer{Timeout: c.cfg.DialTimeout}
+			rawConn, dialErr := dialer.DialContext(ctx, "tcp", addr)
+			if dialErr != nil {
+				return nil, &ErrUnreachableHost{Host: hop.Host, Port: hop.Port, HopIndex: i, Cause: dialErr}
+			}
+			sshConn, chans, reqs, hsErr := ssh.NewClientConn(rawConn, addr, clientConfig)
+			if hsErr != nil {
+				_ = rawConn.Close()
+				return nil, &ErrUnreachableHost{Host: hop.Host, Port: hop.Port, HopIndex: i, Cause: hsErr}
+			}
+			current = ssh.NewClient(sshConn, chans, reqs)
+		} else {
+			netConn, dialErr := current.Dial("tcp", addr)
+			if dialErr != nil {
+				return nil, &ErrUnreachableHost{Host: hop.Host, Port: hop.Port, HopIndex: i, Cause: dialErr}
+			}
+			sshConn, chans, reqs, hsErr := ssh.NewClientConn(netConn, addr, clientConfig)
+			if hsErr != nil {
+				_ = netConn.Close()
+				return nil, &ErrUnreachableHost{Host: hop.Host, Port: hop.Port, HopIndex: i, Cause: hsErr}
+			}
+			current = ssh.NewClient(sshConn, chans, reqs)
+		}
+	}
+	return &Connection{client: current, closeCh: make(chan struct{})}, nil
+}
+
+// buildClientConfig runs the ephemeral-keypair + Vault-cert issuance steps
+// for one hop, then sets HostKeyCallback via hostKeyCallback(hop).
+func (c *Connector) buildClientConfig(ctx context.Context, hop domain.SshTarget) (*ssh.ClientConfig, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("sshconn: generating ephemeral keypair: %w", err)
@@ -150,12 +195,12 @@ func (c *Connector) Connect(ctx context.Context, target domain.SshTarget) (*Conn
 	}
 	authorizedKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pubKeySSH)))
 
-	signedCert, err := c.issuer.SSHSignPublicKey(ctx, target.VaultSSHRole, authorizedKey)
+	signedCert, err := c.issuer.SSHSignPublicKey(ctx, hop.VaultSSHRole, authorizedKey)
 	if err != nil {
-		return nil, fmt.Errorf("sshconn: requesting Vault SSH cert for role %s: %w", target.VaultSSHRole, err)
+		return nil, fmt.Errorf("sshconn: requesting Vault SSH cert for role %s: %w", hop.VaultSSHRole, err)
 	}
 	if strings.TrimSpace(signedCert) == "" {
-		return nil, fmt.Errorf("sshconn: Vault returned an empty signed certificate for role %s", target.VaultSSHRole)
+		return nil, fmt.Errorf("sshconn: Vault returned an empty signed certificate for role %s", hop.VaultSSHRole)
 	}
 
 	certPubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(signedCert))
@@ -164,7 +209,7 @@ func (c *Connector) Connect(ctx context.Context, target domain.SshTarget) (*Conn
 	}
 	cert, ok := certPubKey.(*ssh.Certificate)
 	if !ok {
-		return nil, fmt.Errorf("sshconn: Vault response for role %s was not an SSH certificate", target.VaultSSHRole)
+		return nil, fmt.Errorf("sshconn: Vault response for role %s was not an SSH certificate", hop.VaultSSHRole)
 	}
 
 	certSigner, err := ssh.NewCertSigner(cert, signer)
@@ -172,32 +217,19 @@ func (c *Connector) Connect(ctx context.Context, target domain.SshTarget) (*Conn
 		return nil, fmt.Errorf("sshconn: building certificate signer: %w", err)
 	}
 
-	clientConfig := &ssh.ClientConfig{
-		User:            target.UserName,
+	return &ssh.ClientConfig{
+		User:            hop.UserName,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(certSigner)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // deliberate, documented gap — see package doc comment
+		HostKeyCallback: hostKeyCallback(hop),
 		Timeout:         c.cfg.DialTimeout,
-	}
-
-	addr := net.JoinHostPort(target.Host, strconv.Itoa(c.cfg.Port))
-	dialer := &net.Dialer{Timeout: c.cfg.DialTimeout}
-	rawConn, err := dialer.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return nil, fmt.Errorf("sshconn: dialing %s: %w", addr, err)
-	}
-
-	sshConn, chans, reqs, err := ssh.NewClientConn(rawConn, addr, clientConfig)
-	if err != nil {
-		_ = rawConn.Close()
-		return nil, fmt.Errorf("sshconn: SSH handshake with %s: %w", addr, err)
-	}
-
-	return &Connection{client: ssh.NewClient(sshConn, chans, reqs)}, nil
+	}, nil
 }
 
 // Connection wraps a live, authenticated SSH connection to one target.
 type Connection struct {
-	client *ssh.Client
+	client   *ssh.Client
+	closeCh  chan struct{}
+	closeOne sync.Once
 }
 
 // RunCommand runs cmd in a fresh SSH session and returns its stdout/stderr —
@@ -231,8 +263,41 @@ func (conn *Connection) RunCommand(ctx context.Context, cmd string) (stdout, std
 	}
 }
 
-// Close closes the underlying SSH connection.
+// keepAlive sends an SSH keepalive@openssh.com global request every interval
+// until ctx is cancelled or the connection is closed — matches the spec's
+// ServerAliveInterval (30s). A missed write means the connection is dead;
+// the caller (sshrelay.Provisioner, right after Connect succeeds) starting
+// this loop is what feeds a drop into BUG-SSH-03's reconnect detection
+// (SOL-SSH-03), same "who starts it" placement as
+// devserveragent/session.go's keepAliveLoop, one layer lower.
+func (conn *Connection) keepAlive(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if _, _, err := conn.client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
+				return // caller's next operation on this Connection will observe the same failure
+			}
+		case <-ctx.Done():
+			return
+		case <-conn.closeCh:
+			return
+		}
+	}
+}
+
+// StartKeepAlive launches keepAlive in a goroutine — separated from
+// Connect() itself so a caller that doesn't want the loop (e.g. a
+// short-lived probe connection) can opt out.
+func (conn *Connection) StartKeepAlive(ctx context.Context, interval time.Duration) {
+	go conn.keepAlive(ctx, interval)
+}
+
+// Close closes the underlying SSH connection and stops any running
+// keepalive loop.
 func (conn *Connection) Close() error {
+	conn.closeOne.Do(func() { close(conn.closeCh) })
 	return conn.client.Close()
 }
 

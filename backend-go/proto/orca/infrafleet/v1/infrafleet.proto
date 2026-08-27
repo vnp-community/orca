@@ -213,6 +213,9 @@ message CreateSshTargetRequest {
   string host = 2;
   string user = 3;
   string vault_ssh_role = 4; // Vault SSH secrets engine role for cert issuance
+  int32 port = 5;                     // 0 = default to 22, mirrors domain.NewSshTarget
+  string known_hosts_fingerprint = 6; // optional; "" = unverified (documented gap)
+  string jump_host_target_id = 7;     // optional; "" = no jump host
 }
 
 message CreateSshTargetResponse {
@@ -263,6 +266,9 @@ message SshTarget {
   string host = 3;
   string user = 4;
   string vault_ssh_role = 5; // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+  int32 port = 6;
+  string known_hosts_fingerprint = 7;
+  string jump_host_target_id = 8;
 }
 
 message ListSshTargetsRequest {

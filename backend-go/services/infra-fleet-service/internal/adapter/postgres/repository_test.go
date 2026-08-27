@@ -36,6 +36,8 @@ const (
 
 	testSshTarget1 = "55555555-5555-5555-5555-555555555555"
 	testSshTarget2 = "66666666-6666-6666-6666-666666666666"
+	testSshTarget3 = "88888888-8888-8888-8888-888888888888" // bastion
+	testSshTarget4 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" // target behind testSshTarget3
 )
 
 func setupRepository(t *testing.T) *Repository {
@@ -140,7 +142,7 @@ func TestSshTargetStore_Get_FoundAndNotFound(t *testing.T) {
 	_, store := setupSshTargetStore(t)
 	ctx := context.Background()
 
-	target, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", "deploy", "role-1")
+	target, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", 0, "deploy", "role-1", "", "")
 	if err != nil {
 		t.Fatalf("building ssh target: %v", err)
 	}
@@ -166,6 +168,76 @@ func TestSshTargetStore_Get_FoundAndNotFound(t *testing.T) {
 	}
 }
 
+// TestSshTargetStore_PersistsPortKnownHostsAndJumpHost is the round-trip
+// regression for the port/known_hosts_fingerprint/jump_host_target_id
+// columns added in migrations/0007_ssh_targets_port_knownhosts_jumphost —
+// TASK-SSH-01-04.
+func TestSshTargetStore_PersistsPortKnownHostsAndJumpHost(t *testing.T) {
+	_, store := setupSshTargetStore(t)
+	ctx := context.Background()
+
+	bastion, err := domain.NewSshTarget(testSshTarget3, testTenant1, "10.0.0.10", 2200, "deploy", "role-1", "SHA256:bastionfingerprint", "")
+	if err != nil {
+		t.Fatalf("building bastion ssh target: %v", err)
+	}
+	if _, err := store.Create(ctx, bastion); err != nil {
+		t.Fatalf("creating bastion ssh target: %v", err)
+	}
+
+	behindBastion, err := domain.NewSshTarget(testSshTarget4, testTenant1, "192.168.1.5", 2222, "deploy", "role-2", "SHA256:targetfingerprint", testSshTarget3)
+	if err != nil {
+		t.Fatalf("building ssh target behind bastion: %v", err)
+	}
+	if _, err := store.Create(ctx, behindBastion); err != nil {
+		t.Fatalf("creating ssh target behind bastion: %v", err)
+	}
+
+	gotBastion, err := store.Get(ctx, testTenant1, testSshTarget3)
+	if err != nil {
+		t.Fatalf("get bastion: %v", err)
+	}
+	if gotBastion != bastion {
+		t.Errorf("expected bastion %+v, got %+v", bastion, gotBastion)
+	}
+	if gotBastion.JumpHostTargetID != "" {
+		t.Errorf("expected bastion to have no jump host, got %q", gotBastion.JumpHostTargetID)
+	}
+
+	gotBehind, err := store.Get(ctx, testTenant1, testSshTarget4)
+	if err != nil {
+		t.Fatalf("get target behind bastion: %v", err)
+	}
+	if gotBehind != behindBastion {
+		t.Errorf("expected %+v, got %+v", behindBastion, gotBehind)
+	}
+	if gotBehind.Port != 2222 {
+		t.Errorf("expected port 2222 to round-trip, got %d", gotBehind.Port)
+	}
+	if gotBehind.KnownHostsFingerprint != "SHA256:targetfingerprint" {
+		t.Errorf("expected known-hosts fingerprint to round-trip, got %q", gotBehind.KnownHostsFingerprint)
+	}
+	if gotBehind.JumpHostTargetID != testSshTarget3 {
+		t.Errorf("expected jump_host_target_id to round-trip, got %q", gotBehind.JumpHostTargetID)
+	}
+
+	list, err := store.List(ctx, testTenant1)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	foundBehind := false
+	for _, target := range list {
+		if target.ID == testSshTarget4 {
+			foundBehind = true
+			if target.JumpHostTargetID != testSshTarget3 {
+				t.Errorf("expected List to also carry jump_host_target_id, got %+v", target)
+			}
+		}
+	}
+	if !foundBehind {
+		t.Errorf("expected List to include %q, got %+v", testSshTarget4, list)
+	}
+}
+
 // TestRepository_RegisterAndGet_PersistsSSHTargetID is the round-trip
 // regression for the ssh_target_id column added in
 // migrations/0003_dev_server_ssh_target — a relay-ssh DevServer must come
@@ -175,7 +247,7 @@ func TestRepository_RegisterAndGet_PersistsSSHTargetID(t *testing.T) {
 	repo, store := setupSshTargetStore(t)
 	ctx := context.Background()
 
-	target, err := domain.NewSshTarget(testSshTarget2, testTenant1, "10.0.0.9", "deploy", "role-1")
+	target, err := domain.NewSshTarget(testSshTarget2, testTenant1, "10.0.0.9", 0, "deploy", "role-1", "", "")
 	if err != nil {
 		t.Fatalf("building ssh target: %v", err)
 	}

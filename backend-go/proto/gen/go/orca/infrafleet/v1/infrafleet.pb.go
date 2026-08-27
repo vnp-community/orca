@@ -724,13 +724,16 @@ func (x *RelayResponse) GetResultJson() string {
 }
 
 type CreateSshTargetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
-	User          string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
-	VaultSshRole  string                 `protobuf:"bytes,4,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"` // Vault SSH secrets engine role for cert issuance
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	TenantId              string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Host                  string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	User                  string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	VaultSshRole          string                 `protobuf:"bytes,4,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"`                            // Vault SSH secrets engine role for cert issuance
+	Port                  int32                  `protobuf:"varint,5,opt,name=port,proto3" json:"port,omitempty"`                                                                 // 0 = default to 22, mirrors domain.NewSshTarget
+	KnownHostsFingerprint string                 `protobuf:"bytes,6,opt,name=known_hosts_fingerprint,json=knownHostsFingerprint,proto3" json:"known_hosts_fingerprint,omitempty"` // optional; "" = unverified (documented gap)
+	JumpHostTargetId      string                 `protobuf:"bytes,7,opt,name=jump_host_target_id,json=jumpHostTargetId,proto3" json:"jump_host_target_id,omitempty"`              // optional; "" = no jump host
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *CreateSshTargetRequest) Reset() {
@@ -787,6 +790,27 @@ func (x *CreateSshTargetRequest) GetUser() string {
 func (x *CreateSshTargetRequest) GetVaultSshRole() string {
 	if x != nil {
 		return x.VaultSshRole
+	}
+	return ""
+}
+
+func (x *CreateSshTargetRequest) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *CreateSshTargetRequest) GetKnownHostsFingerprint() string {
+	if x != nil {
+		return x.KnownHostsFingerprint
+	}
+	return ""
+}
+
+func (x *CreateSshTargetRequest) GetJumpHostTargetId() string {
+	if x != nil {
+		return x.JumpHostTargetId
 	}
 	return ""
 }
@@ -1224,14 +1248,17 @@ func (x *KillWorkspacePortResponse) GetReason() string {
 }
 
 type SshTarget struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Host          string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
-	User          string                 `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
-	VaultSshRole  string                 `protobuf:"bytes,5,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"` // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Id                    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId              string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Host                  string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	User                  string                 `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
+	VaultSshRole          string                 `protobuf:"bytes,5,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"` // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+	Port                  int32                  `protobuf:"varint,6,opt,name=port,proto3" json:"port,omitempty"`
+	KnownHostsFingerprint string                 `protobuf:"bytes,7,opt,name=known_hosts_fingerprint,json=knownHostsFingerprint,proto3" json:"known_hosts_fingerprint,omitempty"`
+	JumpHostTargetId      string                 `protobuf:"bytes,8,opt,name=jump_host_target_id,json=jumpHostTargetId,proto3" json:"jump_host_target_id,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *SshTarget) Reset() {
@@ -1295,6 +1322,27 @@ func (x *SshTarget) GetUser() string {
 func (x *SshTarget) GetVaultSshRole() string {
 	if x != nil {
 		return x.VaultSshRole
+	}
+	return ""
+}
+
+func (x *SshTarget) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *SshTarget) GetKnownHostsFingerprint() string {
+	if x != nil {
+		return x.KnownHostsFingerprint
+	}
+	return ""
+}
+
+func (x *SshTarget) GetJumpHostTargetId() string {
+	if x != nil {
+		return x.JumpHostTargetId
 	}
 	return ""
 }
@@ -4009,12 +4057,15 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"paramsJson\"0\n" +
 	"\rRelayResponse\x12\x1f\n" +
 	"\vresult_json\x18\x01 \x01(\tR\n" +
-	"resultJson\"\x83\x01\n" +
+	"resultJson\"\xfe\x01\n" +
 	"\x16CreateSshTargetRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
 	"\x04user\x18\x03 \x01(\tR\x04user\x12$\n" +
-	"\x0evault_ssh_role\x18\x04 \x01(\tR\fvaultSshRole\"=\n" +
+	"\x0evault_ssh_role\x18\x04 \x01(\tR\fvaultSshRole\x12\x12\n" +
+	"\x04port\x18\x05 \x01(\x05R\x04port\x126\n" +
+	"\x17known_hosts_fingerprint\x18\x06 \x01(\tR\x15knownHostsFingerprint\x12-\n" +
+	"\x13jump_host_target_id\x18\a \x01(\tR\x10jumpHostTargetId\"=\n" +
 	"\x17CreateSshTargetResponse\x12\"\n" +
 	"\rssh_target_id\x18\x01 \x01(\tR\vsshTargetId\"4\n" +
 	"\x15GetFleetHealthRequest\x12\x1b\n" +
@@ -4046,13 +4097,16 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x04port\x18\x04 \x01(\x05R\x04port\"C\n" +
 	"\x19KillWorkspacePortResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x86\x01\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x81\x02\n" +
 	"\tSshTarget\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x03 \x01(\tR\x04host\x12\x12\n" +
 	"\x04user\x18\x04 \x01(\tR\x04user\x12$\n" +
-	"\x0evault_ssh_role\x18\x05 \x01(\tR\fvaultSshRole\"\x17\n" +
+	"\x0evault_ssh_role\x18\x05 \x01(\tR\fvaultSshRole\x12\x12\n" +
+	"\x04port\x18\x06 \x01(\x05R\x04port\x126\n" +
+	"\x17known_hosts_fingerprint\x18\a \x01(\tR\x15knownHostsFingerprint\x12-\n" +
+	"\x13jump_host_target_id\x18\b \x01(\tR\x10jumpHostTargetId\"\x17\n" +
 	"\x15ListSshTargetsRequest\"X\n" +
 	"\x16ListSshTargetsResponse\x12>\n" +
 	"\vssh_targets\x18\x01 \x03(\v2\x1d.orca.infrafleet.v1.SshTargetR\n" +
