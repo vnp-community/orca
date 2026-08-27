@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -106,9 +107,44 @@ func (f *fakeUserRepository) Count(ctx context.Context) (int32, error) {
 	return int32(len(f.byID)), nil
 }
 
-// fakeSessionRepository is an in-memory SessionRepository.
+// UpdateUser mirrors the postgres adapter's COALESCE semantics — a nil
+// field leaves the existing value unchanged.
+func (f *fakeUserRepository) UpdateUser(ctx context.Context, userID string, email, name *string, role *domain.Role) (domain.User, error) {
+	u, ok := f.byID[userID]
+	if !ok {
+		return domain.User{}, ErrUserNotFound
+	}
+	oldEmail := u.Email
+	if email != nil {
+		u.Email = *email
+	}
+	if name != nil {
+		u.Name = *name
+	}
+	if role != nil {
+		u.Role = *role
+	}
+	f.byID[userID] = u
+	delete(f.byEmail, oldEmail)
+	f.byEmail[u.Email] = u
+	return u, nil
+}
+
+// fakeSessionRepository is an in-memory SessionRepository. Guarded by mu
+// because ValidateSession's touchBestEffort calls TouchLastSeen from a
+// background goroutine (see validate_session.go) — a test asserting on
+// touchCalls races the fake's map/slice mutations otherwise.
 type fakeSessionRepository struct {
+	mu     sync.Mutex
 	byHash map[string]domain.Session
+
+	touchCalls           []string
+	touchErr             error
+	deleteExpiredCutoffs []time.Time
+	deleteExpiredErr     error
+	listForTenantErr     error
+	lastTenantID         string
+	userEmails           map[string]string // userID -> email, for ListForTenant's join
 }
 
 func newFakeSessionRepository() *fakeSessionRepository {
@@ -116,11 +152,15 @@ func newFakeSessionRepository() *fakeSessionRepository {
 }
 
 func (f *fakeSessionRepository) CreateSession(ctx context.Context, session domain.Session) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.byHash[session.TokenHash] = session
 	return nil
 }
 
 func (f *fakeSessionRepository) GetSessionByTokenHash(ctx context.Context, tokenHash string) (domain.Session, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	s, ok := f.byHash[tokenHash]
 	if !ok {
 		return domain.Session{}, ErrSessionNotFound
@@ -129,6 +169,8 @@ func (f *fakeSessionRepository) GetSessionByTokenHash(ctx context.Context, token
 }
 
 func (f *fakeSessionRepository) RevokeSession(ctx context.Context, tokenHash string, revokedAt time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	s, ok := f.byHash[tokenHash]
 	if !ok {
 		return ErrSessionNotFound
@@ -139,6 +181,8 @@ func (f *fakeSessionRepository) RevokeSession(ctx context.Context, tokenHash str
 }
 
 func (f *fakeSessionRepository) ListForUser(ctx context.Context, userID string) ([]domain.Session, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var out []domain.Session
 	for _, s := range f.byHash {
 		if s.UserID == userID {
@@ -149,6 +193,8 @@ func (f *fakeSessionRepository) ListForUser(ctx context.Context, userID string) 
 }
 
 func (f *fakeSessionRepository) RevokeAllForUser(ctx context.Context, userID string, revokedAt time.Time) (int32, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var n int32
 	for hash, s := range f.byHash {
 		if s.UserID == userID && s.RevokedAt == nil {
@@ -161,9 +207,79 @@ func (f *fakeSessionRepository) RevokeAllForUser(ctx context.Context, userID str
 }
 
 func (f *fakeSessionRepository) CountActive(ctx context.Context, now time.Time) (int32, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var n int32
 	for _, s := range f.byHash {
 		if s.IsValid(now) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+// touchErr/deleteExpiredErr/deleteExpiredN let a test force TouchLastSeen or
+// DeleteExpiredBefore to fail, or control DeleteExpiredBefore's return
+// count, without needing a real Postgres cutoff comparison against byHash.
+func (f *fakeSessionRepository) TouchLastSeen(ctx context.Context, tokenHash string, now time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.touchErr != nil {
+		return f.touchErr
+	}
+	f.touchCalls = append(f.touchCalls, tokenHash)
+	s, ok := f.byHash[tokenHash]
+	if !ok {
+		return nil // no-op for an unknown token hash — see interface doc comment
+	}
+	s.LastSeenAt = &now
+	f.byHash[tokenHash] = s
+	return nil
+}
+
+// touchCallCount reports how many times TouchLastSeen has been called so
+// far — safe to poll from a test racing ValidateSession's background touch
+// goroutine.
+func (f *fakeSessionRepository) touchCallCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.touchCalls)
+}
+
+// ListForTenant mirrors the postgres adapter's tenant-scoping + email join
+// (via userEmails, populated by seedActiveUser/users.seed's callers when a
+// test needs it) and lastTenantID records what tenantID it was actually
+// called with, so a test can assert ListSessions never leaks a
+// caller-supplied tenant_id through.
+func (f *fakeSessionRepository) ListForTenant(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.SessionWithUser, string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lastTenantID = tenantID
+	if f.listForTenantErr != nil {
+		return nil, "", f.listForTenantErr
+	}
+	var out []domain.SessionWithUser
+	for _, s := range f.byHash {
+		if s.TenantID == tenantID {
+			out = append(out, domain.SessionWithUser{Session: s, UserEmail: f.userEmails[s.UserID]})
+		}
+	}
+	return out, "", nil
+}
+
+func (f *fakeSessionRepository) DeleteExpiredBefore(ctx context.Context, cutoff time.Time) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.deleteExpiredErr != nil {
+		return 0, f.deleteExpiredErr
+	}
+	f.deleteExpiredCutoffs = append(f.deleteExpiredCutoffs, cutoff)
+	var n int64
+	for hash, s := range f.byHash {
+		expired := s.ExpiresAt.Before(cutoff)
+		revoked := s.RevokedAt != nil && s.RevokedAt.Before(cutoff)
+		if expired || revoked {
+			delete(f.byHash, hash)
 			n++
 		}
 	}
@@ -253,12 +369,25 @@ func (f *fakeAuditRepository) Append(ctx context.Context, entry domain.AuditEntr
 	return nil
 }
 
-func (f *fakeAuditRepository) Query(ctx context.Context, tenantID string, since time.Time, pageToken string, pageSize int32) ([]domain.AuditEntry, string, error) {
+func (f *fakeAuditRepository) Query(ctx context.Context, filter AuditQueryFilter, pageToken string, pageSize int32) ([]domain.AuditEntry, string, error) {
 	var out []domain.AuditEntry
 	for _, e := range f.entries {
-		if e.TenantID == tenantID {
-			out = append(out, e)
+		if e.TenantID != filter.TenantID {
+			continue
 		}
+		if !filter.Since.IsZero() && e.OccurredAt.Before(filter.Since) {
+			continue
+		}
+		if !filter.To.IsZero() && e.OccurredAt.After(filter.To) {
+			continue
+		}
+		if filter.Action != "" && e.Action != filter.Action {
+			continue
+		}
+		if filter.ActorID != "" && e.ActorID != filter.ActorID {
+			continue
+		}
+		out = append(out, e)
 	}
 	return out, "", nil
 }

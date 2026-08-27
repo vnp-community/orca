@@ -165,6 +165,17 @@ func (f *fakeAdminAuthServiceClient) GetAdminStats(ctx context.Context, in *auth
 	return f.statsResp, nil
 }
 
+// ListSessions/UpdateUser: added to authv1.AuthServiceClient by SOL-AUTH-04
+// (TASK-AUTH-04-01) — not used by this file's tests, same "not used by this
+// test" stub as every other not-yet-exercised method above.
+func (f *fakeAdminAuthServiceClient) ListSessions(ctx context.Context, in *authv1.ListSessionsRequest, opts ...grpc.CallOption) (*authv1.ListSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) UpdateUser(ctx context.Context, in *authv1.UpdateUserRequest, opts ...grpc.CallOption) (*authv1.UpdateUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
 var _ authv1.AuthServiceClient = (*fakeAdminAuthServiceClient)(nil)
 
 // testAuthAdminRouter mounts mountAuthAdminRoutes standalone and injects a

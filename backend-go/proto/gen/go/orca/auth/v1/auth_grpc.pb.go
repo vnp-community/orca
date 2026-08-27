@@ -28,6 +28,8 @@ const (
 	AuthService_CreateUser_FullMethodName                    = "/orca.auth.v1.AuthService/CreateUser"
 	AuthService_ListUsers_FullMethodName                     = "/orca.auth.v1.AuthService/ListUsers"
 	AuthService_UpdateUserRole_FullMethodName                = "/orca.auth.v1.AuthService/UpdateUserRole"
+	AuthService_ListSessions_FullMethodName                  = "/orca.auth.v1.AuthService/ListSessions"
+	AuthService_UpdateUser_FullMethodName                    = "/orca.auth.v1.AuthService/UpdateUser"
 	AuthService_RevokeSession_FullMethodName                 = "/orca.auth.v1.AuthService/RevokeSession"
 	AuthService_QueryAuditLog_FullMethodName                 = "/orca.auth.v1.AuthService/QueryAuditLog"
 	AuthService_DeactivateUser_FullMethodName                = "/orca.auth.v1.AuthService/DeactivateUser"
@@ -62,6 +64,14 @@ type AuthServiceClient interface {
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
 	UpdateUserRole(ctx context.Context, in *UpdateUserRoleRequest, opts ...grpc.CallOption) (*UpdateUserRoleResponse, error)
+	// ListSessions is the cross-user, tenant-scoped admin session-dashboard
+	// RPC — distinct from ListSessionsForUser (single-user scope, kept as-is).
+	// Scope addition beyond this service's original RPC surface (auth-service.md
+	// §3 only lists ListSessionsForUser).
+	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
+	// UpdateUser — the RPC auth-service.md §3 already names but the current
+	// codebase never implemented (only the narrower UpdateUserRole exists).
+	UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*UpdateUserResponse, error)
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
 	QueryAuditLog(ctx context.Context, in *QueryAuditLogRequest, opts ...grpc.CallOption) (*QueryAuditLogResponse, error)
 	DeactivateUser(ctx context.Context, in *DeactivateUserRequest, opts ...grpc.CallOption) (*DeactivateUserResponse, error)
@@ -158,6 +168,26 @@ func (c *authServiceClient) UpdateUserRole(ctx context.Context, in *UpdateUserRo
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateUserRoleResponse)
 	err := c.cc.Invoke(ctx, AuthService_UpdateUserRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSessionsResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*UpdateUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateUserResponse)
+	err := c.cc.Invoke(ctx, AuthService_UpdateUser_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -304,6 +334,14 @@ type AuthServiceServer interface {
 	CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
 	UpdateUserRole(context.Context, *UpdateUserRoleRequest) (*UpdateUserRoleResponse, error)
+	// ListSessions is the cross-user, tenant-scoped admin session-dashboard
+	// RPC — distinct from ListSessionsForUser (single-user scope, kept as-is).
+	// Scope addition beyond this service's original RPC surface (auth-service.md
+	// §3 only lists ListSessionsForUser).
+	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
+	// UpdateUser — the RPC auth-service.md §3 already names but the current
+	// codebase never implemented (only the narrower UpdateUserRole exists).
+	UpdateUser(context.Context, *UpdateUserRequest) (*UpdateUserResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
 	QueryAuditLog(context.Context, *QueryAuditLogRequest) (*QueryAuditLogResponse, error)
 	DeactivateUser(context.Context, *DeactivateUserRequest) (*DeactivateUserResponse, error)
@@ -349,6 +387,12 @@ func (UnimplementedAuthServiceServer) ListUsers(context.Context, *ListUsersReque
 }
 func (UnimplementedAuthServiceServer) UpdateUserRole(context.Context, *UpdateUserRoleRequest) (*UpdateUserRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateUserRole not implemented")
+}
+func (UnimplementedAuthServiceServer) ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSessions not implemented")
+}
+func (UnimplementedAuthServiceServer) UpdateUser(context.Context, *UpdateUserRequest) (*UpdateUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateUser not implemented")
 }
 func (UnimplementedAuthServiceServer) RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeSession not implemented")
@@ -547,6 +591,42 @@ func _AuthService_UpdateUserRole_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AuthServiceServer).UpdateUserRole(ctx, req.(*UpdateUserRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListSessions(ctx, req.(*ListSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_UpdateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).UpdateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_UpdateUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).UpdateUser(ctx, req.(*UpdateUserRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -805,6 +885,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateUserRole",
 			Handler:    _AuthService_UpdateUserRole_Handler,
+		},
+		{
+			MethodName: "ListSessions",
+			Handler:    _AuthService_ListSessions_Handler,
+		},
+		{
+			MethodName: "UpdateUser",
+			Handler:    _AuthService_UpdateUser_Handler,
 		},
 		{
 			MethodName: "RevokeSession",

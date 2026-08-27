@@ -5,7 +5,7 @@
 **Service:** `auth-service` (proto + usecase)
 **File:** `backend-go/proto/orca/auth/v1/auth.proto`, `backend-go/services/auth-service/internal/usecase/query_audit_log.go`
 **Depends on:** TASK-AUTH-05-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `AuditEntry.target_type/target_id/metadata_json/ip_address` and `QueryAuditLogRequest.to/action/actor_id` at unused field numbers (7-10, 5-7), keeping existing numbering intact (no renumbering); `QueryAuditLog` usecase builds an `AuditQueryFilter`; `toProtoAuditEntry` serializes `Metadata` to `metadata_json`; new `TestQueryAuditLog_ForwardsExtendedFilters` passes.
 
 ---
 

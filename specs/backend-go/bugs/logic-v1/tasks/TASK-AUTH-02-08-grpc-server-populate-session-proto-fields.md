@@ -5,7 +5,7 @@
 **Service:** `auth-service` (grpc adapter)
 **File:** `backend-go/services/auth-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-AUTH-02-02, TASK-AUTH-02-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `toProtoSession` sets `Ip`/`UserAgent`/conditional `LastSeenAt`; new `TestServer_ListSessionsForUser` confirms both a touched (LastSeenAt set) and never-touched (unset) session round-trip correctly.
 
 ---
 

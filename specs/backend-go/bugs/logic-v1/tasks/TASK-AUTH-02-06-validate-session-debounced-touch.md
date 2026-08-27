@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase)
 **File:** `backend-go/services/auth-service/internal/usecase/validate_session.go`
 **Depends on:** TASK-AUTH-02-02, TASK-AUTH-02-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — debounced fire-and-forget `touchBestEffort` added; 4 new deterministic tests (nil-LastSeenAt touches, <60s no-touch, >60s touches, touch failure doesn't affect output) pass under `go test -race`.
 
 ---
 

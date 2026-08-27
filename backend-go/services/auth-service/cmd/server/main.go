@@ -131,6 +131,9 @@ func run() error {
 	deleteAccessPolicyUC := usecase.NewDeleteAccessPolicy(repo, repo, opaClient)
 	getAdminStatsUC := usecase.NewGetAdminStats(repo, repo, repo, clock, opaClient)
 
+	listSessionsUC := usecase.NewListSessions(repo, repo, opaClient)
+	updateUserUC := usecase.NewUpdateUser(repo, repo, clock, opaClient)
+
 	// Runs once, before the server starts accepting traffic — see
 	// internal/usecase/bootstrap.go's doc comment for why this isn't an
 	// RPC. No-op unless BOOTSTRAP_TENANT_ID/BOOTSTRAP_ADMIN_EMAIL are set
@@ -152,6 +155,27 @@ func run() error {
 			slog.String("password", generatedPassword))
 	}
 
+	// Session reaper: purges rows expired/revoked more than 7 days ago.
+	// Operational hygiene, not correctness — domain.Session.IsValid already
+	// enforces expiry at read time (auth-service.md §8's reaper NFR).
+	reaper := usecase.NewReapExpiredSessions(repo, clock, 7*24*time.Hour)
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour) // frequent enough per the reaper's "operational, not correctness" NFR
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if n, err := reaper.Execute(ctx); err != nil {
+					logger.Error("session reaper failed", slog.Any("error", err))
+				} else if n > 0 {
+					logger.Info("session reaper purged rows", slog.Int64("count", n))
+				}
+			}
+		}
+	}()
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	authv1.RegisterAuthServiceServer(grpcServer, authgrpc.New(
 		loginUC, logoutUC, validateSessionUC,
@@ -160,6 +184,7 @@ func run() error {
 		deactivateUserUC, reactivateUserUC, listSessionsForUserUC, forceRevokeAllSessionsForUserUC,
 		createAccessPolicyUC, getAccessPolicyUC, listAccessPoliciesUC, updateAccessPolicyUC, deleteAccessPolicyUC,
 		getAdminStatsUC,
+		listSessionsUC, updateUserUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

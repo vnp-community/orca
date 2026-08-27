@@ -5,7 +5,7 @@
 **Service:** `auth-service` (postgres migration)
 **File:** `backend-go/services/auth-service/migrations/0004_audit_log_metadata.up.sql` (+ `.down.sql`)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `0004_audit_log_metadata.{up,down}.sql` (0003 already taken by TASK-AUTH-02-01); verified both `up` and `down` apply cleanly against a real Postgres 16 container via `migrate -path . -database ... up/down -all`, all 4 migrations in sequence.
 
 ---
 

@@ -6,6 +6,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -43,6 +44,9 @@ type Server struct {
 	updateAccessPolicy            *usecase.UpdateAccessPolicy
 	deleteAccessPolicy            *usecase.DeleteAccessPolicy
 	getAdminStats                 *usecase.GetAdminStats
+
+	listSessions *usecase.ListSessions
+	updateUser   *usecase.UpdateUser
 }
 
 func New(
@@ -66,6 +70,8 @@ func New(
 	updateAccessPolicy *usecase.UpdateAccessPolicy,
 	deleteAccessPolicy *usecase.DeleteAccessPolicy,
 	getAdminStats *usecase.GetAdminStats,
+	listSessions *usecase.ListSessions,
+	updateUser *usecase.UpdateUser,
 ) *Server {
 	return &Server{
 		login:             login,
@@ -89,11 +95,19 @@ func New(
 		updateAccessPolicy:            updateAccessPolicy,
 		deleteAccessPolicy:            deleteAccessPolicy,
 		getAdminStats:                 getAdminStats,
+
+		listSessions: listSessions,
+		updateUser:   updateUser,
 	}
 }
 
 func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
-	out, err := s.login.Execute(ctx, usecase.LoginInput{Email: req.GetEmail(), Password: req.GetPassword()})
+	out, err := s.login.Execute(ctx, usecase.LoginInput{
+		Email:     req.GetEmail(),
+		Password:  req.GetPassword(),
+		IP:        req.GetIp(),
+		UserAgent: req.GetUserAgent(),
+	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -154,6 +168,7 @@ func (s *Server) CreateUser(ctx context.Context, req *authv1.CreateUserRequest) 
 		Email:    req.GetEmail(),
 		Name:     req.GetName(),
 		TenantID: req.GetTenantId(),
+		Password: req.GetPassword(),
 		Role:     toDomainRole(req.GetRole()),
 	})
 	if err != nil {
@@ -186,6 +201,45 @@ func (s *Server) UpdateUserRole(ctx context.Context, req *authv1.UpdateUserRoleR
 	return &authv1.UpdateUserRoleResponse{User: toProtoUser(user)}, nil
 }
 
+func (s *Server) ListSessions(ctx context.Context, req *authv1.ListSessionsRequest) (*authv1.ListSessionsResponse, error) {
+	out, err := s.listSessions.Execute(ctx, usecase.ListSessionsInput{
+		PageToken: req.GetPageToken(),
+		PageSize:  req.GetPageSize(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	sessions := make([]*authv1.SessionWithUser, 0, len(out.Sessions))
+	for _, sw := range out.Sessions {
+		sessions = append(sessions, &authv1.SessionWithUser{
+			Session:   toProtoSession(sw.Session),
+			UserEmail: sw.UserEmail,
+		})
+	}
+	return &authv1.ListSessionsResponse{Sessions: sessions, NextPageToken: out.NextPageToken}, nil
+}
+
+func (s *Server) UpdateUser(ctx context.Context, req *authv1.UpdateUserRequest) (*authv1.UpdateUserResponse, error) {
+	in := usecase.UpdateUserInput{UserID: req.GetUserId()}
+	if req.GetEmail() != nil {
+		v := req.GetEmail().GetValue()
+		in.Email = &v
+	}
+	if req.GetName() != nil {
+		v := req.GetName().GetValue()
+		in.Name = &v
+	}
+	if req.Role != nil {
+		r := toDomainRole(req.GetRole())
+		in.Role = &r
+	}
+	user, err := s.updateUser.Execute(ctx, in)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.UpdateUserResponse{User: toProtoUser(user)}, nil
+}
+
 func (s *Server) RevokeSession(ctx context.Context, req *authv1.RevokeSessionRequest) (*authv1.RevokeSessionResponse, error) {
 	if err := s.revokeSession.Execute(ctx, req.GetSessionToken()); err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -199,6 +253,9 @@ func (s *Server) QueryAuditLog(ctx context.Context, req *authv1.QueryAuditLogReq
 		Since:     toTime(req.GetSince()),
 		PageToken: req.GetPageToken(),
 		PageSize:  req.GetPageSize(),
+		To:        toTime(req.GetTo()),
+		Action:    req.GetAction(),
+		ActorID:   req.GetActorId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -310,14 +367,19 @@ func (s *Server) GetAdminStats(ctx context.Context, req *authv1.GetAdminStatsReq
 
 func toProtoSession(s domain.Session) *authv1.Session {
 	out := &authv1.Session{
-		Id:     s.TokenHash,
-		UserId: s.UserID,
+		Id:        s.TokenHash,
+		UserId:    s.UserID,
+		Ip:        s.IP,
+		UserAgent: s.UserAgent,
 	}
 	if !s.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(s.CreatedAt)
 	}
 	if !s.ExpiresAt.IsZero() {
 		out.ExpiresAt = timestamppb.New(s.ExpiresAt)
+	}
+	if s.LastSeenAt != nil {
+		out.LastSeenAt = timestamppb.New(*s.LastSeenAt)
 	}
 	return out
 }
@@ -382,12 +444,23 @@ func toProtoUser(u domain.User) *authv1.User {
 }
 
 func toProtoAuditEntry(e domain.AuditEntry) *authv1.AuditEntry {
+	metadataJSON, err := json.Marshal(e.Metadata)
+	if err != nil {
+		// Marshaling a map[string]any built entirely from JSON-serializable
+		// values (domain.NewAuditEntry's contract) should never fail — fall
+		// back to an empty object rather than surface an error from a
+		// converter function, matching this file's other toProto* helpers.
+		metadataJSON = []byte("{}")
+	}
 	out := &authv1.AuditEntry{
-		Id:       e.ID,
-		TenantId: e.TenantID,
-		ActorId:  e.ActorID,
-		Action:   e.Action,
-		Target:   e.Target,
+		Id:           e.ID,
+		TenantId:     e.TenantID,
+		ActorId:      e.ActorID,
+		Action:       e.Action,
+		TargetType:   e.TargetType,
+		TargetId:     e.TargetID,
+		MetadataJson: string(metadataJSON),
+		IpAddress:    e.IPAddress,
 	}
 	if !e.OccurredAt.IsZero() {
 		out.OccurredAt = timestamppb.New(e.OccurredAt)

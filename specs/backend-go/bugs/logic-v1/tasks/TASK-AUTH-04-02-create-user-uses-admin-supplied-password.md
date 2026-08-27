@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase)
 **File:** `backend-go/services/auth-service/internal/usecase/create_user.go`
 **Depends on:** TASK-AUTH-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `CreateUser.Execute` hashes `in.Password` (8-char floor), removed the random-generate-and-discard path; also wired `req.GetPassword()` into the grpc handler (needed end-to-end, not explicitly in this task's diff but required for the fix to actually work). Tests: `TestCreateUser_AllowedWhenOPADecisionIsTrue` verifies the stored hash matches the admin-supplied plaintext via `Compare`; new `TestCreateUser_WeakPasswordFailsBeforeAnyWrite`.
 
 ---
 

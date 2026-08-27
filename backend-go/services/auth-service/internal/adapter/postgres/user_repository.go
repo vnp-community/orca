@@ -126,6 +126,34 @@ func (r *Repository) SetActive(ctx context.Context, userID string, active bool) 
 	return nil
 }
 
+// UpdateUser applies a partial update — nil fields are left unchanged via
+// COALESCE. Distinct from UpdateUserRole above (kept as-is).
+func (r *Repository) UpdateUser(ctx context.Context, userID string, email, name *string, role *domain.Role) (domain.User, error) {
+	var roleStr *string
+	if role != nil {
+		s := string(*role)
+		roleStr = &s
+	}
+	row := r.pool.QueryRow(ctx, `
+		UPDATE auth.users
+		SET email = COALESCE($2, email), name = COALESCE($3, name), role = COALESCE($4, role)
+		WHERE id = $1
+		RETURNING id, tenant_id, email, name, role, is_active, created_at
+	`, userID, email, name, roleStr)
+
+	var u domain.User
+	var scannedRole string
+	err := row.Scan(&u.ID, &u.TenantID, &u.Email, &u.Name, &scannedRole, &u.IsActive, &u.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.User{}, fmt.Errorf("postgres: update user: %w", usecase.ErrUserNotFound)
+	}
+	if err != nil {
+		return domain.User{}, fmt.Errorf("postgres: scan updated user row: %w", err)
+	}
+	u.Role = domain.Role(scannedRole)
+	return u, nil
+}
+
 // Count returns the total number of users across every tenant.
 func (r *Repository) Count(ctx context.Context) (int32, error) {
 	var n int32

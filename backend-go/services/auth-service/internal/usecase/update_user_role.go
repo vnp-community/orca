@@ -31,6 +31,12 @@ func (uc *UpdateUserRole) Execute(ctx context.Context, userID string, role domai
 		return domain.User{}, apperrors.New(apperrors.KindInvalidArgument, "AUTH_INVALID_ROLE", "invalid role", nil)
 	}
 
+	before, err := uc.users.GetUserByID(ctx, userID) // capture old role before mutating
+	oldRole := ""
+	if err == nil {
+		oldRole = string(before.Role)
+	}
+
 	updated, err := uc.users.UpdateUserRole(ctx, userID, role)
 	if errors.Is(err, ErrUserNotFound) {
 		return domain.User{}, apperrors.New(apperrors.KindNotFound, "AUTH_USER_NOT_FOUND", "user not found", err)
@@ -40,7 +46,8 @@ func (uc *UpdateUserRole) Execute(ctx context.Context, userID string, role domai
 	}
 
 	now := uc.clock.Now()
-	if entry, err := domain.NewAuditEntry(uuid.NewString(), updated.TenantID, actor.ID, "user.role_updated", updated.ID, now); err == nil {
+	if entry, err := domain.NewAuditEntry(uuid.NewString(), updated.TenantID, actor.ID, "user.role_updated",
+		"user", updated.ID, map[string]any{"from": oldRole, "to": string(role)}, "", now); err == nil {
 		_ = uc.audit.Append(ctx, entry)
 	}
 

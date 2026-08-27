@@ -22,7 +22,7 @@ func TestCreateUser_DeniedWhenOPADecisionIsFalse(t *testing.T) {
 	opa := &fakeOPAClient{allow: false}
 	uc := NewCreateUser(users, &fakeAuditRepository{}, fakeHasher{}, &fakeClock{now: time.Now()}, opa)
 	ctx := withActor(context.Background(), "t1", "u1")
-	_, err := uc.Execute(ctx, CreateUserInput{Email: "new@example.com", Name: "New", TenantID: "t1", Role: domain.RoleUser})
+	_, err := uc.Execute(ctx, CreateUserInput{Email: "new@example.com", Name: "New", TenantID: "t1", Password: "initial-pw", Role: domain.RoleUser})
 	if err == nil {
 		t.Fatal("expected an error when OPA denies the actor")
 	}
@@ -37,23 +37,46 @@ func TestCreateUser_AllowedWhenOPADecisionIsTrue(t *testing.T) {
 	audit := &fakeAuditRepository{}
 
 	opa := &fakeOPAClient{allow: true}
-	uc := NewCreateUser(users, audit, fakeHasher{}, &fakeClock{now: time.Now()}, opa)
+	hasher := fakeHasher{}
+	uc := NewCreateUser(users, audit, hasher, &fakeClock{now: time.Now()}, opa)
 	ctx := withActor(context.Background(), "t1", "admin1")
-	created, err := uc.Execute(ctx, CreateUserInput{Email: "new@example.com", Name: "New", TenantID: "t1", Role: domain.RoleUser})
+	created, err := uc.Execute(ctx, CreateUserInput{Email: "new@example.com", Name: "New", TenantID: "t1", Password: "admin-chosen-pw", Role: domain.RoleUser})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if created.Email != "new@example.com" || created.TenantID != "t1" {
 		t.Errorf("unexpected created user: %+v", created)
 	}
-	if _, _, err := users.GetUserByEmail(ctx, "new@example.com"); err != nil {
+	_, storedHash, err := users.GetUserByEmail(ctx, "new@example.com")
+	if err != nil {
 		t.Errorf("expected user to be persisted: %v", err)
+	}
+	// The exact admin-supplied plaintext must verify against the stored
+	// hash — the prior behavior generated-and-discarded a random password,
+	// leaving the account permanently unusable.
+	if err := hasher.Compare(storedHash, "admin-chosen-pw"); err != nil {
+		t.Errorf("expected the admin-supplied password to verify against the stored hash: %v", err)
 	}
 	if len(audit.entries) != 1 || audit.entries[0].Action != "user.created" {
 		t.Errorf("expected one user.created audit entry, got %+v", audit.entries)
 	}
 	if opa.lastActor.ID != "admin1" || opa.lastActor.Role != domain.RoleAdmin {
 		t.Errorf("expected OPA to be queried with the resolved admin actor, got %+v", opa.lastActor)
+	}
+}
+
+func TestCreateUser_WeakPasswordFailsBeforeAnyWrite(t *testing.T) {
+	users := newFakeUserRepository()
+	seedActiveUser(t, users, fakeHasher{}, "admin1", "t1", "admin@example.com", "pw", domain.RoleAdmin)
+
+	uc := NewCreateUser(users, &fakeAuditRepository{}, fakeHasher{}, &fakeClock{now: time.Now()}, &fakeOPAClient{allow: true})
+	ctx := withActor(context.Background(), "t1", "admin1")
+	_, err := uc.Execute(ctx, CreateUserInput{Email: "new@example.com", Name: "New", TenantID: "t1", Password: "short", Role: domain.RoleUser})
+	if err == nil {
+		t.Fatal("expected an error for a too-short password")
+	}
+	if _, _, err := users.GetUserByEmail(ctx, "new@example.com"); err == nil {
+		t.Error("expected no user to have been created for a weak password")
 	}
 }
 
@@ -77,7 +100,7 @@ func TestCreateUser_DuplicateEmailFails(t *testing.T) {
 
 	uc := NewCreateUser(users, &fakeAuditRepository{}, fakeHasher{}, &fakeClock{now: time.Now()}, &fakeOPAClient{allow: true})
 	ctx := withActor(context.Background(), "t1", "admin1")
-	_, err := uc.Execute(ctx, CreateUserInput{Email: "existing@example.com", Name: "Dup", TenantID: "t1", Role: domain.RoleUser})
+	_, err := uc.Execute(ctx, CreateUserInput{Email: "existing@example.com", Name: "Dup", TenantID: "t1", Password: "initial-pw", Role: domain.RoleUser})
 	if err == nil {
 		t.Fatal("expected an error for a duplicate email")
 	}
