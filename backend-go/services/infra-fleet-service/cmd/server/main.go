@@ -226,6 +226,7 @@ func run() error {
 		getHostCapabilitiesUC,
 		dispatchPromptUC,
 		getQueuedPromptUC,
+		terminalLiveStates,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

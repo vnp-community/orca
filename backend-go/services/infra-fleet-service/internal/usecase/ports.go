@@ -223,6 +223,10 @@ type AgentStatusResult struct {
 	AgentRunning  bool
 	AgentKind     string
 	ReadyForInput bool
+	// LastOutputPreview is populated from the shared liveStates registry
+	// (TASK-MB-04-02), BR-MB-15-truncated — empty when no live entry exists
+	// for this ptyId (cross-pod case), an honest absence not an error.
+	LastOutputPreview string
 }
 
 // InspectProcessResult carries InspectTerminalProcessResponse's fields.

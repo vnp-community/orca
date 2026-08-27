@@ -8,6 +8,8 @@ import (
 	"context"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
+
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
 // ProjectRepository is the persistence port for projects and project
@@ -208,6 +210,25 @@ type HostSetupRepository interface {
 // infrafleetv1.InfraFleetServiceClient.
 type DevServerLister interface {
 	Exists(ctx context.Context, tenantID, devServerID string) (bool, error)
+}
+
+// TerminalStatusResolver is the outbound port toward infra-fleet-service's
+// PTY/terminal-session surface — GetMobileWorktreeStatus's ONE cross-service
+// dependency (SOL-MB-04), implemented by internal/adapter/grpcclient against
+// infrafleetv1.InfraFleetServiceClient. Kept as infrafleetv1 DTOs rather than
+// a project-service domain type: this data never persists here, it is
+// composed fresh into MobileWorktreeStatus on every call, so an extra
+// translation layer would buy nothing.
+type TerminalStatusResolver interface {
+	// ListSessionsForDevServer resolves devServerID to its live connection
+	// and lists its terminal sessions — nil, nil (not an error) when the dev
+	// server has no live connection.
+	ListSessionsForDevServer(ctx context.Context, devServerID string) ([]*infrafleetv1.TerminalSession, error)
+	// GetAgentStatus fetches one ptyId's AgentKind/AgentRunning/
+	// ReadyForInput — TerminalSession itself doesn't carry these (see
+	// GetMobileWorktreeStatus's doc comment for the extra-RPC-cost tradeoff
+	// this implies).
+	GetAgentStatus(ctx context.Context, ptyID string) (*infrafleetv1.GetTerminalAgentStatusResponse, error)
 }
 
 // FolderWorkspaceRepository is the persistence port for FolderWorkspace —

@@ -8,6 +8,7 @@ package grpc
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -63,6 +64,12 @@ type Server struct {
 	// --- Mobile prompt dispatch (SOL-MB-03) ---
 	dispatchPrompt  *usecase.DispatchPrompt
 	getQueuedPrompt *usecase.GetQueuedPrompt
+
+	// liveStates is the SAME per-pod quiescence registry AttachPty/
+	// GetTerminalAgentStatus share (TASK-MB-02-01) — read here only to
+	// populate ListTerminalSessions/SpawnTerminalSession's
+	// TerminalSession.LastOutputPreview (TASK-MB-04-02), never written.
+	liveStates *sync.Map
 }
 
 func New(
@@ -95,6 +102,7 @@ func New(
 	getHostCapabilities *usecase.GetHostCapabilities,
 	dispatchPrompt *usecase.DispatchPrompt,
 	getQueuedPrompt *usecase.GetQueuedPrompt,
+	liveStates *sync.Map,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -126,6 +134,7 @@ func New(
 		getHostCapabilities:    getHostCapabilities,
 		dispatchPrompt:         dispatchPrompt,
 		getQueuedPrompt:        getQueuedPrompt,
+		liveStates:             liveStates,
 	}
 }
 
@@ -390,7 +399,7 @@ func (s *Server) SpawnTerminalSession(ctx context.Context, req *infrafleetv1.Spa
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &infrafleetv1.SpawnTerminalSessionResponse{Session: toProtoTerminalSession(session)}, nil
+	return &infrafleetv1.SpawnTerminalSessionResponse{Session: s.toProtoTerminalSession(session)}, nil
 }
 
 func (s *Server) ResizeTerminalSession(ctx context.Context, req *infrafleetv1.ResizeTerminalSessionRequest) (*emptypb.Empty, error) {
@@ -421,7 +430,7 @@ func (s *Server) ListTerminalSessions(ctx context.Context, req *infrafleetv1.Lis
 	}
 	out := make([]*infrafleetv1.TerminalSession, 0, len(sessions))
 	for _, session := range sessions {
-		out = append(out, toProtoTerminalSession(session))
+		out = append(out, s.toProtoTerminalSession(session))
 	}
 	return &infrafleetv1.ListTerminalSessionsResponse{Sessions: out}, nil
 }
@@ -447,9 +456,10 @@ func (s *Server) GetTerminalAgentStatus(ctx context.Context, req *infrafleetv1.G
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &infrafleetv1.GetTerminalAgentStatusResponse{
-		AgentRunning:  result.AgentRunning,
-		AgentKind:     result.AgentKind,
-		ReadyForInput: result.ReadyForInput,
+		AgentRunning:      result.AgentRunning,
+		AgentKind:         result.AgentKind,
+		ReadyForInput:     result.ReadyForInput,
+		LastOutputPreview: result.LastOutputPreview,
 	}, nil
 }
 
@@ -599,13 +609,19 @@ func toProtoPtyServerFrame(msg usecase.PtyServerMessage) *infrafleetv1.PtyServer
 	return &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Out{Out: &infrafleetv1.PtyOutput{Data: msg.Output}}}
 }
 
-func toProtoTerminalSession(session domain.TerminalSession) *infrafleetv1.TerminalSession {
+// toProtoTerminalSession is a method (not a free function) because
+// LastOutputPreview (TASK-MB-04-02) is read from the server's shared
+// liveStates registry, keyed by PtyID — empty when no live entry exists
+// (cross-pod case, or a freshly spawned session with no output yet), not an
+// error.
+func (s *Server) toProtoTerminalSession(session domain.TerminalSession) *infrafleetv1.TerminalSession {
 	return &infrafleetv1.TerminalSession{
 		PtyId:              session.PtyID,
 		ConnectionId:       session.ConnectionID,
 		Cwd:                session.Cwd,
 		CreatedAtUnixMs:    session.CreatedAt.UnixMilli(),
 		LastActiveAtUnixMs: session.LastActiveAt.UnixMilli(),
+		LastOutputPreview:  usecase.LastOutputPreview(s.liveStates, session.PtyID),
 	}
 }
 

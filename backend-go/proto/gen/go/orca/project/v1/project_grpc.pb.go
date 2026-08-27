@@ -56,6 +56,7 @@ const (
 	ProjectService_UpdateHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/UpdateHostSetup"
 	ProjectService_DeleteHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/DeleteHostSetup"
 	ProjectService_SetupExistingFolder_FullMethodName          = "/orca.project.v1.ProjectService/SetupExistingFolder"
+	ProjectService_GetMobileWorktreeStatus_FullMethodName      = "/orca.project.v1.ProjectService/GetMobileWorktreeStatus"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -122,6 +123,11 @@ type ProjectServiceClient interface {
 	UpdateHostSetup(ctx context.Context, in *UpdateHostSetupRequest, opts ...grpc.CallOption) (*UpdateHostSetupResponse, error)
 	DeleteHostSetup(ctx context.Context, in *DeleteHostSetupRequest, opts ...grpc.CallOption) (*DeleteHostSetupResponse, error)
 	SetupExistingFolder(ctx context.Context, in *SetupExistingFolderRequest, opts ...grpc.CallOption) (*SetupExistingFolderResponse, error)
+	// GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
+	// to — project-service already depends on infra-fleet-service (dev-server
+	// binding validation), so this extends that existing edge rather than
+	// adding a new cross-service dependency.
+	GetMobileWorktreeStatus(ctx context.Context, in *GetMobileWorktreeStatusRequest, opts ...grpc.CallOption) (*GetMobileWorktreeStatusResponse, error)
 }
 
 type projectServiceClient struct {
@@ -502,6 +508,16 @@ func (c *projectServiceClient) SetupExistingFolder(ctx context.Context, in *Setu
 	return out, nil
 }
 
+func (c *projectServiceClient) GetMobileWorktreeStatus(ctx context.Context, in *GetMobileWorktreeStatusRequest, opts ...grpc.CallOption) (*GetMobileWorktreeStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMobileWorktreeStatusResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetMobileWorktreeStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -566,6 +582,11 @@ type ProjectServiceServer interface {
 	UpdateHostSetup(context.Context, *UpdateHostSetupRequest) (*UpdateHostSetupResponse, error)
 	DeleteHostSetup(context.Context, *DeleteHostSetupRequest) (*DeleteHostSetupResponse, error)
 	SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error)
+	// GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
+	// to — project-service already depends on infra-fleet-service (dev-server
+	// binding validation), so this extends that existing edge rather than
+	// adding a new cross-service dependency.
+	GetMobileWorktreeStatus(context.Context, *GetMobileWorktreeStatusRequest) (*GetMobileWorktreeStatusResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -686,6 +707,9 @@ func (UnimplementedProjectServiceServer) DeleteHostSetup(context.Context, *Delet
 }
 func (UnimplementedProjectServiceServer) SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetupExistingFolder not implemented")
+}
+func (UnimplementedProjectServiceServer) GetMobileWorktreeStatus(context.Context, *GetMobileWorktreeStatusRequest) (*GetMobileWorktreeStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMobileWorktreeStatus not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -1374,6 +1398,24 @@ func _ProjectService_SetupExistingFolder_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_GetMobileWorktreeStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMobileWorktreeStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetMobileWorktreeStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetMobileWorktreeStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetMobileWorktreeStatus(ctx, req.(*GetMobileWorktreeStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1528,6 +1570,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetupExistingFolder",
 			Handler:    _ProjectService_SetupExistingFolder_Handler,
+		},
+		{
+			MethodName: "GetMobileWorktreeStatus",
+			Handler:    _ProjectService_GetMobileWorktreeStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -316,6 +316,7 @@ message TerminalSession {
   string cwd = 3;
   int64  created_at_unix_ms = 4;
   int64  last_active_at_unix_ms = 5;
+  string last_output_preview = 6; // BR-MB-15: truncated to 500 chars server-side, never a raw dump — see terminal_session.go's TruncatedForMobile
 }
 
 message ResizeTerminalSessionRequest { string pty_id = 1; int32 cols = 2; int32 rows = 3; }
@@ -337,6 +338,7 @@ message GetTerminalAgentStatusResponse {
   bool   agent_running = 1;     // answers both terminal.agentStatus and terminal.isRunningAgent
   string agent_kind = 2;        // best-effort, e.g. "claude" | "codex" | "" if unknown
   bool   ready_for_input = 3;   // agentStatus's richer question: is it idle-and-ready, not just alive
+  string last_output_preview = 4; // BR-MB-15: truncated to 500 chars server-side, never a raw dump
 }
 
 message InspectTerminalProcessRequest  { string pty_id = 1; }

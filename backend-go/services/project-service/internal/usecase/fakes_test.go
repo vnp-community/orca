@@ -3,11 +3,14 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
+
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
 // Shared in-memory fakes used across this package's *_test.go files — the

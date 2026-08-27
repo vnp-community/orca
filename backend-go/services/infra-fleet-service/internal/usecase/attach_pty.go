@@ -54,6 +54,13 @@ type PtyServerMessage struct {
 // loop waiting on adapter/grpc's stream.Send pump.
 const outboundQueueSize = 64
 
+// lastOutputBufferBytes is the in-memory ring buffer's cap — headroom above
+// BR-MB-15's 500-char preview cap; truncation for the mobile contract
+// happens at the read boundary (domain.TruncatedForMobile), not here, so
+// this buffer stays free to hold more context for future non-mobile
+// consumers.
+const lastOutputBufferBytes = 2048
+
 // ptyLiveState is one entry in the shared liveStates registry AttachPty
 // writes and GetTerminalAgentStatus reads (TASK-MB-02-01/02) — per-pod,
 // in-memory map[ptyID]*ptyLiveState. Inherits the same per-pod
@@ -68,6 +75,37 @@ type ptyLiveState struct {
 	// this true on the poll that first observes quiescence, so a later poll
 	// while still quiescent does not republish the same transition.
 	readyNotified bool
+	// lastOutput is a tail-truncated ring-buffer of recent PTY output
+	// (TASK-MB-04-02), capped at lastOutputBufferBytes — read via
+	// domain.TruncatedForMobile at the point of exposure (BR-MB-15).
+	lastOutput []byte
+}
+
+// appendOutput grows buf by chunk, then tail-truncates to
+// lastOutputBufferBytes — keeps the MOST RECENT bytes, not the oldest.
+func appendOutput(buf []byte, chunk []byte) []byte {
+	buf = append(buf, chunk...)
+	if len(buf) > lastOutputBufferBytes {
+		buf = buf[len(buf)-lastOutputBufferBytes:]
+	}
+	return buf
+}
+
+// LastOutputPreview reads ptyID's BR-MB-15-truncated output preview out of
+// the shared liveStates registry — exported so adapter/grpc's
+// ListTerminalSessions mapping can populate TerminalSession.LastOutputPreview
+// without needing access to the unexported ptyLiveState type. Empty when no
+// live entry exists (cross-pod case, or liveStates itself is nil), an
+// honest absence, not an error.
+func LastOutputPreview(liveStates *sync.Map, ptyID string) string {
+	if liveStates == nil {
+		return ""
+	}
+	v, ok := liveStates.Load(ptyID)
+	if !ok {
+		return ""
+	}
+	return domain.TruncatedForMobile(v.(*ptyLiveState).lastOutput)
 }
 
 // AttachPty drives one bidirectional AttachPty stream: consumes decoded
@@ -166,7 +204,12 @@ func (uc *AttachPty) run(ctx context.Context, inbound <-chan PtyClientMessage, o
 				return
 			}
 			if len(ev.Data) > 0 {
-				uc.liveStates.Store(ptyID, &ptyLiveState{lastOutputAt: time.Now(), agentRunning: true})
+				prev, _ := uc.liveStates.Load(ptyID)
+				var buf []byte
+				if prev != nil {
+					buf = prev.(*ptyLiveState).lastOutput
+				}
+				uc.liveStates.Store(ptyID, &ptyLiveState{lastOutputAt: time.Now(), agentRunning: true, lastOutput: appendOutput(buf, ev.Data)})
 			}
 			outbound <- PtyServerMessage{Output: ev.Data}
 		}

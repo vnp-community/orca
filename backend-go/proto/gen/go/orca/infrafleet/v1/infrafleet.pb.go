@@ -1774,6 +1774,7 @@ type TerminalSession struct {
 	Cwd                string                 `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
 	CreatedAtUnixMs    int64                  `protobuf:"varint,4,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
 	LastActiveAtUnixMs int64                  `protobuf:"varint,5,opt,name=last_active_at_unix_ms,json=lastActiveAtUnixMs,proto3" json:"last_active_at_unix_ms,omitempty"`
+	LastOutputPreview  string                 `protobuf:"bytes,6,opt,name=last_output_preview,json=lastOutputPreview,proto3" json:"last_output_preview,omitempty"` // BR-MB-15: truncated to 500 chars server-side, never a raw dump — see terminal_session.go's TruncatedForMobile
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -1841,6 +1842,13 @@ func (x *TerminalSession) GetLastActiveAtUnixMs() int64 {
 		return x.LastActiveAtUnixMs
 	}
 	return 0
+}
+
+func (x *TerminalSession) GetLastOutputPreview() string {
+	if x != nil {
+		return x.LastOutputPreview
+	}
+	return ""
 }
 
 type ResizeTerminalSessionRequest struct {
@@ -2280,12 +2288,13 @@ func (x *GetTerminalAgentStatusRequest) GetPtyId() string {
 }
 
 type GetTerminalAgentStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentRunning  bool                   `protobuf:"varint,1,opt,name=agent_running,json=agentRunning,proto3" json:"agent_running,omitempty"`      // answers both terminal.agentStatus and terminal.isRunningAgent
-	AgentKind     string                 `protobuf:"bytes,2,opt,name=agent_kind,json=agentKind,proto3" json:"agent_kind,omitempty"`                // best-effort, e.g. "claude" | "codex" | "" if unknown
-	ReadyForInput bool                   `protobuf:"varint,3,opt,name=ready_for_input,json=readyForInput,proto3" json:"ready_for_input,omitempty"` // agentStatus's richer question: is it idle-and-ready, not just alive
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	AgentRunning      bool                   `protobuf:"varint,1,opt,name=agent_running,json=agentRunning,proto3" json:"agent_running,omitempty"`                 // answers both terminal.agentStatus and terminal.isRunningAgent
+	AgentKind         string                 `protobuf:"bytes,2,opt,name=agent_kind,json=agentKind,proto3" json:"agent_kind,omitempty"`                           // best-effort, e.g. "claude" | "codex" | "" if unknown
+	ReadyForInput     bool                   `protobuf:"varint,3,opt,name=ready_for_input,json=readyForInput,proto3" json:"ready_for_input,omitempty"`            // agentStatus's richer question: is it idle-and-ready, not just alive
+	LastOutputPreview string                 `protobuf:"bytes,4,opt,name=last_output_preview,json=lastOutputPreview,proto3" json:"last_output_preview,omitempty"` // BR-MB-15: truncated to 500 chars server-side, never a raw dump
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetTerminalAgentStatusResponse) Reset() {
@@ -2337,6 +2346,13 @@ func (x *GetTerminalAgentStatusResponse) GetReadyForInput() bool {
 		return x.ReadyForInput
 	}
 	return false
+}
+
+func (x *GetTerminalAgentStatusResponse) GetLastOutputPreview() string {
+	if x != nil {
+		return x.LastOutputPreview
+	}
+	return ""
 }
 
 type InspectTerminalProcessRequest struct {
@@ -4354,13 +4370,14 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x04cols\x18\x04 \x01(\x05R\x04cols\x12\x12\n" +
 	"\x04rows\x18\x05 \x01(\x05R\x04rows\"]\n" +
 	"\x1cSpawnTerminalSessionResponse\x12=\n" +
-	"\asession\x18\x01 \x01(\v2#.orca.infrafleet.v1.TerminalSessionR\asession\"\xc0\x01\n" +
+	"\asession\x18\x01 \x01(\v2#.orca.infrafleet.v1.TerminalSessionR\asession\"\xf0\x01\n" +
 	"\x0fTerminalSession\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\x12#\n" +
 	"\rconnection_id\x18\x02 \x01(\tR\fconnectionId\x12\x10\n" +
 	"\x03cwd\x18\x03 \x01(\tR\x03cwd\x12+\n" +
 	"\x12created_at_unix_ms\x18\x04 \x01(\x03R\x0fcreatedAtUnixMs\x122\n" +
-	"\x16last_active_at_unix_ms\x18\x05 \x01(\x03R\x12lastActiveAtUnixMs\"]\n" +
+	"\x16last_active_at_unix_ms\x18\x05 \x01(\x03R\x12lastActiveAtUnixMs\x12.\n" +
+	"\x13last_output_preview\x18\x06 \x01(\tR\x11lastOutputPreview\"]\n" +
 	"\x1cResizeTerminalSessionRequest\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\x12\x12\n" +
 	"\x04cols\x18\x02 \x01(\x05R\x04cols\x12\x12\n" +
@@ -4384,12 +4401,13 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x1bFocusTerminalSessionRequest\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"6\n" +
 	"\x1dGetTerminalAgentStatusRequest\x12\x15\n" +
-	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"\x8c\x01\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"\xbc\x01\n" +
 	"\x1eGetTerminalAgentStatusResponse\x12#\n" +
 	"\ragent_running\x18\x01 \x01(\bR\fagentRunning\x12\x1d\n" +
 	"\n" +
 	"agent_kind\x18\x02 \x01(\tR\tagentKind\x12&\n" +
-	"\x0fready_for_input\x18\x03 \x01(\bR\rreadyForInput\"6\n" +
+	"\x0fready_for_input\x18\x03 \x01(\bR\rreadyForInput\x12.\n" +
+	"\x13last_output_preview\x18\x04 \x01(\tR\x11lastOutputPreview\"6\n" +
 	"\x1dInspectTerminalProcessRequest\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"t\n" +
 	"\x1eInspectTerminalProcessResponse\x12\x14\n" +

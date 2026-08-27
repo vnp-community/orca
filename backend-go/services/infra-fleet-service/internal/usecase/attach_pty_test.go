@@ -251,6 +251,75 @@ func TestAttachPty_ExitCodeZero_PublishesAgentCompleted(t *testing.T) {
 	}
 }
 
+// TestAppendOutput_CapsAtBufferSize_TailTruncated: appendOutput caps at
+// lastOutputBufferBytes (2048), keeping the MOST RECENT bytes, not the
+// oldest.
+func TestAppendOutput_CapsAtBufferSize_TailTruncated(t *testing.T) {
+	old := make([]byte, 100)
+	for i := range old {
+		old[i] = 'o'
+	}
+	buf := appendOutput(nil, old)
+
+	chunk := make([]byte, lastOutputBufferBytes)
+	for i := range chunk {
+		chunk[i] = 'n'
+	}
+	buf = appendOutput(buf, chunk)
+
+	if len(buf) != lastOutputBufferBytes {
+		t.Fatalf("expected len %d, got %d", lastOutputBufferBytes, len(buf))
+	}
+	for i, b := range buf {
+		if b != 'n' {
+			t.Fatalf("expected only the most recent bytes to survive, found stale byte %q at index %d", b, i)
+		}
+	}
+}
+
+// TestAppendOutput_BelowCap_AccumulatesWithoutTruncation: total bytes under
+// the cap are kept in full, appended in order.
+func TestAppendOutput_BelowCap_AccumulatesWithoutTruncation(t *testing.T) {
+	buf := appendOutput(nil, []byte("hello "))
+	buf = appendOutput(buf, []byte("world"))
+	if string(buf) != "hello world" {
+		t.Errorf("expected %q, got %q", "hello world", string(buf))
+	}
+}
+
+// TestAttachPty_AccumulatesOutputBuffer_AcrossMultipleChunks is
+// TASK-MB-04-02's regression guard: successive Output chunks on the same
+// pty must be concatenated into the liveStates entry's lastOutput buffer
+// (via appendOutput), not overwritten by the latest chunk alone.
+func TestAttachPty_AccumulatesOutputBuffer_AcrossMultipleChunks(t *testing.T) {
+	sessions := &fakeTerminalSessionRepository{}
+	resolver := &fakeConnectionResolver{}
+	events := make(chan PtyEvent, 2)
+	agent := &fakeDevServerAgentClient{streamPtyEvents: events}
+	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
+	liveStates := &sync.Map{}
+	uc := NewAttachPty(sessions, resolver, agent, NewConnectionStreamLimiter(0), liveStates, &fakeLifecycleEventPublisher{})
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	inbound := make(chan PtyClientMessage, 1)
+	inbound <- PtyClientMessage{Attach: &PtyAttachMessage{PtyID: "pty-1"}}
+	outbound, _ := uc.Execute(ctx, inbound)
+
+	events <- PtyEvent{PtyID: "pty-1", Data: []byte("hello ")}
+	<-outbound
+	events <- PtyEvent{PtyID: "pty-1", Data: []byte("world")}
+	<-outbound
+
+	v, ok := liveStates.Load("pty-1")
+	if !ok {
+		t.Fatal("expected a liveStates entry for pty-1")
+	}
+	got := string(v.(*ptyLiveState).lastOutput)
+	if got != "hello world" {
+		t.Errorf("expected accumulated buffer %q, got %q", "hello world", got)
+	}
+}
+
 func TestAttachPty_StreamLimitReached(t *testing.T) {
 	sessions := &fakeTerminalSessionRepository{}
 	resolver := &fakeConnectionResolver{}

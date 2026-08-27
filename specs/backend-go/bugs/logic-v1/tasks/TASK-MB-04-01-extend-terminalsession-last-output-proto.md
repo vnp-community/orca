@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `last_output_preview` (field 6) to `TerminalSession` and (field 4) to `GetTerminalAgentStatusResponse`; `buf generate` regenerated stubs; `go build ./proto/...` passes.
 
 ---
 

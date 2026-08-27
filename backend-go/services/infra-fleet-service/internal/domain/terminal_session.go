@@ -43,3 +43,16 @@ func (t *TerminalSession) Touch(now time.Time) {
 func (t TerminalSession) IsZero() bool {
 	return t.PtyID == "" && t.TenantID == "" && t.ConnectionID == "" && t.Cwd == "" && t.CreatedAt.IsZero() && t.LastActiveAt.IsZero() && t.ClosedAt == nil
 }
+
+// TruncatedForMobile applies BR-MB-15's 500-char cap at the point of
+// exposure — keeps the buffer's internal size independent of the mobile
+// contract, so a future non-mobile consumer wanting more context isn't
+// retroactively capped by this rule. Tail-truncated: keeps the MOST RECENT
+// bytes, not the head.
+func TruncatedForMobile(lastOutput []byte) string {
+	s := string(lastOutput)
+	if len(s) <= 500 {
+		return s
+	}
+	return s[len(s)-500:]
+}

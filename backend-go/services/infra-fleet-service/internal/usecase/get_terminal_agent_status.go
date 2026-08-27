@@ -8,6 +8,7 @@ import (
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 // readyForInputQuiescence is the heuristic silence threshold (TASK-MB-02-02):
@@ -60,6 +61,15 @@ func (uc *GetTerminalAgentStatus) Execute(ctx context.Context, ptyID string) (Ag
 	result, err := uc.agent.AgentStatus(ctx, devServer, ptyID)
 	if err != nil {
 		return AgentStatusResult{AgentRunning: false}, nil
+	}
+
+	// BR-MB-15: last-output preview is populated whenever a live entry
+	// exists, independent of AgentRunning — a completed/idle session can
+	// still usefully show its last output to a mobile client.
+	if uc.liveStates != nil {
+		if v, ok := uc.liveStates.Load(ptyID); ok {
+			result.LastOutputPreview = domain.TruncatedForMobile(v.(*ptyLiveState).lastOutput)
+		}
 	}
 
 	if result.AgentRunning && uc.liveStates != nil {

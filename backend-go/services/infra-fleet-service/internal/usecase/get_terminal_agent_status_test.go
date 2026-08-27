@@ -111,6 +111,50 @@ func TestGetTerminalAgentStatus_AgentStatusError_DegradesToZeroValue(t *testing.
 	}
 }
 
+// TestGetTerminalAgentStatus_PopulatesLastOutputPreview is
+// TASK-MB-04-02's regression guard: LastOutputPreview is read from the
+// shared liveStates entry (BR-MB-15-truncated), independent of
+// AgentRunning/ReadyForInput — a liveStates entry present with AgentRunning
+// still populates the preview.
+func TestGetTerminalAgentStatus_PopulatesLastOutputPreview(t *testing.T) {
+	sessions := &fakeTerminalSessionRepository{}
+	resolver := &fakeConnectionResolver{}
+	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
+	agent := &fakeDevServerAgentClient{agentStatusResult: AgentStatusResult{AgentRunning: true, ReadyForInput: false, AgentKind: "claude-code"}}
+	liveStates := &sync.Map{}
+	liveStates.Store("pty-1", &ptyLiveState{lastOutputAt: time.Now(), agentRunning: true, lastOutput: []byte("recent output")})
+	uc := NewGetTerminalAgentStatus(sessions, resolver, agent, liveStates, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	result, err := uc.Execute(ctx, "pty-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.LastOutputPreview != "recent output" {
+		t.Errorf("expected LastOutputPreview %q, got %q", "recent output", result.LastOutputPreview)
+	}
+}
+
+// TestGetTerminalAgentStatus_NoLiveStateEntry_EmptyLastOutputPreview: the
+// cross-pod case (no liveStates entry) degrades to an empty preview, not an
+// error.
+func TestGetTerminalAgentStatus_NoLiveStateEntry_EmptyLastOutputPreview(t *testing.T) {
+	sessions := &fakeTerminalSessionRepository{}
+	resolver := &fakeConnectionResolver{}
+	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
+	agent := &fakeDevServerAgentClient{agentStatusResult: AgentStatusResult{AgentRunning: true, ReadyForInput: true, AgentKind: "claude-code"}}
+	uc := NewGetTerminalAgentStatus(sessions, resolver, agent, &sync.Map{}, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	result, err := uc.Execute(ctx, "pty-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.LastOutputPreview != "" {
+		t.Errorf("expected empty LastOutputPreview with no liveStates entry, got %q", result.LastOutputPreview)
+	}
+}
+
 // TestGetTerminalAgentStatus_ReadyTransition_DrainsQueuedPrompt is
 // TASK-MB-03-04's regression guard: a queued prompt present when the agent
 // transitions running->ready must be delivered via WritePty exactly once
