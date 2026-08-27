@@ -40,8 +40,8 @@ func (r *Repository) Save(ctx context.Context, s domain.PushSubscription) error 
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO notification.push_subscriptions (
 			id, tenant_id, user_id, channel, endpoint, p256dh_key, auth_key,
-			device_label, status, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)
+			device_label, status, created_at, updated_at, device_id
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$11)
 		ON CONFLICT (endpoint) DO UPDATE SET
 			tenant_id    = EXCLUDED.tenant_id,
 			user_id      = EXCLUDED.user_id,
@@ -50,10 +50,11 @@ func (r *Repository) Save(ctx context.Context, s domain.PushSubscription) error 
 			auth_key     = EXCLUDED.auth_key,
 			device_label = EXCLUDED.device_label,
 			status       = 'active',
-			updated_at   = EXCLUDED.updated_at
+			updated_at   = EXCLUDED.updated_at,
+			device_id    = COALESCE(EXCLUDED.device_id, notification.push_subscriptions.device_id)
 	`,
 		s.ID, s.TenantID, s.UserID, string(s.Channel), s.Endpoint, s.P256dhKey, s.AuthKey,
-		s.DeviceLabel, string(s.Status), s.CreatedAt,
+		s.DeviceLabel, string(s.Status), s.CreatedAt, s.DeviceID,
 	)
 	if err != nil {
 		return fmt.Errorf("postgres: upsert push subscription: %w", err)
@@ -65,7 +66,7 @@ func (r *Repository) Save(ctx context.Context, s domain.PushSubscription) error 
 func (r *Repository) ListByUser(ctx context.Context, tenantID, userID string) ([]domain.PushSubscription, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, tenant_id, user_id, channel, endpoint, p256dh_key, auth_key,
-		       device_label, status, last_used_at, created_at, updated_at
+		       device_label, status, last_used_at, created_at, updated_at, device_id
 		FROM notification.push_subscriptions
 		WHERE tenant_id = $1 AND user_id = $2 AND status = 'active'
 		ORDER BY created_at DESC
@@ -81,7 +82,7 @@ func (r *Repository) ListByUser(ctx context.Context, tenantID, userID string) ([
 		var channel, status string
 		var lastUsedAt *time.Time
 		if err := rows.Scan(&s.ID, &s.TenantID, &s.UserID, &channel, &s.Endpoint, &s.P256dhKey, &s.AuthKey,
-			&s.DeviceLabel, &status, &lastUsedAt, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			&s.DeviceLabel, &status, &lastUsedAt, &s.CreatedAt, &s.UpdatedAt, &s.DeviceID); err != nil {
 			return nil, fmt.Errorf("postgres: scan push subscription row: %w", err)
 		}
 		s.Channel = domain.Channel(channel)
@@ -106,6 +107,24 @@ func (r *Repository) DeleteByEndpoint(ctx context.Context, endpoint string) erro
 		return fmt.Errorf("postgres: delete push subscription by endpoint: %w", err)
 	}
 	return nil
+}
+
+// DeviceIDFor returns the paired mobile device id associated with a push
+// subscription, or "" if none is paired (a standard Web Push subscription
+// with no BL-MB-01 mobile pairing).
+func (r *Repository) DeviceIDFor(ctx context.Context, subscriptionID string) (string, error) {
+	var deviceID *string
+	err := r.pool.QueryRow(ctx, `SELECT device_id FROM notification.push_subscriptions WHERE id = $1`, subscriptionID).Scan(&deviceID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("postgres: query push subscription device id: %w", err)
+	}
+	if deviceID == nil {
+		return "", nil
+	}
+	return *deviceID, nil
 }
 
 // GetPublicKey returns the tenant's active VAPID key metadata row.

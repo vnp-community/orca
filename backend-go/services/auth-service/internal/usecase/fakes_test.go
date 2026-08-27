@@ -467,3 +467,189 @@ func (f *fakeOPAClient) Decision(ctx context.Context, actor domain.User) (bool, 
 	}
 	return f.allow, nil
 }
+
+// fakePairingSessionRepository is an in-memory PairingSessionRepository.
+type fakePairingSessionRepository struct {
+	byID map[string]domain.PairingSession
+
+	saveErr error
+	// getAndConsumeErr, if set, is returned by GetAndConsume regardless of
+	// map state — lets a test simulate an already-consumed/never-existed
+	// token without needing two real calls.
+	getAndConsumeErr error
+}
+
+func newFakePairingSessionRepository() *fakePairingSessionRepository {
+	return &fakePairingSessionRepository{byID: make(map[string]domain.PairingSession)}
+}
+
+func (f *fakePairingSessionRepository) Save(ctx context.Context, session domain.PairingSession) error {
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	f.byID[session.ID] = session
+	return nil
+}
+
+func (f *fakePairingSessionRepository) GetAndConsume(ctx context.Context, id string) (domain.PairingSession, error) {
+	if f.getAndConsumeErr != nil {
+		return domain.PairingSession{}, f.getAndConsumeErr
+	}
+	session, ok := f.byID[id]
+	if !ok || session.Consumed() {
+		return domain.PairingSession{}, domain.ErrPairingTokenNotFound
+	}
+	now := session.ExpiresAt // arbitrary consumed-at stamp; tests don't assert on it
+	session.ConsumedAt = &now
+	f.byID[id] = session
+	return session, nil
+}
+
+// fakePairedDeviceRepository is an in-memory PairedDeviceRepository.
+type fakePairedDeviceRepository struct {
+	byID map[string]domain.PairedDevice
+
+	saveErr        error
+	countActiveErr error
+	revokeErr      error
+	touchErr       error
+	touchCalled    bool
+}
+
+func newFakePairedDeviceRepository() *fakePairedDeviceRepository {
+	return &fakePairedDeviceRepository{byID: make(map[string]domain.PairedDevice)}
+}
+
+func (f *fakePairedDeviceRepository) Save(ctx context.Context, device domain.PairedDevice) error {
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	f.byID[device.ID] = device
+	return nil
+}
+
+func (f *fakePairedDeviceRepository) CountActive(ctx context.Context, tenantID, userID string) (int, error) {
+	if f.countActiveErr != nil {
+		return 0, f.countActiveErr
+	}
+	n := 0
+	for _, d := range f.byID {
+		if d.TenantID == tenantID && d.UserID == userID && d.Status == domain.DeviceActive {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func (f *fakePairedDeviceRepository) Get(ctx context.Context, id string) (domain.PairedDevice, error) {
+	d, ok := f.byID[id]
+	if !ok {
+		return domain.PairedDevice{}, domain.ErrDeviceNotFound
+	}
+	return d, nil
+}
+
+func (f *fakePairedDeviceRepository) List(ctx context.Context, tenantID, userID string) ([]domain.PairedDevice, error) {
+	var out []domain.PairedDevice
+	for _, d := range f.byID {
+		if d.TenantID == tenantID && d.UserID == userID {
+			out = append(out, d)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakePairedDeviceRepository) RevokeAndWipeSecret(ctx context.Context, id string) error {
+	if f.revokeErr != nil {
+		return f.revokeErr
+	}
+	d, ok := f.byID[id]
+	if !ok {
+		return domain.ErrDeviceNotFound
+	}
+	d.Status = domain.DeviceRevoked
+	d.SharedSecretCiphertext = nil
+	d.VaultKeyRef = ""
+	f.byID[id] = d
+	return nil
+}
+
+func (f *fakePairedDeviceRepository) Touch(ctx context.Context, id string, now time.Time) error {
+	f.touchCalled = true
+	if f.touchErr != nil {
+		return f.touchErr
+	}
+	d, ok := f.byID[id]
+	if !ok {
+		return domain.ErrDeviceNotFound
+	}
+	d.LastUsedAt = now
+	f.byID[id] = d
+	return nil
+}
+
+// fakeDeviceKeyExchanger is an in-memory DeviceKeyExchanger — deterministic,
+// no real X25519 math, so tests can assert on exactly what
+// InitiateDevicePairing/CompleteDevicePairing pass through it.
+type fakeDeviceKeyExchanger struct {
+	pub, priv []byte
+	shared    []byte
+
+	genErr    error
+	sharedErr error
+}
+
+func (f *fakeDeviceKeyExchanger) GenerateEphemeralKeypair() (pub, priv []byte, err error) {
+	if f.genErr != nil {
+		return nil, nil, f.genErr
+	}
+	if f.pub == nil {
+		f.pub = []byte("fake-desktop-pub-key-32-bytes!!")
+	}
+	if f.priv == nil {
+		f.priv = []byte("fake-desktop-priv-key-32-bytes!")
+	}
+	return f.pub, f.priv, nil
+}
+
+func (f *fakeDeviceKeyExchanger) SharedSecret(priv, peerPub []byte) ([]byte, error) {
+	if f.sharedErr != nil {
+		return nil, f.sharedErr
+	}
+	if f.shared == nil {
+		f.shared = []byte("fake-shared-secret-32-bytes!!!!")
+	}
+	return f.shared, nil
+}
+
+// fakeSharedSecretSealer is an in-memory SharedSecretSealer — Encrypt is a
+// no-op passthrough tagged with a fixed key ref, Decrypt reverses it. Real
+// enough for usecase tests, no Vault Transit round trip.
+type fakeSharedSecretSealer struct {
+	encryptErr error
+	decryptErr error
+	// decryptCalled lets a test assert Decrypt was (or wasn't) invoked —
+	// e.g. ResolveDeviceSharedSecret must never call it once a device's
+	// ciphertext has been wiped (BR-MB-04's "no oracle" guarantee).
+	decryptCalled bool
+}
+
+func (f *fakeSharedSecretSealer) Encrypt(ctx context.Context, plaintext []byte) ([]byte, string, error) {
+	if f.encryptErr != nil {
+		return nil, "", f.encryptErr
+	}
+	sealed := append([]byte("sealed:"), plaintext...)
+	return sealed, "fake-key-ref", nil
+}
+
+func (f *fakeSharedSecretSealer) Decrypt(ctx context.Context, ciphertext []byte, keyRef string) ([]byte, error) {
+	f.decryptCalled = true
+	if f.decryptErr != nil {
+		return nil, f.decryptErr
+	}
+	const prefix = "sealed:"
+	if len(ciphertext) < len(prefix) {
+		return nil, errors.New("fakeSharedSecretSealer: not sealed by this fake")
+	}
+	return ciphertext[len(prefix):], nil
+}

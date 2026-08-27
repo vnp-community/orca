@@ -82,3 +82,23 @@ func rateLimitMiddleware(rl *usecase.RateLimiter) func(http.Handler) http.Handle
 		})
 	}
 }
+
+// pairingRateLimitMiddleware wraps the same per-key token-bucket primitive
+// rateLimitMiddleware uses, but keyed on the caller's remote address rather
+// than a resolved tenant — CompleteDevicePairing runs before any identity
+// exists (see pairing_routes.go's doc comment). The "pairing:" key prefix
+// keeps this bucket disjoint from any authenticated tenant's bucket sharing
+// the same RateLimiter instance. Defense in depth against a brute-force
+// pairing-token guesser, alongside BR-MB-01/02's server-side expiry +
+// one-time-use enforcement in auth-service.
+func pairingRateLimitMiddleware(rl *usecase.RateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !rl.Allow("pairing:" + r.RemoteAddr) {
+				writeJSONError(w, http.StatusTooManyRequests, "RATE_LIMITED", "rate limit exceeded")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}

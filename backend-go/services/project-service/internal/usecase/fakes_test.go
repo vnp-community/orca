@@ -3,12 +3,15 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
+
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
 // Shared in-memory fakes used across this package's *_test.go files — the
@@ -1030,4 +1033,61 @@ func (f *fakeDevServerHostnameResolver) Hostname(ctx context.Context, tenantID, 
 		return "", f.err
 	}
 	return f.hostnames[devServerID], nil
+}
+
+// fakeTerminalStatusResolver is an in-memory usecase.TerminalStatusResolver
+// — sessionsByDevServer/errByDevServer let a test seed sessions (or force a
+// failure) per dev_server_id; statusByPtyID/statusErrByPtyID do the same
+// for GetAgentStatus. callsByDevServer/getAgentStatusCalls record call
+// counts so tests can assert de-duplication (one ListSessionsForDevServer
+// call per distinct dev_server_id, per TASK-MB-04-04's Verify section).
+type fakeTerminalStatusResolver struct {
+	mu sync.Mutex
+
+	sessionsByDevServer map[string][]*infrafleetv1.TerminalSession
+	errByDevServer      map[string]error
+	callsByDevServer    map[string]int
+
+	statusByPtyID       map[string]*infrafleetv1.GetTerminalAgentStatusResponse
+	statusErrByPtyID    map[string]error
+	getAgentStatusCalls []string
+}
+
+func newFakeTerminalStatusResolver() *fakeTerminalStatusResolver {
+	return &fakeTerminalStatusResolver{
+		sessionsByDevServer: map[string][]*infrafleetv1.TerminalSession{},
+		errByDevServer:      map[string]error{},
+		callsByDevServer:    map[string]int{},
+		statusByPtyID:       map[string]*infrafleetv1.GetTerminalAgentStatusResponse{},
+		statusErrByPtyID:    map[string]error{},
+	}
+}
+
+func (f *fakeTerminalStatusResolver) ListSessionsForDevServer(ctx context.Context, devServerID string) ([]*infrafleetv1.TerminalSession, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.callsByDevServer[devServerID]++
+	if err, ok := f.errByDevServer[devServerID]; ok {
+		return nil, err
+	}
+	return f.sessionsByDevServer[devServerID], nil
+}
+
+func (f *fakeTerminalStatusResolver) GetAgentStatus(ctx context.Context, ptyID string) (*infrafleetv1.GetTerminalAgentStatusResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.getAgentStatusCalls = append(f.getAgentStatusCalls, ptyID)
+	if err, ok := f.statusErrByPtyID[ptyID]; ok {
+		return nil, err
+	}
+	if status, ok := f.statusByPtyID[ptyID]; ok {
+		return status, nil
+	}
+	return &infrafleetv1.GetTerminalAgentStatusResponse{}, nil
+}
+
+func (f *fakeTerminalStatusResolver) callCount(devServerID string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.callsByDevServer[devServerID]
 }

@@ -90,6 +90,11 @@ service ProjectService {
   // here, then call the execution-owning service), not a synchronous
   // cross-service execution call.
   rpc GetProjectContext(GetProjectContextRequest) returns (ProjectContext);
+  // GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
+  // to — project-service already depends on infra-fleet-service (dev-server
+  // binding validation), so this extends that existing edge rather than
+  // adding a new cross-service dependency.
+  rpc GetMobileWorktreeStatus(GetMobileWorktreeStatusRequest) returns (GetMobileWorktreeStatusResponse);
 }
 
 message Project {
@@ -549,4 +554,20 @@ message ProjectContext {
   string repo_url = 4;            // from the project's primary Repo (position 0), if any
   string dev_server_id = 5;
   string dev_server_hostname = 6; // resolved via infra-fleet-service, best-effort — empty if unresolvable
+}
+
+message GetMobileWorktreeStatusRequest {} // tenant_id/user_id via metadata
+
+message GetMobileWorktreeStatusResponse {
+  repeated MobileWorktreeStatus worktrees = 1;
+  int64 generated_at_unix_ms = 2; // BR-MB-16: client computes "last updated X ago" from this
+}
+
+message MobileWorktreeStatus {
+  string id = 1;              // Worktree.ID
+  string name = 2;            // Worktree.Branch
+  string agent = 3;           // AgentKind, e.g. "claude" | "codex" | "" if none running
+  string status = 4;          // "completed" | "running" | "waiting" | "idle" | "unknown"
+  int64  duration_ms = 5;     // now - TerminalSession.CreatedAt for a running session; 0 if idle
+  string last_output = 6;     // BR-MB-15: truncated to 500 chars server-side, never a raw dump
 }

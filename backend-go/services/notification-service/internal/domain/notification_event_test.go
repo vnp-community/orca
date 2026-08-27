@@ -57,6 +57,49 @@ func TestTranslateEvent_TaskStatusChanged(t *testing.T) {
 	}
 }
 
+func TestTranslateEvent_MobilePushSubjectsMapToRules(t *testing.T) {
+	cases := []struct {
+		subject          string
+		wantType         string
+		wantSeverity     Severity
+		wantChannelCount int
+	}{
+		{"orca.infra.terminal_session.agent_completed", "agent_completed", SeverityInfo, 2},
+		{"orca.infra.terminal_session.agent_error", "agent_error", SeverityWarning, 2},
+		{"orca.infra.terminal_session.agent_waiting", "agent_waiting", SeverityInfo, 2},
+		{"orca.aiprovider.account.rate_limited", "rate_limited", SeverityWarning, 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.subject, func(t *testing.T) {
+			got, err := TranslateEvent("ne-1", "evt-1", tc.subject, "tenant-1", EventPayload{UserID: "user-1"}, time.Now())
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.Type != tc.wantType {
+				t.Errorf("expected type %s, got %s", tc.wantType, got.Type)
+			}
+			if got.Severity != tc.wantSeverity {
+				t.Errorf("expected severity %s, got %s", tc.wantSeverity, got.Severity)
+			}
+			if len(got.Channels) != tc.wantChannelCount {
+				t.Errorf("expected %d channels, got %v", tc.wantChannelCount, got.Channels)
+			}
+			hasWS, hasPush := false, false
+			for _, ch := range got.Channels {
+				if ch == ChannelDeliveryWS {
+					hasWS = true
+				}
+				if ch == ChannelDeliveryPush {
+					hasPush = true
+				}
+			}
+			if !hasWS || !hasPush {
+				t.Errorf("expected both ws and push channels, got %v", got.Channels)
+			}
+		})
+	}
+}
+
 func TestTranslateEvent_UnknownSubjectFallsBackToGenericRule(t *testing.T) {
 	got, err := TranslateEvent("ne-1", "evt-1", "orca.some-new-service.thing.happened", "tenant-1", EventPayload{UserID: "user-1"}, time.Now())
 	if err != nil {

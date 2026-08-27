@@ -93,13 +93,19 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 	if cwd == "" {
 		cwd = in.Cwd
 	}
+	// userID, ok is deliberately not required: terminal spawning must not
+	// start failing for callers that don't carry a resolved user identity
+	// yet (e.g. pre-BL-MB-02 callers) — an empty CreatedByUserID just means
+	// the agent-lifecycle event (TASK-MB-02-01) has no known recipient.
+	userID, _ := tenant.UserID(ctx)
 	session, err := uc.sessions.Create(ctx, domain.TerminalSession{
-		PtyID:        result.PtyID,
-		TenantID:     tenantID,
-		ConnectionID: in.ConnectionID,
-		Cwd:          cwd,
-		CreatedAt:    now,
-		LastActiveAt: now,
+		PtyID:           result.PtyID,
+		TenantID:        tenantID,
+		ConnectionID:    in.ConnectionID,
+		Cwd:             cwd,
+		CreatedAt:       now,
+		LastActiveAt:    now,
+		CreatedByUserID: userID,
 	})
 	if err != nil {
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindInternal, "INFRA_CREATE_TERMINAL_SESSION_FAILED", "failed to persist terminal session", err)

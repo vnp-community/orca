@@ -228,6 +228,29 @@ func (f *fakeAdminAuthServiceClient) UpdateUser(ctx context.Context, in *authv1.
 	return &authv1.UpdateUserResponse{}, nil
 }
 
+// The device-pairing RPCs (TASK-MB-01-01) aren't exercised by this
+// package's tests yet — these are unimplemented stubs purely to satisfy
+// authv1.AuthServiceClient.
+func (f *fakeAdminAuthServiceClient) InitiateDevicePairing(ctx context.Context, in *authv1.InitiateDevicePairingRequest, opts ...grpc.CallOption) (*authv1.InitiateDevicePairingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "fakeAdminAuthServiceClient: InitiateDevicePairing not stubbed")
+}
+
+func (f *fakeAdminAuthServiceClient) CompleteDevicePairing(ctx context.Context, in *authv1.CompleteDevicePairingRequest, opts ...grpc.CallOption) (*authv1.CompleteDevicePairingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "fakeAdminAuthServiceClient: CompleteDevicePairing not stubbed")
+}
+
+func (f *fakeAdminAuthServiceClient) ListPairedDevices(ctx context.Context, in *authv1.ListPairedDevicesRequest, opts ...grpc.CallOption) (*authv1.ListPairedDevicesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "fakeAdminAuthServiceClient: ListPairedDevices not stubbed")
+}
+
+func (f *fakeAdminAuthServiceClient) UnpairDevice(ctx context.Context, in *authv1.UnpairDeviceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "fakeAdminAuthServiceClient: UnpairDevice not stubbed")
+}
+
+func (f *fakeAdminAuthServiceClient) ResolveDeviceSharedSecret(ctx context.Context, in *authv1.ResolveDeviceSharedSecretRequest, opts ...grpc.CallOption) (*authv1.ResolveDeviceSharedSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "fakeAdminAuthServiceClient: ResolveDeviceSharedSecret not stubbed")
+}
+
 var _ authv1.AuthServiceClient = (*fakeAdminAuthServiceClient)(nil)
 
 // testAuthAdminRouter mounts mountAuthAdminRoutes standalone and injects a

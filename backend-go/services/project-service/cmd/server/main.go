@@ -150,6 +150,12 @@ func run() error {
 	}
 	defer func() { _ = devServerLister.Close() }()
 
+	terminalStatusResolver, err := projectgrpcclient.NewInfraFleetTerminalStatusResolver(cfg.InfraFleetServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing infra-fleet-service (terminal status resolver): %w", err)
+	}
+	defer func() { _ = terminalStatusResolver.Close() }()
+
 	// A second infra-fleet-service dial for the health/hostname/tags
 	// lookups TASK-PRF-03/04 add — DevServerHealthChecker/
 	// InfraFleetHostnameResolver/ProfileResolver.DevServerTags all take an
@@ -250,6 +256,11 @@ func run() error {
 
 	folderWorkspaceUC := usecase.NewFolderWorkspaceUseCase(folderWorkspaceRepo)
 
+	// GetMobileWorktreeStatus (SOL-MB-04) reuses worktreeRepo/repo — the
+	// same WorktreeRepository/ProjectRepository instances every other
+	// worktree/project usecase above is wired against.
+	getMobileWorktreeStatusUC := usecase.NewGetMobileWorktreeStatus(worktreeRepo, repo, terminalStatusResolver)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
 		CreateProject:   createProjectUC,
@@ -294,7 +305,8 @@ func run() error {
 		DeleteHostSetup:     deleteHostSetupUC,
 		SetupExistingFolder: setupExistingFolderUC,
 
-		GetProjectContext: getProjectContextUC,
+		GetProjectContext:       getProjectContextUC,
+		GetMobileWorktreeStatus: getMobileWorktreeStatusUC,
 	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

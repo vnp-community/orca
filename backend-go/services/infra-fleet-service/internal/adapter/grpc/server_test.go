@@ -38,6 +38,7 @@ func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sen
 		nil, nil, nil, // port-forward CRUD usecases (SOL-SSH-04), 44-46, unused here
 		nil,           // port-forward event broadcaster (TASK-SSH-04-08), 47, unused here
 		nil, nil, nil, nil, nil, // agent-session usecases (TASK-AG-01..04), 48-52, unused here
+		nil, nil, nil, // mobile prompt-dispatch usecases + liveStates registry (SOL-MB-03/TASK-MB-02-01), 53-55, unused here
 	)
 }
 

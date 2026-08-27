@@ -64,7 +64,8 @@ type Server struct {
 	deleteHostSetup     *usecase.DeleteHostSetup
 	setupExistingFolder *usecase.SetupExistingFolder
 
-	getProjectContext *usecase.GetProjectContext
+	getProjectContext       *usecase.GetProjectContext
+	getMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
@@ -113,7 +114,8 @@ type Deps struct {
 	DeleteHostSetup     *usecase.DeleteHostSetup
 	SetupExistingFolder *usecase.SetupExistingFolder
 
-	GetProjectContext *usecase.GetProjectContext
+	GetProjectContext       *usecase.GetProjectContext
+	GetMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 }
 
 func New(deps Deps) *Server {
@@ -160,7 +162,8 @@ func New(deps Deps) *Server {
 		deleteHostSetup:     deps.DeleteHostSetup,
 		setupExistingFolder: deps.SetupExistingFolder,
 
-		getProjectContext: deps.GetProjectContext,
+		getProjectContext:       deps.GetProjectContext,
+		getMobileWorktreeStatus: deps.GetMobileWorktreeStatus,
 	}
 }
 
@@ -717,6 +720,27 @@ func (s *Server) GetProjectContext(ctx context.Context, req *projectv1.GetProjec
 	return &projectv1.ProjectContext{
 		ProjectId: pc.ProjectID, ProjectName: pc.ProjectName, Description: pc.Description,
 		RepoUrl: pc.RepoURL, DevServerId: pc.DevServerID, DevServerHostname: pc.DevServerHostname,
+	}, nil
+}
+
+// GetMobileWorktreeStatus is BL-MB-04's ONE composed-read call — tenant_id/
+// user_id come from request-context metadata (see GetMobileWorktreeStatusRequest's
+// proto doc comment), not the (empty) request message.
+func (s *Server) GetMobileWorktreeStatus(ctx context.Context, req *projectv1.GetMobileWorktreeStatusRequest) (*projectv1.GetMobileWorktreeStatusResponse, error) {
+	result, err := s.getMobileWorktreeStatus.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.MobileWorktreeStatus, 0, len(result.Worktrees))
+	for _, wt := range result.Worktrees {
+		out = append(out, &projectv1.MobileWorktreeStatus{
+			Id: wt.ID, Name: wt.Name, Agent: wt.Agent, Status: wt.Status,
+			DurationMs: wt.DurationMs, LastOutput: wt.LastOutput,
+		})
+	}
+	return &projectv1.GetMobileWorktreeStatusResponse{
+		Worktrees:         out,
+		GeneratedAtUnixMs: result.GeneratedAt.UnixMilli(),
 	}, nil
 }
 

@@ -5,7 +5,7 @@
 **Service:** `notification-service`
 **File:** `backend-go/services/notification-service/internal/domain/notification_event.go`, `backend-go/services/notification-service/internal/adapter/eventbus/consumer.go`
 **Depends on:** TASK-MB-02-01, TASK-MB-02-02, TASK-MB-02-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added the 4 `subjectRules` entries + 4 `Subjects` consumer bindings (StreamName `INFRA`/`AIPROVIDER`, matching infra-fleet-service's/ai-provider-service's real `EnsureStream` calls verbatim); `TestTranslateEvent_MobilePushSubjectsMapToRules` covers all 4 subjects; `go build`/`go vet`/`go test` clean.
 
 ---
 

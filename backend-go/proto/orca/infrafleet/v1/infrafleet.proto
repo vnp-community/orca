@@ -113,6 +113,11 @@ service InfraFleetService {
   // output, for callers that want a redirectable string, not multiplex
   // frames.
   rpc GetTerminalScrollback(GetTerminalScrollbackRequest) returns (GetTerminalScrollbackResponse);
+  // DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to:
+  // gate on agent readiness, queue if running, require confirmation to
+  // overwrite an existing queued prompt.
+  rpc DispatchPrompt(DispatchPromptRequest) returns (DispatchPromptResponse);
+  rpc GetQueuedPrompt(GetQueuedPromptRequest) returns (GetQueuedPromptResponse);
 
   // --- Terminal/PTY I/O ---
   // The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
@@ -529,6 +534,7 @@ message TerminalSession {
   string cwd = 3;
   int64  created_at_unix_ms = 4;
   int64  last_active_at_unix_ms = 5;
+  string last_output_preview = 6; // BR-MB-15: truncated to 500 chars server-side, never a raw dump — see terminal_session.go's TruncatedForMobile
 }
 
 message SaveTerminalScrollbackSnapshotRequest {
@@ -576,6 +582,7 @@ message GetTerminalAgentStatusResponse {
   bool   agent_running = 1;     // answers both terminal.agentStatus and terminal.isRunningAgent
   string agent_kind = 2;        // best-effort, e.g. "claude" | "codex" | "" if unknown
   bool   ready_for_input = 3;   // agentStatus's richer question: is it idle-and-ready, not just alive
+  string last_output_preview = 4; // BR-MB-15: truncated to 500 chars server-side, never a raw dump
 }
 
 message GetAgentTerminalSessionRequest  { string worktree_id = 1; }
@@ -873,4 +880,30 @@ message SwitchAgentAccountRequest {
   string user_id       = 3;
   string project_id    = 4; // threaded into ResolveProvider's cascade exclusion
   string cwd           = 5;
+}
+
+// --- Mobile prompt dispatch (SOL-MB-03) ------------------------------------
+
+message DispatchPromptRequest {
+  string pty_id = 1;
+  string prompt = 2;          // already decrypted by the caller (api-gateway) before this RPC
+  bool   overwrite = 3;       // BR-MB-12: true only on a caller's explicit confirmation of a second dispatch
+  string dispatched_by_device_id = 4; // audit/attribution — which paired mobile device sent this
+}
+message DispatchPromptResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    INJECTED_IMMEDIATELY = 1;  // BR-MB-09: agent was idle/waiting, written straight to the PTY
+    QUEUED = 2;                // BR-MB-10: agent running, held for later
+    REJECTED_NEEDS_CONFIRMATION = 3; // BR-MB-12: a prompt is already queued and overwrite=false
+  }
+  Outcome outcome = 1;
+  string  existing_queued_prompt_preview = 2; // populated only for REJECTED_NEEDS_CONFIRMATION
+}
+
+message GetQueuedPromptRequest { string pty_id = 1; }
+message GetQueuedPromptResponse {
+  bool   has_queued_prompt = 1;
+  string prompt = 2;
+  int64  queued_at_unix_ms = 3;
 }

@@ -31,10 +31,12 @@ type Config struct {
 	// outbox relay (TASK-AUTH-05-08) and TASK-FLEET-03-06's HealthPublisher
 	// (dev_server.health_degraded) publish through it, as well as
 	// TASK-AG-05-05's AgentStatusPublisher (direct publish for
-	// statusChanged) and its rateLimited outbox relay. Mirrors usage-service's
-	// identical Config.NATSURL/NATS_URL convention. If NATS is unreachable at
-	// startup, outbox rows still get written durably (see cmd/server/main.go),
-	// they just queue up unpublished until a future restart.
+	// statusChanged) and its rateLimited outbox relay, and TASK-MB-02-01's
+	// agent-lifecycle event publisher. Mirrors usage-service's identical
+	// Config.NATSURL/NATS_URL convention. If NATS is unreachable at startup,
+	// outbox rows still get written durably (see cmd/server/main.go), they
+	// just queue up unpublished until a future restart — and mobile push
+	// notifications degrade to "none", never a fatal error.
 	NATSURL string
 	// FleetPollInterval is BL-FLEET-03's poll cadence — read from
 	// FLEET_POLL_INTERVAL_SEC (default 30). An unparseable or non-positive

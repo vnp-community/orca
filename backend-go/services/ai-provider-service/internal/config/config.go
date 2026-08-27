@@ -18,7 +18,8 @@ type Config struct {
 	InfraFleetServiceAddr string
 	// NATSURL is the JetStream endpoint the outbox relay publishes to —
 	// same convention as usage-service's cmd/server/main.go wiring
-	// (TASK-AIP-01-07).
+	// (TASK-AIP-01-07) — and also the endpoint used to publish
+	// orca.aiprovider.account.rate_limited (TASK-MB-02-04, SOL-MB-02).
 	NATSURL string
 }
 

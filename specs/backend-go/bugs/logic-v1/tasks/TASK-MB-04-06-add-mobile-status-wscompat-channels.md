@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_mobile_status.go` (new), `backend-go/services/api-gateway/cmd/server/main.go`
 **Depends on:** TASK-MB-04-05, TASK-MB-03-06 (`RegisterMobileChannels`/`DeviceSecretResolver`/`errNotAMobileSession`/`Identity.DeviceID`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `channels_mobile_status.go` (`mobile.status` pull + `mobile.statusSubscribe` poll-and-diff push, `mobileStatusPollInterval` as a `var` per `channels_accounts.go`'s testability precedent), extended `RegisterMobileChannels` (TASK-MB-03-06) to also call `registerMobileStatusChannels` — no second composition-root call site; `sealMobileEnvelope` lives in the shared `mobile_envelope.go`. `go build`/`go vet` clean; `channels_mobile_status_test.go` covers non-mobile-Identity rejection before any RPC, the sealed-envelope-always response shape (decrypts back to the exact worktree), and the two-identical-polls-produce-exactly-one-`PushEvent` regression guard — all pass.
 
 ---
 

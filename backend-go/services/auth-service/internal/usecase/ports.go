@@ -213,3 +213,52 @@ type TokenSigner interface {
 	// RFC 7517 JWK Set, for GetJWKS to publish.
 	PublicJWKS(ctx context.Context) (jose.JSONWebKeySet, error)
 }
+
+// DeviceKeyExchanger generates NaCl X25519 keypairs and computes shared
+// secrets for BL-MB-01's pairing handshake. Implemented by
+// internal/adapter/nacl.KeyExchanger over golang.org/x/crypto/nacl/box.
+type DeviceKeyExchanger interface {
+	GenerateEphemeralKeypair() (pub, priv []byte, err error)
+	SharedSecret(priv, peerPub []byte) ([]byte, error)
+}
+
+// SharedSecretSealer mediates a paired device's shared secret through
+// Vault Transit — never a plaintext value in this service's own Postgres
+// row, mirroring notification-service's/infra-fleet-service's Vault-mediated
+// secret pattern extended here to a per-device-pairing secret class.
+// Implemented by internal/adapter/vault.SharedSecretSealer.
+type SharedSecretSealer interface {
+	Encrypt(ctx context.Context, plaintext []byte) (ciphertext []byte, keyRef string, err error)
+	Decrypt(ctx context.Context, ciphertext []byte, keyRef string) ([]byte, error)
+}
+
+// PairingSessionRepository is the persistence port for the ephemeral
+// server-side state of an in-progress QR pairing attempt (BL-MB-01).
+// Implemented by internal/adapter/postgres.PairingSessionStore.
+type PairingSessionRepository interface {
+	Save(ctx context.Context, session domain.PairingSession) error
+	// GetAndConsume atomically marks the session consumed and returns it —
+	// the one statement that enforces BR-MB-02 (one-time use) across two
+	// concurrent CompleteDevicePairing calls racing on the same token.
+	// Returns an error satisfying errors.Is(err, domain.ErrPairingTokenNotFound)
+	// if no unconsumed row matches id.
+	GetAndConsume(ctx context.Context, id string) (domain.PairingSession, error)
+}
+
+// PairedDeviceRepository is the persistence port for durably paired mobile
+// devices. Implemented by internal/adapter/postgres.PairedDeviceStore.
+type PairedDeviceRepository interface {
+	Save(ctx context.Context, device domain.PairedDevice) error
+	// CountActive backs BR-MB-03's max-3-active-devices cap check.
+	CountActive(ctx context.Context, tenantID, userID string) (int, error)
+	// Get returns an error satisfying errors.Is(err, domain.ErrDeviceNotFound)
+	// if id doesn't exist.
+	Get(ctx context.Context, id string) (domain.PairedDevice, error)
+	List(ctx context.Context, tenantID, userID string) ([]domain.PairedDevice, error)
+	// RevokeAndWipeSecret marks a device revoked AND nulls its shared-secret
+	// ciphertext in the same statement — BR-MB-04's enforcement mechanism.
+	RevokeAndWipeSecret(ctx context.Context, id string) error
+	// Touch updates last_used_at — called best-effort from
+	// ResolveDeviceSharedSecret.
+	Touch(ctx context.Context, id string, now time.Time) error
+}

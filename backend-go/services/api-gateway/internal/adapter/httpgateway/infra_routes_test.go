@@ -217,6 +217,17 @@ func (f *fakeInfraFleetServiceClient) AttachPty(context.Context, ...grpc.CallOpt
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+// DispatchPrompt/GetQueuedPrompt (SOL-MB-03): no httpgateway route exercises
+// these yet — same unconditional Unimplemented-stub convention as this
+// file's other unused RPCs above.
+func (f *fakeInfraFleetServiceClient) DispatchPrompt(context.Context, *infrafleetv1.DispatchPromptRequest, ...grpc.CallOption) (*infrafleetv1.DispatchPromptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) GetQueuedPrompt(context.Context, *infrafleetv1.GetQueuedPromptRequest, ...grpc.CallOption) (*infrafleetv1.GetQueuedPromptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile: no
 // httpgateway route exercises these (they're wired through wscompat's
 // channels_browser.go instead) — same unconditional Unimplemented-stub

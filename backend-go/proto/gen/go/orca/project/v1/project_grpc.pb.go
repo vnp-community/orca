@@ -59,6 +59,7 @@ const (
 	ProjectService_DeleteHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/DeleteHostSetup"
 	ProjectService_SetupExistingFolder_FullMethodName          = "/orca.project.v1.ProjectService/SetupExistingFolder"
 	ProjectService_GetProjectContext_FullMethodName            = "/orca.project.v1.ProjectService/GetProjectContext"
+	ProjectService_GetMobileWorktreeStatus_FullMethodName      = "/orca.project.v1.ProjectService/GetMobileWorktreeStatus"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -140,6 +141,11 @@ type ProjectServiceClient interface {
 	// here, then call the execution-owning service), not a synchronous
 	// cross-service execution call.
 	GetProjectContext(ctx context.Context, in *GetProjectContextRequest, opts ...grpc.CallOption) (*ProjectContext, error)
+	// GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
+	// to — project-service already depends on infra-fleet-service (dev-server
+	// binding validation), so this extends that existing edge rather than
+	// adding a new cross-service dependency.
+	GetMobileWorktreeStatus(ctx context.Context, in *GetMobileWorktreeStatusRequest, opts ...grpc.CallOption) (*GetMobileWorktreeStatusResponse, error)
 }
 
 type projectServiceClient struct {
@@ -550,6 +556,16 @@ func (c *projectServiceClient) GetProjectContext(ctx context.Context, in *GetPro
 	return out, nil
 }
 
+func (c *projectServiceClient) GetMobileWorktreeStatus(ctx context.Context, in *GetMobileWorktreeStatusRequest, opts ...grpc.CallOption) (*GetMobileWorktreeStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMobileWorktreeStatusResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetMobileWorktreeStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -629,6 +645,11 @@ type ProjectServiceServer interface {
 	// here, then call the execution-owning service), not a synchronous
 	// cross-service execution call.
 	GetProjectContext(context.Context, *GetProjectContextRequest) (*ProjectContext, error)
+	// GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
+	// to — project-service already depends on infra-fleet-service (dev-server
+	// binding validation), so this extends that existing edge rather than
+	// adding a new cross-service dependency.
+	GetMobileWorktreeStatus(context.Context, *GetMobileWorktreeStatusRequest) (*GetMobileWorktreeStatusResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -758,6 +779,9 @@ func (UnimplementedProjectServiceServer) SetupExistingFolder(context.Context, *S
 }
 func (UnimplementedProjectServiceServer) GetProjectContext(context.Context, *GetProjectContextRequest) (*ProjectContext, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetProjectContext not implemented")
+}
+func (UnimplementedProjectServiceServer) GetMobileWorktreeStatus(context.Context, *GetMobileWorktreeStatusRequest) (*GetMobileWorktreeStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMobileWorktreeStatus not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -1500,6 +1524,24 @@ func _ProjectService_GetProjectContext_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_GetMobileWorktreeStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMobileWorktreeStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetMobileWorktreeStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetMobileWorktreeStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetMobileWorktreeStatus(ctx, req.(*GetMobileWorktreeStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1666,6 +1708,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetProjectContext",
 			Handler:    _ProjectService_GetProjectContext_Handler,
+		},
+		{
+			MethodName: "GetMobileWorktreeStatus",
+			Handler:    _ProjectService_GetMobileWorktreeStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

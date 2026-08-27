@@ -15,6 +15,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
@@ -518,6 +519,10 @@ type AgentStatusResult struct {
 	AgentRunning  bool
 	AgentKind     string
 	ReadyForInput bool
+	// LastOutputPreview is populated from the shared liveStates registry
+	// (TASK-MB-04-02), BR-MB-15-truncated — empty when no live entry exists
+	// for this ptyId (cross-pod case), an honest absence not an error.
+	LastOutputPreview string
 }
 
 // InspectProcessResult carries InspectTerminalProcessResponse's fields.
@@ -675,4 +680,29 @@ type LiveSessionCloser interface {
 	// 1008 and a "token revoked" reason — see SOL-AWS-02 for why 1008, not
 	// the never-implemented 4001.
 	CloseSessionsForDevServerToken(ctx context.Context, devServerID, tokenID string) (closed int, err error)
+}
+
+// QueuedPromptRepository is the persistence port for infra.queued_prompts
+// (migrations/0008_queued_prompts) — durable storage for a mobile-dispatched
+// prompt held until the agent becomes ready (BR-MB-10), outliving the
+// per-pod in-memory liveStates registry AttachPty/GetTerminalAgentStatus
+// share. One row per PtyID; Get/GetAndDelete's found=false with a nil error
+// means "no prompt currently queued", matching this codebase's other
+// found-bool repository conventions (see TerminalSessionRepository.Get).
+type QueuedPromptRepository interface {
+	Get(ctx context.Context, ptyID string) (domain.QueuedPrompt, bool, error)
+	Upsert(ctx context.Context, p domain.QueuedPrompt) error
+	Delete(ctx context.Context, ptyID string) error
+	// GetAndDelete atomically reads and removes the row — see
+	// postgres.QueuedPromptStore.GetAndDelete's doc comment for the
+	// double-delivery race it guards against.
+	GetAndDelete(ctx context.Context, ptyID string) (domain.QueuedPrompt, bool, error)
+}
+
+// LifecycleEventPublisher publishes terminal-session agent-lifecycle
+// events for notification-service to translate into mobile pushes
+// (BL-MB-02). Best-effort — a publish failure must never fail the PTY
+// relay loop itself.
+type LifecycleEventPublisher interface {
+	PublishAgentLifecycle(ctx context.Context, tenantID, subject string, payload eventbus.AgentLifecyclePayload) error
 }

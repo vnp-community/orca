@@ -104,6 +104,7 @@ func run() error {
 	agentTokenStore := infrapostgres.NewAgentTokenStore(pool)
 	agentSessionStore := infrapostgres.NewAgentSessionStore(pool)
 	agentRateLimitedOutboxStore := infrapostgres.NewAgentRateLimitedOutboxStore(pool)
+	queuedPromptStore := infrapostgres.NewQueuedPromptStore(pool)
 
 	// Transactional-outbox relay (Epic G, docs/execution-plan.md;
 	// TASK-AUTH-05-08): EstablishConnection durably enqueues an outbox row
@@ -200,6 +201,33 @@ func run() error {
 		bulkProvisioner = unavailableBulkProvisioner{}
 	}
 
+	healthSrv := health.New()
+	healthSrv.Register("postgres", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return pool.Ping(ctx)
+	})
+
+	// terminalLiveStates is the shared per-pod quiescence registry
+	// AttachPty writes and GetTerminalAgentStatus reads (TASK-MB-02-01/02) —
+	// constructed once here so both usecases share the exact same instance.
+	terminalLiveStates := &sync.Map{}
+
+	// Agent-lifecycle push-notification events (TASK-MB-02-01) — best-effort,
+	// reuses the SAME NATS connection as the outbox relay above (pub is nil
+	// when NATS was unreachable at startup): a nil pub degrades this to "no
+	// mobile push notifications", never a fatal error, mirroring
+	// tenant-service's eventbus wiring.
+	var lifecycleEvents usecase.LifecycleEventPublisher
+	if pub != nil {
+		if err := pub.EnsureStream(ctx, infraeventbus.StreamName, []string{"orca.infra.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			lifecycleEvents = infraeventbus.NewLifecyclePublisher(pub)
+			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
+		}
+	}
+
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
 	resolveConnectionUC.Sessions = handshakeInfoProvider{client: agentClient} // TASK-INT-03-02: optional node_version enrichment
@@ -226,12 +254,17 @@ func run() error {
 	listTerminalSessionsUC := usecase.NewListTerminalSessions(terminalSessionStore)
 	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, agentClient)
 	focusTerminalSessionUC := usecase.NewFocusTerminalSession(terminalSessionStore)
-	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient)
+	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient, terminalLiveStates, lifecycleEvents, queuedPromptStore)
 	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
-	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter)
+	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter, terminalLiveStates, lifecycleEvents)
 	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
 	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
 	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
+	// dispatchPrompt/getQueuedPrompt (TASK-MB-03-05) share queuedPromptStore
+	// with getTerminalAgentStatusUC above — the SAME instance the
+	// ready-transition queue-drain hook needs.
+	dispatchPromptUC := usecase.NewDispatchPrompt(terminalSessionStore, repo, agentClient, queuedPromptStore)
+	getQueuedPromptUC := usecase.NewGetQueuedPrompt(terminalSessionStore, repo, queuedPromptStore)
 
 	// --- Emulator relay (TASK-048) / host capabilities relay (TASK-070) ---
 	// Shipped-but-honestly-inert until agent/ gains device.*/host.capabilities
@@ -433,15 +466,11 @@ func run() error {
 		killAgentSessionUC,
 		resumeAgentSessionUC,
 		switchAgentAccountUC,
+		dispatchPromptUC,
+		getQueuedPromptUC,
+		terminalLiveStates,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
-
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
 
 	// direct-websocket's inbound WS handler ("/agent") and token-issuance
 	// endpoint ("/api/agent-token") share this service's existing HTTP

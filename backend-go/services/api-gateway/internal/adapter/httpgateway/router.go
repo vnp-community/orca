@@ -120,6 +120,12 @@ func NewRouter(deps Deps) http.Handler {
 	if deps.WSCompatHandler != nil {
 		r.Get("/ws", deps.WSCompatHandler)
 	}
+	// mountUnauthenticatedPairingRoutes is unauthenticated by design (see its
+	// doc comment) — mounted here, outside the authed group below, following
+	// mountPushRoutes's precedent immediately above. Never move inside r.Group.
+	if deps.AuthClient != nil {
+		mountUnauthenticatedPairingRoutes(r, deps.AuthClient, pairingRateLimitMiddleware(deps.RateLimiter))
+	}
 	if deps.AgentProxyHandler != nil {
 		r.Get("/agent", deps.AgentProxyHandler.ServeHTTP)
 		r.Handle("/api/agent-token", deps.AgentProxyHandler)
@@ -140,6 +146,7 @@ func NewRouter(deps Deps) http.Handler {
 		if deps.AuthClient != nil {
 			mountAuthAdminRoutes(authed, deps.AuthClient)
 			mountAdminRoutes(authed, deps.AuthClient)
+			mountPairingRoutes(authed, deps.AuthClient)
 		}
 		if deps.AnnotationClient != nil {
 			mountAnnotationRoutes(authed, deps.AnnotationClient, deps.GitGatewayClient)

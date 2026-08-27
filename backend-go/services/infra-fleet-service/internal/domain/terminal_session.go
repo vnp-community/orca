@@ -16,6 +16,12 @@ type TerminalSession struct {
 	Cwd          string
 	CreatedAt    time.Time
 	LastActiveAt time.Time
+	// CreatedByUserID is threaded from SpawnTerminalSessionInput — empty for
+	// pre-migration rows and for any caller that doesn't carry a resolved
+	// user identity yet (see usecase.SpawnTerminalSession). Not included in
+	// IsZero's check below: an old row legitimately has it empty without
+	// being an absent session.
+	CreatedByUserID string
 	// ClosedAt is nil while the session is open — set by
 	// usecase.KillTerminalSession, mirrors Connection/DevServer's convention
 	// of a real Go zero value (nil pointer) over a sentinel time, per
@@ -36,4 +42,17 @@ func (t *TerminalSession) Touch(now time.Time) {
 // without a pointer.
 func (t TerminalSession) IsZero() bool {
 	return t.PtyID == "" && t.TenantID == "" && t.ConnectionID == "" && t.Cwd == "" && t.CreatedAt.IsZero() && t.LastActiveAt.IsZero() && t.ClosedAt == nil
+}
+
+// TruncatedForMobile applies BR-MB-15's 500-char cap at the point of
+// exposure — keeps the buffer's internal size independent of the mobile
+// contract, so a future non-mobile consumer wanting more context isn't
+// retroactively capped by this rule. Tail-truncated: keeps the MOST RECENT
+// bytes, not the head.
+func TruncatedForMobile(lastOutput []byte) string {
+	s := string(lastOutput)
+	if len(s) <= 500 {
+		return s
+	}
+	return s[len(s)-500:]
 }

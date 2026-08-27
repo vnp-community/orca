@@ -47,6 +47,12 @@ type Server struct {
 
 	listSessions *usecase.ListSessions
 	updateUser   *usecase.UpdateUser
+
+	initiateDevicePairing     *usecase.InitiateDevicePairing
+	completeDevicePairing     *usecase.CompleteDevicePairing
+	listPairedDevices         *usecase.ListPairedDevices
+	unpairDevice              *usecase.UnpairDevice
+	resolveDeviceSharedSecret *usecase.ResolveDeviceSharedSecret
 }
 
 func New(
@@ -72,6 +78,11 @@ func New(
 	getAdminStats *usecase.GetAdminStats,
 	listSessions *usecase.ListSessions,
 	updateUser *usecase.UpdateUser,
+	initiateDevicePairing *usecase.InitiateDevicePairing,
+	completeDevicePairing *usecase.CompleteDevicePairing,
+	listPairedDevices *usecase.ListPairedDevices,
+	unpairDevice *usecase.UnpairDevice,
+	resolveDeviceSharedSecret *usecase.ResolveDeviceSharedSecret,
 ) *Server {
 	return &Server{
 		login:             login,
@@ -98,6 +109,12 @@ func New(
 
 		listSessions: listSessions,
 		updateUser:   updateUser,
+
+		initiateDevicePairing:     initiateDevicePairing,
+		completeDevicePairing:     completeDevicePairing,
+		listPairedDevices:         listPairedDevices,
+		unpairDevice:              unpairDevice,
+		resolveDeviceSharedSecret: resolveDeviceSharedSecret,
 	}
 }
 
@@ -363,6 +380,65 @@ func (s *Server) GetAdminStats(ctx context.Context, req *authv1.GetAdminStatsReq
 		ActiveSessions: stats.ActiveSessions,
 		TotalPolicies:  stats.TotalPolicies,
 	}, nil
+}
+
+func (s *Server) InitiateDevicePairing(ctx context.Context, req *authv1.InitiateDevicePairingRequest) (*authv1.InitiateDevicePairingResponse, error) {
+	result, err := s.initiateDevicePairing.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.InitiateDevicePairingResponse{
+		PairingToken:     result.PairingToken,
+		DesktopPublicKey: result.DesktopPublicKey,
+		ServerAddress:    result.ServerAddress,
+		ExpiresAtUnixMs:  result.ExpiresAt.UnixMilli(),
+	}, nil
+}
+
+func (s *Server) CompleteDevicePairing(ctx context.Context, req *authv1.CompleteDevicePairingRequest) (*authv1.CompleteDevicePairingResponse, error) {
+	result, err := s.completeDevicePairing.Execute(ctx, req.GetPairingToken(), req.GetMobilePublicKey(), req.GetDeviceLabel())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.CompleteDevicePairingResponse{
+		DeviceId:                     result.DeviceID,
+		DesktopPublicKeyConfirmation: result.DesktopPublicKeyConfirmation,
+		AccessToken:                  result.AccessToken,
+		RefreshToken:                 result.RefreshToken,
+	}, nil
+}
+
+func (s *Server) ListPairedDevices(ctx context.Context, req *authv1.ListPairedDevicesRequest) (*authv1.ListPairedDevicesResponse, error) {
+	devices, err := s.listPairedDevices.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*authv1.PairedDevice, 0, len(devices))
+	for _, d := range devices {
+		out = append(out, &authv1.PairedDevice{
+			Id:               d.ID,
+			DeviceLabel:      d.DeviceLabel,
+			PairedAtUnixMs:   d.PairedAt.UnixMilli(),
+			LastUsedAtUnixMs: d.LastUsedAt.UnixMilli(),
+			Status:           string(d.Status),
+		})
+	}
+	return &authv1.ListPairedDevicesResponse{Devices: out}, nil
+}
+
+func (s *Server) UnpairDevice(ctx context.Context, req *authv1.UnpairDeviceRequest) (*emptypb.Empty, error) {
+	if err := s.unpairDevice.Execute(ctx, req.GetDeviceId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ResolveDeviceSharedSecret(ctx context.Context, req *authv1.ResolveDeviceSharedSecretRequest) (*authv1.ResolveDeviceSharedSecretResponse, error) {
+	secret, err := s.resolveDeviceSharedSecret.Execute(ctx, req.GetDeviceId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.ResolveDeviceSharedSecretResponse{SharedSecret: secret}, nil
 }
 
 func toProtoSession(s domain.Session) *authv1.Session {
