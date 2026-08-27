@@ -54,6 +54,49 @@ type ScmProvider interface {
 	CreatePullRequest(ctx context.Context, cred Credential, repo string, input CreatePullRequestInput) (domain.PullRequest, error)
 	ListPullRequests(ctx context.Context, cred Credential, repo string) ([]domain.PullRequest, error)
 	GetRateLimitStatus(ctx context.Context, cred Credential) (domain.RateLimitStatus, error)
+
+	// MergePullRequest / RequestPullRequestReviewers / RemovePullRequestReviewers
+	// / SetPullRequestAutoMerge / UpdateIssue — see SOL-012 shape 1. GitHub
+	// implements all five for real (TASK-075); other adapters return their
+	// own package-level ErrCapabilityUnsupported sentinel until wired,
+	// mirroring the azuredevops/gitea precedent already in this codebase.
+	MergePullRequest(ctx context.Context, cred Credential, repo string, number int32, input MergePullRequestInput) (domain.PullRequest, bool, string, error)
+	RequestPullRequestReviewers(ctx context.Context, cred Credential, repo string, number int32, reviewerLogins, teamSlugs []string) (domain.PullRequest, error)
+	RemovePullRequestReviewers(ctx context.Context, cred Credential, repo string, number int32, reviewerLogins []string) (domain.PullRequest, error)
+	SetPullRequestAutoMerge(ctx context.Context, cred Credential, repo string, number int32, enabled bool, mergeMethod string) (domain.PullRequest, error)
+	UpdateIssue(ctx context.Context, cred Credential, repo string, number int32, patch IssuePatch) (domain.Issue, error)
+
+	// GetPullRequestForBranch — provider-generic; backs github.prForBranch
+	// AND hostedReview.forBranch (SOL-014). found=false + zero-value
+	// PullRequest means "no open PR/MR for this branch", not an error.
+	GetPullRequestForBranch(ctx context.Context, cred Credential, repo, headBranch string) (pr domain.PullRequest, found bool, err error)
+	// ResolveRepoSlug — github.repoSlug. Resolves candidate (a remote URL,
+	// "owner/name", or bare name) to a canonical owner/name pair.
+	ResolveRepoSlug(ctx context.Context, cred Credential, candidate string) (owner, name string, err error)
+
+	// BranchExists — a plain existence read every provider's REST API
+	// supports uniformly, unlike SOL-012/SOL-013's provider-specific
+	// additions. Backs CheckHostedReviewEligibility's step 2 (SOL-014).
+	BranchExists(ctx context.Context, cred Credential, repo, branch string) (bool, error)
+}
+
+// MergePullRequestInput carries the merge-method/commit-message fields
+// MergePullRequest needs beyond repo+number.
+type MergePullRequestInput struct {
+	MergeMethod   string
+	CommitTitle   string
+	CommitMessage string
+}
+
+// IssuePatch is UpdateIssue's partial-update shape — nil pointer fields mean
+// "leave unchanged", mirroring UpdateIssueRequest's proto3 `optional` fields.
+type IssuePatch struct {
+	Title        *string
+	Body         *string
+	State        *string
+	AddLabels    []string
+	RemoveLabels []string
+	Assignees    []string
 }
 
 // ProviderRegistry resolves which concrete ScmProvider implementation to use
@@ -148,6 +191,26 @@ type OAuthStateCodec interface {
 // acquire write access by accident.
 type CredentialWriter interface {
 	Write(ctx context.Context, tenantID string, provider domain.ScmProvider, token OAuthToken) error
+	// WriteRaw is SetIntegrationCredential's entry point — a manually
+	// pasted token, never exchanged from an authorization code, so it
+	// carries no OAuthToken.Scope. Reuses the same
+	// CREDENTIAL_CATEGORY_SCM_OAUTH / owner_id=provider-name slot Write
+	// already writes to.
+	WriteRaw(ctx context.Context, tenantID string, provider domain.ScmProvider, token, configJSON string) error
+}
+
+// CredentialStatusReader backs GetIntegrationCredentialStatus — metadata
+// only, via credential-broker-service's GetCredentialMetadataByOwner RPC
+// (TASK-038), never ResolveCredentialByOwner (which would leak plaintext
+// for a status check).
+type CredentialStatusReader interface {
+	GetStatus(ctx context.Context, tenantID string, provider domain.ScmProvider) (configured bool, configJSON string, err error)
+}
+
+// CredentialLister backs ListIntegrationCredentials via
+// credential-broker-service's ListCredentialsByCategory RPC (TASK-038).
+type CredentialLister interface {
+	ListConfiguredProviders(ctx context.Context, tenantID string) ([]domain.ScmProvider, error)
 }
 
 // CredentialRevoker is this service's disconnect path into
@@ -183,4 +246,127 @@ type RateLimitCache interface {
 	// fall back to a live provider call.
 	Get(ctx context.Context, tenantID string, provider domain.ScmProvider, freshWithin time.Duration) (status domain.RateLimitStatus, ok bool, err error)
 	Set(ctx context.Context, tenantID string, provider domain.ScmProvider, status domain.RateLimitStatus) error
+}
+
+// ProjectFieldValue is a generic key/value field write — mirrors
+// scmintegrationv1.ProjectFieldValue 1:1 (Kind: "text" | "number" | "date" |
+// "single_select" | "iteration"). See this file's package doc comment for
+// why GitHubProjectsProvider is a separate interface from ScmProvider.
+type ProjectFieldValue struct {
+	FieldID string
+	Kind    string
+	Value   string
+}
+
+// Project, ProjectView, ProjectItem, IssueType, AssignableUser, Label,
+// ProjectComment, WorkItemDetails mirror their scmintegrationv1 message
+// counterparts 1:1 (TASK-077) — usecase/ stays framework-free, so these are
+// distinct Go types from the generated proto ones, converted by
+// internal/adapter/grpc (TASK-079).
+type Project struct {
+	ID     string
+	Slug   string
+	Title  string
+	Number int32
+	Owner  string
+	URL    string
+}
+
+type ProjectView struct {
+	ID     string
+	Name   string
+	Layout string
+}
+
+type ProjectItem struct {
+	ID          string
+	Title       string
+	ContentType string
+	ContentURL  string
+	Fields      []ProjectFieldValue
+}
+
+type IssueType struct {
+	ID          string
+	Name        string
+	Description string
+}
+
+type AssignableUser struct {
+	Login     string
+	Name      string
+	AvatarURL string
+}
+
+type Label struct {
+	Name        string
+	Color       string
+	Description string
+}
+
+type ProjectComment struct {
+	ID     string
+	Body   string
+	Author string
+	URL    string
+}
+
+type WorkItemDetails struct {
+	Slug   string
+	Title  string
+	Body   string
+	State  string
+	URL    string
+	Fields []ProjectFieldValue
+}
+
+// WorkItemPatch is the shared partial-update shape for
+// UpdateIssueBySlug/UpdatePullRequestBySlug — nil pointer fields mean
+// "leave unchanged", same convention as IssuePatch.
+type WorkItemPatch struct {
+	Title        *string
+	Body         *string
+	State        *string
+	AddLabels    []string
+	RemoveLabels []string
+}
+
+// GitHubProjectsProvider is a SEPARATE, narrower port than ScmProvider —
+// only internal/adapter/github implements it (TASK-079). Projects v2 isn't
+// part of the common ScmProvider surface at all, since no other provider
+// has it (see scm-integration-service.md §4's "each provider implements a
+// common port" principle).
+type GitHubProjectsProvider interface {
+	ListAccessibleProjects(ctx context.Context, cred Credential) ([]Project, error)
+	ResolveProjectRef(ctx context.Context, cred Credential, owner string, number int32) (Project, error)
+	ListProjectViews(ctx context.Context, cred Credential, projectSlug string) ([]ProjectView, error)
+	ViewProjectTable(ctx context.Context, cred Credential, projectSlug, viewID, pageToken string, pageSize int32) (items []ProjectItem, nextPageToken string, err error)
+	UpdateProjectItemField(ctx context.Context, cred Credential, projectSlug, itemID string, field ProjectFieldValue) (ProjectItem, error)
+	ClearProjectItemField(ctx context.Context, cred Credential, projectSlug, itemID, fieldID string) (ProjectItem, error)
+	GetWorkItemDetailsBySlug(ctx context.Context, cred Credential, itemSlug string) (WorkItemDetails, error)
+	UpdateIssueBySlug(ctx context.Context, cred Credential, itemSlug string, patch WorkItemPatch) (WorkItemDetails, error)
+	UpdatePullRequestBySlug(ctx context.Context, cred Credential, itemSlug string, patch WorkItemPatch) (WorkItemDetails, error)
+	UpdateIssueTypeBySlug(ctx context.Context, cred Credential, itemSlug, issueType string) (WorkItemDetails, error)
+	ListIssueTypesBySlug(ctx context.Context, cred Credential, itemSlug string) ([]IssueType, error)
+	ListAssignableUsersBySlug(ctx context.Context, cred Credential, itemSlug string) ([]AssignableUser, error)
+	ListLabelsBySlug(ctx context.Context, cred Credential, itemSlug string) ([]Label, error)
+	AddIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, body string) (ProjectComment, error)
+	UpdateIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, commentID, body string) (ProjectComment, error)
+	DeleteIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, commentID string) error
+}
+
+// MRFilter narrows a ListMergeRequests call — mirrors IssueFilter's shape.
+type MRFilter struct {
+	State        string
+	SourceBranch string
+}
+
+// GitLabMergeRequestProvider is a GitLab-only port, same reasoning as
+// GitHubProjectsProvider (see its doc comment): these 3 operations don't
+// belong on the common ScmProvider interface since no other provider
+// implements them.
+type GitLabMergeRequestProvider interface {
+	ListMergeRequests(ctx context.Context, cred Credential, repo string, filter MRFilter) ([]domain.MergeRequest, error)
+	ResolveDiscussion(ctx context.Context, cred Credential, repo string, mrIID int32, discussionID string, resolved bool) (domain.MergeRequestDiscussion, error)
+	GetWorkItemDetails(ctx context.Context, cred Credential, repo string, iid int32, itemType string) (domain.WorkItemDetailsGitLab, error)
 }

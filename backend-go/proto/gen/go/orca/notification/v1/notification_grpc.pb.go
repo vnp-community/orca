@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,9 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	NotificationService_Subscribe_FullMethodName           = "/orca.notification.v1.NotificationService/Subscribe"
-	NotificationService_GetVapidPublicKey_FullMethodName   = "/orca.notification.v1.NotificationService/GetVapidPublicKey"
-	NotificationService_StreamNotifications_FullMethodName = "/orca.notification.v1.NotificationService/StreamNotifications"
+	NotificationService_Subscribe_FullMethodName                  = "/orca.notification.v1.NotificationService/Subscribe"
+	NotificationService_UnregisterPushSubscription_FullMethodName = "/orca.notification.v1.NotificationService/UnregisterPushSubscription"
+	NotificationService_GetVapidPublicKey_FullMethodName          = "/orca.notification.v1.NotificationService/GetVapidPublicKey"
+	NotificationService_StreamNotifications_FullMethodName        = "/orca.notification.v1.NotificationService/StreamNotifications"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
@@ -32,6 +34,7 @@ const (
 // Primary consumer of the async event bus. See specs/backend-go/services/notification-service.md.
 type NotificationServiceClient interface {
 	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (*SubscribeResponse, error)
+	UnregisterPushSubscription(ctx context.Context, in *UnregisterPushSubscriptionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetVapidPublicKey(ctx context.Context, in *GetVapidPublicKeyRequest, opts ...grpc.CallOption) (*GetVapidPublicKeyResponse, error)
 	// StreamNotifications is a server-streaming RPC api-gateway opens per
 	// connected WS client and pipes frames from directly to the browser/mobile.
@@ -50,6 +53,16 @@ func (c *notificationServiceClient) Subscribe(ctx context.Context, in *Subscribe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SubscribeResponse)
 	err := c.cc.Invoke(ctx, NotificationService_Subscribe_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) UnregisterPushSubscription(ctx context.Context, in *UnregisterPushSubscriptionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, NotificationService_UnregisterPushSubscription_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +106,7 @@ type NotificationService_StreamNotificationsClient = grpc.ServerStreamingClient[
 // Primary consumer of the async event bus. See specs/backend-go/services/notification-service.md.
 type NotificationServiceServer interface {
 	Subscribe(context.Context, *SubscribeRequest) (*SubscribeResponse, error)
+	UnregisterPushSubscription(context.Context, *UnregisterPushSubscriptionRequest) (*emptypb.Empty, error)
 	GetVapidPublicKey(context.Context, *GetVapidPublicKeyRequest) (*GetVapidPublicKeyResponse, error)
 	// StreamNotifications is a server-streaming RPC api-gateway opens per
 	// connected WS client and pipes frames from directly to the browser/mobile.
@@ -109,6 +123,9 @@ type UnimplementedNotificationServiceServer struct{}
 
 func (UnimplementedNotificationServiceServer) Subscribe(context.Context, *SubscribeRequest) (*SubscribeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Subscribe not implemented")
+}
+func (UnimplementedNotificationServiceServer) UnregisterPushSubscription(context.Context, *UnregisterPushSubscriptionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnregisterPushSubscription not implemented")
 }
 func (UnimplementedNotificationServiceServer) GetVapidPublicKey(context.Context, *GetVapidPublicKeyRequest) (*GetVapidPublicKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetVapidPublicKey not implemented")
@@ -155,6 +172,24 @@ func _NotificationService_Subscribe_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_UnregisterPushSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnregisterPushSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).UnregisterPushSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_UnregisterPushSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).UnregisterPushSubscription(ctx, req.(*UnregisterPushSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _NotificationService_GetVapidPublicKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetVapidPublicKeyRequest)
 	if err := dec(in); err != nil {
@@ -194,6 +229,10 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Subscribe",
 			Handler:    _NotificationService_Subscribe_Handler,
+		},
+		{
+			MethodName: "UnregisterPushSubscription",
+			Handler:    _NotificationService_UnregisterPushSubscription_Handler,
 		},
 		{
 			MethodName: "GetVapidPublicKey",

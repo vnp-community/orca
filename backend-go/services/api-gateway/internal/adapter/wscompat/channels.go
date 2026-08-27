@@ -24,15 +24,46 @@ import (
 	"encoding/json"
 	"time"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
+	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
+	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
+	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
+
+// rateLimitReader is a minimal read interface over usecase.RateLimiter so
+// this file stays testable without importing the full concrete struct.
+// Satisfied by *usecase.RateLimiter after TASK-003 adds RPS()/Burst().
+type rateLimitReader interface {
+	RPS() float64
+	Burst() int
+}
+
+// rateLimitInfo is the wire shape rateLimits.get returns — mirrors the
+// frontend's RateLimitInfo type.
+type rateLimitInfo struct {
+	RequestsPerSecond float64 `json:"requestsPerSecond"`
+	Burst             int     `json:"burst"`
+}
+
+// rpcTimeout is the per-RPC deadline applied to each outbound gRPC call inside
+// a channel handler. Shorter than handler.go's invokeTimeout (25s) so a slow
+// or unreachable downstream service fails fast with a meaningful error message
+// rather than occupying the full dispatch window.
+//
+// Invariant: rpcTimeout (8s) < invokeTimeout (25s) — verified by
+// TestRPCTimeoutConstant_ShorterThanInvokeTimeout in channels_test.go.
+const rpcTimeout = 8 * time.Second
 
 // RegisterRealChannels wires every channel this pass gives real backend-go
 // implementations to. Called once from main.go's composition root with the
@@ -44,6 +75,14 @@ func RegisterRealChannels(
 	gitClient gitgatewayv1.GitGatewayServiceClient,
 	automationClient automationv1.AutomationServiceClient,
 	infraFleetClient infrafleetv1.InfraFleetServiceClient,
+	tenantClient tenantv1.TenantServiceClient,
+	projectClient projectv1.ProjectServiceClient,
+	issueTrackingClient issuetrackingv1.IssueTrackingServiceClient,
+	orchestrationClient orchestrationv1.OrchestrationServiceClient,
+	scmClient scmintegrationv1.ScmIntegrationServiceClient,
+	workflowClient workflowv1.WorkflowServiceClient,
+	aiProviderClient aiproviderv1.AiProviderServiceClient,
+	rateLimits rateLimitReader,
 ) {
 	registerAnnotationChannels(r, annotationClient)
 	registerTaskChannels(r, taskClient)
@@ -52,6 +91,38 @@ func RegisterRealChannels(
 	registerPreflightChannels(r)
 	registerDevServerChannels(r, infraFleetClient)
 	registerFleetChannels(r, infraFleetClient)
+	registerCrashReportChannels(r)
+	registerRateLimitChannels(r, rateLimits)
+
+	// Final integration pass — every group below was implemented as a
+	// standalone channels_*.go file (channels.go itself deliberately
+	// untouched by that work, per this batch's shared-file-avoidance
+	// convention) and is wired in here in one place rather than at each
+	// group's own call site, per each file's own "wire this from
+	// RegisterRealChannels" doc comment. See each file's package/function
+	// doc comment for which TASK-* IDs it covers.
+	registerAccountsChannels(r, infraFleetClient)
+	registerAiProviderChannels(r, aiProviderClient)
+	registerCredentialsChannels(r, scmClient, issueTrackingClient)
+	registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)
+	registerRepoSshStatusWorkspaceChannels(r, projectClient, gitClient, infraFleetClient)
+	registerSCMChannels(r, scmClient)
+	registerBrowserChannels(r, infraFleetClient)
+	registerBrowserProfileChannels(r, infraFleetClient)
+	// registerGitDeepChannels must be called after registerGitChannels:
+	// both register "git.diff", and only the deep version threads FilePath
+	// through (TASK-228's per-file diff fix) — Registry.Register overwrites
+	// on a repeated key, so call order decides which handler wins.
+	registerGitDeepChannels(r, gitClient)
+	registerFilesChannels(r, gitClient)
+	registerAutomationTaskChannels(r, automationClient, taskClient)
+	registerWorktreeChannels(r, gitClient, projectClient)
+	registerWorkspaceChannels(r, gitClient, projectClient)
+	registerEmulatorFolderWorkspaceHostChannels(r, projectClient, infraFleetClient)
+	registerTeamChannels(r, tenantClient)
+	registerTerminalChannels(r, infraFleetClient)
+	registerTenantProjectChannels(r, tenantClient, projectClient)
+	registerWorkflowChannels(r, workflowClient)
 }
 
 // ── annotation.* ────────────────────────────────────────────────────────
@@ -363,7 +434,11 @@ func devServerHost(wsURL, sshTargetID, name string) string {
 func registerDevServerChannels(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
 	r.Register("devServer.list", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		resp, err := client.ListDevServers(ctx, &infrafleetv1.ListDevServersRequest{})
+		// Per-RPC deadline: fail fast so the write-back (SOL-001 / TASK-001)
+		// still has time to deliver the error to the frontend before invokeTimeout.
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.ListDevServers(rpcCtx, &infrafleetv1.ListDevServersRequest{})
 		if err != nil {
 			return nil, err
 		}
@@ -386,7 +461,10 @@ func registerDevServerChannels(r *Registry, client infrafleetv1.InfraFleetServic
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		resp, err := client.RegisterDevServer(ctx, &infrafleetv1.RegisterDevServerRequest{
+		// Per-RPC deadline (same reasoning as devServer.list above).
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.RegisterDevServer(rpcCtx, &infrafleetv1.RegisterDevServerRequest{
 			TenantId: id.TenantID,
 			Host:     devServerHost(in.WSUrl, in.SSHTargetID, in.Name),
 			Mode:     toConnectionMode(in.ConnectionType),
@@ -428,10 +506,15 @@ func registerFleetChannels(r *Registry, client infrafleetv1.InfraFleetServiceCli
 		}
 
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		// Per-RPC deadline: GetFleetHealth involves active health checks to
+		// dev servers which can be slow — 8s allows for reasonable network
+		// latency while still failing before invokeTimeout.
 		// TenantId on the request is ignored server-side (tenant always comes
 		// from ctx metadata, per infrafleet.proto's comment) — set anyway for
 		// readability/documentation at this call site.
-		resp, err := client.GetFleetHealth(ctx, &infrafleetv1.GetFleetHealthRequest{TenantId: id.TenantID})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.GetFleetHealth(rpcCtx, &infrafleetv1.GetFleetHealthRequest{TenantId: id.TenantID})
 		if err != nil {
 			return nil, err
 		}
@@ -467,24 +550,55 @@ func registerFleetChannels(r *Registry, client infrafleetv1.InfraFleetServiceCli
 // ── preflight.check ──────────────────────────────────────────────────────
 //
 // Registered as a fast, LOCAL (no downstream call) response — see
-// docs/execution-plan.md §7: this channel wasn't the actual cause of the
-// "Request timed out" bug (an unregistered channel already fails fast via
-// notImplementedHandler), but it's called early in every bootstrap and is
-// worth answering honestly rather than leaving unregistered.
+// docs/execution-plan.md §7. This handler is intentionally local-only: if it is
+// observed to time out in production after SOL-001 (TASK-001) and SOL-003
+// (TASK-008) are applied, the cause is writeMu contention (BUG-004 Cause B) —
+// look for "wscompat: writeMu contention detected" log entries on the same
+// connection around the same timestamp.
 //
 // frontend/src/preload/api-types.ts's PreflightStatus asks about `gh`/`glab`
 // CLI installed+authenticated state — that concept doesn't map onto
-// backend-go's design at all: scm-integration-service is a direct OAuth API
-// client, deliberately NOT a `gh`/`glab` CLI wrapper (closes TS Gap 1, see
-// specs/backend-go/services/scm-integration-service.md). Reporting
-// installed:false/authenticated:false for both is the honest answer, not a
-// stub pretending to detect something this architecture doesn't have.
+// backend-go's design: scm-integration-service is a direct OAuth API client,
+// deliberately NOT a `gh`/`glab` CLI wrapper. Reporting installed:false/
+// authenticated:false for both is the honest answer.
 func registerPreflightChannels(r *Registry) {
 	r.Register("preflight.check", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		return map[string]any{
-			"git":  map[string]any{"installed": true}, // git-gateway-service's local executor requires the real git binary — see its README
+			"git":  map[string]any{"installed": true}, // git-gateway-service's local executor requires the real git binary
 			"gh":   map[string]any{"installed": false, "authenticated": false},
 			"glab": map[string]any{"installed": false, "authenticated": false},
+		}, nil
+	})
+}
+
+// ── crashReports.* ──────────────────────────────────────────────────────────
+//
+// backend-go has no crash reporting service — this architecture uses structured
+// gRPC error propagation (apperrors.ToGRPCStatus) and OpenTelemetry traces
+// instead of a separate crash-report collection service. The frontend calls
+// crashReports.getLatestPending on every bootstrap; returning null is the
+// honest answer ("no pending crash report"), not a stub — there is genuinely
+// nothing to report from backend-go's crash/panic path.
+func registerCrashReportChannels(r *Registry) {
+	r.Register("crashReports.getLatestPending", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// null signals "no pending crash report" — matches the frontend's
+		// crashReports.getLatestPending contract (nullable return).
+		return nil, nil
+	})
+}
+
+// ── rateLimits.* ────────────────────────────────────────────────────────────
+//
+// Exposes api-gateway's in-process per-tenant rate limiter configuration.
+// The frontend calls rateLimits.get during bootstrap to understand the
+// current throttle policy (e.g. for UI-level quota indicators). Returns
+// the limiter's configured RPS/burst — not per-tenant counters (those are
+// ephemeral per-replica state, not meaningful to expose externally).
+func registerRateLimitChannels(r *Registry, rl rateLimitReader) {
+	r.Register("rateLimits.get", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		return rateLimitInfo{
+			RequestsPerSecond: rl.RPS(),
+			Burst:             rl.Burst(),
 		}, nil
 	})
 }

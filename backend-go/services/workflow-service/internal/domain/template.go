@@ -39,13 +39,20 @@ var (
 	// ErrTemplateSelfParent guards against a template naming itself as its
 	// own parent, the smallest possible inheritance cycle — see
 	// workflow-service.md §4: "Constructor rejects a template naming
-	// itself as its own parent, directly." Multi-hop cycles can't arise
-	// through this service's RPC surface (a parent must already exist,
-	// with its own id assigned, before a child can reference it — there is
-	// no UpdateTemplate RPC to rewire an existing template's parent after
-	// the fact), so ResolveChain's depth cap (5) is the only additional
-	// safety net needed, not full graph cycle detection.
+	// itself as its own parent, directly." UpdateTemplate (added after this
+	// comment was first written) CAN rewire an existing template's parent,
+	// so a multi-hop cycle is reachable through this service's RPC surface
+	// now — see usecase.UpdateTemplate's cycle re-validation, which walks
+	// the new parent's ResolveChain and rejects if id appears in it. This
+	// constructor-level check still catches the direct self-parent case on
+	// every construction path (Create AND Update), independent of that
+	// re-validation.
 	ErrTemplateSelfParent = errors.New("domain: a template cannot be its own parent")
+	// ErrTemplateVersionConflict is the sentinel adapter/postgres returns
+	// (wrapped) when UpdateTemplate's conditional UPDATE affects zero rows
+	// because templates.version has moved since the caller read it —
+	// usecase maps this to apperrors.KindFailedPrecondition.
+	ErrTemplateVersionConflict = errors.New("domain: template was modified by another request")
 )
 
 // WorkflowTemplate is a reusable, named DAG definition — see
@@ -63,6 +70,10 @@ type WorkflowTemplate struct {
 	// usecase.ResolveTemplate to compute the effective, inheritance-resolved
 	// template — see that usecase's doc comment for the resolution policy.
 	ParentTemplateID string
+	// Version is bumped by UpdateTemplate on every write; 1 at creation —
+	// backs the version-bump-on-write optimistic concurrency check
+	// (SOL-030), mirroring SOL-001's AccessPolicy pattern.
+	Version int32
 }
 
 // NewWorkflowTemplate constructs a WorkflowTemplate, enforcing the
@@ -97,5 +108,6 @@ func NewWorkflowTemplate(id, tenantID, name, dagJSON string, scope Scope, parent
 		DAGJSON:          dagJSON,
 		Scope:            scope,
 		ParentTemplateID: parentTemplateID,
+		Version:          1,
 	}, nil
 }

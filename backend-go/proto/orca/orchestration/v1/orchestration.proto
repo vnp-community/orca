@@ -14,6 +14,14 @@ service OrchestrationService {
   // UpdateTaskStatusAndPromote is one atomic RPC (single DB transaction) —
   // mirrors TS's updateTaskStatus -> promoteReadyTasks chain.
   rpc UpdateTaskStatusAndPromote(UpdateTaskStatusAndPromoteRequest) returns (UpdateTaskStatusAndPromoteResponse);
+
+  // GetDispatchContextForTask is orchestration-service's first read RPC —
+  // a scope addition beyond both the shipped proto and
+  // orchestration-service.md §3's own drafted surface (neither has a
+  // dispatch-context read). Backs orchestration.dispatchShow: "which
+  // terminal was this task dispatched to." See SOL-018 for the "not a
+  // missing assignee_handle field, a missing read RPC" distinction.
+  rpc GetDispatchContextForTask(GetDispatchContextForTaskRequest) returns (GetDispatchContextForTaskResponse);
 }
 
 message DispatchContext {
@@ -90,4 +98,15 @@ message UpdateTaskStatusAndPromoteRequest {
 
 message UpdateTaskStatusAndPromoteResponse {
   repeated string promoted_task_ids = 1;
+}
+
+message GetDispatchContextForTaskRequest {
+  string orchestration_task_id = 1;
+}
+
+message GetDispatchContextForTaskResponse {
+  // Unset when no dispatch context exists yet for this task — a legitimate
+  // state (the task hasn't been dispatched), not an error. Reuses the
+  // existing DispatchContext message; no new message type needed.
+  DispatchContext dispatch = 1;
 }

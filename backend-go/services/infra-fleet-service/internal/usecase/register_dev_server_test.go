@@ -15,14 +15,35 @@ type fakeDevServerRepository struct {
 	byID        map[string]domain.DevServer
 	getErr      error
 	listErr     error
+
+	// found/bySshTarget/findErr drive FindBySshTarget's fake answer — used
+	// by get_ssh_state_test.go/establish_connection_test.go.
+	found          bool
+	bySshTarget    domain.DevServer
+	findErr        error
+	registerCalled bool
+	lastRegistered domain.DevServer
 }
 
 func (f *fakeDevServerRepository) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
+	f.registerCalled = true
+	f.lastRegistered = ds
 	if f.registerErr != nil {
 		return domain.DevServer{}, f.registerErr
 	}
 	f.registered = append(f.registered, ds)
 	return ds, nil
+}
+
+// FindBySshTarget implements usecase.DevServerRepository.FindBySshTarget.
+func (f *fakeDevServerRepository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (domain.DevServer, bool, error) {
+	if f.findErr != nil {
+		return domain.DevServer{}, false, f.findErr
+	}
+	if !f.found {
+		return domain.DevServer{}, false, nil
+	}
+	return f.bySshTarget, true, nil
 }
 
 func (f *fakeDevServerRepository) Get(ctx context.Context, tenantID, id string) (domain.DevServer, error) {

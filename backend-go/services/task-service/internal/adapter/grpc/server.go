@@ -7,6 +7,8 @@ package grpc
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
@@ -25,6 +27,12 @@ type Server struct {
 	resolvePermission   *usecase.ResolvePermission
 	executeTask         *usecase.ExecuteTask
 	hasActiveExecutions *usecase.HasActiveExecutions
+	listTasks           *usecase.ListTasks
+	updateTask          *usecase.UpdateTask
+	deleteTask          *usecase.DeleteTask
+	getDependencies     *usecase.GetDependencies
+	aiDecompose         *usecase.AIDecompose
+	aiApply             *usecase.AIApply
 }
 
 func New(
@@ -35,6 +43,12 @@ func New(
 	resolvePermission *usecase.ResolvePermission,
 	executeTask *usecase.ExecuteTask,
 	hasActiveExecutions *usecase.HasActiveExecutions,
+	listTasks *usecase.ListTasks,
+	updateTask *usecase.UpdateTask,
+	deleteTask *usecase.DeleteTask,
+	getDependencies *usecase.GetDependencies,
+	aiDecompose *usecase.AIDecompose,
+	aiApply *usecase.AIApply,
 ) *Server {
 	return &Server{
 		createTask:          createTask,
@@ -44,6 +58,12 @@ func New(
 		resolvePermission:   resolvePermission,
 		executeTask:         executeTask,
 		hasActiveExecutions: hasActiveExecutions,
+		listTasks:           listTasks,
+		updateTask:          updateTask,
+		deleteTask:          deleteTask,
+		getDependencies:     getDependencies,
+		aiDecompose:         aiDecompose,
+		aiApply:             aiApply,
 	}
 }
 
@@ -128,6 +148,97 @@ func (s *Server) HasActiveExecutions(ctx context.Context, req *taskv1.HasActiveE
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &taskv1.HasActiveExecutionsResponse{HasActive: hasActive}, nil
+}
+
+func (s *Server) ListTasks(ctx context.Context, req *taskv1.ListTasksRequest) (*taskv1.ListTasksResponse, error) {
+	result, err := s.listTasks.Execute(ctx, usecase.ListTasksInput{
+		ProjectID: req.GetProjectId(),
+		PageToken: req.GetPageToken(),
+		PageSize:  req.GetPageSize(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.Task, 0, len(result.Tasks))
+	for _, t := range result.Tasks {
+		out = append(out, toProtoTask(t))
+	}
+	return &taskv1.ListTasksResponse{Tasks: out, NextPageToken: result.NextPageToken}, nil
+}
+
+func (s *Server) UpdateTask(ctx context.Context, req *taskv1.UpdateTaskRequest) (*taskv1.UpdateTaskResponse, error) {
+	in := usecase.UpdateTaskInput{ID: req.GetId()}
+	if req.GetTitle() != nil {
+		v := req.GetTitle().GetValue()
+		in.Title = &v
+	}
+	if req.GetStatus() != nil {
+		v := req.GetStatus().GetValue()
+		in.Status = &v
+	}
+	task, err := s.updateTask.Execute(ctx, in)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.UpdateTaskResponse{Task: toProtoTask(task)}, nil
+}
+
+func (s *Server) DeleteTask(ctx context.Context, req *taskv1.DeleteTaskRequest) (*emptypb.Empty, error) {
+	if err := s.deleteTask.Execute(ctx, usecase.DeleteTaskInput{ID: req.GetId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetDependencies(ctx context.Context, req *taskv1.GetDependenciesRequest) (*taskv1.GetDependenciesResponse, error) {
+	deps, err := s.getDependencies.Execute(ctx, usecase.GetDependenciesInput{TaskID: req.GetTaskId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.Task, 0, len(deps))
+	for _, t := range deps {
+		out = append(out, toProtoTask(t))
+	}
+	return &taskv1.GetDependenciesResponse{Dependencies: out}, nil
+}
+
+func (s *Server) AIDecompose(ctx context.Context, req *taskv1.AIDecomposeRequest) (*taskv1.AIDecomposeResponse, error) {
+	proposals, err := s.aiDecompose.Execute(ctx, usecase.AIDecomposeInput{TaskID: req.GetTaskId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.AIDecomposeResponse{Proposals: toProtoSubtaskProposals(proposals)}, nil
+}
+
+func (s *Server) AIApply(ctx context.Context, req *taskv1.AIApplyRequest) (*taskv1.AIApplyResponse, error) {
+	created, err := s.aiApply.Execute(ctx, usecase.AIApplyInput{
+		TaskID:    req.GetTaskId(),
+		Proposals: toDomainSubtaskProposals(req.GetProposals()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.Task, 0, len(created))
+	for _, t := range created {
+		out = append(out, toProtoTask(t))
+	}
+	return &taskv1.AIApplyResponse{CreatedSubtasks: out}, nil
+}
+
+func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.SubtaskProposal {
+	out := make([]*taskv1.SubtaskProposal, 0, len(proposals))
+	for _, p := range proposals {
+		out = append(out, &taskv1.SubtaskProposal{Title: p.Title, Description: p.Description})
+	}
+	return out
+}
+
+func toDomainSubtaskProposals(proposals []*taskv1.SubtaskProposal) []domain.SubtaskProposal {
+	out := make([]domain.SubtaskProposal, 0, len(proposals))
+	for _, p := range proposals {
+		out = append(out, domain.SubtaskProposal{Title: p.GetTitle(), Description: p.GetDescription()})
+	}
+	return out
 }
 
 func toDomainEdgeKind(t taskv1.EdgeType) domain.EdgeKind {

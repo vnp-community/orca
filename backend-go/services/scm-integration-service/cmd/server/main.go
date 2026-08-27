@@ -89,9 +89,17 @@ func run() error {
 	defer pool.Close()
 	rateLimitCache := postgres.New(pool)
 
+	// githubProjectsAdapter/gitlabMRAdapter are the SAME instances registered
+	// below in registry's map — one GitHub adapter satisfying both
+	// usecase.ScmProvider and usecase.GitHubProjectsProvider, one GitLab
+	// adapter satisfying both usecase.ScmProvider and
+	// usecase.GitLabMergeRequestProvider (SOL-012/SOL-013's "still one
+	// adapter, not a second client" design note).
+	githubProjectsAdapter := scmgithub.New(nil, cfg.GitHubBaseURL)
+	gitlabMRAdapter := scmgitlab.New(nil, cfg.GitLabBaseURL)
 	registry := providerregistry.New(map[domain.ScmProvider]usecase.ScmProvider{
-		domain.ScmProviderGitHub:      scmgithub.New(nil, cfg.GitHubBaseURL),
-		domain.ScmProviderGitLab:      scmgitlab.New(nil, cfg.GitLabBaseURL),
+		domain.ScmProviderGitHub:      githubProjectsAdapter,
+		domain.ScmProviderGitLab:      gitlabMRAdapter,
 		domain.ScmProviderBitbucket:   bitbucket.New(nil, cfg.BitbucketBaseURL),
 		domain.ScmProviderAzureDevOps: azuredevops.New(nil, cfg.AzureDevOpsBaseURL),
 		domain.ScmProviderGitea:       gitea.New(nil, cfg.GiteaBaseURL),
@@ -143,11 +151,67 @@ func run() error {
 	startOAuthFlowUC := usecase.NewStartOAuthFlow(oauthRegistry, stateCodec, nil)
 	completeOAuthFlowUC := usecase.NewCompleteOAuthFlow(oauthRegistry, stateCodec, credentials)
 	revokeAuthUC := usecase.NewRevokeAuth(credentials)
+	setIntegrationCredentialUC := usecase.NewSetIntegrationCredential(credentials)
+	getIntegrationCredentialStatusUC := usecase.NewGetIntegrationCredentialStatus(credentials)
+	listIntegrationCredentialsUC := usecase.NewListIntegrationCredentials(credentials)
+
+	// SOL-012 shape 1/2 — GitHub PR/issue mutations + repo/branch resolution
+	// (TASK-076). registry already fans out per-provider; these usecases
+	// resolve the concrete adapter the same way every other usecase above
+	// does.
+	mergePullRequestUC := usecase.NewMergePullRequest(credentials, registry)
+	requestPullRequestReviewersUC := usecase.NewRequestPullRequestReviewers(credentials, registry)
+	removePullRequestReviewersUC := usecase.NewRemovePullRequestReviewers(credentials, registry)
+	setPullRequestAutoMergeUC := usecase.NewSetPullRequestAutoMerge(credentials, registry)
+	updateIssueUC := usecase.NewUpdateIssue(credentials, registry)
+	getPullRequestForBranchUC := usecase.NewGetPullRequestForBranch(credentials, registry)
+	resolveRepoSlugUC := usecase.NewResolveRepoSlug(credentials, registry)
+
+	// SOL-012 shape 3 — GitHub Projects v2 (TASK-079). githubProjectsAdapter
+	// is the SAME *github.Client instance registered in registry's map below
+	// — one GitHub adapter satisfying both usecase.ScmProvider and
+	// usecase.GitHubProjectsProvider, per SOL-012's design note.
+	listAccessibleProjectsUC := usecase.NewListAccessibleProjects(credentials, githubProjectsAdapter)
+	resolveProjectRefUC := usecase.NewResolveProjectRef(credentials, githubProjectsAdapter)
+	listProjectViewsUC := usecase.NewListProjectViews(credentials, githubProjectsAdapter)
+	viewProjectTableUC := usecase.NewViewProjectTable(credentials, githubProjectsAdapter)
+	updateProjectItemFieldUC := usecase.NewUpdateProjectItemField(credentials, githubProjectsAdapter)
+	clearProjectItemFieldUC := usecase.NewClearProjectItemField(credentials, githubProjectsAdapter)
+	getWorkItemDetailsBySlugUC := usecase.NewGetWorkItemDetailsBySlug(credentials, githubProjectsAdapter)
+	updateIssueBySlugUC := usecase.NewUpdateIssueBySlug(credentials, githubProjectsAdapter)
+	updatePullRequestBySlugUC := usecase.NewUpdatePullRequestBySlug(credentials, githubProjectsAdapter)
+	updateIssueTypeBySlugUC := usecase.NewUpdateIssueTypeBySlug(credentials, githubProjectsAdapter)
+	listIssueTypesBySlugUC := usecase.NewListIssueTypesBySlug(credentials, githubProjectsAdapter)
+	listAssignableUsersBySlugUC := usecase.NewListAssignableUsersBySlug(credentials, githubProjectsAdapter)
+	listLabelsBySlugUC := usecase.NewListLabelsBySlug(credentials, githubProjectsAdapter)
+	addIssueCommentBySlugUC := usecase.NewAddIssueCommentBySlug(credentials, githubProjectsAdapter)
+	updateIssueCommentBySlugUC := usecase.NewUpdateIssueCommentBySlug(credentials, githubProjectsAdapter)
+	deleteIssueCommentBySlugUC := usecase.NewDeleteIssueCommentBySlug(credentials, githubProjectsAdapter)
+
+	// SOL-013 — GitLab-specific (TASK-084). gitlabMRAdapter is the SAME
+	// *gitlab.Client instance registered in registry's map below.
+	listMergeRequestsUC := usecase.NewListMergeRequests(credentials, gitlabMRAdapter)
+	resolveMergeRequestDiscussionUC := usecase.NewResolveMergeRequestDiscussion(credentials, gitlabMRAdapter)
+	getWorkItemDetailsUC := usecase.NewGetWorkItemDetails(credentials, gitlabMRAdapter)
+
+	// SOL-014 — hostedReview.getCreationEligibility (TASK-088). Reuses the
+	// same getAuthStatusUC instance the GetAuthStatus RPC already uses.
+	checkHostedReviewEligibilityUC := usecase.NewCheckHostedReviewEligibility(credentials, registry, getAuthStatusUC)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
 		listIssuesUC, createPullRequestUC, listPullRequestsUC, getRateLimitStatusUC,
 		getAuthStatusUC, startOAuthFlowUC, completeOAuthFlowUC, revokeAuthUC,
+		mergePullRequestUC, requestPullRequestReviewersUC, removePullRequestReviewersUC,
+		setPullRequestAutoMergeUC, updateIssueUC, getPullRequestForBranchUC, resolveRepoSlugUC,
+		listAccessibleProjectsUC, resolveProjectRefUC, listProjectViewsUC, viewProjectTableUC,
+		updateProjectItemFieldUC, clearProjectItemFieldUC, getWorkItemDetailsBySlugUC,
+		updateIssueBySlugUC, updatePullRequestBySlugUC, updateIssueTypeBySlugUC,
+		listIssueTypesBySlugUC, listAssignableUsersBySlugUC, listLabelsBySlugUC,
+		addIssueCommentBySlugUC, updateIssueCommentBySlugUC, deleteIssueCommentBySlugUC,
+		listMergeRequestsUC, resolveMergeRequestDiscussionUC, getWorkItemDetailsUC,
+		checkHostedReviewEligibilityUC,
+		setIntegrationCredentialUC, getIntegrationCredentialStatusUC, listIntegrationCredentialsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

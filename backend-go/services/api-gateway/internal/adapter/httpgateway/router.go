@@ -70,13 +70,25 @@ type Deps struct {
 	// upgrade time), not via authMiddleware below — see NewRouter's
 	// mounting order.
 	WSCompatHandler http.HandlerFunc
+	// AgentProxyHandler serves /agent (WS) and /api/agent-token (HTTP),
+	// raw-proxied to infra-fleet-service — see agent_proxy_routes.go's
+	// NewAgentProxyHandler doc comment for why this is a byte-for-byte
+	// proxy rather than a gRPC translation. Auth happens INSIDE
+	// infra-fleet-service (ORCA_AGENT_API_SECRET bearer check /
+	// single-use token slots), same "auth inside the handler, not via
+	// authMiddleware" shape as WSCompatHandler above — the Dev Server
+	// Agent has no user session cookie to present. Nil is valid — the
+	// routes are simply not mounted (see Config.InfraFleetHTTPAddr).
+	AgentProxyHandler http.Handler
 }
 
 // NewRouter builds api-gateway's chi router. Three route groups, in order:
 //  1. Unauthenticated: POST /auth/local (login itself can't require a
-//     session — that would be circular) and GET /ws (auth handled inside
+//     session — that would be circular), GET /ws (auth handled inside
 //     wscompat.Handler, once at upgrade, not per-HTTP-request — matching
-//     the old backend's WsSessionRouter design).
+//     the old backend's WsSessionRouter design), and GET /agent + /api/
+//     agent-token (auth handled inside infra-fleet-service, see
+//     AgentProxyHandler's doc comment above).
 //  2. Authenticated: everything else (/v1/*, including the real
 //     usage-service proxy, the real notification WS bridge, the Phase 5
 //     mountXRoutes proxies below, and 501 stubs for the remaining
@@ -88,8 +100,17 @@ func NewRouter(deps Deps) http.Handler {
 		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator)
 	}
 	mountTraceRoutes(r)
+	// mountPushRoutes is unauthenticated by design (see its doc comment) —
+	// mounted here, outside the authed group below, never moved inside it.
+	if deps.NotificationClient != nil {
+		mountPushRoutes(r, deps.NotificationClient)
+	}
 	if deps.WSCompatHandler != nil {
 		r.Get("/ws", deps.WSCompatHandler)
+	}
+	if deps.AgentProxyHandler != nil {
+		r.Get("/agent", deps.AgentProxyHandler.ServeHTTP)
+		r.Handle("/api/agent-token", deps.AgentProxyHandler)
 	}
 
 	r.Group(func(authed chi.Router) {
@@ -106,6 +127,7 @@ func NewRouter(deps Deps) http.Handler {
 		// degrades to that prefix's 501 stub instead of panicking.
 		if deps.AuthClient != nil {
 			mountAuthAdminRoutes(authed, deps.AuthClient)
+			mountAdminRoutes(authed, deps.AuthClient)
 		}
 		if deps.AnnotationClient != nil {
 			mountAnnotationRoutes(authed, deps.AnnotationClient)

@@ -13,6 +13,8 @@ import (
 	"github.com/stablyai/orca-go/services/tenant-service/internal/usecase"
 
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
+
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // ResolvedProfileGetter is satisfied by both usecase.GetResolvedProfile and
@@ -35,6 +37,13 @@ type Server struct {
 	createTeam         *usecase.CreateTeam
 	addTeamMember      *usecase.AddTeamMember
 	listTeamMembers    *usecase.ListTeamMembers
+	getUserProfile     *usecase.GetUserProfile
+	listDepartments    *usecase.ListDepartments
+	updateCompany      *usecase.UpdateCompany
+	updateDepartment   *usecase.UpdateDepartment
+	updateUserProfile  *usecase.UpdateUserProfile
+	listTeams          *usecase.ListTeams
+	removeTeamMember   *usecase.RemoveTeamMember
 }
 
 func New(
@@ -46,6 +55,13 @@ func New(
 	createTeam *usecase.CreateTeam,
 	addTeamMember *usecase.AddTeamMember,
 	listTeamMembers *usecase.ListTeamMembers,
+	getUserProfile *usecase.GetUserProfile,
+	listDepartments *usecase.ListDepartments,
+	updateCompany *usecase.UpdateCompany,
+	updateDepartment *usecase.UpdateDepartment,
+	updateUserProfile *usecase.UpdateUserProfile,
+	listTeams *usecase.ListTeams,
+	removeTeamMember *usecase.RemoveTeamMember,
 ) *Server {
 	return &Server{
 		createCompany:      createCompany,
@@ -56,6 +72,13 @@ func New(
 		createTeam:         createTeam,
 		addTeamMember:      addTeamMember,
 		listTeamMembers:    listTeamMembers,
+		getUserProfile:     getUserProfile,
+		listDepartments:    listDepartments,
+		updateCompany:      updateCompany,
+		updateDepartment:   updateDepartment,
+		updateUserProfile:  updateUserProfile,
+		listTeams:          listTeams,
+		removeTeamMember:   removeTeamMember,
 	}
 }
 
@@ -159,6 +182,132 @@ func (s *Server) ListTeamMembers(ctx context.Context, req *tenantv1.ListTeamMemb
 		out = append(out, &tenantv1.TeamMember{UserId: m.UserID, Priority: m.Priority})
 	}
 	return &tenantv1.ListTeamMembersResponse{Members: out}, nil
+}
+
+func (s *Server) GetUserProfile(ctx context.Context, req *tenantv1.GetUserProfileRequest) (*tenantv1.GetUserProfileResponse, error) {
+	profile, err := s.getUserProfile.Execute(ctx, usecase.GetUserProfileInput{UserID: req.GetUserId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	proto, err := toProtoUserProfile(profile)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.GetUserProfileResponse{Profile: proto}, nil
+}
+
+func (s *Server) ListDepartments(ctx context.Context, req *tenantv1.ListDepartmentsRequest) (*tenantv1.ListDepartmentsResponse, error) {
+	depts, err := s.listDepartments.Execute(ctx, usecase.ListDepartmentsInput{CompanyID: req.GetCompanyId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*tenantv1.Department, 0, len(depts))
+	for _, d := range depts {
+		proto, err := toProtoDepartment(d)
+		if err != nil {
+			return nil, apperrors.ToGRPCStatus(err)
+		}
+		out = append(out, proto)
+	}
+	return &tenantv1.ListDepartmentsResponse{Departments: out}, nil
+}
+
+func (s *Server) UpdateCompany(ctx context.Context, req *tenantv1.UpdateCompanyRequest) (*tenantv1.UpdateCompanyResponse, error) {
+	company, err := s.updateCompany.Execute(ctx, usecase.UpdateCompanyInput{
+		ID: req.GetId(),
+		Patch: domain.CompanySettingsPatch{
+			Name:         req.GetName(),
+			SettingsJSON: req.GetSettingsJson(),
+		},
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	proto, err := toProtoCompany(company)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.UpdateCompanyResponse{Company: proto}, nil
+}
+
+func (s *Server) UpdateDepartment(ctx context.Context, req *tenantv1.UpdateDepartmentRequest) (*tenantv1.UpdateDepartmentResponse, error) {
+	dept, err := s.updateDepartment.Execute(ctx, usecase.UpdateDepartmentInput{
+		ID: req.GetId(),
+		Patch: domain.DepartmentSettingsPatch{
+			Name:         req.GetName(),
+			SettingsJSON: req.GetSettingsJson(),
+		},
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	proto, err := toProtoDepartment(dept)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.UpdateDepartmentResponse{Department: proto}, nil
+}
+
+func (s *Server) UpdateUserProfile(ctx context.Context, req *tenantv1.UpdateUserProfileRequest) (*tenantv1.UpdateUserProfileResponse, error) {
+	in := usecase.UpdateUserProfileInput{
+		UserID:          req.GetUserId(),
+		DepartmentID:    req.GetDepartmentId(),
+		ClearDepartment: req.GetClearDepartment(),
+	}
+	if req.GetSettingsJson() != "" {
+		settings, err := unmarshalSettings(req.GetSettingsJson())
+		if err != nil {
+			return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "TENANT_INVALID_PROFILE_SETTINGS", "settings_json is not valid JSON", err))
+		}
+		in.Settings = settings
+		in.SetSettings = true
+	}
+	profile, err := s.updateUserProfile.Execute(ctx, in)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	proto, err := toProtoUserProfile(profile)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.UpdateUserProfileResponse{Profile: proto}, nil
+}
+
+func (s *Server) ListTeams(ctx context.Context, req *tenantv1.ListTeamsRequest) (*tenantv1.ListTeamsResponse, error) {
+	teams, err := s.listTeams.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*tenantv1.Team, 0, len(teams))
+	for _, t := range teams {
+		proto, err := toProtoTeam(t)
+		if err != nil {
+			return nil, apperrors.ToGRPCStatus(err)
+		}
+		out = append(out, proto)
+	}
+	return &tenantv1.ListTeamsResponse{Teams: out}, nil
+}
+
+func (s *Server) RemoveTeamMember(ctx context.Context, req *tenantv1.RemoveTeamMemberRequest) (*emptypb.Empty, error) {
+	err := s.removeTeamMember.Execute(ctx, usecase.RemoveTeamMemberInput{
+		TeamID: req.GetTeamId(),
+		UserID: req.GetUserId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func toProtoUserProfile(p domain.UserProfile) (*tenantv1.UserProfile, error) {
+	settingsJSON, err := marshalSettings(p.Settings)
+	if err != nil {
+		return nil, apperrors.New(apperrors.KindInternal, "TENANT_MARSHAL_PROFILE_FAILED", "failed to marshal user profile settings", err)
+	}
+	return &tenantv1.UserProfile{
+		UserId: p.UserID, CompanyId: p.CompanyID, DepartmentId: p.DepartmentID, SettingsJson: settingsJSON,
+	}, nil
 }
 
 func toProtoCompany(c domain.Company) (*tenantv1.Company, error) {

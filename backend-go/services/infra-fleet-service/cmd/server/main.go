@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -32,6 +33,7 @@ import (
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
+	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -82,29 +84,40 @@ func run() error {
 	// be the same Go value.
 	repo := infrapostgres.New(pool)
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
+	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
+	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
-	// wired below via agentwsserver) are both real. relay-ssh's connection
-	// layer (Health probe + shell.exec, via devserveragent.WithRelaySSH) is
-	// also real — see client.go's package doc comment — and now wired in via
-	// a Vault client used only for SSH cert issuance (sshconn.SSHCertIssuer).
+	// wired below via agentwsserver) are both real, and so is relay-ssh now
+	// (deploy agent/out/agent.js over SSH, launch it --stdio, real JSON-RPC
+	// session — see adapter/sshrelay's package doc comment), wired in via a
+	// Vault client used only for SSH cert issuance (sshconn.SSHCertIssuer).
 	// vault.NewClient() only builds the API client object (no network call,
 	// see common/secrets's doc comment) — construction failing means
 	// VAULT_ADDR is malformed, not that Vault is unreachable, so this stays
 	// a startup log warning + relay-ssh left unavailable, not a fatal error:
 	// this service's core (dev-server registry, relay-websocket,
 	// direct-websocket) has nothing to do with Vault and must not
-	// crash-loop over one optional mode's dependency.
+	// crash-loop over one optional mode's dependency. ORCA_RELAY_BUNDLE_PATH
+	// unset is the same kind of "leave relay-ssh unavailable" case, checked
+	// lazily inside sshrelay.deploy rather than here, since it's still worth
+	// constructing the provisioner (so config wiring is visibly complete)
+	// even if deploy will fail until an operator sets the bundle path.
+	agentCfg := infradevserveragent.LoadConfigFromEnv()
 	var agentOpts []infradevserveragent.Option
 	vaultClient, err := secrets.NewClient()
 	if err != nil {
 		logger.Warn("failed to construct Vault client — relay-ssh mode will report ErrConnectionModeNotImplemented", slog.Any("error", err))
 	} else {
 		sshConnector := infrasshconn.NewConnector(vaultClient, infrasshconn.LoadConfigFromEnv())
-		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(sshConnector, sshTargetStore))
+		sshRelayCfg := infrasshrelay.LoadConfigFromEnv(agentCfg.OrcaVersion)
+		if sshRelayCfg.BundlePath == "" {
+			logger.Warn("ORCA_RELAY_BUNDLE_PATH is not set — relay-ssh dev servers will fail to provision until it points at a built agent/out/agent.js")
+		}
+		provisioner := infrasshrelay.NewProvisioner(sshConnector, sshTargetStore, sshRelayCfg)
+		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(provisioner))
 	}
 
-	agentCfg := infradevserveragent.LoadConfigFromEnv()
 	agentClient := infradevserveragent.New(agentCfg, logger, agentOpts...)
 	defer agentClient.Close()
 
@@ -116,6 +129,33 @@ func run() error {
 	listDevServersUC := usecase.NewListDevServers(repo)
 	createConnectionUC := usecase.NewCreateConnection(repo)
 	relayUC := usecase.NewRelay(repo, agentClient)
+	listSshTargetsUC := usecase.NewListSshTargets(sshTargetStore)
+	getSshStateUC := usecase.NewGetSshState(sshTargetStore, repo, repo)
+	establishConnectionUC := usecase.NewEstablishConnection(sshTargetStore, repo, repo, agentClient)
+	killWorkspacePortUC := usecase.NewKillWorkspacePort(repo, agentClient)
+
+	// --- Terminal/PTY (TASK-185) --- one ConnectionStreamLimiter shared by
+	// AttachPty across every stream this process serves.
+	ptyStreamLimiter := usecase.NewConnectionStreamLimiter(0)
+	spawnTerminalSessionUC := usecase.NewSpawnTerminalSession(repo, agentClient, terminalSessionStore, cfg.ServerDeployment)
+	resizeTerminalSessionUC := usecase.NewResizeTerminalSession(terminalSessionStore, repo, agentClient)
+	killTerminalSessionUC := usecase.NewKillTerminalSession(terminalSessionStore, repo, agentClient)
+	stopTerminalProcessUC := usecase.NewStopTerminalProcess(terminalSessionStore, repo, agentClient)
+	listTerminalSessionsUC := usecase.NewListTerminalSessions(terminalSessionStore)
+	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, agentClient)
+	focusTerminalSessionUC := usecase.NewFocusTerminalSession(terminalSessionStore)
+	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient)
+	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
+	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter)
+	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
+	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
+	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
+
+	// --- Emulator relay (TASK-048) / host capabilities relay (TASK-070) ---
+	// Shipped-but-honestly-inert until agent/ gains device.*/host.capabilities
+	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
+	emulatorRelayUC := usecase.NewEmulatorRelay(repo, agentClient)
+	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
@@ -127,6 +167,25 @@ func run() error {
 		listDevServersUC,
 		createConnectionUC,
 		relayUC,
+		listSshTargetsUC,
+		getSshStateUC,
+		establishConnectionUC,
+		killWorkspacePortUC,
+		spawnTerminalSessionUC,
+		resizeTerminalSessionUC,
+		killTerminalSessionUC,
+		stopTerminalProcessUC,
+		listTerminalSessionsUC,
+		waitTerminalSessionUC,
+		focusTerminalSessionUC,
+		getTerminalAgentStatusUC,
+		inspectTerminalProcessUC,
+		attachPtyUC,
+		listBrowserProfilesUC,
+		createBrowserProfileUC,
+		deleteBrowserProfileUC,
+		emulatorRelayUC,
+		getHostCapabilitiesUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

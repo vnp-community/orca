@@ -88,6 +88,24 @@ func (f *fakeUserRepository) UpdateUserRole(ctx context.Context, userID string, 
 	return u, nil
 }
 
+func (f *fakeUserRepository) SetActive(ctx context.Context, userID string, active bool) error {
+	u, ok := f.byID[userID]
+	if !ok {
+		// Matches the real postgres adapter: affecting 0 rows is not an
+		// error — the caller re-reads the user afterward and surfaces
+		// ErrUserNotFound from that read instead.
+		return nil
+	}
+	u.IsActive = active
+	f.byID[userID] = u
+	f.byEmail[u.Email] = u
+	return nil
+}
+
+func (f *fakeUserRepository) Count(ctx context.Context) (int32, error) {
+	return int32(len(f.byID)), nil
+}
+
 // fakeSessionRepository is an in-memory SessionRepository.
 type fakeSessionRepository struct {
 	byHash map[string]domain.Session
@@ -117,6 +135,111 @@ func (f *fakeSessionRepository) RevokeSession(ctx context.Context, tokenHash str
 	}
 	s.RevokedAt = &revokedAt
 	f.byHash[tokenHash] = s
+	return nil
+}
+
+func (f *fakeSessionRepository) ListForUser(ctx context.Context, userID string) ([]domain.Session, error) {
+	var out []domain.Session
+	for _, s := range f.byHash {
+		if s.UserID == userID {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeSessionRepository) RevokeAllForUser(ctx context.Context, userID string, revokedAt time.Time) (int32, error) {
+	var n int32
+	for hash, s := range f.byHash {
+		if s.UserID == userID && s.RevokedAt == nil {
+			s.RevokedAt = &revokedAt
+			f.byHash[hash] = s
+			n++
+		}
+	}
+	return n, nil
+}
+
+func (f *fakeSessionRepository) CountActive(ctx context.Context, now time.Time) (int32, error) {
+	var n int32
+	for _, s := range f.byHash {
+		if s.IsValid(now) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+// fakeAccessPolicyRepository is an in-memory AccessPolicyRepository —
+// stores every version row (append-only, matching the real postgres
+// adapter's (id, version) primary key), keyed by id then version.
+type fakeAccessPolicyRepository struct {
+	versions map[string]map[int32]domain.AccessPolicy
+
+	insertErr error
+}
+
+func newFakeAccessPolicyRepository() *fakeAccessPolicyRepository {
+	return &fakeAccessPolicyRepository{versions: make(map[string]map[int32]domain.AccessPolicy)}
+}
+
+func (f *fakeAccessPolicyRepository) InsertPolicyVersion(ctx context.Context, p domain.AccessPolicy) error {
+	if f.insertErr != nil {
+		return f.insertErr
+	}
+	if f.versions[p.ID] == nil {
+		f.versions[p.ID] = make(map[int32]domain.AccessPolicy)
+	}
+	f.versions[p.ID][p.Version] = p
+	return nil
+}
+
+func (f *fakeAccessPolicyRepository) GetLatestPolicy(ctx context.Context, id string) (domain.AccessPolicy, error) {
+	versions, ok := f.versions[id]
+	if !ok || len(versions) == 0 {
+		return domain.AccessPolicy{}, ErrPolicyNotFound
+	}
+	var latest domain.AccessPolicy
+	for _, p := range versions {
+		if p.Version > latest.Version {
+			latest = p
+		}
+	}
+	return latest, nil
+}
+
+func (f *fakeAccessPolicyRepository) ListLatestPolicies(ctx context.Context, pageToken string, pageSize int32) ([]domain.AccessPolicy, string, error) {
+	var out []domain.AccessPolicy
+	for id := range f.versions {
+		latest, err := f.GetLatestPolicy(ctx, id)
+		if err == nil {
+			out = append(out, latest)
+		}
+	}
+	return out, "", nil
+}
+
+func (f *fakeAccessPolicyRepository) DeletePolicy(ctx context.Context, id string) error {
+	delete(f.versions, id)
+	return nil
+}
+
+func (f *fakeAccessPolicyRepository) CountDistinctIDs(ctx context.Context) (int32, error) {
+	return int32(len(f.versions)), nil
+}
+
+// fakePolicyPublisher is an in-memory PolicyDataPublisher — records every
+// call so tests can assert UpdateAccessPolicy actually invoked it.
+type fakePolicyPublisher struct {
+	published  []domain.AccessPolicy
+	publishErr error
+}
+
+func (f *fakePolicyPublisher) PublishPolicyChange(ctx context.Context, policy domain.AccessPolicy) error {
+	if f.publishErr != nil {
+		return f.publishErr
+	}
+	f.published = append(f.published, policy)
 	return nil
 }
 

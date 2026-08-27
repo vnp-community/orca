@@ -20,8 +20,16 @@ import (
 
 // fakeIssueTrackingServiceClient implements
 // issuetrackingv1.IssueTrackingServiceClient with per-method canned
-// responses/errors, configurable per test.
+// responses/errors, configurable per test. Embeds the generated interface
+// so the widened surface (Connect/SearchIssues/ListTeams/etc., added
+// alongside jira.*/linear.*) compiles without every method being
+// hand-written here — this package's REST routes only ever call
+// ListIssues/CreateIssue/LinkIssue; a call to an unimplemented method
+// panics via the nil embedded interface, which is the correct failure
+// mode for a test accidentally exercising a path this fake doesn't cover.
 type fakeIssueTrackingServiceClient struct {
+	issuetrackingv1.IssueTrackingServiceClient
+
 	listIssuesResp *issuetrackingv1.ListIssuesResponse
 	listIssuesErr  error
 

@@ -38,6 +38,14 @@ x-go-common-env: &go-common-env
   TENANT_SERVICE_ADDR: tenant-service:9090
   PROJECT_SERVICE_ADDR: project-service:9090
   INFRA_FLEET_SERVICE_ADDR: infra-fleet-service:9090
+  # infra-fleet-service's own HTTP listener, NOT the gRPC one above — only
+  # api-gateway reads this (Config.InfraFleetHTTPAddr), to raw-proxy the Dev
+  # Server Agent's /agent (WS) + /api/agent-token routes there (see
+  # api-gateway/internal/adapter/httpgateway/agent_proxy_routes.go). Those
+  # two routes are mounted on infra-fleet-service's HTTP_PORT alongside its
+  # usual /healthz/readyz/metrics (infra-fleet-service/cmd/server/main.go),
+  # so this is deliberately a second address distinct from the 9090 one.
+  INFRA_FLEET_SERVICE_HTTP_ADDR: infra-fleet-service:8080
   GIT_GATEWAY_SERVICE_ADDR: git-gateway-service:9090
   SCM_INTEGRATION_SERVICE_ADDR: scm-integration-service:9090
   ISSUE_TRACKING_SERVICE_ADDR: issue-tracking-service:9090
@@ -132,6 +140,42 @@ services:
     networks:
       - orca-go-net
 
+  # Vault dev-mode auto-mounts secret/ (KV) only, never transit/ or any named
+  # KV v2 mount — nothing else in this deploy set enables either, so
+  # auth-service's TransitEnsureKey (common/secrets/vault.go) 404s on every
+  # boot without transit/, and credential-broker-service's WriteCredential
+  # fails CREDENTIAL_VAULT_WRITE_FAILED (confirmed by running TASK-220/043's
+  # real docker-compose E2E verification against this stack) without the
+  # `credential-secrets` KV v2 mount its own README documents as required
+  # setup (services/credential-broker-service/README.md, `internal/usecase/
+  # vault_paths.go`'s `kvMount`). Both checks are idempotent (read
+  # `vault secrets list` before enabling) so it's safe to re-run on every
+  # `docker compose up -d`, incl. against a live long-running vault.
+  vault-init:
+    image: hashicorp/vault:1.17
+    container_name: orca-go-vault-init
+    restart: "no"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        vault secrets list -address="$$VAULT_ADDR" | grep -q '^transit/' \
+          || vault secrets enable -address="$$VAULT_ADDR" -path=transit transit
+        vault secrets list -address="$$VAULT_ADDR" | grep -q '^credential-secrets/' \
+          || vault secrets enable -address="$$VAULT_ADDR" -path=credential-secrets -version=2 kv
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-dev-root-token}
+    depends_on:
+      vault: { condition: service_healthy }
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options: { max-size: "20m", max-file: "3" }
+    networks:
+      - orca-go-net
+
   nats:
     image: nats:2.10-alpine
     container_name: orca-go-nats
@@ -152,9 +196,9 @@ services:
       - orca-go-net
 
   # ------------------------------------------------------------
-  # backend-go services — 13 own a database (bind-mount ./bin/<svc>/orca +
-  # DATABASE_DSN), 4 don't (git-gateway, scm-integration, issue-tracking,
-  # api-gateway — see specs/backend-go/services/00-service-catalog.md).
+  # backend-go services — 15 own a database (bind-mount ./bin/<svc>/orca +
+  # DATABASE_DSN), 2 don't (git-gateway, api-gateway — see
+  # specs/backend-go/services/00-service-catalog.md).
   # Every container: same public distroless image, no build step, binary
   # bind-mounted read-only at /app/bin/orca.
   # ------------------------------------------------------------
@@ -176,6 +220,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
+      vault-init: { condition: service_completed_successfully }
 
   tenant-service:
     <<: *go-defaults
@@ -211,6 +256,12 @@ services:
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/infra?sslmode=disable
+      # Gates POST/GET /api/agent-token (proxied in from api-gateway, see
+      # INFRA_FLEET_SERVICE_HTTP_ADDR above) — must match deploy/agent/.env's
+      # ORCA_AGENT_API_SECRET on every Dev Server Agent, or token issuance
+      # fail-secure-rejects every request (agentwsserver's own startup log
+      # warns loudly when this is empty).
+      ORCA_AGENT_API_SECRET: ${ORCA_AGENT_API_SECRET:-}
     depends_on:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
@@ -333,7 +384,7 @@ services:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
 
-  # 3 services with no database:
+  # 2 services with no database:
   git-gateway-service:
     <<: *go-defaults
     container_name: orca-go-git-gateway
@@ -343,14 +394,23 @@ services:
     depends_on:
       infra-fleet-service: { condition: service_started }
       project-service: { condition: service_started }
+      # ai-provider-service: DiscoverCommitMessageModels (TASK-211) dials it
+      # directly. grpc.NewClient is lazy (non-blocking), so this is
+      # startup-ordering hygiene, not a hard requirement.
+      ai-provider-service: { condition: service_started }
 
   scm-integration-service:
     <<: *go-defaults
     container_name: orca-go-scm-integration
     volumes:
       - ./bin/scm-integration-service/orca:/app/bin/orca:ro
-    environment: *go-common-env
+    environment:
+      <<: *go-common-env
+      # Owns scm.rate_limit_cache/webhook_delivery_log as of Phase 3
+      # (docs/execution-plan.md §3) — see cmd/server/main.go's doc comment.
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/scm?sslmode=disable
     depends_on:
+      postgres: { condition: service_healthy }
       credential-broker-service: { condition: service_started }
 
   issue-tracking-service:
@@ -476,6 +536,10 @@ services:
     <<: *migrate-defaults
     volumes: ["./bin/issue-tracking-service/migrations:/migrations:ro"]
     command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuetracking?sslmode=disable", "up"]
+  migrate-scm:
+    <<: *migrate-defaults
+    volumes: ["./bin/scm-integration-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/scm?sslmode=disable", "up"]
 
 networks:
   orca-go-net:

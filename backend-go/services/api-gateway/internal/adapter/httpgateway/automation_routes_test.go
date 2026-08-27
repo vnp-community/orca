@@ -20,10 +20,19 @@ import (
 )
 
 // fakeAutomationServiceClient implements automationv1.AutomationServiceClient
-// entirely in-memory, configurable to return either a canned response or a
-// gRPC status error per method, and records the last request/context it saw
-// so tests can assert on what mountAutomationRoutes actually sent upstream.
+// (the methods this REST-route layer's tests exercise) entirely in-memory,
+// configurable to return either a canned response or a gRPC status error per
+// method, and records the last request/context it saw so tests can assert
+// on what mountAutomationRoutes actually sent upstream. The embedded (nil)
+// interface satisfies every OTHER AutomationServiceClient method added
+// since this fake was written (e.g. TASK-218's List/Update/Delete) without
+// needing a hook for each — those RPCs aren't exercised by
+// automation_routes.go's REST handlers, so a panic-on-call default is
+// correct: it would mean this file started calling one of them and needs a
+// real hook added.
 type fakeAutomationServiceClient struct {
+	automationv1.AutomationServiceClient
+
 	createAutomationResp *automationv1.CreateAutomationResponse
 	createAutomationErr  error
 	lastCreateReq        *automationv1.CreateAutomationRequest

@@ -22,6 +22,7 @@ type Server struct {
 	createGate                 *usecase.CreateGate
 	resolveGate                *usecase.ResolveGate
 	updateTaskStatusAndPromote *usecase.UpdateTaskStatusAndPromote
+	getDispatchContextForTask  *usecase.GetDispatchContextForTask
 }
 
 func New(
@@ -29,12 +30,14 @@ func New(
 	createGate *usecase.CreateGate,
 	resolveGate *usecase.ResolveGate,
 	updateTaskStatusAndPromote *usecase.UpdateTaskStatusAndPromote,
+	getDispatchContextForTask *usecase.GetDispatchContextForTask,
 ) *Server {
 	return &Server{
 		createDispatchContext:      createDispatchContext,
 		createGate:                 createGate,
 		resolveGate:                resolveGate,
 		updateTaskStatusAndPromote: updateTaskStatusAndPromote,
+		getDispatchContextForTask:  getDispatchContextForTask,
 	}
 }
 
@@ -111,5 +114,23 @@ func (s *Server) UpdateTaskStatusAndPromote(ctx context.Context, req *orchestrat
 	}
 	return &orchestrationv1.UpdateTaskStatusAndPromoteResponse{
 		PromotedTaskIds: out.PromotedTaskIDs,
+	}, nil
+}
+
+func (s *Server) GetDispatchContextForTask(ctx context.Context, req *orchestrationv1.GetDispatchContextForTaskRequest) (*orchestrationv1.GetDispatchContextForTaskResponse, error) {
+	dc, found, err := s.getDispatchContextForTask.Execute(ctx, req.GetOrchestrationTaskId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	if !found {
+		return &orchestrationv1.GetDispatchContextForTaskResponse{}, nil
+	}
+	return &orchestrationv1.GetDispatchContextForTaskResponse{
+		Dispatch: &orchestrationv1.DispatchContext{
+			Id:                  dc.ID,
+			Handle:              dc.Handle,
+			CoordinatorRunId:    dc.CoordinatorRunID,
+			OrchestrationTaskId: dc.OrchestrationTaskID,
+		},
 	}, nil
 }

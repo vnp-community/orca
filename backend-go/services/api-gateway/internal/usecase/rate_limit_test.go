@@ -35,3 +35,44 @@ func TestRateLimiter_TracksTenantsIndependently(t *testing.T) {
 		t.Fatal("expected tenant-b's first call to succeed regardless of tenant-a's state")
 	}
 }
+
+// TestRateLimiterAccessors verifies the RPS() and Burst() read-only methods
+// added by SOL-002 / TASK-003 — confirming they return the configured values
+// without mutating any state.
+func TestRateLimiterAccessors(t *testing.T) {
+	rl := NewRateLimiter(50.0, 100)
+
+	if got := rl.RPS(); got != 50.0 {
+		t.Errorf("RPS(): want 50.0, got %f", got)
+	}
+	if got := rl.Burst(); got != 100 {
+		t.Errorf("Burst(): want 100, got %d", got)
+	}
+}
+
+// TestRateLimiterAccessors_ZeroValues verifies edge case with zero/minimal config.
+func TestRateLimiterAccessors_ZeroValues(t *testing.T) {
+	rl := NewRateLimiter(0, 0)
+
+	if got := rl.RPS(); got != 0 {
+		t.Errorf("RPS(): want 0, got %f", got)
+	}
+	if got := rl.Burst(); got != 0 {
+		t.Errorf("Burst(): want 0, got %d", got)
+	}
+}
+
+// TestRateLimiterAccessors_DoNotMutateState verifies that calling RPS()/Burst()
+// multiple times returns the same value (no side effects, safe for concurrent use).
+func TestRateLimiterAccessors_DoNotMutateState(t *testing.T) {
+	rl := NewRateLimiter(100.0, 50)
+
+	for i := 0; i < 10; i++ {
+		if got := rl.RPS(); got != 100.0 {
+			t.Errorf("iteration %d: RPS() mutated state, got %f", i, got)
+		}
+		if got := rl.Burst(); got != 50 {
+			t.Errorf("iteration %d: Burst() mutated state, got %d", i, got)
+		}
+	}
+}

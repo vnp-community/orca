@@ -27,3 +27,10 @@ func NewDepartment(id, companyID, name string, settings Settings) (Department, e
 	}
 	return Department{ID: id, CompanyID: companyID, Name: name, Settings: emptySettings(settings)}, nil
 }
+
+// DepartmentSettingsPatch carries UpdateDepartment's field-mask semantics —
+// same "" = no change convention as CompanySettingsPatch.
+type DepartmentSettingsPatch struct {
+	Name         string
+	SettingsJSON string
+}

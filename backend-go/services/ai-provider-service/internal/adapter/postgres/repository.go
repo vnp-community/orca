@@ -42,11 +42,11 @@ func (r *Repository) Create(ctx context.Context, account domain.ProviderAccount)
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO ai_provider.accounts (
 			id, tenant_id, provider_type, status, credential_ref,
-			scope, user_id, project_id, rotation_grace_until, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			scope, user_id, project_id, dev_server_id, rotation_grace_until, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 	`,
 		account.ID, account.TenantID, string(account.ProviderType), string(account.Status), account.CredentialRef,
-		string(account.Scope), nullableString(account.UserID), nullableString(account.ProjectID),
+		string(account.Scope), nullableString(account.UserID), nullableString(account.ProjectID), account.DevServerID,
 		account.RotationGraceUntil, account.CreatedAt, account.UpdatedAt,
 	)
 	if err != nil {
@@ -58,9 +58,9 @@ func (r *Repository) Create(ctx context.Context, account domain.ProviderAccount)
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.ProviderAccount, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, tenant_id, provider_type, status, credential_ref,
-		       scope, user_id, project_id, rotation_grace_until, created_at, updated_at
+		       scope, user_id, project_id, dev_server_id, rotation_grace_until, created_at, updated_at
 		FROM ai_provider.accounts
-		WHERE tenant_id = $1 AND id = $2
+		WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
 	`, tenantID, id)
 
 	account, err := scanAccount(row)
@@ -76,13 +76,15 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Provi
 func (r *Repository) List(ctx context.Context, filter usecase.ListAccountsFilter) ([]domain.ProviderAccount, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, tenant_id, provider_type, status, credential_ref,
-		       scope, user_id, project_id, rotation_grace_until, created_at, updated_at
+		       scope, user_id, project_id, dev_server_id, rotation_grace_until, created_at, updated_at
 		FROM ai_provider.accounts
 		WHERE tenant_id = $1
+		  AND deleted_at IS NULL
 		  AND ($2 = '' OR scope = $2)
 		  AND ($3 = '' OR user_id = $3::uuid OR project_id = $3::uuid)
+		  AND ($4 = '' OR dev_server_id = $4)
 		ORDER BY created_at
-	`, filter.TenantID, string(filter.Scope), filter.ScopeRefID)
+	`, filter.TenantID, string(filter.Scope), filter.ScopeRefID, filter.DevServerID)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: query accounts: %w", err)
 	}
@@ -111,7 +113,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, in usecase.UpdateStatusIn
 			updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
 		RETURNING id, tenant_id, provider_type, status, credential_ref,
-		          scope, user_id, project_id, rotation_grace_until, created_at, updated_at
+		          scope, user_id, project_id, dev_server_id, rotation_grace_until, created_at, updated_at
 	`, in.TenantID, in.AccountID, string(in.Status), in.CredentialRef, in.RotationGraceUntil)
 
 	account, err := scanAccount(row)
@@ -122,6 +124,47 @@ func (r *Repository) UpdateStatus(ctx context.Context, in usecase.UpdateStatusIn
 		return domain.ProviderAccount{}, fmt.Errorf("postgres: update account status: %w", err)
 	}
 	return account, nil
+}
+
+// Update implements usecase.ProviderAccountRepository.Update — mutates only
+// Label/ModelHint/BaseURL, never Status/CredentialRef (see ports.go's doc
+// comment on why those two axes are kept apart).
+func (r *Repository) Update(ctx context.Context, in usecase.UpdateFields) (domain.ProviderAccount, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE ai_provider.accounts
+		SET label = $3, model_hint = $4, base_url = $5, updated_at = now()
+		WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
+		RETURNING id, tenant_id, provider_type, status, credential_ref,
+		          scope, user_id, project_id, dev_server_id, rotation_grace_until, created_at, updated_at
+	`, in.TenantID, in.AccountID, in.Label, nullableString(in.ModelHint), nullableString(in.BaseURL))
+
+	account, err := scanAccount(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ProviderAccount{}, domain.ErrAccountNotFound
+	}
+	if err != nil {
+		return domain.ProviderAccount{}, fmt.Errorf("postgres: update account: %w", err)
+	}
+	return account, nil
+}
+
+// Delete implements usecase.ProviderAccountRepository.Delete — soft-delete
+// only (status='revoked' + deleted_at), never a hard DELETE — preserves
+// usage_daily's FK and the account's row in the audit trail. See ports.go's
+// doc comment.
+func (r *Repository) Delete(ctx context.Context, tenantID, accountID string) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE ai_provider.accounts
+		SET status = 'revoked', deleted_at = now(), updated_at = now()
+		WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
+	`, tenantID, accountID)
+	if err != nil {
+		return fmt.Errorf("postgres: deleting provider account: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrAccountNotFound
+	}
+	return nil
 }
 
 // GetToday implements usecase.UsageRepository — reads the daily rollup row
@@ -158,7 +201,7 @@ func scanAccount(row rowScanner) (domain.ProviderAccount, error) {
 	var userID, projectID *string
 	if err := row.Scan(
 		&a.ID, &a.TenantID, &providerType, &status, &a.CredentialRef,
-		&scope, &userID, &projectID, &a.RotationGraceUntil, &a.CreatedAt, &a.UpdatedAt,
+		&scope, &userID, &projectID, &a.DevServerID, &a.RotationGraceUntil, &a.CreatedAt, &a.UpdatedAt,
 	); err != nil {
 		return domain.ProviderAccount{}, err
 	}

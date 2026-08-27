@@ -32,6 +32,18 @@ type TaskRepository interface {
 	// currently in_progress — see usecase.HasActiveExecutions's doc comment
 	// for the one-way-transition caveat this answer is subject to today.
 	HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error)
+	// List returns tasks for tenantID, optionally filtered by projectID
+	// (empty = no filter), cursor-paginated by page_size/page_token.
+	List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error)
+	// Update persists a partial field update (title/status). Status
+	// transitions into StatusInProgress are rejected at the domain layer
+	// (domain.Task.SetStatus) before this is ever called — see TASK-223's
+	// Context note.
+	Update(ctx context.Context, tenantID string, task domain.Task) error
+	// Delete removes a task. task_edges/task_grants reference tasks(id)
+	// with ON DELETE CASCADE (migrations/0001_init.up.sql) — no explicit
+	// edge/grant cleanup needed.
+	Delete(ctx context.Context, tenantID, id string) error
 }
 
 // EdgeRepository is the persistence port for task_edges rows. Cycle
@@ -51,9 +63,9 @@ type EdgeRepository interface {
 	// contract simple; see this service's README for the scale follow-up.
 	ListByKind(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error)
 	// ListFrom returns the edges of the given kind originating at
-	// fromTaskID — used by the Execute usecase's complexity branch (§3.1):
-	// a task with any parent_child or depends_on edges from it is
-	// "complex".
+	// fromTaskID — used by the Execute usecase's complexity branch (§3.1)
+	// and reused as-is by GetDependencies (TASK-223) for the identical
+	// depends_on edge kind.
 	ListFrom(ctx context.Context, tenantID, fromTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error)
 }
 
@@ -95,12 +107,15 @@ type OPAClient interface {
 }
 
 // SimpleExecutor relays Execute's simple-path dispatch to
-// infra-fleet-service (-> Dev Server Agent agent.exec), per
+// infra-fleet-service (-> Dev Server Agent agent.execPrompt), per
 // task-service.md §3.1.
 //
-// STUB in this scaffold: internal/adapter/grpcclient's implementation
-// returns a fixed placeholder execution ref without calling
-// infra-fleet-service — see this service's README.
+// internal/adapter/grpcclient's implementation is real (TASK-224): resolves
+// the task's project_id to a connectionId + worktreePath via
+// ProjectExecutionResolver and relays through infra-fleet-service's Relay
+// RPC, method "agent.execPrompt" (not "agent.exec" — see that file's doc
+// comment for the full agent-rpc-catalog citation trail behind that
+// choice).
 type SimpleExecutor interface {
 	Execute(ctx context.Context, tenantID, taskID, requestID string) (executionRef string, err error)
 }
@@ -113,4 +128,57 @@ type SimpleExecutor interface {
 // orchestration-service — see this service's README.
 type ComplexExecutor interface {
 	Execute(ctx context.Context, tenantID, taskID, requestID string) (executionRef string, err error)
+}
+
+// ProjectExecutionResolver resolves a project's execution target
+// (connectionId, or none for host-local) via infra-fleet-service —
+// task-service never calls project-service or infra-fleet-service directly
+// from this port's consumers (SimpleExecutor, AIDecompose); the resolution
+// itself lives in internal/adapter/grpcclient, mirroring
+// git-gateway-service's ConnectionResolver split.
+//
+// worktreePath is infra-fleet-service's ResolveConnectionResponse.repo_path
+// echoed straight through — the same field git-gateway-service's
+// ConnectionResolver folds into ResolvedConnection.RepoPath
+// (git-gateway-service/internal/usecase/ports.go:26-37) for its GitExecutor
+// to operate against. SimpleExecutor (TASK-224 Gap 1) needs this same value
+// as agent.execPrompt's required worktreePath field — see
+// simple_executor.go's doc comment for the full citation trail.
+type ProjectExecutionResolver interface {
+	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID, worktreePath string, connected bool, err error)
+}
+
+// AIProviderContextResolver resolves AI provider/account context for a
+// tenant+user by calling ai-provider-service — distinct from
+// ProjectExecutionResolver (execution target) and from AICompleter below
+// (the actual completion call).
+type AIProviderContextResolver interface {
+	ResolveContext(ctx context.Context, tenantID, userID string) (providerContext string, err error)
+}
+
+// AICompleter relays a prompt to the Dev Server Agent's ai.complete method
+// over a resolved connectionID — same port shape as
+// git-gateway-service.AICompleter, implemented here against
+// infra-fleet-service's Relay RPC rather than duplicated per-service.
+type AICompleter interface {
+	Complete(ctx context.Context, connectionID, prompt string) (string, error)
+}
+
+// TxRunner wraps a set of subtask creates + parent-link edges in one
+// Postgres transaction — closes TASK-224 Gap 2 (AIApply's create-subtask +
+// add-edge loop was not atomic: a mid-loop failure could leave a partial
+// subtree). A real precedent for this shape now exists in this repo (it did
+// not when ai_apply.go was first written) —
+// credential-broker-service/internal/usecase/ports.go's TxRunner
+// (RunInTx(ctx, fn func(ctx, metadataRepo, auditRepo) error) error),
+// implemented via pgx.BeginFunc in that service's postgres.Repository. This
+// port mirrors that shape exactly: RunInTx hands fn a TaskRepository/
+// EdgeRepository pair already scoped to the open transaction, reusing the
+// exact port shapes AIApply's CreateTask/AddEdge sub-usecases already know,
+// rather than inventing transaction-specific interfaces or a generic
+// UnitOfWork abstraction. If fn returns a non-nil error, every write fn made
+// through either repo rolls back together. Implemented by
+// internal/adapter/postgres.Repository.
+type TxRunner interface {
+	RunInTx(ctx context.Context, fn func(ctx context.Context, tasks TaskRepository, edges EdgeRepository) error) error
 }

@@ -2,23 +2,17 @@
 // credential-broker-service connection — Epic B (docs/execution-plan.md
 // §8), replacing the previous env-var-reading StubResolver.
 //
-// Lookup key and wire shape: like scm-integration-service (see that
-// service's internal/adapter/credentialbroker package doc comment for the
-// full rationale), this service is only ever handed (tenantID, provider) —
-// never an opaque credential_id — so it resolves via
-// credentialbrokerv1.ResolveCredentialByOwner, owner_id = the provider
-// name ("jira"/"linear"). Unlike scm-integration-service's Credential
-// (a single opaque token), usecase.Credential here has three fields
-// (BaseURL, Email, Token — Jira needs all three; Linear needs only Token).
-// credential-broker-service's ResolveCredentialByOwnerResponse.value is a
-// single plaintext byte slice, so this adapter's convention is: the
-// envelope a caller WriteCredential's for an issue-tracker credential is a
-// JSON object {"baseUrl":"...","email":"...","token":"..."}, and Resolve
-// JSON-decodes the returned value back into usecase.Credential. There is no
-// WriteCredential caller for this category anywhere in this scaffold yet
-// (no "connect Jira/Linear" flow exists — see this service's README "Known
-// gaps"), so this convention is documented here for whenever that flow is
-// built, not yet exercised end to end against a real written credential.
+// Resolve is keyed through ConnectionRepository per TASK-097/SOL-015's
+// credential-model design: Resolve looks up credential_id via connections,
+// then calls ResolveCredential(credential_id) — the per-request read path.
+// ResolveCredentialByOwner (owner_id = "<userID>:<provider>") is used only
+// by Write/ExistingCredentialID for Connect's create-vs-already-connected
+// bootstrap — never the per-request read path. credential-broker-service's
+// ResolveCredentialResponse.value is a single plaintext byte slice, so this
+// adapter's convention is: the envelope a caller WriteCredential's for an
+// issue-tracker credential is a JSON object
+// {"baseUrl":"...","email":"...","token":"..."}, and Resolve JSON-decodes
+// the returned value back into usecase.Credential.
 package credential
 
 import (
@@ -37,46 +31,203 @@ import (
 // Resolver implements usecase.CredentialResolver against a real
 // credential-broker-service connection.
 type Resolver struct {
-	client credentialbrokerv1.CredentialBrokerServiceClient
+	client      credentialbrokerv1.CredentialBrokerServiceClient
+	connections usecase.ConnectionRepository
 }
 
 // New wraps an already-dialed connection to credential-broker-service (see
 // cmd/server/main.go's composition root for the dial + insecure-transport-
 // credentials rationale shared by every peer-service client in this
 // workspace).
-func New(conn grpc.ClientConnInterface) *Resolver {
-	return &Resolver{client: credentialbrokerv1.NewCredentialBrokerServiceClient(conn)}
+func New(conn grpc.ClientConnInterface, connections usecase.ConnectionRepository) *Resolver {
+	return &Resolver{client: credentialbrokerv1.NewCredentialBrokerServiceClient(conn), connections: connections}
 }
 
 var _ usecase.CredentialResolver = (*Resolver)(nil)
 
 // credentialEnvelope is the JSON shape this adapter expects
-// ResolveCredentialByOwner's plaintext value to decode into — see the
-// package doc comment.
+// ResolveCredential's plaintext value to decode into — see the package doc
+// comment.
 type credentialEnvelope struct {
 	BaseURL string `json:"baseUrl"`
 	Email   string `json:"email"`
 	Token   string `json:"token"`
 }
 
-// Resolve fetches this tenant's Jira/Linear credential. Like
-// scm-integration-service, this service is on credentialbroker.proto's
-// documented authorized-caller list for plaintext resolution — holding the
-// credential for the duration of one outbound Jira/Linear API call is this
-// service's job.
-func (r *Resolver) Resolve(ctx context.Context, tenantID string, provider domain.Provider) (usecase.Credential, error) {
-	resp, err := r.client.ResolveCredentialByOwner(ctx, &credentialbrokerv1.ResolveCredentialByOwnerRequest{
-		TenantId: tenantID,
-		Category: credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH,
-		OwnerId:  string(provider),
-	})
+func ownerID(userID string, provider domain.Provider) string {
+	return fmt.Sprintf("%s:%s", userID, provider)
+}
+
+// Resolve looks up which credential_id backs (tenantID, userID, provider,
+// workspaceID) via ConnectionRepository, then resolves it — the
+// per-request read path, never a direct owner-keyed lookup.
+func (r *Resolver) Resolve(ctx context.Context, tenantID, userID string, provider domain.Provider, workspaceID string) (usecase.Credential, error) {
+	credID, err := r.connections.GetCredentialID(ctx, tenantID, userID, provider, workspaceID)
+	if err != nil {
+		return usecase.Credential{}, fmt.Errorf("credential: resolving connection for %s: %w", provider, err)
+	}
+	resp, err := r.client.ResolveCredential(ctx, &credentialbrokerv1.ResolveCredentialRequest{CredentialId: credID})
 	if err != nil {
 		return usecase.Credential{}, fmt.Errorf("credential: resolving %s credential: %w", provider, err)
 	}
-
 	var envelope credentialEnvelope
 	if err := json.Unmarshal(resp.GetValue(), &envelope); err != nil {
 		return usecase.Credential{}, fmt.Errorf("credential: decoding %s credential envelope: %w", provider, err)
 	}
 	return usecase.Credential{BaseURL: envelope.BaseURL, Email: envelope.Email, Token: envelope.Token}, nil
+}
+
+// Write encrypts and persists cred under a composite owner_id
+// ("<userID>:<provider>") via credential-broker-service.WriteCredential.
+//
+// WriteCredentialRequest.encrypted_envelope is documented as a
+// client-side-encrypted envelope (credentialbroker.proto's doc comment on
+// WriteCredentialRequest) — this adapter, like scm-integration-service's
+// existing caller, writes the plaintext JSON envelope directly for now
+// (matches this service's pre-existing convention; no client-side
+// encryption layer exists anywhere in backend-go yet). Flagged here rather
+// than silently deviating without a comment — do not treat this as solved.
+func (r *Resolver) Write(ctx context.Context, tenantID, userID string, provider domain.Provider, cred usecase.Credential) (string, error) {
+	envelope, err := json.Marshal(credentialEnvelope{BaseURL: cred.BaseURL, Email: cred.Email, Token: cred.Token})
+	if err != nil {
+		return "", fmt.Errorf("credential: encoding %s credential envelope: %w", provider, err)
+	}
+	resp, err := r.client.WriteCredential(ctx, &credentialbrokerv1.WriteCredentialRequest{
+		TenantId:          tenantID,
+		OwnerId:           ownerID(userID, provider),
+		Category:          credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH,
+		EncryptedEnvelope: envelope,
+	})
+	if err != nil {
+		return "", fmt.Errorf("credential: writing %s credential: %w", provider, err)
+	}
+	return resp.GetMetadata().GetId(), nil
+}
+
+// ExistingCredentialID checks whether a credential already exists for this
+// composite owner_id via ResolveCredentialByOwner — used only by Connect's
+// create-new-vs-already-connected bootstrap decision, never the
+// per-request read path (that's Resolve, above).
+func (r *Resolver) ExistingCredentialID(ctx context.Context, tenantID, userID string, provider domain.Provider) (string, bool, error) {
+	resp, err := r.client.ResolveCredentialByOwner(ctx, &credentialbrokerv1.ResolveCredentialByOwnerRequest{
+		TenantId: tenantID,
+		Category: credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH,
+		OwnerId:  ownerID(userID, provider),
+	})
+	if err != nil {
+		return "", false, nil // not found is not an error here — Connect treats it as "create new"
+	}
+	// ResolveCredentialByOwnerResponse carries only the plaintext value, not
+	// an id — this adapter has no credential_id to report from this call.
+	// Callers only need the boolean "does one already exist" today.
+	_ = resp
+	return "", true, nil
+}
+
+// credentialsOwnerID is the owner_id convention for
+// SetIntegrationCredential/GetIntegrationCredentialStatus/
+// ListIntegrationCredentials/RevokeAuth (TASK-041) — the provider name
+// alone, e.g. "jira". DELIBERATELY DISTINCT from ownerID(userID, provider)
+// above: those tenant+user-scoped RPCs back the per-user Connect flow's
+// composite "<userID>:<provider>" slot, while these 4 RPCs are keyed only
+// by (tenant_id, provider), same convention scm-integration-service uses
+// for its own SetIntegrationCredential/etc. Conflating the two would let a
+// credentials.set call silently shadow (or be shadowed by) a per-user
+// Connect credential for the same provider.
+func credentialsOwnerID(provider domain.Provider) string {
+	return string(provider)
+}
+
+var _ usecase.CredentialWriter = (*Resolver)(nil)
+
+// WriteRaw implements usecase.CredentialWriter.WriteRaw — a manually pasted
+// token (SetIntegrationCredential), stored under credentialsOwnerID.
+// configJSON is expected to be a JSON object with optional baseUrl/email
+// keys (Jira only; Linear callers pass "" or "{}") — builds the same
+// {"baseUrl","email","token"} envelope shape this file's Resolve/Write
+// already use, so a future ResolveCredentialByOwner-based reader against
+// this owner_id decodes it the same way.
+func (r *Resolver) WriteRaw(ctx context.Context, tenantID string, provider domain.Provider, token, configJSON string) error {
+	envelope := credentialEnvelope{Token: token}
+	if configJSON != "" {
+		var cfg struct {
+			BaseURL string `json:"baseUrl"`
+			Email   string `json:"email"`
+		}
+		if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+			return fmt.Errorf("credential: decoding config_json for %s: %w", provider, err)
+		}
+		envelope.BaseURL, envelope.Email = cfg.BaseURL, cfg.Email
+	}
+	blob, err := json.Marshal(envelope)
+	if err != nil {
+		return fmt.Errorf("credential: encoding %s credential envelope: %w", provider, err)
+	}
+	_, err = r.client.WriteCredential(ctx, &credentialbrokerv1.WriteCredentialRequest{
+		TenantId:          tenantID,
+		OwnerId:           credentialsOwnerID(provider),
+		Category:          credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH,
+		EncryptedEnvelope: blob,
+		ConfigJson:        configJSON,
+	})
+	if err != nil {
+		return fmt.Errorf("credential: writing %s credential: %w", provider, err)
+	}
+	return nil
+}
+
+var _ usecase.CredentialStatusReader = (*Resolver)(nil)
+
+// GetStatus implements usecase.CredentialStatusReader via
+// GetCredentialMetadataByOwner — metadata only, never plaintext.
+func (r *Resolver) GetStatus(ctx context.Context, tenantID string, provider domain.Provider) (bool, string, error) {
+	resp, err := r.client.GetCredentialMetadataByOwner(ctx, &credentialbrokerv1.GetCredentialMetadataByOwnerRequest{
+		TenantId: tenantID,
+		Category: credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH,
+		OwnerId:  credentialsOwnerID(provider),
+	})
+	if err != nil {
+		return false, "", fmt.Errorf("credential: fetching %s credential status: %w", provider, err)
+	}
+	metadata := resp.GetMetadata()
+	if metadata == nil {
+		return false, "", nil
+	}
+	return true, metadata.GetConfigJson(), nil
+}
+
+var _ usecase.CredentialLister = (*Resolver)(nil)
+
+// ListConfiguredProviders implements usecase.CredentialLister via
+// ListCredentialsByCategory.
+func (r *Resolver) ListConfiguredProviders(ctx context.Context, tenantID string) ([]domain.Provider, error) {
+	resp, err := r.client.ListCredentialsByCategory(ctx, &credentialbrokerv1.ListCredentialsByCategoryRequest{
+		TenantId: tenantID,
+		Category: credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("credential: listing issue-tracker credentials: %w", err)
+	}
+	providers := make([]domain.Provider, 0, len(resp.GetCredentials()))
+	for _, m := range resp.GetCredentials() {
+		providers = append(providers, domain.Provider(m.GetOwnerId()))
+	}
+	return providers, nil
+}
+
+var _ usecase.CredentialRevoker = (*Resolver)(nil)
+
+// RevokeByOwner implements usecase.CredentialRevoker via
+// RevokeCredentialByOwner — RevokeAuth's only call site, keyed by the same
+// credentialsOwnerID convention WriteRaw/GetStatus use.
+func (r *Resolver) RevokeByOwner(ctx context.Context, tenantID string, provider domain.Provider) error {
+	_, err := r.client.RevokeCredentialByOwner(ctx, &credentialbrokerv1.RevokeCredentialByOwnerRequest{
+		TenantId: tenantID,
+		Category: credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH,
+		OwnerId:  credentialsOwnerID(provider),
+	})
+	if err != nil {
+		return fmt.Errorf("credential: revoking %s credential: %w", provider, err)
+	}
+	return nil
 }

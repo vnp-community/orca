@@ -90,13 +90,31 @@ func run() error {
 	defer func() { _ = brokerConn.Close() }()
 	broker := aiprovidergrpcclient.New(brokerConn)
 
+	// infra-fleet-service connection — mediates TestConnection's relay to
+	// the execution plane (TASK-028); same insecure-transport-credentials
+	// local-dev/scaffold convenience as brokerConn above.
+	infraFleetConn, err := grpc.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dialing infra-fleet-service at %s: %w", cfg.InfraFleetServiceAddr, err)
+	}
+	defer func() { _ = infraFleetConn.Close() }()
+	infraFleet := aiprovidergrpcclient.NewInfraFleetClient(infraFleetConn)
+
 	createAccountUC := usecase.NewCreateAccount(repo, broker, uuid.NewString, nil)
 	resolveProviderUC := usecase.NewResolveProvider(repo)
 	rotateKeyUC := usecase.NewRotateKey(repo, broker)
 	getUsageTodayUC := usecase.NewGetUsageToday(repo, nil)
+	listAccountsUC := usecase.NewListAccounts(repo)
+	updateAccountUC := usecase.NewUpdateAccount(repo)
+	deleteAccountUC := usecase.NewDeleteAccount(repo)
+	writeCredentialUC := usecase.NewWriteCredential(repo, broker)
+	testConnectionUC := usecase.NewTestConnection(repo, infraFleet)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	aiproviderv1.RegisterAiProviderServiceServer(grpcServer, aiprovidergrpc.New(createAccountUC, resolveProviderUC, rotateKeyUC, getUsageTodayUC))
+	aiproviderv1.RegisterAiProviderServiceServer(grpcServer, aiprovidergrpc.New(
+		createAccountUC, resolveProviderUC, rotateKeyUC, getUsageTodayUC,
+		listAccountsUC, updateAccountUC, deleteAccountUC, writeCredentialUC, testConnectionUC,
+	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	healthSrv := health.New()

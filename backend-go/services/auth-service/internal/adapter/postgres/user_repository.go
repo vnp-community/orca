@@ -113,6 +113,28 @@ func (r *Repository) HasAnyUsers(ctx context.Context) (bool, error) {
 	return exists, nil
 }
 
+// SetActive flips a user's is_active flag — idempotent, matching
+// usecase.UserRepository's doc comment; a userID that doesn't exist yet
+// affects 0 rows, which is not treated as an error here (the caller,
+// DeactivateUser/ReactivateUser, re-reads the user afterward and surfaces
+// ErrUserNotFound from that read instead).
+func (r *Repository) SetActive(ctx context.Context, userID string, active bool) error {
+	_, err := r.pool.Exec(ctx, `UPDATE auth.users SET is_active = $2 WHERE id = $1`, userID, active)
+	if err != nil {
+		return fmt.Errorf("postgres: set user active: %w", err)
+	}
+	return nil
+}
+
+// Count returns the total number of users across every tenant.
+func (r *Repository) Count(ctx context.Context) (int32, error) {
+	var n int32
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM auth.users`).Scan(&n); err != nil {
+		return 0, fmt.Errorf("postgres: count users: %w", err)
+	}
+	return n, nil
+}
+
 // rowScanner is satisfied by both pgx.Row and pgx.Rows, letting
 // scanUserWithHash serve both QueryRow and Query call sites.
 type rowScanner interface {

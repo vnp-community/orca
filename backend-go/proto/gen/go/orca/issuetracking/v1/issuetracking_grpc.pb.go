@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,9 +20,37 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IssueTrackingService_ListIssues_FullMethodName  = "/orca.issuetracking.v1.IssueTrackingService/ListIssues"
-	IssueTrackingService_CreateIssue_FullMethodName = "/orca.issuetracking.v1.IssueTrackingService/CreateIssue"
-	IssueTrackingService_LinkIssue_FullMethodName   = "/orca.issuetracking.v1.IssueTrackingService/LinkIssue"
+	IssueTrackingService_ListIssues_FullMethodName                     = "/orca.issuetracking.v1.IssueTrackingService/ListIssues"
+	IssueTrackingService_CreateIssue_FullMethodName                    = "/orca.issuetracking.v1.IssueTrackingService/CreateIssue"
+	IssueTrackingService_LinkIssue_FullMethodName                      = "/orca.issuetracking.v1.IssueTrackingService/LinkIssue"
+	IssueTrackingService_Connect_FullMethodName                        = "/orca.issuetracking.v1.IssueTrackingService/Connect"
+	IssueTrackingService_Disconnect_FullMethodName                     = "/orca.issuetracking.v1.IssueTrackingService/Disconnect"
+	IssueTrackingService_SelectWorkspace_FullMethodName                = "/orca.issuetracking.v1.IssueTrackingService/SelectWorkspace"
+	IssueTrackingService_GetConnectionStatus_FullMethodName            = "/orca.issuetracking.v1.IssueTrackingService/GetConnectionStatus"
+	IssueTrackingService_TestConnection_FullMethodName                 = "/orca.issuetracking.v1.IssueTrackingService/TestConnection"
+	IssueTrackingService_SearchIssues_FullMethodName                   = "/orca.issuetracking.v1.IssueTrackingService/SearchIssues"
+	IssueTrackingService_GetIssue_FullMethodName                       = "/orca.issuetracking.v1.IssueTrackingService/GetIssue"
+	IssueTrackingService_UpdateIssue_FullMethodName                    = "/orca.issuetracking.v1.IssueTrackingService/UpdateIssue"
+	IssueTrackingService_AddIssueComment_FullMethodName                = "/orca.issuetracking.v1.IssueTrackingService/AddIssueComment"
+	IssueTrackingService_ListIssueComments_FullMethodName              = "/orca.issuetracking.v1.IssueTrackingService/ListIssueComments"
+	IssueTrackingService_ListProjects_FullMethodName                   = "/orca.issuetracking.v1.IssueTrackingService/ListProjects"
+	IssueTrackingService_ListIssueTypes_FullMethodName                 = "/orca.issuetracking.v1.IssueTrackingService/ListIssueTypes"
+	IssueTrackingService_ListCreateFields_FullMethodName               = "/orca.issuetracking.v1.IssueTrackingService/ListCreateFields"
+	IssueTrackingService_ListAssignableUsers_FullMethodName            = "/orca.issuetracking.v1.IssueTrackingService/ListAssignableUsers"
+	IssueTrackingService_ListPriorities_FullMethodName                 = "/orca.issuetracking.v1.IssueTrackingService/ListPriorities"
+	IssueTrackingService_ListTransitions_FullMethodName                = "/orca.issuetracking.v1.IssueTrackingService/ListTransitions"
+	IssueTrackingService_GetProjectStatusOrder_FullMethodName          = "/orca.issuetracking.v1.IssueTrackingService/GetProjectStatusOrder"
+	IssueTrackingService_CreateProject_FullMethodName                  = "/orca.issuetracking.v1.IssueTrackingService/CreateProject"
+	IssueTrackingService_GetProject_FullMethodName                     = "/orca.issuetracking.v1.IssueTrackingService/GetProject"
+	IssueTrackingService_ListTeams_FullMethodName                      = "/orca.issuetracking.v1.IssueTrackingService/ListTeams"
+	IssueTrackingService_ListTeamLabels_FullMethodName                 = "/orca.issuetracking.v1.IssueTrackingService/ListTeamLabels"
+	IssueTrackingService_ListTeamMembers_FullMethodName                = "/orca.issuetracking.v1.IssueTrackingService/ListTeamMembers"
+	IssueTrackingService_GetCustomView_FullMethodName                  = "/orca.issuetracking.v1.IssueTrackingService/GetCustomView"
+	IssueTrackingService_ListWorkflowStates_FullMethodName             = "/orca.issuetracking.v1.IssueTrackingService/ListWorkflowStates"
+	IssueTrackingService_SetIntegrationCredential_FullMethodName       = "/orca.issuetracking.v1.IssueTrackingService/SetIntegrationCredential"
+	IssueTrackingService_GetIntegrationCredentialStatus_FullMethodName = "/orca.issuetracking.v1.IssueTrackingService/GetIntegrationCredentialStatus"
+	IssueTrackingService_ListIntegrationCredentials_FullMethodName     = "/orca.issuetracking.v1.IssueTrackingService/ListIntegrationCredentials"
+	IssueTrackingService_RevokeAuth_FullMethodName                     = "/orca.issuetracking.v1.IssueTrackingService/RevokeAuth"
 )
 
 // IssueTrackingServiceClient is the client API for IssueTrackingService service.
@@ -31,9 +60,60 @@ const (
 // IssueTrackingService: Jira/Linear direct API integration (already correct
 // shape in TS, faithful port). See specs/backend-go/services/issue-tracking-service.md.
 type IssueTrackingServiceClient interface {
+	// ── existing, kept for compatibility ──────────────────────────────
 	ListIssues(ctx context.Context, in *ListIssuesRequest, opts ...grpc.CallOption) (*ListIssuesResponse, error)
 	CreateIssue(ctx context.Context, in *CreateIssueRequest, opts ...grpc.CallOption) (*CreateIssueResponse, error)
 	LinkIssue(ctx context.Context, in *LinkIssueRequest, opts ...grpc.CallOption) (*LinkIssueResponse, error)
+	// ── connection mgmt (new, SOL-015) ──────────────────────────────────
+	Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectionStatus, error)
+	Disconnect(ctx context.Context, in *DisconnectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SelectWorkspace(ctx context.Context, in *SelectWorkspaceRequest, opts ...grpc.CallOption) (*ConnectionStatus, error)
+	GetConnectionStatus(ctx context.Context, in *GetConnectionStatusRequest, opts ...grpc.CallOption) (*ConnectionStatus, error)
+	TestConnection(ctx context.Context, in *TestConnectionRequest, opts ...grpc.CallOption) (*TestConnectionResult, error)
+	// ── issue querying/mutation beyond ListIssues/CreateIssue (new, SOL-015) ────
+	SearchIssues(ctx context.Context, in *SearchIssuesRequest, opts ...grpc.CallOption) (*SearchIssuesResponse, error)
+	GetIssue(ctx context.Context, in *GetIssueRequest, opts ...grpc.CallOption) (*Issue, error)
+	UpdateIssue(ctx context.Context, in *UpdateIssueRequest, opts ...grpc.CallOption) (*Issue, error)
+	AddIssueComment(ctx context.Context, in *AddIssueCommentRequest, opts ...grpc.CallOption) (*IssueComment, error)
+	ListIssueComments(ctx context.Context, in *ListIssueCommentsRequest, opts ...grpc.CallOption) (*ListIssueCommentsResponse, error)
+	// ── project/workflow metadata (new, SOL-015) ─────────────────────────────
+	ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error)
+	ListIssueTypes(ctx context.Context, in *ListIssueTypesRequest, opts ...grpc.CallOption) (*ListIssueTypesResponse, error)
+	ListCreateFields(ctx context.Context, in *ListCreateFieldsRequest, opts ...grpc.CallOption) (*ListCreateFieldsResponse, error)
+	ListAssignableUsers(ctx context.Context, in *ListAssignableUsersRequest, opts ...grpc.CallOption) (*ListAssignableUsersResponse, error)
+	// ── scope additions beyond the TDD (flagged, not silently skipped) ──
+	ListPriorities(ctx context.Context, in *ListPrioritiesRequest, opts ...grpc.CallOption) (*ListPrioritiesResponse, error)
+	ListTransitions(ctx context.Context, in *ListTransitionsRequest, opts ...grpc.CallOption) (*ListTransitionsResponse, error)
+	GetProjectStatusOrder(ctx context.Context, in *GetProjectStatusOrderRequest, opts ...grpc.CallOption) (*GetProjectStatusOrderResponse, error)
+	// ── Linear project/team surface (new, SOL-016) ──────────────────────
+	CreateProject(ctx context.Context, in *CreateProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	GetProject(ctx context.Context, in *GetProjectRequest, opts ...grpc.CallOption) (*Project, error)
+	// Linear-only — no forced Jira mapping, see SOL-016's "genuinely
+	// diverges" table for why Team is not folded into Project.
+	ListTeams(ctx context.Context, in *ListTeamsRequest, opts ...grpc.CallOption) (*ListTeamsResponse, error)
+	ListTeamLabels(ctx context.Context, in *ListTeamLabelsRequest, opts ...grpc.CallOption) (*ListTeamLabelsResponse, error)
+	ListTeamMembers(ctx context.Context, in *ListTeamMembersRequest, opts ...grpc.CallOption) (*ListTeamMembersResponse, error)
+	GetCustomView(ctx context.Context, in *GetCustomViewRequest, opts ...grpc.CallOption) (*CustomView, error)
+	// ListWorkflowStates backs linear.teamStates — SOL-016's own mapping
+	// table maps teamStates onto "ListWorkflowStates ... Linear's per-team
+	// ordered state list is exactly the WorkflowState concept §4 already
+	// generalizes" but no earlier task actually added this RPC; added here
+	// rather than silently left a dangling reference. team_id scopes it to
+	// one Linear team; Jira has no per-project ordered-workflow-state
+	// listing RPC today (GetProjectStatusOrder is the closest Jira analog,
+	// above, but it groups by Kanban column, not a flat ordered list), so
+	// this stays Linear-only for now, same as ListTeams/ListTeamLabels/
+	// ListTeamMembers/GetCustomView above.
+	ListWorkflowStates(ctx context.Context, in *ListWorkflowStatesRequest, opts ...grpc.CallOption) (*ListWorkflowStatesResponse, error)
+	// SetIntegrationCredential/GetIntegrationCredentialStatus/
+	// ListIntegrationCredentials/RevokeAuth back api-gateway's
+	// credentials.set/status/list/revoke channels for jira/linear
+	// (SOL-007). Unlike scm-integration-service, this service has no prior
+	// OAuth-flow surface — RevokeAuth is new here too, not reused.
+	SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error)
+	GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error)
+	ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error)
+	RevokeAuth(ctx context.Context, in *RevokeAuthRequest, opts ...grpc.CallOption) (*RevokeAuthResponse, error)
 }
 
 type issueTrackingServiceClient struct {
@@ -74,6 +154,286 @@ func (c *issueTrackingServiceClient) LinkIssue(ctx context.Context, in *LinkIssu
 	return out, nil
 }
 
+func (c *issueTrackingServiceClient) Connect(ctx context.Context, in *ConnectRequest, opts ...grpc.CallOption) (*ConnectionStatus, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConnectionStatus)
+	err := c.cc.Invoke(ctx, IssueTrackingService_Connect_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) Disconnect(ctx context.Context, in *DisconnectRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, IssueTrackingService_Disconnect_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) SelectWorkspace(ctx context.Context, in *SelectWorkspaceRequest, opts ...grpc.CallOption) (*ConnectionStatus, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConnectionStatus)
+	err := c.cc.Invoke(ctx, IssueTrackingService_SelectWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) GetConnectionStatus(ctx context.Context, in *GetConnectionStatusRequest, opts ...grpc.CallOption) (*ConnectionStatus, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConnectionStatus)
+	err := c.cc.Invoke(ctx, IssueTrackingService_GetConnectionStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) TestConnection(ctx context.Context, in *TestConnectionRequest, opts ...grpc.CallOption) (*TestConnectionResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TestConnectionResult)
+	err := c.cc.Invoke(ctx, IssueTrackingService_TestConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) SearchIssues(ctx context.Context, in *SearchIssuesRequest, opts ...grpc.CallOption) (*SearchIssuesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchIssuesResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_SearchIssues_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) GetIssue(ctx context.Context, in *GetIssueRequest, opts ...grpc.CallOption) (*Issue, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Issue)
+	err := c.cc.Invoke(ctx, IssueTrackingService_GetIssue_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) UpdateIssue(ctx context.Context, in *UpdateIssueRequest, opts ...grpc.CallOption) (*Issue, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Issue)
+	err := c.cc.Invoke(ctx, IssueTrackingService_UpdateIssue_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) AddIssueComment(ctx context.Context, in *AddIssueCommentRequest, opts ...grpc.CallOption) (*IssueComment, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IssueComment)
+	err := c.cc.Invoke(ctx, IssueTrackingService_AddIssueComment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListIssueComments(ctx context.Context, in *ListIssueCommentsRequest, opts ...grpc.CallOption) (*ListIssueCommentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIssueCommentsResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListIssueComments_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProjectsResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListProjects_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListIssueTypes(ctx context.Context, in *ListIssueTypesRequest, opts ...grpc.CallOption) (*ListIssueTypesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIssueTypesResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListIssueTypes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListCreateFields(ctx context.Context, in *ListCreateFieldsRequest, opts ...grpc.CallOption) (*ListCreateFieldsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCreateFieldsResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListCreateFields_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListAssignableUsers(ctx context.Context, in *ListAssignableUsersRequest, opts ...grpc.CallOption) (*ListAssignableUsersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAssignableUsersResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListAssignableUsers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListPriorities(ctx context.Context, in *ListPrioritiesRequest, opts ...grpc.CallOption) (*ListPrioritiesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPrioritiesResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListPriorities_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListTransitions(ctx context.Context, in *ListTransitionsRequest, opts ...grpc.CallOption) (*ListTransitionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTransitionsResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListTransitions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) GetProjectStatusOrder(ctx context.Context, in *GetProjectStatusOrderRequest, opts ...grpc.CallOption) (*GetProjectStatusOrderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProjectStatusOrderResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_GetProjectStatusOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) CreateProject(ctx context.Context, in *CreateProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Project)
+	err := c.cc.Invoke(ctx, IssueTrackingService_CreateProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) GetProject(ctx context.Context, in *GetProjectRequest, opts ...grpc.CallOption) (*Project, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Project)
+	err := c.cc.Invoke(ctx, IssueTrackingService_GetProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListTeams(ctx context.Context, in *ListTeamsRequest, opts ...grpc.CallOption) (*ListTeamsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTeamsResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListTeams_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListTeamLabels(ctx context.Context, in *ListTeamLabelsRequest, opts ...grpc.CallOption) (*ListTeamLabelsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTeamLabelsResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListTeamLabels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListTeamMembers(ctx context.Context, in *ListTeamMembersRequest, opts ...grpc.CallOption) (*ListTeamMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTeamMembersResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListTeamMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) GetCustomView(ctx context.Context, in *GetCustomViewRequest, opts ...grpc.CallOption) (*CustomView, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CustomView)
+	err := c.cc.Invoke(ctx, IssueTrackingService_GetCustomView_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListWorkflowStates(ctx context.Context, in *ListWorkflowStatesRequest, opts ...grpc.CallOption) (*ListWorkflowStatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorkflowStatesResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListWorkflowStates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetIntegrationCredentialResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_SetIntegrationCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIntegrationCredentialStatusResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_GetIntegrationCredentialStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIntegrationCredentialsResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_ListIntegrationCredentials_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *issueTrackingServiceClient) RevokeAuth(ctx context.Context, in *RevokeAuthRequest, opts ...grpc.CallOption) (*RevokeAuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeAuthResponse)
+	err := c.cc.Invoke(ctx, IssueTrackingService_RevokeAuth_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IssueTrackingServiceServer is the server API for IssueTrackingService service.
 // All implementations must embed UnimplementedIssueTrackingServiceServer
 // for forward compatibility.
@@ -81,9 +441,60 @@ func (c *issueTrackingServiceClient) LinkIssue(ctx context.Context, in *LinkIssu
 // IssueTrackingService: Jira/Linear direct API integration (already correct
 // shape in TS, faithful port). See specs/backend-go/services/issue-tracking-service.md.
 type IssueTrackingServiceServer interface {
+	// ── existing, kept for compatibility ──────────────────────────────
 	ListIssues(context.Context, *ListIssuesRequest) (*ListIssuesResponse, error)
 	CreateIssue(context.Context, *CreateIssueRequest) (*CreateIssueResponse, error)
 	LinkIssue(context.Context, *LinkIssueRequest) (*LinkIssueResponse, error)
+	// ── connection mgmt (new, SOL-015) ──────────────────────────────────
+	Connect(context.Context, *ConnectRequest) (*ConnectionStatus, error)
+	Disconnect(context.Context, *DisconnectRequest) (*emptypb.Empty, error)
+	SelectWorkspace(context.Context, *SelectWorkspaceRequest) (*ConnectionStatus, error)
+	GetConnectionStatus(context.Context, *GetConnectionStatusRequest) (*ConnectionStatus, error)
+	TestConnection(context.Context, *TestConnectionRequest) (*TestConnectionResult, error)
+	// ── issue querying/mutation beyond ListIssues/CreateIssue (new, SOL-015) ────
+	SearchIssues(context.Context, *SearchIssuesRequest) (*SearchIssuesResponse, error)
+	GetIssue(context.Context, *GetIssueRequest) (*Issue, error)
+	UpdateIssue(context.Context, *UpdateIssueRequest) (*Issue, error)
+	AddIssueComment(context.Context, *AddIssueCommentRequest) (*IssueComment, error)
+	ListIssueComments(context.Context, *ListIssueCommentsRequest) (*ListIssueCommentsResponse, error)
+	// ── project/workflow metadata (new, SOL-015) ─────────────────────────────
+	ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error)
+	ListIssueTypes(context.Context, *ListIssueTypesRequest) (*ListIssueTypesResponse, error)
+	ListCreateFields(context.Context, *ListCreateFieldsRequest) (*ListCreateFieldsResponse, error)
+	ListAssignableUsers(context.Context, *ListAssignableUsersRequest) (*ListAssignableUsersResponse, error)
+	// ── scope additions beyond the TDD (flagged, not silently skipped) ──
+	ListPriorities(context.Context, *ListPrioritiesRequest) (*ListPrioritiesResponse, error)
+	ListTransitions(context.Context, *ListTransitionsRequest) (*ListTransitionsResponse, error)
+	GetProjectStatusOrder(context.Context, *GetProjectStatusOrderRequest) (*GetProjectStatusOrderResponse, error)
+	// ── Linear project/team surface (new, SOL-016) ──────────────────────
+	CreateProject(context.Context, *CreateProjectRequest) (*Project, error)
+	GetProject(context.Context, *GetProjectRequest) (*Project, error)
+	// Linear-only — no forced Jira mapping, see SOL-016's "genuinely
+	// diverges" table for why Team is not folded into Project.
+	ListTeams(context.Context, *ListTeamsRequest) (*ListTeamsResponse, error)
+	ListTeamLabels(context.Context, *ListTeamLabelsRequest) (*ListTeamLabelsResponse, error)
+	ListTeamMembers(context.Context, *ListTeamMembersRequest) (*ListTeamMembersResponse, error)
+	GetCustomView(context.Context, *GetCustomViewRequest) (*CustomView, error)
+	// ListWorkflowStates backs linear.teamStates — SOL-016's own mapping
+	// table maps teamStates onto "ListWorkflowStates ... Linear's per-team
+	// ordered state list is exactly the WorkflowState concept §4 already
+	// generalizes" but no earlier task actually added this RPC; added here
+	// rather than silently left a dangling reference. team_id scopes it to
+	// one Linear team; Jira has no per-project ordered-workflow-state
+	// listing RPC today (GetProjectStatusOrder is the closest Jira analog,
+	// above, but it groups by Kanban column, not a flat ordered list), so
+	// this stays Linear-only for now, same as ListTeams/ListTeamLabels/
+	// ListTeamMembers/GetCustomView above.
+	ListWorkflowStates(context.Context, *ListWorkflowStatesRequest) (*ListWorkflowStatesResponse, error)
+	// SetIntegrationCredential/GetIntegrationCredentialStatus/
+	// ListIntegrationCredentials/RevokeAuth back api-gateway's
+	// credentials.set/status/list/revoke channels for jira/linear
+	// (SOL-007). Unlike scm-integration-service, this service has no prior
+	// OAuth-flow surface — RevokeAuth is new here too, not reused.
+	SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error)
+	GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error)
+	ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error)
+	RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error)
 	mustEmbedUnimplementedIssueTrackingServiceServer()
 }
 
@@ -102,6 +513,90 @@ func (UnimplementedIssueTrackingServiceServer) CreateIssue(context.Context, *Cre
 }
 func (UnimplementedIssueTrackingServiceServer) LinkIssue(context.Context, *LinkIssueRequest) (*LinkIssueResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LinkIssue not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) Connect(context.Context, *ConnectRequest) (*ConnectionStatus, error) {
+	return nil, status.Error(codes.Unimplemented, "method Connect not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) Disconnect(context.Context, *DisconnectRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method Disconnect not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) SelectWorkspace(context.Context, *SelectWorkspaceRequest) (*ConnectionStatus, error) {
+	return nil, status.Error(codes.Unimplemented, "method SelectWorkspace not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) GetConnectionStatus(context.Context, *GetConnectionStatusRequest) (*ConnectionStatus, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetConnectionStatus not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) TestConnection(context.Context, *TestConnectionRequest) (*TestConnectionResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestConnection not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) SearchIssues(context.Context, *SearchIssuesRequest) (*SearchIssuesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchIssues not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) GetIssue(context.Context, *GetIssueRequest) (*Issue, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIssue not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) UpdateIssue(context.Context, *UpdateIssueRequest) (*Issue, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateIssue not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) AddIssueComment(context.Context, *AddIssueCommentRequest) (*IssueComment, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddIssueComment not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListIssueComments(context.Context, *ListIssueCommentsRequest) (*ListIssueCommentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIssueComments not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListProjects not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListIssueTypes(context.Context, *ListIssueTypesRequest) (*ListIssueTypesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIssueTypes not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListCreateFields(context.Context, *ListCreateFieldsRequest) (*ListCreateFieldsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCreateFields not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListAssignableUsers(context.Context, *ListAssignableUsersRequest) (*ListAssignableUsersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAssignableUsers not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListPriorities(context.Context, *ListPrioritiesRequest) (*ListPrioritiesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPriorities not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListTransitions(context.Context, *ListTransitionsRequest) (*ListTransitionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTransitions not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) GetProjectStatusOrder(context.Context, *GetProjectStatusOrderRequest) (*GetProjectStatusOrderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetProjectStatusOrder not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) CreateProject(context.Context, *CreateProjectRequest) (*Project, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateProject not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) GetProject(context.Context, *GetProjectRequest) (*Project, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetProject not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListTeams(context.Context, *ListTeamsRequest) (*ListTeamsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTeams not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListTeamLabels(context.Context, *ListTeamLabelsRequest) (*ListTeamLabelsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTeamLabels not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListTeamMembers(context.Context, *ListTeamMembersRequest) (*ListTeamMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTeamMembers not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) GetCustomView(context.Context, *GetCustomViewRequest) (*CustomView, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCustomView not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListWorkflowStates(context.Context, *ListWorkflowStatesRequest) (*ListWorkflowStatesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListWorkflowStates not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetIntegrationCredential not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIntegrationCredentialStatus not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIntegrationCredentials not implemented")
+}
+func (UnimplementedIssueTrackingServiceServer) RevokeAuth(context.Context, *RevokeAuthRequest) (*RevokeAuthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeAuth not implemented")
 }
 func (UnimplementedIssueTrackingServiceServer) mustEmbedUnimplementedIssueTrackingServiceServer() {}
 func (UnimplementedIssueTrackingServiceServer) testEmbeddedByValue()                              {}
@@ -178,6 +673,510 @@ func _IssueTrackingService_LinkIssue_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IssueTrackingService_Connect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConnectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).Connect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_Connect_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).Connect(ctx, req.(*ConnectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_Disconnect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisconnectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).Disconnect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_Disconnect_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).Disconnect(ctx, req.(*DisconnectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_SelectWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SelectWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).SelectWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_SelectWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).SelectWorkspace(ctx, req.(*SelectWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_GetConnectionStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConnectionStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).GetConnectionStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_GetConnectionStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).GetConnectionStatus(ctx, req.(*GetConnectionStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_TestConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TestConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).TestConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_TestConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).TestConnection(ctx, req.(*TestConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_SearchIssues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchIssuesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).SearchIssues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_SearchIssues_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).SearchIssues(ctx, req.(*SearchIssuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_GetIssue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIssueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).GetIssue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_GetIssue_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).GetIssue(ctx, req.(*GetIssueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_UpdateIssue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateIssueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).UpdateIssue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_UpdateIssue_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).UpdateIssue(ctx, req.(*UpdateIssueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_AddIssueComment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddIssueCommentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).AddIssueComment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_AddIssueComment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).AddIssueComment(ctx, req.(*AddIssueCommentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListIssueComments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIssueCommentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListIssueComments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListIssueComments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListIssueComments(ctx, req.(*ListIssueCommentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListProjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProjectsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListProjects(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListProjects_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListProjects(ctx, req.(*ListProjectsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListIssueTypes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIssueTypesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListIssueTypes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListIssueTypes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListIssueTypes(ctx, req.(*ListIssueTypesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListCreateFields_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCreateFieldsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListCreateFields(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListCreateFields_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListCreateFields(ctx, req.(*ListCreateFieldsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListAssignableUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAssignableUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListAssignableUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListAssignableUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListAssignableUsers(ctx, req.(*ListAssignableUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListPriorities_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPrioritiesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListPriorities(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListPriorities_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListPriorities(ctx, req.(*ListPrioritiesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListTransitions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTransitionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListTransitions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListTransitions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListTransitions(ctx, req.(*ListTransitionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_GetProjectStatusOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProjectStatusOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).GetProjectStatusOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_GetProjectStatusOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).GetProjectStatusOrder(ctx, req.(*GetProjectStatusOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_CreateProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).CreateProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_CreateProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).CreateProject(ctx, req.(*CreateProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_GetProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).GetProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_GetProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).GetProject(ctx, req.(*GetProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListTeams_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTeamsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListTeams(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListTeams_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListTeams(ctx, req.(*ListTeamsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListTeamLabels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTeamLabelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListTeamLabels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListTeamLabels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListTeamLabels(ctx, req.(*ListTeamLabelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListTeamMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTeamMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListTeamMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListTeamMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListTeamMembers(ctx, req.(*ListTeamMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_GetCustomView_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCustomViewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).GetCustomView(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_GetCustomView_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).GetCustomView(ctx, req.(*GetCustomViewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListWorkflowStates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorkflowStatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListWorkflowStates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListWorkflowStates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListWorkflowStates(ctx, req.(*ListWorkflowStatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_SetIntegrationCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetIntegrationCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).SetIntegrationCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_SetIntegrationCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).SetIntegrationCredential(ctx, req.(*SetIntegrationCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_GetIntegrationCredentialStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIntegrationCredentialStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).GetIntegrationCredentialStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_GetIntegrationCredentialStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).GetIntegrationCredentialStatus(ctx, req.(*GetIntegrationCredentialStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_ListIntegrationCredentials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIntegrationCredentialsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).ListIntegrationCredentials(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_ListIntegrationCredentials_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).ListIntegrationCredentials(ctx, req.(*ListIntegrationCredentialsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IssueTrackingService_RevokeAuth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeAuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IssueTrackingServiceServer).RevokeAuth(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IssueTrackingService_RevokeAuth_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IssueTrackingServiceServer).RevokeAuth(ctx, req.(*RevokeAuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IssueTrackingService_ServiceDesc is the grpc.ServiceDesc for IssueTrackingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -196,6 +1195,118 @@ var IssueTrackingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LinkIssue",
 			Handler:    _IssueTrackingService_LinkIssue_Handler,
+		},
+		{
+			MethodName: "Connect",
+			Handler:    _IssueTrackingService_Connect_Handler,
+		},
+		{
+			MethodName: "Disconnect",
+			Handler:    _IssueTrackingService_Disconnect_Handler,
+		},
+		{
+			MethodName: "SelectWorkspace",
+			Handler:    _IssueTrackingService_SelectWorkspace_Handler,
+		},
+		{
+			MethodName: "GetConnectionStatus",
+			Handler:    _IssueTrackingService_GetConnectionStatus_Handler,
+		},
+		{
+			MethodName: "TestConnection",
+			Handler:    _IssueTrackingService_TestConnection_Handler,
+		},
+		{
+			MethodName: "SearchIssues",
+			Handler:    _IssueTrackingService_SearchIssues_Handler,
+		},
+		{
+			MethodName: "GetIssue",
+			Handler:    _IssueTrackingService_GetIssue_Handler,
+		},
+		{
+			MethodName: "UpdateIssue",
+			Handler:    _IssueTrackingService_UpdateIssue_Handler,
+		},
+		{
+			MethodName: "AddIssueComment",
+			Handler:    _IssueTrackingService_AddIssueComment_Handler,
+		},
+		{
+			MethodName: "ListIssueComments",
+			Handler:    _IssueTrackingService_ListIssueComments_Handler,
+		},
+		{
+			MethodName: "ListProjects",
+			Handler:    _IssueTrackingService_ListProjects_Handler,
+		},
+		{
+			MethodName: "ListIssueTypes",
+			Handler:    _IssueTrackingService_ListIssueTypes_Handler,
+		},
+		{
+			MethodName: "ListCreateFields",
+			Handler:    _IssueTrackingService_ListCreateFields_Handler,
+		},
+		{
+			MethodName: "ListAssignableUsers",
+			Handler:    _IssueTrackingService_ListAssignableUsers_Handler,
+		},
+		{
+			MethodName: "ListPriorities",
+			Handler:    _IssueTrackingService_ListPriorities_Handler,
+		},
+		{
+			MethodName: "ListTransitions",
+			Handler:    _IssueTrackingService_ListTransitions_Handler,
+		},
+		{
+			MethodName: "GetProjectStatusOrder",
+			Handler:    _IssueTrackingService_GetProjectStatusOrder_Handler,
+		},
+		{
+			MethodName: "CreateProject",
+			Handler:    _IssueTrackingService_CreateProject_Handler,
+		},
+		{
+			MethodName: "GetProject",
+			Handler:    _IssueTrackingService_GetProject_Handler,
+		},
+		{
+			MethodName: "ListTeams",
+			Handler:    _IssueTrackingService_ListTeams_Handler,
+		},
+		{
+			MethodName: "ListTeamLabels",
+			Handler:    _IssueTrackingService_ListTeamLabels_Handler,
+		},
+		{
+			MethodName: "ListTeamMembers",
+			Handler:    _IssueTrackingService_ListTeamMembers_Handler,
+		},
+		{
+			MethodName: "GetCustomView",
+			Handler:    _IssueTrackingService_GetCustomView_Handler,
+		},
+		{
+			MethodName: "ListWorkflowStates",
+			Handler:    _IssueTrackingService_ListWorkflowStates_Handler,
+		},
+		{
+			MethodName: "SetIntegrationCredential",
+			Handler:    _IssueTrackingService_SetIntegrationCredential_Handler,
+		},
+		{
+			MethodName: "GetIntegrationCredentialStatus",
+			Handler:    _IssueTrackingService_GetIntegrationCredentialStatus_Handler,
+		},
+		{
+			MethodName: "ListIntegrationCredentials",
+			Handler:    _IssueTrackingService_ListIntegrationCredentials_Handler,
+		},
+		{
+			MethodName: "RevokeAuth",
+			Handler:    _IssueTrackingService_RevokeAuth_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

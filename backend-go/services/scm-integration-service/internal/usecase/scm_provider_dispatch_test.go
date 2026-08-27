@@ -28,9 +28,100 @@ type fakeProvider struct {
 	rateLimit    domain.RateLimitStatus
 	rateLimitErr error
 
+	mergedPR        domain.PullRequest
+	merged          bool
+	mergeSHA        string
+	mergeErr        error
+	reviewersPR     domain.PullRequest
+	reviewersErr    error
+	autoMergePR     domain.PullRequest
+	autoMergeErr    error
+	updatedIssue    domain.Issue
+	updateIssueErr  error
+	branchPR        domain.PullRequest
+	branchFound     bool
+	branchErr       error
+	slugOwner       string
+	slugName        string
+	slugErr         error
+	branchExists    bool
+	branchExistsErr error
+
 	lastCred Credential
 	lastRepo string
 	calls    int
+}
+
+func (f *fakeProvider) MergePullRequest(ctx context.Context, cred Credential, repo string, number int32, input MergePullRequestInput) (domain.PullRequest, bool, string, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.mergeErr != nil {
+		return domain.PullRequest{}, false, "", f.mergeErr
+	}
+	return f.mergedPR, f.merged, f.mergeSHA, nil
+}
+
+func (f *fakeProvider) RequestPullRequestReviewers(ctx context.Context, cred Credential, repo string, number int32, reviewerLogins, teamSlugs []string) (domain.PullRequest, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.reviewersErr != nil {
+		return domain.PullRequest{}, f.reviewersErr
+	}
+	return f.reviewersPR, nil
+}
+
+func (f *fakeProvider) RemovePullRequestReviewers(ctx context.Context, cred Credential, repo string, number int32, reviewerLogins []string) (domain.PullRequest, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.reviewersErr != nil {
+		return domain.PullRequest{}, f.reviewersErr
+	}
+	return f.reviewersPR, nil
+}
+
+func (f *fakeProvider) SetPullRequestAutoMerge(ctx context.Context, cred Credential, repo string, number int32, enabled bool, mergeMethod string) (domain.PullRequest, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.autoMergeErr != nil {
+		return domain.PullRequest{}, f.autoMergeErr
+	}
+	return f.autoMergePR, nil
+}
+
+func (f *fakeProvider) UpdateIssue(ctx context.Context, cred Credential, repo string, number int32, patch IssuePatch) (domain.Issue, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.updateIssueErr != nil {
+		return domain.Issue{}, f.updateIssueErr
+	}
+	return f.updatedIssue, nil
+}
+
+func (f *fakeProvider) GetPullRequestForBranch(ctx context.Context, cred Credential, repo, headBranch string) (domain.PullRequest, bool, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.branchErr != nil {
+		return domain.PullRequest{}, false, f.branchErr
+	}
+	return f.branchPR, f.branchFound, nil
+}
+
+func (f *fakeProvider) ResolveRepoSlug(ctx context.Context, cred Credential, candidate string) (string, string, error) {
+	f.lastCred = cred
+	f.calls++
+	if f.slugErr != nil {
+		return "", "", f.slugErr
+	}
+	return f.slugOwner, f.slugName, nil
+}
+
+func (f *fakeProvider) BranchExists(ctx context.Context, cred Credential, repo, branch string) (bool, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.branchExistsErr != nil {
+		return false, f.branchExistsErr
+	}
+	return f.branchExists, nil
 }
 
 func (f *fakeProvider) ListIssues(ctx context.Context, cred Credential, repo string, filter IssueFilter) ([]domain.Issue, error) {
@@ -97,6 +188,242 @@ func (f *fakeCredentialResolver) Resolve(ctx context.Context, tenantID string, p
 		return Credential{}, f.err
 	}
 	return Credential{Token: f.token}, nil
+}
+
+// fakeCredentialResolverConnectedFlag is a small fake specific to
+// CheckHostedReviewEligibility's tests — GetAuthStatus.Execute calls
+// CredentialResolver.Resolve and treats a nil error as "connected" (see
+// get_auth_status.go), so this fake returns nil when connected: true and a
+// sentinel error otherwise.
+type fakeCredentialResolverConnectedFlag struct {
+	connected bool
+}
+
+func (f *fakeCredentialResolverConnectedFlag) Resolve(ctx context.Context, tenantID string, provider domain.ScmProvider) (Credential, error) {
+	if f.connected {
+		return Credential{Token: "tok"}, nil
+	}
+	return Credential{}, errors.New("not connected")
+}
+
+// fakeGitHubProjects is an in-memory GitHubProjectsProvider — mirrors
+// fakeProvider's recording-fields pattern.
+type fakeGitHubProjects struct {
+	projects    []Project
+	projectsErr error
+
+	project    Project
+	projectErr error
+
+	views    []ProjectView
+	viewsErr error
+
+	items         []ProjectItem
+	nextPageToken string
+	itemsErr      error
+
+	item    ProjectItem
+	itemErr error
+
+	details    WorkItemDetails
+	detailsErr error
+
+	issueTypes    []IssueType
+	issueTypesErr error
+
+	users    []AssignableUser
+	usersErr error
+
+	labels    []Label
+	labelsErr error
+
+	comment    ProjectComment
+	commentErr error
+
+	deleteErr error
+
+	lastItemSlug string
+	calls        int
+}
+
+func (f *fakeGitHubProjects) ListAccessibleProjects(ctx context.Context, cred Credential) ([]Project, error) {
+	f.calls++
+	if f.projectsErr != nil {
+		return nil, f.projectsErr
+	}
+	return f.projects, nil
+}
+
+func (f *fakeGitHubProjects) ResolveProjectRef(ctx context.Context, cred Credential, owner string, number int32) (Project, error) {
+	f.calls++
+	if f.projectErr != nil {
+		return Project{}, f.projectErr
+	}
+	return f.project, nil
+}
+
+func (f *fakeGitHubProjects) ListProjectViews(ctx context.Context, cred Credential, projectSlug string) ([]ProjectView, error) {
+	f.calls++
+	if f.viewsErr != nil {
+		return nil, f.viewsErr
+	}
+	return f.views, nil
+}
+
+func (f *fakeGitHubProjects) ViewProjectTable(ctx context.Context, cred Credential, projectSlug, viewID, pageToken string, pageSize int32) ([]ProjectItem, string, error) {
+	f.calls++
+	if f.itemsErr != nil {
+		return nil, "", f.itemsErr
+	}
+	return f.items, f.nextPageToken, nil
+}
+
+func (f *fakeGitHubProjects) UpdateProjectItemField(ctx context.Context, cred Credential, projectSlug, itemID string, field ProjectFieldValue) (ProjectItem, error) {
+	f.calls++
+	if f.itemErr != nil {
+		return ProjectItem{}, f.itemErr
+	}
+	return f.item, nil
+}
+
+func (f *fakeGitHubProjects) ClearProjectItemField(ctx context.Context, cred Credential, projectSlug, itemID, fieldID string) (ProjectItem, error) {
+	f.calls++
+	if f.itemErr != nil {
+		return ProjectItem{}, f.itemErr
+	}
+	return f.item, nil
+}
+
+func (f *fakeGitHubProjects) GetWorkItemDetailsBySlug(ctx context.Context, cred Credential, itemSlug string) (WorkItemDetails, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.detailsErr != nil {
+		return WorkItemDetails{}, f.detailsErr
+	}
+	return f.details, nil
+}
+
+func (f *fakeGitHubProjects) UpdateIssueBySlug(ctx context.Context, cred Credential, itemSlug string, patch WorkItemPatch) (WorkItemDetails, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.detailsErr != nil {
+		return WorkItemDetails{}, f.detailsErr
+	}
+	return f.details, nil
+}
+
+func (f *fakeGitHubProjects) UpdatePullRequestBySlug(ctx context.Context, cred Credential, itemSlug string, patch WorkItemPatch) (WorkItemDetails, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.detailsErr != nil {
+		return WorkItemDetails{}, f.detailsErr
+	}
+	return f.details, nil
+}
+
+func (f *fakeGitHubProjects) UpdateIssueTypeBySlug(ctx context.Context, cred Credential, itemSlug, issueType string) (WorkItemDetails, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.detailsErr != nil {
+		return WorkItemDetails{}, f.detailsErr
+	}
+	return f.details, nil
+}
+
+func (f *fakeGitHubProjects) ListIssueTypesBySlug(ctx context.Context, cred Credential, itemSlug string) ([]IssueType, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.issueTypesErr != nil {
+		return nil, f.issueTypesErr
+	}
+	return f.issueTypes, nil
+}
+
+func (f *fakeGitHubProjects) ListAssignableUsersBySlug(ctx context.Context, cred Credential, itemSlug string) ([]AssignableUser, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.usersErr != nil {
+		return nil, f.usersErr
+	}
+	return f.users, nil
+}
+
+func (f *fakeGitHubProjects) ListLabelsBySlug(ctx context.Context, cred Credential, itemSlug string) ([]Label, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.labelsErr != nil {
+		return nil, f.labelsErr
+	}
+	return f.labels, nil
+}
+
+func (f *fakeGitHubProjects) AddIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, body string) (ProjectComment, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.commentErr != nil {
+		return ProjectComment{}, f.commentErr
+	}
+	return f.comment, nil
+}
+
+func (f *fakeGitHubProjects) UpdateIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, commentID, body string) (ProjectComment, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.commentErr != nil {
+		return ProjectComment{}, f.commentErr
+	}
+	return f.comment, nil
+}
+
+func (f *fakeGitHubProjects) DeleteIssueCommentBySlug(ctx context.Context, cred Credential, itemSlug, commentID string) error {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	return f.deleteErr
+}
+
+// fakeGitLabMergeRequestProvider is an in-memory GitLabMergeRequestProvider
+// — mirrors fakeProvider's recording-fields pattern.
+type fakeGitLabMergeRequestProvider struct {
+	mrs    []domain.MergeRequest
+	mrsErr error
+
+	disc    domain.MergeRequestDiscussion
+	discErr error
+
+	details    domain.WorkItemDetailsGitLab
+	detailsErr error
+
+	lastCred   Credential
+	lastRepo   string
+	lastFilter MRFilter
+	calls      int
+}
+
+func (f *fakeGitLabMergeRequestProvider) ListMergeRequests(ctx context.Context, cred Credential, repo string, filter MRFilter) ([]domain.MergeRequest, error) {
+	f.lastCred, f.lastRepo, f.lastFilter = cred, repo, filter
+	f.calls++
+	if f.mrsErr != nil {
+		return nil, f.mrsErr
+	}
+	return f.mrs, nil
+}
+
+func (f *fakeGitLabMergeRequestProvider) ResolveDiscussion(ctx context.Context, cred Credential, repo string, mrIID int32, discussionID string, resolved bool) (domain.MergeRequestDiscussion, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.discErr != nil {
+		return domain.MergeRequestDiscussion{}, f.discErr
+	}
+	return f.disc, nil
+}
+
+func (f *fakeGitLabMergeRequestProvider) GetWorkItemDetails(ctx context.Context, cred Credential, repo string, iid int32, itemType string) (domain.WorkItemDetailsGitLab, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.detailsErr != nil {
+		return domain.WorkItemDetailsGitLab{}, f.detailsErr
+	}
+	return f.details, nil
 }
 
 func TestListIssues_DispatchesToResolvedProviderWithCredential(t *testing.T) {

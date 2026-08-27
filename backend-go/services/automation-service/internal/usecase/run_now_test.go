@@ -34,6 +34,30 @@ func (f *fakeAutomationRepository) Get(ctx context.Context, tenantID, id string)
 	return a, nil
 }
 
+// List/Update/Delete satisfy usecase.AutomationRepository for tests in this
+// package that don't exercise list/update/delete directly (those get their
+// own dedicated fakes in list_automations_test.go/update_automation_test.go/
+// delete_automation_test.go).
+func (f *fakeAutomationRepository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Automation, string, error) {
+	var out []domain.Automation
+	for _, a := range f.byID {
+		if a.TenantID == tenantID {
+			out = append(out, a)
+		}
+	}
+	return out, "", nil
+}
+
+func (f *fakeAutomationRepository) Update(ctx context.Context, tenantID string, a domain.Automation) error {
+	f.byID[a.ID] = a
+	return nil
+}
+
+func (f *fakeAutomationRepository) Delete(ctx context.Context, tenantID, id string) error {
+	delete(f.byID, id)
+	return nil
+}
+
 // fakeAutomationRunRepository is an in-memory AutomationRunRepository.
 type fakeAutomationRunRepository struct {
 	byID    map[string]domain.AutomationRun

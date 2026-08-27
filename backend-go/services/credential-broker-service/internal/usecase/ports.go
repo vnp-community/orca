@@ -37,6 +37,10 @@ type CredentialMetadataRepository interface {
 	// ResolveCredentialByOwner doc comment). Returns
 	// domain.ErrCredentialNotFound (wrapped) when no matching row exists.
 	GetByOwner(ctx context.Context, tenantID string, category domain.Category, ownerID string) (domain.CredentialMetadata, error)
+	// ListByCategory returns every non-revoked row for (tenantID, category)
+	// — backs ListCredentialsByCategory ("which owner_ids have a credential
+	// in this category").
+	ListByCategory(ctx context.Context, tenantID string, category domain.Category) ([]domain.CredentialMetadata, error)
 }
 
 // AuditRepository is the append-only access-audit-log port. Per

@@ -26,7 +26,7 @@ func TestNewCredentialMetadata_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewCredentialMetadata(tt.id, tt.tenantID, tt.ownerID, tt.category, tt.vaultPath, StatusActive, now)
+			_, err := NewCredentialMetadata(tt.id, tt.tenantID, tt.ownerID, tt.category, tt.vaultPath, StatusActive, "", now)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -39,7 +39,7 @@ func TestNewCredentialMetadata_ValidatesInvariants(t *testing.T) {
 
 func TestNewCredentialMetadata_DefaultsStatusToPending(t *testing.T) {
 	now := time.Now()
-	m, err := NewCredentialMetadata("c1", "t1", "o1", CategoryScmOAuth, "credential/t1/c1", "", now)
+	m, err := NewCredentialMetadata("c1", "t1", "o1", CategoryScmOAuth, "credential/t1/c1", "", "", now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestNewCredentialMetadata_DefaultsStatusToPending(t *testing.T) {
 
 func TestNewCredentialMetadata_RejectsInvalidStatus(t *testing.T) {
 	now := time.Now()
-	_, err := NewCredentialMetadata("c1", "t1", "o1", CategoryScmOAuth, "credential/t1/c1", Status("bogus"), now)
+	_, err := NewCredentialMetadata("c1", "t1", "o1", CategoryScmOAuth, "credential/t1/c1", Status("bogus"), "", now)
 	if err != ErrInvalidStatus {
 		t.Fatalf("expected ErrInvalidStatus, got %v", err)
 	}
@@ -91,7 +91,7 @@ func TestCategory_Engine(t *testing.T) {
 
 func TestCredentialMetadata_Revoke(t *testing.T) {
 	now := time.Now()
-	m, err := NewCredentialMetadata("c1", "t1", "o1", CategoryScmOAuth, "credential/t1/c1", StatusActive, now)
+	m, err := NewCredentialMetadata("c1", "t1", "o1", CategoryScmOAuth, "credential/t1/c1", StatusActive, "", now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

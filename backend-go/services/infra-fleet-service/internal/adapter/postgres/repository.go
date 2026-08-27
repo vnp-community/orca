@@ -1,8 +1,10 @@
 // Package postgres implements infra-fleet-service's DevServerRepository,
-// SshTargetRepository, SshTargetResolver, ConnectionRepository,
-// ConnectionResolver, and FleetHealthPort ports (defined in internal/usecase)
-// against this service's own PostgreSQL database — see
-// specs/backend-go/architecture/05-data-architecture.md's
+// SshTargetRepository, ConnectionRepository, ConnectionResolver, and
+// FleetHealthPort ports (defined in internal/usecase), plus
+// adapter/sshrelay.SshTargetResolver (a structurally-identical interface
+// that package declares for itself, per this codebase's Dependency
+// Inversion convention), against this service's own PostgreSQL database —
+// see specs/backend-go/architecture/05-data-architecture.md's
 // database-per-service rule: this is the ONLY package in infra-fleet-service
 // that knows SQL exists.
 package postgres
@@ -113,10 +115,10 @@ func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevSer
 }
 
 // SshTargetStore implements usecase.SshTargetRepository and
-// usecase.SshTargetResolver against the same infra.ssh_targets table
-// Repository's ResolveConnection/GetFleetHealth etc. read from — split into
-// its own type rather than a method on Repository, see Repository's doc
-// comment for why (the Get method-name collision with
+// adapter/sshrelay.SshTargetResolver against the same infra.ssh_targets
+// table Repository's ResolveConnection/GetFleetHealth etc. read from — split
+// into its own type rather than a method on Repository, see Repository's
+// doc comment for why (the Get method-name collision with
 // DevServerRepository.Get).
 type SshTargetStore struct {
 	pool *pgxpool.Pool
@@ -142,9 +144,36 @@ func (s *SshTargetStore) Create(ctx context.Context, target domain.SshTarget) (d
 	return target, nil
 }
 
+// List returns every SSH target registered for tenantID.
+func (s *SshTargetStore) List(ctx context.Context, tenantID string) ([]domain.SshTarget, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, tenant_id, host, user_name, vault_ssh_role
+		FROM infra.ssh_targets
+		WHERE tenant_id = $1
+		ORDER BY host
+	`, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query ssh targets: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.SshTarget
+	for rows.Next() {
+		var t domain.SshTarget
+		if err := rows.Scan(&t.ID, &t.TenantID, &t.Host, &t.UserName, &t.VaultSSHRole); err != nil {
+			return nil, fmt.Errorf("postgres: scan ssh target row: %w", err)
+		}
+		out = append(out, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate ssh target rows: %w", err)
+	}
+	return out, nil
+}
+
 // Get fetches an SSH target scoped to tenantID — implements both
-// usecase.SshTargetRepository and usecase.SshTargetResolver (the latter
-// consumed by adapter/devserveragent.Client to resolve DevServer.SSHTargetID
+// usecase.SshTargetRepository and adapter/sshrelay.SshTargetResolver (the
+// latter consumed by sshrelay.Provisioner to resolve DevServer.SSHTargetID
 // before dialing via sshconn.Connector for relay-ssh mode).
 func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error) {
 	row := s.pool.QueryRow(ctx, `
@@ -173,13 +202,52 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 // service's README "Known gaps" for what still isn't wired (port_forwards,
 // provider_registry_entries, terminal_sessions).
 func (r *Repository) ResolveConnection(ctx context.Context, tenantID, connectionID string) (bool, domain.DevServer, domain.Connection, error) {
-	row := r.pool.QueryRow(ctx, `
+	const q = `
 		SELECT c.id, c.tenant_id, c.dev_server_id, c.repo_path, c.worktree_id,
 		       ds.id, ds.tenant_id, ds.host, ds.connection_mode
 		FROM infra.connections c
 		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
-		WHERE c.tenant_id = $1 AND c.id = $2
-	`, tenantID, connectionID)
+		WHERE c.tenant_id = $1 AND c.id = $2`
+	return r.scanConnectionRow(ctx, q, tenantID, connectionID)
+}
+
+// ResolveConnectionByDevServer is ResolveConnection's reverse-lookup
+// counterpart — see usecase.ConnectionResolver's doc comment (TASK-025).
+// A dev server can have had multiple connection rows over time — resolves
+// the most recently created one.
+func (r *Repository) ResolveConnectionByDevServer(ctx context.Context, tenantID, devServerID string) (bool, domain.DevServer, domain.Connection, error) {
+	const q = `
+		SELECT c.id, c.tenant_id, c.dev_server_id, c.repo_path, c.worktree_id,
+		       ds.id, ds.tenant_id, ds.host, ds.connection_mode
+		FROM infra.connections c
+		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
+		WHERE c.tenant_id = $1 AND c.dev_server_id = $2
+		ORDER BY c.created_at DESC
+		LIMIT 1`
+	return r.scanConnectionRow(ctx, q, tenantID, devServerID)
+}
+
+// ResolveConnectionByWorktree is ResolveConnection's worktree-keyed
+// counterpart — see usecase.ConnectionResolver's doc comment (TASK-025).
+func (r *Repository) ResolveConnectionByWorktree(ctx context.Context, tenantID, worktreeID string) (bool, domain.DevServer, domain.Connection, error) {
+	const q = `
+		SELECT c.id, c.tenant_id, c.dev_server_id, c.repo_path, c.worktree_id,
+		       ds.id, ds.tenant_id, ds.host, ds.connection_mode
+		FROM infra.connections c
+		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
+		WHERE c.tenant_id = $1 AND c.worktree_id = $2
+		ORDER BY c.created_at DESC
+		LIMIT 1`
+	return r.scanConnectionRow(ctx, q, tenantID, worktreeID)
+}
+
+// scanConnectionRow factors out ResolveConnection/ResolveConnectionByDevServer/
+// ResolveConnectionByWorktree's shared row-scan + "no rows means
+// connected=false, not an error" handling (TASK-025) — same column order,
+// same pgx.ErrNoRows branch, so all three callers share it instead of
+// duplicating the scan 3 ways.
+func (r *Repository) scanConnectionRow(ctx context.Context, query string, args ...any) (bool, domain.DevServer, domain.Connection, error) {
+	row := r.pool.QueryRow(ctx, query, args...)
 
 	var conn domain.Connection
 	var ds domain.DevServer
@@ -204,13 +272,58 @@ func (r *Repository) ResolveConnection(ctx context.Context, tenantID, connection
 // persisted row — the write side ResolveConnection's join reads from.
 func (r *Repository) CreateConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error) {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO infra.connections (id, tenant_id, dev_server_id, repo_path, worktree_id)
-		VALUES ($1, $2, $3, $4, $5)
-	`, conn.ID, conn.TenantID, conn.DevServerID, conn.RepoPath, conn.WorktreeID)
+		INSERT INTO infra.connections (id, tenant_id, dev_server_id, repo_path, worktree_id, status, last_activity_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, conn.ID, conn.TenantID, conn.DevServerID, conn.RepoPath, conn.WorktreeID, conn.Status, conn.LastActivityAt)
 	if err != nil {
 		return domain.Connection{}, fmt.Errorf("postgres: insert connection: %w", err)
 	}
 	return conn, nil
+}
+
+// GetActiveByDevServer returns the most recent connection for devServerID
+// whose status is not "closed" — see Connection.Status's doc comment
+// (migrations/0004_connection_status).
+func (r *Repository) GetActiveByDevServer(ctx context.Context, tenantID, devServerID string) (domain.Connection, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, tenant_id, dev_server_id, repo_path, worktree_id, status, last_activity_at
+		FROM infra.connections
+		WHERE tenant_id = $1 AND dev_server_id = $2 AND status <> 'closed'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, tenantID, devServerID)
+
+	var conn domain.Connection
+	err := row.Scan(&conn.ID, &conn.TenantID, &conn.DevServerID, &conn.RepoPath, &conn.WorktreeID, &conn.Status, &conn.LastActivityAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Connection{}, false, nil
+	}
+	if err != nil {
+		return domain.Connection{}, false, fmt.Errorf("postgres: get active connection by dev server: %w", err)
+	}
+	return conn, true, nil
+}
+
+// FindBySshTarget returns the DevServer bound to sshTargetID, if any.
+func (r *Repository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (domain.DevServer, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id
+		FROM infra.dev_servers
+		WHERE tenant_id = $1 AND ssh_target_id = $2
+		LIMIT 1
+	`, tenantID, sshTargetID)
+
+	var ds domain.DevServer
+	var mode string
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &ds.SSHTargetID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DevServer{}, false, nil
+	}
+	if err != nil {
+		return domain.DevServer{}, false, fmt.Errorf("postgres: find dev server by ssh target: %w", err)
+	}
+	ds.Mode = domain.ConnectionMode(mode)
+	return ds, true, nil
 }
 
 // GetFleetHealth returns the latest fleet-health sample per dev server for

@@ -148,6 +148,7 @@ type ProviderAccount struct {
 	Scope              AccountScope
 	UserID             string // set iff Scope == ScopeUser
 	ProjectID          string // set iff Scope == ScopeProject
+	DevServerID        string // which dev server holds this account's pushed ciphertext; empty until first push (§9)
 	RotationGraceUntil *time.Time
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
@@ -165,6 +166,7 @@ func NewProviderAccount(
 	credentialRef string,
 	scope AccountScope,
 	userID, projectID string,
+	devServerID string,
 	rotationGraceUntil *time.Time,
 	createdAt, updatedAt time.Time,
 ) (ProviderAccount, error) {
@@ -203,6 +205,7 @@ func NewProviderAccount(
 		Scope:              scope,
 		UserID:             userID,
 		ProjectID:          projectID,
+		DevServerID:        devServerID,
 		RotationGraceUntil: rotationGraceUntil,
 		CreatedAt:          createdAt,
 		UpdatedAt:          updatedAt,

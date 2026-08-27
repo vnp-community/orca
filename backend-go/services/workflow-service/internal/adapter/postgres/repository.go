@@ -44,14 +44,14 @@ func (r *Repository) CreateTemplate(ctx context.Context, tmpl domain.WorkflowTem
 
 func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (domain.WorkflowTemplate, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, '')
+		SELECT id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, ''), version
 		FROM workflow.templates
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
 	var tmpl domain.WorkflowTemplate
 	var scope string
-	err := row.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &scope, &tmpl.ParentTemplateID)
+	err := row.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &scope, &tmpl.ParentTemplateID, &tmpl.Version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.WorkflowTemplate{}, domain.ErrTemplateNotFound
 	}
@@ -62,12 +62,40 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (doma
 	return tmpl, nil
 }
 
+// Update performs the version-bump-on-write conditional UPDATE — the
+// versioning rule this solution adds (SOL-030), mirroring SOL-001's
+// AccessPolicy pattern. pgx.ErrNoRows here is unambiguous: the caller
+// (usecase.UpdateTemplate) already confirmed the row exists via GetTemplate
+// before calling this, so a zero-row UPDATE can only mean the version
+// moved between that read and this write.
+func (r *Repository) Update(ctx context.Context, t domain.WorkflowTemplate, expectedVersion int32) (domain.WorkflowTemplate, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE workflow.templates
+		SET name = $1, dag_json = $2::jsonb, scope = $3, parent_template_id = NULLIF($4, ''),
+		    version = version + 1, updated_at = now()
+		WHERE id = $5 AND tenant_id = $6 AND version = $7
+		RETURNING id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, ''), version
+	`, t.Name, t.DAGJSON, string(t.Scope), t.ParentTemplateID, t.ID, t.TenantID, expectedVersion)
+
+	var updated domain.WorkflowTemplate
+	var scope string
+	err := row.Scan(&updated.ID, &updated.TenantID, &updated.Name, &updated.DAGJSON, &scope, &updated.ParentTemplateID, &updated.Version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.WorkflowTemplate{}, domain.ErrTemplateVersionConflict
+	}
+	if err != nil {
+		return domain.WorkflowTemplate{}, fmt.Errorf("postgres: update template: %w", err)
+	}
+	updated.Scope = domain.Scope(scope)
+	return updated, nil
+}
+
 // ListTemplates backs usecase.ListTemplates — keyset pagination, same
 // shape as annotation-service's ListAnnotations (id::text > pageToken
 // cursor, ORDER BY id, next = last row's id iff the page came back full).
 func (r *Repository) ListTemplates(ctx context.Context, tenantID, scope, pageToken string, pageSize int32) ([]domain.WorkflowTemplate, string, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, '')
+		SELECT id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, ''), version
 		FROM workflow.templates
 		WHERE tenant_id = $1 AND ($2 = '' OR scope = $2) AND id::text > $3
 		ORDER BY id
@@ -82,7 +110,7 @@ func (r *Repository) ListTemplates(ctx context.Context, tenantID, scope, pageTok
 	for rows.Next() {
 		var tmpl domain.WorkflowTemplate
 		var s string
-		if err := rows.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &s, &tmpl.ParentTemplateID); err != nil {
+		if err := rows.Scan(&tmpl.ID, &tmpl.TenantID, &tmpl.Name, &tmpl.DAGJSON, &s, &tmpl.ParentTemplateID, &tmpl.Version); err != nil {
 			return nil, "", fmt.Errorf("postgres: scan template row: %w", err)
 		}
 		tmpl.Scope = domain.Scope(s)

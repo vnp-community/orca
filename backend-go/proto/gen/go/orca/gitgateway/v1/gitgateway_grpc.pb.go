@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,12 +20,67 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GitGatewayService_GetStatus_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/GetStatus"
-	GitGatewayService_GetDiff_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/GetDiff"
-	GitGatewayService_Commit_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/Commit"
-	GitGatewayService_Push_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/Push"
-	GitGatewayService_Pull_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/Pull"
-	GitGatewayService_GenerateCommitMessage_FullMethodName = "/orca.gitgateway.v1.GitGatewayService/GenerateCommitMessage"
+	GitGatewayService_GetStatus_FullMethodName                   = "/orca.gitgateway.v1.GitGatewayService/GetStatus"
+	GitGatewayService_GetDiff_FullMethodName                     = "/orca.gitgateway.v1.GitGatewayService/GetDiff"
+	GitGatewayService_Commit_FullMethodName                      = "/orca.gitgateway.v1.GitGatewayService/Commit"
+	GitGatewayService_Push_FullMethodName                        = "/orca.gitgateway.v1.GitGatewayService/Push"
+	GitGatewayService_Pull_FullMethodName                        = "/orca.gitgateway.v1.GitGatewayService/Pull"
+	GitGatewayService_GenerateCommitMessage_FullMethodName       = "/orca.gitgateway.v1.GitGatewayService/GenerateCommitMessage"
+	GitGatewayService_Stage_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Stage"
+	GitGatewayService_Unstage_FullMethodName                     = "/orca.gitgateway.v1.GitGatewayService/Unstage"
+	GitGatewayService_History_FullMethodName                     = "/orca.gitgateway.v1.GitGatewayService/History"
+	GitGatewayService_CheckIgnored_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/CheckIgnored"
+	GitGatewayService_ForkSync_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/ForkSync"
+	GitGatewayService_UpstreamStatus_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/UpstreamStatus"
+	GitGatewayService_CommitCompare_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/CommitCompare"
+	GitGatewayService_BranchCompare_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/BranchCompare"
+	GitGatewayService_CommitDiff_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/CommitDiff"
+	GitGatewayService_BranchDiff_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/BranchDiff"
+	GitGatewayService_SubmoduleStatus_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/SubmoduleStatus"
+	GitGatewayService_RemoteCommitUrl_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/RemoteCommitUrl"
+	GitGatewayService_RemoteFileUrl_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/RemoteFileUrl"
+	GitGatewayService_Fetch_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Fetch"
+	GitGatewayService_GeneratePullRequestFields_FullMethodName   = "/orca.gitgateway.v1.GitGatewayService/GeneratePullRequestFields"
+	GitGatewayService_DiscoverCommitMessageModels_FullMethodName = "/orca.gitgateway.v1.GitGatewayService/DiscoverCommitMessageModels"
+	GitGatewayService_ReadFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/ReadFile"
+	GitGatewayService_ReadFileChunk_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/ReadFileChunk"
+	GitGatewayService_ReadFilePreview_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/ReadFilePreview"
+	GitGatewayService_ReadDir_FullMethodName                     = "/orca.gitgateway.v1.GitGatewayService/ReadDir"
+	GitGatewayService_WriteFile_FullMethodName                   = "/orca.gitgateway.v1.GitGatewayService/WriteFile"
+	GitGatewayService_WriteFileChunk_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/WriteFileChunk"
+	GitGatewayService_CreateDir_FullMethodName                   = "/orca.gitgateway.v1.GitGatewayService/CreateDir"
+	GitGatewayService_DeleteFile_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/DeleteFile"
+	GitGatewayService_StatFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/StatFile"
+	GitGatewayService_SearchFiles_FullMethodName                 = "/orca.gitgateway.v1.GitGatewayService/SearchFiles"
+	GitGatewayService_ListAllFiles_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/ListAllFiles"
+	GitGatewayService_ListMarkdownDocuments_FullMethodName       = "/orca.gitgateway.v1.GitGatewayService/ListMarkdownDocuments"
+	GitGatewayService_RenameFile_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/RenameFile"
+	GitGatewayService_CopyFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/CopyFile"
+	GitGatewayService_Clone_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Clone"
+	GitGatewayService_BaseRefDefault_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/BaseRefDefault"
+	GitGatewayService_SearchRefs_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/SearchRefs"
+	GitGatewayService_InitRepo_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/InitRepo"
+	GitGatewayService_CheckHooks_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/CheckHooks"
+	GitGatewayService_ReadIssueCommand_FullMethodName            = "/orca.gitgateway.v1.GitGatewayService/ReadIssueCommand"
+	GitGatewayService_WriteIssueCommand_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/WriteIssueCommand"
+	GitGatewayService_ScanSetupScriptImports_FullMethodName      = "/orca.gitgateway.v1.GitGatewayService/ScanSetupScriptImports"
+	GitGatewayService_CreateWorktree_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/CreateWorktree"
+	GitGatewayService_RemoveWorktree_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/RemoveWorktree"
+	GitGatewayService_ForceDeleteBranch_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/ForceDeleteBranch"
+	GitGatewayService_DetectWorktrees_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/DetectWorktrees"
+	GitGatewayService_PrefetchCreateBase_FullMethodName          = "/orca.gitgateway.v1.GitGatewayService/PrefetchCreateBase"
+	GitGatewayService_ResolvePrBase_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/ResolvePrBase"
+	GitGatewayService_ResolveMrBase_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/ResolveMrBase"
+	GitGatewayService_Checkout_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/Checkout"
+	GitGatewayService_ListLocalBranches_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/ListLocalBranches"
+	GitGatewayService_FastForward_FullMethodName                 = "/orca.gitgateway.v1.GitGatewayService/FastForward"
+	GitGatewayService_RebaseFromBase_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/RebaseFromBase"
+	GitGatewayService_AbortRebase_FullMethodName                 = "/orca.gitgateway.v1.GitGatewayService/AbortRebase"
+	GitGatewayService_AbortMerge_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/AbortMerge"
+	GitGatewayService_ConflictOperation_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/ConflictOperation"
+	GitGatewayService_ResolveConflict_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/ResolveConflict"
+	GitGatewayService_Discard_FullMethodName                     = "/orca.gitgateway.v1.GitGatewayService/Discard"
+	GitGatewayService_BulkDiscard_FullMethodName                 = "/orca.gitgateway.v1.GitGatewayService/BulkDiscard"
 )
 
 // GitGatewayServiceClient is the client API for GitGatewayService service.
@@ -34,6 +90,12 @@ const (
 // GitGatewayService is a stateless dispatcher: resolve the worktree's owning
 // host via infra-fleet-service, execute locally or relay. Owns no data.
 // See specs/backend-go/services/git-gateway-service.md.
+//
+// NOTE (SOL-031 / TASK-192): this file is being edited concurrently by
+// another work group adding git.*/files.* RPCs — the worktree.* RPCs below
+// were added against the pre-existing (GetStatus..GenerateCommitMessage)
+// service surface only, and will need a manual merge against that group's
+// changes to this same file.
 type GitGatewayServiceClient interface {
 	GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
 	GetDiff(ctx context.Context, in *GetDiffRequest, opts ...grpc.CallOption) (*GetDiffResponse, error)
@@ -41,6 +103,97 @@ type GitGatewayServiceClient interface {
 	Push(ctx context.Context, in *PushRequest, opts ...grpc.CallOption) (*PushResponse, error)
 	Pull(ctx context.Context, in *PullRequest, opts ...grpc.CallOption) (*PullResponse, error)
 	GenerateCommitMessage(ctx context.Context, in *GenerateCommitMessageRequest, opts ...grpc.CallOption) (*GenerateCommitMessageResponse, error)
+	// ── Group B (TASK-208) — staging. Both always relay to the agent's bulk
+	// variant regardless of path count — see RelayExecutor.Stage/Unstage. ──
+	Stage(ctx context.Context, in *StageRequest, opts ...grpc.CallOption) (*StageResponse, error)
+	Unstage(ctx context.Context, in *UnstageRequest, opts ...grpc.CallOption) (*UnstageResponse, error)
+	// ── Group C (TASK-209) — history/compare. commitCompare/branchCompare/
+	// commitDiff/branchDiff/submoduleStatus were BLOCKED pending a real shape
+	// redesign; now implemented for real against the confirmed agent contract
+	// (specs/agent/api/agent-rpc-catalog-git-fs.md:49-55/143-147) — see each
+	// message's own doc comment for citations. ───────────────────────────────
+	History(ctx context.Context, in *HistoryRequest, opts ...grpc.CallOption) (*HistoryResponse, error)
+	CheckIgnored(ctx context.Context, in *CheckIgnoredRequest, opts ...grpc.CallOption) (*CheckIgnoredResponse, error)
+	ForkSync(ctx context.Context, in *ForkSyncRequest, opts ...grpc.CallOption) (*ForkSyncResponse, error)
+	UpstreamStatus(ctx context.Context, in *UpstreamStatusRequest, opts ...grpc.CallOption) (*UpstreamStatusResponse, error)
+	CommitCompare(ctx context.Context, in *CommitCompareRequest, opts ...grpc.CallOption) (*CommitCompareResponse, error)
+	BranchCompare(ctx context.Context, in *BranchCompareRequest, opts ...grpc.CallOption) (*BranchCompareResponse, error)
+	CommitDiff(ctx context.Context, in *CommitDiffRequest, opts ...grpc.CallOption) (*FileDiffResponse, error)
+	BranchDiff(ctx context.Context, in *BranchDiffRequest, opts ...grpc.CallOption) (*FileDiffResponse, error)
+	SubmoduleStatus(ctx context.Context, in *SubmoduleStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
+	// ── Group D (TASK-210) — remote. fetch was BLOCKED on the pushTarget
+	// design question and TASK-227 reachability — both now resolved. ───────
+	RemoteCommitUrl(ctx context.Context, in *RemoteCommitUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error)
+	RemoteFileUrl(ctx context.Context, in *RemoteFileUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error)
+	Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error)
+	// ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
+	GeneratePullRequestFields(ctx context.Context, in *GeneratePullRequestFieldsRequest, opts ...grpc.CallOption) (*GeneratePullRequestFieldsResponse, error)
+	DiscoverCommitMessageModels(ctx context.Context, in *DiscoverCommitMessageModelsRequest, opts ...grpc.CallOption) (*DiscoverCommitMessageModelsResponse, error)
+	// ── File I/O (TASK-049) — resolve worktree_id -> host -> local exec or
+	// relay, identical dispatch shape to every git.* RPC above. ─────────────
+	ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (*ReadFileResponse, error)
+	ReadFileChunk(ctx context.Context, in *ReadFileChunkRequest, opts ...grpc.CallOption) (*ReadFileChunkResponse, error)
+	ReadFilePreview(ctx context.Context, in *ReadFilePreviewRequest, opts ...grpc.CallOption) (*ReadFilePreviewResponse, error)
+	ReadDir(ctx context.Context, in *ReadDirRequest, opts ...grpc.CallOption) (*ReadDirResponse, error)
+	WriteFile(ctx context.Context, in *WriteFileRequest, opts ...grpc.CallOption) (*WriteFileResponse, error)
+	WriteFileChunk(ctx context.Context, in *WriteFileChunkRequest, opts ...grpc.CallOption) (*WriteFileChunkResponse, error)
+	CreateDir(ctx context.Context, in *CreateDirRequest, opts ...grpc.CallOption) (*CreateDirResponse, error)
+	DeleteFile(ctx context.Context, in *DeleteFileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	StatFile(ctx context.Context, in *StatFileRequest, opts ...grpc.CallOption) (*StatFileResponse, error)
+	SearchFiles(ctx context.Context, in *SearchFilesRequest, opts ...grpc.CallOption) (*SearchFilesResponse, error)
+	ListAllFiles(ctx context.Context, in *ListAllFilesRequest, opts ...grpc.CallOption) (*ListAllFilesResponse, error)
+	ListMarkdownDocuments(ctx context.Context, in *ListMarkdownDocumentsRequest, opts ...grpc.CallOption) (*ListMarkdownDocumentsResponse, error)
+	// Known gaps carried forward from the old backend — both RPCs exist so
+	// the contract is honest, but return FAILED_PRECONDITION whenever
+	// dispatch resolves to a relay target, never a silent no-op.
+	RenameFile(ctx context.Context, in *RenameFileRequest, opts ...grpc.CallOption) (*RenameFileResponse, error)
+	CopyFile(ctx context.Context, in *CopyFileRequest, opts ...grpc.CallOption) (*CopyFileResponse, error)
+	// repo.*-owned RPCs (TASK-156) — file/host operations against a repo's
+	// working tree, not the repos Postgres table (that's project-service's
+	// UpdateRepo). See SOL-023 Bucket 3.
+	Clone(ctx context.Context, in *CloneRequest, opts ...grpc.CallOption) (*CloneResponse, error)
+	BaseRefDefault(ctx context.Context, in *BaseRefDefaultRequest, opts ...grpc.CallOption) (*BaseRefDefaultResponse, error)
+	SearchRefs(ctx context.Context, in *SearchRefsRequest, opts ...grpc.CallOption) (*SearchRefsResponse, error)
+	InitRepo(ctx context.Context, in *InitRepoRequest, opts ...grpc.CallOption) (*InitRepoResponse, error)
+	CheckHooks(ctx context.Context, in *CheckHooksRequest, opts ...grpc.CallOption) (*CheckHooksResponse, error)
+	ReadIssueCommand(ctx context.Context, in *ReadIssueCommandRequest, opts ...grpc.CallOption) (*ReadIssueCommandResponse, error)
+	WriteIssueCommand(ctx context.Context, in *WriteIssueCommandRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ScanSetupScriptImports(ctx context.Context, in *ScanSetupScriptImportsRequest, opts ...grpc.CallOption) (*ScanSetupScriptImportsResponse, error)
+	CreateWorktree(ctx context.Context, in *CreateWorktreeRequest, opts ...grpc.CallOption) (*CreateWorktreeResponse, error)
+	RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Required on every GitExecutor implementation from day one — TASK-194
+	// makes it a required interface method, not an optional one, closing the
+	// old TS backend's crash-bug class (forceDeletePreservedBranch? was
+	// optional and only one provider implemented it).
+	ForceDeleteBranch(ctx context.Context, in *ForceDeleteBranchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// DetectWorktrees is the concrete form of project-service.md §4's
+	// "git-gateway-service reconciles on demand" — returns raw on-disk
+	// paths, no bookkeeping join (that diff happens at api-gateway's edge
+	// layer, TASK-195, per 05-data-architecture.md's cross-service
+	// aggregation rule).
+	DetectWorktrees(ctx context.Context, in *DetectWorktreesRequest, opts ...grpc.CallOption) (*DetectWorktreesResponse, error)
+	PrefetchCreateBase(ctx context.Context, in *PrefetchCreateBaseRequest, opts ...grpc.CallOption) (*PrefetchCreateBaseResponse, error)
+	ResolvePrBase(ctx context.Context, in *ResolvePrBaseRequest, opts ...grpc.CallOption) (*ResolveBaseResponse, error)
+	ResolveMrBase(ctx context.Context, in *ResolveMrBaseRequest, opts ...grpc.CallOption) (*ResolveBaseResponse, error)
+	// ── Group A — branch/ref operations (TASK-207) ───────────────────────────
+	// 4 of these methods (Checkout/ListLocalBranches/FastForward/
+	// ConflictOperation) needed a genuine shape redesign against the
+	// confirmed real agent contract (specs/agent/api/agent-rpc-catalog-git-fs.md)
+	// rather than the mechanical param rename the other 5 got — see each
+	// message's own doc comment below for citations. ConflictOperation's
+	// original single-RPC design is replaced by two RPCs: ConflictOperation
+	// (a pure detector, matching the real agent) and ResolveConflict (the
+	// per-file resolve op the real agent does not implement).
+	Checkout(ctx context.Context, in *CheckoutRequest, opts ...grpc.CallOption) (*CheckoutResponse, error)
+	ListLocalBranches(ctx context.Context, in *ListLocalBranchesRequest, opts ...grpc.CallOption) (*ListLocalBranchesResponse, error)
+	FastForward(ctx context.Context, in *FastForwardRequest, opts ...grpc.CallOption) (*FastForwardResponse, error)
+	RebaseFromBase(ctx context.Context, in *RebaseFromBaseRequest, opts ...grpc.CallOption) (*RebaseFromBaseResponse, error)
+	AbortRebase(ctx context.Context, in *AbortRebaseRequest, opts ...grpc.CallOption) (*AbortRebaseResponse, error)
+	AbortMerge(ctx context.Context, in *AbortMergeRequest, opts ...grpc.CallOption) (*AbortMergeResponse, error)
+	ConflictOperation(ctx context.Context, in *ConflictOperationRequest, opts ...grpc.CallOption) (*ConflictOperationResponse, error)
+	ResolveConflict(ctx context.Context, in *ResolveConflictRequest, opts ...grpc.CallOption) (*ResolveConflictResponse, error)
+	Discard(ctx context.Context, in *DiscardRequest, opts ...grpc.CallOption) (*DiscardResponse, error)
+	BulkDiscard(ctx context.Context, in *BulkDiscardRequest, opts ...grpc.CallOption) (*BulkDiscardResponse, error)
 }
 
 type gitGatewayServiceClient struct {
@@ -111,6 +264,556 @@ func (c *gitGatewayServiceClient) GenerateCommitMessage(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) Stage(ctx context.Context, in *StageRequest, opts ...grpc.CallOption) (*StageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StageResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_Stage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) Unstage(ctx context.Context, in *UnstageRequest, opts ...grpc.CallOption) (*UnstageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnstageResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_Unstage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) History(ctx context.Context, in *HistoryRequest, opts ...grpc.CallOption) (*HistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HistoryResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_History_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CheckIgnored(ctx context.Context, in *CheckIgnoredRequest, opts ...grpc.CallOption) (*CheckIgnoredResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckIgnoredResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CheckIgnored_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ForkSync(ctx context.Context, in *ForkSyncRequest, opts ...grpc.CallOption) (*ForkSyncResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ForkSyncResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ForkSync_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) UpstreamStatus(ctx context.Context, in *UpstreamStatusRequest, opts ...grpc.CallOption) (*UpstreamStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpstreamStatusResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_UpstreamStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CommitCompare(ctx context.Context, in *CommitCompareRequest, opts ...grpc.CallOption) (*CommitCompareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommitCompareResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CommitCompare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) BranchCompare(ctx context.Context, in *BranchCompareRequest, opts ...grpc.CallOption) (*BranchCompareResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BranchCompareResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_BranchCompare_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CommitDiff(ctx context.Context, in *CommitDiffRequest, opts ...grpc.CallOption) (*FileDiffResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FileDiffResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CommitDiff_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) BranchDiff(ctx context.Context, in *BranchDiffRequest, opts ...grpc.CallOption) (*FileDiffResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FileDiffResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_BranchDiff_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) SubmoduleStatus(ctx context.Context, in *SubmoduleStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetStatusResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_SubmoduleStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) RemoteCommitUrl(ctx context.Context, in *RemoteCommitUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoteUrlResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_RemoteCommitUrl_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) RemoteFileUrl(ctx context.Context, in *RemoteFileUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoteUrlResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_RemoteFileUrl_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FetchResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_Fetch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) GeneratePullRequestFields(ctx context.Context, in *GeneratePullRequestFieldsRequest, opts ...grpc.CallOption) (*GeneratePullRequestFieldsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneratePullRequestFieldsResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_GeneratePullRequestFields_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) DiscoverCommitMessageModels(ctx context.Context, in *DiscoverCommitMessageModelsRequest, opts ...grpc.CallOption) (*DiscoverCommitMessageModelsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DiscoverCommitMessageModelsResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_DiscoverCommitMessageModels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (*ReadFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadFileResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ReadFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ReadFileChunk(ctx context.Context, in *ReadFileChunkRequest, opts ...grpc.CallOption) (*ReadFileChunkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadFileChunkResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ReadFileChunk_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ReadFilePreview(ctx context.Context, in *ReadFilePreviewRequest, opts ...grpc.CallOption) (*ReadFilePreviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadFilePreviewResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ReadFilePreview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ReadDir(ctx context.Context, in *ReadDirRequest, opts ...grpc.CallOption) (*ReadDirResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadDirResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ReadDir_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) WriteFile(ctx context.Context, in *WriteFileRequest, opts ...grpc.CallOption) (*WriteFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WriteFileResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_WriteFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) WriteFileChunk(ctx context.Context, in *WriteFileChunkRequest, opts ...grpc.CallOption) (*WriteFileChunkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WriteFileChunkResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_WriteFileChunk_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CreateDir(ctx context.Context, in *CreateDirRequest, opts ...grpc.CallOption) (*CreateDirResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateDirResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CreateDir_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) DeleteFile(ctx context.Context, in *DeleteFileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, GitGatewayService_DeleteFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) StatFile(ctx context.Context, in *StatFileRequest, opts ...grpc.CallOption) (*StatFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatFileResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_StatFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) SearchFiles(ctx context.Context, in *SearchFilesRequest, opts ...grpc.CallOption) (*SearchFilesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchFilesResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_SearchFiles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ListAllFiles(ctx context.Context, in *ListAllFilesRequest, opts ...grpc.CallOption) (*ListAllFilesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAllFilesResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ListAllFiles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ListMarkdownDocuments(ctx context.Context, in *ListMarkdownDocumentsRequest, opts ...grpc.CallOption) (*ListMarkdownDocumentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMarkdownDocumentsResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ListMarkdownDocuments_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) RenameFile(ctx context.Context, in *RenameFileRequest, opts ...grpc.CallOption) (*RenameFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RenameFileResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_RenameFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CopyFile(ctx context.Context, in *CopyFileRequest, opts ...grpc.CallOption) (*CopyFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CopyFileResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CopyFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) Clone(ctx context.Context, in *CloneRequest, opts ...grpc.CallOption) (*CloneResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CloneResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_Clone_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) BaseRefDefault(ctx context.Context, in *BaseRefDefaultRequest, opts ...grpc.CallOption) (*BaseRefDefaultResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BaseRefDefaultResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_BaseRefDefault_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) SearchRefs(ctx context.Context, in *SearchRefsRequest, opts ...grpc.CallOption) (*SearchRefsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchRefsResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_SearchRefs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) InitRepo(ctx context.Context, in *InitRepoRequest, opts ...grpc.CallOption) (*InitRepoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitRepoResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_InitRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CheckHooks(ctx context.Context, in *CheckHooksRequest, opts ...grpc.CallOption) (*CheckHooksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckHooksResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CheckHooks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ReadIssueCommand(ctx context.Context, in *ReadIssueCommandRequest, opts ...grpc.CallOption) (*ReadIssueCommandResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadIssueCommandResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ReadIssueCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) WriteIssueCommand(ctx context.Context, in *WriteIssueCommandRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, GitGatewayService_WriteIssueCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ScanSetupScriptImports(ctx context.Context, in *ScanSetupScriptImportsRequest, opts ...grpc.CallOption) (*ScanSetupScriptImportsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ScanSetupScriptImportsResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ScanSetupScriptImports_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CreateWorktree(ctx context.Context, in *CreateWorktreeRequest, opts ...grpc.CallOption) (*CreateWorktreeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateWorktreeResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CreateWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, GitGatewayService_RemoveWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ForceDeleteBranch(ctx context.Context, in *ForceDeleteBranchRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, GitGatewayService_ForceDeleteBranch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) DetectWorktrees(ctx context.Context, in *DetectWorktreesRequest, opts ...grpc.CallOption) (*DetectWorktreesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DetectWorktreesResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_DetectWorktrees_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) PrefetchCreateBase(ctx context.Context, in *PrefetchCreateBaseRequest, opts ...grpc.CallOption) (*PrefetchCreateBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PrefetchCreateBaseResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_PrefetchCreateBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ResolvePrBase(ctx context.Context, in *ResolvePrBaseRequest, opts ...grpc.CallOption) (*ResolveBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveBaseResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ResolvePrBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ResolveMrBase(ctx context.Context, in *ResolveMrBaseRequest, opts ...grpc.CallOption) (*ResolveBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveBaseResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ResolveMrBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) Checkout(ctx context.Context, in *CheckoutRequest, opts ...grpc.CallOption) (*CheckoutResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckoutResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_Checkout_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ListLocalBranches(ctx context.Context, in *ListLocalBranchesRequest, opts ...grpc.CallOption) (*ListLocalBranchesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListLocalBranchesResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ListLocalBranches_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) FastForward(ctx context.Context, in *FastForwardRequest, opts ...grpc.CallOption) (*FastForwardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FastForwardResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_FastForward_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) RebaseFromBase(ctx context.Context, in *RebaseFromBaseRequest, opts ...grpc.CallOption) (*RebaseFromBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RebaseFromBaseResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_RebaseFromBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) AbortRebase(ctx context.Context, in *AbortRebaseRequest, opts ...grpc.CallOption) (*AbortRebaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AbortRebaseResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_AbortRebase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) AbortMerge(ctx context.Context, in *AbortMergeRequest, opts ...grpc.CallOption) (*AbortMergeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AbortMergeResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_AbortMerge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ConflictOperation(ctx context.Context, in *ConflictOperationRequest, opts ...grpc.CallOption) (*ConflictOperationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConflictOperationResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ConflictOperation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ResolveConflict(ctx context.Context, in *ResolveConflictRequest, opts ...grpc.CallOption) (*ResolveConflictResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveConflictResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ResolveConflict_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) Discard(ctx context.Context, in *DiscardRequest, opts ...grpc.CallOption) (*DiscardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DiscardResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_Discard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) BulkDiscard(ctx context.Context, in *BulkDiscardRequest, opts ...grpc.CallOption) (*BulkDiscardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BulkDiscardResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_BulkDiscard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GitGatewayServiceServer is the server API for GitGatewayService service.
 // All implementations must embed UnimplementedGitGatewayServiceServer
 // for forward compatibility.
@@ -118,6 +821,12 @@ func (c *gitGatewayServiceClient) GenerateCommitMessage(ctx context.Context, in 
 // GitGatewayService is a stateless dispatcher: resolve the worktree's owning
 // host via infra-fleet-service, execute locally or relay. Owns no data.
 // See specs/backend-go/services/git-gateway-service.md.
+//
+// NOTE (SOL-031 / TASK-192): this file is being edited concurrently by
+// another work group adding git.*/files.* RPCs — the worktree.* RPCs below
+// were added against the pre-existing (GetStatus..GenerateCommitMessage)
+// service surface only, and will need a manual merge against that group's
+// changes to this same file.
 type GitGatewayServiceServer interface {
 	GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error)
 	GetDiff(context.Context, *GetDiffRequest) (*GetDiffResponse, error)
@@ -125,6 +834,97 @@ type GitGatewayServiceServer interface {
 	Push(context.Context, *PushRequest) (*PushResponse, error)
 	Pull(context.Context, *PullRequest) (*PullResponse, error)
 	GenerateCommitMessage(context.Context, *GenerateCommitMessageRequest) (*GenerateCommitMessageResponse, error)
+	// ── Group B (TASK-208) — staging. Both always relay to the agent's bulk
+	// variant regardless of path count — see RelayExecutor.Stage/Unstage. ──
+	Stage(context.Context, *StageRequest) (*StageResponse, error)
+	Unstage(context.Context, *UnstageRequest) (*UnstageResponse, error)
+	// ── Group C (TASK-209) — history/compare. commitCompare/branchCompare/
+	// commitDiff/branchDiff/submoduleStatus were BLOCKED pending a real shape
+	// redesign; now implemented for real against the confirmed agent contract
+	// (specs/agent/api/agent-rpc-catalog-git-fs.md:49-55/143-147) — see each
+	// message's own doc comment for citations. ───────────────────────────────
+	History(context.Context, *HistoryRequest) (*HistoryResponse, error)
+	CheckIgnored(context.Context, *CheckIgnoredRequest) (*CheckIgnoredResponse, error)
+	ForkSync(context.Context, *ForkSyncRequest) (*ForkSyncResponse, error)
+	UpstreamStatus(context.Context, *UpstreamStatusRequest) (*UpstreamStatusResponse, error)
+	CommitCompare(context.Context, *CommitCompareRequest) (*CommitCompareResponse, error)
+	BranchCompare(context.Context, *BranchCompareRequest) (*BranchCompareResponse, error)
+	CommitDiff(context.Context, *CommitDiffRequest) (*FileDiffResponse, error)
+	BranchDiff(context.Context, *BranchDiffRequest) (*FileDiffResponse, error)
+	SubmoduleStatus(context.Context, *SubmoduleStatusRequest) (*GetStatusResponse, error)
+	// ── Group D (TASK-210) — remote. fetch was BLOCKED on the pushTarget
+	// design question and TASK-227 reachability — both now resolved. ───────
+	RemoteCommitUrl(context.Context, *RemoteCommitUrlRequest) (*RemoteUrlResponse, error)
+	RemoteFileUrl(context.Context, *RemoteFileUrlRequest) (*RemoteUrlResponse, error)
+	Fetch(context.Context, *FetchRequest) (*FetchResponse, error)
+	// ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
+	GeneratePullRequestFields(context.Context, *GeneratePullRequestFieldsRequest) (*GeneratePullRequestFieldsResponse, error)
+	DiscoverCommitMessageModels(context.Context, *DiscoverCommitMessageModelsRequest) (*DiscoverCommitMessageModelsResponse, error)
+	// ── File I/O (TASK-049) — resolve worktree_id -> host -> local exec or
+	// relay, identical dispatch shape to every git.* RPC above. ─────────────
+	ReadFile(context.Context, *ReadFileRequest) (*ReadFileResponse, error)
+	ReadFileChunk(context.Context, *ReadFileChunkRequest) (*ReadFileChunkResponse, error)
+	ReadFilePreview(context.Context, *ReadFilePreviewRequest) (*ReadFilePreviewResponse, error)
+	ReadDir(context.Context, *ReadDirRequest) (*ReadDirResponse, error)
+	WriteFile(context.Context, *WriteFileRequest) (*WriteFileResponse, error)
+	WriteFileChunk(context.Context, *WriteFileChunkRequest) (*WriteFileChunkResponse, error)
+	CreateDir(context.Context, *CreateDirRequest) (*CreateDirResponse, error)
+	DeleteFile(context.Context, *DeleteFileRequest) (*emptypb.Empty, error)
+	StatFile(context.Context, *StatFileRequest) (*StatFileResponse, error)
+	SearchFiles(context.Context, *SearchFilesRequest) (*SearchFilesResponse, error)
+	ListAllFiles(context.Context, *ListAllFilesRequest) (*ListAllFilesResponse, error)
+	ListMarkdownDocuments(context.Context, *ListMarkdownDocumentsRequest) (*ListMarkdownDocumentsResponse, error)
+	// Known gaps carried forward from the old backend — both RPCs exist so
+	// the contract is honest, but return FAILED_PRECONDITION whenever
+	// dispatch resolves to a relay target, never a silent no-op.
+	RenameFile(context.Context, *RenameFileRequest) (*RenameFileResponse, error)
+	CopyFile(context.Context, *CopyFileRequest) (*CopyFileResponse, error)
+	// repo.*-owned RPCs (TASK-156) — file/host operations against a repo's
+	// working tree, not the repos Postgres table (that's project-service's
+	// UpdateRepo). See SOL-023 Bucket 3.
+	Clone(context.Context, *CloneRequest) (*CloneResponse, error)
+	BaseRefDefault(context.Context, *BaseRefDefaultRequest) (*BaseRefDefaultResponse, error)
+	SearchRefs(context.Context, *SearchRefsRequest) (*SearchRefsResponse, error)
+	InitRepo(context.Context, *InitRepoRequest) (*InitRepoResponse, error)
+	CheckHooks(context.Context, *CheckHooksRequest) (*CheckHooksResponse, error)
+	ReadIssueCommand(context.Context, *ReadIssueCommandRequest) (*ReadIssueCommandResponse, error)
+	WriteIssueCommand(context.Context, *WriteIssueCommandRequest) (*emptypb.Empty, error)
+	ScanSetupScriptImports(context.Context, *ScanSetupScriptImportsRequest) (*ScanSetupScriptImportsResponse, error)
+	CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error)
+	RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*emptypb.Empty, error)
+	// Required on every GitExecutor implementation from day one — TASK-194
+	// makes it a required interface method, not an optional one, closing the
+	// old TS backend's crash-bug class (forceDeletePreservedBranch? was
+	// optional and only one provider implemented it).
+	ForceDeleteBranch(context.Context, *ForceDeleteBranchRequest) (*emptypb.Empty, error)
+	// DetectWorktrees is the concrete form of project-service.md §4's
+	// "git-gateway-service reconciles on demand" — returns raw on-disk
+	// paths, no bookkeeping join (that diff happens at api-gateway's edge
+	// layer, TASK-195, per 05-data-architecture.md's cross-service
+	// aggregation rule).
+	DetectWorktrees(context.Context, *DetectWorktreesRequest) (*DetectWorktreesResponse, error)
+	PrefetchCreateBase(context.Context, *PrefetchCreateBaseRequest) (*PrefetchCreateBaseResponse, error)
+	ResolvePrBase(context.Context, *ResolvePrBaseRequest) (*ResolveBaseResponse, error)
+	ResolveMrBase(context.Context, *ResolveMrBaseRequest) (*ResolveBaseResponse, error)
+	// ── Group A — branch/ref operations (TASK-207) ───────────────────────────
+	// 4 of these methods (Checkout/ListLocalBranches/FastForward/
+	// ConflictOperation) needed a genuine shape redesign against the
+	// confirmed real agent contract (specs/agent/api/agent-rpc-catalog-git-fs.md)
+	// rather than the mechanical param rename the other 5 got — see each
+	// message's own doc comment below for citations. ConflictOperation's
+	// original single-RPC design is replaced by two RPCs: ConflictOperation
+	// (a pure detector, matching the real agent) and ResolveConflict (the
+	// per-file resolve op the real agent does not implement).
+	Checkout(context.Context, *CheckoutRequest) (*CheckoutResponse, error)
+	ListLocalBranches(context.Context, *ListLocalBranchesRequest) (*ListLocalBranchesResponse, error)
+	FastForward(context.Context, *FastForwardRequest) (*FastForwardResponse, error)
+	RebaseFromBase(context.Context, *RebaseFromBaseRequest) (*RebaseFromBaseResponse, error)
+	AbortRebase(context.Context, *AbortRebaseRequest) (*AbortRebaseResponse, error)
+	AbortMerge(context.Context, *AbortMergeRequest) (*AbortMergeResponse, error)
+	ConflictOperation(context.Context, *ConflictOperationRequest) (*ConflictOperationResponse, error)
+	ResolveConflict(context.Context, *ResolveConflictRequest) (*ResolveConflictResponse, error)
+	Discard(context.Context, *DiscardRequest) (*DiscardResponse, error)
+	BulkDiscard(context.Context, *BulkDiscardRequest) (*BulkDiscardResponse, error)
 	mustEmbedUnimplementedGitGatewayServiceServer()
 }
 
@@ -152,6 +952,171 @@ func (UnimplementedGitGatewayServiceServer) Pull(context.Context, *PullRequest) 
 }
 func (UnimplementedGitGatewayServiceServer) GenerateCommitMessage(context.Context, *GenerateCommitMessageRequest) (*GenerateCommitMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateCommitMessage not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) Stage(context.Context, *StageRequest) (*StageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Stage not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) Unstage(context.Context, *UnstageRequest) (*UnstageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Unstage not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) History(context.Context, *HistoryRequest) (*HistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method History not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CheckIgnored(context.Context, *CheckIgnoredRequest) (*CheckIgnoredResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckIgnored not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ForkSync(context.Context, *ForkSyncRequest) (*ForkSyncResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ForkSync not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) UpstreamStatus(context.Context, *UpstreamStatusRequest) (*UpstreamStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpstreamStatus not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CommitCompare(context.Context, *CommitCompareRequest) (*CommitCompareResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitCompare not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) BranchCompare(context.Context, *BranchCompareRequest) (*BranchCompareResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BranchCompare not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CommitDiff(context.Context, *CommitDiffRequest) (*FileDiffResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitDiff not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) BranchDiff(context.Context, *BranchDiffRequest) (*FileDiffResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BranchDiff not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) SubmoduleStatus(context.Context, *SubmoduleStatusRequest) (*GetStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SubmoduleStatus not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) RemoteCommitUrl(context.Context, *RemoteCommitUrlRequest) (*RemoteUrlResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoteCommitUrl not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) RemoteFileUrl(context.Context, *RemoteFileUrlRequest) (*RemoteUrlResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoteFileUrl not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) Fetch(context.Context, *FetchRequest) (*FetchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Fetch not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) GeneratePullRequestFields(context.Context, *GeneratePullRequestFieldsRequest) (*GeneratePullRequestFieldsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GeneratePullRequestFields not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) DiscoverCommitMessageModels(context.Context, *DiscoverCommitMessageModelsRequest) (*DiscoverCommitMessageModelsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DiscoverCommitMessageModels not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ReadFile(context.Context, *ReadFileRequest) (*ReadFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadFile not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ReadFileChunk(context.Context, *ReadFileChunkRequest) (*ReadFileChunkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadFileChunk not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ReadFilePreview(context.Context, *ReadFilePreviewRequest) (*ReadFilePreviewResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadFilePreview not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ReadDir(context.Context, *ReadDirRequest) (*ReadDirResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadDir not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) WriteFile(context.Context, *WriteFileRequest) (*WriteFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteFile not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) WriteFileChunk(context.Context, *WriteFileChunkRequest) (*WriteFileChunkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteFileChunk not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CreateDir(context.Context, *CreateDirRequest) (*CreateDirResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateDir not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) DeleteFile(context.Context, *DeleteFileRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteFile not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) StatFile(context.Context, *StatFileRequest) (*StatFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StatFile not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) SearchFiles(context.Context, *SearchFilesRequest) (*SearchFilesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchFiles not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ListAllFiles(context.Context, *ListAllFilesRequest) (*ListAllFilesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAllFiles not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ListMarkdownDocuments(context.Context, *ListMarkdownDocumentsRequest) (*ListMarkdownDocumentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMarkdownDocuments not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) RenameFile(context.Context, *RenameFileRequest) (*RenameFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RenameFile not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CopyFile(context.Context, *CopyFileRequest) (*CopyFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CopyFile not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) Clone(context.Context, *CloneRequest) (*CloneResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Clone not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) BaseRefDefault(context.Context, *BaseRefDefaultRequest) (*BaseRefDefaultResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BaseRefDefault not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) SearchRefs(context.Context, *SearchRefsRequest) (*SearchRefsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchRefs not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) InitRepo(context.Context, *InitRepoRequest) (*InitRepoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InitRepo not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CheckHooks(context.Context, *CheckHooksRequest) (*CheckHooksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckHooks not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ReadIssueCommand(context.Context, *ReadIssueCommandRequest) (*ReadIssueCommandResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadIssueCommand not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) WriteIssueCommand(context.Context, *WriteIssueCommandRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteIssueCommand not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ScanSetupScriptImports(context.Context, *ScanSetupScriptImportsRequest) (*ScanSetupScriptImportsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ScanSetupScriptImports not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateWorktree not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveWorktree not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ForceDeleteBranch(context.Context, *ForceDeleteBranchRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ForceDeleteBranch not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) DetectWorktrees(context.Context, *DetectWorktreesRequest) (*DetectWorktreesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DetectWorktrees not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) PrefetchCreateBase(context.Context, *PrefetchCreateBaseRequest) (*PrefetchCreateBaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PrefetchCreateBase not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ResolvePrBase(context.Context, *ResolvePrBaseRequest) (*ResolveBaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolvePrBase not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ResolveMrBase(context.Context, *ResolveMrBaseRequest) (*ResolveBaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveMrBase not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) Checkout(context.Context, *CheckoutRequest) (*CheckoutResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Checkout not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ListLocalBranches(context.Context, *ListLocalBranchesRequest) (*ListLocalBranchesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListLocalBranches not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) FastForward(context.Context, *FastForwardRequest) (*FastForwardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FastForward not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) RebaseFromBase(context.Context, *RebaseFromBaseRequest) (*RebaseFromBaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RebaseFromBase not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) AbortRebase(context.Context, *AbortRebaseRequest) (*AbortRebaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AbortRebase not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) AbortMerge(context.Context, *AbortMergeRequest) (*AbortMergeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AbortMerge not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ConflictOperation(context.Context, *ConflictOperationRequest) (*ConflictOperationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConflictOperation not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ResolveConflict(context.Context, *ResolveConflictRequest) (*ResolveConflictResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveConflict not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) Discard(context.Context, *DiscardRequest) (*DiscardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Discard not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) BulkDiscard(context.Context, *BulkDiscardRequest) (*BulkDiscardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BulkDiscard not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) mustEmbedUnimplementedGitGatewayServiceServer() {}
 func (UnimplementedGitGatewayServiceServer) testEmbeddedByValue()                           {}
@@ -282,6 +1247,996 @@ func _GitGatewayService_GenerateCommitMessage_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_Stage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).Stage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_Stage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).Stage(ctx, req.(*StageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_Unstage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnstageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).Unstage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_Unstage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).Unstage(ctx, req.(*UnstageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_History_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).History(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_History_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).History(ctx, req.(*HistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CheckIgnored_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckIgnoredRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CheckIgnored(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CheckIgnored_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CheckIgnored(ctx, req.(*CheckIgnoredRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ForkSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForkSyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ForkSync(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ForkSync_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ForkSync(ctx, req.(*ForkSyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_UpstreamStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpstreamStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).UpstreamStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_UpstreamStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).UpstreamStatus(ctx, req.(*UpstreamStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CommitCompare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitCompareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CommitCompare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CommitCompare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CommitCompare(ctx, req.(*CommitCompareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_BranchCompare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BranchCompareRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).BranchCompare(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_BranchCompare_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).BranchCompare(ctx, req.(*BranchCompareRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CommitDiff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitDiffRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CommitDiff(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CommitDiff_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CommitDiff(ctx, req.(*CommitDiffRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_BranchDiff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BranchDiffRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).BranchDiff(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_BranchDiff_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).BranchDiff(ctx, req.(*BranchDiffRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_SubmoduleStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmoduleStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).SubmoduleStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_SubmoduleStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).SubmoduleStatus(ctx, req.(*SubmoduleStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_RemoteCommitUrl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoteCommitUrlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).RemoteCommitUrl(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_RemoteCommitUrl_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).RemoteCommitUrl(ctx, req.(*RemoteCommitUrlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_RemoteFileUrl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoteFileUrlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).RemoteFileUrl(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_RemoteFileUrl_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).RemoteFileUrl(ctx, req.(*RemoteFileUrlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_Fetch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FetchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).Fetch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_Fetch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).Fetch(ctx, req.(*FetchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_GeneratePullRequestFields_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GeneratePullRequestFieldsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).GeneratePullRequestFields(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_GeneratePullRequestFields_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).GeneratePullRequestFields(ctx, req.(*GeneratePullRequestFieldsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_DiscoverCommitMessageModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DiscoverCommitMessageModelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).DiscoverCommitMessageModels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_DiscoverCommitMessageModels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).DiscoverCommitMessageModels(ctx, req.(*DiscoverCommitMessageModelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ReadFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ReadFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ReadFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ReadFile(ctx, req.(*ReadFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ReadFileChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadFileChunkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ReadFileChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ReadFileChunk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ReadFileChunk(ctx, req.(*ReadFileChunkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ReadFilePreview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadFilePreviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ReadFilePreview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ReadFilePreview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ReadFilePreview(ctx, req.(*ReadFilePreviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ReadDir_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadDirRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ReadDir(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ReadDir_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ReadDir(ctx, req.(*ReadDirRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_WriteFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).WriteFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_WriteFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).WriteFile(ctx, req.(*WriteFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_WriteFileChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteFileChunkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).WriteFileChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_WriteFileChunk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).WriteFileChunk(ctx, req.(*WriteFileChunkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CreateDir_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDirRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CreateDir(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CreateDir_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CreateDir(ctx, req.(*CreateDirRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_DeleteFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).DeleteFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_DeleteFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).DeleteFile(ctx, req.(*DeleteFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_StatFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StatFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).StatFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_StatFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).StatFile(ctx, req.(*StatFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_SearchFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchFilesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).SearchFiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_SearchFiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).SearchFiles(ctx, req.(*SearchFilesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ListAllFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAllFilesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ListAllFiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ListAllFiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ListAllFiles(ctx, req.(*ListAllFilesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ListMarkdownDocuments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMarkdownDocumentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ListMarkdownDocuments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ListMarkdownDocuments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ListMarkdownDocuments(ctx, req.(*ListMarkdownDocumentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_RenameFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenameFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).RenameFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_RenameFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).RenameFile(ctx, req.(*RenameFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CopyFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CopyFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CopyFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CopyFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CopyFile(ctx, req.(*CopyFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_Clone_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloneRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).Clone(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_Clone_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).Clone(ctx, req.(*CloneRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_BaseRefDefault_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BaseRefDefaultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).BaseRefDefault(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_BaseRefDefault_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).BaseRefDefault(ctx, req.(*BaseRefDefaultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_SearchRefs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRefsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).SearchRefs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_SearchRefs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).SearchRefs(ctx, req.(*SearchRefsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_InitRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).InitRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_InitRepo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).InitRepo(ctx, req.(*InitRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CheckHooks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckHooksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CheckHooks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CheckHooks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CheckHooks(ctx, req.(*CheckHooksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ReadIssueCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadIssueCommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ReadIssueCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ReadIssueCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ReadIssueCommand(ctx, req.(*ReadIssueCommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_WriteIssueCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteIssueCommandRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).WriteIssueCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_WriteIssueCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).WriteIssueCommand(ctx, req.(*WriteIssueCommandRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ScanSetupScriptImports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ScanSetupScriptImportsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ScanSetupScriptImports(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ScanSetupScriptImports_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ScanSetupScriptImports(ctx, req.(*ScanSetupScriptImportsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CreateWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CreateWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CreateWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CreateWorktree(ctx, req.(*CreateWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_RemoveWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).RemoveWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_RemoveWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).RemoveWorktree(ctx, req.(*RemoveWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ForceDeleteBranch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForceDeleteBranchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ForceDeleteBranch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ForceDeleteBranch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ForceDeleteBranch(ctx, req.(*ForceDeleteBranchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_DetectWorktrees_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DetectWorktreesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).DetectWorktrees(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_DetectWorktrees_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).DetectWorktrees(ctx, req.(*DetectWorktreesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_PrefetchCreateBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PrefetchCreateBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).PrefetchCreateBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_PrefetchCreateBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).PrefetchCreateBase(ctx, req.(*PrefetchCreateBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ResolvePrBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolvePrBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ResolvePrBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ResolvePrBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ResolvePrBase(ctx, req.(*ResolvePrBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ResolveMrBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveMrBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ResolveMrBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ResolveMrBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ResolveMrBase(ctx, req.(*ResolveMrBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_Checkout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckoutRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).Checkout(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_Checkout_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).Checkout(ctx, req.(*CheckoutRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ListLocalBranches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListLocalBranchesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ListLocalBranches(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ListLocalBranches_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ListLocalBranches(ctx, req.(*ListLocalBranchesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_FastForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FastForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).FastForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_FastForward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).FastForward(ctx, req.(*FastForwardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_RebaseFromBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RebaseFromBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).RebaseFromBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_RebaseFromBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).RebaseFromBase(ctx, req.(*RebaseFromBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_AbortRebase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AbortRebaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).AbortRebase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_AbortRebase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).AbortRebase(ctx, req.(*AbortRebaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_AbortMerge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AbortMergeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).AbortMerge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_AbortMerge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).AbortMerge(ctx, req.(*AbortMergeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ConflictOperation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConflictOperationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ConflictOperation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ConflictOperation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ConflictOperation(ctx, req.(*ConflictOperationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ResolveConflict_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveConflictRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ResolveConflict(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ResolveConflict_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ResolveConflict(ctx, req.(*ResolveConflictRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_Discard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DiscardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).Discard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_Discard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).Discard(ctx, req.(*DiscardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_BulkDiscard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BulkDiscardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).BulkDiscard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_BulkDiscard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).BulkDiscard(ctx, req.(*BulkDiscardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GitGatewayService_ServiceDesc is the grpc.ServiceDesc for GitGatewayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -312,6 +2267,226 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateCommitMessage",
 			Handler:    _GitGatewayService_GenerateCommitMessage_Handler,
+		},
+		{
+			MethodName: "Stage",
+			Handler:    _GitGatewayService_Stage_Handler,
+		},
+		{
+			MethodName: "Unstage",
+			Handler:    _GitGatewayService_Unstage_Handler,
+		},
+		{
+			MethodName: "History",
+			Handler:    _GitGatewayService_History_Handler,
+		},
+		{
+			MethodName: "CheckIgnored",
+			Handler:    _GitGatewayService_CheckIgnored_Handler,
+		},
+		{
+			MethodName: "ForkSync",
+			Handler:    _GitGatewayService_ForkSync_Handler,
+		},
+		{
+			MethodName: "UpstreamStatus",
+			Handler:    _GitGatewayService_UpstreamStatus_Handler,
+		},
+		{
+			MethodName: "CommitCompare",
+			Handler:    _GitGatewayService_CommitCompare_Handler,
+		},
+		{
+			MethodName: "BranchCompare",
+			Handler:    _GitGatewayService_BranchCompare_Handler,
+		},
+		{
+			MethodName: "CommitDiff",
+			Handler:    _GitGatewayService_CommitDiff_Handler,
+		},
+		{
+			MethodName: "BranchDiff",
+			Handler:    _GitGatewayService_BranchDiff_Handler,
+		},
+		{
+			MethodName: "SubmoduleStatus",
+			Handler:    _GitGatewayService_SubmoduleStatus_Handler,
+		},
+		{
+			MethodName: "RemoteCommitUrl",
+			Handler:    _GitGatewayService_RemoteCommitUrl_Handler,
+		},
+		{
+			MethodName: "RemoteFileUrl",
+			Handler:    _GitGatewayService_RemoteFileUrl_Handler,
+		},
+		{
+			MethodName: "Fetch",
+			Handler:    _GitGatewayService_Fetch_Handler,
+		},
+		{
+			MethodName: "GeneratePullRequestFields",
+			Handler:    _GitGatewayService_GeneratePullRequestFields_Handler,
+		},
+		{
+			MethodName: "DiscoverCommitMessageModels",
+			Handler:    _GitGatewayService_DiscoverCommitMessageModels_Handler,
+		},
+		{
+			MethodName: "ReadFile",
+			Handler:    _GitGatewayService_ReadFile_Handler,
+		},
+		{
+			MethodName: "ReadFileChunk",
+			Handler:    _GitGatewayService_ReadFileChunk_Handler,
+		},
+		{
+			MethodName: "ReadFilePreview",
+			Handler:    _GitGatewayService_ReadFilePreview_Handler,
+		},
+		{
+			MethodName: "ReadDir",
+			Handler:    _GitGatewayService_ReadDir_Handler,
+		},
+		{
+			MethodName: "WriteFile",
+			Handler:    _GitGatewayService_WriteFile_Handler,
+		},
+		{
+			MethodName: "WriteFileChunk",
+			Handler:    _GitGatewayService_WriteFileChunk_Handler,
+		},
+		{
+			MethodName: "CreateDir",
+			Handler:    _GitGatewayService_CreateDir_Handler,
+		},
+		{
+			MethodName: "DeleteFile",
+			Handler:    _GitGatewayService_DeleteFile_Handler,
+		},
+		{
+			MethodName: "StatFile",
+			Handler:    _GitGatewayService_StatFile_Handler,
+		},
+		{
+			MethodName: "SearchFiles",
+			Handler:    _GitGatewayService_SearchFiles_Handler,
+		},
+		{
+			MethodName: "ListAllFiles",
+			Handler:    _GitGatewayService_ListAllFiles_Handler,
+		},
+		{
+			MethodName: "ListMarkdownDocuments",
+			Handler:    _GitGatewayService_ListMarkdownDocuments_Handler,
+		},
+		{
+			MethodName: "RenameFile",
+			Handler:    _GitGatewayService_RenameFile_Handler,
+		},
+		{
+			MethodName: "CopyFile",
+			Handler:    _GitGatewayService_CopyFile_Handler,
+		},
+		{
+			MethodName: "Clone",
+			Handler:    _GitGatewayService_Clone_Handler,
+		},
+		{
+			MethodName: "BaseRefDefault",
+			Handler:    _GitGatewayService_BaseRefDefault_Handler,
+		},
+		{
+			MethodName: "SearchRefs",
+			Handler:    _GitGatewayService_SearchRefs_Handler,
+		},
+		{
+			MethodName: "InitRepo",
+			Handler:    _GitGatewayService_InitRepo_Handler,
+		},
+		{
+			MethodName: "CheckHooks",
+			Handler:    _GitGatewayService_CheckHooks_Handler,
+		},
+		{
+			MethodName: "ReadIssueCommand",
+			Handler:    _GitGatewayService_ReadIssueCommand_Handler,
+		},
+		{
+			MethodName: "WriteIssueCommand",
+			Handler:    _GitGatewayService_WriteIssueCommand_Handler,
+		},
+		{
+			MethodName: "ScanSetupScriptImports",
+			Handler:    _GitGatewayService_ScanSetupScriptImports_Handler,
+		},
+		{
+			MethodName: "CreateWorktree",
+			Handler:    _GitGatewayService_CreateWorktree_Handler,
+		},
+		{
+			MethodName: "RemoveWorktree",
+			Handler:    _GitGatewayService_RemoveWorktree_Handler,
+		},
+		{
+			MethodName: "ForceDeleteBranch",
+			Handler:    _GitGatewayService_ForceDeleteBranch_Handler,
+		},
+		{
+			MethodName: "DetectWorktrees",
+			Handler:    _GitGatewayService_DetectWorktrees_Handler,
+		},
+		{
+			MethodName: "PrefetchCreateBase",
+			Handler:    _GitGatewayService_PrefetchCreateBase_Handler,
+		},
+		{
+			MethodName: "ResolvePrBase",
+			Handler:    _GitGatewayService_ResolvePrBase_Handler,
+		},
+		{
+			MethodName: "ResolveMrBase",
+			Handler:    _GitGatewayService_ResolveMrBase_Handler,
+		},
+		{
+			MethodName: "Checkout",
+			Handler:    _GitGatewayService_Checkout_Handler,
+		},
+		{
+			MethodName: "ListLocalBranches",
+			Handler:    _GitGatewayService_ListLocalBranches_Handler,
+		},
+		{
+			MethodName: "FastForward",
+			Handler:    _GitGatewayService_FastForward_Handler,
+		},
+		{
+			MethodName: "RebaseFromBase",
+			Handler:    _GitGatewayService_RebaseFromBase_Handler,
+		},
+		{
+			MethodName: "AbortRebase",
+			Handler:    _GitGatewayService_AbortRebase_Handler,
+		},
+		{
+			MethodName: "AbortMerge",
+			Handler:    _GitGatewayService_AbortMerge_Handler,
+		},
+		{
+			MethodName: "ConflictOperation",
+			Handler:    _GitGatewayService_ConflictOperation_Handler,
+		},
+		{
+			MethodName: "ResolveConflict",
+			Handler:    _GitGatewayService_ResolveConflict_Handler,
+		},
+		{
+			MethodName: "Discard",
+			Handler:    _GitGatewayService_Discard_Handler,
+		},
+		{
+			MethodName: "BulkDiscard",
+			Handler:    _GitGatewayService_BulkDiscard_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

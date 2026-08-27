@@ -19,26 +19,43 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProjectService_CreateProject_FullMethodName         = "/orca.project.v1.ProjectService/CreateProject"
-	ProjectService_GetProject_FullMethodName            = "/orca.project.v1.ProjectService/GetProject"
-	ProjectService_ListProjects_FullMethodName          = "/orca.project.v1.ProjectService/ListProjects"
-	ProjectService_AddMember_FullMethodName             = "/orca.project.v1.ProjectService/AddMember"
-	ProjectService_RebindDevServer_FullMethodName       = "/orca.project.v1.ProjectService/RebindDevServer"
-	ProjectService_UpdateProject_FullMethodName         = "/orca.project.v1.ProjectService/UpdateProject"
-	ProjectService_DeleteProject_FullMethodName         = "/orca.project.v1.ProjectService/DeleteProject"
-	ProjectService_AddRepo_FullMethodName               = "/orca.project.v1.ProjectService/AddRepo"
-	ProjectService_ListRepos_FullMethodName             = "/orca.project.v1.ProjectService/ListRepos"
-	ProjectService_ReorderRepos_FullMethodName          = "/orca.project.v1.ProjectService/ReorderRepos"
-	ProjectService_RemoveRepo_FullMethodName            = "/orca.project.v1.ProjectService/RemoveRepo"
-	ProjectService_RecordWorktreeCreated_FullMethodName = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
-	ProjectService_RecordWorktreeRemoved_FullMethodName = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
-	ProjectService_ListWorktrees_FullMethodName         = "/orca.project.v1.ProjectService/ListWorktrees"
-	ProjectService_SetWorktreeActivation_FullMethodName = "/orca.project.v1.ProjectService/SetWorktreeActivation"
-	ProjectService_RenameWorktree_FullMethodName        = "/orca.project.v1.ProjectService/RenameWorktree"
-	ProjectService_CreateProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/CreateProjectGroup"
-	ProjectService_UpdateProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/UpdateProjectGroup"
-	ProjectService_DeleteProjectGroup_FullMethodName    = "/orca.project.v1.ProjectService/DeleteProjectGroup"
-	ProjectService_ListProjectGroups_FullMethodName     = "/orca.project.v1.ProjectService/ListProjectGroups"
+	ProjectService_CreateProject_FullMethodName                = "/orca.project.v1.ProjectService/CreateProject"
+	ProjectService_GetProject_FullMethodName                   = "/orca.project.v1.ProjectService/GetProject"
+	ProjectService_ListProjects_FullMethodName                 = "/orca.project.v1.ProjectService/ListProjects"
+	ProjectService_AddMember_FullMethodName                    = "/orca.project.v1.ProjectService/AddMember"
+	ProjectService_ListMembers_FullMethodName                  = "/orca.project.v1.ProjectService/ListMembers"
+	ProjectService_RemoveMember_FullMethodName                 = "/orca.project.v1.ProjectService/RemoveMember"
+	ProjectService_UpdateMemberRole_FullMethodName             = "/orca.project.v1.ProjectService/UpdateMemberRole"
+	ProjectService_RebindDevServer_FullMethodName              = "/orca.project.v1.ProjectService/RebindDevServer"
+	ProjectService_UpdateProject_FullMethodName                = "/orca.project.v1.ProjectService/UpdateProject"
+	ProjectService_DeleteProject_FullMethodName                = "/orca.project.v1.ProjectService/DeleteProject"
+	ProjectService_AddRepo_FullMethodName                      = "/orca.project.v1.ProjectService/AddRepo"
+	ProjectService_ListRepos_FullMethodName                    = "/orca.project.v1.ProjectService/ListRepos"
+	ProjectService_ReorderRepos_FullMethodName                 = "/orca.project.v1.ProjectService/ReorderRepos"
+	ProjectService_RemoveRepo_FullMethodName                   = "/orca.project.v1.ProjectService/RemoveRepo"
+	ProjectService_UpdateRepo_FullMethodName                   = "/orca.project.v1.ProjectService/UpdateRepo"
+	ProjectService_RecordWorktreeCreated_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
+	ProjectService_RecordWorktreeRemoved_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
+	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
+	ProjectService_SetWorktreeActivation_FullMethodName        = "/orca.project.v1.ProjectService/SetWorktreeActivation"
+	ProjectService_RenameWorktree_FullMethodName               = "/orca.project.v1.ProjectService/RenameWorktree"
+	ProjectService_CreateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/CreateProjectGroup"
+	ProjectService_UpdateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/UpdateProjectGroup"
+	ProjectService_DeleteProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/DeleteProjectGroup"
+	ProjectService_ListProjectGroups_FullMethodName            = "/orca.project.v1.ProjectService/ListProjectGroups"
+	ProjectService_CreateFolderWorkspace_FullMethodName        = "/orca.project.v1.ProjectService/CreateFolderWorkspace"
+	ProjectService_UpdateFolderWorkspace_FullMethodName        = "/orca.project.v1.ProjectService/UpdateFolderWorkspace"
+	ProjectService_DeleteFolderWorkspace_FullMethodName        = "/orca.project.v1.ProjectService/DeleteFolderWorkspace"
+	ProjectService_ListFolderWorkspaces_FullMethodName         = "/orca.project.v1.ProjectService/ListFolderWorkspaces"
+	ProjectService_GetFolderWorkspacePathStatus_FullMethodName = "/orca.project.v1.ProjectService/GetFolderWorkspacePathStatus"
+	ProjectService_MoveProject_FullMethodName                  = "/orca.project.v1.ProjectService/MoveProject"
+	ProjectService_ScanNested_FullMethodName                   = "/orca.project.v1.ProjectService/ScanNested"
+	ProjectService_ImportNested_FullMethodName                 = "/orca.project.v1.ProjectService/ImportNested"
+	ProjectService_CreateHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/CreateHostSetup"
+	ProjectService_ListHostSetups_FullMethodName               = "/orca.project.v1.ProjectService/ListHostSetups"
+	ProjectService_UpdateHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/UpdateHostSetup"
+	ProjectService_DeleteHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/DeleteHostSetup"
+	ProjectService_SetupExistingFolder_FullMethodName          = "/orca.project.v1.ProjectService/SetupExistingFolder"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -52,6 +69,9 @@ type ProjectServiceClient interface {
 	GetProject(ctx context.Context, in *GetProjectRequest, opts ...grpc.CallOption) (*GetProjectResponse, error)
 	ListProjects(ctx context.Context, in *ListProjectsRequest, opts ...grpc.CallOption) (*ListProjectsResponse, error)
 	AddMember(ctx context.Context, in *AddMemberRequest, opts ...grpc.CallOption) (*AddMemberResponse, error)
+	ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error)
+	RemoveMember(ctx context.Context, in *RemoveMemberRequest, opts ...grpc.CallOption) (*RemoveMemberResponse, error)
+	UpdateMemberRole(ctx context.Context, in *UpdateMemberRoleRequest, opts ...grpc.CallOption) (*UpdateMemberRoleResponse, error)
 	RebindDevServer(ctx context.Context, in *RebindDevServerRequest, opts ...grpc.CallOption) (*RebindDevServerResponse, error)
 	// UpdateProject's field list deliberately excludes dev_server_id —
 	// RebindDevServer (with its active-execution guard) stays the sole path
@@ -64,6 +84,7 @@ type ProjectServiceClient interface {
 	ListRepos(ctx context.Context, in *ListReposRequest, opts ...grpc.CallOption) (*ListReposResponse, error)
 	ReorderRepos(ctx context.Context, in *ReorderReposRequest, opts ...grpc.CallOption) (*ReorderReposResponse, error)
 	RemoveRepo(ctx context.Context, in *RemoveRepoRequest, opts ...grpc.CallOption) (*RemoveRepoResponse, error)
+	UpdateRepo(ctx context.Context, in *UpdateRepoRequest, opts ...grpc.CallOption) (*UpdateRepoResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -78,6 +99,29 @@ type ProjectServiceClient interface {
 	UpdateProjectGroup(ctx context.Context, in *UpdateProjectGroupRequest, opts ...grpc.CallOption) (*UpdateProjectGroupResponse, error)
 	DeleteProjectGroup(ctx context.Context, in *DeleteProjectGroupRequest, opts ...grpc.CallOption) (*DeleteProjectGroupResponse, error)
 	ListProjectGroups(ctx context.Context, in *ListProjectGroupsRequest, opts ...grpc.CallOption) (*ListProjectGroupsResponse, error)
+	// Folder workspaces — standalone, non-git filesystem paths added directly
+	// to the workspace. No project_id — see FolderWorkspace's doc comment
+	// below. See specs/backend-go/bugs/missing-v1/solutions/SOL-010-folderworkspace-channels.md.
+	CreateFolderWorkspace(ctx context.Context, in *CreateFolderWorkspaceRequest, opts ...grpc.CallOption) (*CreateFolderWorkspaceResponse, error)
+	UpdateFolderWorkspace(ctx context.Context, in *UpdateFolderWorkspaceRequest, opts ...grpc.CallOption) (*UpdateFolderWorkspaceResponse, error)
+	DeleteFolderWorkspace(ctx context.Context, in *DeleteFolderWorkspaceRequest, opts ...grpc.CallOption) (*DeleteFolderWorkspaceResponse, error)
+	ListFolderWorkspaces(ctx context.Context, in *ListFolderWorkspacesRequest, opts ...grpc.CallOption) (*ListFolderWorkspacesResponse, error)
+	// GetFolderWorkspacePathStatus is a DB-conflict check against this
+	// service's own tables, NOT a live filesystem probe — see the response
+	// message's doc comment.
+	GetFolderWorkspacePathStatus(ctx context.Context, in *GetFolderWorkspacePathStatusRequest, opts ...grpc.CallOption) (*GetFolderWorkspacePathStatusResponse, error)
+	// MoveProject/ScanNested/ImportNested: nested-repo import workflow —
+	// project-service.md §5's project_groups.project_id column, first
+	// exercised by these RPCs.
+	MoveProject(ctx context.Context, in *MoveProjectRequest, opts ...grpc.CallOption) (*MoveProjectResponse, error)
+	ScanNested(ctx context.Context, in *ScanNestedRequest, opts ...grpc.CallOption) (*ScanNestedResponse, error)
+	ImportNested(ctx context.Context, in *ImportNestedRequest, opts ...grpc.CallOption) (*ImportNestedResponse, error)
+	// ── projectHostSetup.* — pre-project dev-server-folder wizard ─────────
+	CreateHostSetup(ctx context.Context, in *CreateHostSetupRequest, opts ...grpc.CallOption) (*CreateHostSetupResponse, error)
+	ListHostSetups(ctx context.Context, in *ListHostSetupsRequest, opts ...grpc.CallOption) (*ListHostSetupsResponse, error)
+	UpdateHostSetup(ctx context.Context, in *UpdateHostSetupRequest, opts ...grpc.CallOption) (*UpdateHostSetupResponse, error)
+	DeleteHostSetup(ctx context.Context, in *DeleteHostSetupRequest, opts ...grpc.CallOption) (*DeleteHostSetupResponse, error)
+	SetupExistingFolder(ctx context.Context, in *SetupExistingFolderRequest, opts ...grpc.CallOption) (*SetupExistingFolderResponse, error)
 }
 
 type projectServiceClient struct {
@@ -122,6 +166,36 @@ func (c *projectServiceClient) AddMember(ctx context.Context, in *AddMemberReque
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AddMemberResponse)
 	err := c.cc.Invoke(ctx, ProjectService_AddMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMembersResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RemoveMember(ctx context.Context, in *RemoveMemberRequest, opts ...grpc.CallOption) (*RemoveMemberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveMemberResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RemoveMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateMemberRole(ctx context.Context, in *UpdateMemberRoleRequest, opts ...grpc.CallOption) (*UpdateMemberRoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateMemberRoleResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateMemberRole_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -192,6 +266,16 @@ func (c *projectServiceClient) RemoveRepo(ctx context.Context, in *RemoveRepoReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RemoveRepoResponse)
 	err := c.cc.Invoke(ctx, ProjectService_RemoveRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateRepo(ctx context.Context, in *UpdateRepoRequest, opts ...grpc.CallOption) (*UpdateRepoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateRepoResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateRepo_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -288,6 +372,136 @@ func (c *projectServiceClient) ListProjectGroups(ctx context.Context, in *ListPr
 	return out, nil
 }
 
+func (c *projectServiceClient) CreateFolderWorkspace(ctx context.Context, in *CreateFolderWorkspaceRequest, opts ...grpc.CallOption) (*CreateFolderWorkspaceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateFolderWorkspaceResponse)
+	err := c.cc.Invoke(ctx, ProjectService_CreateFolderWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateFolderWorkspace(ctx context.Context, in *UpdateFolderWorkspaceRequest, opts ...grpc.CallOption) (*UpdateFolderWorkspaceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateFolderWorkspaceResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateFolderWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) DeleteFolderWorkspace(ctx context.Context, in *DeleteFolderWorkspaceRequest, opts ...grpc.CallOption) (*DeleteFolderWorkspaceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteFolderWorkspaceResponse)
+	err := c.cc.Invoke(ctx, ProjectService_DeleteFolderWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListFolderWorkspaces(ctx context.Context, in *ListFolderWorkspacesRequest, opts ...grpc.CallOption) (*ListFolderWorkspacesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListFolderWorkspacesResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListFolderWorkspaces_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetFolderWorkspacePathStatus(ctx context.Context, in *GetFolderWorkspacePathStatusRequest, opts ...grpc.CallOption) (*GetFolderWorkspacePathStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFolderWorkspacePathStatusResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetFolderWorkspacePathStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) MoveProject(ctx context.Context, in *MoveProjectRequest, opts ...grpc.CallOption) (*MoveProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MoveProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_MoveProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ScanNested(ctx context.Context, in *ScanNestedRequest, opts ...grpc.CallOption) (*ScanNestedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ScanNestedResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ScanNested_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ImportNested(ctx context.Context, in *ImportNestedRequest, opts ...grpc.CallOption) (*ImportNestedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImportNestedResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ImportNested_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) CreateHostSetup(ctx context.Context, in *CreateHostSetupRequest, opts ...grpc.CallOption) (*CreateHostSetupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateHostSetupResponse)
+	err := c.cc.Invoke(ctx, ProjectService_CreateHostSetup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListHostSetups(ctx context.Context, in *ListHostSetupsRequest, opts ...grpc.CallOption) (*ListHostSetupsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListHostSetupsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListHostSetups_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateHostSetup(ctx context.Context, in *UpdateHostSetupRequest, opts ...grpc.CallOption) (*UpdateHostSetupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateHostSetupResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateHostSetup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) DeleteHostSetup(ctx context.Context, in *DeleteHostSetupRequest, opts ...grpc.CallOption) (*DeleteHostSetupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteHostSetupResponse)
+	err := c.cc.Invoke(ctx, ProjectService_DeleteHostSetup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) SetupExistingFolder(ctx context.Context, in *SetupExistingFolderRequest, opts ...grpc.CallOption) (*SetupExistingFolderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetupExistingFolderResponse)
+	err := c.cc.Invoke(ctx, ProjectService_SetupExistingFolder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -299,6 +513,9 @@ type ProjectServiceServer interface {
 	GetProject(context.Context, *GetProjectRequest) (*GetProjectResponse, error)
 	ListProjects(context.Context, *ListProjectsRequest) (*ListProjectsResponse, error)
 	AddMember(context.Context, *AddMemberRequest) (*AddMemberResponse, error)
+	ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error)
+	RemoveMember(context.Context, *RemoveMemberRequest) (*RemoveMemberResponse, error)
+	UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error)
 	RebindDevServer(context.Context, *RebindDevServerRequest) (*RebindDevServerResponse, error)
 	// UpdateProject's field list deliberately excludes dev_server_id —
 	// RebindDevServer (with its active-execution guard) stays the sole path
@@ -311,6 +528,7 @@ type ProjectServiceServer interface {
 	ListRepos(context.Context, *ListReposRequest) (*ListReposResponse, error)
 	ReorderRepos(context.Context, *ReorderReposRequest) (*ReorderReposResponse, error)
 	RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error)
+	UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -325,6 +543,29 @@ type ProjectServiceServer interface {
 	UpdateProjectGroup(context.Context, *UpdateProjectGroupRequest) (*UpdateProjectGroupResponse, error)
 	DeleteProjectGroup(context.Context, *DeleteProjectGroupRequest) (*DeleteProjectGroupResponse, error)
 	ListProjectGroups(context.Context, *ListProjectGroupsRequest) (*ListProjectGroupsResponse, error)
+	// Folder workspaces — standalone, non-git filesystem paths added directly
+	// to the workspace. No project_id — see FolderWorkspace's doc comment
+	// below. See specs/backend-go/bugs/missing-v1/solutions/SOL-010-folderworkspace-channels.md.
+	CreateFolderWorkspace(context.Context, *CreateFolderWorkspaceRequest) (*CreateFolderWorkspaceResponse, error)
+	UpdateFolderWorkspace(context.Context, *UpdateFolderWorkspaceRequest) (*UpdateFolderWorkspaceResponse, error)
+	DeleteFolderWorkspace(context.Context, *DeleteFolderWorkspaceRequest) (*DeleteFolderWorkspaceResponse, error)
+	ListFolderWorkspaces(context.Context, *ListFolderWorkspacesRequest) (*ListFolderWorkspacesResponse, error)
+	// GetFolderWorkspacePathStatus is a DB-conflict check against this
+	// service's own tables, NOT a live filesystem probe — see the response
+	// message's doc comment.
+	GetFolderWorkspacePathStatus(context.Context, *GetFolderWorkspacePathStatusRequest) (*GetFolderWorkspacePathStatusResponse, error)
+	// MoveProject/ScanNested/ImportNested: nested-repo import workflow —
+	// project-service.md §5's project_groups.project_id column, first
+	// exercised by these RPCs.
+	MoveProject(context.Context, *MoveProjectRequest) (*MoveProjectResponse, error)
+	ScanNested(context.Context, *ScanNestedRequest) (*ScanNestedResponse, error)
+	ImportNested(context.Context, *ImportNestedRequest) (*ImportNestedResponse, error)
+	// ── projectHostSetup.* — pre-project dev-server-folder wizard ─────────
+	CreateHostSetup(context.Context, *CreateHostSetupRequest) (*CreateHostSetupResponse, error)
+	ListHostSetups(context.Context, *ListHostSetupsRequest) (*ListHostSetupsResponse, error)
+	UpdateHostSetup(context.Context, *UpdateHostSetupRequest) (*UpdateHostSetupResponse, error)
+	DeleteHostSetup(context.Context, *DeleteHostSetupRequest) (*DeleteHostSetupResponse, error)
+	SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -347,6 +588,15 @@ func (UnimplementedProjectServiceServer) ListProjects(context.Context, *ListProj
 func (UnimplementedProjectServiceServer) AddMember(context.Context, *AddMemberRequest) (*AddMemberResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AddMember not implemented")
 }
+func (UnimplementedProjectServiceServer) ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMembers not implemented")
+}
+func (UnimplementedProjectServiceServer) RemoveMember(context.Context, *RemoveMemberRequest) (*RemoveMemberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveMember not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateMemberRole not implemented")
+}
 func (UnimplementedProjectServiceServer) RebindDevServer(context.Context, *RebindDevServerRequest) (*RebindDevServerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RebindDevServer not implemented")
 }
@@ -367,6 +617,9 @@ func (UnimplementedProjectServiceServer) ReorderRepos(context.Context, *ReorderR
 }
 func (UnimplementedProjectServiceServer) RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveRepo not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateRepo not implemented")
 }
 func (UnimplementedProjectServiceServer) RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecordWorktreeCreated not implemented")
@@ -394,6 +647,45 @@ func (UnimplementedProjectServiceServer) DeleteProjectGroup(context.Context, *De
 }
 func (UnimplementedProjectServiceServer) ListProjectGroups(context.Context, *ListProjectGroupsRequest) (*ListProjectGroupsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListProjectGroups not implemented")
+}
+func (UnimplementedProjectServiceServer) CreateFolderWorkspace(context.Context, *CreateFolderWorkspaceRequest) (*CreateFolderWorkspaceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateFolderWorkspace not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateFolderWorkspace(context.Context, *UpdateFolderWorkspaceRequest) (*UpdateFolderWorkspaceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateFolderWorkspace not implemented")
+}
+func (UnimplementedProjectServiceServer) DeleteFolderWorkspace(context.Context, *DeleteFolderWorkspaceRequest) (*DeleteFolderWorkspaceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteFolderWorkspace not implemented")
+}
+func (UnimplementedProjectServiceServer) ListFolderWorkspaces(context.Context, *ListFolderWorkspacesRequest) (*ListFolderWorkspacesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListFolderWorkspaces not implemented")
+}
+func (UnimplementedProjectServiceServer) GetFolderWorkspacePathStatus(context.Context, *GetFolderWorkspacePathStatusRequest) (*GetFolderWorkspacePathStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFolderWorkspacePathStatus not implemented")
+}
+func (UnimplementedProjectServiceServer) MoveProject(context.Context, *MoveProjectRequest) (*MoveProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MoveProject not implemented")
+}
+func (UnimplementedProjectServiceServer) ScanNested(context.Context, *ScanNestedRequest) (*ScanNestedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ScanNested not implemented")
+}
+func (UnimplementedProjectServiceServer) ImportNested(context.Context, *ImportNestedRequest) (*ImportNestedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ImportNested not implemented")
+}
+func (UnimplementedProjectServiceServer) CreateHostSetup(context.Context, *CreateHostSetupRequest) (*CreateHostSetupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateHostSetup not implemented")
+}
+func (UnimplementedProjectServiceServer) ListHostSetups(context.Context, *ListHostSetupsRequest) (*ListHostSetupsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListHostSetups not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateHostSetup(context.Context, *UpdateHostSetupRequest) (*UpdateHostSetupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateHostSetup not implemented")
+}
+func (UnimplementedProjectServiceServer) DeleteHostSetup(context.Context, *DeleteHostSetupRequest) (*DeleteHostSetupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteHostSetup not implemented")
+}
+func (UnimplementedProjectServiceServer) SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetupExistingFolder not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -484,6 +776,60 @@ func _ProjectService_AddMember_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).AddMember(ctx, req.(*AddMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListMembers(ctx, req.(*ListMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RemoveMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RemoveMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RemoveMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RemoveMember(ctx, req.(*RemoveMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateMemberRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMemberRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateMemberRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateMemberRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateMemberRole(ctx, req.(*UpdateMemberRoleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -610,6 +956,24 @@ func _ProjectService_RemoveRepo_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).RemoveRepo(ctx, req.(*RemoveRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateRepo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateRepo(ctx, req.(*UpdateRepoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -776,6 +1140,240 @@ func _ProjectService_ListProjectGroups_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_CreateFolderWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateFolderWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).CreateFolderWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_CreateFolderWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).CreateFolderWorkspace(ctx, req.(*CreateFolderWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateFolderWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateFolderWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateFolderWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateFolderWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateFolderWorkspace(ctx, req.(*UpdateFolderWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_DeleteFolderWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteFolderWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).DeleteFolderWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_DeleteFolderWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).DeleteFolderWorkspace(ctx, req.(*DeleteFolderWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListFolderWorkspaces_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFolderWorkspacesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListFolderWorkspaces(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListFolderWorkspaces_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListFolderWorkspaces(ctx, req.(*ListFolderWorkspacesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetFolderWorkspacePathStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFolderWorkspacePathStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetFolderWorkspacePathStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetFolderWorkspacePathStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetFolderWorkspacePathStatus(ctx, req.(*GetFolderWorkspacePathStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_MoveProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MoveProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).MoveProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_MoveProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).MoveProject(ctx, req.(*MoveProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ScanNested_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ScanNestedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ScanNested(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ScanNested_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ScanNested(ctx, req.(*ScanNestedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ImportNested_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportNestedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ImportNested(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ImportNested_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ImportNested(ctx, req.(*ImportNestedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_CreateHostSetup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateHostSetupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).CreateHostSetup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_CreateHostSetup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).CreateHostSetup(ctx, req.(*CreateHostSetupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListHostSetups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListHostSetupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListHostSetups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListHostSetups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListHostSetups(ctx, req.(*ListHostSetupsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateHostSetup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateHostSetupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateHostSetup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateHostSetup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateHostSetup(ctx, req.(*UpdateHostSetupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_DeleteHostSetup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteHostSetupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).DeleteHostSetup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_DeleteHostSetup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).DeleteHostSetup(ctx, req.(*DeleteHostSetupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_SetupExistingFolder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetupExistingFolderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).SetupExistingFolder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_SetupExistingFolder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).SetupExistingFolder(ctx, req.(*SetupExistingFolderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -798,6 +1396,18 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddMember",
 			Handler:    _ProjectService_AddMember_Handler,
+		},
+		{
+			MethodName: "ListMembers",
+			Handler:    _ProjectService_ListMembers_Handler,
+		},
+		{
+			MethodName: "RemoveMember",
+			Handler:    _ProjectService_RemoveMember_Handler,
+		},
+		{
+			MethodName: "UpdateMemberRole",
+			Handler:    _ProjectService_UpdateMemberRole_Handler,
 		},
 		{
 			MethodName: "RebindDevServer",
@@ -826,6 +1436,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveRepo",
 			Handler:    _ProjectService_RemoveRepo_Handler,
+		},
+		{
+			MethodName: "UpdateRepo",
+			Handler:    _ProjectService_UpdateRepo_Handler,
 		},
 		{
 			MethodName: "RecordWorktreeCreated",
@@ -862,6 +1476,58 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListProjectGroups",
 			Handler:    _ProjectService_ListProjectGroups_Handler,
+		},
+		{
+			MethodName: "CreateFolderWorkspace",
+			Handler:    _ProjectService_CreateFolderWorkspace_Handler,
+		},
+		{
+			MethodName: "UpdateFolderWorkspace",
+			Handler:    _ProjectService_UpdateFolderWorkspace_Handler,
+		},
+		{
+			MethodName: "DeleteFolderWorkspace",
+			Handler:    _ProjectService_DeleteFolderWorkspace_Handler,
+		},
+		{
+			MethodName: "ListFolderWorkspaces",
+			Handler:    _ProjectService_ListFolderWorkspaces_Handler,
+		},
+		{
+			MethodName: "GetFolderWorkspacePathStatus",
+			Handler:    _ProjectService_GetFolderWorkspacePathStatus_Handler,
+		},
+		{
+			MethodName: "MoveProject",
+			Handler:    _ProjectService_MoveProject_Handler,
+		},
+		{
+			MethodName: "ScanNested",
+			Handler:    _ProjectService_ScanNested_Handler,
+		},
+		{
+			MethodName: "ImportNested",
+			Handler:    _ProjectService_ImportNested_Handler,
+		},
+		{
+			MethodName: "CreateHostSetup",
+			Handler:    _ProjectService_CreateHostSetup_Handler,
+		},
+		{
+			MethodName: "ListHostSetups",
+			Handler:    _ProjectService_ListHostSetups_Handler,
+		},
+		{
+			MethodName: "UpdateHostSetup",
+			Handler:    _ProjectService_UpdateHostSetup_Handler,
+		},
+		{
+			MethodName: "DeleteHostSetup",
+			Handler:    _ProjectService_DeleteHostSetup_Handler,
+		},
+		{
+			MethodName: "SetupExistingFolder",
+			Handler:    _ProjectService_SetupExistingFolder_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

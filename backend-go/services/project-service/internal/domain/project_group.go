@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"encoding/json"
+	"errors"
+)
 
 var (
 	// ErrGroupSelfParent guards against a group naming itself as its own
@@ -31,6 +34,9 @@ type ProjectGroup struct {
 	Name     string
 	// ParentGroupID is empty for a root-of-tree group.
 	ParentGroupID string
+	// ProjectID is empty for a pure organizational folder node; set only
+	// for a project's own leaf group (see UpsertLeafGroupForProject).
+	ProjectID string
 }
 
 // NewProjectGroup constructs a ProjectGroup, enforcing the invariants a
@@ -46,4 +52,40 @@ func NewProjectGroup(id, tenantID, name, parentGroupID string) (ProjectGroup, er
 		return ProjectGroup{}, ErrGroupSelfParent
 	}
 	return ProjectGroup{ID: id, TenantID: tenantID, Name: name, ParentGroupID: parentGroupID}, nil
+}
+
+// NestedRepoCandidate is one filesystem entry ScanNested found under a
+// scanned root path — mirrors project.proto's NestedRepoCandidate.
+type NestedRepoCandidate struct {
+	Path          string
+	SuggestedName string
+	IsGitRepo     bool
+}
+
+// nestedRepoCandidateWire is ParseNestedRepoCandidates's JSON decoding
+// shape for one Dev Server Agent-reported candidate — snake_case keys,
+// matching this codebase's other Agent JSON-RPC payloads (e.g.
+// infra-fleet-service's ScanWorkspacePorts result shape). NOT yet
+// confirmed against a real Agent handler — see this task's Context.
+type nestedRepoCandidateWire struct {
+	Path          string `json:"path"`
+	SuggestedName string `json:"suggested_name"`
+	IsGitRepo     bool   `json:"is_git_repo"`
+}
+
+// ParseNestedRepoCandidates decodes a Relay call's result_json into
+// candidates — pure domain-layer JSON->struct mapping, no I/O (usecase.ScanNested
+// is the one caller).
+func ParseNestedRepoCandidates(resultJSON []byte) ([]NestedRepoCandidate, error) {
+	var wire struct {
+		Candidates []nestedRepoCandidateWire `json:"candidates"`
+	}
+	if err := json.Unmarshal(resultJSON, &wire); err != nil {
+		return nil, err
+	}
+	out := make([]NestedRepoCandidate, 0, len(wire.Candidates))
+	for _, c := range wire.Candidates {
+		out = append(out, NestedRepoCandidate{Path: c.Path, SuggestedName: c.SuggestedName, IsGitRepo: c.IsGitRepo})
+	}
+	return out, nil
 }

@@ -12,7 +12,7 @@ import (
 func mustAccount(t *testing.T, id, tenantID string, scope domain.AccountScope, userID, projectID string, status domain.AccountStatus) domain.ProviderAccount {
 	t.Helper()
 	now := time.Now()
-	acc, err := domain.NewProviderAccount(id, tenantID, domain.ProviderTypeAnthropic, status, "cred-"+id, scope, userID, projectID, nil, now, now)
+	acc, err := domain.NewProviderAccount(id, tenantID, domain.ProviderTypeAnthropic, status, "cred-"+id, scope, userID, projectID, "", nil, now, now)
 	if err != nil {
 		t.Fatalf("building account %s: %v", id, err)
 	}

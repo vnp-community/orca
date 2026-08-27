@@ -21,6 +21,8 @@ import (
 // fakeTaskServiceClient implements taskv1.TaskServiceClient with
 // per-method canned responses/errors, configurable per test.
 type fakeTaskServiceClient struct {
+	taskv1.TaskServiceClient // nil embed: satisfies methods this fake doesn't hook (e.g. TASK-223's List/Update/Delete/GetDependencies, TASK-224's AIApply) — panics if actually called, which is correct since this REST-route layer's tests don't exercise them
+
 	createTaskResp *taskv1.CreateTaskResponse
 	createTaskErr  error
 	createTaskReq  *taskv1.CreateTaskRequest // captures the last request for assertions

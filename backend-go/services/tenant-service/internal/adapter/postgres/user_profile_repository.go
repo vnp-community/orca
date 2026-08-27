@@ -75,6 +75,47 @@ func (r *UserProfileRepository) Get(ctx context.Context, companyID, userID strin
 	return p, true, nil
 }
 
+func (r *UserProfileRepository) ListUserIDsByDepartment(ctx context.Context, companyID, departmentID string) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT user_id FROM tenant.user_profiles
+		WHERE company_id = $1 AND department_id = $2
+	`, companyID, departmentID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query user ids by department: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			return nil, fmt.Errorf("postgres: scan user id row: %w", err)
+		}
+		out = append(out, uid)
+	}
+	return out, rows.Err()
+}
+
+func (r *UserProfileRepository) ListUserIDsByCompany(ctx context.Context, companyID string) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT user_id FROM tenant.user_profiles WHERE company_id = $1
+	`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query user ids by company: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			return nil, fmt.Errorf("postgres: scan user id row: %w", err)
+		}
+		out = append(out, uid)
+	}
+	return out, rows.Err()
+}
+
 func nullableString(s string) *string {
 	if s == "" {
 		return nil

@@ -93,6 +93,10 @@ func (f *fakeCredentialWriter) Write(_ context.Context, tenantID string, provide
 	return f.writeErr
 }
 
+func (f *fakeCredentialWriter) WriteRaw(context.Context, string, domain.ScmProvider, string, string) error {
+	panic("not used by CompleteOAuthFlow")
+}
+
 func TestStartOAuthFlow_BuildsAuthorizationURLAndSignedState(t *testing.T) {
 	exchangers := &fakeOAuthExchangerRegistry{exchangers: map[domain.ScmProvider]OAuthExchanger{
 		domain.ScmProviderGitHub: &fakeOAuthExchanger{authURL: "https://github.com/login/oauth/authorize"},

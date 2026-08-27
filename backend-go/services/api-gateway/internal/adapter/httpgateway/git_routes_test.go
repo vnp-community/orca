@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -20,10 +21,29 @@ import (
 )
 
 // fakeGitGatewayServiceClient implements gitgatewayv1.GitGatewayServiceClient
-// (6 methods, per the generated _grpc.pb.go) over per-method hook
-// functions — tests set only the hooks they exercise; any unset hook fails
-// the test loudly instead of nil-panicking.
+// over per-method hook functions for the 6 methods this REST-route layer's
+// tests exercise — tests set only the hooks they exercise; any unset hook
+// fails the test loudly instead of nil-panicking. The embedded (nil)
+// interface satisfies every OTHER GitGatewayServiceClient method added
+// since this fake was written (staging/history/remote/AI-assist/files.*,
+// TASK-208..211/049) without this REST-route test file needing a hook for
+// each — those RPCs aren't exercised by git_routes.go's REST handlers, so
+// a panic-on-call default is correct: it would mean this file started
+// calling one of them and needs a real hook added.
+// over per-method hook functions — tests set only the hooks they exercise;
+// any unset hook fails the test loudly instead of nil-panicking.
+//
+// The 7 worktree.*-Func hooks below (CreateWorktree/RemoveWorktree/
+// ForceDeleteBranch/DetectWorktrees/PrefetchCreateBase/ResolvePrBase/
+// ResolveMrBase) were added to keep this fake satisfying
+// gitgatewayv1.GitGatewayServiceClient after TASK-192's proto regen grew
+// the interface — this file's own git_routes.go usage is unaffected
+// (SOL-031's worktree.* channels are wired through wscompat, not
+// httpgateway's REST routes); none of this file's existing tests exercise
+// them, so their hooks are expected to stay nil/unused.
 type fakeGitGatewayServiceClient struct {
+	gitgatewayv1.GitGatewayServiceClient
+
 	t *testing.T
 
 	getStatusFunc             func(ctx context.Context, in *gitgatewayv1.GetStatusRequest) (*gitgatewayv1.GetStatusResponse, error)
@@ -32,6 +52,22 @@ type fakeGitGatewayServiceClient struct {
 	pushFunc                  func(ctx context.Context, in *gitgatewayv1.PushRequest) (*gitgatewayv1.PushResponse, error)
 	pullFunc                  func(ctx context.Context, in *gitgatewayv1.PullRequest) (*gitgatewayv1.PullResponse, error)
 	generateCommitMessageFunc func(ctx context.Context, in *gitgatewayv1.GenerateCommitMessageRequest) (*gitgatewayv1.GenerateCommitMessageResponse, error)
+
+	cloneFunc                  func(ctx context.Context, in *gitgatewayv1.CloneRequest) (*gitgatewayv1.CloneResponse, error)
+	initRepoFunc               func(ctx context.Context, in *gitgatewayv1.InitRepoRequest) (*gitgatewayv1.InitRepoResponse, error)
+	baseRefDefaultFunc         func(ctx context.Context, in *gitgatewayv1.BaseRefDefaultRequest) (*gitgatewayv1.BaseRefDefaultResponse, error)
+	searchRefsFunc             func(ctx context.Context, in *gitgatewayv1.SearchRefsRequest) (*gitgatewayv1.SearchRefsResponse, error)
+	checkHooksFunc             func(ctx context.Context, in *gitgatewayv1.CheckHooksRequest) (*gitgatewayv1.CheckHooksResponse, error)
+	readIssueCommandFunc       func(ctx context.Context, in *gitgatewayv1.ReadIssueCommandRequest) (*gitgatewayv1.ReadIssueCommandResponse, error)
+	writeIssueCommandFunc      func(ctx context.Context, in *gitgatewayv1.WriteIssueCommandRequest) (*emptypb.Empty, error)
+	scanSetupScriptImportsFunc func(ctx context.Context, in *gitgatewayv1.ScanSetupScriptImportsRequest) (*gitgatewayv1.ScanSetupScriptImportsResponse, error)
+	createWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error)
+	removeWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error)
+	forceDeleteBranchFunc  func(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error)
+	detectWorktreesFunc    func(ctx context.Context, in *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error)
+	prefetchCreateBaseFunc func(ctx context.Context, in *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error)
+	resolvePrBaseFunc      func(ctx context.Context, in *gitgatewayv1.ResolvePrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
+	resolveMrBaseFunc      func(ctx context.Context, in *gitgatewayv1.ResolveMrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
 }
 
 func (f *fakeGitGatewayServiceClient) GetStatus(ctx context.Context, in *gitgatewayv1.GetStatusRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetStatusResponse, error) {
@@ -74,6 +110,111 @@ func (f *fakeGitGatewayServiceClient) GenerateCommitMessage(ctx context.Context,
 		f.t.Fatal("unexpected call to GenerateCommitMessage")
 	}
 	return f.generateCommitMessageFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) Clone(ctx context.Context, in *gitgatewayv1.CloneRequest, _ ...grpc.CallOption) (*gitgatewayv1.CloneResponse, error) {
+	if f.cloneFunc == nil {
+		f.t.Fatal("unexpected call to Clone")
+	}
+	return f.cloneFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) InitRepo(ctx context.Context, in *gitgatewayv1.InitRepoRequest, _ ...grpc.CallOption) (*gitgatewayv1.InitRepoResponse, error) {
+	if f.initRepoFunc == nil {
+		f.t.Fatal("unexpected call to InitRepo")
+	}
+	return f.initRepoFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) BaseRefDefault(ctx context.Context, in *gitgatewayv1.BaseRefDefaultRequest, _ ...grpc.CallOption) (*gitgatewayv1.BaseRefDefaultResponse, error) {
+	if f.baseRefDefaultFunc == nil {
+		f.t.Fatal("unexpected call to BaseRefDefault")
+	}
+	return f.baseRefDefaultFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) SearchRefs(ctx context.Context, in *gitgatewayv1.SearchRefsRequest, _ ...grpc.CallOption) (*gitgatewayv1.SearchRefsResponse, error) {
+	if f.searchRefsFunc == nil {
+		f.t.Fatal("unexpected call to SearchRefs")
+	}
+	return f.searchRefsFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) CheckHooks(ctx context.Context, in *gitgatewayv1.CheckHooksRequest, _ ...grpc.CallOption) (*gitgatewayv1.CheckHooksResponse, error) {
+	if f.checkHooksFunc == nil {
+		f.t.Fatal("unexpected call to CheckHooks")
+	}
+	return f.checkHooksFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) ReadIssueCommand(ctx context.Context, in *gitgatewayv1.ReadIssueCommandRequest, _ ...grpc.CallOption) (*gitgatewayv1.ReadIssueCommandResponse, error) {
+	if f.readIssueCommandFunc == nil {
+		f.t.Fatal("unexpected call to ReadIssueCommand")
+	}
+	return f.readIssueCommandFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) WriteIssueCommand(ctx context.Context, in *gitgatewayv1.WriteIssueCommandRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	if f.writeIssueCommandFunc == nil {
+		f.t.Fatal("unexpected call to WriteIssueCommand")
+	}
+	return f.writeIssueCommandFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) ScanSetupScriptImports(ctx context.Context, in *gitgatewayv1.ScanSetupScriptImportsRequest, _ ...grpc.CallOption) (*gitgatewayv1.ScanSetupScriptImportsResponse, error) {
+	if f.scanSetupScriptImportsFunc == nil {
+		f.t.Fatal("unexpected call to ScanSetupScriptImports")
+	}
+	return f.scanSetupScriptImportsFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) CreateWorktree(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateWorktreeResponse, error) {
+	if f.createWorktreeFunc == nil {
+		f.t.Fatal("unexpected call to CreateWorktree")
+	}
+	return f.createWorktreeFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	if f.removeWorktreeFunc == nil {
+		f.t.Fatal("unexpected call to RemoveWorktree")
+	}
+	return f.removeWorktreeFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) ForceDeleteBranch(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	if f.forceDeleteBranchFunc == nil {
+		f.t.Fatal("unexpected call to ForceDeleteBranch")
+	}
+	return f.forceDeleteBranchFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) DetectWorktrees(ctx context.Context, in *gitgatewayv1.DetectWorktreesRequest, _ ...grpc.CallOption) (*gitgatewayv1.DetectWorktreesResponse, error) {
+	if f.detectWorktreesFunc == nil {
+		f.t.Fatal("unexpected call to DetectWorktrees")
+	}
+	return f.detectWorktreesFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) PrefetchCreateBase(ctx context.Context, in *gitgatewayv1.PrefetchCreateBaseRequest, _ ...grpc.CallOption) (*gitgatewayv1.PrefetchCreateBaseResponse, error) {
+	if f.prefetchCreateBaseFunc == nil {
+		f.t.Fatal("unexpected call to PrefetchCreateBase")
+	}
+	return f.prefetchCreateBaseFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) ResolvePrBase(ctx context.Context, in *gitgatewayv1.ResolvePrBaseRequest, _ ...grpc.CallOption) (*gitgatewayv1.ResolveBaseResponse, error) {
+	if f.resolvePrBaseFunc == nil {
+		f.t.Fatal("unexpected call to ResolvePrBase")
+	}
+	return f.resolvePrBaseFunc(ctx, in)
+}
+
+func (f *fakeGitGatewayServiceClient) ResolveMrBase(ctx context.Context, in *gitgatewayv1.ResolveMrBaseRequest, _ ...grpc.CallOption) (*gitgatewayv1.ResolveBaseResponse, error) {
+	if f.resolveMrBaseFunc == nil {
+		f.t.Fatal("unexpected call to ResolveMrBase")
+	}
+	return f.resolveMrBaseFunc(ctx, in)
 }
 
 var _ gitgatewayv1.GitGatewayServiceClient = (*fakeGitGatewayServiceClient)(nil)

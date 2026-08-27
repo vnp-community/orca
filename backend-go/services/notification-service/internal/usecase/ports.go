@@ -21,6 +21,11 @@ type SubscriptionRepository interface {
 	Save(ctx context.Context, sub domain.PushSubscription) error
 	// ListByUser returns a tenant's user's active subscriptions.
 	ListByUser(ctx context.Context, tenantID, userID string) ([]domain.PushSubscription, error)
+	// DeleteByEndpoint removes the subscription row for endpoint (matches
+	// push_subscriptions.endpoint's unique index). Deleting an endpoint
+	// with no matching row affects 0 rows and is NOT an error — the
+	// unregister operation is idempotent by design.
+	DeleteByEndpoint(ctx context.Context, endpoint string) error
 }
 
 // VapidKeyRepository is the persistence port for VAPID public-key

@@ -45,10 +45,10 @@ full rationale.
 
 ```
 deploy/dev/
-├── docker-compose.yml           # postgres, vault, nats, 17 backend-go services, frontend, 13 migrate-* one-shots
+├── docker-compose.yml           # postgres, vault, vault-init, nats, 17 backend-go services, frontend, 14 migrate-* one-shots
 ├── .env.example / .env          # config (backend-go + frontend only — agent config is deploy/agent/.env.example)
 ├── docker/
-│   ├── postgres/init-databases.sh   # creates the 13 per-service databases on first boot
+│   ├── postgres/init-databases.sh   # creates the 14 per-service databases on first boot
 │   └── nginx/orca.conf              # frontend: serves the SPA + reverse-proxies /v1/* to api-gateway
 └── scripts/
     ├── build-local.sh           # [LOCAL] cross-compile all 17 Go binaries + vite-build frontend
