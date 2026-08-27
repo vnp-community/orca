@@ -2,6 +2,7 @@ import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 import type { BrowserTab, TerminalTab } from '../../../shared/types'
 import { createUntitledMarkdownFileWithTemplateSelection } from './create-untitled-markdown'
 import { getConnectionId } from './connection-context'
+import { appGetFloatingMarkdownDirectory } from '@/runtime/runtime-app-client'
 import { detectLanguage } from './language-detect'
 import type { AppState } from '@/store/types'
 import { focusTerminalTabSurface } from './focus-terminal-tab-surface'
@@ -57,7 +58,7 @@ export async function createFloatingWorkspaceMarkdownTab(
 ): Promise<void> {
   const targetGroupId = store.activeGroupIdByWorktree[FLOATING_TERMINAL_WORKTREE_ID]
   const floatingMarkdownDirectory =
-    markdownDirectory ?? (await window.api.app.getFloatingMarkdownDirectory())
+    markdownDirectory ?? (await appGetFloatingMarkdownDirectory())
   if (!floatingMarkdownDirectory) {
     return
   }

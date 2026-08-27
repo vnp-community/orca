@@ -1,0 +1,83 @@
+# ============================================================
+# Orca Backend + Frontend Runtime Container — ARTIFACT MODE
+# ============================================================
+# Why this file exists (vs. Dockerfile): Dockerfile builds backend/+frontend/
+# FROM SOURCE inside the image (2 builder stages + 1 runtime stage) — the
+# whole application source tree has to be rsynced to the server first, and
+# the server pays the full pnpm-install + vite-build cost on every deploy.
+#
+# This variant does the opposite: backend/out/server + frontend/out/web are
+# already built LOCALLY (deploy/dev/scripts/build-local.sh) and rsynced up
+# by deploy/dev/scripts/sync-to-server-artifact.sh — only the build OUTPUT
+# and the manifests needed for `pnpm install --prod` travel over the wire,
+# never the source tree. This image is a single stage: install backend's
+# production deps, then copy in the pre-built artifacts directly.
+#
+# Build: docker build -f deploy/dev/docker/backend/Dockerfile.artifact \
+#          -t vnpblc/orca-server:dev .
+# Ports: 6768 (WebSocket/RPC) + 6769 (HTTP static + /health/*)
+# ============================================================
+
+FROM node:22-bookworm-slim
+
+LABEL maintainer="VNP-BLC DevOps <devops@vnpblc.com>"
+LABEL description="Orca Backend (RPC/WS + admin API) + Frontend (web SPA) runtime — artifact mode, no server-side compile"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/home/orca
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ git openssh-client wget curl ca-certificates \
+  && mkdir -p /usr/share/keyrings \
+  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+       | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+       > /etc/apt/sources.list.d/github-cli.list \
+  && apt-get update && apt-get install -y --no-install-recommends gh \
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get clean
+
+RUN groupadd -r orca \
+ && useradd -r -g orca -d /home/orca -s /bin/bash -c "Orca runtime user" orca \
+ && mkdir -p /home/orca/.config/orca \
+              /home/orca/.ssh \
+              /home/orca/.local/share/orca \
+              /home/orca/.local/bin \
+              /data/orca \
+              /srv/projects \
+ && chown -R orca:orca /home/orca /data/orca /srv/projects
+
+WORKDIR /opt/orca/app
+RUN chown -R orca:orca /opt/orca
+
+# Why: only manifests are needed here, not backend/ source — out/server
+# below is pre-built LOCALLY (see header comment), not compiled in this
+# image. Same production-dependency set as Dockerfile's runtime stage.
+COPY backend/package.json ./package.json
+COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY desktop/config/patches ./config/patches
+RUN npm pkg delete scripts.postinstall scripts.prepare && corepack enable && pnpm install --prod --ignore-workspace
+
+# Pre-built artifacts, rsynced by sync-to-server-artifact.sh — out/server +
+# out/web as siblings (backend/src/server/index.ts resolves the frontend
+# bundle via resolve(__dirname, '..', 'web'), same layout Dockerfile produces).
+COPY backend/out/server ./out/server
+COPY frontend/out/web ./out/web
+
+COPY deploy/dev/docker/backend/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENV ORCA_PORT=6768
+ENV ORCA_HTTP_PORT=6769
+ENV ORCA_USER_DATA_PATH=/data/orca
+ENV NODE_ENV=production
+
+EXPOSE 6768
+EXPOSE 6769
+
+VOLUME ["/data/orca"]
+
+USER orca
+WORKDIR /home/orca
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -14,6 +14,32 @@ import type { WebPushSubscription } from '../../shared/types'
 
 export type { WebPushSubscription }
 
+/**
+ * ADR-021 Phase 1: narrow interface seam for WebPushManager's `Store`
+ * dependency — the 4 methods below (verified by grep) are its complete
+ * persistence surface. A future Postgres-backed implementation (migration
+ * 0022's `notification` schema —
+ * specs/backend/models/08-postgres-microservices-target-architecture.md §4)
+ * only needs these 4 methods to be a drop-in replacement in server mode. See
+ * automations/automation-store-dependency.ts's module doc comment for the
+ * same pattern applied to AutomationService — including why this is ASYNC
+ * (not a direct `Pick<Store, ...>`, unlike this file's first version): `Store`
+ * no longer satisfies this for free, `notifications/web-push-store-adapter.ts`
+ * bridges the two.
+ *
+ * ⚠️ `getVapidKeys()`/`setVapidKeys()` carry the VAPID *private* key — per
+ * ADR-021 §4, a Postgres-backed implementation of this interface must NOT
+ * store that value in the `notification.vapid_key_metadata` table (public
+ * key/status only); it needs its own credential-store-backed path for the
+ * private key, same as every other secret in specs/backend/models/05.
+ */
+export type WebPushStoreDependency = {
+  getWebPushSubscriptions(): Promise<WebPushSubscription[]>
+  setWebPushSubscriptions(subscriptions: WebPushSubscription[]): Promise<void>
+  getVapidKeys(): Promise<{ publicKey: string; privateKey: string } | null | undefined>
+  setVapidKeys(keys: { publicKey: string; privateKey: string }): Promise<void>
+}
+
 export type WebPushPayload = {
   /** Short notification title (required). */
   title: string
@@ -31,20 +57,38 @@ export type WebPushPayload = {
 const DEFAULT_TTL_SECONDS = 86_400
 
 export class WebPushManager {
-  private vapidKeys: { publicKey: string; privateKey: string }
+  private vapidKeys: { publicKey: string; privateKey: string } | null = null
+  // Why memoized as a promise, not just lazily awaited each call: two
+  // concurrent first-callers (e.g. a subscribe RPC racing sendToAll on
+  // startup) must not each independently generateVAPIDKeys() and clobber
+  // each other's write — the old constructor-eager-load never had this race
+  // (Node's single-threaded constructor ran once, synchronously); this is the
+  // async equivalent of that same "exactly once" guarantee.
+  private vapidKeysPromise: Promise<{ publicKey: string; privateKey: string }> | null = null
 
-  constructor(private store: Store) {
-    this.vapidKeys = this.loadOrCreateVapidKeys()
-    webPush.setVapidDetails(
-      'mailto:admin@orca.local',
-      this.vapidKeys.publicKey,
-      this.vapidKeys.privateKey
-    )
+  // Why no eager load here (unlike the sync-Store version this replaces):
+  // WebPushStoreDependency is async now (ADR-021 §"Deliberately ASYNC" in
+  // automation-store-dependency.ts applies the same here), and constructors
+  // cannot be async — key loading moves to ensureVapidKeys(), called lazily
+  // by every method that needs it.
+  constructor(private store: WebPushStoreDependency) {}
+
+  private async ensureVapidKeys(): Promise<{ publicKey: string; privateKey: string }> {
+    if (this.vapidKeys) {return this.vapidKeys}
+    if (!this.vapidKeysPromise) {
+      this.vapidKeysPromise = this.loadOrCreateVapidKeys().then((keys) => {
+        this.vapidKeys = keys
+        webPush.setVapidDetails('mailto:admin@orca.local', keys.publicKey, keys.privateKey)
+        return keys
+      })
+    }
+    return this.vapidKeysPromise
   }
 
   /** Returns the VAPID public key so the renderer can subscribe. */
-  getPublicKey(): string {
-    return this.vapidKeys.publicKey
+  async getPublicKey(): Promise<string> {
+    const keys = await this.ensureVapidKeys()
+    return keys.publicKey
   }
 
   /**
@@ -52,10 +96,10 @@ export class WebPushManager {
    * Deduplication is by endpoint — a new subscription from the same browser
    * replaces the old one (keys may rotate).
    */
-  saveSubscription(
+  async saveSubscription(
     subscription: PushSubscriptionJSON,
     meta?: { userAgent?: string }
-  ): WebPushSubscription {
+  ): Promise<WebPushSubscription> {
     const record: WebPushSubscription = {
       id: randomUUID(),
       endpoint: subscription.endpoint!,
@@ -67,8 +111,8 @@ export class WebPushManager {
       userAgent: meta?.userAgent
     }
 
-    const existing = this.store.getWebPushSubscriptions()
-    this.store.setWebPushSubscriptions([
+    const existing = await this.store.getWebPushSubscriptions()
+    await this.store.setWebPushSubscriptions([
       ...existing.filter((s) => s.endpoint !== record.endpoint),
       record
     ])
@@ -76,9 +120,9 @@ export class WebPushManager {
   }
 
   /** Remove a subscription by endpoint URL. */
-  removeSubscription(endpoint: string): void {
-    const existing = this.store.getWebPushSubscriptions()
-    this.store.setWebPushSubscriptions(existing.filter((s) => s.endpoint !== endpoint))
+  async removeSubscription(endpoint: string): Promise<void> {
+    const existing = await this.store.getWebPushSubscriptions()
+    await this.store.setWebPushSubscriptions(existing.filter((s) => s.endpoint !== endpoint))
   }
 
   /**
@@ -86,7 +130,8 @@ export class WebPushManager {
    * Uses Promise.allSettled so one failed delivery doesn't block the others.
    */
   async sendToAll(payload: WebPushPayload): Promise<void> {
-    const subscriptions = this.store.getWebPushSubscriptions()
+    await this.ensureVapidKeys()
+    const subscriptions = await this.store.getWebPushSubscriptions()
     await Promise.allSettled(
       subscriptions.map((sub) => this.sendToSubscription(sub, payload))
     )
@@ -106,7 +151,7 @@ export class WebPushManager {
       // 410 Gone: the browser revoked the subscription — auto-remove to keep
       // the subscription list lean and avoid repeated failed sends.
       if ((err as { statusCode?: number }).statusCode === 410) {
-        this.removeSubscription(sub.endpoint)
+        await this.removeSubscription(sub.endpoint)
       }
       // All other errors: log but do not rethrow (other subs must still deliver).
       // In production, plug in a structured logger here.
@@ -119,11 +164,14 @@ export class WebPushManager {
    * subscriptions with the public key and reject notifications from a
    * different key even for the same endpoint.
    */
-  private loadOrCreateVapidKeys(): { publicKey: string; privateKey: string } {
-    const stored = this.store.getVapidKeys()
+  private async loadOrCreateVapidKeys(): Promise<{ publicKey: string; privateKey: string }> {
+    const stored = await this.store.getVapidKeys()
     if (stored) {return stored}
     const keys = webPush.generateVAPIDKeys()
-    this.store.setVapidKeys(keys)
+    await this.store.setVapidKeys(keys)
     return keys
   }
 }
+
+/** Re-exported so callers constructing WebPushManager don't need a separate `Store` import. */
+export type { Store }

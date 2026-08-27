@@ -45,6 +45,7 @@ import { useNativeChatExternalAttachments } from './use-native-chat-external-att
 import { dispatchDictationControl } from '../dictation/dictation-control-events'
 import { useNativeChatComposerKeyDown } from './use-native-chat-composer-keydown'
 
+import { shellPickAttachment } from '../../runtime/runtime-shell-client'
 // Why: a plain ESC byte is what the agent TUIs read as the interrupt key over a
 // PTY (matching how xterm forwards Escape). The richer interrupt-intent
 // inference (agent-interrupt-intent.ts) is driven by the existing PTY input
@@ -249,7 +250,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
 
     const pickAttachment = useCallback(() => {
       void (async () => {
-        const filePath = await window.api.shell.pickAttachment()
+        const filePath = await shellPickAttachment()
         if (!filePath) {
           return
         }

@@ -10,6 +10,12 @@ import type {
   ClaudeUsageSummary
 } from '../../../../shared/claude-usage-types'
 import type { AppState } from '../types'
+import {
+  getClaudeUsageScanState as rpcGetClaudeUsageScanState,
+  getClaudeUsageSnapshot as rpcGetClaudeUsageSnapshot,
+  refreshClaudeUsage as rpcRefreshClaudeUsage,
+  setClaudeUsageEnabled as rpcSetClaudeUsageEnabled
+} from '../../runtime/runtime-claude-usage-client'
 
 export type ClaudeUsageSlice = {
   claudeUsageScope: ClaudeUsageScope
@@ -43,9 +49,7 @@ export const createClaudeUsageSlice: StateCreator<AppState, [], [], ClaudeUsageS
 
   setClaudeUsageEnabled: async (enabled) => {
     try {
-      const nextScanState = (await window.api.claudeUsage.setEnabled({
-        enabled
-      })) as ClaudeUsageScanState
+      const nextScanState = (await rpcSetClaudeUsageEnabled(enabled)) as ClaudeUsageScanState
       set({
         // Why: every enable should look like a fresh scan cycle in the UI.
         // Reusing the last completed timestamp makes repeated toggles skip the
@@ -84,7 +88,7 @@ export const createClaudeUsageSlice: StateCreator<AppState, [], [], ClaudeUsageS
 
   fetchClaudeUsage: async (opts) => {
     try {
-      const scanState = (await window.api.claudeUsage.getScanState()) as ClaudeUsageScanState
+      const scanState = (await rpcGetClaudeUsageScanState()) as ClaudeUsageScanState
       const currentScanState = get().claudeUsageScanState
       const shouldPreserveLoadingState =
         opts?.forceRefresh === true &&
@@ -105,11 +109,11 @@ export const createClaudeUsageSlice: StateCreator<AppState, [], [], ClaudeUsageS
       }
 
       const { claudeUsageScope, claudeUsageRange } = get()
-      const snapshot = (await window.api.claudeUsage.getSnapshot({
-        scope: claudeUsageScope,
-        range: claudeUsageRange,
-        limit: 10
-      })) as ClaudeUsageSnapshot
+      const snapshot = (await rpcGetClaudeUsageSnapshot(
+        claudeUsageScope,
+        claudeUsageRange,
+        10
+      )) as ClaudeUsageSnapshot
       const hasCachedSnapshot =
         snapshot.scanState.lastScanCompletedAt !== null || snapshot.scanState.hasAnyClaudeData
 
@@ -135,15 +139,13 @@ export const createClaudeUsageSlice: StateCreator<AppState, [], [], ClaudeUsageS
         })
       }
 
-      await window.api.claudeUsage.refresh({
-        force: opts?.forceRefresh ?? false
-      })
+      await rpcRefreshClaudeUsage(opts?.forceRefresh ?? false)
       const { claudeUsageScope: refreshedScope, claudeUsageRange: refreshedRange } = get()
-      const refreshedSnapshot = (await window.api.claudeUsage.getSnapshot({
-        scope: refreshedScope,
-        range: refreshedRange,
-        limit: 10
-      })) as ClaudeUsageSnapshot
+      const refreshedSnapshot = (await rpcGetClaudeUsageSnapshot(
+        refreshedScope,
+        refreshedRange,
+        10
+      )) as ClaudeUsageSnapshot
 
       set({
         claudeUsageScanState: refreshedSnapshot.scanState,

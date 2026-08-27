@@ -54,12 +54,28 @@ describe('CliSection project runtime defaults', () => {
     const getWslInstallStatus = vi
       .fn()
       .mockResolvedValue({ supported: true, state: 'installed', pathConfigured: true })
+    const getInstallStatus = vi.fn()
+    const installWsl = vi.fn()
     vi.stubGlobal('window', {
       api: {
         cli: {
-          getInstallStatus: vi.fn(),
+          getInstallStatus,
           getWslInstallStatus,
-          installWsl: vi.fn()
+          installWsl
+        },
+        runtime: {
+          call: vi.fn(async ({ method, params }: { method: string; params?: unknown }) => {
+            if (method === 'cli.getInstallStatus') {
+              return { ok: true, result: await getInstallStatus() }
+            }
+            if (method === 'cli.getWslInstallStatus') {
+              return { ok: true, result: await getWslInstallStatus(params) }
+            }
+            if (method === 'cli.installWsl') {
+              return { ok: true, result: await installWsl(params) }
+            }
+            throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+          })
         },
         shell: { openPath: vi.fn() }
       }

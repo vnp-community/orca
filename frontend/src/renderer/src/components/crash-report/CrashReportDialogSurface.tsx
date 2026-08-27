@@ -28,6 +28,10 @@ import {
   getCrashReportSubmitWarningNotice
 } from './crash-report-submit-notice'
 import { useCrashReportCopy } from './use-crash-report-copy'
+import {
+  dismissRuntimeCrashReport,
+  submitRuntimeCrashReport
+} from '@/runtime/runtime-crash-reports-client'
 
 function formatSummary(report: CrashReportRecord): string {
   if (isReactErrorBoundaryReport(report)) {
@@ -153,7 +157,7 @@ export function CrashReportDialogSurface({
 
   const dismissReportIfNeeded = async (): Promise<void> => {
     if (report?.status === 'pending') {
-      await window.api.crashReports.dismiss({ reportId: report.id })
+      await dismissRuntimeCrashReport(report.id)
       if (mountedRef.current) {
         onReportChange({ ...report, status: 'dismissed' })
       }
@@ -170,7 +174,9 @@ export function CrashReportDialogSurface({
   const handleSubmit = async (): Promise<void> => {
     setSubmitting(true)
     try {
-      const result = await window.api.crashReports.submit({
+      // Why: mirror web's own "Unavailable on web" preload stub result when the
+      // wrapper no-ops to null (web is gated out of the desktop-only RPC path).
+      const result = (await submitRuntimeCrashReport({
         ...(report ? { reportId: report.id } : {}),
         notes,
         includeDiagnosticLogs,
@@ -179,7 +185,11 @@ export function CrashReportDialogSurface({
         submitAnonymously: !viewer,
         githubLogin: viewer?.login ?? null,
         githubEmail: null
-      })
+      })) ?? {
+        ok: false as const,
+        status: null,
+        error: translate('auto.web.web.preload.api.fb290366b2', 'Unavailable on web.')
+      }
       if (!result.ok) {
         showSubmitFailure(result.error, result.diagnosticBundle)
         console.error('Failed to submit crash report:', result.error)

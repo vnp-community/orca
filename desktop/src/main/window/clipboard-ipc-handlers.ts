@@ -42,7 +42,10 @@ type ClipboardWriteFileRequest = {
   connectionId?: string
 }
 
-async function saveClipboardImageBufferForTarget(
+// Why: exported so the ui.saveClipboardImageAsTempFile RPC method (desktop
+// runtime/rpc/methods/ui-actions.ts) can call the exact same temp-file logic
+// the ipcMain 'clipboard:saveImageAsTempFile' handler uses below.
+export async function saveClipboardImageBufferForTarget(
   buffer: Buffer,
   args?: SaveClipboardImageAsTempFileArgs
 ): Promise<string> {

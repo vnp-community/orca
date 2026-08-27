@@ -3,6 +3,7 @@ import { Check, Copy } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const LOG_EXCERPT_ERROR_LINE_PATTERN =
   /(?:##\[error\]|::error::|::error\b|\berror:|FAILED|exit code|ENOENT|EACCES|panic:|AssertionError)/i
 
@@ -58,7 +59,7 @@ function CopyButton({
   const handleCopy = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
-      void window.api.ui.writeClipboardText(text).then(() => {
+      void uiWriteClipboardText(text).then(() => {
         if (!isMountedRef.current) {
           return
         }

@@ -6,10 +6,11 @@ import { OnboardingInlineCommandTerminal } from '@/components/onboarding/Onboard
 import { ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND } from '@/lib/agent-feature-install-commands'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function CliSkillSetupTerminal(): React.JSX.Element {
   const handleCopySkillCommand = async (): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND)
+      await uiWriteClipboardText(ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND)
       toast.success(
         translate(
           'auto.components.feature.tips.CliSkillSetupTerminal.b8ad063571',

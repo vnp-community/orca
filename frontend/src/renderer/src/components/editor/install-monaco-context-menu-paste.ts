@@ -9,6 +9,7 @@ import {
   runOrcaContextMenuPaste
 } from './monaco-context-menu-paste'
 
+import { uiReadClipboardText } from '@/runtime/runtime-ui-client'
 let installed = false
 
 /**
@@ -35,7 +36,7 @@ export function installMonacoContextMenuPaste(monaco: typeof Monaco): void {
       runOrcaContextMenuPaste({
         getFocusedEditor: () =>
           monaco.editor.getEditors().find((candidate) => candidate.hasTextFocus()) ?? null,
-        readClipboardText: (options) => window.api.ui.readClipboardText(options),
+        readClipboardText: (options) => uiReadClipboardText(options),
         getClipboardMetadata: (text) => InMemoryClipboardMetadataManager.INSTANCE.get(text),
         emptySelectionClipboardOptionId: monaco.editor.EditorOption.emptySelectionClipboard,
         readOnlyOptionId: monaco.editor.EditorOption.readOnly,

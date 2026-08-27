@@ -1,4 +1,5 @@
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { registerLocalhostWorktreeLabel } from '../runtime/runtime-localhost-worktree-labels-client'
 import {
   parseLoopbackUrlWithPort,
   type LocalhostWorktreeLabelRoute
@@ -6,6 +7,7 @@ import {
 import type { GlobalSettings } from '../../../shared/types'
 import type { WorkspacePort, WorkspacePortScanResult } from '../../../shared/workspace-ports'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 export type OpenHttpLinkOptions = {
   worktreeId?: string | null
   forceSystemBrowser?: boolean
@@ -100,11 +102,11 @@ export function openHttpLink(url: string, opts: OpenHttpLinkOptions = {}): void 
 
   const localhostRoute = state ? localhostLabelRouteForHttpLink(url, state, sourceOwner) : null
   if (!localhostRoute) {
-    void window.api.shell.openUrl(url)
+    void shellOpenUrl(url)
     return
   }
   void openLabeledLocalhostLink(url, localhostRoute, (labeledUrl) => {
-    void window.api.shell.openUrl(labeledUrl)
+    void shellOpenUrl(labeledUrl)
   })
 }
 
@@ -136,7 +138,11 @@ export async function resolveLocalhostHttpLinkDisplayUrl(url: string): Promise<s
     return null
   }
   try {
-    const result = await window.api.localhostWorktreeLabels.register(localhostRoute)
+    // Why: localhost labeling always targets this device's own workspace-port
+    // scan data (see localhostLabelRouteForTerminalLink), independent of the
+    // globally active runtime environment — force local resolution rather
+    // than branching on settings.activeRuntimeEnvironmentId.
+    const result = await registerLocalhostWorktreeLabel(undefined, localhostRoute)
     return result.url
   } catch {
     return null
@@ -149,7 +155,8 @@ async function openLabeledLocalhostLink(
   open: (url: string) => void
 ): Promise<void> {
   try {
-    const result = await window.api.localhostWorktreeLabels.register(route)
+    // Why: see resolveLocalhostHttpLinkDisplayUrl — always local.
+    const result = await registerLocalhostWorktreeLabel(undefined, route)
     open(result.url)
   } catch {
     open(fallbackUrl)

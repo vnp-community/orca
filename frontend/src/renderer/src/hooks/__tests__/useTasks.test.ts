@@ -31,13 +31,13 @@ describe('useTasks', () => {
     mockRpc.mockResolvedValue([])
   })
 
-  it('fetches tasks via tasks.list(projectId) on mount', async () => {
+  it('fetches tasks via task.list(projectId) on mount', async () => {
     mockRpc.mockResolvedValueOnce([{ id: 't1', title: 'Task 1', projectId: 'p1', status: 'todo' }])
     const { useTasks } = await import('../useTasks')
     renderHook(() => useTasks('p1'))
-    
+
     await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'tasks.list', { projectId: 'p1' })
+      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.list', { projectId: 'p1' })
       expect(mockStore.setTasks).toHaveBeenCalledWith([{ id: 't1', title: 'Task 1', projectId: 'p1', status: 'todo' }])
     })
   })

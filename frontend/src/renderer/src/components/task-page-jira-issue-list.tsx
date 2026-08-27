@@ -8,6 +8,7 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { JiraIssue, JiraProjectStatusOrder } from '../../../shared/types'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 export type TaskPageJiraIssueSection = {
   key: string
   label: string
@@ -255,7 +256,7 @@ function JiraIssueRow({
               size="icon-xs"
               onClick={(event) => {
                 event.stopPropagation()
-                window.api.shell.openUrl(issue.url)
+                shellOpenUrl(issue.url)
               }}
               aria-label={translate(
                 'auto.components.TaskPage.4ac8ff2275',

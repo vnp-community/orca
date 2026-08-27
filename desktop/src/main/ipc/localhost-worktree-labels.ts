@@ -13,17 +13,24 @@ import {
   scanWorkspacePortProbes
 } from '../ports/workspace-port-ownership'
 
+/** Underlying implementation of `localhostWorktreeLabels:register` — also called by the RPC method. */
+export async function registerLocalhostWorktreeLabelRoute(
+  store: Store,
+  rawArgs: unknown
+): Promise<LocalhostWorktreeLabelResult> {
+  const route = parseRegisterArgs(rawArgs)
+  // Why: the proxy will forward to any host it's given, so we restrict the
+  // target to loopback or a host:port that matches a live workspace port —
+  // otherwise this IPC is an open proxy / SSRF vector.
+  await assertAllowedTarget(store, route.targetUrl)
+  return localhostWorktreeLabelProxy.registerRoute(route)
+}
+
 export function registerLocalhostWorktreeLabelHandlers(store: Store): void {
   ipcMain.handle(
     'localhostWorktreeLabels:register',
-    async (_event, rawArgs: unknown): Promise<LocalhostWorktreeLabelResult> => {
-      const route = parseRegisterArgs(rawArgs)
-      // Why: the proxy will forward to any host it's given, so we restrict the
-      // target to loopback or a host:port that matches a live workspace port —
-      // otherwise this IPC is an open proxy / SSRF vector.
-      await assertAllowedTarget(store, route.targetUrl)
-      return localhostWorktreeLabelProxy.registerRoute(route)
-    }
+    async (_event, rawArgs: unknown): Promise<LocalhostWorktreeLabelResult> =>
+      registerLocalhostWorktreeLabelRoute(store, rawArgs)
   )
 }
 

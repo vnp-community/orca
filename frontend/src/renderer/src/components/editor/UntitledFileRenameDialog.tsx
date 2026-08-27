@@ -14,6 +14,7 @@ import { getRelativePathInsideRoot } from '@/lib/path'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 
+import { shellPickDirectory } from '../../runtime/runtime-shell-client'
 type UntitledFileRenameDialogProps = {
   open: boolean
   currentName: string
@@ -78,7 +79,7 @@ export function UntitledFileRenameDialog({
   }
 
   const handleBrowse = useCallback(async () => {
-    const picked = await window.api.shell.pickDirectory({ defaultPath: dir || worktreePath })
+    const picked = await shellPickDirectory({ defaultPath: dir || worktreePath })
     if (!picked) {
       return
     }

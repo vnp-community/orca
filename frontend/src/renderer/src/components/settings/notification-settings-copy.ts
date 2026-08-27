@@ -1,6 +1,11 @@
 import { toast } from 'sonner'
 import type { GlobalSettings } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import {
+  dispatchRuntimeNotification,
+  getRuntimeNotificationPermissionStatus,
+  openRuntimeNotificationSystemSettings
+} from '@/runtime/runtime-notifications-client'
 
 type SystemNotificationSettingsCopy = {
   failureTitle: string
@@ -64,7 +69,7 @@ export async function sendNotificationSettingsTestNotification(
   volumeDraft: number,
   options?: SendTestNotificationOptions
 ): Promise<NotificationTestOutcome> {
-  const permissionStatus = await window.api.notifications.getPermissionStatus()
+  const permissionStatus = await getRuntimeNotificationPermissionStatus()
   if (!permissionStatus.supported) {
     toast.error(
       translate(
@@ -75,7 +80,7 @@ export async function sendNotificationSettingsTestNotification(
     return 'not-sent'
   }
 
-  const result = await window.api.notifications.dispatch({
+  const result = await dispatchRuntimeNotification({
     source: 'test',
     requireDisplayConfirmation: true
   })
@@ -117,7 +122,7 @@ export async function sendNotificationSettingsTestNotification(
               'Open Settings'
             ),
             onClick: () => {
-              void window.api.notifications.openSystemSettings()
+              void openRuntimeNotificationSystemSettings()
             }
           }
         }
@@ -144,7 +149,7 @@ export async function sendNotificationSettingsTestNotification(
             'Open Settings'
           ),
           onClick: () => {
-            void window.api.notifications.openSystemSettings()
+            void openRuntimeNotificationSystemSettings()
           }
         }
       })

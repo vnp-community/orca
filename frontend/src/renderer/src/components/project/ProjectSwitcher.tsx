@@ -1,7 +1,8 @@
 // ProjectSwitcher.tsx — Command-palette style project selector (TDD-FE-12)
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { useAppStore } from '../../store'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { Check, ChevronsUpDown, Loader2, Plus } from 'lucide-react'
 import { Button } from '../ui/button'
 import {
@@ -15,14 +16,31 @@ import {
 } from '../ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { cn } from '../../lib/utils'
+import { CreateProjectDialog } from './CreateProjectDialog'
+
+type OrcaProjectListItem = { id: string; name: string; devServerId: string }
 
 export function ProjectSwitcher() {
   const { project, switchProject, isInitializing } = useWorkspace()
-  const projects = useAppStore(s => (s as any).projects as any[] ?? [])
+  const [projects, setProjects] = useState<OrcaProjectListItem[]>([])
   const [open, setOpen]     = useState(false)
   const [search, setSearch] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
 
-  const filtered = (projects as { id: string; name: string; devServerId: string }[]).filter(p =>
+  const refetchProjects = () => {
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    return callRuntimeRpc<OrcaProjectListItem[]>(target, 'project.list', null)
+      .then(list => setProjects(list ?? []))
+      .catch(() => setProjects([]))
+  }
+
+  // `useAppStore`'s `projects` field is session-grant string[], not OrcaProject[] —
+  // fetch the real OrcaProject list from the backend instead of reading that field.
+  useEffect(() => {
+    void refetchProjects()
+  }, [])
+
+  const filtered = projects.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -76,13 +94,27 @@ export function ProjectSwitcher() {
               ))}
             </CommandGroup>
             <CommandSeparator />
-            <CommandItem data-testid="create-project-item">
+            <CommandItem
+              data-testid="create-project-item"
+              onSelect={() => {
+                setOpen(false)
+                setCreateOpen(true)
+              }}
+            >
               <Plus size={14} className="mr-2" />
               Create New Project
             </CommandItem>
           </CommandList>
         </Command>
       </PopoverContent>
+      <CreateProjectDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={created => {
+          void refetchProjects()
+          void switchProject(created.id)
+        }}
+      />
     </Popover>
   )
 }

@@ -69,6 +69,8 @@ import {
   getActiveRuntimeTarget
 } from '../../runtime/runtime-rpc-client'
 import { syncRuntimeGitForkDefaultBranch } from '../../runtime/runtime-git-client'
+import { getRuntimeOnboardingState } from '../../runtime/runtime-onboarding-client'
+import { findRuntimeOrcaProfileProjects } from '../../runtime/runtime-orca-profiles-client'
 import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
 import { buildDismissedOnboardingFolderAgentStartup } from '@/lib/onboarding-folder-agent-startup'
 import { markOnboardingProjectAdded } from '@/lib/onboarding-project-checklist'
@@ -87,6 +89,8 @@ import {
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { formatFolderWorkspaceCreateError } from '../../lib/folder-workspace-path-status'
+import { logRemoveProjectDiagnostic } from '@/lib/remove-project-diagnostic-log'
+import { isWebClientLocation } from '@/lib/web-client-location'
 
 const ERROR_TOAST_DURATION = 60_000
 const SAFE_AUTO_FORK_SYNC_COOLDOWN_MS = 10 * 60 * 1000
@@ -284,16 +288,23 @@ function formatProjectPresenceProfileNames(profileNames: readonly string[]): str
 
 async function warnIfProjectKnownInAnotherProfile(
   repo: Repo,
-  activeOrcaProfileId: string | null
+  activeOrcaProfileId: string | null,
+  settings: Pick<AppState, 'settings'>['settings']
 ): Promise<void> {
-  const findProjectProfiles = window.api.orcaProfiles?.findProjectProfiles
+  const target = getActiveRuntimeTarget(settings)
+  // Why: window.api.orcaProfiles is absent on the web build's preload; that
+  // only matters for the local-IPC path — an environment RPC target always
+  // has starNag/orcaProfiles coverage regardless of this process's preload.
+  if (target.kind !== 'environment' && !window.api.orcaProfiles?.findProjectProfiles) {
+    return
+  }
   // Why: without a loaded active profile ID the scan cannot exclude the
   // current profile and would false-positive on the project just added.
-  if (!findProjectProfiles || !activeOrcaProfileId) {
+  if (!activeOrcaProfileId) {
     return
   }
   try {
-    const result = await findProjectProfiles({
+    const result = await findRuntimeOrcaProfileProjects(settings, {
       path: repo.path,
       connectionId: repo.connectionId ?? null,
       executionHostId: getRepoExecutionHostId(repo),
@@ -416,16 +427,25 @@ async function fetchProjectHostSetupCompatibility(
       }
     }
     await assertProjectHostSetupRuntimeCapability(target)
-    const [projectResponse, setupResponse] = await Promise.all([
-      callRuntimeRpc<{ projects: Project[] }>(target, 'project.list', undefined, {
-        timeoutMs: 15_000
-      }),
-      callRuntimeRpc<{ setups: ProjectHostSetup[] }>(target, 'projectHostSetup.list', undefined, {
-        timeoutMs: 15_000
-      })
-    ])
+    // Why (root cause of the 'session-auth' repos crash): 'project.list' used
+    // to be this legacy repo-derived-project RPC method, but
+    // backend/src/main/runtime/rpc/methods/project-runtime-rpc-methods.ts
+    // deliberately dropped it in favor of project-rpc-handler.ts's v5.0
+    // OrcaProject 'project.list' (a different concept — collaborative,
+    // membership-scoped projects, not desktop repo/host-setup derivation).
+    // That handler returns a plain OrcaProject[] array, not {projects: [...]}
+    // — calling it here silently produced {projects: undefined}. Only
+    // 'projectHostSetup.list' still serves the legacy shape this function
+    // needs; 'projects' is derived from `repos` the same way the catch
+    // fallback below does.
+    const setupResponse = await callRuntimeRpc<{ setups: ProjectHostSetup[] }>(
+      target,
+      'projectHostSetup.list',
+      undefined,
+      { timeoutMs: 15_000 }
+    )
     return {
-      projects: projectResponse.projects,
+      projects: projectHostSetupProjectionFromRepos(repos).projects,
       setups: setupResponse.setups.map((setup) => setupWithFetchedOwner(setup, target))
     }
   } catch {
@@ -624,15 +644,31 @@ function mergeProjectHostSetupCompatibility(
   derived: Pick<RepoSlice, 'projects' | 'projectHostSetups'>,
   fetched: ProjectHostSetupProjection
 ): Pick<RepoSlice, 'projects' | 'projectHostSetups'> {
-  const fetchedSetupOwners = new Set(fetched.setups.map(getProjectHostSetupOwnerKey))
+  // Why: seen live against the 'session-auth' web environment — despite every
+  // known producer of `fetched` (fetchProjectHostSetupCompatibility's success
+  // AND catch-fallback paths) always constructing {projects, setups} as real
+  // arrays, this crashed with "Cannot read properties of undefined (reading
+  // 'map')" here specifically (confirmed via the deployed bundle's minified
+  // source, not guesswork). Root cause not pinned down — guard defensively so
+  // a malformed payload degrades instead of crashing, and log it so the next
+  // occurrence shows the real shape.
+  if (!Array.isArray(fetched.setups) || !Array.isArray(fetched.projects)) {
+    console.error(
+      '[repos] mergeProjectHostSetupCompatibility received a malformed `fetched`:',
+      fetched
+    )
+  }
+  const fetchedSetups = Array.isArray(fetched.setups) ? fetched.setups : []
+  const fetchedProjects = Array.isArray(fetched.projects) ? fetched.projects : []
+  const fetchedSetupOwners = new Set(fetchedSetups.map(getProjectHostSetupOwnerKey))
   const derivedSetups = derived.projectHostSetups.filter(
     (setup) => !fetchedSetupOwners.has(getProjectHostSetupOwnerKey(setup))
   )
-  const projectHostSetups = mergeProjectHostSetupsByOwner(derivedSetups, fetched.setups)
+  const projectHostSetups = mergeProjectHostSetupsByOwner(derivedSetups, fetchedSetups)
   const setupProjectIds = new Set(projectHostSetups.map((setup) => setup.projectId))
-  const fetchedProjectIds = new Set(fetched.projects.map((project) => project.id))
+  const fetchedProjectIds = new Set(fetchedProjects.map((project) => project.id))
   return {
-    projects: mergeProjectCompatibilityProjects(derived.projects, fetched.projects).filter(
+    projects: mergeProjectCompatibilityProjects(derived.projects, fetchedProjects).filter(
       (project) => fetchedProjectIds.has(project.id) || setupProjectIds.has(project.id)
     ),
     projectHostSetups
@@ -927,7 +963,21 @@ async function fetchRepoCatalogForTarget(
             reuseRecentCompatibilityFailure: true
           })
         ).repos
-  const repos = fetchedRepos.map((repo) => repoWithFetchedOwner(repo, target))
+  // Why: seen live against the 'session-auth' web environment — repo.list's
+  // handler always returns { repos: Repo[] } server-side, so an undefined/
+  // non-array payload here means a malformed or dropped RPC response, not a
+  // real empty catalog. Treat it as empty instead of throwing 'Cannot read
+  // properties of undefined (reading map)' out of fetchRuntimeEnvironmentRepos,
+  // which cascaded into an uncaught React render crash downstream.
+  if (!Array.isArray(fetchedRepos)) {
+    console.error(
+      `[repos] repo.list returned a non-array payload for target ${JSON.stringify(target)}:`,
+      fetchedRepos
+    )
+  }
+  const repos = (Array.isArray(fetchedRepos) ? fetchedRepos : []).map((repo) =>
+    repoWithFetchedOwner(repo, target)
+  )
   return {
     repos,
     projectHostSetupCompatibility: await fetchProjectHostSetupCompatibility(target, repos),
@@ -1742,7 +1792,13 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       return
     }
 
-    const environments = await listRuntimeEnvironmentsForAllHostLoad()
+    // Why: a paired web client has no distinct "local" host — the 'local'
+    // fetch above and runtimeEnvironments.list() both resolve to the same
+    // session-auth connection, so re-fetching it here would duplicate every
+    // repo into a phantom 'runtime:session-auth'-tagged row alongside the
+    // 'local' one already applied (the ambiguous-host errors on remove /
+    // workspace-delete traced back to exactly this duplication).
+    const environments = isWebClientLocation() ? [] : await listRuntimeEnvironmentsForAllHostLoad()
     // Why: unreachable remotes can spend the full connect timeout; merge each
     // resolved host through the state updater so parallel loads do not clobber.
     await Promise.all(
@@ -1800,7 +1856,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       return
     }
 
-    const environments = await listRuntimeEnvironmentsForAllHostLoad()
+    // Why: see the matching comment in fetchReposForAllHosts — a paired web
+    // client's runtimeEnvironments.list() is the same session-auth connection
+    // already fetched above as 'local', so looping it here would duplicate
+    // every group into a phantom 'runtime:session-auth'-tagged row.
+    const environments = isWebClientLocation() ? [] : await listRuntimeEnvironmentsForAllHostLoad()
     await Promise.all(
       environments.map(async (environment) => {
         try {
@@ -1856,7 +1916,12 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       return
     }
 
-    const environments = await listRuntimeEnvironmentsForAllHostLoad()
+    // Why: see the matching comment in fetchReposForAllHosts — a paired web
+    // client's runtimeEnvironments.list() is the same session-auth connection
+    // already fetched above as 'local', so looping it here would duplicate
+    // every folder workspace into a phantom 'runtime:session-auth'-tagged row
+    // (this is what surfaced as "Workspace identity is ambiguous across hosts").
+    const environments = isWebClientLocation() ? [] : await listRuntimeEnvironmentsForAllHostLoad()
     await Promise.all(
       environments.map(async (environment) => {
         try {
@@ -2423,7 +2488,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         )
         // Why: the design requires the cross-profile advisory for SSH-added
         // projects too — the presence lookup already keys on connection/host.
-        await warnIfProjectKnownInAnotherProfile(repo, get().activeOrcaProfileId)
+        await warnIfProjectKnownInAnotherProfile(repo, get().activeOrcaProfileId, get().settings)
       }
       return repo
     } catch (err) {
@@ -2636,7 +2701,9 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       // Falling through to the local-clone branch below would silently clone
       // onto the Orca server's own filesystem instead of the Dev Server.
       if (parsedHost?.kind === 'devServer') {
-        throw new Error('Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.')
+        throw new Error(
+          'Cloning a new repository onto a Dev Server is not supported yet. Add an existing folder instead.'
+        )
       }
       const target = getProjectSetupRuntimeTarget(args.hostId)
       if (parsedHost?.kind !== 'ssh') {
@@ -2722,7 +2789,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       const folderWorktree = get().worktreesByRepo[repo.id]?.[0]
       if (folderWorktree) {
         const { activateAndRevealWorktree } = await import('../../lib/worktree-activation')
-        const onboarding = await window.api.onboarding.get().catch(() => null)
+        const onboarding = await getRuntimeOnboardingState(get().settings).catch(() => null)
         // Why: a new user can dismiss the wizard, then immediately add their
         // first folder from Landing. That path skips onboarding's completeRepo
         // hook, so carry the selected default agent into the first terminal here.
@@ -2749,6 +2816,9 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   },
 
   removeProject: async (projectId, options) => {
+    logRemoveProjectDiagnostic(
+      `removeProject ENTER projectId=${projectId} hostId=${options?.hostId ?? 'none'}`
+    )
     try {
       // Why: pass an explicit hostId (e.g. when removing an SSH host's root repo)
       // so a duplicate id across hosts resolves to the intended row instead of
@@ -2758,6 +2828,29 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         hostId: options?.hostId
       })
       if (!ownerRepo) {
+        // Why: this used to be a silent no-op — a duplicate repo id across hosts
+        // that findRepoForHost can't disambiguate (or an already-removed id)
+        // left "Remove Project" looking like it did nothing, with no signal in
+        // the UI or the console to explain why.
+        const matchingHostIds = get()
+          .repos.filter((repo) => repo.id === projectId)
+          .map((repo) => getRepoExecutionHostId(repo))
+        console.error(
+          `Failed to remove repo: could not resolve an owning host for repo ${projectId} ` +
+            `(requestedHostId=${options?.hostId ?? 'none'}, matchingHostIds=[${matchingHostIds.join(', ')}])`
+        )
+        toast.error(
+          translate(
+            'auto.store.slices.repos.removeProjectAmbiguousHost',
+            'Failed to remove project'
+          ),
+          {
+            description: translate(
+              'auto.store.slices.repos.removeProjectAmbiguousHostDescription',
+              'Could not determine which host owns this project. Try removing it from that host directly.'
+            )
+          }
+        )
         return
       }
       const ownerHostId = getRepoExecutionHostId(ownerRepo)
@@ -2768,7 +2861,8 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       if (isRuntimeOwnedSshTargetId(ownerRepo.connectionId)) {
         await cleanupEphemeralVmRuntimesForDeleted({
           workspaceIds: getKnownRepoWorktreeIds(get(), projectId, ownerHostId),
-          runtimeOwnedSshTargetIds: [ownerRepo.connectionId as string]
+          runtimeOwnedSshTargetIds: [ownerRepo.connectionId as string],
+          settings: settingsForRepoOwner(get(), projectId, ownerHostId)
         })
       }
       // Why: derive the runtime target from the owner's own settings, passing the
@@ -2784,11 +2878,18 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       const idExistsOnOtherHost = get().repos.some(
         (repo) => repo.id === projectId && getRepoExecutionHostId(repo) !== ownerHostId
       )
+      logRemoveProjectDiagnostic(
+        `removeProject(${projectId}) resolved ownerHostId=${ownerHostId} targetKind=${target.kind} ` +
+          `${target.kind === 'environment' ? `environmentId=${target.environmentId} ` : ''}idExistsOnOtherHost=${idExistsOnOtherHost}`
+      )
       await (target.kind === 'local'
         ? idExistsOnOtherHost
           ? window.api.repos.removeForHost({ repoId: projectId, hostId: ownerHostId })
           : window.api.repos.remove({ repoId: projectId })
         : callRuntimeRpc(target, 'repo.rm', { repo: projectId }, { timeoutMs: 15_000 }))
+      logRemoveProjectDiagnostic(
+        `removeProject(${projectId}) removal call resolved without throwing`
+      )
 
       get().clearOrcaHookTrustForRepo(projectId)
       const repoPath = get().repos.find((repo) =>
@@ -2943,8 +3044,21 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
             : {})
         }
       })
+      logRemoveProjectDiagnostic(
+        `removeProject(${projectId}) local set() applied, repos.length now=${get().repos.length}`
+      )
     } catch (err) {
+      // Why: previously swallowed entirely — a failed repo.rm (e.g. RPC timeout,
+      // unauthenticated runtime session) left the project visibly unremoved with
+      // no feedback that anything had gone wrong.
+      logRemoveProjectDiagnostic(`removeProject(${projectId}) CAUGHT: ${String(err)}`)
       console.error('Failed to remove repo:', err)
+      toast.error(
+        translate('auto.store.slices.repos.removeProjectFailed', 'Failed to remove project'),
+        {
+          description: err instanceof Error ? err.message : String(err)
+        }
+      )
     }
   },
 

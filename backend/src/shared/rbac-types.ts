@@ -27,6 +27,8 @@ export type OrcaUser = {
   role: 'developer' | 'lead' | 'admin'
   provider: OrcaIdentityProvider
   providerUserId: string
+  /** orca_users.department_id (migration 0006) — null if not assigned to a department */
+  departmentId: string | null
 }
 
 export type OrcaAccessPolicy = {

@@ -2,9 +2,12 @@ import type { FeatureInteractionState } from '../../../../shared/feature-interac
 import { hasFeatureInteraction } from '../../../../shared/feature-interactions'
 import {
   FEATURE_WALL_SETUP_STEPS,
+  isAddDevServerRepoComplete,
+  isConnectDevServerComplete,
   type FeatureWallSetupStepId
 } from '../../../../shared/feature-wall-setup-steps'
-import type { GlobalSettings, Worktree } from '../../../../shared/types'
+import type { DevServer } from '../../../../shared/dev-server-types'
+import type { GlobalSettings, Repo, Worktree } from '../../../../shared/types'
 
 export type FeatureWallSetupProgressInput = {
   ready?: boolean
@@ -19,6 +22,13 @@ export type FeatureWallSetupProgressInput = {
   gitRepoCount: number
   worktreesByRepo: Record<string, Worktree[]>
   hasSetupScript: boolean
+  devServers: DevServer[]
+  // Why optional: only 'connect-dev-server' is a displayed step today (see
+  // FEATURE_WALL_SETUP_STEPS) — 'add-dev-server-repo' isn't wired to any UI
+  // yet, so callers that don't have this data on hand can omit it and get a
+  // conservative "not done" default instead of threading it through unused.
+  repos?: Repo[]
+  activeDevServerId?: string | null
 }
 
 export type FeatureWallSetupProgress = {
@@ -50,6 +60,14 @@ export function getFeatureWallSetupProgress(
     (input.computerUsePermissionsReady || input.computerUseUnavailable === true) &&
     input.orchestrationSkillInstalled
   const stepDone: Record<FeatureWallSetupStepId, boolean> = {
+    'connect-dev-server': isConnectDevServerComplete(input.devServers),
+    // Why: not currently a displayed step (see FEATURE_WALL_SETUP_STEPS) — the
+    // scaffolding from TASK-040 already had this helper ready, so compute it
+    // correctly rather than a placeholder, for whenever it gets surfaced.
+    'add-dev-server-repo': isAddDevServerRepoComplete(
+      input.repos ?? [],
+      input.activeDevServerId ?? null
+    ),
     'default-agent':
       Boolean(input.settings?.defaultTuiAgent) && input.settings?.defaultTuiAgent !== 'blank',
     'add-two-repos': input.gitRepoCount >= 2,

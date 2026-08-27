@@ -6,6 +6,7 @@ import { settingsForRuntimeOwner } from '@/runtime/runtime-rpc-client'
 import { extractIpcErrorMessage } from './rich-markdown-ipc-error-message'
 import { insertRichMarkdownImageFromPath } from './rich-markdown-image-insert'
 
+import { uiSaveClipboardImageAsTempFile } from '@/runtime/runtime-ui-client'
 export type RichMarkdownImagePasteArgs = {
   editor: Editor | null
   event: ClipboardEvent
@@ -75,5 +76,5 @@ async function saveClipboardImageForMarkdownPaste(
   // temp save through SSH would put the source file on the wrong machine.
   const connectionId = hasRuntimeOwner ? undefined : (getConnectionId(worktreeId) ?? undefined)
 
-  return window.api.ui.saveClipboardImageAsTempFile({ connectionId })
+  return uiSaveClipboardImageAsTempFile({ connectionId })
 }

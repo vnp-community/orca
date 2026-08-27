@@ -86,6 +86,22 @@ node /home/ubuntu/orca-agent/agent.js
 | [TDD-AG-12](./12-agent-spawner.md) | ProfileAware Agent Spawner — AI Agent CLI Host | C3.9, C3.11 | ADR-009 | 🚧 In-Progress |
 | [TDD-AG-13](./13-external-api-connectors.md) | External API Connectors — GitHub & GitLab | C3.12 | ADR-012 | 🚧 In-Progress |
 
+> **RPC surface — current source of truth:** the tables above (esp. TDD-AG-07,
+> 10, 11) describe the original v5.0 method set at design time. The RPC
+> surface has grown substantially since (`fs.stat`/`fs.glob`/`fs.writeFile`/
+> `fs.mkdir`/`fs.rmdir`, `git.history`/`branchCompare`/`commitCompare`/
+> `branchDiff`/`commitDiff`/`checkIgnored`/`forkSync`/`submoduleStatus`/
+> `worktree.*`, `shell.exec`, `notification.send`, `preflight.*`, `ai.*`,
+> `github.*`/`gitlab.*`, `pty.*`, and more), and — critically — the agent runs
+> **two independently-registered RPC surfaces** (a direct-WebSocket dispatch
+> table and a separate SSH-relay dispatcher), which these TDDs don't
+> distinguish. For an exhaustive, code-verified catalog of every method
+> either side of the backend↔agent connection exposes, see
+> [`specs/agent/api/`](../../api/README.md) — generated 2026-08-15 by reading
+> current source directly, with `file:line` citations and a dedicated
+> [`gaps-and-findings.md`](../../api/gaps-and-findings.md) tracking drift
+> between this TDD set and the real surface.
+
 ---
 
 ## Addendum A: v5.0 HLD Cross-References (2026-07-30)

@@ -23,6 +23,11 @@ import {
 } from '@/components/automations/automation-run-output-snapshot'
 import { translate } from '@/i18n/i18n'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import {
+  connectRuntimeSsh,
+  getRuntimeSshState,
+  needsRuntimeSshPassphrasePrompt
+} from '@/runtime/runtime-ssh-client'
 
 const AUTOMATIONS_CHANGED_EVENT = 'orca:automations-changed'
 const activeReuseDispatchTabIds = new Set<string>()
@@ -86,9 +91,10 @@ export function useAutomationDispatchEvents(): void {
 
         try {
           if (repo.connectionId) {
-            const needsPrompt = await window.api.ssh.needsPassphrasePrompt({
-              targetId: repo.connectionId
-            })
+            const needsPrompt = await needsRuntimeSshPassphrasePrompt(
+              useAppStore.getState().settings,
+              repo.connectionId
+            )
             if (needsPrompt) {
               await markDispatchResult({
                 runId: run.id,
@@ -102,10 +108,16 @@ export function useAutomationDispatchEvents(): void {
               })
               return
             }
-            const sshState = await window.api.ssh.getState({ targetId: repo.connectionId })
+            const sshState = await getRuntimeSshState(
+              useAppStore.getState().settings,
+              repo.connectionId
+            )
             if (sshState?.status !== 'connected') {
               try {
-                const connected = await window.api.ssh.connect({ targetId: repo.connectionId })
+                const connected = await connectRuntimeSsh(
+                  useAppStore.getState().settings,
+                  repo.connectionId
+                )
                 if (connected?.status !== 'connected') {
                   throw new Error('SSH target is unavailable.')
                 }

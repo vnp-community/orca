@@ -26,8 +26,11 @@ export function useSshUserAccount(
 
   useEffect(() => {
     let cancelled = false
+    // Why: ssh.getUserAccount reports the SSH-configured username for the
+    // target (no per-user Linux account provisioning exists backend-side).
+    // linuxUsername is null only when the target itself is unknown.
     callRuntimeRpc({ kind: 'local' }, 'ssh.getUserAccount', { serverId })
-      .then((result: { linuxUsername: string; provisioned: boolean }) => {
+      .then((result: { linuxUsername: string | null; provisioned: boolean }) => {
         if (!cancelled) {
           setLinuxUsername(result.linuxUsername)
           setProvisioned(result.provisioned)

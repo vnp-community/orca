@@ -8,6 +8,7 @@
  */
 
 import type { PersistedDevServer } from './dev-server-types'
+import type { ResolvedProfile } from './resolved-profile-type'
 
 /** Visibility scopes for projects */
 export type ProjectVisibility = 'private' | 'team' | 'company'
@@ -47,7 +48,7 @@ export type ProjectContext = {
   /** The dev server where the project resides */
   devServer: PersistedDevServer
   /** Merged 3-layer profile for the requesting user */
-  resolvedProfile: import('../main/profile/OrcaProfile').ResolvedProfile
+  resolvedProfile: ResolvedProfile
 }
 
 /** Parameters required to create a new project */

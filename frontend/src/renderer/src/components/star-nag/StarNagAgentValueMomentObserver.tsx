@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import { useAppStore } from '@/store'
+import {
+  prepareRuntimeStarNagAgentValueMoment,
+  showRuntimeStarNagAgentValueMoment
+} from '@/runtime/runtime-star-nag-client'
 
 // Why: leave a short quiet window after agents finish so the prompt does not
 // interrupt follow-up typing or status churn from the completed run.
@@ -80,7 +84,9 @@ export function StarNagAgentValueMomentObserver(): null {
       }
       void (async () => {
         if (!preparationRef.current) {
-          preparationRef.current = await window.api.starNag.agentValueMoment()
+          preparationRef.current = await prepareRuntimeStarNagAgentValueMoment(
+            useAppStore.getState().settings
+          )
           if (preparationRef.current.status !== 'ready') {
             pendingRef.current = false
             requestedRef.current = true
@@ -97,7 +103,7 @@ export function StarNagAgentValueMomentObserver(): null {
         }
         pendingRef.current = false
         requestedRef.current = true
-        await window.api.starNag.showAgentValueMoment()
+        await showRuntimeStarNagAgentValueMoment(useAppStore.getState().settings)
       })()
     }, CHECK_DELAY_MS)
   }, [])

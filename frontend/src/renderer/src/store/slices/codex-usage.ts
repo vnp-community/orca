@@ -10,6 +10,12 @@ import type {
   CodexUsageSummary
 } from '../../../../shared/codex-usage-types'
 import type { AppState } from '../types'
+import {
+  getCodexUsageScanState as rpcGetCodexUsageScanState,
+  getCodexUsageSnapshot as rpcGetCodexUsageSnapshot,
+  refreshCodexUsage as rpcRefreshCodexUsage,
+  setCodexUsageEnabled as rpcSetCodexUsageEnabled
+} from '../../runtime/runtime-codex-usage-client'
 
 export type CodexUsageSlice = {
   codexUsageScope: CodexUsageScope
@@ -43,9 +49,7 @@ export const createCodexUsageSlice: StateCreator<AppState, [], [], CodexUsageSli
 
   setCodexUsageEnabled: async (enabled) => {
     try {
-      const nextScanState = (await window.api.codexUsage.setEnabled({
-        enabled
-      })) as CodexUsageScanState
+      const nextScanState = (await rpcSetCodexUsageEnabled(enabled)) as CodexUsageScanState
       set({
         codexUsageScanState: enabled
           ? {
@@ -81,7 +85,7 @@ export const createCodexUsageSlice: StateCreator<AppState, [], [], CodexUsageSli
 
   fetchCodexUsage: async (opts) => {
     try {
-      const scanState = (await window.api.codexUsage.getScanState()) as CodexUsageScanState
+      const scanState = (await rpcGetCodexUsageScanState()) as CodexUsageScanState
       const currentScanState = get().codexUsageScanState
       const shouldPreserveLoadingState =
         opts?.forceRefresh === true &&
@@ -102,11 +106,11 @@ export const createCodexUsageSlice: StateCreator<AppState, [], [], CodexUsageSli
       }
 
       const { codexUsageScope, codexUsageRange } = get()
-      const snapshot = (await window.api.codexUsage.getSnapshot({
-        scope: codexUsageScope,
-        range: codexUsageRange,
-        limit: 10
-      })) as CodexUsageSnapshot
+      const snapshot = (await rpcGetCodexUsageSnapshot(
+        codexUsageScope,
+        codexUsageRange,
+        10
+      )) as CodexUsageSnapshot
       const hasCachedSnapshot =
         snapshot.scanState.lastScanCompletedAt !== null || snapshot.scanState.hasAnyCodexData
 
@@ -132,15 +136,13 @@ export const createCodexUsageSlice: StateCreator<AppState, [], [], CodexUsageSli
         })
       }
 
-      await window.api.codexUsage.refresh({
-        force: opts?.forceRefresh ?? false
-      })
+      await rpcRefreshCodexUsage(opts?.forceRefresh ?? false)
       const { codexUsageScope: refreshedScope, codexUsageRange: refreshedRange } = get()
-      const refreshedSnapshot = (await window.api.codexUsage.getSnapshot({
-        scope: refreshedScope,
-        range: refreshedRange,
-        limit: 10
-      })) as CodexUsageSnapshot
+      const refreshedSnapshot = (await rpcGetCodexUsageSnapshot(
+        refreshedScope,
+        refreshedRange,
+        10
+      )) as CodexUsageSnapshot
 
       set({
         codexUsageScanState: refreshedSnapshot.scanState,

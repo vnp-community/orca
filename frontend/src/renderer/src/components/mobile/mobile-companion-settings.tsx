@@ -6,20 +6,22 @@ import { useState } from 'react'
 import { Smartphone, Bell, Monitor, Plus, QrCode } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PairedDevicesPanel } from './paired-devices-panel'
 import { MobileNotificationSettings } from './mobile-notification-settings'
+import { getRuntimeMobilePairingQR } from '@/runtime/runtime-mobile-client'
 
 // ─── QR Pair Dialog ────────────────────────────────────────────────────────────
-// Shows the existing QR pairing flow using window.api.mobile.getPairingQR
-// (already implemented in preload/mobile IPC)
+// Shows the existing QR pairing flow via getRuntimeMobilePairingQR
+// (routes through window.api.mobile.getPairingQR locally, RPC remotely)
 
-function PairNewDeviceDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function PairNewDeviceDialog({
+  open,
+  onOpenChange
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}) {
   const [qrData, setQrData] = useState<{ qrDataUrl: string; pairingUrl: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,11 +30,13 @@ function PairNewDeviceDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     setIsLoading(true)
     setError(null)
     try {
-      const result = await window.api.mobile.getPairingQR()
+      const result = await getRuntimeMobilePairingQR()
       if (result.available) {
         setQrData({ qrDataUrl: result.qrDataUrl, pairingUrl: result.pairingUrl })
       } else {
-        setError('Mobile pairing server is not running. Ensure Orca is running with mobile support.')
+        setError(
+          'Mobile pairing server is not running. Ensure Orca is running with mobile support.'
+        )
       }
     } catch (e: any) {
       setError(e?.message ?? 'Failed to generate QR code')
@@ -44,8 +48,11 @@ function PairNewDeviceDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   // Load QR on open
   function handleOpenChange(v: boolean) {
     onOpenChange(v)
-    if (v) {loadQR()}
-    else {setQrData(null)}
+    if (v) {
+      loadQR()
+    } else {
+      setQrData(null)
+    }
   }
 
   return (
@@ -66,9 +73,7 @@ function PairNewDeviceDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           )}
 
           {error && (
-            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
-            </div>
+            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
           )}
 
           {qrData && (
@@ -84,12 +89,7 @@ function PairNewDeviceDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               <p className="text-[10px] font-mono text-muted-foreground break-all text-center">
                 {qrData.pairingUrl}
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={loadQR}
-              >
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={loadQR}>
                 Refresh QR
               </Button>
             </div>
@@ -113,11 +113,7 @@ export function MobileCompanionSettings() {
           <Smartphone size={16} className="text-muted-foreground" />
           <h3 className="text-base font-semibold">Mobile Companion</h3>
         </div>
-        <Button
-          size="sm"
-          className="h-7 gap-1 text-xs"
-          onClick={() => setPairDialogOpen(true)}
-        >
+        <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => setPairDialogOpen(true)}>
           <Plus size={12} />
           Pair New Device
         </Button>
@@ -149,10 +145,7 @@ export function MobileCompanionSettings() {
         </TabsContent>
       </Tabs>
 
-      <PairNewDeviceDialog
-        open={pairDialogOpen}
-        onOpenChange={setPairDialogOpen}
-      />
+      <PairNewDeviceDialog open={pairDialogOpen} onOpenChange={setPairDialogOpen} />
     </div>
   )
 }

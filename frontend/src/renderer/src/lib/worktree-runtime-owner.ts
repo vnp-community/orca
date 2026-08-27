@@ -192,6 +192,54 @@ export function getRuntimeEnvironmentIdForWorktree(
   return getGlobalActiveRuntimeEnvironmentId(state)
 }
 
+/**
+ * Whether enough store data has loaded to confidently tell "this worktree has
+ * no runtime-environment owner" apart from "we simply haven't fetched its
+ * repo record yet".
+ *
+ * FIX BUG-FE-PTY-001: right after a page refresh, ensureWorktreeHasInitialTerminal
+ * (worktree-activation.ts) used to fall straight through to "no owner, spawn a
+ * local terminal" the instant getRuntimeEnvironmentIdForWorktree() returned
+ * null — which it also does when the repo record for this worktree simply
+ * hasn't loaded into the store yet (repos/worktreesByRepo mid-fetch). That
+ * local terminal.create then raced the real Dev-Server session mirror landing
+ * a few hundred ms later: shouldReplaceTerminalTab() (web-session-tabs-sync.ts)
+ * correctly recognizes the local placeholder as redundant once mirrored PTYs
+ * arrive and replaces it, but the local terminal.create had already resolved
+ * server-side by then, so its PTY gets destroyed the instant it's created —
+ * surfacing as SSH_SESSION_EXPIRED on the very next open.
+ *
+ * Mirrors getRuntimeEnvironmentIdForWorktree()'s own lookup order so a caller
+ * can gate "is it safe to treat null as 'genuinely no owner'" without this
+ * function's result ever disagreeing with what that lookup would find.
+ */
+export function isRepoOwnerDataLoadedForWorktree(
+  state: WorktreeRuntimeOwnerState,
+  worktreeId: string | null | undefined
+): boolean {
+  if (!worktreeId || worktreeId === FLOATING_TERMINAL_WORKTREE_ID) {
+    return true
+  }
+  const workspaceScope = parseWorkspaceKey(worktreeId)
+  if (workspaceScope?.type === 'folder') {
+    // Why: no race reported for folder workspaces — keep this fix scoped to
+    // the repo/worktree lookup path that BUG-FE-PTY-001 actually hit.
+    return true
+  }
+  const worktree = findWorktreeRecord(state.worktreesByRepo, worktreeId)
+  if (!worktree) {
+    return false
+  }
+  if (getRuntimeEnvironmentIdFromWorktreeHost(worktree.hostId) !== undefined) {
+    // Why: a concrete worktree-level host already resolves ownership on its
+    // own (see getRuntimeEnvironmentIdForWorktree above) — the repo record
+    // is never consulted in that case, so its load state doesn't matter here.
+    return true
+  }
+  const repoId = worktree.repoId ?? getRepoIdFromWorktreeId(worktreeId)
+  return findRepoRecord(state.repos, repoId) !== null
+}
+
 export function getExplicitRuntimeEnvironmentIdForWorktree(
   state: WorktreeRuntimeOwnerState,
   worktreeId: string | null | undefined
