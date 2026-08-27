@@ -43,6 +43,9 @@ type Config struct {
 	// from FLEET_WEBHOOK_URL, empty (the default) disables webhook.Alerter
 	// entirely (see that package's doc comment).
 	FleetWebhookURL string
+	// CredentialBrokerAddr is credential-broker-service's gRPC target —
+	// dialed for relay-websocket agent token write/resolve (SOL-AWS-01).
+	CredentialBrokerAddr string
 }
 
 const defaultFleetPollIntervalSec = 30
@@ -53,11 +56,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:              base,
-		ServerDeployment:  os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
-		NATSURL:           commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
-		FleetPollInterval: fleetPollIntervalFromEnv(),
-		FleetWebhookURL:   os.Getenv("FLEET_WEBHOOK_URL"),
+		Base:                 base,
+		ServerDeployment:     os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		NATSURL:              commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		FleetPollInterval:    fleetPollIntervalFromEnv(),
+		FleetWebhookURL:      os.Getenv("FLEET_WEBHOOK_URL"),
+		CredentialBrokerAddr: commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
 	}, nil
 }
 

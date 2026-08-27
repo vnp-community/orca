@@ -12,8 +12,9 @@
 // correspondence.
 //
 //   - relay-websocket: Orca dials out to the agent's own WebSocket server
-//     (agent-connection-relay.ts), authenticating with a static
-//     ORCA_AGENT_TOKEN bearer token.
+//     (agent-connection-relay.ts), authenticating with a per-DevServer
+//     bearer token resolved fresh on every dial (AgentTokenSource, see
+//     TASK-AWS-01-03/SOL-AWS-01).
 //   - direct-websocket: the agent dials in to adapter/agentwsserver's
 //     inbound WS server, authenticating with a single-use, SHA-256-hashed
 //     token slot; a successful handshake there calls
@@ -96,6 +97,27 @@ type Client struct {
 	// sshProvisioner is nil unless WithRelaySSH was passed to New —
 	// relay-ssh mode returns ErrConnectionModeNotImplemented until it is.
 	sshProvisioner SshProvisioner
+
+	// tokens resolves relay-websocket bearer tokens per dial — nil means
+	// relay-websocket dev servers always fail to connect (WithAgentTokens
+	// was not passed to New), matching sshProvisioner's nil-means-disabled
+	// convention.
+	tokens AgentTokenSource
+}
+
+var _ usecase.LiveSessionCloser = (*Client)(nil)
+
+// AgentTokenSource is the narrow seam Client needs to resolve a
+// relay-websocket DevServer's current bearer token — implemented over
+// usecase.AgentTokenRepository + usecase.CredentialBrokerClient
+// (TASK-AWS-03-04, TASK-AWS-01-02). Defined here per this package's
+// existing "accept interfaces, return structs" convention (see
+// SshProvisioner's doc comment).
+type AgentTokenSource interface {
+	// TokenFor resolves devServer's current active relay-websocket bearer
+	// token, resolved fresh — not cached across process restarts — so a
+	// revoked token is honored on the very next dial with no deploy.
+	TokenFor(ctx context.Context, devServer domain.DevServer) (string, error)
 }
 
 // Option configures optional Client behavior beyond relay-websocket/
@@ -112,9 +134,18 @@ func WithRelaySSH(provisioner SshProvisioner) Option {
 	}
 }
 
-// New constructs a Client. cfg.Token (ORCA_AGENT_TOKEN) must be set for any
-// relay-websocket dev server to be reachable — see Config's doc comment for
-// why this is deployment-wide config rather than a per-DevServer field.
+// WithAgentTokens enables relay-websocket mode by supplying the
+// per-DevServer token resolver — see AgentTokenSource's doc comment.
+func WithAgentTokens(tokens AgentTokenSource) Option {
+	return func(c *Client) {
+		c.tokens = tokens
+	}
+}
+
+// New constructs a Client. WithAgentTokens must be passed for any
+// relay-websocket dev server to be reachable — see AgentTokenSource's doc
+// comment for why this is resolved per-dial rather than a single
+// deployment-wide config value.
 func New(cfg Config, logger *slog.Logger, opts ...Option) *Client {
 	if logger == nil {
 		logger = slog.Default()
@@ -142,12 +173,24 @@ func (c *Client) getOrCreateSession(ctx context.Context, devServer domain.DevSer
 }
 
 // getOrDialSession is relay-websocket's original path: create the session
-// lazily on first use, (re)dial if the previous connection dropped.
+// lazily on first use, (re)dial if the previous connection dropped. The
+// bearer token is resolved fresh via c.tokens on every dial — never cached
+// across process restarts — so a revoked token is honored on the very next
+// reconnect attempt (see AgentTokenSource's doc comment, TASK-AWS-01-03).
 func (c *Client) getOrDialSession(ctx context.Context, devServer domain.DevServer) (*session, error) {
+	if c.tokens == nil {
+		return nil, fmt.Errorf("devserveragent: relay-websocket support was not enabled (see WithAgentTokens)")
+	}
+	token, err := c.tokens.TokenFor(ctx, devServer)
+	if err != nil {
+		return nil, fmt.Errorf("devserveragent: resolving agent token for dev server %s: %w", devServer.ID, err)
+	}
+
 	c.mu.Lock()
 	sess, ok := c.sessions[devServer.ID]
 	if !ok {
 		sess = newSession(devServer.Host, c.cfg, c.logger)
+		sess.tokenSource = func(ctx context.Context) (string, error) { return c.tokens.TokenFor(ctx, devServer) }
 		c.sessions[devServer.ID] = sess
 	}
 	c.mu.Unlock()
@@ -155,7 +198,7 @@ func (c *Client) getOrDialSession(ctx context.Context, devServer domain.DevServe
 	if sess.isHandshaked() {
 		return sess, nil
 	}
-	if err := sess.connect(ctx); err != nil {
+	if err := sess.connect(ctx, token); err != nil {
 		return nil, err
 	}
 	return sess, nil
@@ -232,6 +275,50 @@ func (c *Client) AttachInboundSession(devServerID, host string, conn *websocket.
 	c.mu.Unlock()
 
 	sess.attachTransport(newWSTransport(conn, c.logger), info)
+}
+
+// LiveSessionCount reports the number of dev servers this Client currently
+// holds a session entry for (handshaked or not — reconnecting sessions
+// still occupy a slot) — backs agentwsserver's capacity check
+// (TASK-AWS-02-03).
+func (c *Client) LiveSessionCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.sessions)
+}
+
+// CloseSessionsForDevServerToken implements usecase.LiveSessionCloser.
+// direct-websocket only: this Client tracks at most one live session per
+// devServerID (see the Client doc comment), so "close the session
+// authenticated as tokenID" reduces to "close devServerID's current
+// session" — the token/session binding itself isn't tracked separately
+// (a revoked token's *next* handshake attempt is what actually enforces
+// revocation; this call just also drops the currently-live connection, if
+// any, per SOL-AWS-03's immediate-effect guarantee).
+func (c *Client) CloseSessionsForDevServerToken(ctx context.Context, devServerID, tokenID string) (int, error) {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok || !sess.isHandshaked() {
+		return 0, nil
+	}
+	sess.close()
+	return 1, nil
+}
+
+// HandshakeInfoFor returns the live session's most recently attached
+// HandshakeInfo for devServerID — backs ResolveConnection's optional
+// Node-version enrichment (TASK-INT-03-02). found=false covers both "no
+// session at all" and "session exists but isn't currently handshaked",
+// mirroring LiveSessionCount's mutex-guarded read shape.
+func (c *Client) HandshakeInfoFor(devServerID string) (HandshakeInfo, bool) {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok {
+		return HandshakeInfo{}, false
+	}
+	return sess.handshakeInfoSnapshot()
 }
 
 // Exec dispatches one JSON-RPC method call (e.g. "ports.scan",

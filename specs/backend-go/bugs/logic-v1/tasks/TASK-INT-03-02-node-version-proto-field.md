@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`, `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `node_version` field added to `ResolveConnectionResponse`; `usecase.HandshakeInfoProvider` port + `ResolveConnection.Sessions` optional field; `devserveragent.Client.HandshakeInfoFor`/`session.handshakeInfoSnapshot`; `handshakeInfoProvider` composition-root adapter wired in main.go; grpc handler populates the field. 3 new usecase tests (enrich, nil-Sessions, miss) all green; `go build`/`go vet`/`go test` clean. `buf breaking` skipped (stale local `main` ref); change is purely additive.
 
 ---
 

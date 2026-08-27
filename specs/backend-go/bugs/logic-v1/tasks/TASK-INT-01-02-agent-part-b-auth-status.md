@@ -5,7 +5,7 @@
 **Service:** `agent` (TypeScript, `agent/src/relay/` — NOT a backend-go service; flagged explicitly per SOL-INT-01's "Agent changes needed" section, included here because the solution calls it out as a required, if small, companion change)
 **File:** `agent/src/relay/relay.ts` (or wherever `RelayDispatcher` registers its method table — confirm exact file before editing)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `registerAuthStatusHandlers` (new `relay-auth-status-handlers.ts`) reuses `handleGitHubAuthStatus`/`handleGitLabAuthStatus` verbatim, registered via `dispatcher.onRequest` from `relay.ts`'s `main()` using `loadAgentConfig()` + a `relayLogLine`-backed `AgentLogger` (never console/stdout, which would corrupt the `--stdio` framed protocol). 3 new unit tests against a real `RelayDispatcher` all green; `tsc --noEmit` shows zero new errors; `grep` confirms both Part A and Part B now register both methods; full `src/relay/` suite shows only 2 pre-existing unrelated failures, neither touching `relay.ts` or the new file.
 
 ---
 

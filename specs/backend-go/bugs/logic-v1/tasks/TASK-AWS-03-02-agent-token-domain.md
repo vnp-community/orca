@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/agent_token.go` (new)
 **Depends on:** TASK-AWS-03-01
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `domain/agent_token.go` created verbatim per spec; `go build`/`go vet` clean; zero non-stdlib imports.
 
 ---
 

@@ -25,6 +25,16 @@ type Config struct {
 	// LoadConfigFromEnv's parameter rather than a second os.Getenv call for
 	// the same value.
 	OrcaVersion string
+	// MinAgentVersion gates a direct-websocket agent's handshake — an agent
+	// reporting an older AgentVersion is rejected with 1008 (see
+	// isBelowMinimumVersion, rejectVersion in version.go). Empty disables
+	// the check entirely (fail open — matches an agent build too old to
+	// send agentVersion at all, see server.go's firstNonEmpty fallback).
+	MinAgentVersion string
+	// MaxConcurrentSessions caps live direct-websocket sessions accepted by
+	// this process — see capacity.go (TASK-AWS-02-03). <= 0 disables the
+	// check.
+	MaxConcurrentSessions int
 }
 
 // LoadConfigFromEnv reads ORCA_AGENT_API_SECRET and combines it with
@@ -33,8 +43,10 @@ type Config struct {
 // so this avoids re-reading ORCA_VERSION redundantly.
 func LoadConfigFromEnv(port int, orcaVersion string) Config {
 	return Config{
-		Port:        port,
-		APISecret:   os.Getenv("ORCA_AGENT_API_SECRET"),
-		OrcaVersion: orcaVersion,
+		Port:                  port,
+		APISecret:             os.Getenv("ORCA_AGENT_API_SECRET"),
+		OrcaVersion:           orcaVersion,
+		MinAgentVersion:       os.Getenv("ORCA_AGENT_MIN_VERSION"), // e.g. "1.0.0"; empty = no check
+		MaxConcurrentSessions: 500,                                 // circuit-breaker default, see capacity.go's doc comment — not a tuned production limit
 	}
 }

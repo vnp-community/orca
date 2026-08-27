@@ -115,6 +115,81 @@ func TestResolveConnection_Found_ReturnsConnectedAndDevServer(t *testing.T) {
 	}
 }
 
+// fakeHandshakeInfoProvider is an in-memory usecase.HandshakeInfoProvider
+// for TASK-INT-03-02's node_version enrichment tests.
+type fakeHandshakeInfoProvider struct {
+	byDevServer map[string]string // devServerID -> nodeVersion
+}
+
+func (f fakeHandshakeInfoProvider) NodeVersionFor(devServerID string) (string, bool) {
+	v, ok := f.byDevServer[devServerID]
+	return v, ok
+}
+
+// TestResolveConnection_Sessions_EnrichesNodeVersion covers TASK-INT-03-02:
+// a connected resolution with Sessions set gets NodeVersion populated from
+// the live session.
+func TestResolveConnection_Sessions_EnrichesNodeVersion(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	uc := NewResolveConnection(resolver)
+	uc.Sessions = fakeHandshakeInfoProvider{byDevServer: map[string]string{"ds1": "20.11.0"}}
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.NodeVersion != "20.11.0" {
+		t.Errorf("NodeVersion = %q, want 20.11.0", out.NodeVersion)
+	}
+}
+
+// TestResolveConnection_Sessions_NilLeavesNodeVersionEmpty covers the
+// default (nil Sessions) case: NodeVersion stays empty, never an error.
+func TestResolveConnection_Sessions_NilLeavesNodeVersionEmpty(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	uc := NewResolveConnection(resolver)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.NodeVersion != "" {
+		t.Errorf("NodeVersion = %q, want empty when Sessions is nil", out.NodeVersion)
+	}
+}
+
+// TestResolveConnection_Sessions_MissLeavesNodeVersionEmpty covers a
+// Sessions miss (no live session, or a session that predates the field) —
+// still not an error.
+func TestResolveConnection_Sessions_MissLeavesNodeVersionEmpty(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	uc := NewResolveConnection(resolver)
+	uc.Sessions = fakeHandshakeInfoProvider{byDevServer: map[string]string{}}
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.NodeVersion != "" {
+		t.Errorf("NodeVersion = %q, want empty on a Sessions miss", out.NodeVersion)
+	}
+}
+
 // Branch 2: not found — no dev server owns this connectionId, meaning
 // "execute locally". This must NOT be an error.
 func TestResolveConnection_NotFound_ReturnsNotConnectedWithoutError(t *testing.T) {

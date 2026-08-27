@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/cmd/server/main.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — credential-broker-service dialed in main.go, credentialBrokerClient threaded through RegisterRealChannels' signature and call site; `go build`/`go vet ./services/api-gateway/...` clean. See TASK-INT-02-02's Status for why the client is not yet consumed by any channel.
 
 ---
 

@@ -19,11 +19,12 @@ import (
 // three under test (CLI agent access, BUG-CLI-02) — each RPC handler this
 // package's tests exercise only touches its own field, so leaving the rest
 // nil is safe and avoids constructing all ~30 of this service's usecases
-// just to contract-test three handlers. The 4 trailing nils are the
-// fleet-import/bulk-provision/detect/preflight usecases (BL-FLEET-01..04)
-// New() also now takes — untouched by these tests, which construct their
-// own *Server{...} literals directly (see below) when they need those
-// fields instead.
+// just to contract-test three handlers. The 4 trailing nils before the
+// agent-token trio are the fleet-import/bulk-provision/detect/preflight
+// usecases (BL-FLEET-01..04); the final 3 nils are the persistent
+// agent-token usecases (BL-AWS-03) — both untouched by these tests, which
+// construct their own *Server{...} literals directly (see below) when they
+// need those fields instead.
 func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sendTerminalInput *usecase.SendTerminalInput, getTerminalScrollback *usecase.GetTerminalScrollback) *Server {
 	return New(
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
@@ -32,6 +33,7 @@ func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sen
 		nil, nil, nil, // scrollback-snapshot usecases (SOL-TM-03), unused by this package's tests
 		getAgentTerminalSession, sendTerminalInput, getTerminalScrollback,
 		nil, nil, nil, nil, // fleet import/bulk-provision/detect/preflight usecases, unused here
+		nil, nil, nil, // persistent agent-token usecases (BL-AWS-03), unused here
 	)
 }
 

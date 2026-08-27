@@ -75,6 +75,11 @@ type Server struct {
 
 	detectDevServerAgents   *usecase.DetectDevServerAgents
 	checkDevServerPreflight *usecase.CheckDevServerPreflight
+
+	// --- Persistent agent tokens (BL-AWS-03, TASK-AWS-03-07) ---
+	createAgentToken *usecase.CreateAgentToken
+	listAgentTokens  *usecase.ListAgentTokens
+	revokeAgentToken *usecase.RevokeAgentToken
 }
 
 func New(
@@ -115,6 +120,9 @@ func New(
 	bulkProvisionFleet *usecase.BulkProvisionFleet,
 	detectDevServerAgents *usecase.DetectDevServerAgents,
 	checkDevServerPreflight *usecase.CheckDevServerPreflight,
+	createAgentToken *usecase.CreateAgentToken,
+	listAgentTokens *usecase.ListAgentTokens,
+	revokeAgentToken *usecase.RevokeAgentToken,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -158,6 +166,10 @@ func New(
 
 		detectDevServerAgents:   detectDevServerAgents,
 		checkDevServerPreflight: checkDevServerPreflight,
+
+		createAgentToken: createAgentToken,
+		listAgentTokens:  listAgentTokens,
+		revokeAgentToken: revokeAgentToken,
 	}
 }
 
@@ -190,6 +202,7 @@ func (s *Server) ResolveConnection(ctx context.Context, req *infrafleetv1.Resolv
 		resp.RepoPath = out.RepoPath
 		resp.WorktreeId = out.WorktreeID
 		resp.ConnectionId = out.ConnectionID
+		resp.NodeVersion = out.NodeVersion
 	}
 	return resp, nil
 }
@@ -412,6 +425,44 @@ func (s *Server) KillWorkspacePort(ctx context.Context, req *infrafleetv1.KillWo
 	return &infrafleetv1.KillWorkspacePortResponse{Ok: ok, Reason: reason}, nil
 }
 
+// CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
+// persistent, named, per-DevServer agent token admin surface — see
+// specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-03-agent-token-management.md.
+
+func (s *Server) CreateAgentToken(ctx context.Context, req *infrafleetv1.CreateAgentTokenRequest) (*infrafleetv1.CreateAgentTokenResponse, error) {
+	plaintext, tok, err := s.createAgentToken.Execute(ctx, req.GetDevServerId(), req.GetName())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CreateAgentTokenResponse{
+		Id: tok.ID, Token: plaintext, Name: tok.Name, CreatedAtUnixMs: tok.CreatedAt.UnixMilli(),
+	}, nil
+}
+
+func (s *Server) ListAgentTokens(ctx context.Context, req *infrafleetv1.ListAgentTokensRequest) (*infrafleetv1.ListAgentTokensResponse, error) {
+	summaries, err := s.listAgentTokens.Execute(ctx, req.GetDevServerId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.AgentTokenSummary, 0, len(summaries))
+	for _, sum := range summaries {
+		pb := &infrafleetv1.AgentTokenSummary{Id: sum.ID, Name: sum.Name, CreatedAtUnixMs: sum.CreatedAt.UnixMilli()}
+		if sum.LastUsedAt != nil {
+			ms := sum.LastUsedAt.UnixMilli()
+			pb.LastUsedAtUnixMs = &ms
+		}
+		out = append(out, pb)
+	}
+	return &infrafleetv1.ListAgentTokensResponse{Tokens: out}, nil
+}
+
+func (s *Server) RevokeAgentToken(ctx context.Context, req *infrafleetv1.RevokeAgentTokenRequest) (*emptypb.Empty, error) {
+	if err := s.revokeAgentToken.Execute(ctx, req.GetDevServerId(), req.GetId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
 // ListBrowserProfiles backs the frontend's browser.profileList channel —
 // see usecase.ListBrowserProfiles's doc comment (SOL-006 Group C).
 func (s *Server) ListBrowserProfiles(ctx context.Context, req *infrafleetv1.ListBrowserProfilesRequest) (*infrafleetv1.ListBrowserProfilesResponse, error) {
@@ -501,6 +552,8 @@ func (s *Server) SpawnTerminalSession(ctx context.Context, req *infrafleetv1.Spa
 		Cols:             req.GetCols(),
 		Rows:             req.GetRows(),
 		ShellIntegration: req.GetShellIntegration(),
+		Command:          req.GetCommand(),
+		UserID:           req.GetUserId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

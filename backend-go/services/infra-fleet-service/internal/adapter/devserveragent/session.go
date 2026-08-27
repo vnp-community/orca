@@ -85,6 +85,14 @@ type session struct {
 
 	closeCh chan struct{}
 	closeMu sync.Mutex
+
+	// tokenSource resolves this session's current relay-websocket bearer
+	// token, re-invoked on every (re)connect so a token rotated between
+	// attempts is picked up with no process restart — set by Client at
+	// newSession time for relay-websocket only; nil for
+	// direct-websocket/relay-ssh, which never call connect(). See
+	// TASK-AWS-01-03/SOL-AWS-01.
+	tokenSource func(ctx context.Context) (string, error)
 }
 
 // wsURL builds ws://host:port/orca-relay — the fixed path
@@ -104,20 +112,21 @@ func newSession(host string, cfg Config, logger *slog.Logger) *session {
 	}
 }
 
-// connect dials the agent and runs the initiator handshake. Safe to call
-// again after a disconnect (reconnect path) — each call replaces
-// s.transport. relay-websocket only — direct-websocket/relay-ssh sessions
-// never call this, see attachTransport's callers.
-func (s *session) connect(ctx context.Context) error {
-	if s.cfg.Token == "" {
-		return fmt.Errorf("devserveragent: ORCA_AGENT_TOKEN is not configured — relay-websocket mode requires it (see specs/agent/api/connection-modes.md §2)")
+// connect dials the agent and runs the initiator handshake using token
+// (resolved per-dial by the caller — see Client.AgentTokenSource). Safe to
+// call again after a disconnect (reconnect path). relay-websocket only —
+// direct-websocket/relay-ssh sessions never call this, see
+// attachTransport's callers.
+func (s *session) connect(ctx context.Context, token string) error {
+	if token == "" {
+		return fmt.Errorf("devserveragent: no relay-websocket token resolved for this dev server (see SOL-AWS-01)")
 	}
 
 	dialCtx, cancel := context.WithTimeout(ctx, s.cfg.DialTimeout)
 	defer cancel()
 
 	header := http.Header{}
-	header.Set("Authorization", "Bearer "+s.cfg.Token)
+	header.Set("Authorization", "Bearer "+token)
 	conn, _, err := websocket.Dial(dialCtx, s.wsURL(), &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		return fmt.Errorf("devserveragent: dial %s: %w", s.wsURL(), err)
@@ -452,7 +461,14 @@ func (s *session) backgroundReconnect() {
 		s.mu.Unlock()
 
 		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.DialTimeout+s.cfg.HandshakeTimeout)
-		err := s.connect(ctx)
+		token := ""
+		var err error
+		if s.tokenSource != nil {
+			token, err = s.tokenSource(ctx)
+		}
+		if err == nil {
+			err = s.connect(ctx, token)
+		}
 		cancel()
 
 		s.mu.Lock()
@@ -539,12 +555,14 @@ func (s *session) isHandshaked() bool {
 }
 
 // handshakeInfoSnapshot returns the HandshakeInfo captured at the most
-// recent attachTransport, if this session has completed one — see
-// Client.LastHandshakeInfo's doc comment for why this exists.
+// recent attachTransport, if this session has completed one and is still
+// live — shared by Client.LastHandshakeInfo (SOL-FLEET-04) and
+// Client.HandshakeInfoFor (TASK-INT-03-02), both narrow wrappers over this
+// same session-local read.
 func (s *session) handshakeInfoSnapshot() (HandshakeInfo, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.handshaked {
+	if !s.handshaked || s.transport == nil {
 		return HandshakeInfo{}, false
 	}
 	return s.handshakeInfo, true

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/usecase/preflight.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — usecase/preflight.go created with PreflightCheckResult/MergePreflightStatuses; preflight_test.go covers relay-overrides-local, relay-only-append, relayErr-produces-connectivity-warning-only-even-with-nonempty-relay, stable ordering, and empty inputs — all pass.
 
 ---
 

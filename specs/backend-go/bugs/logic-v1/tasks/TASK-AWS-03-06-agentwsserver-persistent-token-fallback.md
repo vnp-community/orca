@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/agentwsserver/server.go`, `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/client.go`
 **Depends on:** TASK-AWS-03-04, TASK-AWS-03-05
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `TokenValidator` port + `Server.Tokens` fallback wired into `handleConnection`; `Client.CloseSessionsForDevServerToken` implements `usecase.LiveSessionCloser`; main.go wires `agentTokenValidator`/`agentTokenStore`; 4 new tests (persistent-token success + non-single-use, revoked-token rejected, close active session, close with no live session) all green.
 
 ---
 

@@ -44,6 +44,13 @@ service InfraFleetService {
   rpc EstablishConnection(EstablishConnectionRequest) returns (Connection);
   rpc KillWorkspacePort(KillWorkspacePortRequest) returns (KillWorkspacePortResponse);
 
+  // CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
+  // persistent, named, per-DevServer agent token admin surface — see
+  // specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-03-agent-token-management.md.
+  rpc CreateAgentToken(CreateAgentTokenRequest) returns (CreateAgentTokenResponse);
+  rpc ListAgentTokens(ListAgentTokensRequest) returns (ListAgentTokensResponse);
+  rpc RevokeAgentToken(RevokeAgentTokenRequest) returns (google.protobuf.Empty);
+
   // --- Terminal/PTY lifecycle (control-plane, unary) ---
   rpc SpawnTerminalSession(SpawnTerminalSessionRequest) returns (SpawnTerminalSessionResponse);
   rpc ResizeTerminalSession(ResizeTerminalSessionRequest) returns (google.protobuf.Empty);
@@ -230,6 +237,11 @@ message ResolveConnectionResponse {
   // valid Relay connection_id without re-deriving it from DevServer.id,
   // which is a different id space (dev_servers.id, not connections.id).
   string connection_id = 5;
+  // node_version is the connected session's self-reported Node.js version
+  // (devserveragent.HandshakeInfo.NodeVersion, captured at handshake time)
+  // — empty when connected is false or the session predates this field.
+  // Added for SOL-INT-03's preflight merge; not populated by any other RPC.
+  string node_version = 6;
 }
 
 message ListDevServersRequest {
@@ -365,6 +377,17 @@ message SpawnTerminalSessionRequest {
   // unexamined to the agent's pty.create; see SOL-TM-04. Defaults to
   // false — existing callers that don't set it see no behavior change.
   bool   shell_integration = 6;
+  // command, when set, is the initial command line the spawned shell runs
+  // (agent's pty.create `command` param) instead of an interactive shell
+  // prompt — added for github.startAuthLogin/gitlab.startAuthLogin
+  // (TASK-INT-01-01), which spawn `gh auth login`/`glab auth login`
+  // directly rather than typing it into an interactive shell.
+  string command = 7;
+  // user_id engages pty-handler.ts's per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR
+  // env isolation for a `gh `/`glab `-prefixed command — see
+  // pty-handler.ts:680-699. Always set from the caller's authenticated
+  // identity server-side (wscompat), never trusted from client args.
+  string user_id = 8;
 }
 message SpawnTerminalSessionResponse {
   TerminalSession session = 1;
@@ -645,3 +668,24 @@ message CheckDevServerPreflightResponse {
   PortCheckResult port = 4;
   CheckResult gh = 5;
 }
+
+// --- Persistent agent tokens (BL-AWS-03) -----------------------------------
+
+message CreateAgentTokenRequest  { string dev_server_id = 1; string name = 2; }
+message CreateAgentTokenResponse {
+  string id = 1;
+  string token = 2; // plaintext — shown once, never returned again
+  string name = 3;
+  int64 created_at_unix_ms = 4;
+}
+
+message AgentTokenSummary {
+  string id = 1;
+  string name = 2;
+  int64 created_at_unix_ms = 3;
+  optional int64 last_used_at_unix_ms = 4;
+}
+message ListAgentTokensRequest  { string dev_server_id = 1; }
+message ListAgentTokensResponse { repeated AgentTokenSummary tokens = 1; }
+
+message RevokeAgentTokenRequest { string dev_server_id = 1; string id = 2; }

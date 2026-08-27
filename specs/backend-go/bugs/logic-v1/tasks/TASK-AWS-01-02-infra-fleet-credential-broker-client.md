@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/ports.go`, `backend-go/services/infra-fleet-service/internal/adapter/grpcclient/credential_broker_client.go` (new), `backend-go/services/infra-fleet-service/internal/config/config.go`, `backend-go/services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-AWS-01-01
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — port + adapter + config + dial wiring added; `credentialBrokerClient` constructed in main.go (real usage wired in by TASK-AWS-01-03/03-05/03-06/03-07); `go build`/`go vet` clean.
 
 ---
 

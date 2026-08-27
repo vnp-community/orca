@@ -18,6 +18,14 @@ type SpawnTerminalSessionInput struct {
 	Cols             int32
 	Rows             int32
 	ShellIntegration bool // BR-TM-13 — forwarded to SpawnPtyInput, never inspected here
+	// Command, when set, is the initial command line the spawned shell runs
+	// instead of an interactive prompt — see infrafleet.proto's
+	// SpawnTerminalSessionRequest.command doc comment (TASK-INT-01-01).
+	Command string
+	// UserID engages pty-handler.ts's per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR
+	// isolation for a gh/glab Command — always the caller's authenticated
+	// identity, set server-side by wscompat, never client-supplied.
+	UserID string
 }
 
 // SpawnTerminalSession creates a new PTY on the dev server ConnectionID
@@ -70,6 +78,8 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 	result, err := uc.agent.SpawnPty(ctx, devServer, SpawnPtyInput{
 		Cwd: in.Cwd, Shell: in.Shell, Cols: in.Cols, Rows: in.Rows,
 		ShellIntegration: in.ShellIntegration,
+		Command:          in.Command,
+		UserID:           in.UserID,
 	})
 	if err != nil {
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindInternal, "INFRA_AGENT_SPAWN_PTY_FAILED", "failed to spawn pty on dev server agent", err)

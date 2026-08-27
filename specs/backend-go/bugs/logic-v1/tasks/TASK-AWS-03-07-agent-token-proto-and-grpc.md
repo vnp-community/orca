@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`, `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`, `backend-go/services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-AWS-03-05
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — 3 RPCs + messages added to infrafleet.proto, `buf generate` regenerated stubs; 3 handlers added to `grpc/server.go`; usecases constructed and wired in main.go; `go build`/`go vet`/`go test` clean across proto, credential-broker-service, infra-fleet-service. `buf breaking` skipped (local `main` git ref in this worktree predates backend-go); change is purely additive.
 
 ---
 

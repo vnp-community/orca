@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/ports.go`
 **Depends on:** TASK-AWS-03-02
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `AgentTokenRepository`/`LiveSessionCloser` appended to `usecase/ports.go` verbatim; `go build` clean.
 
 ---
 
