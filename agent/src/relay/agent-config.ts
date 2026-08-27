@@ -6,7 +6,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-export type AgentConnectionMode = 'direct-websocket' | 'relay-websocket'
+export type AgentConnectionMode = 'direct-websocket' | 'relay-websocket' | 'stdio'
 export type AgentLogLevel = 'info' | 'debug' | 'warn' | 'error'
 
 export type AgentConfig = {
@@ -70,7 +70,52 @@ function deriveHttpUrl(wsUrl: string): string {
   }
 }
 
-export function loadAgentConfig(): AgentConfig {
+/**
+ * @param opts.stdio  Force stdio-mode config loading (used by tests). When
+ *   omitted, autodetected from `process.argv.includes('--stdio')` — the same
+ *   flag agent-entry.ts checks before calling this function.
+ */
+export function loadAgentConfig(opts?: { stdio?: boolean }): AgentConfig {
+  const home = homedir()
+  const toolPath = buildToolPath(home)
+  const toolEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    PATH:              toolPath,
+    HOME:              home,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '',
+    GITHUB_TOKEN:      process.env.GITHUB_TOKEN      ?? '',
+    GH_TOKEN:          process.env.GH_TOKEN          ?? '',
+  }
+  const devServerId = process.env.DEV_SERVER_ID || 'dev-local'
+  const logLevel     = (process.env.LOG_LEVEL || 'info') as AgentLogLevel
+  const workDir      = process.env.AGENT_WORK_DIR || process.cwd()
+  const credentialDir = join(home, '.orca', 'credentials')
+
+  // stdio mode: the Go backend (infra-fleet-service) SSH-deploys this same
+  // bundle and launches it as `node agent.js --stdio`, wiring stdin/stdout to
+  // an SSH exec channel. The SSH connection itself is the transport AND the
+  // trust boundary — there is no URL to dial and no token to validate, so all
+  // of ORCA_URL/agentPort/agentToken/apiSecret/tlsRejectUnauthorized are
+  // irrelevant and must not be required (unlike the two WS modes below).
+  const isStdio = opts?.stdio ?? process.argv.includes('--stdio')
+  if (isStdio) {
+    return {
+      mode: 'stdio',
+      orcaUrl: '',
+      orcaHttpUrl: '',
+      agentToken: '',
+      apiSecret: '',
+      agentPort: 0,
+      devServerId,
+      logLevel,
+      workDir,
+      toolPath,
+      toolEnv,
+      credentialDir,
+      tlsRejectUnauthorized: true,
+    }
+  }
+
   // Use || instead of ?? so that empty string env vars also fall back to defaults.
   const rawMode = process.env.MODE || 'direct-websocket'
   if (rawMode !== 'direct-websocket' && rawMode !== 'relay-websocket') {
@@ -79,9 +124,6 @@ export function loadAgentConfig(): AgentConfig {
     )
   }
   const mode = rawMode as AgentConnectionMode
-
-  const home = homedir()
-  const toolPath = buildToolPath(home)
 
   const orcaUrl = process.env.ORCA_URL || 'wss://b15.openledger.vn/agent'
   // ORCA_HTTP_URL can be set explicitly (e.g. http://172.20.2.39:6769) for
@@ -95,19 +137,12 @@ export function loadAgentConfig(): AgentConfig {
     agentToken:  process.env.AGENT_TOKEN        ?? '',
     apiSecret:   process.env.ORCA_AGENT_API_SECRET ?? '',
     agentPort:   Number.parseInt(process.env.AGENT_PORT || '6799', 10),
-    devServerId: process.env.DEV_SERVER_ID || 'dev-local',
-    logLevel:    (process.env.LOG_LEVEL    || 'info') as AgentLogLevel,
-    workDir:     process.env.AGENT_WORK_DIR || process.cwd(),
+    devServerId,
+    logLevel,
+    workDir,
     toolPath,
-    toolEnv: {
-      ...process.env,
-      PATH:              toolPath,
-      HOME:              home,
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? '',
-      GITHUB_TOKEN:      process.env.GITHUB_TOKEN      ?? '',
-      GH_TOKEN:          process.env.GH_TOKEN          ?? '',
-    },
-    credentialDir: join(home, '.orca', 'credentials'),
+    toolEnv,
+    credentialDir,
     tlsRejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
   }
 }

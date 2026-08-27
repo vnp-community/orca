@@ -53,6 +53,7 @@ import { queueHookCommandsForFirstWorktreeTab } from '@/lib/hook-command-delayed
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import {
   getRuntimeEnvironmentIdForWorktree,
+  isRepoOwnerDataLoadedForWorktree,
   type WorktreeRuntimeOwnerState
 } from '@/lib/worktree-runtime-owner'
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../shared/workspace-scope'
@@ -495,7 +496,17 @@ export function ensureWorktreeHasInitialTerminal(
   // Why: remote web clients mirror the runtime server's session tabs. A local
   // activation fallback can spawn a second host terminal before the mirror lands,
   // but returned setup fallbacks still need to run on an already mirrored tab.
-  if (isWebRuntimeSessionActive(getRuntimeEnvironmentIdForWorktree(ownerState, worktreeId))) {
+  //
+  // FIX BUG-FE-PTY-001: also take this branch when the repo record needed to
+  // resolve ownership simply hasn't loaded yet (e.g. right after a page
+  // refresh) — getRuntimeEnvironmentIdForWorktree() returns null in that case
+  // too, indistinguishable from "genuinely no owner" without this check, which
+  // used to let a doomed local terminal.create race the real mirror landing a
+  // moment later and lose (see isRepoOwnerDataLoadedForWorktree's doc comment).
+  if (
+    isWebRuntimeSessionActive(getRuntimeEnvironmentIdForWorktree(ownerState, worktreeId)) ||
+    !isRepoOwnerDataLoadedForWorktree(ownerState, worktreeId)
+  ) {
     const existingTerminalTabId = store.tabsByWorktree[worktreeId]?.[0]?.id
     if (existingTerminalTabId && (setup || issueCommand)) {
       queueSetupAndIssueCommands(

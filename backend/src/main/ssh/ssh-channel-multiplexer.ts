@@ -38,7 +38,17 @@ const REQUEST_TIMEOUT_MS = 30_000
 // (system sleep, App Nap timer throttling) — not that the link is dead (#7773).
 const WAKE_GAP_MS = KEEPALIVE_SEND_MS * 3
 
+// TEMP DIAG BUG-FE-PTY-001: multiple SshChannelMultiplexer instances run
+// concurrently (one per connected devServerId — dev-01, dev-ai, test-01 are
+// all connected simultaneously in this deployment), all logging through the
+// same [DIAG BUG-FE-PTY-001] prefix. Without a per-instance tag, a close
+// event for one devServer's mux is indistinguishable from another's in the
+// merged log, making frame-sequence correlation unreliable.
+let diagNextMuxInstanceId = 1
+
 export class SshChannelMultiplexer {
+  // TEMP DIAG BUG-FE-PTY-001
+  private readonly diagMuxId = diagNextMuxInstanceId++
   private decoder: FrameDecoder
   private transport: MultiplexerTransport
   private nextRequestId = 1
@@ -275,7 +285,7 @@ export class SshChannelMultiplexer {
     }
     if (process.env.ORCA_SSH_MUX_DEBUG === '1') {
       console.warn(
-        `[ssh-mux] Disposing multiplexer (reason: ${reason})`,
+        `[ssh-mux] Disposing multiplexer muxId=${this.diagMuxId} (reason: ${reason})`,
         new Error('dispose trace').stack
       )
     }
@@ -363,6 +373,15 @@ export class SshChannelMultiplexer {
   }
 
   private handleFrame(frame: DecodedFrame): void {
+    // TEMP DIAG BUG-FE-PTY-001: unconditional entry log for every decoded
+    // frame — feed()'s while-loop can synchronously process MULTIPLE frames
+    // from one 'message' event, so the earlier close-site stack trace
+    // (FrameDecoder.onFrame -> ws.close) alone doesn't say WHICH frame in a
+    // batch triggered it, or whether it's a throw at all (no
+    // parseJsonRpcMessage-fail log fired despite the same call site).
+    console.error(
+      `[DIAG BUG-FE-PTY-001] handleFrame ENTER muxId=${this.diagMuxId} type=${frame.type} id=${frame.id} ack=${frame.ack} payloadLen=${frame.payload.length}`
+    )
     // Why: any decoded frame proves the relay round-trip is alive; resolve
     // pending resume probes before ordinary dispatch (#7773).
     for (const waiter of this.livenessProbeWaiters.splice(0)) {
@@ -391,7 +410,22 @@ export class SshChannelMultiplexer {
         const msg = parseJsonRpcMessage(frame.payload)
         this.handleMessage(msg)
       } catch (err) {
-        this.handleProtocolError(err)
+        // FIX BUG-FE-PTY-001: a single frame that fails to parse as JSON-RPC
+        // (bad JSON, wrong jsonrpc version — or, per live diagnosis, a race
+        // where handleMessage's own dispatch throws) used to call
+        // handleProtocolError() -> dispose('connection_lost'), tearing down
+        // the ENTIRE agent connection — killing every other in-flight PTY
+        // and pending request on it — for what is recoverable at the single
+        // frame level. Unlike the oversized-frame case above, this is safe to
+        // just skip: FrameDecoder.feed() already advanced its buffer past
+        // this frame via takeBytes(totalLength) BEFORE calling onFrame(), so
+        // the decoder's byte stream stays correctly synchronized regardless
+        // of what we do with a frame we can't parse. Only the one pending
+        // request this frame would have resolved is affected (it times out
+        // normally instead), not the whole session.
+        console.error(
+          `[DIAG BUG-FE-PTY-001] frame failed to process (skipping this frame, keeping connection alive) muxId=${this.diagMuxId} frameId=${frame.id} frameAck=${frame.ack} payloadLen=${frame.payload.length} payloadUtf8=${JSON.stringify(frame.payload.toString('utf-8'))} payloadHex=${frame.payload.toString('hex')} err=${err instanceof Error ? err.stack : String(err)}`
+        )
       }
     }
   }

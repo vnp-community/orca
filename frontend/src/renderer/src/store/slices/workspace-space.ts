@@ -3,6 +3,10 @@ import type {
   WorkspaceSpaceAnalysis,
   WorkspaceSpaceScanProgress
 } from '../../../../shared/workspace-space-types'
+import {
+  analyzeWorkspaceSpace,
+  cancelWorkspaceSpaceScan as cancelWorkspaceSpaceScanRpc
+} from '../../runtime/runtime-workspace-space-client'
 import type { AppState } from '../types'
 
 let inFlightScan: Promise<WorkspaceSpaceAnalysis> | null = null
@@ -86,7 +90,7 @@ export const createWorkspaceSpaceSlice: StateCreator<AppState, [], [], Workspace
       }
     }),
   cancelWorkspaceSpaceScan: async () => {
-    const cancelled = await window.api.workspaceSpace.cancel()
+    const cancelled = await cancelWorkspaceSpaceScanRpc(get().settings)
     if (cancelled) {
       get().recordFeatureInteraction?.('workspace-cleanup')
     }
@@ -117,8 +121,7 @@ export const createWorkspaceSpaceSlice: StateCreator<AppState, [], [], Workspace
     })
     // Why: the compact Resource Manager card and the full Space page share
     // one manual scan result; duplicate button presses should join the same IO.
-    inFlightScan = window.api.workspaceSpace
-      .analyze()
+    inFlightScan = analyzeWorkspaceSpace(get().settings, get().applyWorkspaceSpaceProgress)
       .then((result) => {
         if (!result.ok) {
           throw new Error('Workspace space scan cancelled')

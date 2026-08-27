@@ -1,0 +1,43 @@
+package domain
+
+import "errors"
+
+var (
+	// ErrEmptyRepoURL is returned by NewRepo when URL is empty — a repo
+	// catalog entry pointing nowhere is never a valid domain state.
+	ErrEmptyRepoURL = errors.New("domain: url is required")
+	// ErrRepoNotFound is the sentinel adapter/postgres returns (wrapped) when
+	// a lookup/remove targets a repo that doesn't exist — usecase/ maps this
+	// to apperrors.KindNotFound.
+	ErrRepoNotFound = errors.New("domain: repo not found")
+)
+
+// Repo is a project's repository catalog entry — metadata only (url,
+// display name, ordering), no working-tree state. See project-service.md
+// §4's Repo entity; this is the slice of that fuller model
+// (path/remote_url/icon_ref) the current proto surface (AddRepo/ListRepos/
+// ReorderRepos/RemoveRepo) actually exercises.
+type Repo struct {
+	ID          string
+	ProjectID   string
+	URL         string
+	DisplayName string
+	// Position orders repos within a project — see usecase.ReorderRepos.
+	// Ordering is by position value, not contiguity: removing a repo leaves
+	// a gap deliberately rather than renumbering the rest.
+	Position int32
+}
+
+// NewRepo constructs a Repo, enforcing the invariants a catalog entry must
+// satisfy to be meaningful. Position isn't a constructor parameter — it's
+// assigned by the repository (AddRepo appends at the next available slot),
+// not chosen by the caller.
+func NewRepo(id, projectID, url, displayName string) (Repo, error) {
+	if projectID == "" {
+		return Repo{}, ErrEmptyProjectID
+	}
+	if url == "" {
+		return Repo{}, ErrEmptyRepoURL
+	}
+	return Repo{ID: id, ProjectID: projectID, URL: url, DisplayName: displayName}, nil
+}

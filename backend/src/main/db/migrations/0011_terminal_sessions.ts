@@ -36,9 +36,9 @@ export const migration0011TerminalSessions: Migration = {
         remote_handle    TEXT,
         -- State
         status           TEXT    NOT NULL DEFAULT 'active',
-        last_active_at   INTEGER NOT NULL,
-        created_at       INTEGER NOT NULL,
-        updated_at       INTEGER NOT NULL
+        last_active_at   BIGINT NOT NULL,
+        created_at       BIGINT NOT NULL,
+        updated_at       BIGINT NOT NULL
       )
     `)
 

@@ -15,6 +15,7 @@ import { normalizeSearchFileMatchCount } from '../../../../shared/search-match-c
 import type { SearchFileResult, SearchMatch } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 // ─── Toggle Button ────────────────────────────────────────
 export function ToggleButton({
   active,
@@ -103,9 +104,7 @@ export function FileResultRow({
               </TooltipTrigger>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem
-                onClick={() => window.api.ui.writeClipboardText(fileResult.relativePath)}
-              >
+              <ContextMenuItem onClick={() => uiWriteClipboardText(fileResult.relativePath)}>
                 <Copy className="size-3.5" />
                 {translate(
                   'auto.components.right.sidebar.SearchResultItems.3596b9668d',
@@ -202,9 +201,7 @@ export function MatchResultRow({
         </Button>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem
-          onClick={() => window.api.ui.writeClipboardText(`${relativePath}#L${match.line}`)}
-        >
+        <ContextMenuItem onClick={() => uiWriteClipboardText(`${relativePath}#L${match.line}`)}>
           <Copy className="size-3.5" />
           {translate(
             'auto.components.right.sidebar.SearchResultItems.cc06595a3b',

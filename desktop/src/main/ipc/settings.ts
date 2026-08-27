@@ -28,6 +28,17 @@ import { applyPRBotAuthorOverride } from '../../shared/pr-bot-author-overrides'
 // check stay O(1) without re-coercing the readonly tuple on every call.
 const SETTINGS_CHANGED_WHITELIST_SET = new Set<string>(SETTINGS_CHANGED_WHITELIST)
 
+// Why: the RPC surface (desktop/src/main/runtime/rpc/methods/cache.ts) runs in
+// this same main process and reads/writes the exact Store instance
+// `registerSettingsHandlers` was wired with, so the `cache:getGitHub` /
+// `cache:setGitHub` ipcMain channels and the `cache.*` RPC methods stay
+// backed by one on-disk store instead of forking state.
+let cacheStoreRef: Store | null = null
+
+export function getCacheStoreForRpc(): Store | null {
+  return cacheStoreRef
+}
+
 type LegacyTerminalScrollbackSettingsUpdate = Partial<GlobalSettings> & {
   terminalScrollbackBytes?: unknown
 }
@@ -54,6 +65,7 @@ export function registerSettingsHandlers(
   store: Store,
   agentAwakeService?: AgentAwakeService
 ): void {
+  cacheStoreRef = store
   store.onSettingsChanged((updates, _settings, originWebContentsId) => {
     for (const window of BrowserWindow.getAllWindows()) {
       const isOrigin =

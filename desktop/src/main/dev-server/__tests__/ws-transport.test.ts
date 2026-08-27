@@ -20,14 +20,21 @@ function createMockWs(readyState = WS_READY_STATE.OPEN) {
     }),
     close: vi.fn(),
     on: vi.fn((event: string, cb: MockListener) => {
-      if (!listeners[event]) {listeners[event] = []}
+      if (!listeners[event]) {
+        listeners[event] = []
+      }
       listeners[event].push(cb)
+    }),
+    off: vi.fn((event: string, cb: MockListener) => {
+      listeners[event] = (listeners[event] ?? []).filter((l) => l !== cb)
     }),
     // Test helpers
     _emit(event: string, data?: unknown) {
-      for (const cb of listeners[event] ?? []) {cb(data)}
+      for (const cb of listeners[event] ?? []) {
+        cb(data)
+      }
     },
-    _sent: sent,
+    _sent: sent
   }
   return ws
 }
@@ -153,8 +160,8 @@ describe('runOrcaInitiatorHandshake', () => {
           platform: 'linux',
           arch: 'x64',
           agentVersion: '1.0.0',
-          sessionId: 'sess-settle',
-        },
+          sessionId: 'sess-settle'
+        }
       },
       1,
       0
@@ -177,8 +184,8 @@ describe('runOrcaInitiatorHandshake', () => {
           arch: 'arm64',
           nodeVersion: 'v20.11.0',
           agentVersion: '1.0.0',
-          sessionId: 'sess-test-123',
-        },
+          sessionId: 'sess-test-123'
+        }
       },
       1,
       0
@@ -201,7 +208,7 @@ describe('runOrcaInitiatorHandshake', () => {
       {
         jsonrpc: '2.0',
         id: 1,
-        error: { code: -33100, message: 'Version too old' },
+        error: { code: -33100, message: 'Version too old' }
       },
       1,
       0
@@ -242,8 +249,8 @@ describe('runOrcaInitiatorHandshake', () => {
           platform: 'darwin',
           arch: 'arm64',
           agentVersion: '1.0.0',
-          sessionId: 'sess-after-ka',
-        },
+          sessionId: 'sess-after-ka'
+        }
       },
       2,
       1
@@ -251,6 +258,33 @@ describe('runOrcaInitiatorHandshake', () => {
     ws._emit('message', response)
     const info = await promise
     expect(info.sessionId).toBe('sess-after-ka')
+  })
+
+  // Regression for BUG-FE-PTY-001 (initiator side, for consistency with the
+  // receiver-side fix): the handshake listener must be detached on resolve.
+  it('detaches its message listener after resolving', async () => {
+    const ws = createMockWs()
+    const promise = runOrcaInitiatorHandshake(ws, '1.4.0')
+
+    const response = encodeJsonRpcFrame(
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        result: {
+          ok: true,
+          platform: 'linux',
+          arch: 'x64',
+          agentVersion: '1.0.0',
+          sessionId: 'sess-x'
+        }
+      },
+      1,
+      0
+    )
+    ws._emit('message', response)
+    await promise
+
+    expect(ws.off).toHaveBeenCalledWith('message', expect.any(Function))
   })
 })
 
@@ -280,8 +314,8 @@ describe('runOrcaReceiverHandshake', () => {
           arch: 'x64',
           nodeVersion: 'v20.11.0',
           capabilities: ['fs', 'git'],
-          ...overrides,
-        },
+          ...overrides
+        }
       },
       1,
       0
@@ -361,14 +395,39 @@ describe('runOrcaReceiverHandshake', () => {
     const promise = runOrcaReceiverHandshake(ws, validateToken, '1.4.0')
 
     // A response frame (has result, no method)
-    const responseFrame = encodeJsonRpcFrame(
-      { jsonrpc: '2.0', id: 1, result: { ok: true } },
-      1,
-      0
-    )
+    const responseFrame = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, result: { ok: true } }, 1, 0)
     ws._emit('message', responseFrame)
 
     await expect(promise).rejects.toThrow('Protocol violation')
     expect(ws.close).toHaveBeenCalled()
+  })
+
+  // Regression for BUG-FE-PTY-001: the handshake decoder's 'message' listener
+  // must be detached once the handshake settles, or every later regular frame
+  // (normal post-handshake RPC traffic) gets fed into handshake-only parsing
+  // that rejects it as "not agent.handshake" and closes the connection.
+  it('detaches its message listener after resolving, so later frames do not close the connection', async () => {
+    const ws = createMockWs()
+    const promise = runOrcaReceiverHandshake(ws, validateToken, '1.4.0')
+
+    ws._emit('message', makeHandshakeFrame())
+    await promise
+    ws.close.mockClear()
+
+    // A normal post-handshake RPC response — must NOT be seen by the
+    // handshake decoder anymore.
+    const responseFrame = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 2, result: { ok: true } }, 2, 1)
+    ws._emit('message', responseFrame)
+
+    expect(ws.close).not.toHaveBeenCalled()
+  })
+
+  it('detaches its message listener after rejecting on invalid token', async () => {
+    const ws = createMockWs()
+    const promise = runOrcaReceiverHandshake(ws, validateToken, '1.4.0')
+
+    ws._emit('message', makeHandshakeFrame({ agentToken: 'wrong-token' }))
+    await promise.catch(() => {})
+    expect(ws.off).toHaveBeenCalledWith('message', expect.any(Function))
   })
 })

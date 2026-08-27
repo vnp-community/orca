@@ -24,8 +24,8 @@ export const migration0006CompanyDept: Migration = {
         name          TEXT    NOT NULL,
         profile_json  TEXT    NOT NULL DEFAULT '{}',
         admin_user_id TEXT,
-        created_at    INTEGER NOT NULL,
-        updated_at    INTEGER NOT NULL,
+        created_at    BIGINT NOT NULL,
+        updated_at    BIGINT NOT NULL,
         updated_by    TEXT
       )
     `)
@@ -38,8 +38,8 @@ export const migration0006CompanyDept: Migration = {
         name           TEXT    NOT NULL,
         parent_dept_id TEXT    REFERENCES orca_departments(id) ON DELETE SET NULL,
         profile_json   TEXT    NOT NULL DEFAULT '{}',
-        created_at     INTEGER NOT NULL,
-        updated_at     INTEGER NOT NULL,
+        created_at     BIGINT NOT NULL,
+        updated_at     BIGINT NOT NULL,
         updated_by     TEXT
       )
     `)
@@ -53,7 +53,7 @@ export const migration0006CompanyDept: Migration = {
       CREATE TABLE IF NOT EXISTS orca_user_profiles (
         user_id      TEXT    PRIMARY KEY REFERENCES orca_users(id) ON DELETE CASCADE,
         profile_json TEXT    NOT NULL DEFAULT '{}',
-        updated_at   INTEGER NOT NULL
+        updated_at   BIGINT NOT NULL
       )
     `)
 

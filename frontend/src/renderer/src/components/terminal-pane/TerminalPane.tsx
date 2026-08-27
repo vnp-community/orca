@@ -200,6 +200,7 @@ import {
 } from './regular-terminal-focus-ownership'
 import { refreshTerminalImeInputContext } from './terminal-ime-input-context-refresh'
 
+import { uiReadClipboardText, uiSaveClipboardImageAsTempFile } from '@/runtime/runtime-ui-client'
 type TerminalPaneProps = {
   tabId: string
   worktreeId: string
@@ -2104,8 +2105,8 @@ export default function TerminalPane({
       )
       const activeElementAtDispatch = document.activeElement
       void pasteTerminalClipboard({
-        readClipboardText: window.api.ui.readClipboardText,
-        saveClipboardImageAsTempFile: window.api.ui.saveClipboardImageAsTempFile,
+        readClipboardText: uiReadClipboardText,
+        saveClipboardImageAsTempFile: uiSaveClipboardImageAsTempFile,
         connectionId,
         runtimeEnvironmentId,
         forceBracketedMultilineTextPaste,
@@ -2240,8 +2241,8 @@ export default function TerminalPane({
         worktreeId
       )
       void pasteTerminalClipboard({
-        readClipboardText: window.api.ui.readClipboardText,
-        saveClipboardImageAsTempFile: window.api.ui.saveClipboardImageAsTempFile,
+        readClipboardText: uiReadClipboardText,
+        saveClipboardImageAsTempFile: uiSaveClipboardImageAsTempFile,
         connectionId,
         runtimeEnvironmentId,
         forceBracketedMultilineTextPaste,

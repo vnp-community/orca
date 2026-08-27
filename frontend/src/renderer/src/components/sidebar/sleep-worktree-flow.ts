@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
+import { suspendRuntimeEphemeralVmWorkspace } from '@/runtime/runtime-ephemeral-vm-client'
 import { clearWorktreeSleepIntent, markWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import { VIRTUALIZED_SCROLL_ANCHOR_RECORD_EVENT } from '@/hooks/useVirtualizedScrollAnchor'
 import { translate } from '@/i18n/i18n'
@@ -146,8 +147,10 @@ export async function runSleepWorktrees(worktreeIds: readonly string[]): Promise
         // serializer buffers into buffersByLeafId for SSH wake to reseed
         // scrollback. See DESIGN_DOC_TERMINAL_HISTORY_FIX_V2.md §3.3.c.
         await shutdownWorktreeTerminals(worktreeId, { keepIdentifiers: true })
-        if (typeof window !== 'undefined' && window.api?.ephemeralVm?.suspendWorkspace) {
-          await window.api.ephemeralVm.suspendWorkspace({ workspaceId: worktreeId })
+        if (typeof window !== 'undefined' && window.api?.ephemeralVm) {
+          await suspendRuntimeEphemeralVmWorkspace(useAppStore.getState().settings, {
+            workspaceId: worktreeId
+          })
         }
       } catch (err) {
         errors.push(err instanceof Error ? err.message : String(err))

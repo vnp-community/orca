@@ -9,6 +9,7 @@ import type { FeatureWallOpenSourceTelemetry } from '../../../../shared/telemetr
 import { track } from '@/lib/telemetry'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export function PreviewMedia(props: {
   posterUrl: string | null
   gifUrl: string | null
@@ -84,7 +85,7 @@ export function RelatedFeatures(props: {
                   source
                 })
                 track('feature_wall_tile_clicked', { tile_id: tile.id })
-                void window.api.shell.openUrl(tile.docsUrl)
+                void shellOpenUrl(tile.docsUrl)
               }}
               className="inline-flex items-center gap-1.5 text-left text-[13px] hover:underline hover:underline-offset-2"
             >

@@ -115,9 +115,9 @@ export class MySQLAdapter implements IAsyncDatabase {
     }
   }
 
-  async query(sql: string, params?: BindValue[]): Promise<Record<string, unknown>[]> {
+  async query<T = Record<string, unknown>>(sql: string, params?: BindValue[]): Promise<T[]> {
     const [rows] = await (this.connection as any).execute(sql, params ?? [])
-    return rows as Record<string, unknown>[]
+    return rows as T[]
   }
 }
 

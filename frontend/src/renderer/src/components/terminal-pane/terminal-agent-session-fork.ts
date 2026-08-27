@@ -17,6 +17,8 @@ import type { ProjectExecutionRuntimeResolution } from '../../../../shared/proje
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { markRuntimeAgentTrusted } from '@/runtime/runtime-agent-trust-client'
 type ForkAgentSessionFromPaneArgs = {
   pane: ManagedPane
   tabId: string
@@ -65,7 +67,7 @@ function getUsableForkBase(
 
 async function copyForkContext(prompt: string, pane: ManagedPane): Promise<boolean> {
   try {
-    await window.api.ui.writeClipboardText(prompt)
+    await uiWriteClipboardText(prompt)
     toast.message(
       translate(
         'auto.components.terminal.pane.terminal.agent.session.fork.c00421d320',
@@ -112,11 +114,11 @@ async function preflightForkAgentTrust(args: {
 }): Promise<void> {
   const { agent, workspacePath, connectionId } = args
   const preflight = TUI_AGENT_CONFIG[agent].preflightTrust
-  if (!preflight || !workspacePath || !window.api.agentTrust?.markTrusted) {
+  if (!preflight || !workspacePath) {
     return
   }
   try {
-    await window.api.agentTrust.markTrusted({
+    await markRuntimeAgentTrusted({
       preset: preflight,
       workspacePath,
       ...(connectionId ? { connectionId } : {})
@@ -189,7 +191,7 @@ export async function copyAgentSessionContextFromPane(pane: ManagedPane): Promis
     return false
   }
   try {
-    await window.api.ui.writeClipboardText(transcript)
+    await uiWriteClipboardText(transcript)
     toast.message(
       translate(
         'auto.components.terminal.pane.terminal.agent.session.fork.373a3103e7',

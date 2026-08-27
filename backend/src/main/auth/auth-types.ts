@@ -10,7 +10,10 @@
 import type { OrcaUser } from '../../shared/rbac-types'
 
 /** Subset of OrcaUser fields returned after authentication (no sensitive data) */
-export type OrcaSessionUser = Pick<OrcaUser, 'id' | 'email' | 'name' | 'role' | 'provider'>
+export type OrcaSessionUser = Pick<
+  OrcaUser,
+  'id' | 'email' | 'name' | 'role' | 'provider' | 'departmentId'
+>
 
 /** An authenticated HTTP session stored in orca_sessions table */
 export type OrcaSession = {

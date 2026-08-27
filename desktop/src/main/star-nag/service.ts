@@ -22,6 +22,27 @@ const STAR_NAG_COOLDOWN_DAYS = 3
 const STAR_NAG_COOLDOWN_MS = STAR_NAG_COOLDOWN_DAYS * 24 * 60 * 60 * 1000
 type StarNagSurface = 'card' | 'toast'
 
+// Why: mirrors 'star-nag:show'/'star-nag:hide' (the BrowserWindow.webContents.send
+// payloads) so starNag.subscribe RPC subscribers observe the identical shape the
+// desktop's own renderer gets over IPC.
+export type StarNagVisibilityEvent =
+  | { type: 'show'; mode: StarNagPromptMode; surface: StarNagSurface }
+  | { type: 'hide' }
+
+// Why: the RPC method registry (runtime/rpc/methods/star-nag.ts) is a static
+// array evaluated at module load, before the service exists — it reads this
+// singleton lazily inside each handler instead, the same pattern
+// getActiveRuntimeRpcServer()/getActiveOnboardingStore() use.
+let activeStarNagService: StarNagService | null = null
+
+export function getActiveStarNagService(): StarNagService | null {
+  return activeStarNagService
+}
+
+export function setActiveStarNagService(service: StarNagService | null): void {
+  activeStarNagService = service
+}
+
 export class StarNagService {
   private store: Store
   private stats: StatsCollector
@@ -44,6 +65,11 @@ export class StarNagService {
   // when the renderer later reports a user action.
   private promptSession: StarNagPromptSession | null = null
   private agentValueMoment: StarNagAgentValueMoment
+  // Why: fan-out for starNag.subscribe RPC callers (remote/mobile), parallel
+  // to the win.webContents.send calls that reach the desktop's own renderer.
+  // See RuntimeConnectionSubscriptionNotifyCommands.onNotificationDispatched
+  // for the analogous pattern this mirrors.
+  private readonly visibilityListeners = new Set<(event: StarNagVisibilityEvent) => void>()
 
   constructor(store: Store, stats: StatsCollector) {
     this.store = store
@@ -182,6 +208,7 @@ export class StarNagService {
     }
     const context = createStarNagPromptContext(this.store, this.stats, source, mode)
     win.webContents.send('star-nag:show', { mode, surface })
+    this.notifyVisibilityListeners({ type: 'show', mode, surface })
     this.promptVisible = true
     this.promptSession = context
     this.trackOutcome('shown')
@@ -194,6 +221,23 @@ export class StarNagService {
       if (!win.isDestroyed()) {
         win.webContents.send('star-nag:hide')
       }
+    }
+    this.notifyVisibilityListeners({ type: 'hide' })
+  }
+
+  // Why: starNag.subscribe RPC subscribers (remote/mobile) get the same
+  // show/hide transitions the desktop's own renderer gets via IPC. Returns an
+  // unsubscribe function for the RPC subscription cleanup mechanism.
+  onVisibilityChanged(listener: (event: StarNagVisibilityEvent) => void): () => void {
+    this.visibilityListeners.add(listener)
+    return () => {
+      this.visibilityListeners.delete(listener)
+    }
+  }
+
+  private notifyVisibilityListeners(event: StarNagVisibilityEvent): void {
+    for (const listener of this.visibilityListeners) {
+      listener(event)
     }
   }
 
@@ -215,19 +259,20 @@ export class StarNagService {
     })
   }
 
-  // ── Public actions (invoked from IPC) ─────────────────────────────
+  // ── Public actions (invoked from IPC, and from the RPC method wrappers in
+  // runtime/rpc/methods/star-nag.ts via getActiveStarNagService — see below) ──
 
-  private async prepareAgentValueMoment(): Promise<AgentValueMomentPreparation> {
+  async prepareAgentValueMoment(): Promise<AgentValueMomentPreparation> {
     return this.agentValueMoment.prepare()
   }
 
-  private showPreparedAgentValueMoment(): void {
+  showPreparedAgentValueMoment(): void {
     // Why: renderer re-confirms "not typing / no active agent" after the slow
     // gh check before invoking this show step.
     this.agentValueMoment.showPrepared()
   }
 
-  private async onboardingCompleted(): Promise<void> {
+  async onboardingCompleted(): Promise<void> {
     await handleStarNagOnboardingCompleted({
       store: this.store,
       isCooldownActive: (deferredUntil) => this.isCooldownActive(deferredUntil),
@@ -255,11 +300,11 @@ export class StarNagService {
    * for a substantial cross-version cooldown. We still maintain the legacy
    * threshold fields so historical dashboards and old builds remain coherent.
    */
-  private dismiss(): void {
+  dismiss(): void {
     this.defer('dismissed')
   }
 
-  private defer(outcome: Extract<StarNagOutcome, 'dismissed' | 'later'>): void {
+  defer(outcome: Extract<StarNagOutcome, 'dismissed' | 'later'>): void {
     const session = this.promptSession
     if (!session) {
       this.promptVisible = false
@@ -285,12 +330,12 @@ export class StarNagService {
     this.promptSession = null
   }
 
-  private disable(): void {
+  disable(): void {
     this.trackOutcome('disabled')
     this.markCompleted()
   }
 
-  private openWeb(): void {
+  openWeb(): void {
     const session = this.promptSession
     if (!session || session.openedRepoTracked) {
       return
@@ -304,7 +349,7 @@ export class StarNagService {
     this.promptSession = null
   }
 
-  private async starOrcaFromNag(): Promise<boolean> {
+  async starOrcaFromNag(): Promise<boolean> {
     const session = this.promptSession
     if (!session) {
       return false
@@ -332,7 +377,7 @@ export class StarNagService {
   }
 
   /** User successfully starred or opted out → never nag again. */
-  private markCompleted(): void {
+  markCompleted(): void {
     this.store.updateUI({ starNagCompleted: true, starNagDeferredUntil: null })
     this.promptVisible = false
     this.promptSession = null
@@ -346,7 +391,7 @@ export class StarNagService {
   }
 
   /** Dev-only entry point: skip all gating and fire the notification. */
-  private forceShow(): void {
+  forceShow(): void {
     if (this.promptVisible) {
       return
     }

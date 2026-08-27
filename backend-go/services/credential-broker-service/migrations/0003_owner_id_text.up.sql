@@ -1,0 +1,14 @@
+-- owner_id was declared UUID in 0001_init, but domain.CredentialMetadata's
+-- own doc comment ("user id or service name, per credentialbroker.proto")
+-- and every real caller disagree: scm-integration-service/issue-tracking-
+-- service write a bare provider name ("bitbucket", "jira") or a
+-- provider-derived composite string, never a UUID — only ai-provider-
+-- service's account-ID caller happens to pass a UUID-shaped string.
+-- Confirmed as a real, previously-undetected bug (every existing test used
+-- a fake CredentialMetadataRepository, never a real Postgres) by TASK-043's
+-- live docker-compose cross-service verification: WriteCredential(owner_id
+-- = "bitbucket") failed Postgres's `invalid input syntax for type uuid`
+-- before this migration. TEXT accepts every existing caller's format,
+-- including UUID-shaped ones, so this is a widening change with no data
+-- loss for any caller.
+ALTER TABLE credential.credential_metadata ALTER COLUMN owner_id TYPE TEXT;

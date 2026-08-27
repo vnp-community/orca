@@ -56,6 +56,7 @@
 | [BUG-FE-CR-001](./frontend/bugs/code-review/) | Code Review | 🔴 HIGH | DiffViewer, Annotation UI chưa implement |
 | [BUG-FE-FLEET-001](./frontend/bugs/fleet/) | Fleet Mgmt | 🔴 HIGH | Fleet Dashboard Admin SPA chưa implement |
 | [BUG-FE-WF-001](./frontend/bugs/workflow-orchestration/) | Workflow Orch. | ~~🔴~~ ✅ PARTIAL | WorkflowBuilder — cần xác nhận lại |
+| **NEW** [BUG-FE-BIGFILE-001](./frontend/bugs/bigfile_v1/BUG-FE-BIGFILE-001-frontend-oversized-files-overview.md) | Code Health | 🟠 HIGH | 111 file `frontend/src` > 1,000 dòng (`orca-runtime.ts` ban đầu 26,730 → 24,837 sau TASK-008); 10 bug con cho nhóm >5,000 dòng |
 
 ---
 

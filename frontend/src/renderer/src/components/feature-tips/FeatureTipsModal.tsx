@@ -33,6 +33,7 @@ import {
 } from './feature-tip-telemetry'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
+import { installRuntimeCli } from '@/runtime/runtime-cli-client'
 
 const WAVEFORM_BAR_HEIGHTS = [30, 60, 90, 70, 100, 50, 80, 35, 65]
 
@@ -191,7 +192,7 @@ export default function FeatureTipsModal(): JSX.Element | null {
         trackOrcaCliFeatureTipSetupClicked(telemetrySource)
         setPrimaryBusy(true)
         try {
-          const result = await installCliFromFeatureTip(() => window.api.cli.install())
+          const result = await installCliFromFeatureTip(() => installRuntimeCli())
           if (result.kind === 'installed') {
             trackOrcaCliFeatureTipSetupResult(telemetrySource, 'installed')
             if (!canApplySetupResult()) {

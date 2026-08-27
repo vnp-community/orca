@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
+import { useAppStore } from '../store'
+import { detectRuntimeOnboardingWindowsCapabilities } from '../runtime/runtime-onboarding-client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +46,9 @@ export function useRemoteWindowsTerminalCapabilities(
     }
     setCaps((prev) => ({ ...prev, loading: true, error: null }))
     try {
-      const result = await window.api.onboarding.detectWindowsCapabilities({ devServerId: id })
+      const result = await detectRuntimeOnboardingWindowsCapabilities(useAppStore.getState().settings, {
+        devServerId: id
+      })
       const next: RemoteWindowsCapabilities = {
         wslAvailable: result.wslAvailable,
         wslDistros: result.wslDistros,

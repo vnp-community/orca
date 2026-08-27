@@ -25,10 +25,13 @@ afterEach(() => {
 
 describe('setup guide step completion telemetry', () => {
   it('uses setup-first ordering for setup-guide open first-incomplete telemetry', () => {
-    expect(getSetupGuideTelemetryFirstIncompleteStepId(createProgress({}))).toBe('notifications')
+    expect(getSetupGuideTelemetryFirstIncompleteStepId(createProgress({}))).toBe(
+      'connect-dev-server'
+    )
     expect(
       getSetupGuideTelemetryFirstIncompleteStepId(
         createProgress({
+          'connect-dev-server': true,
           notifications: true,
           'default-agent': true,
           'agent-capabilities': true,

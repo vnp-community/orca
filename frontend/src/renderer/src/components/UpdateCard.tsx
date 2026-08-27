@@ -10,7 +10,13 @@ import { Progress } from './ui/progress'
 import { AlertCircle, Check, Loader2, Minus, Network, RotateCw, X } from 'lucide-react'
 import type { ChangelogData } from '../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import {
+  updaterCheck,
+  updaterDownload,
+  updaterQuitAndInstall
+} from '@/runtime/runtime-updater-client'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function releaseUrlForVersion(version: string | null): string {
@@ -75,7 +81,7 @@ function CompactCardContent({
         {action && (
           <button
             className="text-xs text-muted-foreground underline hover:text-foreground mt-0.5"
-            onClick={() => void window.api.shell.openUrl(action.url)}
+            onClick={() => void shellOpenUrl(action.url)}
           >
             {action.label}
           </button>
@@ -200,7 +206,7 @@ export function UpdateCard() {
   // auto-restart the app — the user expects to click "Restart" in Settings.
   useEffect(() => {
     if (status.state === 'downloaded' && hasStartedDownload.current) {
-      void window.api.updater.quitAndInstall().catch((error) => {
+      void updaterQuitAndInstall().catch((error) => {
         setInstallError(String((error as Error)?.message ?? error))
       })
     }
@@ -299,7 +305,7 @@ export function UpdateCard() {
     if (!reassuranceSeen) {
       markReassuranceSeen()
     }
-    void window.api.updater.download()
+    void updaterDownload()
   }
 
   // Why: the 'error' variant has no version field, so dismiss needs an
@@ -318,7 +324,7 @@ export function UpdateCard() {
   }
 
   const handleInstallRetry = () => {
-    void window.api.updater.quitAndInstall().catch((error) => {
+    void updaterQuitAndInstall().catch((error) => {
       setInstallError(String((error as Error)?.message ?? error))
     })
   }
@@ -374,7 +380,7 @@ export function UpdateCard() {
               : {
                   label: translate('auto.components.UpdateCard.6b0085010d', 'Re-check'),
                   onClick: () => {
-                    void window.api.updater.check({ includePrerelease: false })
+                    void updaterCheck({ includePrerelease: false })
                   }
                 }
           }
@@ -703,7 +709,7 @@ function RichCardContent({
             {' '}
             <button
               className="text-xs text-muted-foreground/70 underline hover:text-foreground inline"
-              onClick={() => void window.api.shell.openUrl(release.releaseNotesUrl)}
+              onClick={() => void shellOpenUrl(release.releaseNotesUrl)}
             >
               +{releasesBehind - 1}{' '}
               {translate('auto.components.UpdateCard.ccd8b0a793', 'more since your last update')}
@@ -714,7 +720,7 @@ function RichCardContent({
 
       <button
         className="text-xs text-muted-foreground underline hover:text-foreground self-start"
-        onClick={() => void window.api.shell.openUrl(release.releaseNotesUrl)}
+        onClick={() => void shellOpenUrl(release.releaseNotesUrl)}
       >
         {translate('auto.components.UpdateCard.aad383aecc', 'Read the full release notes')}
       </button>
@@ -768,7 +774,7 @@ function SimpleCardContent({
 
       <button
         className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground self-start"
-        onClick={() => void window.api.shell.openUrl(releaseUrl)}
+        onClick={() => void shellOpenUrl(releaseUrl)}
       >
         {translate('auto.components.UpdateCard.44324ef542', 'Release notes')}
       </button>
@@ -866,9 +872,7 @@ function DownloadingContent({
       <button
         className="text-xs text-muted-foreground underline hover:text-foreground self-start"
         onClick={() =>
-          void window.api.shell.openUrl(
-            release ? release.releaseNotesUrl : releaseUrlForVersion(version)
-          )
+          void shellOpenUrl(release ? release.releaseNotesUrl : releaseUrlForVersion(version))
         }
       >
         {release
@@ -975,7 +979,7 @@ function ErrorCardContent({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => void window.api.shell.openUrl(releaseUrl)}
+          onClick={() => void shellOpenUrl(releaseUrl)}
           className={primaryAction ? 'flex-1' : 'w-full'}
         >
           {translate('auto.components.UpdateCard.47126bcf57', 'Download Manually')}

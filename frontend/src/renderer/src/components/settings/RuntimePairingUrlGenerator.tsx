@@ -6,7 +6,9 @@ import { Label } from '../ui/label'
 import { RuntimeAccessGrantList } from './RuntimeAccessGrantList'
 import { translate } from '@/i18n/i18n'
 import { RuntimePairingGeneratorForm } from './RuntimePairingGeneratorForm'
+import { listRuntimeNetworkInterfaces } from '@/runtime/runtime-mobile-client'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const LOOPBACK_ADDRESS = '127.0.0.1'
 
 // Why: runtime pairing tokens stay valid in the main-process registry; keep the
@@ -121,7 +123,7 @@ export function RuntimePairingUrlGenerator({
         setRefreshingNetworkInterfaces(true)
       }
       try {
-        const result = await window.api.mobile.listNetworkInterfaces()
+        const result = await listRuntimeNetworkInterfaces()
         if (mountedRef.current && loadId === networkInterfaceLoadIdRef.current) {
           setNetworkInterfaces(result.interfaces)
         }
@@ -283,7 +285,7 @@ export function RuntimePairingUrlGenerator({
 
   const copyGeneratedUrl = async (target: 'web' | 'pairing', value: string): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(value)
+      await uiWriteClipboardText(value)
       if (mountedRef.current) {
         clearCopiedTargetResetTimer()
         setCopiedTarget(target)

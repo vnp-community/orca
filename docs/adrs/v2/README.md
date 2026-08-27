@@ -2,10 +2,12 @@
 
 **Phạm vi:** v2 ADRs — quyết định kiến trúc bổ sung từ HLD v6.0  
 **Ngày tạo:** 2026-07-30  
-**Căn cứ:** `docs/hld/README.md` (v6.0 Architecture Layers L0–L5 + A0–A4), `docs/hld/C4-code.md` (C4.11)  
+**Căn cứ:** `docs/hld/v1/README.md` (v6.0 Architecture Layers L0–L5 + A0–A4), `docs/hld/v1/C4-code.md` (C4.11)  
 **Liên hệ:** Xem [ADR v1](../v1/README.md) cho ADR-001–015 (v5.0 baseline + v6.0 Agent concepts)
 
 > 📌 Xem [Enterprise Migration Impact Assessment](../enterprise-migration-impact-assessment.md) cho deployment checklist và rollback plan.
+
+> ⚠️ **Current vs. Proposed:** Các ADR v2 này và các tài liệu C4 model dưới `docs/hld/v1/` mô tả kiến trúc **v6.0 đề xuất** (proposed target state), chưa được implement — xem "Trạng thái Implementation" ở cuối mỗi ADR. Để biết kiến trúc **hiện tại đã implement thật sự** trong code, xem 3 file ở gốc `docs/hld/`: [`backend-server-architecture.md`](../../hld/backend-server-architecture.md), [`dev-server-architecture.md`](../../hld/dev-server-architecture.md), [`web-server-architecture.md`](../../hld/web-server-architecture.md) — các file này đã được rà soát và sửa lại đúng theo code thật vào tháng 8/2026.
 
 ---
 
@@ -52,11 +54,11 @@ ADR-013 Migration    → ADR-020 (Rollout Phases)
 
 | ADR | HLD Section |
 |-----|------------|
-| ADR-016 | `README.md` Architecture Layers L5, `C4-code.md` §C4.3 MigrationRunner |
-| ADR-017 | `README.md` Architecture Layers A0–A4, `C4-code.md` §C4.11 |
-| ADR-018 | `README.md` Architecture Layers overview, `C1-system-context.md`, `C2-containers.md` |
-| ADR-019 | `README.md` Principle 8 "Agent Autonomous", `C4-code.md` §C4.11 |
-| ADR-020 | `deployment.md`, `security.md` Trust Boundaries |
+| ADR-016 | `v1/README.md` Architecture Layers L5, `v1/C4-code.md` §C4.3 MigrationRunner |
+| ADR-017 | `v1/README.md` Architecture Layers A0–A4, `v1/C4-code.md` §C4.11 |
+| ADR-018 | `v1/README.md` Architecture Layers overview, `v1/C1-system-context.md`, `v1/C2-containers.md` |
+| ADR-019 | `v1/README.md` Principle 8 "Agent Autonomous", `v1/C4-code.md` §C4.11 |
+| ADR-020 | `v1/deployment.md`, `v1/security.md` Trust Boundaries |
 
 ---
 
@@ -110,7 +112,7 @@ ADR-013 Migration    → ADR-020 (Rollout Phases)
 |---|---|
 | [ADR v1 README](../v1/README.md) | ADR-001–015 (v5.0/v6.0 baseline) |
 | [enterprise-migration-impact-assessment.md](../enterprise-migration-impact-assessment.md) | Deployment guide + rollback plan |
-| [HLD README](../../hld/README.md) | v6.0 Architecture Layers |
-| [HLD C4-code.md](../../hld/C4-code.md) | C4.11: Dev Server Agent modules |
-| [HLD deployment.md](../../hld/deployment.md) | Docker Compose + deployment diagram |
+| [HLD README](../../hld/v1/README.md) | v6.0 Architecture Layers |
+| [HLD C4-code.md](../../hld/v1/C4-code.md) | C4.11: Dev Server Agent modules |
+| [HLD deployment.md](../../hld/v1/deployment.md) | Docker Compose + deployment diagram |
 | [flows/README.md](../../flows/README.md) | Data flow documents F22–F39 |

@@ -41,6 +41,13 @@ vi.mock('sonner', () => ({
   }
 }))
 
+// Why: WorktreeOpenInMenu now calls the shell wrapper (runtime-shell-client),
+// not window.api.shell directly.
+vi.mock('@/runtime/runtime-shell-client', () => ({
+  shellOpenInFileManager: openInFileManagerMock,
+  shellOpenInExternalEditor: openInExternalEditorMock
+}))
+
 vi.mock('@/store', () => {
   const useAppStore = Object.assign(
     (selector: (state: { settings: typeof mockState.settings }) => unknown) =>
@@ -97,12 +104,7 @@ describe('WorktreeOpenInMenu', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        api: {
-          shell: {
-            openInFileManager: openInFileManagerMock,
-            openInExternalEditor: openInExternalEditorMock
-          }
-        }
+        api: {}
       }
     })
   })

@@ -84,8 +84,13 @@ export class ProjectService {
       op: 'create', devServerId: params.devServerId, memberCount: 1 // creator luôn là owner đầu tiên
     })
 
-    // Validate devServerId
-    const server = this.devServerManager.get(params.devServerId)
+    // Validate devServerId — list() instead of get(): GatewayDevServerManagerProxy
+    // (User Process / multi-user web mode) doesn't support synchronous get() over
+    // IPC and always throws (BUG-BE-RPC-002). list() is awaitable in both modes —
+    // the real DevServerManager returns a plain array, awaiting a non-Promise
+    // value just resolves to it immediately.
+    const servers = await this.devServerManager.list()
+    const server = servers.find((s) => s.id === params.devServerId) ?? null
     span.step('validateDevServer', { devServerId: params.devServerId })
     if (!server) {
       span.fail('DEV_SERVER_NOT_FOUND', { devServerId: params.devServerId })
@@ -141,13 +146,13 @@ export class ProjectService {
       db.query<ProjectRow>(
         `SELECT
            id, name, description,
-           dev_server_id as devServerId,
-           repo_path as repoPath,
-           default_branch as defaultBranch,
+           dev_server_id as "devServerId",
+           repo_path as "repoPath",
+           default_branch as "defaultBranch",
            visibility,
-           created_by as createdBy,
-           created_at as createdAt,
-           updated_at as updatedAt
+           created_by as "createdBy",
+           created_at as "createdAt",
+           updated_at as "updatedAt"
          FROM orca_v5_projects WHERE id = ?`,
         [projectId]
       )
@@ -165,13 +170,13 @@ export class ProjectService {
       db.query<ProjectRow>(
         `SELECT
            p.id, p.name, p.description,
-           p.dev_server_id as devServerId,
-           p.repo_path as repoPath,
-           p.default_branch as defaultBranch,
+           p.dev_server_id as "devServerId",
+           p.repo_path as "repoPath",
+           p.default_branch as "defaultBranch",
            p.visibility,
-           p.created_by as createdBy,
-           p.created_at as createdAt,
-           p.updated_at as updatedAt
+           p.created_by as "createdBy",
+           p.created_at as "createdAt",
+           p.updated_at as "updatedAt"
          FROM orca_v5_projects p
          JOIN orca_v5_project_members m ON m.project_id = p.id
          WHERE m.user_id = ?
@@ -195,7 +200,10 @@ export class ProjectService {
     })
 
     if (patch.devServerId !== undefined) {
-      const server = this.devServerManager.get(patch.devServerId)
+      // See create()'s comment above — list() works in both real and User Process
+      // (GatewayDevServerManagerProxy) mode, sync get() does not (BUG-BE-RPC-002).
+      const servers = await this.devServerManager.list()
+      const server = servers.find((s) => s.id === patch.devServerId) ?? null
       span.step('validateDevServer', { devServerId: patch.devServerId })
       if (!server) {
         span.fail('DEV_SERVER_NOT_FOUND', { devServerId: patch.devServerId })
@@ -288,10 +296,10 @@ export class ProjectService {
     const rows = await this.pool.withConnection((db) =>
       db.query<MemberRow>(
         `SELECT
-           project_id as projectId,
-           user_id as userId,
+           project_id as "projectId",
+           user_id as "userId",
            role,
-           added_at as addedAt
+           added_at as "addedAt"
          FROM orca_v5_project_members WHERE project_id = ?`,
         [projectId]
       )
@@ -304,10 +312,10 @@ export class ProjectService {
     const rows = await this.pool.withConnection((db) =>
       db.query<MemberRow>(
         `SELECT
-           project_id as projectId,
-           user_id as userId,
+           project_id as "projectId",
+           user_id as "userId",
            role,
-           added_at as addedAt
+           added_at as "addedAt"
          FROM orca_v5_project_members WHERE project_id = ? AND user_id = ?`,
         [projectId, userId]
       )

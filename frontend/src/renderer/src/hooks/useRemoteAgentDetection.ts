@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { DevServer } from '../../../shared/dev-server-types'
+import { useAppStore } from '../store'
+import {
+  detectRuntimeOnboardingAgents,
+  detectRuntimeOnboardingAgentsAllServers
+} from '../runtime/runtime-onboarding-client'
 
 export type AgentDetectionState = {
   agents: string[]
@@ -38,7 +43,9 @@ export function useRemoteAgentDetection(devServerId: string | null): AgentDetect
     }
     setState((prev) => ({ ...prev, loading: true, error: null }))
     try {
-      const result = await window.api.onboarding.detectAgents({ devServerId })
+      const result = await detectRuntimeOnboardingAgents(useAppStore.getState().settings, {
+        devServerId
+      })
       const next: AgentDetectionState = {
         agents: result.agents,
         platform: result.platform,
@@ -84,7 +91,7 @@ export function useAllServersAgentDetection(
 
   useEffect(() => {
     if (!serverIds) {return}
-    void window.api.onboarding.detectAgentsAllServers().then((raw) => {
+    void detectRuntimeOnboardingAgentsAllServers(useAppStore.getState().settings).then((raw) => {
       const mapped: Record<string, AgentDetectionState> = {}
       for (const [id, data] of Object.entries(raw)) {
         mapped[id] = {

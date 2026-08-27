@@ -3,6 +3,11 @@ import { toast } from 'sonner'
 import type { AppState } from '../types'
 import type { SparsePreset } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import {
+  listSparsePresets,
+  removeSparsePreset as removeSparsePresetRpc,
+  saveSparsePreset as saveSparsePresetRpc
+} from '../../runtime/runtime-sparse-presets-client'
 
 const ERROR_TOAST_DURATION = 60_000
 
@@ -101,7 +106,7 @@ export const createSparsePresetsSlice: StateCreator<AppState, [], [], SparsePres
       sparsePresetsErrorByRepo: { ...s.sparsePresetsErrorByRepo, [repoId]: undefined }
     }))
     try {
-      const presets = await window.api.sparsePresets.list({ repoId })
+      const presets = await listSparsePresets(get().settings, { repoId })
       set((s) => ({
         sparsePresetsByRepo: { ...s.sparsePresetsByRepo, [repoId]: presets },
         sparsePresetsLoadingByRepo: { ...s.sparsePresetsLoadingByRepo, [repoId]: false },
@@ -141,7 +146,7 @@ export const createSparsePresetsSlice: StateCreator<AppState, [], [], SparsePres
           return null
         }
       }
-      const saved = await window.api.sparsePresets.save(args)
+      const saved = await saveSparsePresetRpc(get().settings, args)
       set((s) => {
         const existing = s.sparsePresetsByRepo[args.repoId]
         if (existing === undefined) {
@@ -190,7 +195,7 @@ export const createSparsePresetsSlice: StateCreator<AppState, [], [], SparsePres
       }
     }))
     try {
-      await window.api.sparsePresets.remove({ repoId, presetId })
+      await removeSparsePresetRpc(get().settings, { repoId, presetId })
       toast.success(translate('auto.store.slices.sparse.presets.ee434d7941', 'Preset removed'))
     } catch (err) {
       set((s) => ({

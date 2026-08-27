@@ -29,8 +29,8 @@ export const migration0007Projects: Migration = {
         default_branch TEXT    NOT NULL DEFAULT 'main',
         visibility     TEXT    NOT NULL DEFAULT 'team',
         created_by     TEXT    NOT NULL,
-        created_at     INTEGER NOT NULL,
-        updated_at     INTEGER NOT NULL
+        created_at     BIGINT NOT NULL,
+        updated_at     BIGINT NOT NULL
       )
     `)
     await db.exec(`
@@ -44,7 +44,7 @@ export const migration0007Projects: Migration = {
         project_id TEXT    NOT NULL REFERENCES orca_v5_projects(id) ON DELETE CASCADE,
         user_id    TEXT    NOT NULL REFERENCES orca_users(id) ON DELETE CASCADE,
         role       TEXT    NOT NULL DEFAULT 'member',
-        added_at   INTEGER NOT NULL,
+        added_at   BIGINT NOT NULL,
         PRIMARY KEY (project_id, user_id)
       )
     `)

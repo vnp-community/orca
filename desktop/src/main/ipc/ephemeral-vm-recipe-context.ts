@@ -26,7 +26,15 @@ export type RecipeRepoResult =
   | { ok: true; repo: Exclude<ReturnType<Store['getRepo']>, null | undefined> }
   | { ok: false; message: string; doctor: (recipeId: string) => EphemeralVmRecipeDoctorResult }
 
-export function listRecipes(store: Store, repoId: string): EphemeralVmRecipeListResult {
+// Why: narrowed to the two reads this module actually performs so callers can
+// pass either the concrete desktop Store or OrcaRuntimeService's narrower
+// RuntimeStore (e.g. from the local RPC registry, which only holds the latter).
+export type EphemeralVmRecipeStore = Pick<Store, 'getRepo' | 'getRepos'>
+
+export function listRecipes(
+  store: EphemeralVmRecipeStore,
+  repoId: string
+): EphemeralVmRecipeListResult {
   const repo = store.getRepo(repoId)
   if (!repo || isFolderRepo(repo)) {
     return {
@@ -55,7 +63,7 @@ export function listRecipes(store: Store, repoId: string): EphemeralVmRecipeList
   }
 }
 
-export function listRecipeCatalog(store: Store): EphemeralVmRecipeCatalogEntry[] {
+export function listRecipeCatalog(store: EphemeralVmRecipeStore): EphemeralVmRecipeCatalogEntry[] {
   return store
     .getRepos()
     .filter((repo) => isGitRepoKind(repo) && !isFolderRepo(repo) && !repo.connectionId)
@@ -72,7 +80,7 @@ export function listRecipeCatalog(store: Store): EphemeralVmRecipeCatalogEntry[]
     .filter((entry) => entry.recipes.length > 0 || entry.diagnostics.length > 0)
 }
 
-export function getRecipeRepo(store: Store, repoId: string): RecipeRepoResult {
+export function getRecipeRepo(store: EphemeralVmRecipeStore, repoId: string): RecipeRepoResult {
   const repo = store.getRepo(repoId)
   if (!repo || isFolderRepo(repo)) {
     return failedRecipeRepo(null, `Repo not found: ${repoId}`)
@@ -84,7 +92,7 @@ export function getRecipeRepo(store: Store, repoId: string): RecipeRepoResult {
 }
 
 export function getRuntimeRecipeContext(
-  store: Store,
+  store: EphemeralVmRecipeStore,
   userDataPath: string,
   runtimeId: string
 ): {

@@ -13,6 +13,12 @@ import { MobilePairedDevicesSection, type PairedDevice } from './MobilePairedDev
 import { MobileAutoRestoreFitSection } from './MobileAutoRestoreFitSection'
 import { WindowsFirewallNotice } from '../mobile/WindowsFirewallNotice'
 import { translate } from '@/i18n/i18n'
+import {
+  getRuntimeMobilePairingQR,
+  listRuntimeNetworkInterfaces,
+  listRuntimePairedDevices,
+  revokeRuntimeMobileDevice
+} from '@/runtime/runtime-mobile-client'
 export { getMobilePaneSearchEntries } from './mobile-pane-search'
 
 export function MobilePane(): React.JSX.Element {
@@ -42,7 +48,7 @@ export function MobilePane(): React.JSX.Element {
 
   const loadDevices = useCallback(async () => {
     try {
-      const result = await window.api.mobile.listDevices()
+      const result = await listRuntimePairedDevices()
       if (mountedRef.current) {
         devicesRef.current = result.devices
         setDevices(result.devices)
@@ -56,7 +62,7 @@ export function MobilePane(): React.JSX.Element {
     async (opts: { notifyOnError?: boolean } = {}) => {
       setRefreshingNetworkInterfaces(true)
       try {
-        const result = await window.api.mobile.listNetworkInterfaces()
+        const result = await listRuntimeNetworkInterfaces()
         if (mountedRef.current) {
           setNetworkInterfaces(result.interfaces)
           setSelectedAddress((currentAddress) =>
@@ -85,7 +91,7 @@ export function MobilePane(): React.JSX.Element {
     async (opts: { rotate?: boolean } = {}) => {
       setLoading(true)
       try {
-        const result = await window.api.mobile.getPairingQR({
+        const result = await getRuntimeMobilePairingQR({
           ...(selectedAddress ? { address: selectedAddress } : {}),
           ...(opts.rotate ? { rotate: true } : {})
         })
@@ -141,7 +147,7 @@ export function MobilePane(): React.JSX.Element {
 
   async function revokeDevice(deviceId: string) {
     try {
-      await window.api.mobile.revokeDevice({ deviceId })
+      await revokeRuntimeMobileDevice(deviceId)
       if (mountedRef.current) {
         setDevices((prev) => {
           const nextDevices = prev.filter((d) => d.deviceId !== deviceId)

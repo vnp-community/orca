@@ -1,51 +1,62 @@
 // src/renderer/src/hooks/use-code-review.ts
 // BL-CR-01~05: Hook that manages state for the full code review flow
-// Loads changed files from git numstat, handles file selection, line annotation
+// Loads changed files from git status, handles file selection, line annotation
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { callRuntimeRpc } from '../runtime/runtime-rpc-client'
-import { getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
+import { pushRuntimeGit } from '../runtime/runtime-git-client'
+import { toRuntimeWorktreeSelector } from '../runtime/runtime-worktree-selector'
 import { useAppStore } from '../store'
 import { useWorkspace } from '../context/WorkspaceContext'
-import type { ChangedFile } from '../components/code-review/changed-files-tree'
+import type { ChangedFile, ChangeType } from '../components/code-review/changed-files-tree'
+import type { GitStatusEntry, GitStatusResult } from '../../../shared/git-status-types'
 
 type UseCodeReviewOptions = {
   reviewId?: string
 }
 
-// Parse git numstat output line into a ChangedFile record
-// Format: "<additions>\t<deletions>\t<path>" (or "{old => new}" for renames)
-function parseNumstatLine(line: string): ChangedFile | null {
-  const parts = line.split('\t')
-  if (parts.length < 3) {return null}
-  const additions = Number.parseInt(parts[0], 10) || 0
-  const deletions = Number.parseInt(parts[1], 10) || 0
-  const rawPath = parts.slice(2).join('\t')
+// BUG-FE-RPC gap fix: this used to call a nonexistent `git.exec` escape hatch
+// with a raw `git diff HEAD --numstat` argv (specs/frontend/tdd/api/gaps-and-mismatches.md
+// Category 2) — no such method exists, and deliberately so (every git.* RPC is
+// narrow and Zod-validated, not a raw-exec passthrough). `git.status` already
+// returns per-entry added/removed line counts (git-uncommitted-line-stats.ts),
+// which covers the same "changed since HEAD" data `--numstat` provided.
+//
+// Unlike `git diff HEAD --numstat` (one combined row per file), `git.status`
+// reports staged and unstaged changes to the same file as separate entries, so
+// merge them back into one row per path here. Untracked files are dropped to
+// match `git diff HEAD`'s semantics, which never included them either.
+function toChangedFiles(entries: GitStatusEntry[]): ChangedFile[] {
+  const byPath = new Map<string, ChangedFile>()
+  for (const entry of entries) {
+    if (entry.area === 'untracked') {continue}
 
-  // Detect rename: "src/{old => new}/file.ts" or "old/path => new/path"
-  const renameMatch = rawPath.match(/^(.*)\{(.+) => (.+)\}(.*)$/)
-  if (renameMatch) {
-    const [, prefix, oldPart, newPart, suffix] = renameMatch
-    return {
-      path: `${prefix}${newPart}${suffix}`.replace('//', '/'),
-      oldPath: `${prefix}${oldPart}${suffix}`.replace('//', '/'),
-      changeType: 'renamed',
-      additions,
-      deletions,
+    const changeType: ChangeType =
+      entry.status === 'added' ? 'added' :
+      entry.status === 'deleted' ? 'deleted' :
+      entry.status === 'renamed' ? 'renamed' :
+      'modified' // 'modified' and 'copied' both collapse to 'modified' — ChangeType has no 'copied'
+
+    const existing = byPath.get(entry.path)
+    if (existing) {
+      existing.additions += entry.added ?? 0
+      existing.deletions += entry.removed ?? 0
+      if (entry.oldPath) {existing.oldPath = entry.oldPath}
+    } else {
+      byPath.set(entry.path, {
+        path: entry.path,
+        changeType,
+        additions: entry.added ?? 0,
+        deletions: entry.removed ?? 0,
+        ...(entry.oldPath ? { oldPath: entry.oldPath } : {})
+      })
     }
   }
-
-  // Determine change type from additions/deletions pattern
-  const changeType: ChangedFile['changeType'] =
-    additions > 0 && deletions === 0 ? 'added' :
-    additions === 0 && deletions > 0 ? 'deleted' :
-    'modified'
-
-  return { path: rawPath.trim(), changeType, additions, deletions }
+  return Array.from(byPath.values())
 }
 
-export function useCodeReview({ reviewId }: UseCodeReviewOptions = {}) {
+export function useCodeReview({ reviewId: _reviewId }: UseCodeReviewOptions = {}) {
   const [changedFiles, setChangedFiles]     = useState<ChangedFile[]>([])
   const [selectedFile, setSelectedFile]     = useState<string | null>(null)
   const [annotationLine, setAnnotationLine] = useState<number | null>(null)
@@ -53,24 +64,17 @@ export function useCodeReview({ reviewId }: UseCodeReviewOptions = {}) {
   const [commitMessage, setCommitMessage]   = useState('')
   const [isCommitting, setIsCommitting]     = useState(false)
 
-  const { project, worktreePath } = useWorkspace()
+  const { project, currentWorktree } = useWorkspace()
 
   const refreshChangedFiles = useCallback(async () => {
-    if (!project) {return}
+    if (!project || !currentWorktree) {return}
     setIsLoadingFiles(true)
     try {
       const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      // git diff HEAD --numstat returns additions/deletions per file
-      const numstatOutput = await callRuntimeRpc<string>(target, 'git.exec', {
-        projectId: project.id,
-        worktreePath: worktreePath ?? project.rootPath,
-        args: ['diff', 'HEAD', '--numstat'],
+      const status = await callRuntimeRpc<GitStatusResult>(target, 'git.status', {
+        worktree: toRuntimeWorktreeSelector(currentWorktree.id)
       })
-      const files = numstatOutput
-        .split('\n')
-        .filter(Boolean)
-        .map(parseNumstatLine)
-        .filter((f): f is ChangedFile => f !== null)
+      const files = toChangedFiles(status.entries)
 
       setChangedFiles(files)
       // Auto-select first file
@@ -83,7 +87,7 @@ export function useCodeReview({ reviewId }: UseCodeReviewOptions = {}) {
     } finally {
       setIsLoadingFiles(false)
     }
-  }, [project, worktreePath, selectedFile])
+  }, [project, currentWorktree, selectedFile])
 
   // Load on mount
   useEffect(() => {
@@ -99,16 +103,23 @@ export function useCodeReview({ reviewId }: UseCodeReviewOptions = {}) {
   }, [])
 
   const handleCommit = useCallback(async (push: boolean) => {
-    if (!commitMessage.trim() || !project) {return}
+    if (!commitMessage.trim() || !project || !currentWorktree) {return}
     setIsCommitting(true)
     try {
-      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+      const settings = useAppStore.getState().settings
+      const target = getActiveRuntimeTarget(settings)
       await callRuntimeRpc(target, 'git.commit', {
-        projectId: project.id,
-        worktreePath: worktreePath ?? project.rootPath,
-        message: commitMessage,
-        push,
+        worktree: toRuntimeWorktreeSelector(currentWorktree.id),
+        message: commitMessage
       })
+      if (push) {
+        // git.commit has no push option of its own (GitCommit params: {worktree, message}
+        // only) — chain the real git.push RPC, matching useGit.ts's commit+push pattern.
+        await pushRuntimeGit(
+          { settings, worktreeId: currentWorktree.id, worktreePath: currentWorktree.path },
+          { publish: true }
+        )
+      }
       toast.success(push ? 'Committed and pushed' : 'Committed')
       setCommitMessage('')
       await refreshChangedFiles()
@@ -117,7 +128,7 @@ export function useCodeReview({ reviewId }: UseCodeReviewOptions = {}) {
     } finally {
       setIsCommitting(false)
     }
-  }, [commitMessage, project, worktreePath, refreshChangedFiles])
+  }, [commitMessage, project, currentWorktree, refreshChangedFiles])
 
   return {
     changedFiles,
