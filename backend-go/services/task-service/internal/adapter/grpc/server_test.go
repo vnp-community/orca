@@ -292,6 +292,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 	// (TASK-TG-03-01's manage-access check) in addition to the standalone
 	// ResolvePermission RPC wiring below.
 	resolvePermissionUC := usecase.NewResolvePermission(tasks, tasks, stubTeams{}, stubOPA{})
+	shareLinks := newFakeShareLinkRepository()
 	return New(
 		createTaskUC,
 		usecase.NewGetTask(tasks),
@@ -313,7 +314,60 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		usecase.NewGenerateAgentPrompt(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "generated prompt text"}),
 		usecase.NewRevokeGrant(tasks, resolvePermissionUC, stubEvents{}),
 		usecase.NewListGrants(tasks, resolvePermissionUC),
+		usecase.NewCreatePublicLink(shareLinks, resolvePermissionUC),
+		usecase.NewRevokePublicLink(shareLinks, resolvePermissionUC, tasks),
+		usecase.NewResolvePublicLink(shareLinks),
 	)
+}
+
+// fakeShareLinkRepository backs the public-link RPCs' wiring/contract
+// tests — ONE shared instance across Create/Revoke/Resolve so a link
+// created via one usecase is visible to the others, matching how the real
+// ShareLinkStore is a single table shared by all three.
+func newFakeShareLinkRepository() *fakeShareLinkRepository {
+	return &fakeShareLinkRepository{links: map[string]fakeShareLink{}}
+}
+
+type fakeShareLink struct {
+	taskID    string
+	tokenHash string
+	revoked   bool
+}
+
+type fakeShareLinkRepository struct {
+	links  map[string]fakeShareLink
+	nextID int
+}
+
+func (f *fakeShareLinkRepository) Create(ctx context.Context, tenantID, taskID, tokenHash, createdBy string) (string, error) {
+	f.nextID++
+	id := fmt.Sprintf("link-%d", f.nextID)
+	f.links[id] = fakeShareLink{taskID: taskID, tokenHash: tokenHash}
+	return id, nil
+}
+func (f *fakeShareLinkRepository) ResolveActive(ctx context.Context, tenantID, tokenHash string) (string, error) {
+	for _, l := range f.links {
+		if l.tokenHash == tokenHash && !l.revoked {
+			return l.taskID, nil
+		}
+	}
+	return "", errors.New("not found")
+}
+func (f *fakeShareLinkRepository) Revoke(ctx context.Context, tenantID, linkID string) error {
+	l, ok := f.links[linkID]
+	if !ok {
+		return errors.New("not found")
+	}
+	l.revoked = true
+	f.links[linkID] = l
+	return nil
+}
+func (f *fakeShareLinkRepository) TaskIDFor(ctx context.Context, tenantID, linkID string) (string, error) {
+	l, ok := f.links[linkID]
+	if !ok {
+		return "", errors.New("not found")
+	}
+	return l.taskID, nil
 }
 
 type stubEvents struct{}

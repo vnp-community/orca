@@ -55,6 +55,10 @@ service TaskService {
 
   rpc RevokeGrant(RevokeGrantRequest) returns (google.protobuf.Empty);
   rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse);
+
+  rpc CreatePublicLink(CreatePublicLinkRequest) returns (CreatePublicLinkResponse); // requires 'manage'; returns the plaintext token ONCE
+  rpc RevokePublicLink(RevokePublicLinkRequest) returns (google.protobuf.Empty);
+  rpc ResolvePublicLink(ResolvePublicLinkRequest) returns (ResolvePublicLinkResponse); // token -> task_id + read-only grant, no auth required
 }
 
 message Task {
@@ -290,3 +294,9 @@ message Grant {
 message ListGrantsResponse {
   repeated Grant grants = 1;
 }
+
+message CreatePublicLinkRequest { string task_id = 1; google.protobuf.Timestamp expires_at = 2; }
+message CreatePublicLinkResponse { string id = 1; string token = 2; } // token returned ONCE, plaintext, never again
+message RevokePublicLinkRequest { string id = 1; }
+message ResolvePublicLinkRequest { string token = 1; }
+message ResolvePublicLinkResponse { string task_id = 1; }

@@ -40,6 +40,9 @@ const (
 	TaskService_GenerateAgentPrompt_FullMethodName = "/orca.task.v1.TaskService/GenerateAgentPrompt"
 	TaskService_RevokeGrant_FullMethodName         = "/orca.task.v1.TaskService/RevokeGrant"
 	TaskService_ListGrants_FullMethodName          = "/orca.task.v1.TaskService/ListGrants"
+	TaskService_CreatePublicLink_FullMethodName    = "/orca.task.v1.TaskService/CreatePublicLink"
+	TaskService_RevokePublicLink_FullMethodName    = "/orca.task.v1.TaskService/RevokePublicLink"
+	TaskService_ResolvePublicLink_FullMethodName   = "/orca.task.v1.TaskService/ResolvePublicLink"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -87,6 +90,9 @@ type TaskServiceClient interface {
 	GenerateAgentPrompt(ctx context.Context, in *GenerateAgentPromptRequest, opts ...grpc.CallOption) (*GenerateAgentPromptResponse, error)
 	RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error)
+	CreatePublicLink(ctx context.Context, in *CreatePublicLinkRequest, opts ...grpc.CallOption) (*CreatePublicLinkResponse, error)
+	RevokePublicLink(ctx context.Context, in *RevokePublicLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ResolvePublicLink(ctx context.Context, in *ResolvePublicLinkRequest, opts ...grpc.CallOption) (*ResolvePublicLinkResponse, error)
 }
 
 type taskServiceClient struct {
@@ -297,6 +303,36 @@ func (c *taskServiceClient) ListGrants(ctx context.Context, in *ListGrantsReques
 	return out, nil
 }
 
+func (c *taskServiceClient) CreatePublicLink(ctx context.Context, in *CreatePublicLinkRequest, opts ...grpc.CallOption) (*CreatePublicLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreatePublicLinkResponse)
+	err := c.cc.Invoke(ctx, TaskService_CreatePublicLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) RevokePublicLink(ctx context.Context, in *RevokePublicLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_RevokePublicLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ResolvePublicLink(ctx context.Context, in *ResolvePublicLinkRequest, opts ...grpc.CallOption) (*ResolvePublicLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolvePublicLinkResponse)
+	err := c.cc.Invoke(ctx, TaskService_ResolvePublicLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -342,6 +378,9 @@ type TaskServiceServer interface {
 	GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error)
 	RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error)
 	ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error)
+	CreatePublicLink(context.Context, *CreatePublicLinkRequest) (*CreatePublicLinkResponse, error)
+	RevokePublicLink(context.Context, *RevokePublicLinkRequest) (*emptypb.Empty, error)
+	ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -411,6 +450,15 @@ func (UnimplementedTaskServiceServer) RevokeGrant(context.Context, *RevokeGrantR
 }
 func (UnimplementedTaskServiceServer) ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListGrants not implemented")
+}
+func (UnimplementedTaskServiceServer) CreatePublicLink(context.Context, *CreatePublicLinkRequest) (*CreatePublicLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePublicLink not implemented")
+}
+func (UnimplementedTaskServiceServer) RevokePublicLink(context.Context, *RevokePublicLinkRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokePublicLink not implemented")
+}
+func (UnimplementedTaskServiceServer) ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolvePublicLink not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -793,6 +841,60 @@ func _TaskService_ListGrants_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_CreatePublicLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePublicLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).CreatePublicLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_CreatePublicLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).CreatePublicLink(ctx, req.(*CreatePublicLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_RevokePublicLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokePublicLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RevokePublicLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RevokePublicLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RevokePublicLink(ctx, req.(*RevokePublicLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ResolvePublicLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolvePublicLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ResolvePublicLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ResolvePublicLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ResolvePublicLink(ctx, req.(*ResolvePublicLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -879,6 +981,18 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListGrants",
 			Handler:    _TaskService_ListGrants_Handler,
+		},
+		{
+			MethodName: "CreatePublicLink",
+			Handler:    _TaskService_CreatePublicLink_Handler,
+		},
+		{
+			MethodName: "RevokePublicLink",
+			Handler:    _TaskService_RevokePublicLink_Handler,
+		},
+		{
+			MethodName: "ResolvePublicLink",
+			Handler:    _TaskService_ResolvePublicLink_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

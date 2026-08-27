@@ -142,6 +142,16 @@ type GrantRepository interface {
 	ListGrantsForTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error)
 }
 
+// ShareLinkRepository is the persistence port for task.task_share_links
+// rows — the public/anonymous share-link flow (TASK-TG-03-08). Never
+// stores or returns a plaintext token, only its SHA-256 hash.
+type ShareLinkRepository interface {
+	Create(ctx context.Context, tenantID, taskID, tokenHash, createdBy string) (id string, err error)
+	ResolveActive(ctx context.Context, tenantID, tokenHash string) (taskID string, err error)
+	Revoke(ctx context.Context, tenantID, linkID string) error
+	TaskIDFor(ctx context.Context, tenantID, linkID string) (taskID string, err error)
+}
+
 // EventPublisher writes a best-effort outbox row for async consumption
 // (notification-service) — see internal/adapter/eventbus's doc comment for
 // the outbox-write + common/outbox.Relay polling-publish implementation,

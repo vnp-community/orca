@@ -205,12 +205,21 @@ func run() error {
 	// AddEdge RPCs, which don't need a shared transaction).
 	aiApplyUC := usecase.NewAIApply(repo)
 	generateAgentPromptUC := usecase.NewGenerateAgentPrompt(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter)
+	// TASK-TG-03-08's public/anonymous share-link flow. See server.go's
+	// ResolvePublicLink doc comment for why api-gateway is NOT wired to
+	// expose this yet. shareLinkStore is its own type (not repo) — see
+	// adapter/postgres/share_links.go's doc comment for the method-name
+	// collision that requires this.
+	shareLinkStore := taskpostgres.NewShareLinkStore(pool)
+	createPublicLinkUC := usecase.NewCreatePublicLink(shareLinkStore, resolvePermissionUC)
+	revokePublicLinkUC := usecase.NewRevokePublicLink(shareLinkStore, resolvePermissionUC, repo)
+	resolvePublicLinkUC := usecase.NewResolvePublicLink(shareLinkStore)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
 		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, generateAgentPromptUC,
-		revokeGrantUC, listGrantsUC,
+		revokeGrantUC, listGrantsUC, createPublicLinkUC, revokePublicLinkUC, resolvePublicLinkUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

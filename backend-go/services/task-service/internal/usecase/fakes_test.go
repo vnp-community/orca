@@ -518,6 +518,69 @@ type fakeClock struct{ now time.Time }
 
 func (f *fakeClock) Now() time.Time { return f.now }
 
+// fakeShareLinkRepository backs the public-link usecases' tests without a
+// database — stores only the token hash it's given, never a plaintext, the
+// same discipline the real ShareLinkStore keeps.
+type fakeShareLinkRepository struct {
+	links     map[string]fakeShareLink
+	nextID    int
+	createErr error
+}
+
+type fakeShareLink struct {
+	tenantID  string
+	taskID    string
+	tokenHash string
+	revoked   bool
+	expiresAt *time.Time
+}
+
+func newFakeShareLinkRepository() *fakeShareLinkRepository {
+	return &fakeShareLinkRepository{links: map[string]fakeShareLink{}}
+}
+
+func (f *fakeShareLinkRepository) Create(ctx context.Context, tenantID, taskID, tokenHash, createdBy string) (string, error) {
+	if f.createErr != nil {
+		return "", f.createErr
+	}
+	f.nextID++
+	id := fmt.Sprintf("link-%d", f.nextID)
+	f.links[id] = fakeShareLink{tenantID: tenantID, taskID: taskID, tokenHash: tokenHash}
+	return id, nil
+}
+
+func (f *fakeShareLinkRepository) ResolveActive(ctx context.Context, tenantID, tokenHash string) (string, error) {
+	now := time.Now()
+	for _, l := range f.links {
+		if l.tenantID != tenantID || l.tokenHash != tokenHash || l.revoked {
+			continue
+		}
+		if l.expiresAt != nil && !l.expiresAt.After(now) {
+			continue
+		}
+		return l.taskID, nil
+	}
+	return "", errNotFound
+}
+
+func (f *fakeShareLinkRepository) Revoke(ctx context.Context, tenantID, linkID string) error {
+	l, ok := f.links[linkID]
+	if !ok || l.tenantID != tenantID || l.revoked {
+		return errNotFound
+	}
+	l.revoked = true
+	f.links[linkID] = l
+	return nil
+}
+
+func (f *fakeShareLinkRepository) TaskIDFor(ctx context.Context, tenantID, linkID string) (string, error) {
+	l, ok := f.links[linkID]
+	if !ok || l.tenantID != tenantID {
+		return "", errNotFound
+	}
+	return l.taskID, nil
+}
+
 type fakeExecutor struct {
 	ref    string
 	err    error

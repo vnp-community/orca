@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 
@@ -38,6 +39,9 @@ type Server struct {
 	generateAgentPrompt *usecase.GenerateAgentPrompt
 	revokeGrant         *usecase.RevokeGrant
 	listGrants          *usecase.ListGrants
+	createPublicLink    *usecase.CreatePublicLink
+	revokePublicLink    *usecase.RevokePublicLink
+	resolvePublicLink   *usecase.ResolvePublicLink
 }
 
 func New(
@@ -57,6 +61,9 @@ func New(
 	generateAgentPrompt *usecase.GenerateAgentPrompt,
 	revokeGrant *usecase.RevokeGrant,
 	listGrants *usecase.ListGrants,
+	createPublicLink *usecase.CreatePublicLink,
+	revokePublicLink *usecase.RevokePublicLink,
+	resolvePublicLink *usecase.ResolvePublicLink,
 ) *Server {
 	return &Server{
 		createTask:          createTask,
@@ -75,6 +82,9 @@ func New(
 		generateAgentPrompt: generateAgentPrompt,
 		revokeGrant:         revokeGrant,
 		listGrants:          listGrants,
+		createPublicLink:    createPublicLink,
+		revokePublicLink:    revokePublicLink,
+		resolvePublicLink:   resolvePublicLink,
 	}
 }
 
@@ -159,6 +169,40 @@ func (s *Server) ListGrants(ctx context.Context, req *taskv1.ListGrantsRequest) 
 		out = append(out, pg)
 	}
 	return &taskv1.ListGrantsResponse{Grants: out}, nil
+}
+
+func (s *Server) CreatePublicLink(ctx context.Context, req *taskv1.CreatePublicLinkRequest) (*taskv1.CreatePublicLinkResponse, error) {
+	id, token, err := s.createPublicLink.Execute(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.CreatePublicLinkResponse{Id: id, Token: token}, nil
+}
+
+func (s *Server) RevokePublicLink(ctx context.Context, req *taskv1.RevokePublicLinkRequest) (*emptypb.Empty, error) {
+	if err := s.revokePublicLink.Execute(ctx, req.GetId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// ResolvePublicLink is the one RPC in this service meaningfully callable
+// without a JWT (spec: "anonymous read-only access via a random token") —
+// see TASK-TG-03-08's Context section for why api-gateway is NOT yet wired
+// to expose this to a browser (a new unauthenticated-route trust boundary,
+// out of scope here) and why tenantID below still comes from
+// tenant.RequireTenantID(ctx) rather than the wire request (which has no
+// tenant_id field) in the meantime.
+func (s *Server) ResolvePublicLink(ctx context.Context, req *taskv1.ResolvePublicLinkRequest) (*taskv1.ResolvePublicLinkResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "TASK_NO_TENANT", "no tenant in request context", err))
+	}
+	taskID, err := s.resolvePublicLink.Execute(ctx, tenantID, req.GetToken())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.ResolvePublicLinkResponse{TaskId: taskID}, nil
 }
 
 func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error) {

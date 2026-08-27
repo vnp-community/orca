@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `backend-go/services/task-service/internal/usecase/public_link.go` (new)
 **Depends on:** TASK-TG-03-05 (migration — `task.task_share_links` table)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — CreatePublicLink/RevokePublicLink/ResolvePublicLink usecases, ShareLinkStore adapter, proto RPCs, and main.go/server.go wiring all present; `go test ./services/task-service/internal/usecase/... -run 'TestCreatePublicLink|TestResolvePublicLink|TestRevokePublicLink'` passes (9/9).
 
 ---
 
