@@ -281,6 +281,24 @@ func handleRevokeAuth(client scmintegrationv1.ScmIntegrationServiceClient) http.
 	}
 }
 
+// parseReviewType maps a REST/WS-facing review-type string to
+// scmintegrationv1.ReviewType — "" (omitted) resolves to
+// REVIEW_TYPE_UNSPECIFIED, which SubmitReview's usecase then defaults to
+// REQUEST_CHANGES server-side (BR-PI-11), so an unrecognized string here
+// degrades the same safe way an omitted one does, rather than erroring.
+func parseReviewType(v string) scmintegrationv1.ReviewType {
+	switch v {
+	case "comment":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_COMMENT
+	case "approve":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_APPROVE
+	case "request_changes":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_REQUEST_CHANGES
+	default:
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_UNSPECIFIED
+	}
+}
+
 func parseSCMProvider(v string) scmintegrationv1.ScmProvider {
 	switch v {
 	case "github":

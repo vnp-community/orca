@@ -65,9 +65,9 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 			RepoID           string `json:"repoId"`
 			BaseRef          string `json:"baseRef"`
 			Provider         string `json:"provider"` // "github"|"gitlab"|"jira"|"linear"
-			Repo             string `json:"repo"`      // scm only
-			Number           int32  `json:"number"`    // scm only
-			IssueRef         string `json:"issueRef"`  // tracker only
+			Repo             string `json:"repo"`     // scm only
+			Number           int32  `json:"number"`   // scm only
+			IssueRef         string `json:"issueRef"` // tracker only
 			SkipAgentStart   bool   `json:"skipAgentStart"`
 			SkipStatusUpdate bool   `json:"skipStatusUpdate"`
 		}

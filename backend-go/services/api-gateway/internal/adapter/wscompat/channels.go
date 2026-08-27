@@ -106,7 +106,7 @@ func RegisterRealChannels(
 	registerCredentialsChannels(r, scmClient, issueTrackingClient)
 	registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)
 	registerRepoSshStatusWorkspaceChannels(r, projectClient, gitClient, infraFleetClient)
-	registerSCMChannels(r, scmClient)
+	registerSCMChannels(r, scmClient, annotationClient)
 	registerBrowserChannels(r, infraFleetClient)
 	registerBrowserProfileChannels(r, infraFleetClient)
 	// registerGitDeepChannels must be called after registerGitChannels:

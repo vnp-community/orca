@@ -57,6 +57,10 @@ type fakeScmIntegrationServiceClient struct {
 
 	revokeAuthResp *scmintegrationv1.RevokeAuthResponse
 	revokeAuthErr  error
+
+	submitReviewResp *scmintegrationv1.Review
+	submitReviewErr  error
+	submitReviewReq  *scmintegrationv1.SubmitReviewRequest
 }
 
 func (f *fakeScmIntegrationServiceClient) ListIssues(_ context.Context, in *scmintegrationv1.ListIssuesRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIssuesResponse, error) {
@@ -65,6 +69,14 @@ func (f *fakeScmIntegrationServiceClient) ListIssues(_ context.Context, in *scmi
 		return nil, f.listIssuesErr
 	}
 	return f.listIssuesResp, nil
+}
+
+func (f *fakeScmIntegrationServiceClient) SubmitReview(_ context.Context, in *scmintegrationv1.SubmitReviewRequest, _ ...grpc.CallOption) (*scmintegrationv1.Review, error) {
+	f.submitReviewReq = in
+	if f.submitReviewErr != nil {
+		return nil, f.submitReviewErr
+	}
+	return f.submitReviewResp, nil
 }
 
 func (f *fakeScmIntegrationServiceClient) ListIssueCommentsBySlug(_ context.Context, in *scmintegrationv1.ListIssueCommentsBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIssueCommentsBySlugResponse, error) {

@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 )
 
@@ -53,6 +54,9 @@ type fakeScmIntegrationClient struct {
 	// TASK-PI-01-07 additions.
 	listIssuesFunc              func(ctx context.Context, in *scmintegrationv1.ListIssuesRequest) (*scmintegrationv1.ListIssuesResponse, error)
 	listIssueCommentsBySlugFunc func(ctx context.Context, in *scmintegrationv1.ListIssueCommentsBySlugRequest) (*scmintegrationv1.ListIssueCommentsBySlugResponse, error)
+
+	// TASK-PI-04-06 addition.
+	submitReviewFunc func(ctx context.Context, in *scmintegrationv1.SubmitReviewRequest) (*scmintegrationv1.Review, error)
 
 	// credentials.* group (channels_credentials_test.go, TASK-042).
 	setIntegrationCredentialFunc       func(ctx context.Context, in *scmintegrationv1.SetIntegrationCredentialRequest) (*scmintegrationv1.SetIntegrationCredentialResponse, error)
@@ -204,6 +208,23 @@ func (f *fakeScmIntegrationClient) ListIssueCommentsBySlug(ctx context.Context, 
 	return f.listIssueCommentsBySlugFunc(ctx, in)
 }
 
+func (f *fakeScmIntegrationClient) SubmitReview(ctx context.Context, in *scmintegrationv1.SubmitReviewRequest, _ ...grpc.CallOption) (*scmintegrationv1.Review, error) {
+	return f.submitReviewFunc(ctx, in)
+}
+
+// fakeAnnotationClient is a func-based test double for
+// annotationv1.AnnotationServiceClient — same embed-and-override shape as
+// fakeScmIntegrationClient above.
+type fakeAnnotationClient struct {
+	annotationv1.AnnotationServiceClient
+
+	listAnnotationsFunc func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error)
+}
+
+func (f *fakeAnnotationClient) ListAnnotations(ctx context.Context, in *annotationv1.ListAnnotationsRequest, _ ...grpc.CallOption) (*annotationv1.ListAnnotationsResponse, error) {
+	return f.listAnnotationsFunc(ctx, in)
+}
+
 // ── github.* ──────────────────────────────────────────────────────────────
 
 func TestGitHubMergePRChannel_Success(t *testing.T) {
@@ -216,7 +237,7 @@ func TestGitHubMergePRChannel_Success(t *testing.T) {
 	}
 
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "github.mergePR",
 		argsJSON(t, map[string]any{"repo": "o/r", "number": 42, "mergeMethod": "squash"}))
@@ -244,7 +265,7 @@ func TestGitHubRequestPRReviewersChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.requestPRReviewers",
 		argsJSON(t, map[string]any{"repo": "o/r", "number": 42, "reviewerLogins": []string{"alice"}, "teamSlugs": []string{"team-a"}}))
@@ -266,7 +287,7 @@ func TestGitHubPRForBranchChannel_ReturnsNilWhenNotFound(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.prForBranch",
 		argsJSON(t, map[string]any{"repo": "o/r", "headBranch": "feature-x"}))
@@ -285,7 +306,7 @@ func TestGitHubPRForBranchChannel_ReturnsPRWhenFound(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.prForBranch",
 		argsJSON(t, map[string]any{"repo": "o/r", "headBranch": "feature-x"}))
@@ -307,7 +328,7 @@ func TestGitHubUpdateIssueChannel_OmitsUnsetOptionalFields(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	// title/body/state absent from args[0] entirely.
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.updateIssue",
@@ -332,7 +353,7 @@ func TestGitHubUpdateIssueChannel_SetsProvidedOptionalFields(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.updateIssue",
 		argsJSON(t, map[string]any{"repo": "o/r", "number": 1, "title": "new title"}))
@@ -351,7 +372,7 @@ func TestGitHubRepoSlugChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.repoSlug",
 		argsJSON(t, map[string]any{"candidate": "git@github.com:octocat/hello-world.git"}))
@@ -375,7 +396,7 @@ func TestGitHubProjectListAccessibleChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listAccessible", nil)
 	if err != nil {
@@ -399,7 +420,7 @@ func TestGitHubProjectUpdateItemFieldChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateItemField",
 		argsJSON(t, map[string]any{"projectSlug": "acme/7", "itemId": "item-1", "fieldId": "f1", "kind": "text", "value": "hi"}))
@@ -423,7 +444,7 @@ func TestGitHubProjectDeleteIssueCommentBySlugChannel_ReturnsNil(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.deleteIssueCommentBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "commentId": "c1"}))
@@ -453,7 +474,7 @@ func TestGitHubRateLimitChannelMatchesRESTContract(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.rateLimit", nil)
 	if err != nil {
@@ -478,7 +499,7 @@ func TestGitHubRemovePRReviewersChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.removePRReviewers",
 		argsJSON(t, map[string]any{"repo": "o/r", "number": 42, "reviewerLogins": []string{"alice", "bob"}}))
@@ -504,7 +525,7 @@ func TestGitHubRemovePRReviewersChannel_PropagatesError(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.removePRReviewers",
 		argsJSON(t, map[string]any{"repo": "o/r", "number": 42, "reviewerLogins": []string{"alice"}}))
@@ -522,7 +543,7 @@ func TestGitHubSetPRAutoMergeChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.setPRAutoMerge",
 		argsJSON(t, map[string]any{"repo": "o/r", "number": 42, "enabled": true, "mergeMethod": "squash"}))
@@ -546,7 +567,7 @@ func TestGitHubStartAuthLoginChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "github.startAuthLogin",
 		argsJSON(t, map[string]any{"redirectUri": "https://app.example.com/callback"}))
@@ -574,7 +595,7 @@ func TestGitHubRevokeAuthChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.revokeAuth", nil)
 	if err != nil {
@@ -596,7 +617,7 @@ func TestGitHubRevokeAuthChannel_PropagatesError(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.revokeAuth", nil)
 	if !errors.Is(err, wantErr) {
@@ -615,7 +636,7 @@ func TestGitHubProjectResolveRefChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.resolveRef",
 		argsJSON(t, map[string]any{"owner": "acme", "number": 7}))
@@ -640,7 +661,7 @@ func TestGitHubProjectListViewsChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listViews",
 		argsJSON(t, map[string]any{"projectSlug": "acme/7"}))
@@ -665,7 +686,7 @@ func TestGitHubProjectViewTableChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.viewTable",
 		argsJSON(t, map[string]any{"projectSlug": "acme/7", "viewId": "v1", "pageToken": "tok", "pageSize": 25}))
@@ -690,7 +711,7 @@ func TestGitHubProjectClearItemFieldChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.clearItemField",
 		argsJSON(t, map[string]any{"projectSlug": "acme/7", "itemId": "item-1", "fieldId": "f1"}))
@@ -714,7 +735,7 @@ func TestGitHubProjectWorkItemDetailsBySlugChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.workItemDetailsBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1"}))
@@ -739,7 +760,7 @@ func TestGitHubProjectUpdateIssueBySlugChannel_OmitsUnsetOptionalFields(t *testi
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateIssueBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "addLabels": []string{"bug"}}))
@@ -762,7 +783,7 @@ func TestGitHubProjectUpdateIssueBySlugChannel_PropagatesError(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateIssueBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "title": "new title"}))
@@ -780,7 +801,7 @@ func TestGitHubProjectUpdatePullRequestBySlugChannel_SetsProvidedOptionalFields(
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updatePullRequestBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#2", "state": "closed"}))
@@ -804,7 +825,7 @@ func TestGitHubProjectUpdateIssueTypeBySlugChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateIssueTypeBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "issueType": "Bug"}))
@@ -826,7 +847,7 @@ func TestGitHubProjectListIssueTypesBySlugChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listIssueTypesBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1"}))
@@ -846,7 +867,7 @@ func TestGitHubProjectListAssignableUsersBySlugChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listAssignableUsersBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1"}))
@@ -866,7 +887,7 @@ func TestGitHubProjectListLabelsBySlugChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.listLabelsBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1"}))
@@ -888,7 +909,7 @@ func TestGitHubProjectAddIssueCommentBySlugChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.addIssueCommentBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "body": "a comment"}))
@@ -913,7 +934,7 @@ func TestGitHubProjectUpdateIssueCommentBySlugChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.project.updateIssueCommentBySlug",
 		argsJSON(t, map[string]any{"itemSlug": "acme/repo#1", "commentId": "c1", "body": "edited"}))
@@ -938,7 +959,7 @@ func TestGitHubIssuesChannel_FiltersAndForceRefreshForwarded(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.issues",
 		argsJSON(t, map[string]any{
@@ -976,7 +997,7 @@ func TestGitHubIssueCommentsChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.issueComments",
 		argsJSON(t, map[string]any{"itemSlug": "o/r#42"}))
@@ -1009,7 +1030,7 @@ func TestGitLabListMRsChannel_Success(t *testing.T) {
 	}
 
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "gitlab.listMRs",
 		argsJSON(t, map[string]any{"repo": "group/project", "state": "opened"}))
@@ -1034,7 +1055,7 @@ func TestGitLabResolveMRDiscussionChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "gitlab.resolveMRDiscussion",
 		argsJSON(t, map[string]any{"repo": "group/project", "mergeRequestIid": 42, "discussionId": "disc-1", "resolved": true}))
@@ -1056,7 +1077,7 @@ func TestGitLabWorkItemDetailsChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "gitlab.workItemDetails",
 		argsJSON(t, map[string]any{"repo": "group/project", "iid": 42, "itemType": "issue"}))
@@ -1084,7 +1105,7 @@ func TestGitLabRateLimitChannelMatchesRESTContract(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "gitlab.rateLimit", nil)
 	if err != nil {
@@ -1109,7 +1130,7 @@ func TestGitLabIssuesChannel_UsesGitlabProvider(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "gitlab.issues",
 		argsJSON(t, map[string]any{"repo": "group/project", "state": "opened"}))
@@ -1135,7 +1156,7 @@ func TestHostedReviewCreateChannel_Success(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "hostedReview.create",
 		argsJSON(t, map[string]any{"provider": "gitlab", "repo": "group/project", "title": "t", "headBranch": "h", "baseBranch": "b"}))
@@ -1158,7 +1179,7 @@ func TestHostedReviewForBranchChannel_ReturnsNilWhenNotFound(t *testing.T) {
 		},
 	}
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "hostedReview.forBranch",
 		argsJSON(t, map[string]any{"provider": "github", "repo": "o/r", "headBranch": "feature-x"}))
@@ -1180,7 +1201,7 @@ func TestHostedReviewGetCreationEligibilityChannel_Success(t *testing.T) {
 	}
 
 	r := NewRegistry()
-	registerSCMChannels(r, fake)
+	registerSCMChannels(r, fake, nil)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "hostedReview.getCreationEligibility",
 		argsJSON(t, map[string]any{"provider": "gitlab", "repo": "group/project", "headBranch": "feature-x", "baseBranch": "main"}))
@@ -1193,6 +1214,71 @@ func TestHostedReviewGetCreationEligibilityChannel_Success(t *testing.T) {
 	}
 	if gotReq.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB {
 		t.Errorf("expected SCM_PROVIDER_GITLAB from parseWSProvider(\"gitlab\"), got %v", gotReq.GetProvider())
+	}
+}
+
+// TestHostedReviewSubmitChannel_Success uses the same fake
+// ScmIntegrationServiceClient + fake AnnotationServiceClient harness
+// hostedReview.create already uses (TASK-PI-04-07).
+func TestHostedReviewSubmitChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.SubmitReviewRequest
+	scm := &fakeScmIntegrationClient{
+		submitReviewFunc: func(ctx context.Context, in *scmintegrationv1.SubmitReviewRequest) (*scmintegrationv1.Review, error) {
+			gotReq = in
+			return &scmintegrationv1.Review{Id: "review-1", State: scmintegrationv1.ReviewType_REVIEW_TYPE_APPROVE}, nil
+		},
+	}
+	annotations := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return &annotationv1.ListAnnotationsResponse{
+				Annotations: []*annotationv1.Annotation{
+					{Anchor: &annotationv1.Anchor{FilePath: "a.go", Line: 1}, Content: "nit"},
+				},
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, scm, annotations)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "hostedReview.submit",
+		argsJSON(t, map[string]any{"repoId": "repo-1", "provider": "github", "prNumber": 42, "reviewType": "approve", "summary": "lgtm"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	review, ok := result.(*scmintegrationv1.Review)
+	if !ok || review.GetId() != "review-1" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB {
+		t.Errorf("expected SCM_PROVIDER_GITHUB from parseWSProvider(\"github\"), got %v", gotReq.GetProvider())
+	}
+	if gotReq.GetPrNumber() != 42 || gotReq.GetReviewType() != scmintegrationv1.ReviewType_REVIEW_TYPE_APPROVE {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	if len(gotReq.GetComments()) != 1 || gotReq.GetComments()[0].GetPath() != "a.go" {
+		t.Errorf("expected the annotation to be mapped into a ReviewComment, got %+v", gotReq.GetComments())
+	}
+}
+
+func TestHostedReviewSubmitChannel_NoAnnotationsFailsBeforeSubmitReview(t *testing.T) {
+	scm := &fakeScmIntegrationClient{
+		submitReviewFunc: func(ctx context.Context, in *scmintegrationv1.SubmitReviewRequest) (*scmintegrationv1.Review, error) {
+			t.Fatal("SubmitReview should not be called when there are no annotations")
+			return nil, nil
+		},
+	}
+	annotations := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return &annotationv1.ListAnnotationsResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, scm, annotations)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "hostedReview.submit",
+		argsJSON(t, map[string]any{"repoId": "repo-1", "provider": "github", "prNumber": 42}))
+	if err == nil {
+		t.Fatal("expected an error when there are no annotations to submit")
 	}
 }
 

@@ -174,6 +174,12 @@ func NewRouter(deps Deps) http.Handler {
 		if deps.SCMClient != nil {
 			mountSCMRoutes(authed, deps.SCMClient)
 		}
+		// mountPRReviewRoutes (SOL-PI-04) composes both clients — the
+		// annotation-service read + scm-integration-service write this
+		// aggregation route needs.
+		if deps.SCMClient != nil && deps.AnnotationClient != nil {
+			mountPRReviewRoutes(authed, deps.SCMClient, deps.AnnotationClient)
+		}
 		if deps.WorkflowClient != nil {
 			mountWorkflowRoutes(authed, deps.WorkflowClient)
 		}
