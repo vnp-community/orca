@@ -95,6 +95,13 @@ type Server struct {
 	resolveConflict    *usecase.ResolveConflict
 	discard            *usecase.Discard
 	bulkDiscard        *usecase.BulkDiscard
+
+	// SOL-PW-03 — merge/stash/branch-write
+	mergeBranch  *usecase.MergeBranch
+	stashPush    *usecase.StashPush
+	stashPop     *usecase.StashPop
+	createBranch *usecase.CreateBranch
+	deleteBranch *usecase.DeleteBranch
 }
 
 // New wires every usecase this server dispatches to. Parameter order
@@ -162,6 +169,11 @@ func New(
 	resolveConflict *usecase.ResolveConflict,
 	discard *usecase.Discard,
 	bulkDiscard *usecase.BulkDiscard,
+	mergeBranch *usecase.MergeBranch,
+	stashPush *usecase.StashPush,
+	stashPop *usecase.StashPop,
+	createBranch *usecase.CreateBranch,
+	deleteBranch *usecase.DeleteBranch,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -228,6 +240,12 @@ func New(
 		resolveConflict:   resolveConflict,
 		discard:           discard,
 		bulkDiscard:       bulkDiscard,
+
+		mergeBranch:  mergeBranch,
+		stashPush:    stashPush,
+		stashPop:     stashPop,
+		createBranch: createBranch,
+		deleteBranch: deleteBranch,
 	}
 }
 
@@ -533,7 +551,7 @@ func (s *Server) ReadDir(ctx context.Context, req *gitgatewayv1.ReadDirRequest) 
 	}
 	out := make([]*gitgatewayv1.DirEntry, 0, len(entries))
 	for _, e := range entries {
-		out = append(out, &gitgatewayv1.DirEntry{Name: e.Name, IsDirectory: e.IsDirectory})
+		out = append(out, &gitgatewayv1.DirEntry{Name: e.Name, IsDirectory: e.IsDirectory, SizeBytes: e.SizeBytes})
 	}
 	return &gitgatewayv1.ReadDirResponse{Entries: out}, nil
 }
@@ -822,6 +840,58 @@ func (s *Server) BulkDiscard(ctx context.Context, req *gitgatewayv1.BulkDiscardR
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.BulkDiscardResponse{Success: result.Success, FailedPaths: result.FailedPaths}, nil
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write ────────────────────────────────
+
+func (s *Server) MergeBranch(ctx context.Context, req *gitgatewayv1.MergeBranchRequest) (*gitgatewayv1.MergeBranchResponse, error) {
+	result, err := s.mergeBranch.Execute(ctx, usecase.MergeBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(), NoFF: req.GetNoFf(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.MergeBranchResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+func (s *Server) StashPush(ctx context.Context, req *gitgatewayv1.StashPushRequest) (*gitgatewayv1.StashPushResponse, error) {
+	result, err := s.stashPush.Execute(ctx, usecase.StashPushInput{
+		WorktreeID: req.GetWorktreeId(), Message: req.GetMessage(), IncludeUntracked: req.GetIncludeUntracked(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.StashPushResponse{Success: result.Success}, nil
+}
+
+func (s *Server) StashPop(ctx context.Context, req *gitgatewayv1.StashPopRequest) (*gitgatewayv1.StashPopResponse, error) {
+	result, err := s.stashPop.Execute(ctx, usecase.StashPopInput{
+		WorktreeID: req.GetWorktreeId(), StashRef: req.GetStashRef(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.StashPopResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+func (s *Server) CreateBranch(ctx context.Context, req *gitgatewayv1.CreateBranchRequest) (*gitgatewayv1.CreateBranchResponse, error) {
+	branch, err := s.createBranch.Execute(ctx, usecase.CreateBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(), Checkout: req.GetCheckout(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CreateBranchResponse{Branch: branch}, nil
+}
+
+func (s *Server) DeleteBranch(ctx context.Context, req *gitgatewayv1.DeleteBranchRequest) (*gitgatewayv1.DeleteBranchResponse, error) {
+	result, err := s.deleteBranch.Execute(ctx, usecase.DeleteBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.DeleteBranchResponse{Success: result.Success}, nil
 }
 
 func toProtoBranches(branches []domain.BranchInfo) []*gitgatewayv1.BranchInfo {

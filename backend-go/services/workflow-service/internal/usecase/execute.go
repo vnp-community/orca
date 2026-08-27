@@ -2,8 +2,10 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -129,14 +131,41 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 // final status (completed if every wave succeeded, failed if any step
 // did not — see waveDispatcher's doc comment for the failure-semantics
 // rationale). Runs entirely off the originating RPC's goroutine.
+// runToCompletion is the one place exec.Status transitions to a terminal
+// value for the main dispatch path — the single outbox publish point
+// SOL-PW-04 (TASK-PW-04-06) adds. A marshal failure degrades to "persist
+// status, skip the event" rather than failing the whole terminal
+// transition — matches this function's existing best-effort logging
+// posture for UpdateExecution failures (both are already fire-and-forget
+// from a background goroutine with no caller to propagate an error to).
 func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step) {
 	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves)
 
 	exec.Status = domain.StatusCompleted
+	subject := "orca.workflow.execution.completed"
 	if !succeeded {
 		exec.Status = domain.StatusFailed
+		subject = "orca.workflow.execution.failed"
 	}
-	if err := uc.executions.UpdateExecution(ctx, exec); err != nil {
+
+	payload, err := json.Marshal(workflowExecutionTerminalPayload{
+		ExecutionID: exec.ID, TemplateID: exec.TemplateID, ProjectID: exec.ProjectID, Status: string(exec.Status),
+	})
+	var event *domain.OutboxEvent
+	if err != nil {
+		slog.ErrorContext(ctx, "workflow: marshaling terminal-status event payload failed", slog.String("execution_id", exec.ID), slog.Any("error", err))
+	} else {
+		event = &domain.OutboxEvent{ID: uuid.NewString(), Subject: subject, OccurredAt: time.Now().UTC(), PayloadJSON: payload}
+	}
+
+	if err := uc.executions.UpdateExecution(ctx, exec, event); err != nil {
 		slog.ErrorContext(ctx, "workflow: persisting final execution status failed", slog.String("execution_id", exec.ID), slog.String("status", string(exec.Status)), slog.Any("error", err))
 	}
+}
+
+type workflowExecutionTerminalPayload struct {
+	ExecutionID string `json:"execution_id"`
+	TemplateID  string `json:"template_id"`
+	ProjectID   string `json:"project_id"`
+	Status      string `json:"status"`
 }

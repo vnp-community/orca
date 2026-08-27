@@ -179,7 +179,7 @@ func TestRepository_Update_PersistsTitleAndStatus(t *testing.T) {
 
 	task.Title = "new title"
 	task.Status = domain.StatusDone
-	if err := repo.Update(ctx, tenantID, task); err != nil {
+	if err := repo.Update(ctx, tenantID, task, nil); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 
@@ -202,8 +202,115 @@ func TestRepository_Update_WrongTenant_Fails(t *testing.T) {
 		t.Fatalf("creating task: %v", err)
 	}
 
-	if err := repo.Update(ctx, uuid.NewString(), task); err == nil {
+	if err := repo.Update(ctx, uuid.NewString(), task, nil); err == nil {
 		t.Fatal("expected an error updating a task under the wrong tenant")
+	}
+}
+
+// ── SOL-PW-04 — outbox + task_number (TASK-PW-04-02/03) ──────────────────
+
+func TestRepository_Create_AssignsNonZeroTaskNumber(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "title", domain.StatusOpen, "", "")
+	created, err := repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+	if created.TaskNumber == 0 {
+		t.Error("expected a non-zero task_number to be assigned")
+	}
+}
+
+func TestRepository_FindByNumber_ResolvesWithinProject_NotAcrossProjects(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+	projectA := uuid.NewString()
+	projectB := uuid.NewString()
+
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "title", domain.StatusOpen, "", projectA)
+	created, err := repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	got, err := repo.FindByNumber(ctx, tenantID, projectA, created.TaskNumber)
+	if err != nil {
+		t.Fatalf("FindByNumber within the correct project: %v", err)
+	}
+	if got.ID != created.ID {
+		t.Errorf("expected to resolve task %s, got %s", created.ID, got.ID)
+	}
+
+	if _, err := repo.FindByNumber(ctx, tenantID, projectB, created.TaskNumber); err == nil {
+		t.Fatal("expected NOT_FOUND resolving the same task_number under a different project")
+	}
+}
+
+func TestRepository_Update_WithEvents_WritesOutboxRowsInSameTransaction(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "title", domain.StatusOpen, "", "")
+	created, err := repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	created.Status = domain.StatusCancelled
+	events := []domain.OutboxEvent{
+		{ID: uuid.NewString(), Subject: "orca.task.task.statuschanged", OccurredAt: time.Now().UTC(), PayloadJSON: []byte(`{}`)},
+	}
+	if err := repo.Update(ctx, tenantID, created, events); err != nil {
+		t.Fatalf("update with events: %v", err)
+	}
+
+	unpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("FetchUnpublished: %v", err)
+	}
+	if len(unpublished) != 1 || unpublished[0].Subject != "orca.task.task.statuschanged" {
+		t.Fatalf("expected exactly 1 unpublished outbox row, got %+v", unpublished)
+	}
+
+	if err := repo.MarkPublished(ctx, []string{unpublished[0].ID}); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+	afterMark, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("FetchUnpublished after mark: %v", err)
+	}
+	if len(afterMark) != 0 {
+		t.Errorf("expected no unpublished rows after MarkPublished, got %+v", afterMark)
+	}
+}
+
+func TestRepository_Update_NilEvents_WritesNoOutboxRow(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "title", domain.StatusOpen, "", "")
+	created, err := repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	created.Title = "renamed"
+	if err := repo.Update(ctx, tenantID, created, nil); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	unpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("FetchUnpublished: %v", err)
+	}
+	if len(unpublished) != 0 {
+		t.Errorf("expected no outbox rows for a nil-event update, got %+v", unpublished)
 	}
 }
 

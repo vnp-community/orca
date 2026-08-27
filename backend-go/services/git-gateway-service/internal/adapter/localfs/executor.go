@@ -81,7 +81,15 @@ func (e *Executor) ReadDir(ctx context.Context, repoPath, relPath string) ([]dom
 	}
 	out := make([]domain.DirEntry, 0, len(entries))
 	for _, ent := range entries {
-		out = append(out, domain.DirEntry{Name: ent.Name(), IsDirectory: ent.IsDir()})
+		var size int64
+		if !ent.IsDir() {
+			info, err := ent.Info()
+			if err != nil {
+				continue // unreadable entry (permissions/race) — skip, don't fail the whole ReadDir
+			}
+			size = info.Size()
+		}
+		out = append(out, domain.DirEntry{Name: ent.Name(), IsDirectory: ent.IsDir(), SizeBytes: size})
 	}
 	return out, nil
 }

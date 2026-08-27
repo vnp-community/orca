@@ -78,6 +78,7 @@ func TestConnectionResolver_ResolveConnection_Connected(t *testing.T) {
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{
 			Connected: true,
 			RepoPath:  "/remote/repo",
+			DevServer: &infrafleetv1.DevServer{Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_WEBSOCKET},
 		},
 	}
 	r := NewConnectionResolver(fake)
@@ -94,6 +95,27 @@ func TestConnectionResolver_ResolveConnection_Connected(t *testing.T) {
 	}
 	if conn.RepoPath != "/remote/repo" {
 		t.Errorf("expected RepoPath from response, got %q", conn.RepoPath)
+	}
+	if conn.Mode != infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_WEBSOCKET {
+		t.Errorf("expected Mode forwarded from resp.GetDevServer().GetMode(), got %v", conn.Mode)
+	}
+}
+
+func TestConnectionResolver_ResolveConnection_NotConnected_ModeLeftAtZeroValue(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	r := NewConnectionResolver(fake)
+
+	conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-3")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conn.Connected {
+		t.Error("expected Connected=false")
+	}
+	if conn.Mode != infrafleetv1.ConnectionMode_CONNECTION_MODE_UNSPECIFIED {
+		t.Errorf("expected Mode left at zero value when not connected, got %v", conn.Mode)
 	}
 }
 
@@ -147,6 +169,44 @@ func TestRelayExecutor_GetStatus_Success(t *testing.T) {
 	}
 	if params["worktreePath"] != "/repo" {
 		t.Errorf("expected worktreePath param (real agent contract, see BUG-036/TASK-228), got %+v", params)
+	}
+}
+
+// TestReadDir_MapsAgentFileTreeNodeShape asserts against the agent's real
+// fs.readDir response shape (agent/src/relay/fs-agent-extensions.ts:27-32's
+// FileTreeNode: {name, type:'file'|'directory', size?}) — not an invented
+// fixture. See TASK-PW-02-04.
+func TestReadDir_MapsAgentFileTreeNodeShape(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"entries": []map[string]any{
+			{"path": "/repo/a.txt", "name": "a.txt", "type": "file", "size": 42},
+			{"path": "/repo/sub", "name": "sub", "type": "directory"},
+		},
+		"path": "/repo",
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)},
+	}
+	r := NewRelayExecutor(fake)
+
+	entries, err := r.ReadDir(ctxWithTenant(t), "/repo", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("unexpected entries: %+v", entries)
+	}
+	if entries[0].Name != "a.txt" || entries[0].IsDirectory || entries[0].SizeBytes != 42 {
+		t.Errorf("unexpected file entry: %+v", entries[0])
+	}
+	if entries[1].Name != "sub" || !entries[1].IsDirectory || entries[1].SizeBytes != 0 {
+		t.Errorf("unexpected directory entry: %+v", entries[1])
+	}
+	if fake.gotRelay.GetMethod() != "fs.readDir" {
+		t.Errorf("expected method=fs.readDir, got %q", fake.gotRelay.GetMethod())
 	}
 }
 
@@ -853,6 +913,126 @@ func TestRelayExecutor_Fetch_NilPushTargetOmitsField(t *testing.T) {
 	}
 	if _, ok := params["pushTarget"]; ok {
 		t.Error("expected pushTarget to be omitted when nil")
+	}
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write contract tests (TASK-PW-03-05) ──
+
+func TestMergeBranch_SendsExpectedGitExecArgs(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":""}`}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.MergeBranch(ctxWithTenant(t), "/repo", "feature", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.exec" {
+		t.Errorf("expected method=git.exec, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	args, _ := params["args"].([]any)
+	if len(args) != 3 || args[0] != "merge" || args[1] != "--no-ff" || args[2] != "feature" {
+		t.Errorf("unexpected args: %+v", params["args"])
+	}
+	if !got.Success || got.HadConflicts {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestMergeBranch_DetectsConflictFromStderr(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"CONFLICT (content): Merge conflict in a.txt"}`}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.MergeBranch(ctxWithTenant(t), "/repo", "feature", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.Success || !got.HadConflicts {
+		t.Errorf("expected HadConflicts=true, got %+v", got)
+	}
+}
+
+func TestStashPush_SendsExpectedGitExecArgs(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":""}`}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.StashPush(ctxWithTenant(t), "/repo", "wip", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	args, _ := params["args"].([]any)
+	if len(args) != 5 || args[0] != "stash" || args[1] != "push" || args[2] != "-u" || args[3] != "-m" || args[4] != "wip" {
+		t.Errorf("unexpected args: %+v", params["args"])
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestStashPop_SendsExpectedGitExecArgs(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":""}`}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.StashPop(ctxWithTenant(t), "/repo", "stash@{1}")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	args, _ := params["args"].([]any)
+	if len(args) != 3 || args[0] != "stash" || args[1] != "pop" || args[2] != "stash@{1}" {
+		t.Errorf("unexpected args: %+v", params["args"])
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestCreateBranch_WithCheckout_ComposesTwoGitExecCalls(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":""}`}}
+	r := NewRelayExecutor(fake)
+
+	got, err := r.CreateBranch(ctxWithTenant(t), "/repo", "feature", "main", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "feature" {
+		t.Errorf("expected branch=feature, got %q", got)
+	}
+	// fake only records the LAST Relay call — the second (checkout) one.
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	args, _ := params["args"].([]any)
+	if len(args) != 2 || args[0] != "checkout" || args[1] != "feature" {
+		t.Errorf("unexpected final args (expected checkout call): %+v", params["args"])
+	}
+}
+
+func TestDeleteBranch_SendsExpectedGitExecArgs(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":""}`}}
+	r := NewRelayExecutor(fake)
+
+	if err := r.DeleteBranch(ctxWithTenant(t), "/repo", "feature"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	args, _ := params["args"].([]any)
+	if len(args) != 3 || args[0] != "branch" || args[1] != "-d" || args[2] != "feature" {
+		t.Errorf("unexpected args: %+v", params["args"])
 	}
 }
 

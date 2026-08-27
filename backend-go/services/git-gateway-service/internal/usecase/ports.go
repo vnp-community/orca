@@ -15,6 +15,7 @@ package usecase
 import (
 	"context"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
@@ -34,6 +35,12 @@ type ResolvedConnection struct {
 	Connected    bool
 	ConnectionID string
 	RepoPath     string
+	// Mode is empty when Connected is false (host-local — the distinction
+	// doesn't apply). Populated from infra-fleet-service's
+	// ResolveConnectionResponse.dev_server.mode. Added SOL-PW-03 to gate
+	// the merge/stash/branch-write/push-stream operations Part B
+	// (relay-ssh) genuinely does not support.
+	Mode infrafleetv1.ConnectionMode
 }
 
 // ConnectionResolver resolves which host owns a worktree, by calling
@@ -236,6 +243,16 @@ type GitExecutor interface {
 	ResolveConflict(ctx context.Context, repoPath, path, operation string) (domain.SimpleResult, error)
 	Discard(ctx context.Context, repoPath, path string) (domain.SimpleResult, error)
 	BulkDiscard(ctx context.Context, repoPath string, paths []string) (domain.BulkDiscardResult, error)
+
+	// ── SOL-PW-03 — merge/stash/branch-write. Only reachable when the
+	// usecase layer's ConnectionResolver check confirms the target is not
+	// a relay-ssh connection; RelayExecutor's implementations do not
+	// re-check mode themselves. ─────────────────────────────────────────
+	MergeBranch(ctx context.Context, repoPath, branch string, noFF bool) (domain.MergeResult, error)
+	StashPush(ctx context.Context, repoPath, message string, includeUntracked bool) (domain.SimpleResult, error)
+	StashPop(ctx context.Context, repoPath, stashRef string) (domain.MergeResult, error) // reuses MergeResult's had_conflicts shape
+	CreateBranch(ctx context.Context, repoPath, branch, baseRef string, checkout bool) (string, error)
+	DeleteBranch(ctx context.Context, repoPath, branch string) error // soft; ForceDeleteBranch (existing) stays the -D path
 }
 
 // DevServerReachability resolves whether devServerID is a live,

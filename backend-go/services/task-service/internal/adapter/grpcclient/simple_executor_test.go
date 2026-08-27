@@ -74,7 +74,10 @@ func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, 
 func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
 	panic("not implemented")
 }
-func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task) error {
+func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task, events []domain.OutboxEvent) error {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) FindByNumber(ctx context.Context, tenantID, projectID string, taskNumber int64) (domain.Task, error) {
 	panic("not implemented")
 }
 func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) error {

@@ -2,7 +2,11 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
@@ -179,13 +183,31 @@ func (uc *RecoverExecutions) resumeToCompletion(ctx context.Context, exec domain
 }
 
 // finish persists exec's final status — completed or failed, mirroring
-// runToCompletion's own terminal-status logic exactly (see execute.go).
+// runToCompletion's own terminal-status logic exactly (see execute.go),
+// INCLUDING its outbox publish (SOL-PW-04, TASK-PW-04-06): a recovered
+// execution still publishes orca.workflow.execution.completed/.failed —
+// a downstream consumer that missed the original event (e.g. was down
+// during the crash that triggered this recovery scan) still needs to
+// learn the execution finished.
 func (uc *RecoverExecutions) finish(ctx context.Context, exec domain.WorkflowExecution, succeeded bool) {
 	exec.Status = domain.StatusCompleted
+	subject := "orca.workflow.execution.completed"
 	if !succeeded {
 		exec.Status = domain.StatusFailed
+		subject = "orca.workflow.execution.failed"
 	}
-	if err := uc.executions.UpdateExecution(ctx, exec); err != nil {
+
+	payload, err := json.Marshal(workflowExecutionTerminalPayload{
+		ExecutionID: exec.ID, TemplateID: exec.TemplateID, ProjectID: exec.ProjectID, Status: string(exec.Status),
+	})
+	var event *domain.OutboxEvent
+	if err != nil {
+		slog.ErrorContext(ctx, "workflow: recovery scan: marshaling terminal-status event payload failed", slog.String("execution_id", exec.ID), slog.Any("error", err))
+	} else {
+		event = &domain.OutboxEvent{ID: uuid.NewString(), Subject: subject, OccurredAt: time.Now().UTC(), PayloadJSON: payload}
+	}
+
+	if err := uc.executions.UpdateExecution(ctx, exec, event); err != nil {
 		slog.ErrorContext(ctx, "workflow: recovery scan: persisting final execution status failed", slog.String("execution_id", exec.ID), slog.String("status", string(exec.Status)), slog.Any("error", err))
 	}
 }

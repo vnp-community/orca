@@ -826,14 +826,32 @@ func (r *RelayExecutor) ReadFilePreview(ctx context.Context, repoPath, relPath s
 	return content, result.Truncated, err
 }
 
+// ReadDir relays via the agent's fs.readDir, whose FileTreeNode entry shape
+// (agent/src/relay/fs-agent-extensions.ts:27-32) is {name, type:'file'|
+// 'directory', size?} — neither field name matches domain.DirEntry's own
+// json tags (`isDirectory`/`sizeBytes`), so this uses an explicit
+// intermediate shape rather than the generic tag-based unmarshal
+// TASK-PW-02-04 otherwise expected to "just work". SOL-PW-02: size is now
+// threaded from the agent's real `size` field.
 func (r *RelayExecutor) ReadDir(ctx context.Context, repoPath, relPath string) ([]domain.DirEntry, error) {
 	var result struct {
-		Entries []domain.DirEntry `json:"entries"`
+		Entries []struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+			Size int64  `json:"size"`
+		} `json:"entries"`
 	}
 	err := r.relay(ctx, repoPath, "fs.readDir", map[string]any{
 		"path": filepath.Join(repoPath, relPath),
 	}, &result)
-	return result.Entries, err
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.DirEntry, 0, len(result.Entries))
+	for _, e := range result.Entries {
+		out = append(out, domain.DirEntry{Name: e.Name, IsDirectory: e.Type == "directory", SizeBytes: e.Size})
+	}
+	return out, nil
 }
 
 func (r *RelayExecutor) WriteFile(ctx context.Context, repoPath, relPath string, content []byte, createParents bool) (int64, error) {
@@ -932,4 +950,85 @@ func decodeFileContent(content, encoding string) ([]byte, error) {
 		return base64.StdEncoding.DecodeString(content)
 	}
 	return []byte(content), nil
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write. Only reachable when the target
+// connection is Part A (relay-websocket/direct-websocket); Part B's
+// (relay-ssh) git.exec whitelist rejects checkout/merge/stash/branch -d
+// outright (agent-rpc-catalog-git-fs.md's "Not allowed at all" list). The
+// usecase layer's ConnectionResolver check is expected to prevent these
+// methods from ever being called against a relay-ssh connection — none of
+// them re-check mode themselves. ───────────────────────────────────────────
+
+// MergeBranch relays via git.exec's merge subcommand.
+func (r *RelayExecutor) MergeBranch(ctx context.Context, repoPath, branch string, noFF bool) (domain.MergeResult, error) {
+	args := []string{"merge"}
+	if noFF {
+		args = append(args, "--no-ff")
+	}
+	args = append(args, branch)
+	var result gitExecResult
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": args, "cwd": repoPath}, &result)
+	if err != nil {
+		return domain.MergeResult{}, err
+	}
+	return domain.MergeResult{Success: true, HadConflicts: strings.Contains(result.Stderr, "CONFLICT")}, nil
+}
+
+// StashPush relays via git.exec's stash push subcommand.
+func (r *RelayExecutor) StashPush(ctx context.Context, repoPath, message string, includeUntracked bool) (domain.SimpleResult, error) {
+	args := []string{"stash", "push"}
+	if includeUntracked {
+		args = append(args, "-u")
+	}
+	if message != "" {
+		args = append(args, "-m", message)
+	}
+	var result gitExecResult
+	if err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": args, "cwd": repoPath}, &result); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// StashPop relays via git.exec's stash pop subcommand.
+func (r *RelayExecutor) StashPop(ctx context.Context, repoPath, stashRef string) (domain.MergeResult, error) {
+	args := []string{"stash", "pop"}
+	if stashRef != "" {
+		args = append(args, stashRef)
+	}
+	var result gitExecResult
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": args, "cwd": repoPath}, &result)
+	if err != nil {
+		return domain.MergeResult{}, err
+	}
+	return domain.MergeResult{Success: true, HadConflicts: strings.Contains(result.Stderr, "CONFLICT")}, nil
+}
+
+// CreateBranch composes two git.exec calls (branch then checkout)
+// sequentially when checkout=true — `checkout -b`'s combined form is not
+// on either Part's exec whitelist as a single flag-shape, so this always
+// issues the two subcommands separately.
+func (r *RelayExecutor) CreateBranch(ctx context.Context, repoPath, branch, baseRef string, checkout bool) (string, error) {
+	args := []string{"branch", branch}
+	if baseRef != "" {
+		args = append(args, baseRef)
+	}
+	var result gitExecResult
+	if err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": args, "cwd": repoPath}, &result); err != nil {
+		return "", err
+	}
+	if checkout {
+		var coResult gitExecResult
+		if err := r.relay(ctx, repoPath, "git.exec", map[string]any{"args": []string{"checkout", branch}, "cwd": repoPath}, &coResult); err != nil {
+			return "", err
+		}
+	}
+	return branch, nil
+}
+
+// DeleteBranch relays via git.exec's branch -d subcommand (soft delete).
+func (r *RelayExecutor) DeleteBranch(ctx context.Context, repoPath, branch string) error {
+	var result gitExecResult
+	return r.relay(ctx, repoPath, "git.exec", map[string]any{"args": []string{"branch", "-d", branch}, "cwd": repoPath}, &result)
 }

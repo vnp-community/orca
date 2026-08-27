@@ -66,6 +66,17 @@ type Task struct {
 	// task currently in_progress" — see that usecase's doc comment for the
 	// honest limit on what "in_progress" currently means here.
 	ProjectID string
+	// TaskNumber is a per-project sequential number (immutable, assigned
+	// once at Create) so a commit message can reference "#TG-42" without
+	// embedding a UUID — added SOL-PW-04.
+	TaskNumber int64
+	// WorktreeID mirrors project-service's Worktree.TaskID from the task
+	// side — empty until an agent run or commit-close saga sets it via
+	// UpdateTask. Added SOL-PW-04.
+	WorktreeID string
+	// PRURL is set by the PR-creation write-back saga — empty until a PR
+	// referencing this task's #TG-N is created. Added SOL-PW-04.
+	PRURL string
 }
 
 func validStatus(s string) bool {

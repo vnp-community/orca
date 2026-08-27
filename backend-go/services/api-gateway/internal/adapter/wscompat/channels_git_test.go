@@ -1076,7 +1076,7 @@ func TestFilesReadDirChannel_ReturnsUnwrappedEntries(t *testing.T) {
 			if in.GetWorktreeId() != "wt-1" || in.GetPath() != "dir" {
 				t.Errorf("unexpected request: %+v", in)
 			}
-			return &gitgatewayv1.ReadDirResponse{Entries: []*gitgatewayv1.DirEntry{{Name: "a.txt"}}}, nil
+			return &gitgatewayv1.ReadDirResponse{Entries: []*gitgatewayv1.DirEntry{{Name: "a.txt", SizeBytes: 42}}}, nil
 		},
 	}
 	r := NewRegistry()
@@ -1088,8 +1088,8 @@ func TestFilesReadDirChannel_ReturnsUnwrappedEntries(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	entries, ok := result.([]*gitgatewayv1.DirEntry)
-	if !ok || len(entries) != 1 || entries[0].GetName() != "a.txt" {
-		t.Errorf("expected unwrapped entries slice, got %+v", result)
+	if !ok || len(entries) != 1 || entries[0].GetName() != "a.txt" || entries[0].GetSizeBytes() != 42 {
+		t.Errorf("expected unwrapped entries slice with sizeBytes, got %+v", result)
 	}
 }
 

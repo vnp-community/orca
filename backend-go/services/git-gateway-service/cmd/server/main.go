@@ -200,6 +200,16 @@ func run() error {
 	discardUC := usecase.NewDiscard(resolver, local, relay)
 	bulkDiscardUC := usecase.NewBulkDiscard(resolver, local, relay)
 
+	// SOL-PW-03 — merge/stash/branch-write. Mode-gated inline (each
+	// usecase calls resolver.ResolveConnection directly rather than going
+	// through dispatchExecutor) so a relay-ssh connection fails closed
+	// before ever attempting the relay call.
+	mergeBranchUC := usecase.NewMergeBranch(resolver, local, relay)
+	stashPushUC := usecase.NewStashPush(resolver, local, relay)
+	stashPopUC := usecase.NewStashPop(resolver, local, relay)
+	createBranchUC := usecase.NewCreateBranch(resolver, local, relay)
+	deleteBranchUC := usecase.NewDeleteBranch(resolver, local, relay)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
 		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
@@ -218,6 +228,7 @@ func run() error {
 		checkoutUC, listLocalBranchesUC, fastForwardUC, rebaseFromBaseUC,
 		abortRebaseUC, abortMergeUC, conflictOperationUC, resolveConflictUC,
 		discardUC, bulkDiscardUC,
+		mergeBranchUC, stashPushUC, stashPopUC, createBranchUC, deleteBranchUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

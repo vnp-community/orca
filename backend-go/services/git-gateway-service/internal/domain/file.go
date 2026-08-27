@@ -4,8 +4,12 @@ package domain
 
 // DirEntry is one entry returned by FilesystemExecutor.ReadDir.
 type DirEntry struct {
-	Name        string
-	IsDirectory bool
+	Name        string `json:"name"`
+	IsDirectory bool   `json:"isDirectory"`
+	// SizeBytes is 0 for directories. Populated from the same source
+	// FileStat.SizeBytes already uses (os.Stat locally, the agent's
+	// fs.stat/fs.readDir response over relay) — added SOL-PW-02.
+	SizeBytes int64 `json:"sizeBytes"`
 }
 
 // FileStat is FilesystemExecutor.Stat's result.

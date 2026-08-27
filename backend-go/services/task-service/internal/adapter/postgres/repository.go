@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 )
@@ -66,12 +67,17 @@ func (r *Repository) RunInTx(ctx context.Context, fn func(ctx context.Context, t
 	})
 }
 
+// Create inserts a task and assigns its task_number from the shared
+// per-service sequence (nextval('task.task_number_seq')), returning it via
+// RETURNING so the caller's response carries the real assigned value —
+// SOL-PW-04 (TASK-PW-04-03).
 func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
-	_, err := r.db.Exec(ctx, `
-		INSERT INTO task.tasks (id, tenant_id, title, status, parent_id, project_id)
-		VALUES ($1, $2, $3, $4, $5, $6)
+	row := r.db.QueryRow(ctx, `
+		INSERT INTO task.tasks (id, tenant_id, title, status, parent_id, project_id, task_number)
+		VALUES ($1, $2, $3, $4, $5, $6, nextval('task.task_number_seq'))
+		RETURNING task_number
 	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID))
-	if err != nil {
+	if err := row.Scan(&task.TaskNumber); err != nil {
 		return domain.Task{}, fmt.Errorf("postgres: insert task: %w", err)
 	}
 	return task, nil
@@ -79,17 +85,38 @@ func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task,
 
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Task, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, '')
+		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, ''),
+		       COALESCE(task_number, 0), COALESCE(worktree_id::text, ''), COALESCE(pr_url, '')
 		FROM task.tasks
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
 	var t domain.Task
-	if err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID); err != nil {
+	if err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID, &t.TaskNumber, &t.WorktreeID, &t.PRURL); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Task{}, fmt.Errorf("postgres: task %s not found: %w", id, err)
 		}
 		return domain.Task{}, fmt.Errorf("postgres: query task: %w", err)
+	}
+	return t, nil
+}
+
+// FindByNumber resolves a project-scoped "#TG-N" reference to a task via
+// idx_tasks_project_task_number — added SOL-PW-04.
+func (r *Repository) FindByNumber(ctx context.Context, tenantID, projectID string, taskNumber int64) (domain.Task, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, ''),
+		       COALESCE(task_number, 0), COALESCE(worktree_id::text, ''), COALESCE(pr_url, '')
+		FROM task.tasks
+		WHERE tenant_id = $1 AND project_id = $2 AND task_number = $3
+	`, tenantID, projectID, taskNumber)
+
+	var t domain.Task
+	if err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID, &t.TaskNumber, &t.WorktreeID, &t.PRURL); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Task{}, fmt.Errorf("postgres: no task with number %d in project %s: %w", taskNumber, projectID, err)
+		}
+		return domain.Task{}, fmt.Errorf("postgres: query task by number: %w", err)
 	}
 	return t, nil
 }
@@ -208,19 +235,83 @@ func (r *Repository) List(ctx context.Context, tenantID, projectID, pageToken st
 	return out, nextToken, nil
 }
 
-// Update persists a partial (title/status) field update — the status guard
-// itself runs at the domain layer (domain.Task.SetStatus) before this is
-// ever called; this is a plain UPDATE of both columns unconditionally.
-func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task) error {
-	tag, err := r.db.Exec(ctx, `
-		UPDATE task.tasks SET title = $3, status = $4, updated_at = now()
+// Update persists a partial (title/status/worktree_id/pr_url) field update
+// and, when events is non-empty, one outbox row per event — ALL in one
+// Postgres transaction, so a status transition and its published fact(s)
+// are never observed inconsistently. Follows usage-service.Repository.
+// SaveSession's exact transaction shape (begin -> exec task update -> exec
+// outbox insert(s) -> commit; defer tx.Rollback for the error path).
+// SOL-PW-04 (TASK-PW-04-02/03).
+func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task, events []domain.OutboxEvent) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE task.tasks SET title = $3, status = $4, worktree_id = $5, pr_url = $6, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
-	`, tenantID, t.ID, t.Title, t.Status)
+	`, tenantID, t.ID, t.Title, t.Status, nullableUUID(t.WorktreeID), nullableString(t.PRURL))
 	if err != nil {
 		return fmt.Errorf("postgres: update task: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("postgres: task %s not found for tenant %s", t.ID, tenantID)
+	}
+
+	for _, event := range events {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO task.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, event.ID, tenantID, event.Subject, event.OccurredAt, 1, event.PayloadJSON)
+		if err != nil {
+			return fmt.Errorf("postgres: insert outbox event: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+// FetchUnpublished and MarkPublished implement common/outbox.Store — see
+// cmd/server/main.go for where the relay is wired. Identical query/scan
+// shape to usage-service's FetchUnpublished/MarkPublished, against
+// task.outbox_events.
+func (r *Repository) FetchUnpublished(ctx context.Context, limit int) ([]outbox.Record, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, subject, occurred_at, version, payload
+		FROM task.outbox_events
+		WHERE published_at IS NULL
+		ORDER BY created_at
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query unpublished outbox events: %w", err)
+	}
+	defer rows.Close()
+
+	var out []outbox.Record
+	for rows.Next() {
+		var rec outbox.Record
+		if err := rows.Scan(&rec.ID, &rec.Event.TenantID, &rec.Subject, &rec.Event.OccurredAt, &rec.Event.Version, &rec.Event.Payload); err != nil {
+			return nil, fmt.Errorf("postgres: scan outbox event row: %w", err)
+		}
+		rec.Event.ID = rec.ID
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate outbox event rows: %w", err)
+	}
+	return out, nil
+}
+
+func (r *Repository) MarkPublished(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `UPDATE task.outbox_events SET published_at = now() WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return fmt.Errorf("postgres: mark outbox events published: %w", err)
 	}
 	return nil
 }
@@ -244,4 +335,11 @@ func nullableUUID(id string) any {
 		return nil
 	}
 	return id
+}
+
+func nullableString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }

@@ -99,6 +99,16 @@ var subjectRules = map[string]subjectRule{
 		Type: "task_completed", Title: "Task completed", Body: "Your task has finished.",
 		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
 	},
+	// Added SOL-PW-04 (TASK-PW-04-08). Fires on EVERY status transition
+	// (open->in_progress, etc.), not just completion — an "open ->
+	// in_progress" toast on every single task dispatch would be noise the
+	// .completed subject above doesn't have, so this is deliberately
+	// WS-only, low-severity: available to any future in-app UI without
+	// becoming a push notification.
+	"orca.task.task.statuschanged": {
+		Type: "task_status_changed", Title: "Task updated", Body: "",
+		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS},
+	},
 	"orca.workflow.execution.completed": {
 		Type: "workflow_completed", Title: "Workflow finished", Body: "Your workflow execution has completed.",
 		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},

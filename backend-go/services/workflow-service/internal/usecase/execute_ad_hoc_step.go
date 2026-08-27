@@ -110,7 +110,7 @@ func (uc *ExecuteAdHocStep) Execute(ctx context.Context, in ExecuteAdHocStepInpu
 	if runErr != nil || result.Status == domain.ResultStatusFailed {
 		exec.Status = domain.StatusFailed
 	}
-	if uerr := uc.executions.UpdateExecution(ctx, exec); uerr != nil {
+	if uerr := uc.executions.UpdateExecution(ctx, exec, nil); uerr != nil {
 		slog.ErrorContext(ctx, "workflow: persisting final ad hoc execution status failed", slog.String("execution_id", exec.ID), slog.Any("error", uerr))
 	}
 

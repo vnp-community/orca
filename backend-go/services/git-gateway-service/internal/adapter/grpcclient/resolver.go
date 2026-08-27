@@ -80,5 +80,6 @@ func (r *ConnectionResolver) ResolveConnection(ctx context.Context, worktreeID s
 		Connected:    true,
 		ConnectionID: worktreeID,
 		RepoPath:     resp.GetRepoPath(),
+		Mode:         resp.GetDevServer().GetMode(),
 	}, nil
 }

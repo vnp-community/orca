@@ -121,6 +121,19 @@ service GitGatewayService {
   rpc ResolveConflict(ResolveConflictRequest) returns (ResolveConflictResponse);
   rpc Discard(DiscardRequest) returns (DiscardResponse);
   rpc BulkDiscard(BulkDiscardRequest) returns (BulkDiscardResponse);
+
+  // ── SOL-PW-03 — merge/stash/branch-write + push/pull progress streaming.
+  // Only reachable over relay-websocket/direct-websocket connections; a
+  // relay-ssh connection's git.exec whitelist rejects these subcommands
+  // outright (usecase-layer mode gate, not an executor-level check). ─────
+  rpc MergeBranch(MergeBranchRequest) returns (MergeBranchResponse);
+  rpc StashPush(StashPushRequest) returns (StashPushResponse);
+  rpc StashPop(StashPopRequest) returns (StashPopResponse);
+  rpc CreateBranch(CreateBranchRequest) returns (CreateBranchResponse);
+  rpc DeleteBranch(DeleteBranchRequest) returns (DeleteBranchResponse); // soft (-d); ForceDeleteBranch remains the -D path
+
+  rpc PushStream(PushRequest) returns (stream GitProgressEvent);
+  rpc PullStream(PullRequest) returns (stream GitProgressEvent);
 }
 
 message GetStatusRequest {
@@ -462,6 +475,11 @@ message ReadDirRequest {
 message DirEntry {
   string name = 1;
   bool is_directory = 2;
+  // Added (SOL-PW-02): 0 for directories — a directory's "size" isn't a
+  // meaningful git-gateway-service concept and the frontend doesn't render
+  // one for folder rows (BL-PW-02's expandDirectory() contract). Populated
+  // from the same os.Stat/fs.stat source StatFile already uses.
+  int64 size_bytes = 3;
 }
 message ReadDirResponse {
   repeated DirEntry entries = 1;
@@ -621,6 +639,56 @@ message RemoveWorktreeRequest {
 message ForceDeleteBranchRequest {
   string worktree_id = 1;
   string branch = 2;
+}
+
+// ── SOL-PW-03 additions ─────────────────────────────────────────────────
+message MergeBranchRequest {
+  string worktree_id = 1;
+  string branch = 2;      // branch to merge INTO the current branch
+  bool   no_ff = 3;       // default true when unset at the usecase layer
+}
+message MergeBranchResponse {
+  bool success = 1;
+  bool had_conflicts = 2;  // mirrors PullResponse's existing had_conflicts shape
+}
+
+message StashPushRequest {
+  string worktree_id = 1;
+  string message = 2;      // optional; empty = git's default stash message
+  bool   include_untracked = 3;
+}
+message StashPushResponse { bool success = 1; }
+
+message StashPopRequest {
+  string worktree_id = 1;
+  string stash_ref = 2;    // empty = pop the most recent (stash@{0})
+}
+message StashPopResponse {
+  bool success = 1;
+  bool had_conflicts = 2;
+}
+
+message CreateBranchRequest {
+  string worktree_id = 1;
+  string branch = 2;
+  string base_ref = 3;     // empty = branch from current HEAD
+  bool   checkout = 4;     // true = also switch to it
+}
+message CreateBranchResponse { string branch = 1; }
+
+message DeleteBranchRequest {
+  string worktree_id = 1;
+  string branch = 2;
+}
+message DeleteBranchResponse { bool success = 1; }
+
+// GitProgressEvent mirrors the agent's git.execStream frame shape
+// (specs/agent/api/agent-rpc-catalog-git-fs.md: {type:'stream.chunk',line,source?} / {type:'stream.end',exitCode}).
+message GitProgressEvent {
+  string line = 1;
+  string source = 2;      // "stdout" | "stderr"
+  bool   is_final = 3;
+  int32  exit_code = 4;   // only meaningful when is_final
 }
 
 message DetectWorktreesRequest  { string repo_id = 1; }

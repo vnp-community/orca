@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/merge_branch.go` (+4 sibling files), `backend-go/services/git-gateway-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-PW-03-04, TASK-PW-03-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — 5 new usecases (mode-gated inline ResolveConnection call, fail closed on relay-ssh) + grpc.Server/main.go wiring; 11 new usecase dispatch tests + 5 new grpc translation tests pass, incl. relay-ssh zero-call regression guard for all five ops
 
 ---
 

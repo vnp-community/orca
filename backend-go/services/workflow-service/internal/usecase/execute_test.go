@@ -168,6 +168,9 @@ func TestExecute_DispatchesWavesAndMarksExecutionCompleted(t *testing.T) {
 	if final.Status != domain.StatusCompleted {
 		t.Fatalf("expected the execution to finish completed, got %v", final.Status)
 	}
+	if executions.lastUpdateEvent == nil || executions.lastUpdateEvent.Subject != "orca.workflow.execution.completed" {
+		t.Errorf("expected exactly one orca.workflow.execution.completed outbox event, got %+v", executions.lastUpdateEvent)
+	}
 
 	rows := stepExecutions.byExecution(exec.ID)
 	if len(rows) != 2 {
@@ -206,6 +209,9 @@ func TestExecute_WaveFailureMarksExecutionFailed(t *testing.T) {
 	final := <-done
 	if final.Status != domain.StatusFailed {
 		t.Fatalf("expected the execution to finish failed, got %v", final.Status)
+	}
+	if executions.lastUpdateEvent == nil || executions.lastUpdateEvent.Subject != "orca.workflow.execution.failed" {
+		t.Errorf("expected exactly one orca.workflow.execution.failed outbox event, got %+v", executions.lastUpdateEvent)
 	}
 }
 

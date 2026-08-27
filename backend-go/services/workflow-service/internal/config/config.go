@@ -22,6 +22,10 @@ type Config struct {
 	// Agent/Shell/Notification step executors on the execution plane —
 	// mirrors git-gateway-service's identically-named config field.
 	InfraFleetServiceAddr string
+	// NATSURL is where the outbox relay (SOL-PW-04, TASK-PW-04-06)
+	// publishes workflow.* domain events — same env var name/default as
+	// usage-service's identical field.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -33,6 +37,7 @@ func Load() (Config, error) {
 		Base:                  base,
 		WebhookAllowlistHosts: splitCSV(commonconfig.StringEnv("WEBHOOK_ALLOWLIST_HOSTS", "")),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }
 

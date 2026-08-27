@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/migrations/0007_workflow_outbox.up.sql`, `backend-go/services/workflow-service/internal/adapter/postgres/repository.go`, `backend-go/services/workflow-service/internal/domain/outbox.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0007 (workflow.outbox_events); domain.OutboxEvent added; UpdateExecution signature extended with an event param (single *domain.OutboxEvent, not a slice) + tx-wrapped; FetchUnpublished/MarkPublished added; all 5 existing call sites (cancel/pause/resume/ad-hoc/recover) updated; integration tests pass
 
 ---
 

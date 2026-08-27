@@ -76,3 +76,60 @@ func TestUpdateTask_NotFound(t *testing.T) {
 		t.Fatal("expected an error for a nonexistent task")
 	}
 }
+
+// ── SOL-PW-04 — outbox enqueue regression guards (TASK-PW-04-03) ─────────
+
+func TestUpdateTask_StatusTransition_EnqueuesExactlyOneStatusChangedEvent(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusOpen}
+	uc := NewUpdateTask(repo)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	status := domain.StatusCancelled
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Status: &status}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.lastUpdateEvents) != 1 {
+		t.Fatalf("expected exactly 1 outbox event, got %+v", repo.lastUpdateEvents)
+	}
+	if repo.lastUpdateEvents[0].Subject != "orca.task.task.statuschanged" {
+		t.Errorf("unexpected subject: %q", repo.lastUpdateEvents[0].Subject)
+	}
+}
+
+func TestUpdateTask_TransitionIntoDone_AlsoEnqueuesCompletedEvent(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusOpen}
+	uc := NewUpdateTask(repo)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	status := domain.StatusDone
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Status: &status}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.lastUpdateEvents) != 2 {
+		t.Fatalf("expected 2 outbox events (statuschanged + completed), got %+v", repo.lastUpdateEvents)
+	}
+	subjects := map[string]bool{}
+	for _, e := range repo.lastUpdateEvents {
+		subjects[e.Subject] = true
+	}
+	if !subjects["orca.task.task.statuschanged"] || !subjects["orca.task.task.completed"] {
+		t.Errorf("expected both statuschanged and completed subjects, got %+v", repo.lastUpdateEvents)
+	}
+}
+
+func TestUpdateTask_TitleOnly_EnqueuesNoEvents(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Title: "old", Status: domain.StatusOpen}
+	uc := NewUpdateTask(repo)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	newTitle := "new"
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Title: &newTitle}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.lastUpdateEvents) != 0 {
+		t.Errorf("expected no outbox events for a title-only update, got %+v", repo.lastUpdateEvents)
+	}
+}

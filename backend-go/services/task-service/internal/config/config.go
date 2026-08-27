@@ -24,6 +24,10 @@ type Config struct {
 	// AIProviderServiceAddr is where AIDecompose's AIProviderContextResolver
 	// dials ai-provider-service's ResolveProvider RPC.
 	AIProviderServiceAddr string
+	// NATSURL is where the outbox relay (SOL-PW-04, TASK-PW-04-04)
+	// publishes task.* domain events — same env var name/default as
+	// usage-service's identical field.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -36,5 +40,6 @@ func Load() (Config, error) {
 		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
+		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

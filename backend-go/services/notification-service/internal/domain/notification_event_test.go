@@ -37,6 +37,26 @@ func TestTranslateEvent_CredentialRotatedIsCritical(t *testing.T) {
 	}
 }
 
+// TestTranslateEvent_TaskStatusChanged is SOL-PW-04's regression guard
+// (TASK-PW-04-08): the new orca.task.task.statuschanged subject maps to a
+// WS-only, SeverityInfo NotificationEvent — deliberately no push, to avoid
+// a toast on every single task dispatch.
+func TestTranslateEvent_TaskStatusChanged(t *testing.T) {
+	got, err := TranslateEvent("ne-1", "evt-1", "orca.task.task.statuschanged", "tenant-1", EventPayload{UserID: "user-1"}, time.Now())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Type != "task_status_changed" {
+		t.Errorf("expected type task_status_changed, got %s", got.Type)
+	}
+	if got.Severity != SeverityInfo {
+		t.Errorf("expected severity info, got %s", got.Severity)
+	}
+	if len(got.Channels) != 1 || got.Channels[0] != ChannelDeliveryWS {
+		t.Errorf("expected WS-only delivery (no push), got %v", got.Channels)
+	}
+}
+
 func TestTranslateEvent_UnknownSubjectFallsBackToGenericRule(t *testing.T) {
 	got, err := TranslateEvent("ne-1", "evt-1", "orca.some-new-service.thing.happened", "tenant-1", EventPayload{UserID: "user-1"}, time.Now())
 	if err != nil {

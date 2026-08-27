@@ -89,13 +89,21 @@ func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, page
 	}
 	return out, "", nil
 }
-func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task) error {
+func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task, events []domain.OutboxEvent) error {
 	existing, ok := f.tasks[task.ID]
 	if !ok || existing.TenantID != tenantID {
 		return errors.New("not found")
 	}
 	f.tasks[task.ID] = task
 	return nil
+}
+func (f *fakeTaskRepository) FindByNumber(ctx context.Context, tenantID, projectID string, taskNumber int64) (domain.Task, error) {
+	for _, t := range f.tasks {
+		if t.TenantID == tenantID && t.ProjectID == projectID && t.TaskNumber == taskNumber {
+			return t, nil
+		}
+	}
+	return domain.Task{}, errors.New("not found")
 }
 func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) error {
 	existing, ok := f.tasks[id]
@@ -200,6 +208,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		usecase.NewGetDependencies(tasks, edges),
 		usecase.NewAIDecompose(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "1. Do X"}),
 		usecase.NewAIApply(fakeTxRunner{tasks: tasks, edges: edges}),
+		usecase.NewFindTaskByNumber(tasks),
 	)
 }
 

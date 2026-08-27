@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added Task.task_number/worktree_id/pr_url, UpdateTaskRequest.pr_url/worktree_id, FindTaskByNumber RPC + messages; buf generate clean, no breaking changes vs origin/main
 
 ---
 

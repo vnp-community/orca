@@ -104,7 +104,7 @@ func TestRepository_ExecutionPauseResumeRoundTrip(t *testing.T) {
 	if err := exec.Pause(time.Now().UTC()); err != nil {
 		t.Fatalf("pause: %v", err)
 	}
-	if err := repo.UpdateExecution(ctx, exec); err != nil {
+	if err := repo.UpdateExecution(ctx, exec, nil); err != nil {
 		t.Fatalf("update (pause): %v", err)
 	}
 
@@ -409,7 +409,7 @@ func TestRepository_ListRunning_ReturnsOnlyRunningAcrossTenants(t *testing.T) {
 	if err := paused.Pause(time.Now().UTC()); err != nil {
 		t.Fatalf("pause: %v", err)
 	}
-	if err := repo.UpdateExecution(ctx, paused); err != nil {
+	if err := repo.UpdateExecution(ctx, paused, nil); err != nil {
 		t.Fatalf("update (pause): %v", err)
 	}
 
@@ -421,7 +421,7 @@ func TestRepository_ListRunning_ReturnsOnlyRunningAcrossTenants(t *testing.T) {
 		t.Fatalf("create completed execution: %v", err)
 	}
 	completed.Status = domain.StatusCompleted
-	if err := repo.UpdateExecution(ctx, completed); err != nil {
+	if err := repo.UpdateExecution(ctx, completed, nil); err != nil {
 		t.Fatalf("update (completed): %v", err)
 	}
 
@@ -483,5 +483,78 @@ func TestRepository_ListStepExecutions_ScopedByTenant(t *testing.T) {
 	}
 	if len(rowsForOther) != 0 {
 		t.Fatalf("expected a different tenant to see 0 rows for another tenant's execution, got %d", len(rowsForOther))
+	}
+}
+
+// ── SOL-PW-04 — outbox (TASK-PW-04-05) ────────────────────────────────────
+
+func TestRepository_UpdateExecution_WithEvent_WritesOutboxRowInSameTransaction(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000005", tenantID, "t", `{"steps":[]}`, domain.ScopePersonal, "")
+	_ = repo.CreateTemplate(ctx, tmpl)
+	exec, _ := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000005", tenantID, tmpl.ID, "trace", "")
+	if err := repo.CreateExecution(ctx, exec); err != nil {
+		t.Fatalf("create execution: %v", err)
+	}
+
+	exec.Status = domain.StatusCompleted
+	event := &domain.OutboxEvent{
+		ID:          "eeeeeeee-0000-0000-0000-000000000010",
+		Subject:     "orca.workflow.execution.completed",
+		OccurredAt:  time.Now().UTC(),
+		PayloadJSON: []byte(`{}`),
+	}
+	if err := repo.UpdateExecution(ctx, exec, event); err != nil {
+		t.Fatalf("update with event: %v", err)
+	}
+
+	unpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("FetchUnpublished: %v", err)
+	}
+	if len(unpublished) != 1 || unpublished[0].Subject != "orca.workflow.execution.completed" {
+		t.Fatalf("expected exactly 1 unpublished outbox row, got %+v", unpublished)
+	}
+
+	if err := repo.MarkPublished(ctx, []string{unpublished[0].ID}); err != nil {
+		t.Fatalf("MarkPublished: %v", err)
+	}
+	afterMark, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("FetchUnpublished after mark: %v", err)
+	}
+	if len(afterMark) != 0 {
+		t.Errorf("expected no unpublished rows after MarkPublished, got %+v", afterMark)
+	}
+}
+
+func TestRepository_UpdateExecution_NilEvent_WritesNoOutboxRow(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "11111111-1111-1111-1111-111111111112"
+
+	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000006", tenantID, "t", `{"steps":[]}`, domain.ScopePersonal, "")
+	_ = repo.CreateTemplate(ctx, tmpl)
+	exec, _ := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000006", tenantID, tmpl.ID, "trace", "")
+	if err := repo.CreateExecution(ctx, exec); err != nil {
+		t.Fatalf("create execution: %v", err)
+	}
+
+	if err := exec.Pause(time.Now().UTC()); err != nil {
+		t.Fatalf("pause: %v", err)
+	}
+	if err := repo.UpdateExecution(ctx, exec, nil); err != nil {
+		t.Fatalf("update (nil event): %v", err)
+	}
+
+	unpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("FetchUnpublished: %v", err)
+	}
+	if len(unpublished) != 0 {
+		t.Errorf("expected no outbox rows for a nil-event update, got %+v", unpublished)
 	}
 }

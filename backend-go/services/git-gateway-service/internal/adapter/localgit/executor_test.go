@@ -1066,3 +1066,147 @@ func TestFetch_NilPushTargetUsesDefaultRemote(t *testing.T) {
 		t.Errorf("expected Success=true, got %+v", got)
 	}
 }
+
+// ── SOL-PW-03 — merge/stash/branch-write (TASK-PW-03-04) ────────────────
+
+func TestMergeBranch_GenuineConflict_ReportsHadConflicts(t *testing.T) {
+	dir := initRepo(t)
+	runGit(t, dir, "checkout", "-b", "feature")
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("feature change\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	runGit(t, dir, "commit", "-am", "feature change")
+	runGit(t, dir, "checkout", "main")
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("main change\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	runGit(t, dir, "commit", "-am", "main change")
+
+	e := New()
+	got, err := e.MergeBranch(context.Background(), dir, "feature", true)
+	if err != nil {
+		t.Fatalf("unexpected error (conflict is a domain outcome, not a Go error): %v", err)
+	}
+	if got.Success || !got.HadConflicts {
+		t.Errorf("expected HadConflicts=true, got %+v", got)
+	}
+}
+
+func TestMergeBranch_CleanMerge_Succeeds(t *testing.T) {
+	dir := initRepo(t)
+	runGit(t, dir, "checkout", "-b", "feature")
+	if err := os.WriteFile(filepath.Join(dir, "feature.txt"), []byte("new file\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	runGit(t, dir, "add", "feature.txt")
+	runGit(t, dir, "commit", "-m", "add feature.txt")
+	runGit(t, dir, "checkout", "main")
+
+	e := New()
+	got, err := e.MergeBranch(context.Background(), dir, "feature", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.Success || got.HadConflicts {
+		t.Errorf("unexpected result: %+v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "feature.txt")); err != nil {
+		t.Errorf("expected feature.txt to exist after merge: %v", err)
+	}
+}
+
+func TestStashPushPop_RoundTripsWorkingTreeState(t *testing.T) {
+	dir := initRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("dirty change\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	e := New()
+	pushResult, err := e.StashPush(context.Background(), dir, "wip", true)
+	if err != nil {
+		t.Fatalf("StashPush: %v", err)
+	}
+	if !pushResult.Success {
+		t.Errorf("expected Success=true, got %+v", pushResult)
+	}
+	// Working tree should be clean (back to committed content) immediately
+	// after the stash push.
+	content, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(content) != "hello\n" {
+		t.Fatalf("expected working tree restored to committed content after stash push, got %q", content)
+	}
+
+	popResult, err := e.StashPop(context.Background(), dir, "")
+	if err != nil {
+		t.Fatalf("StashPop: %v", err)
+	}
+	if !popResult.Success || popResult.HadConflicts {
+		t.Errorf("unexpected pop result: %+v", popResult)
+	}
+	content, err = os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(content) != "dirty change\n" {
+		t.Errorf("expected dirty change restored after stash pop, got %q", content)
+	}
+}
+
+func TestCreateBranch_WithCheckout_LeavesHEADOnNewBranch(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	got, err := e.CreateBranch(context.Background(), dir, "feature", "", true)
+	if err != nil {
+		t.Fatalf("CreateBranch: %v", err)
+	}
+	if got != "feature" {
+		t.Errorf("expected branch=feature, got %q", got)
+	}
+	current := strings.TrimSpace(runGit(t, dir, "branch", "--show-current"))
+	if current != "feature" {
+		t.Errorf("expected HEAD on feature, got %q", current)
+	}
+}
+
+func TestCreateBranch_WithoutCheckout_StaysOnCurrentBranch(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	if _, err := e.CreateBranch(context.Background(), dir, "feature", "", false); err != nil {
+		t.Fatalf("CreateBranch: %v", err)
+	}
+	current := strings.TrimSpace(runGit(t, dir, "branch", "--show-current"))
+	if current != "main" {
+		t.Errorf("expected HEAD to remain on main, got %q", current)
+	}
+}
+
+func TestDeleteBranch_UnmergedBranch_Fails(t *testing.T) {
+	dir := initRepo(t)
+	runGit(t, dir, "checkout", "-b", "feature")
+	if err := os.WriteFile(filepath.Join(dir, "unmerged.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	runGit(t, dir, "add", "unmerged.txt")
+	runGit(t, dir, "commit", "-m", "unmerged commit")
+	runGit(t, dir, "checkout", "main")
+
+	e := New()
+	if err := e.DeleteBranch(context.Background(), dir, "feature"); err == nil {
+		t.Fatal("expected soft-delete (-d) of an unmerged branch to fail, matching git's own safety behavior")
+	}
+}
+
+func TestDeleteBranch_MergedBranch_Succeeds(t *testing.T) {
+	dir := initRepo(t)
+	runGit(t, dir, "branch", "feature")
+
+	e := New()
+	if err := e.DeleteBranch(context.Background(), dir, "feature"); err != nil {
+		t.Fatalf("unexpected error deleting a fully-merged branch: %v", err)
+	}
+}
