@@ -66,3 +66,10 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 	}
 	return nil
 }
+
+// newGetRequest is a small helper shared by non-c.do request paths (health
+// checks, the raw-text snapshot fetch) that don't want JSON
+// marshal/unmarshal or bearer-token injection folded in.
+func newGetRequest(ctx context.Context, url string) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+}
