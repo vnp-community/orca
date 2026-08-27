@@ -50,6 +50,7 @@ import { parseGitLabIssueOrMRLink } from '@/lib/gitlab-links'
 import { getLocalPreflightContext, localPreflightContextKey } from '@/lib/local-preflight-context'
 import { getRepoOwnerRoutedSettings } from '@/lib/repo-runtime-owner'
 import { cn } from '@/lib/utils'
+import { getRuntimeGitHubRepoSlug } from '@/runtime/runtime-github-client'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { searchRuntimeRepoBaseRefDetails } from '@/runtime/runtime-repo-client'
@@ -83,6 +84,7 @@ import {
 } from '../../../../shared/task-source-context'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../shared/execution-host'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 type RepoOption = ReturnType<typeof useAppStore.getState>['repos'][number]
 const EMPTY_REPO_SEARCH_REPOS: readonly RepoOption[] = []
 
@@ -1409,7 +1411,7 @@ export default function SmartWorkspaceNameField({
                           type="button"
                           variant="ghost"
                           size="icon-xs"
-                          onClick={() => void window.api.shell.openUrl(selectedSource.url!)}
+                          onClick={() => void shellOpenUrl(selectedSource.url!)}
                           className="size-6 shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
                           aria-label={translate(
                             'auto.components.new.workspace.SmartWorkspaceNameField.2c69728c2a',
@@ -1818,7 +1820,10 @@ async function getRepoSlugCached(
     return cache.get(cacheKey) ?? null
   }
   try {
-    const slug = await window.api.gh.repoSlug({ repoPath: repo.path, repoId: repo.id })
+    const slug = await getRuntimeGitHubRepoSlug(useAppStore.getState().settings, {
+      repoPath: repo.path,
+      repoId: repo.id
+    })
     cache.set(cacheKey, slug)
     return slug
   } catch {

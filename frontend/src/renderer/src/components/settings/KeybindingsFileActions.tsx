@@ -16,6 +16,7 @@ import {
 } from '../ui/dropdown-menu'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenInExternalEditor } from '../../runtime/runtime-shell-client'
 function openFailureMessage(reason: string): string {
   switch (reason) {
     case 'not-absolute':
@@ -132,7 +133,7 @@ export function KeybindingsFileActions(): React.JSX.Element {
         )
         return
       }
-      const result = await window.api.shell.openInExternalEditor(filePath, command)
+      const result = await shellOpenInExternalEditor(filePath, command)
       if (!result.ok) {
         toast.error(openFailureMessage(result.reason))
       }

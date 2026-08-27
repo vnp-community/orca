@@ -11,6 +11,7 @@ import {
   shouldShowSourceControlBranchContextRow
 } from './source-control-branch-context-stats'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export { shouldShowSourceControlBranchContextRow } from './source-control-branch-context-stats'
 
 function BaseRefButton({
@@ -76,7 +77,7 @@ function ManualReviewLinkButton({
         'Open review page in browser'
       )}
       onClick={() => {
-        void window.api.shell.openUrl(url)
+        void shellOpenUrl(url)
       }}
     />
   )

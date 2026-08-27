@@ -16,6 +16,10 @@ describe('clearUnreadDockBadgeCount', () => {
   beforeEach(() => {
     setUnreadDockBadgeCount = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('window', {
+      // Why: runtime-app-client's isWebClientLocation() gate — force the web
+      // branch so this stays on the already-mocked window.api.app mock instead
+      // of the desktop runtime-RPC transport.
+      __ORCA_WEB_CLIENT__: true,
       api: {
         app: {
           setUnreadDockBadgeCount

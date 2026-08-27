@@ -27,7 +27,10 @@ import {
   ensureWslCliAvailableForAgentSkillTerminal,
   getWslCliDistroRequest
 } from './CliSkillRuntimeSetup'
+import { isWebClientLocation } from '@/lib/web-client-location'
+import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type RecipeCatalogEntry = Awaited<
   ReturnType<typeof window.api.ephemeralVm.listRecipeCatalog>
 >[number]
@@ -74,6 +77,17 @@ export function EphemeralVmsPane(): React.JSX.Element {
     if (mountedRef.current) {
       setIsLoading(true)
     }
+    // Why: ephemeral VM/container provisioning is local desktop-main
+    // orchestration with no runtime RPC equivalent — the web build's
+    // window.api.ephemeralVm has no real implementation, so surface an
+    // honest empty state instead of relying on the silent fallback proxy.
+    if (isWebClientLocation()) {
+      if (mountedRef.current) {
+        setCatalog([])
+        setIsLoading(false)
+      }
+      return
+    }
     try {
       const nextCatalog = await window.api.ephemeralVm.listRecipeCatalog()
       if (mountedRef.current) {
@@ -111,7 +125,7 @@ export function EphemeralVmsPane(): React.JSX.Element {
 
   const copyPrompt = async (): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(AGENT_PROMPT)
+      await uiWriteClipboardText(AGENT_PROMPT)
       useAppStore.getState().recordFeatureInteraction('ephemeral-vm-setup')
       setPromptCopied(true)
       setTimeout(() => setPromptCopied(false), 1500)
@@ -152,10 +166,10 @@ export function EphemeralVmsPane(): React.JSX.Element {
         preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
         getPrerequisiteStatus={() =>
           activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-            ? window.api.cli.getWslInstallStatus(
+            ? getRuntimeWslCliInstallStatus(
                 getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
               )
-            : window.api.cli.getInstallStatus()
+            : getRuntimeCliInstallStatus()
         }
         onBeforeOpenTerminal={async () => {
           await (activeSkillRuntime.agentRuntime?.runtime === 'wsl'

@@ -1424,10 +1424,15 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
         runHooks: skipArchive !== true
       })
     },
-    // Why: forget-locally clears a workspace pinned to a disconnected/removed
-    // SSH host on the desktop app; a paired web client has no such ghost state.
-    forgetLocal: () => {
-      throw new Error('Forgetting a workspace is unavailable in paired web clients.')
+    // Why: a paired web client's backend connection can pin a workspace to a
+    // removed/disconnected SSH host too (BUG-FE-RPC-worktree-forgetLocal) —
+    // worktree.forgetLocal clears Orca's own record without touching the
+    // (unreachable) remote, same contract as the desktop IPC handler.
+    forgetLocal: async ({ worktreeId }) => {
+      invalidateRuntimeWorktreeCaches()
+      return callRuntimeResult<RemoveWorktreeResult>('worktree.forgetLocal', {
+        worktree: toRuntimeWorktreeSelector(worktreeId)
+      })
     },
     forceDeletePreservedBranch: ({ worktreeId, branchName, expectedHead }) =>
       callRuntimeResult<ForceDeleteWorktreeBranchResult>('worktree.forceDeleteBranch', {

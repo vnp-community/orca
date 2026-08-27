@@ -35,7 +35,10 @@ type AgentStatusRuntimeEnrichment = Pick<
 
 const MAX_AGENT_STATUS_DROP_TAB_ID_LENGTH = 160
 
-function enrichAgentStatusIpcPayload(
+// Why: exported so rpc/methods/agent-status.ts's getSnapshot RPC method
+// applies the exact same terminalHandle/orchestration enrichment the
+// 'agentStatus:getSnapshot' ipcMain handler does.
+export function enrichAgentStatusIpcPayload(
   data: AgentStatusIpcPayload,
   runtime: AgentStatusRuntimeEnrichment | undefined
 ): AgentStatusIpcPayload {

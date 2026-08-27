@@ -13,6 +13,13 @@ import {
   createOrcaProfilesAuthActions,
   type OrcaProfilesAuthActions
 } from './orca-profiles-auth-actions'
+import {
+  fetchRuntimeOrcaProfiles,
+  fetchRuntimeOrcaProfileAuthStatus,
+  createRuntimeLocalOrcaProfile,
+  switchRuntimeOrcaProfile,
+  transferRuntimeOrcaProfileProject
+} from '../../runtime/runtime-orca-profiles-client'
 
 export type OrcaProfilesSlice = OrcaProfilesAuthActions & {
   orcaProfiles: OrcaProfileSummary[]
@@ -48,8 +55,8 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
     set({ orcaProfilesLoading: true })
     try {
       const [state, authStatus] = await Promise.all([
-        window.api.orcaProfiles.list(),
-        window.api.orcaProfiles.authStatus()
+        fetchRuntimeOrcaProfiles(get().settings),
+        fetchRuntimeOrcaProfileAuthStatus(get().settings)
       ])
       set({
         activeOrcaProfileId: state.activeProfileId,
@@ -66,7 +73,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
 
   fetchOrcaProfileAuthStatus: async () => {
     try {
-      const authStatus = await window.api.orcaProfiles.authStatus()
+      const authStatus = await fetchRuntimeOrcaProfileAuthStatus(get().settings)
       set({ orcaProfileAuthStatus: authStatus })
       return authStatus
     } catch (err) {
@@ -77,7 +84,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
 
   createLocalOrcaProfile: async (name) => {
     try {
-      const state = await window.api.orcaProfiles.createLocal({ name })
+      const state = await createRuntimeLocalOrcaProfile(get().settings, { name })
       set({
         activeOrcaProfileId: state.activeProfileId,
         orcaProfiles: state.profiles
@@ -104,7 +111,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
     }
     set({ orcaProfileSwitching: true })
     try {
-      const result = await window.api.orcaProfiles.switchProfile({ profileId })
+      const result = await switchRuntimeOrcaProfile(get().settings, { profileId })
       if (result?.status !== 'relaunching') {
         // Why: only a relaunch may keep the switcher locked; a stale
         // "already-active" answer would otherwise disable it forever.
@@ -126,7 +133,7 @@ export const createOrcaProfilesSlice: StateCreator<AppState, [], [], OrcaProfile
 
   transferOrcaProfileProject: async (args) => {
     try {
-      const result = await window.api.orcaProfiles.transferProject(args)
+      const result = await transferRuntimeOrcaProfileProject(get().settings, args)
       if (result.status === 'duplicate-target') {
         toast.error(
           translate(

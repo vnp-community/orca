@@ -2,7 +2,9 @@
 
 **Level:** 2 — Containers  
 **Mô tả:** Các containers (executables, services) tạo nên hệ thống Orca  
-**Cập nhật:** 2026-07-28 (v5.0 — thêm Profile/Project, AI Provider, Workflow, Task Graph layers)
+**Cập nhật:** 2026-08-14 (correction pass — port Agent WS, framing Relay vs Dev Server Agent; xem ghi chú bên dưới)
+
+> **Trạng thái kiến trúc:** File này mô tả containers của kiến trúc v5.0 hiện hành. Một số dòng (đánh dấu 🚧 bên dưới) mô tả tầm nhìn "v6.0 Dev Server Agent" — Proposed, chưa triển khai (`docs/adrs/v2/ADR-017/018/019`, tất cả tự khai Proposed). Kiến trúc thực tế được tài liệu hoá chính xác hơn tại `docs/hld/backend-server-architecture.md`, `docs/hld/dev-server-architecture.md`, `docs/hld/web-server-architecture.md` (`docs/hld/` gốc). Port Agent WebSocket thật là **`:6769/agent`**, không phải `:6768` — đã sửa bên dưới; xem `audit/agent/connection-wire-protocol-vs-design-review.md` §2.3.
 
 ---
 
@@ -30,8 +32,8 @@ C4Container
   Container_Boundary(orca_web_boundary, "Orca Web Server (Node.js)") {
     Container(web_http, "HTTP Server", "Express / Node.js :6769",
       "SPA serving + health + auth routes + admin API\nPOST /auth/local, GET /admin/api/*, /health/ready")
-    Container(web_ws, "WebSocket Server", "ws / Node.js :6768",
-      "RPC over WebSocket (web mode)\nAgent WebSocket endpoint: /agent\nWsSessionRouter: proxy per-user")
+    Container(web_ws, "WebSocket Server", "ws / Node.js :6768 (RPC, single-user) / :6769 (multi-user + Agent)",
+      "RPC over WebSocket (web mode) trên :6768\nAgent WebSocket endpoint /agent: gắn vào httpPort :6769, KHÔNG phải :6768\nWsSessionRouter (multi-user, ORCA_MULTI_USER=1): cũng trên :6769")
     Container(auth_layer, "Auth Layer", "AuthManager / bcrypt",
       "auth-router.ts, auth-manager.ts, auth-session-store.ts\nbcrypt 12 rounds + HTTP-only cookie + session TTL")
     Container(session_mgr, "Session Manager", "SessionManager / fork()",
@@ -43,7 +45,7 @@ C4Container
     Container(fleet_monitor, "FleetHealthMonitor", "Node.js",
       "Poll dev servers every 60s\nMetrics: CPU%, RAM%, disk%, latency\nWebhook alerts")
     Container(web_db, "Multi-DB Layer", "IConnectionPool / MigrationRunner",
-      "Dialects: SQLite, MySQL, PostgreSQL, TiDB\nMigrations 0001-0010\nDSN: ORCA_DB_URL env")
+      "Dialects: SQLite, MySQL, PostgreSQL, TiDB\nMigrations 0001-0013 (13 file thật, không dừng ở 0010)\nDSN: ORCA_DB_URL env")
 
     Container(profile_svc, "Profile & Project Service", "TypeScript",
       "Company/Dept/User profile 3-layer inheritance\nProfileResolver + cache (TTL 60s)\nProject registry + Dev Server binding\nProjectAwareAgentSpawner")
@@ -64,8 +66,8 @@ C4Container
   Container(orca_cli, "Orca CLI", "Node.js / TypeScript",
     "Command-line interface:\norca worktree, orca agent, orca serve\nCI/CD integration, headless mode")
 
-  Container(relay, "Orca Relay", "Node.js / TypeScript (compiled binary)",
-    "Deployed on remote SSH host:\nPTY bridging, file ops, git ops,\nport scanning, agent hooks")
+  Container(relay, "Orca Relay / Dev Server Agent", "Node.js / TypeScript (compiled binary, agent/src/relay/*)",
+    "Deployed on remote SSH host:\nPTY bridging, file ops, git ops (git.exec passthrough),\nAI agent spawn + credential store (AES-256-GCM),\nport scanning, agent hooks.\n2 connection modes: relay-websocket (Agent = WS server, default port 6799)\nand direct-websocket (Agent -> Orca :6769/agent)")
 
   ContainerDb(sqlite, "SQLite Database", "better-sqlite3",
     "Persistence: worktrees, sessions,\nscrollback snapshots, settings,\nautomations, notifications history")
@@ -84,7 +86,7 @@ C4Container
   Rel(user, mobile_app, "Uses on mobile", "Touch UI")
   Rel(user, orca_cli, "CLI commands", "Terminal")
   Rel(admin, admin_spa, "Manages users/sessions", "HTTPS /admin")
-  Rel(agentdev, agent_ws, "Connects agent", "ws://orca:6768/agent")
+  Rel(agentdev, agent_ws, "Connects agent", "ws://orca:6769/agent")
   Rel(custom_agent, agent_ws, "WS connection", "Binary frames + JSON-RPC")
 
   Rel(renderer, preload, "Calls API via", "contextBridge")
@@ -231,26 +233,32 @@ C4Container
 
 ---
 
-### 7. Orca Relay
-**Runtime:** Node.js (compiled single binary, chạy trên remote host)  
-**Tech:** TypeScript, node-pty, WebSocket  
+### 7. Orca Relay / Dev Server Agent
+
+> Tên gọi cũ "Orca Relay" (v4/v5 thin binary) vẫn dùng cho tên mode kết nối trong code (`relay-websocket`, `relay-ssh`), nhưng binary thật hiện tại làm nhiều hơn một relay PTY đơn thuần — nó cũng spawn AI agent, quản lý credential store, và có 2 chế độ kết nối (agent là WS server HOẶC agent tự kết nối ra ngoài như WS client). Đây KHÔNG phải "Dev Server Agent v6.0" theo tầm nhìn ADR-013/017 (không có layer A0-A4, không có Signed Execution Context) — đó vẫn là 🚧 Proposed, chưa triển khai.
+
+**Runtime:** Node.js 22+ (compiled single binary via `ncc`, chạy trên remote host)  
+**Tech:** TypeScript, node-pty, WebSocket, ssh2  
 **Chức năng:**
-- Bridge PTY sessions từ remote host về Desktop
-- File system operations (read, write, list, watch)
-- Git operations trên remote
+- Bridge PTY sessions từ remote host về Desktop/Backend
+- File system operations (read, write, list, watch, grep, glob)
+- Git operations trên remote — chủ yếu qua `git.exec`/`git.execStream` (generic command passthrough), không phải RPC theo từng operation
+- AI Agent spawn (`agent.spawn`/`agent.kill`/`agent.sendInput`) + AI provider credential store (AES-256-GCM, `~/.orca/ai-providers/*.enc`)
 - Port scanning và forwarding
-- Agent hook interception
+- Agent hook interception (structured JSON POST từ AI CLI, không phải OSC-133 parsing)
+- **2 chế độ kết nối tới Backend:** `relay-websocket` (Agent mở WS server tại `/orca-relay`, port mặc định **6799**, Backend kết nối vào) và `direct-websocket` (Agent tự kết nối ra `ws://orca:6769/agent` như WS client)
 
-**Source:** `src/relay/`  
+**Source:** `agent/src/relay/` (trước đây `src/relay/` — đường dẫn trong tài liệu cũ đã lạc hậu)  
 **Key files:**
-- `relay.ts` — Main relay loop
-- `pty-handler.ts` — PTY I/O bridging
-- `fs-handler.ts` — File system operations
-- `git-handler.ts` — Git operations
-- `port-scan-handler.ts` — Port detection
-- `agent-hook-server.ts` — Agent hook interception
+- `agent-entry.ts` — Entry point (thay thế `deploy/dev/agent/agent.js` CommonJS v1.0 cũ)
+- `agent-rpc-dispatch.ts` — RPC method router (~40 method: `pty.*`, `git.*`, `fs.*`, `ai.provider.*`, `agent.*`, `github.*`, `gitlab.*`, `preflight.*`, `tools/*`)
+- `agent-spawner.ts` — AI agent PTY lifecycle (`PTY_REGISTRY`)
+- `agent-git-handler.ts` — Git operations (bao gồm `git.pr.create` qua `gh` CLI — hiện KHÔNG được Backend gọi tới, xem `audit/backend/backend-vs-design-review.md` §2.12b)
+- `agent-connection-relay.ts` / `agent-connection-direct.ts` — 2 chế độ kết nối
+- `agent-hook-server.ts` — Agent hook interception (`RelayAgentHookServer`)
+- `context.ts` — chỉ còn `expandTilde()` + stub rỗng có chủ đích (`registerRoot()`); FS path-allowlist đã bị gỡ có chủ đích, trust boundary dồn vào renderer/SSH user — xem `docs/relay-fs-allowlist-removal.md` và `audit/agent/rpc-dispatch-lifecycle-vs-design-review.md` §2.3
 
-**Deploy:** Upload via SFTP, execute on remote host
+**Deploy:** Upload via SFTP, execute on remote host (`node relay.js` theo bootstrap thật, không phải một binary tên `orca-relay` riêng)
 
 ---
 
@@ -347,9 +355,9 @@ C4Container
 **Runtime:** Node.js / TypeScript (trong Orca Web Server process)  
 **Chức năng:**
 - `AIProviderService`: CRUD `orca_ai_provider_accounts` (metadata only — no credentials)
-- `ProviderCredentialRelay`: encrypt credentials in browser → relay SSH → write `~/.orca/ai-providers/<id>.enc` trên Dev Server
-- `AIProviderResolver`: priority cascade (user > project > server-default) + model detection
-- `ProviderHealthChecker`: background cron mỗi 15 phút, quota tracking
+- Credential relay: encrypt credentials in browser → relay SSH → write `~/.orca/ai-providers/<id>.enc` trên Dev Server. Logic nằm trực tiếp trong `AIProviderService.writeCredentialToDevServer()` — **không có class `ProviderCredentialRelay` riêng** như tài liệu trước ghi (`audit/backend/backend-vs-design-review.md` §2.6)
+- `ProviderResolver`: priority cascade — thứ tự thật là **user-scope → project-scope** (tài liệu trước ghi ngược: project → user)
+- `ProviderHealthChecker`: background cron mỗi 15 phút, quota tracking. ⚠️ Key rotation (grace period, status `'rotating'`) và cảnh báo quota 80% **chưa được implement** dù có trong tiêu chí F35 (§5.14)
 
 **Source:** `src/main/ai-providers/`  
 **DB tables:** `orca_ai_provider_accounts`, `orca_provider_usage`  
@@ -365,11 +373,12 @@ C4Container
 - `TemplateResolver`: inheritance chain merge + overrides + inject/remove steps
 - `WorkflowOrchestrator`: build DAG → topological sort → wave-based parallel execution
 - `StepExecutors`: agent, shell, action, webhook, parallel, condition
-- `WorkflowServerResolver`: `project:<id>` / `server:<id>` / `fleet:tag:<tag>` → devServerId
-- State persistence: resumable sau Orca restart
+- `WorkflowServerResolver`: hiện chỉ hỗ trợ đầy đủ dispatch `project:<id>`; `server:<devServerId>` ném lỗi "not yet implemented"; `fleet:tag:<tag>` chưa được wire (§5.15)
+- State persistence: resumable sau Orca restart (crash-recovery) — ⚠️ đây KHÔNG phải user-triggered pause/resume qua UI; `WorkflowStatus` không có state `'paused'`, không có method `pause()`/`resume()` thật (§5.15)
+- ❌ Provider selection theo từng step (mix Claude/GPT-4o giữa các bước) — **0% code**, `StepExecutors` không import `AIProviderService`/`ProviderResolver` (§5.15)
 
 **Source:** `src/main/workflow/`  
-**DB tables:** `orca_workflow_templates`, `orca_workflow_executions`, `orca_step_executions`
+**DB tables:** `orca_workflow_templates`, `orca_workflow_executions`, `orca_workflow_step_executions`
 
 ---
 

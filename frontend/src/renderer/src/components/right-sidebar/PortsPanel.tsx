@@ -59,7 +59,14 @@ import {
 import type { PortForwardEntry, EnrichedDetectedPort } from '../../../../shared/ssh-types'
 import type { WorkspacePort } from '../../../../shared/workspace-ports'
 import { translate } from '@/i18n/i18n'
+import {
+  addRuntimeSshPortForward,
+  removeRuntimeSshPortForward,
+  updateRuntimeSshPortForward
+} from '@/runtime/runtime-ssh-client'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export {
   killWorkspacePortForTarget,
   openWorkspacePortInBrowser,
@@ -522,7 +529,7 @@ function LocalPortRow({
   onOpenInBrowser: (port: WorkspacePort, event?: React.MouseEvent<HTMLButtonElement>) => void
 }): React.JSX.Element {
   const handleCopy = useCallback(() => {
-    void window.api.ui.writeClipboardText(addressForPort(port))
+    void uiWriteClipboardText(addressForPort(port))
   }, [port])
 
   const handleOpenBrowser = useCallback(
@@ -701,7 +708,7 @@ function LocalPortRow({
         <ContextMenuItem
           className={LOCAL_PORT_MENU_ITEM_CLASS}
           onSelect={() => {
-            void window.api.ui.writeClipboardText(JSON.stringify(port, null, 2))
+            void uiWriteClipboardText(JSON.stringify(port, null, 2))
           }}
         >
           <Copy size={13} />
@@ -877,7 +884,7 @@ function SshPortsPanel(): React.JSX.Element {
           isMac: navigator.userAgent.includes('Mac')
         })
       ) {
-        void window.api.shell.openUrl(url)
+        void shellOpenUrl(url)
         return
       }
       if (!activeWorktree?.id) {
@@ -1048,7 +1055,7 @@ function ForwardedPortRow({
   const handleRemove = useCallback(async () => {
     setRemoving(true)
     try {
-      await window.api.ssh.removePortForward({ id: entry.id })
+      await removeRuntimeSshPortForward(useAppStore.getState().settings, entry.id)
     } catch {
       // broadcast will update state
     }
@@ -1058,7 +1065,7 @@ function ForwardedPortRow({
   }, [entry.id, mountedRef])
 
   const handleCopy = useCallback(() => {
-    void window.api.ui.writeClipboardText(forwardedAddress)
+    void uiWriteClipboardText(forwardedAddress)
   }, [forwardedAddress])
 
   const handleOpenBrowser = useCallback(
@@ -1390,8 +1397,9 @@ function PortForwardForm({
 
       setSubmitting(true)
       try {
+        const settings = useAppStore.getState().settings
         await (mode === 'edit' && editId
-          ? window.api.ssh.updatePortForward({
+          ? updateRuntimeSshPortForward(settings, {
               id: editId,
               targetId,
               localPort: lPort,
@@ -1399,7 +1407,7 @@ function PortForwardForm({
               remotePort: rPort,
               label: label || undefined
             })
-          : window.api.ssh.addPortForward({
+          : addRuntimeSshPortForward(settings, {
               targetId,
               localPort: lPort,
               remoteHost: remoteHost || 'localhost',

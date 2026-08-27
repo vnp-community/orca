@@ -1,5 +1,9 @@
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
+import {
+  attachRuntimeEphemeralVmWorkspace,
+  cleanupRuntimeEphemeralVmWorkspace
+} from '@/runtime/runtime-ephemeral-vm-client'
 import { prepareEphemeralVmWorkspaceTarget } from '@/lib/ephemeral-vm-workspace-target'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
 import { getProjectIdentityKey } from '../../../shared/project-host-setup-projection'
@@ -146,7 +150,7 @@ export async function attachEphemeralVmRuntimeToWorkspace(
     return
   }
   try {
-    await window.api.ephemeralVm.attachWorkspace({
+    await attachRuntimeEphemeralVmWorkspace(useAppStore.getState().settings, {
       runtimeId: request.ephemeralVmRuntimeId,
       workspaceId
     })
@@ -179,7 +183,9 @@ export async function cleanupEphemeralVmRuntimeForFailedCreate(
     return
   }
   try {
-    await window.api.ephemeralVm.cleanup({ runtimeId: request.ephemeralVmRuntimeId })
+    await cleanupRuntimeEphemeralVmWorkspace(useAppStore.getState().settings, {
+      runtimeId: request.ephemeralVmRuntimeId
+    })
   } catch (error) {
     console.error('Failed to clean up ephemeral VM runtime after workspace creation failed:', error)
   }

@@ -79,6 +79,12 @@ export function useSidebarProjectDrop(): {
 
       setIsHandlingDrop(true)
       try {
+        // Why: this stats a brand-new project root dropped from the OS, not
+        // content inside an existing worktree, so there is no runtime/worktree
+        // context to route through — remote runtimes are already rejected above.
+        // Why: this stats a brand-new project root dropped from the OS, not
+        // content inside an existing worktree, so there is no runtime/worktree
+        // context to route through — remote runtimes are already rejected above.
         await window.api.fs.authorizeExternalPath({ targetPath: pathResolution.path })
         const stat = await window.api.fs.stat({ filePath: pathResolution.path })
         if (!mountedRef.current) {

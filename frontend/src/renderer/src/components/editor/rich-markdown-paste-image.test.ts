@@ -3,9 +3,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clipboardHasImage, handleRichMarkdownImagePaste } from './rich-markdown-paste-image'
 import { insertRichMarkdownImageFromPath } from './rich-markdown-image-insert'
+import { uiSaveClipboardImageAsTempFile } from '@/runtime/runtime-ui-client'
 
 vi.mock('./rich-markdown-image-insert', () => ({
   insertRichMarkdownImageFromPath: vi.fn().mockResolvedValue(undefined)
+}))
+
+// Why: paste-image now calls the ui wrapper (runtime-ui-client), not
+// window.api.ui directly — mock it the same way as the other runtime-*-client mocks.
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiSaveClipboardImageAsTempFile: vi.fn()
 }))
 
 vi.mock('@/lib/connection-context', () => ({
@@ -62,13 +69,7 @@ describe('rich markdown image paste', () => {
   beforeEach(() => {
     document.body.replaceChildren()
     vi.clearAllMocks()
-    vi.stubGlobal('window', {
-      api: {
-        ui: {
-          saveClipboardImageAsTempFile: vi.fn().mockResolvedValue('/tmp/orca-paste-image.png')
-        }
-      }
-    })
+    vi.mocked(uiSaveClipboardImageAsTempFile).mockResolvedValue('/tmp/orca-paste-image.png')
   })
 
   it('detects image files on the clipboard', () => {
@@ -98,7 +99,7 @@ describe('rich markdown image paste', () => {
 
     expect(event.preventDefault).toHaveBeenCalled()
     await flushPromises()
-    expect(window.api.ui.saveClipboardImageAsTempFile).toHaveBeenCalledWith({
+    expect(uiSaveClipboardImageAsTempFile).toHaveBeenCalledWith({
       connectionId: 'ssh-1'
     })
     expect(insertRichMarkdownImageFromPath).toHaveBeenCalledWith({
@@ -124,7 +125,7 @@ describe('rich markdown image paste', () => {
     })
 
     await flushPromises()
-    expect(window.api.ui.saveClipboardImageAsTempFile).toHaveBeenCalledWith({
+    expect(uiSaveClipboardImageAsTempFile).toHaveBeenCalledWith({
       connectionId: undefined
     })
   })
@@ -133,7 +134,7 @@ describe('rich markdown image paste', () => {
     const destroyedRef = { current: false }
     const event = pasteEvent([{ kind: 'file', type: 'image/png' }])
     const editor = editorAt(5, destroyedRef)
-    vi.mocked(window.api.ui.saveClipboardImageAsTempFile).mockImplementation(async () => {
+    vi.mocked(uiSaveClipboardImageAsTempFile).mockImplementation(async () => {
       destroyedRef.current = true
       return '/tmp/orca-paste-image.png'
     })

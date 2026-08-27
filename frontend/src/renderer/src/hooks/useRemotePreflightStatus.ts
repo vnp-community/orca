@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAppStore } from '../store'
+import { getRuntimeOnboardingPreflightStatus } from '../runtime/runtime-onboarding-client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,7 +38,10 @@ export function useRemotePreflightStatus(devServerId: string | null): {
     if (!devServerId) {return}
     setLoading(true)
     try {
-      const result = await window.api.onboarding.getPreflightStatus({ devServerId, force })
+      const result = await getRuntimeOnboardingPreflightStatus(useAppStore.getState().settings, {
+        devServerId,
+        force
+      })
       setRemotePreflightStatus(devServerId, result)
     } catch {
       // Non-fatal: stale data shown

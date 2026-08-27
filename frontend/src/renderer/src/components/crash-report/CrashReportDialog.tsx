@@ -6,6 +6,11 @@ import {
   takePendingReactErrorBoundaryReport
 } from '@/lib/react-error-boundary-reporting'
 import type { CrashReportRecord } from '../../../../shared/crash-reporting'
+import {
+  dismissRuntimeCrashReport,
+  getRuntimeLatestCrashReport,
+  getRuntimeLatestPendingCrashReport
+} from '@/runtime/runtime-crash-reports-client'
 
 const CrashReportDialogSurface = lazy(() =>
   import('./CrashReportDialogSurface').then((module) => ({
@@ -30,15 +35,15 @@ export function CrashReportDialog(): React.JSX.Element | null {
       setLoading(true)
       try {
         const nextReport = promptIfPresent
-          ? await window.api.crashReports.getLatestPending()
-          : await window.api.crashReports.getLatestReport()
+          ? await getRuntimeLatestPendingCrashReport()
+          : await getRuntimeLatestCrashReport()
         let displayedReport = nextReport
         if (nextReport?.status === 'pending' && promptIfPresent) {
           try {
             // Why: startup crash prompts are one-shot. The lazy dialog keeps the
             // report data locally if the user sends immediately, while Help >
             // Report Crash can still reopen dismissed unsent reports.
-            await window.api.crashReports.dismiss({ reportId: nextReport.id })
+            await dismissRuntimeCrashReport(nextReport.id)
             displayedReport = { ...nextReport, status: 'dismissed' as const }
           } catch (error) {
             console.error('Failed to dismiss crash report after startup prompt:', error)

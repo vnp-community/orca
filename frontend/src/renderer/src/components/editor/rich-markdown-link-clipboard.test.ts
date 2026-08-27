@@ -2,22 +2,23 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { toastError, toastSuccess } = vi.hoisted(() => ({
+const { toastError, toastSuccess, writeClipboardText } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
-  toastError: vi.fn()
+  toastError: vi.fn(),
+  writeClipboardText: vi.fn()
 }))
 
 vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: toastError } }))
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiWriteClipboardText: (text: string) => writeClipboardText(text)
+}))
 
 import { copyRichMarkdownLink } from './rich-markdown-link-clipboard'
 
 describe('copyRichMarkdownLink', () => {
-  const writeClipboardText = vi.fn()
-
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(window as unknown as { api: unknown }).api = { ui: { writeClipboardText } }
   })
 
   it('reports success only after the clipboard write resolves', async () => {

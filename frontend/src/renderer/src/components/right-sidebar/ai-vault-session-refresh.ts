@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AiVaultListResult, AiVaultSession } from '../../../../shared/ai-vault-types'
 import type { ExecutionHostScope } from '../../../../shared/execution-host'
 import { useAppStore } from '@/store'
+import {
+  listRuntimeAiVaultSessions,
+  subscribeRuntimeAiVaultWindowFocus
+} from '@/runtime/runtime-ai-vault-client'
 
 const SESSION_LIMIT = 500
 
@@ -89,7 +93,7 @@ export function useAiVaultSessionRefresh(
       const hostScope = executionHostScopeRef.current
       const scanKey = `${hostScope}\n${scopeKey}`
       try {
-        const result = await window.api.aiVault.listSessions({
+        const result = await listRuntimeAiVaultSessions({
           limit: SESSION_LIMIT,
           scopePaths: scopePathsRef.current,
           executionHostScope: hostScope,
@@ -201,7 +205,7 @@ export function useAiVaultSessionRefresh(
       }
       requestForcedRescan()
     }
-    const unsubscribeWindowFocus = window.api.aiVault.onWindowFocused?.(onRefocus)
+    const unsubscribeWindowFocus = subscribeRuntimeAiVaultWindowFocus(onRefocus)
     document.addEventListener('visibilitychange', onRefocus)
     return () => {
       unsubscribeWindowFocus?.()

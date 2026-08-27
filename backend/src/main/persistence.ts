@@ -1,7 +1,9 @@
 /* eslint-disable max-lines -- Why: persistence keeps schema defaults, migration,
 load/save, and flush logic in one file so the full storage contract is reviewable
 as a unit instead of being scattered across modules. */
-import { app, safeStorage } from 'electron'
+import { safeStorage } from 'electron'
+import { getDataFile } from './persistence-paths'
+import { sanitizeOnboardingUpdate } from './persistence-migration'
 import {
   readFileSync,
   writeFileSync,
@@ -58,7 +60,6 @@ import type {
   OrcaWorkspaceLayout,
   NotificationSettings,
   OnboardingChecklistState,
-  OnboardingOutcome,
   OnboardingState,
   PerServerChecklistState,
   LegacyPaneKeyAliasEntry,
@@ -80,8 +81,6 @@ import {
 } from '../shared/task-source-context'
 import type { MigrationUnsupportedPtyEntry } from '../shared/agent-status-types'
 import type { WebPushSubscription } from '../shared/types'
-import { MOBILE_PAIRING_USERDATA_FILES } from './runtime/mobile-pairing-files'
-import { hardenExistingSecureFile } from '../shared/secure-file'
 import {
   LEGACY_DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS,
   type RemovedSshTargetTombstone,
@@ -102,7 +101,6 @@ import {
   isDefaultedCompactWorktreeCardProperties,
   normalizeAgentActivityDisplayMode,
   normalizeWorktreeCardProperties,
-  ONBOARDING_FLOW_VERSION,
   ONBOARDING_FINAL_STEP
 } from '../shared/constants'
 import { parseWorkspaceSession } from '../shared/workspace-session-schema'
@@ -240,6 +238,19 @@ import { track } from './telemetry/client'
 import { getCohortAtEmit } from './telemetry/cohort-classifier'
 import { isStartupDiagnosticsEnabled, logStartupDiagnostic } from './startup/startup-diagnostics'
 
+// Barrel re-export: initDataPath/getCanonicalUserDataPath moved to
+// ./persistence-paths (TASK-BIGFILE-010) — kept re-exported here so existing
+// importers of persistence.ts don't need to change their import path.
+export { initDataPath, getCanonicalUserDataPath } from './persistence-paths'
+// Barrel re-export: migrateMobilePairingDataToCanonicalUserDataPath and
+// sanitizeOnboardingUpdate moved to ./persistence-migration (TASK-BIGFILE-011)
+// — kept re-exported here so existing importers of persistence.ts don't need
+// to change their import path.
+export {
+  migrateMobilePairingDataToCanonicalUserDataPath,
+  sanitizeOnboardingUpdate
+} from './persistence-migration'
+
 function encrypt(plaintext: string): string {
   if (!plaintext || !safeStorage.isEncryptionAvailable()) {
     return plaintext
@@ -316,40 +327,6 @@ function retireLegacyInstructionsForClearedTextActionRecipes(
   }
 
   return changed ? { ...sourceControlAi, instructionsByOperation } : sourceControlAi
-}
-
-// Why: the data-file path must not be a module-level constant. Module-level
-// code runs at import time — before configureDevUserDataPath() redirects the
-// userData path in index.ts — so a constant would capture the default (non-dev)
-// path, causing dev and production instances to share the same file and silently
-// overwrite each other.
-//
-// It also must not be resolved lazily on every call, because app.setName('Orca')
-// runs before the Store constructor and would change the resolved path from
-// lowercase 'orca' to uppercase 'Orca'. On case-sensitive filesystems (Linux)
-// this would look in the wrong directory and lose existing user data.
-//
-// Solution: index.ts calls initDataPath() right after configureDevUserDataPath()
-// but before app.setName(), capturing the correct path at the right moment.
-let _dataFile: string | null = null
-let _userDataDir: string | null = null
-
-export function initDataPath(): void {
-  // ORCA_DATA_DIR: allows headless/container deployments to redirect data storage.
-  // Must be set before initDataPath() is called (i.e., before app.setName()).
-  const userDataDir = process.env.ORCA_DATA_DIR ?? app.getPath('userData')
-  _userDataDir = userDataDir
-  _dataFile = join(userDataDir, 'orca-data.json')
-}
-
-function getDataFile(): string {
-  if (!_dataFile) {
-    // Safety fallback — should not be hit in normal startup.
-    const userDataDir = app.getPath('userData')
-    _userDataDir = userDataDir
-    _dataFile = join(userDataDir, 'orca-data.json')
-  }
-  return _dataFile
 }
 
 // Why a sidecar: githubCache is a refetchable 5-min-TTL poll cache whose
@@ -454,58 +431,6 @@ function readGithubCacheSnapshot(dataFile: string): PersistedState['githubCache'
     // Missing or corrupt snapshot: start with an empty cache and refetch.
   }
   return null
-}
-
-/**
- * Return the userData directory captured at initDataPath() time, before
- * app.setName() can change how app.getPath('userData') resolves.
- *
- * Subsystems that must share storage with orca-data.json (mobile pairing's
- * DeviceRegistry, E2EE keypair, runtime metadata) read this instead of
- * resolving the path late, which on case-sensitive filesystems can land in a
- * different directory and lose paired devices across restarts/updates.
- */
-export function getCanonicalUserDataPath(): string {
-  if (!_userDataDir) {
-    // Safety fallback — should not be hit in normal startup.
-    _userDataDir = app.getPath('userData')
-  }
-  return _userDataDir
-}
-
-/**
- * Copy legacy mobile pairing credentials into the canonical userData directory.
- *
- * Existing installs may already have credentials in the late app.getPath('userData')
- * directory. Before switching the runtime server to the canonical path, copy the
- * registry and E2EE keypair forward as a pair so an update does not force one
- * last re-pair or mix devices with the wrong key.
- */
-export function migrateMobilePairingDataToCanonicalUserDataPath(sourceUserDataDir: string): void {
-  const targetUserDataDir = getCanonicalUserDataPath()
-  if (resolve(sourceUserDataDir) === resolve(targetUserDataDir)) {
-    return
-  }
-
-  const migrations = MOBILE_PAIRING_USERDATA_FILES.map((fileName) => ({
-    sourcePath: join(sourceUserDataDir, fileName),
-    targetPath: join(targetUserDataDir, fileName)
-  }))
-  if (migrations.some(({ sourcePath }) => !existsSync(sourcePath))) {
-    return
-  }
-  if (migrations.some(({ targetPath }) => existsSync(targetPath))) {
-    return
-  }
-
-  mkdirSync(targetUserDataDir, { recursive: true })
-  for (const { sourcePath, targetPath } of migrations) {
-    copyFileSync(sourcePath, targetPath)
-    // Why: these are credential files (device tokens, E2EE secret key). copyFileSync
-    // does not carry Windows ACLs, so re-assert the current-user-only restriction on
-    // the copy instead of relying on the runtime's later lazy re-harden on read.
-    hardenExistingSecureFile(targetPath)
-  }
 }
 
 // Why (issue #1158): keep 5 rolling backups of orca-data.json so a corrupt or
@@ -1190,129 +1115,6 @@ function normalizeSshTarget(t: SshTarget): SshTarget {
 // strict whitelist guards every entry into onboarding state — arbitrary
 // renderer/disk input cannot inject unknown keys or wrong-typed values.
 // Returns only validated fields; unknown keys are dropped silently.
-// Why: returns Partial<...> with a partial checklist so the IPC update path
-// merges over current state without wiping previously-true keys. Invalid
-// top-level fields are OMITTED (not coerced to fallbacks) so partial updates
-// don't clobber valid persisted state; the load-path caller spreads defaults.
-type SanitizeOnboardingUpdateOptions = {
-  migrateLegacyProgress?: boolean
-}
-
-function remapLegacyOnboardingLastCompletedStep(
-  lastCompletedStep: number,
-  raw: Record<string, unknown>
-): number {
-  if (raw.outcome === 'completed' && lastCompletedStep >= 4) {
-    return ONBOARDING_FINAL_STEP
-  }
-  // Why: v3 was the four-step flow before the Windows terminal preference
-  // page. Step 4 already meant notifications, so open progress should resume
-  // there rather than treating it as the newly inserted Windows step.
-  if (raw.flowVersion === 3) {
-    return Math.min(4, lastCompletedStep)
-  }
-  // Why: v2 was the five-step flow; missing/older versions were seven-step
-  // data where step 4 was removed agent setup, not completed integrations.
-  if (raw.flowVersion === 2) {
-    if (lastCompletedStep === 3) {
-      return 2
-    }
-    if (lastCompletedStep >= 4) {
-      return 3
-    }
-    return lastCompletedStep
-  }
-  if (lastCompletedStep === 3) {
-    return 2
-  }
-  if (lastCompletedStep === 4) {
-    return 2
-  }
-  if (lastCompletedStep >= 5) {
-    return 3
-  }
-  return lastCompletedStep
-}
-
-export function sanitizeOnboardingUpdate(
-  input: unknown,
-  options: SanitizeOnboardingUpdateOptions = {}
-): Partial<Omit<OnboardingState, 'checklist'>> & { checklist?: Partial<OnboardingChecklistState> } {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return {}
-  }
-  const raw = input as Record<string, unknown>
-  const out: Partial<Omit<OnboardingState, 'checklist'>> & {
-    checklist?: Partial<OnboardingChecklistState>
-  } = {}
-
-  if ('closedAt' in raw) {
-    // Why: `typeof raw.closedAt === 'number'` would let NaN/Infinity through;
-    // JSON.stringify writes those as `null` on save, which silently reverts
-    // closedAt and re-opens the wizard on next load. Require a finite,
-    // non-negative timestamp so live state matches what disk can persist.
-    if (typeof raw.closedAt === 'number' && Number.isFinite(raw.closedAt) && raw.closedAt >= 0) {
-      out.closedAt = raw.closedAt
-    } else if (raw.closedAt === null) {
-      out.closedAt = null
-    }
-    // else: omit — preserve existing persisted value on merge.
-  }
-  if ('outcome' in raw) {
-    const v = raw.outcome
-    if (v === 'completed' || v === 'dismissed') {
-      out.outcome = v as OnboardingOutcome
-    } else if (v === null) {
-      out.outcome = null
-    }
-    // else: omit.
-  }
-  if ('flowVersion' in raw) {
-    const v = raw.flowVersion
-    if (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= ONBOARDING_FLOW_VERSION) {
-      out.flowVersion = v
-    }
-    // else: omit.
-  }
-  if ('lastCompletedStep' in raw) {
-    const v = raw.lastCompletedStep
-    if (typeof v === 'number' && Number.isInteger(v) && v >= -1) {
-      const isLegacyFlow =
-        options.migrateLegacyProgress && raw.flowVersion !== ONBOARDING_FLOW_VERSION
-      // Why: removing two wizard pages changed numeric meanings. Migrate raw
-      // legacy disk values before the new final-step bound can drop them.
-      const normalized = isLegacyFlow ? remapLegacyOnboardingLastCompletedStep(v, raw) : v
-      if (normalized <= ONBOARDING_FINAL_STEP) {
-        out.lastCompletedStep = normalized
-      }
-    }
-    // else: omit.
-  }
-  if ('checklist' in raw) {
-    const rawChecklist = raw.checklist
-    if (rawChecklist && typeof rawChecklist === 'object' && !Array.isArray(rawChecklist)) {
-      // Why: copy ONLY caller-sent boolean keys so partial updates (e.g.
-      // `{ addedRepo: true }`) don't reset other checklist items to false.
-      const defaults = getDefaultOnboardingState().checklist
-      const rc = rawChecklist as Record<string, unknown>
-      const checklist: Partial<OnboardingChecklistState> = {}
-      for (const key of Object.keys(defaults) as (keyof OnboardingChecklistState)[]) {
-        if (key in rc && typeof rc[key] === 'boolean') {
-          // Why: perServer is Record<...>, not boolean — skip non-boolean keys
-          // so we only copy boolean checklist flags here.
-          if (typeof defaults[key] !== 'boolean') {continue
-          ;}(checklist as Record<string, unknown>)[key] = rc[key] as boolean
-        }
-      }
-      out.checklist = checklist
-    }
-  }
-  if (options.migrateLegacyProgress) {
-    out.flowVersion = ONBOARDING_FLOW_VERSION
-  }
-  return out
-}
-
 function normalizeLoadedOnboardingState(
   input: unknown,
   defaults: OnboardingState
@@ -1371,7 +1173,9 @@ function normalizeLoadedOnboardingState(
 function migrateOnboardingChecklist(onboarding: OnboardingState): OnboardingState {
   const cl = onboarding.checklist
   // Already migrated, or no checklist yet.
-  if (!cl || cl.perServer !== undefined) {return onboarding}
+  if (!cl || cl.perServer !== undefined) {
+    return onboarding
+  }
 
   const PER_SERVER_KEYS: (keyof PerServerChecklistState)[] = [
     'addedRepo',
@@ -1395,8 +1199,7 @@ function migrateOnboardingChecklist(onboarding: OnboardingState): OnboardingStat
     ...onboarding,
     checklist: {
       ...cl,
-      perServer:
-        Object.keys(perServerItems).length > 0 ? { local: perServerItems } : {}
+      perServer: Object.keys(perServerItems).length > 0 ? { local: perServerItems } : {}
     }
   }
 }
@@ -2648,6 +2451,24 @@ function deleteRemovedTerminalScrollbackSnapshots(
 
 export type StoreOptions = {
   dataFile?: string
+  /**
+   * ADR-021 §"chỉ dùng 1 database" — server mode pre-fetches this from
+   * Postgres (PgOrcaDataStatePersistence.loadRawState(), async) BEFORE
+   * constructing Store, since the constructor's own load() is synchronous
+   * and Postgres I/O cannot happen inside it. `null` means "no row yet"
+   * (fresh install) — same as "file does not exist" for the sync path this
+   * replaces. `undefined` (the default) means "not using Postgres — read
+   * dataFile normally," so Electron desktop mode is unaffected by this
+   * option existing. See orca-data-state-persistence.ts's module doc comment.
+   */
+  preloadedRawState?: PersistedState | null
+  /**
+   * ADR-021 — when set, writeToDiskAsync() calls this with its already-built
+   * (secrets-encrypted) JSON payload instead of writing dataFile. Debounce/
+   * hash-skip/generation-race logic in scheduleSave()/writeToDiskAsync() is
+   * unchanged; only the final "where do the bytes go" step is redirected.
+   */
+  persistOverride?: (payload: string) => Promise<void>
 }
 
 export class Store {
@@ -2671,6 +2492,13 @@ export class Store {
   private githubCacheDirty = false
   private gitUsernameCache = new Map<string, string>()
   private loadNeedsSave = false
+  // ADR-021 — see StoreOptions' doc comments. persistOverride is NOT
+  // readonly — hydrateFromPostgres() (called post-construction, since
+  // server-bootstrap.ts's DevServerManager already needs a live `store`
+  // reference before the DB pool exists — see that method's doc comment)
+  // sets it once the pool becomes available.
+  private readonly preloadedRawState: PersistedState | null | undefined
+  private persistOverride: ((payload: string) => Promise<void>) | undefined
   private settingsChangeListeners = new Set<
     (
       updates: Partial<GlobalSettings>,
@@ -2684,6 +2512,8 @@ export class Store {
     // Why: profile switching creates more than one possible state path. Capture
     // the path per Store instance so late async writes cannot follow a global path.
     this.dataFile = options.dataFile ?? getDataFile()
+    this.preloadedRawState = options.preloadedRawState
+    this.persistOverride = options.persistOverride
     const profileSnapshotRoot = getProfileTerminalScrollbackSnapshotRoot(this.dataFile)
     const legacySnapshotRoot = getProfileTerminalScrollbackSnapshotRoot(getDataFile())
     this.terminalScrollbackSnapshotStorage = {
@@ -2899,7 +2729,16 @@ export class Store {
     // users as fresh, flipping them to default-on in violation of the
     // social contract we installed them under.
     const dataFile = this.dataFile
-    const fileExistedOnLoad = existsSync(dataFile)
+    // ADR-021 §"chỉ dùng 1 database": when server-bootstrap.ts pre-fetched
+    // state from Postgres (StoreOptions.preloadedRawState !== undefined),
+    // that IS the "does a row already exist" signal — skip the file-existence
+    // check/read entirely and feed the pre-fetched object into the exact same
+    // migration/decrypt/defaults-merge pipeline below. See
+    // orca-data-state-persistence.ts's module doc comment.
+    const usingPreloadedState = this.preloadedRawState !== undefined
+    const fileExistedOnLoad = usingPreloadedState
+      ? this.preloadedRawState !== null
+      : existsSync(dataFile)
     logPersistenceStartupMilestone('persistence-load-start', {
       fileExists: fileExistedOnLoad
     })
@@ -2907,15 +2746,25 @@ export class Store {
     let result: PersistedState | null = null
     try {
       if (fileExistedOnLoad) {
-        const readStartedAt = performance.now()
-        const raw = readFileSync(dataFile, 'utf-8')
-        logPersistenceStartupMilestone('persistence-read-done', {
-          bytes: Buffer.byteLength(raw),
-          durationMs: Math.round(performance.now() - readStartedAt)
-        })
-        logPersistenceStartupMilestone('persistence-json-parse-start')
-        const parsed = JSON.parse(raw) as PersistedState
-        logPersistenceStartupMilestone('persistence-json-parse-done')
+        let parsed: PersistedState
+        if (usingPreloadedState) {
+          // Why no readFileSync/JSON.parse here: the bytes already went
+          // through JSON.parse once inside PgOrcaDataStatePersistence.loadRawState()
+          // (server-bootstrap.ts, before this constructor ran) — reparsing a
+          // JS object would be a no-op at best and a lossy round-trip at worst.
+          parsed = this.preloadedRawState as PersistedState
+          logPersistenceStartupMilestone('persistence-read-done', { bytes: -1, durationMs: 0 })
+        } else {
+          const readStartedAt = performance.now()
+          const raw = readFileSync(dataFile, 'utf-8')
+          logPersistenceStartupMilestone('persistence-read-done', {
+            bytes: Buffer.byteLength(raw),
+            durationMs: Math.round(performance.now() - readStartedAt)
+          })
+          logPersistenceStartupMilestone('persistence-json-parse-start')
+          parsed = JSON.parse(raw) as PersistedState
+          logPersistenceStartupMilestone('persistence-json-parse-done')
+        }
 
         // Why: secret settings are stored encrypted on disk via safeStorage.
         // Decrypt at the load boundary so the rest of the app sees plaintext.
@@ -3515,7 +3364,12 @@ export class Store {
     // because a user whose `orca-data.json` got corrupted is not a fresh
     // install of the telemetry release — they still count as existing and
     // must see the opt-in banner, not the default-on toast.
-    if (result === null && allowBackupRecovery) {
+    // ADR-021: backup recovery reads local .bak files — meaningless (and
+    // actively wrong) when the state source is Postgres, not this dataFile.
+    // A stale local backup from a previous non-Postgres run must never
+    // silently override real Postgres state on a parse failure; fall through
+    // to defaults instead, same as "no file and no backup" already does.
+    if (result === null && allowBackupRecovery && !usingPreloadedState) {
       let hasBackup = false
       for (let i = 0; i < BACKUP_COUNT; i++) {
         if (existsSync(backupPath(dataFile, i))) {
@@ -3709,6 +3563,55 @@ export class Store {
     }
   }
 
+  /**
+   * ADR-021 §"chỉ dùng 1 database" — switches this already-constructed Store
+   * to Postgres for all FUTURE reads/writes. Called once, post-construction,
+   * from server-bootstrap.ts after the DB pool exists.
+   *
+   * Why post-construction (not StoreOptions.preloadedRawState at construction
+   * time, like every other ADR-021 store): `DevServerManager` and several IPC
+   * handler registrations need a live `store` reference before the DB
+   * pool/tenantId are resolved in server-bootstrap.ts's current initialization
+   * order — reordering bootstrap to create the pool first would also have to
+   * move DevServerManager/RelayConnectionPool/WebCredentialStore construction,
+   * a much larger, riskier restructuring than this method. Called before
+   * `rpcServer.start()`, so no real client request can ever observe the
+   * pre-hydration (file-loaded or default) state.
+   *
+   * Two cases:
+   * - No row in Postgres yet (first boot with Postgres configured): seed it
+   *   with whatever the constructor already loaded (from the local file, or
+   *   defaults) — that value already went through the full 700+ line
+   *   migration/normalize pipeline in load(), unchanged.
+   * - A row exists: replace `this.state` with it. Deliberately NOT re-run
+   *   through load()'s full migration pipeline (that logic is entangled with
+   *   constructor-only fields like `loadNeedsSave` and is a return-a-new-
+   *   object function, not a re-invokable "migrate this object in place"
+   *   one) — only a shallow defaults merge
+   *   (`{...getDefaultPersistedState(), ...postgresState}`), so top-level
+   *   fields added by an app version newer than the Postgres row's last
+   *   write still get a default instead of `undefined`. Known gap vs. the
+   *   file path's per-field migrations (e.g. migrateTerminalScrollbackRows)
+   *   — acceptable because a Postgres row is always written by
+   *   buildStateToSave(), i.e. always already in *some* fully-migrated
+   *   shape, just possibly an older one; worth revisiting if a future
+   *   PersistedState field needs its own non-trivial migration logic to run
+   *   on a Postgres-sourced load, not just a default-fill.
+   */
+  async hydrateFromPostgres(persistence: {
+    loadRawState<T>(): Promise<T | null>
+    save(payload: string): Promise<void>
+  }): Promise<void> {
+    const existing = await persistence.loadRawState<PersistedState>()
+    if (existing) {
+      this.state = { ...getDefaultPersistedState(homedir()), ...existing }
+    } else {
+      await persistence.save(this.buildStateToSave())
+      this.lastWrittenStateHash = this.computeStateHash()
+    }
+    this.persistOverride = (payload) => persistence.save(payload)
+  }
+
   // Why githubCache is omitted: it is memory-only during the session (see
   // getGithubCacheFile) — excluding it from both the payload and the hash
   // keeps cache refreshes from ever touching the durable file.
@@ -3756,6 +3659,19 @@ export class Store {
       return
     }
     const payload = this.buildStateToSave()
+
+    // ADR-021 §"chỉ dùng 1 database": server mode redirects here instead of
+    // the file tmp-write+rename+backup-rotation path below — none of that
+    // (tmp files, atomic rename, .bak rotation) applies to a Postgres UPSERT,
+    // which is already atomic. Same generation/hash bookkeeping either way.
+    if (this.persistOverride) {
+      await this.persistOverride(payload)
+      if (this.writeGeneration === gen) {
+        this.lastWrittenStateHash = stateHash
+      }
+      return
+    }
+
     const dataFile = this.dataFile
     const dir = dirname(dataFile)
     await mkdir(dir, { recursive: true }).catch(() => {})

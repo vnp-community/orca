@@ -1,7 +1,7 @@
 # Orca Web Frontend — Kiến trúc Client-Side (Browser)
 
 **Nguồn:** TDD v5 (`specs/frontend/tdd/v5/`), HLD v1 (C2, C3, C4)  
-**Cập nhật:** 2026-07-30  
+**Cập nhật:** 2026-08-14 — correction pass against `audit/frontend/03-hld-doc-drift.md` (§5.1 wire protocol, §9.1/§9.6/§9.8 paths, §10.2/§10.7 GitPanel, §11 Admin SPA routes, §12 routing)  
 **Scope:** Chỉ bao gồm những gì chạy trong **browser** (React + Zustand + Vite) — mọi xử lý nghiệp vụ thuộc [backend-server-architecture.md](./backend-server-architecture.md)
 
 ---
@@ -92,7 +92,7 @@ export async function bootstrapWebApp(): Promise<void> {
 
   // 2b. Có session → tạo WebSocketRpcClient
   const client = new WebSocketRpcClient(wsUrl)
-  await client.connect()  // retry 3 lần, delay 2s
+  await client.connect()  // reconnect backoff: 500ms→1s→2s→5s→10s→30s (no attempt limit)
 
   // 3. Load initial data
   await Promise.all([
@@ -191,38 +191,58 @@ Browser → https://orca-server/
 
 ## 5. Transport Layer (Client-side RPC)
 
-### 5.1 WebSocketRpcClient (restructure_v1)
+### 5.1 WebSocketRpcClient
 
-**File:** `src/platform/adapters/web/rpc-client.ts`  
-**Interface:** `IRpcClient` (`src/platform/rpc-client-interface.ts`)
+**File:** `frontend/src/platform/adapters/web/rpc-client.ts`  
+**Interface:** `IRpcClient` (`frontend/src/platform/rpc-client-interface.ts`) — decouples `ConnectionStatusProvider` and `web-preload-api` from the concrete transport, and is the *same* surface Electron's `ipcRenderer` preload exposes on desktop, so `web-preload-api.ts` can implement `window.api` identically on both targets.
 
 ```typescript
+// IRpcClient — real shape, not JSON-RPC 2.0 call()/callStream()
+export type IRpcClient = {
+  connect(): Promise<void>
+  disconnect(): void
+  isConnected(): boolean
+  invoke(channel: string, ...args: unknown[]): Promise<unknown>
+  send(channel: string, data?: unknown): void
+  on(channel: string, handler: (...args: unknown[]) => void): () => void
+  off(channel: string, handler: (...args: unknown[]) => void): void
+  once(channel: string, handler: (...args: unknown[]) => void): void
+}
+
 class WebSocketRpcClient implements IRpcClient {
-  private ws: WebSocket
-  private pendingRequests: Map<string, RequestState>
+  private ws: WebSocket | null
+  private readonly pending: Map<string, PendingInvocation>   // request id → resolve/reject/timeout
+  private readonly listeners: Map<string, Set<Handler>>       // push-channel → handlers
 
-  async connect(): Promise<void> // maxRetries=3, delay=2s
-  
-  async call<T>(method: string, params?: unknown): Promise<T>
-  // → JSON-RPC 2.0 request
-  // → wait for matching id in response
-
-  async callStream(method: string, params?: unknown): AsyncIterable<StreamChunk>
-  // → streaming: git.push progress, step output...
-
-  close(): void
-  onReconnect(cb: () => void): void
-  offReconnect(cb: () => void): void
+  connect(): Promise<void>       // sets intentionallyClosed=false, opens WS (10s connect timeout)
+  disconnect(): void             // sets intentionallyClosed=true — stops the reconnect loop
+  isConnected(): boolean
+  invoke(channel, ...args): Promise<unknown>   // request/response, 30s timeout
+  send(channel, data?): void                   // fire-and-forget
+  on/off/once(channel, handler)                // subscribe to server-push messages
 }
 ```
 
-**Wire protocol:**
+**Wire protocol — plain JSON text, not binary framing:**
+
 ```
-Frame: TYPE[1B] | SEQ[4B BE] | ACK[4B BE] | LEN[4B BE] | PAYLOAD[LEN bytes]
-       = 13-byte fixed header
-TYPE:  0x01 = Regular | 0x09 = KeepAlive (every 30s)
-PAYLOAD: UTF-8 JSON-RPC 2.0
+WebSocket message = JSON.stringify(envelope), no ArrayBuffer/binary frame, no SEQ/ACK.
+
+Client → Server:
+  invoke: { id, type: 'invoke', channel, args }
+  send:   { type: 'send', channel, data }
+
+Server → Client:
+  result: { id, type: 'result', result }
+  error:  { id, type: 'error', message }
+  push:   { type: 'push', channel, args }
 ```
+
+This is an ipcRenderer-style envelope (`invoke`/`on`/`once`), **not** JSON-RPC 2.0 — there is no `method`/`params`/`jsonrpc` field. `rpc-client.ts` itself has **no keepalive/ping-pong logic at all**.
+
+**Reconnect:** unexpected `ws.onclose` (network blip, proxy timeout, server restart) schedules a reconnect via `RECONNECT_DELAYS_MS = [500, 1000, 2000, 5000, 10000, 30000]` (ms) — backoff caps at 30s, **no limit on attempt count** (not "maxRetries=3, delay=2s"). `ConnectionStatusProvider` polls `isConnected()` every 2s so the banner clears automatically once a reconnect succeeds. Explicit `disconnect()` (logout/unmount) sets `intentionallyClosed` and skips the reconnect loop entirely.
+
+> **Do not confuse with the SSH relay's binary protocol.** A 13-byte `TYPE[1B]|SEQ[4B BE]|ACK[4B BE]|LEN[4B BE]|PAYLOAD` frame format *does* exist in the codebase, but it belongs to a completely different subsystem: `frontend/src/main/ssh/relay-protocol.ts` (`HEADER_LENGTH = 13`, `MessageType.Regular = 1`, `MessageType.KeepAlive = 9`), used by the SSH remote-relay multiplexer (`ssh-channel-multiplexer.ts`, modeled on VS Code's `PersistentProtocol`) for the F23/F24 remote dev-server connection — it never touches the browser's `WebSocketRpcClient`. Its real keepalive interval is `KEEPALIVE_SEND_MS = 5_000` (5s), not 30s.
 
 ### 5.2 WebRuntimeClient (E2EE pairing — Desktop Pair Code sharing only)
 
@@ -394,14 +414,13 @@ LoginPage:
     │       → loginLocal(email, pwd) → POST /auth/local
     │       → Set-Cookie: orca_session
     │       → AuthSlice.setAuth(user)
-    │       → navigate('/workspace')
+    │       → window.location.href = '/'   (hard reload, not router navigation — §12)
     │
-    ├── SsoButton (GitHub/Google/Keycloak)
-    │       → redirect to SSO provider OAuth flow
-    │
-    └── PairCodeFallback (backward compat pairing)
-            → WebConnect flow (E2EE)
+    └── SsoButton (GitHub/Google/Keycloak)
+            → redirect to SSO provider OAuth flow
 ```
+
+**CR-FE2E-002 removed `PairCodeFallback` from `LoginPage`** (`LoginPage.tsx:3`: *"PairCodeFallback removed"*) — the multi-user login branch always has session-cookie login available, so the fallback UI no longer applies there. `PairCodeFallback.tsx` still exists as a file, but only the separate legacy pair-code entry point (`web/pair-code-app-entry.tsx`, §12 item 3) can reach it now.
 
 ### 7.2 Auth State (AuthSlice)
 
@@ -437,7 +456,7 @@ const logout = useLogout()        // () => Promise<void>
 | `LoginPage` | `web/login/LoginPage.tsx` | Login container + SSO routing |
 | `LoginForm` | `web/login/LoginForm.tsx` | Email + password form |
 | `SsoButton` | `web/login/SsoButton.tsx` | GitHub/Google/Keycloak link |
-| `PairCodeFallback` | `web/login/PairCodeFallback.tsx` | Legacy pairing UI |
+| `PairCodeFallback` | `web/login/PairCodeFallback.tsx` | Legacy pairing UI — file still exists, but **no longer referenced by `LoginPage`** (CR-FE2E-002); only reachable via the separate `pair-code-app-entry.tsx` |
 | `UserAvatarMenu` | `components/auth/UserAvatarMenu.tsx` | Avatar dropdown (web-only) |
 | `UserRoleBadge` | `components/auth/UserRoleBadge.tsx` | Role indicator badge |
 
@@ -504,7 +523,7 @@ const PullRequestPage = lazy(() => import('./components/PullRequestPage'))
 
 ### 9.1 Worktree Sidebar (F01)
 
-**File:** `src/renderer/src/components/worktree-sidebar/`
+**File:** `src/renderer/src/components/sidebar/` (not `worktree-sidebar/`)
 
 | Element | Mô tả |
 |---------|-------|
@@ -592,7 +611,7 @@ Multi-provider issue tracker:
 
 ### 9.6 QuickOpen (F10)
 
-**File:** `src/renderer/src/components/QuickOpen/`
+**File:** `src/renderer/src/components/QuickOpen.tsx` (a flat file, not a `QuickOpen/` folder)
 
 Trigger: **Cmd+P**
 
@@ -623,24 +642,35 @@ Wizard tạo worktree mới:
 
 ### 9.8 Fleet Management UI (F27, F28, F31) [v3.0]
 
-**Files:** `src/renderer/src/components/fleet/`
+**There is no `components/fleet/` folder.** The fleet UI is split across two real locations — a settings-panel copy and an admin-console copy:
+
+**Files:** `src/renderer/src/components/settings/ssh/`
 
 | Component | Chức năng |
 |-----------|-----------|
-| `FleetHealthDashboard` | Status grid tất cả servers: CPU/RAM/disk/latency |
-| `FleetImportDialog` | YAML import danh sách servers với progress |
-| `BulkProvisioningWizard` | Provision nhiều servers cùng lúc |
-| `BootstrapStatusPanel` | 7-step bootstrap tracker per server |
-| `UserProfileBadge` | SSH username + role badge per server |
+| `FleetHealthDashboard.tsx` | Status grid tất cả servers: CPU/RAM/disk/latency |
+| `FleetImportProgress.tsx`, `FleetSummaryCard.tsx`, `FleetFilterBar.tsx`, `FleetHealthTable.tsx`, `FleetAlertStrip.tsx` | Fleet health list, filtering, alert banner |
+| `FleetProvisionWizard.tsx` (not `BulkProvisioningWizard`) | Provision nhiều servers cùng lúc |
+| `ServerBootstrapPanel.tsx` / `BootstrapStepList.tsx` (not `BootstrapStatusPanel`) | Bootstrap step tracker per server |
+| `ProvisionServerSelector.tsx`, `ProvisionConfirmStep.tsx`, `ProvisionProgressPanel.tsx`, `ProvisionDoneSummary.tsx` | Provisioning wizard steps |
+| `SshTargetGroupRow.tsx`, `SshTargetGroupedList.tsx`, `SshTargetGroup.tsx` | Server list grouping |
 
-**Hooks:**
+**Files:** `src/renderer/src/components/admin/fleet/`
+
+| Component | Chức năng |
+|-----------|-----------|
+| `fleet-dashboard.tsx` (exports `FleetDashboard`) | Admin console's `/fleet` route page |
+| `fleet-import-dialog.tsx` | YAML import dialog with progress |
+
+`UserProfileBadge` exists but lives in `components/activity/UserProfileBadge.tsx`, not the fleet UI.
+
+**Hooks (real):**
 ```typescript
-useFleetHealthPolling()   // 30s polling + IPC events
-useFleetImport()          // YAML import với progress
-useBootstrapAutomation()  // 7-step bootstrap tracking
-useServerGroups()         // grouping + filter
-useBulkProvisioning()     // parallel provision
+useFleetHealthPolling()   // hooks/useFleetHealthPolling.ts (30s polling)
+useSshProvisioning()      // hooks/useSshProvisioning.ts
 ```
+
+`useFleetImport()`, `useBootstrapAutomation()`, `useServerGroups()`, `useBulkProvisioning()` do **not exist anywhere** in `hooks/` — remove from any future doc unless implemented.
 
 ---
 
@@ -775,14 +805,16 @@ switchProject('proj-abc'):
 | `FileTreeNode` | F38 | Single node: icon + name + git badge |
 | `RemoteFileViewer` | F38 | Read-only Monaco tab (syntax highlight) |
 | `FileSearchPanel` | F13 | Glob + grep results stream |
-| `GitPanel` | F39 | Full Git UI: status/diff/commit/push/branch/PR |
+| `GitPanel` (`workspace/git/GitPanel.tsx`) | F39 | Full Git UI: Changes/History/Branches/Pull Requests tabs |
 | `DiffViewer` | F39 | Unified diff với syntax highlight |
+| `StagingArea` | F39 | Stage/unstage file list (Changes tab, doc trước đây không nhắc) |
 | `CommitForm` | F39 | Message input + AI generate + commit + push |
 | `BranchManager` | F39 | list/create/switch/delete/merge |
 | `WorktreeSwitcher` | F01 | Dropdown + new worktree |
-| `GitLog` | F39 | Last 50 commits + ASCII branch graph |
+| `GitHistory` (not `GitLog`) | F39 | Last 50 commits + ASCII branch graph |
 | `PullRequestForm` | F39 | Title + AI body + reviewers → gh CLI |
-| `ConflictPanel` | F39 | Conflict files + AI resolve |
+| `PullRequestList` | F39 | Pull Requests tab — **not wired to a backend RPC yet**, renders "not available" (doc trước đây không nhắc) |
+| ~~`ConflictPanel`~~ | F39 | 🚧 documented, not implemented — no `ConflictPanel` component exists in code (0 grep hits repo-wide); likely an F39 AI-assisted conflict resolution feature that was never built, not just a doc typo |
 | `AgentPanel` | F04 | Provider display + prompt + live output stream |
 | `WorkspaceTerminal` | F02 | Bottom panel PTY sessions (multi-tab) |
 
@@ -855,7 +887,9 @@ actions: setTasks(), updateTask(), setActive()
 
 ### 10.7 Remote Git UI (F39) — GitPanel Chi tiết
 
-**File:** `src/renderer/src/components/workspace/GitPanel/`
+**File:** `src/renderer/src/components/workspace/git/GitPanel.tsx` (thư mục tên `git/`, không phải `GitPanel/`)
+
+Sub-components thật trong `workspace/git/`: `DiffViewer.tsx`, `CommitForm.tsx`, `BranchManager.tsx`, `PullRequestForm.tsx`, `GitHistory.tsx` (không phải `GitLog`), `StagingArea.tsx`, `PullRequestList.tsx`. **Không có `ConflictPanel.tsx`** — xem cảnh báo 🚧 ở §10.2.
 
 **RPC calls từ GitPanel:**
 
@@ -907,44 +941,57 @@ User search
 
 **URL:** `https://orca-server/admin`  
 **Entry:** `src/renderer/admin-index.html` → `src/renderer/src/admin/admin-main.tsx`  
-**Root component:** `AdminApp.tsx` (React Router, riêng biệt với App.tsx)  
-**Guard:** Requires `role === 'admin'`
+**Root component:** `AdminApp.tsx` — **prop-driven state routing, NOT React Router.** The code comments say this explicitly:
+- `AdminApp.tsx:1-2`: *"Uses prop-driven state routing (no react-router-dom). Pages are loaded lazily."*
+- `AdminLayout.tsx:1-2`: *"Uses simple hash-based routing (no react-router-dom dependency required)."*
+
+`react-router` / `react-router-dom` is **not a dependency in any `package.json`** in the repo. Navigation is `useState<AdminRoute>('/')` in `AdminApp`, compared by string in `PageContent()`; `AdminLayout`'s left nav calls `onNavigate(route)` to update it. Each page component is `React.lazy()`-loaded.  
+**Guard:** `AdminApp` renders "Not authenticated. Redirecting…" if `useAuthUser()` returns null; the actual admin-role check happens server-side.
 
 **Transport:** REST `/admin/api/*` qua `admin-api-client.ts`
 
-| Page | Route | Chức năng |
-|------|-------|-----------|
-| Dashboard | `/admin` | Stats: users, sessions, fleet health |
-| Users | `/admin/users` | CRUD users, set role, reset password, deactivate |
-| Sessions | `/admin/sessions` | Xem active sessions, kill session |
-| Audit Log | `/admin/audit` | Append-only log viewer, date filter |
-| SSH Hosts | `/admin/ssh-hosts` | CRUD dev server SSH configs |
-| Fleet Status | `/admin/fleet` | Health dashboard tất cả servers |
-| AI Providers | `/admin/ai-providers` | CRUD accounts, rotate credentials |
-| Departments | `/admin/departments` | CRUD departments, assign team leads |
-| Company Profile | `/admin/company` | AI policy, security settings |
-| Policies | `/admin/policies` | RBAC access policies |
+**Real `AdminRoute` union** (`AdminLayout.tsx:5-16`) — 11 values, not the 10-route table this doc previously listed (which included a nonexistent "Departments" page and wrong SSH Hosts / Company Profile paths):
+
+| Page | `AdminRoute` value | Component | Chức năng |
+|------|--------------------|-----------|-----------|
+| Dashboard | `/` | `AdminDashboard` | Stats: users, sessions, fleet health |
+| Users | `/users` | `UsersPage` | List/CRUD users |
+| New User | `/users/new` | `UserForm` (mode=create) | Create user form |
+| Edit User | `/users/:id/edit` *(matched via `startsWith`, not in the type union)* | `UserForm` (mode=edit) | Edit user form |
+| Policies | `/policies` | `PoliciesPage` | RBAC access policies |
+| New Policy | `/policies/new` | `PolicyForm` (mode=create) | Create policy form |
+| Edit Policy | `/policies/:id/edit` *(same `startsWith` pattern)* | `PolicyForm` (mode=edit) | Edit policy form |
+| Sessions | `/sessions` | `SessionsPage` | Xem active sessions, kill session |
+| Audit Log | `/audit` | `AuditPage` | Append-only log viewer, date filter |
+| Profile | `/profile` | `ProfileAdminPage` (in-page tabs: Company → `CompanyProfileAdmin`, Departments → `DeptProfileAdmin`) | Company Profile **và** Department profile admin — this is where "Company Profile" and department management actually live, not a separate `/admin/company` or `/admin/departments` route |
+| AI Providers | `/ai-providers` | `ProviderList` | CRUD accounts, rotate credentials |
+| Teams | `/teams` | `TeamAdmin` | Team management (added since the previous audit pass — not in the 8/10-route lists earlier docs cited) |
+| Fleet | `/fleet` | `FleetDashboard` (`components/admin/fleet/fleet-dashboard.tsx`) | Health dashboard tất cả servers — there is no separate "SSH Hosts" page; SSH host config is folded into Fleet |
+
+Left-nav (`AdminLayout.tsx` `NAV_ITEMS`) shows 9 top-level entries — Dashboard, Users, Policies, Sessions, Audit Log, AI Providers, Profile, Teams, Fleet — the `/new` and `/:id/edit` routes are reached via in-page buttons, not the nav.
+
+No **Departments** page exists as its own route (grep for `DepartmentsPage` under `components/admin/` — 0 hits); department management is a tab inside `/profile`.
 
 ---
 
-## 12. Routing (Web Mode)
+## 12. "Routing" (Web Mode) — không có router thật nào
 
-```
-/               → redirect → /workspace | /login
-/login          → LoginPage (chưa auth)
-/workspace      → App Shell + WorkspaceLayout
-/workspace/:id  → Workspace cho project cụ thể
-/admin          → AdminApp (requireAdmin)
-/admin/users
-/admin/sessions
-/admin/audit
-/admin/ssh-hosts
-/admin/fleet
-/admin/ai-providers
-/admin/departments
-/admin/company
-/admin/policies
-```
+**Không tồn tại client-side router nào cho app chính.** Không `react-router`, không `useParams`, không path pattern `/workspace/:id` ở bất kỳ đâu trong `src/renderer/src`. Bảng route trước đây trong mục này mô tả 1 hệ thống chưa từng được xây.
+
+**Cơ chế thật — 3 entry point riêng biệt, quyết định bởi `web/main.tsx` lúc load:**
+
+1. **Desktop app** (`main.tsx`) — Electron renderer, mount thẳng `<App />`.
+2. **Multi-user web app** (`web/main-web-bootstrap.tsx`) — dùng khi server expose `/auth/config` (`ORCA_MULTI_USER=1`). `WebRoot()` branch bằng **boolean/state thuần**, không match URL:
+   - `sessionUser !== null` → mount `<App />` trực tiếp (bỏ qua pairing flow)
+   - `sessionUser === null` && chưa có stored environment → render `<LoginPage />`
+   - có stored/paired environment → mount `<App />`
+   - Sau login thành công: **`window.location.href = '/'` cứng** — reload trang, không phải router navigation.
+3. **Legacy pair-code web app** (`web/pair-code-app-entry.tsx`) — fallback khi `/auth/config` 404 (server single-user cũ hơn). E2EE pairing UI (`WebConnect`) thay cho login form.
+4. **Admin console** (`components/admin/AdminApp.tsx`) — bundle HTML hoàn toàn riêng (`admin-index.html`), không nằm chung route tree với 3 entry point trên. Routing nội bộ của nó là state-branching (§11), cũng không phải router.
+
+**Bên trong `<App />` chính** — không có URL routing: đúng 1 `activeView: TopLevelView` field trong Zustand `ui` slice (`store/slices/ui.ts`), đổi qua `setActiveView()` từ sidebar (`components/sidebar/SidebarNav.tsx`). 9 top-level view: `terminal` (default), `workspace`, `settings`, `tasks`, `activity`, `automations`, `space`, `skills`, `mobile`. Xem [`docs/ui/page-tree.md`](../ui/page-tree.md) và [`docs/ui/README.md`](../ui/README.md) để có bảng đầy đủ view ↔ component.
+
+**Nếu router hoá thực sự là dự định tương lai**, hãy đánh dấu 🚧 Planned trong 1 mục riêng thay vì trình bày như một bảng route đã tồn tại.
 
 ---
 
@@ -1002,14 +1049,14 @@ const TaskPage = lazy(() => import('./components/TaskPage'))
 | **F22** Web Server Mode | ✅ | Toàn bộ React SPA (web-index.html) | served từ Backend `:6769` |
 | **F23** Multi-User Auth | ✅ | LoginPage, LoginForm, SsoButton, AuthContext | `POST /auth/local` REST |
 | **F24** Per-User Sandbox | ✅ | — (transparent, handled backend) | — |
-| **F25** Admin Panel | ✅ | AdminApp + 10 pages (admin-index.html) | `GET/POST /admin/api/*` REST |
+| **F25** Admin Panel | ✅ | AdminApp + 11-route table, §11 (admin-index.html) | `GET/POST /admin/api/*` REST |
 | **F26** Multi-Database | ✅ | — (transparent to frontend) | — |
-| **F27** Fleet Health | ✅ | FleetHealthDashboard, ServerStatusBar | `fleet.getStatus` RPC |
-| **F28** Dev Server Onboarding | ✅ | DevServerCard/List/Dialog, BootstrapStatusPanel | `fleet.provision` RPC |
-| **F29** Agent WebSocket Protocol | ✅ | — (WebSocketRpcClient handles transparently) | WS binary frames |
+| **F27** Fleet Health | ✅ | FleetHealthDashboard (`settings/ssh/`), ServerStatusBar | `fleet.getStatus` RPC |
+| **F28** Dev Server Onboarding | ✅ | DevServerCard/List/Dialog, ServerBootstrapPanel | `fleet.provision` RPC |
+| **F29** Agent WebSocket Protocol | ✅ | — (WebSocketRpcClient handles transparently) | plain JSON WS messages (§5.1) — not binary frames |
 | **F30** Remote Integrations | ✅ | Settings (Integrations tab), GitPanel | `credentials.*`, `preflight.check` RPC |
-| **F31** Fleet Provisioning | ✅ | BulkProvisioningWizard, FleetImportDialog | `fleet.provision` RPC |
-| **F32** Team RBAC | 📋 | UsersPage + DepartmentsPage (Admin) | `admin.users.*` REST |
+| **F31** Fleet Provisioning | ✅ | FleetProvisionWizard (`settings/ssh/`), fleet-import-dialog (`admin/fleet/`) | `fleet.provision` RPC |
+| **F32** Team RBAC | 📋 | UsersPage + TeamAdmin (Admin `/teams`, not a "DepartmentsPage") | `admin.users.*` REST |
 | **F33** Profile Hierarchy | 🚧 | ProfileEditor, ProfileSourceBadge, Settings (Profile tab) | `profile.*` RPC |
 | **F34** Project-Dev Server Binding | 🚧 | ProjectSelector, Admin SSH Hosts | `projects.*` RPC |
 | **F35** AI Provider Mgmt | 🚧 | AIProvidersPage (Admin), AgentPanel (provider badge) | `ai-providers.*` RPC |
@@ -1032,7 +1079,7 @@ BROWSER
 │  ├── Admin SPA  ──── GET/POST /admin/api/* ─────────────────────→ Backend :6769
 │  │
 │  ├── WebSocketRpcClient ──── WSS /:6768/ ───────────────────────→ Backend :6768
-│  │   └── JSON-RPC 2.0 calls ────────────────────────────────────→ WsSessionRouter
+│  │   └── JSON invoke/send envelopes (plain text, §5.1) ─────────→ WsSessionRouter
 │  │   └── server-push events ←────────────────────────────────── (pty:data, agent:status, ...)
 │  │
 │  ├── Zustand Store (40+ slices)

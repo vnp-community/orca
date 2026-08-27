@@ -8,6 +8,11 @@ import {
 } from '../../../../shared/mcp-config'
 import { joinPath } from '../../lib/path'
 import { extractIpcErrorMessage } from '../../lib/ipc-error'
+import {
+  readRuntimeDirectory,
+  readRuntimeFilePreview,
+  type RuntimeFileOperationArgs
+} from '@/runtime/runtime-file-client'
 import type { LoadedMcpConfigInspection } from './McpConfigFileRow'
 
 function isMissingFileError(error: unknown): boolean {
@@ -17,10 +22,10 @@ function isMissingFileError(error: unknown): boolean {
 
 export async function loadMcpConfigInspections(
   targetRootPath: string,
-  connectionId: string | undefined
+  fileContext: RuntimeFileOperationArgs
 ): Promise<LoadedMcpConfigInspection[]> {
   const entriesByRelativeDir = new Map<string, readonly McpConfigDirectoryEntry[]>()
-  const rootEntries = await window.api.fs.readDir({ dirPath: targetRootPath, connectionId })
+  const rootEntries = await readRuntimeDirectory(fileContext, targetRootPath)
   entriesByRelativeDir.set('', rootEntries)
 
   const rootDirectoryNames = new Set(
@@ -33,10 +38,10 @@ export async function loadMcpConfigInspections(
         return
       }
       try {
-        const entries = await window.api.fs.readDir({
-          dirPath: joinPath(targetRootPath, relativeDir),
-          connectionId
-        })
+        const entries = await readRuntimeDirectory(
+          fileContext,
+          joinPath(targetRootPath, relativeDir)
+        )
         entriesByRelativeDir.set(relativeDir, entries)
       } catch (error) {
         unreadableParentDirMessages.set(
@@ -74,7 +79,7 @@ export async function loadMcpConfigInspections(
       }
 
       try {
-        const result = await window.api.fs.readFile({ filePath: absolutePath, connectionId })
+        const result = await readRuntimeFilePreview(fileContext, absolutePath)
         const inspection = inspectMcpConfigContent(candidate, result.isBinary ? '' : result.content)
         return { ...inspection, absolutePath }
       } catch (error) {

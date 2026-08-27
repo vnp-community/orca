@@ -49,7 +49,19 @@ export type IDatabase = {
   close(): void | Promise<void>
   readonly capabilities: IDatabaseCapabilities
   transaction<T>(fn: () => T | Promise<T>): Promise<T>
-  query(sql: string, params?: BindValue[]): Promise<Record<string, unknown>[]>
+  /**
+   * Generic defaults to the pre-existing untyped-row shape, so every call
+   * site that never wrote `query<T>(...)` keeps compiling and behaving
+   * identically — this widens the signature, it does not change it. Callers
+   * that DO write `query<SomeRowShape>(...)` (11 files as of ADR-021 Phase 1
+   * — ProfileService, TaskService, WorkflowOrchestrator, AIProviderService,
+   * TeamService, annotation-store.ts, and the new Pg*Store repositories under
+   * ADR-021) were relying on a generic parameter this signature never
+   * actually declared; TS silently rejected all of them (TS2558 "Expected 0
+   * type arguments, but got 1"). No adapter's *implementation* changes here —
+   * `T` is compile-time only, erased at runtime, so this is a type-only fix.
+   */
+  query<T = Record<string, unknown>>(sql: string, params?: BindValue[]): Promise<T[]>
 }
 
 /**

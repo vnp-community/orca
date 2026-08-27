@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const PULL_POLICY_ERROR_PREFIX = 'Pull needs a Git pull policy for divergent branches.'
 
 const PULL_POLICY_OPTIONS = [
@@ -53,7 +54,7 @@ export function PullPolicyRemoteActionNotice({
   }, [copiedCommand])
 
   const handleCopyCommand = useCallback((command: string) => {
-    void window.api.ui.writeClipboardText(command)
+    void uiWriteClipboardText(command)
     setCopiedCommand(command)
   }, [])
 

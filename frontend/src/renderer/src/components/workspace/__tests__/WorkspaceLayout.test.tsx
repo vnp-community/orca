@@ -15,6 +15,7 @@ vi.mock('../WorkspaceTabBar', () => ({
       <span>{activeTab}</span>
       <button data-testid="tab-tasks" onClick={() => onTabChange('tasks')}>Tasks</button>
       <button data-testid="tab-git" onClick={() => onTabChange('git')}>Git</button>
+      <button data-testid="tab-agent" onClick={() => onTabChange('agent')}>Agent</button>
     </div>
   )
 }))
@@ -33,6 +34,19 @@ vi.mock('../ExplorerPanel', () => ({ ExplorerPanel: () => <div data-testid="expl
 vi.mock('../git/GitPanel', () => ({ GitPanel: () => <div data-testid="git-panel" /> }))
 vi.mock('../../task/TaskGraphPanel', () => ({ TaskGraphPanel: () => <div data-testid="task-graph-panel" /> }))
 vi.mock('../../workflow/WorkflowMonitor', () => ({ WorkflowMonitor: () => <div data-testid="workflow-monitor" /> }))
+vi.mock('../AgentPanel', () => ({
+  AgentPanel: ({ worktreeId }: { worktreeId: string }) => (
+    <div data-testid="agent-panel" data-worktree-id={worktreeId} />
+  )
+}))
+vi.mock('../WorkspaceTerminalPanel', () => ({
+  WorkspaceTerminalPanel: ({ worktreeId }: { worktreeId: string }) => (
+    <div data-testid="workspace-terminal-panel" data-worktree-id={worktreeId} />
+  )
+}))
+vi.mock('../../status-bar/SshStatusSegment', () => ({
+  SshStatusSegment: () => <div data-testid="ssh-status-segment" />
+}))
 
 describe('WorkspaceLayout', () => {
   beforeEach(() => {
@@ -41,6 +55,7 @@ describe('WorkspaceLayout', () => {
       project: { id: 'p1' },
       isOffline: false,
       isInitializing: false,
+      currentWorktree: null,
       switchProject: vi.fn(),
       on: vi.fn().mockReturnValue(() => {}),
       emit: vi.fn()
@@ -87,5 +102,53 @@ describe('WorkspaceLayout', () => {
     expect(screen.queryByTestId('terminal-panel')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('toggle-terminal'))
     expect(screen.getByTestId('terminal-panel')).toBeInTheDocument()
+  })
+
+  it('"agent" tab with no currentWorktree → shows NoWorktreeSelected empty state', async () => {
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('tab-agent'))
+    await waitFor(() => {
+      expect(screen.getByTestId('no-worktree-selected')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('agent-panel')).not.toBeInTheDocument()
+  })
+
+  it('"agent" tab with currentWorktree → AgentPanel renders with worktreeId', async () => {
+    vi.mocked(useWorkspace).mockReturnValue({
+      project: { id: 'p1' },
+      isOffline: false,
+      isInitializing: false,
+      currentWorktree: { id: 'wt-1', path: '/tmp/wt-1', branch: 'main', isMain: true },
+      switchProject: vi.fn(),
+      on: vi.fn().mockReturnValue(() => {}),
+      emit: vi.fn()
+    } as unknown as ReturnType<typeof useWorkspace>)
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('tab-agent'))
+    await waitFor(() => {
+      expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-worktree-id', 'wt-1')
+    })
+  })
+
+  it('terminal panel with no currentWorktree → prompts to select a worktree, no PTY mount', () => {
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('toggle-terminal'))
+    expect(screen.getByTestId('terminal-panel')).toHaveTextContent('Select a worktree')
+    expect(screen.queryByTestId('workspace-terminal-panel')).not.toBeInTheDocument()
+  })
+
+  it('terminal panel with currentWorktree → mounts WorkspaceTerminalPanel with worktreeId', () => {
+    vi.mocked(useWorkspace).mockReturnValue({
+      project: { id: 'p1' },
+      isOffline: false,
+      isInitializing: false,
+      currentWorktree: { id: 'wt-1', path: '/tmp/wt-1', branch: 'main', isMain: true },
+      switchProject: vi.fn(),
+      on: vi.fn().mockReturnValue(() => {}),
+      emit: vi.fn()
+    } as unknown as ReturnType<typeof useWorkspace>)
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('toggle-terminal'))
+    expect(screen.getByTestId('workspace-terminal-panel')).toHaveAttribute('data-worktree-id', 'wt-1')
   })
 })

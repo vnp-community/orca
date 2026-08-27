@@ -14,6 +14,8 @@ import { useMountedRef } from '@/hooks/useMountedRef'
 import { statusColor } from '@/components/settings/SshTargetCard'
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
+import { connectRuntimeSsh } from '@/runtime/runtime-ssh-client'
 
 type SshDisconnectedDialogProps = {
   open: boolean
@@ -73,7 +75,7 @@ export function SshDisconnectedDialog({
   const handleReconnect = useCallback(async () => {
     setConnecting(true)
     try {
-      await window.api.ssh.connect({ targetId })
+      await connectRuntimeSsh(useAppStore.getState().settings, targetId)
       if (mountedRef.current) {
         onOpenChange(false)
       }
