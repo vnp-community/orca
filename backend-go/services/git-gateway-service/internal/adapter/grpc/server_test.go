@@ -274,6 +274,10 @@ func (fakeProjectClient) RecordWorktreeRemoved(context.Context, string) error {
 	return nil
 }
 
+func (fakeProjectClient) FindWorktreeByIdempotencyKey(context.Context, string, string) (domain.WorktreeRecord, bool, error) {
+	return domain.WorktreeRecord{}, false, nil
+}
+
 type fakeSCMClient struct{}
 
 func (fakeSCMClient) GetPullRequestBase(context.Context, string, int32) (string, string, error) {

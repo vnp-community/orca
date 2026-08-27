@@ -11,7 +11,7 @@ import (
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
 
-const worktreeColumns = `id, project_id, repo_id, path, branch, active`
+const worktreeColumns = `id, project_id, repo_id, path, branch, active, idempotency_key`
 
 // WorktreeRepository implements usecase.WorktreeRepository against
 // project.worktrees.
@@ -25,10 +25,10 @@ func NewWorktreeRepository(pool *pgxpool.Pool) *WorktreeRepository {
 
 func (r *WorktreeRepository) RecordWorktreeCreated(ctx context.Context, wt domain.Worktree) (domain.Worktree, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO project.worktrees (id, project_id, repo_id, path, branch, active)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO project.worktrees (id, project_id, repo_id, path, branch, active, idempotency_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING `+worktreeColumns,
-		wt.ID, wt.ProjectID, wt.RepoID, wt.Path, wt.Branch, wt.Active,
+		wt.ID, wt.ProjectID, wt.RepoID, wt.Path, wt.Branch, wt.Active, wt.IdempotencyKey,
 	)
 
 	out, err := scanWorktree(row)
@@ -36,6 +36,27 @@ func (r *WorktreeRepository) RecordWorktreeCreated(ctx context.Context, wt domai
 		return domain.Worktree{}, fmt.Errorf("postgres: insert worktree: %w", err)
 	}
 	return out, nil
+}
+
+// FindWorktreeByIdempotencyKey backs BR-CLI-01 — a second CreateWorktree
+// call with the same (project_id, idempotency_key) returns the existing row
+// instead of git-gateway-service re-running `git worktree add`.
+// found=false, err=nil means "no match yet", not an error.
+func (r *WorktreeRepository) FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.Worktree, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT `+worktreeColumns+`
+		FROM project.worktrees
+		WHERE project_id = $1 AND idempotency_key = $2
+	`, projectID, idempotencyKey)
+
+	out, err := scanWorktree(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Worktree{}, false, nil
+	}
+	if err != nil {
+		return domain.Worktree{}, false, fmt.Errorf("postgres: find worktree by idempotency key: %w", err)
+	}
+	return out, true, nil
 }
 
 // RecordWorktreeRemoved hard-deletes the worktree row — see
@@ -117,7 +138,7 @@ func (r *WorktreeRepository) RenameWorktree(ctx context.Context, worktreeID, bra
 // checks errors.Is(err, pgx.ErrNoRows) against the raw scan error).
 func scanWorktree(row rowScanner) (domain.Worktree, error) {
 	var wt domain.Worktree
-	if err := row.Scan(&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active); err != nil {
+	if err := row.Scan(&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active, &wt.IdempotencyKey); err != nil {
 		return domain.Worktree{}, err
 	}
 	return wt, nil

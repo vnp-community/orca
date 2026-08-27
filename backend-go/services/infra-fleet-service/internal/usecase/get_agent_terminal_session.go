@@ -1,23 +1,3 @@
-# TASK-CLI-02-02: `GetAgentTerminalSession` usecase — worktree → live pty resolution
-
-**From Solution:** SOL-CLI-02
-**Priority:** P0 — `api-gateway`'s `resolveAgentPtyID` (TASK-CLI-02-05) is built on this
-**Service:** `infra-fleet-service`
-**File:** `backend-go/services/infra-fleet-service/internal/usecase/get_agent_terminal_session.go`
-**Depends on:** TASK-CLI-02-01
-**Status:** [x] DONE — `GetAgentTerminalSession` usecase added, wired into `cmd/server/main.go`; all 4 verify-listed test cases pass (exact match, subdirectory non-match, latest-`LastActiveAt` tie-break, no-connection-resolved).
-
----
-
-## Context
-
-`--worktree <id>` -> `ptyId` resolution is genuine business logic (matching by `cwd`, tie-breaking by `last_active_at`), so per `03-clean-architecture-guidelines.md`'s usecase-owns-business-decisions rule it belongs in a new `infra-fleet-service` usecase, not as `if`-logic in `api-gateway`'s REST handler. It composes two ports that already exist: `ConnectionResolver.ResolveConnection` (worktree_id -> connection_id/repo_path) and `TerminalSessionRepository.List` (connection_id -> open sessions).
-
-## Changes to make
-
-`backend-go/services/infra-fleet-service/internal/usecase/get_agent_terminal_session.go`:
-
-```go
 package usecase
 
 import (
@@ -76,16 +56,3 @@ func (uc *GetAgentTerminalSession) Execute(ctx context.Context, worktreeID strin
 	}
 	return best, found, nil
 }
-```
-
-Wire into `internal/adapter/grpc/server.go`'s `Server` struct/`New(...)` and `cmd/server/main.go`'s DI construction (`usecase.NewGetAgentTerminalSession(repo, terminalSessionStore)`, matching `getTerminalAgentStatusUC`'s existing construction line).
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/infra-fleet-service/...
-go test ./services/infra-fleet-service/internal/usecase/... -run TestGetAgentTerminalSession -v
-```
-
-Expected new test file `get_agent_terminal_session_test.go` (fake `ConnectionResolver`/`TerminalSessionRepository`): exact `cwd` match returns `found=true`; subdirectory `cwd` does not match; two sessions with matching `cwd` return the one with the later `LastActiveAt`; no connection resolved (`worktree_id` unknown) returns `found=false`, not an error.

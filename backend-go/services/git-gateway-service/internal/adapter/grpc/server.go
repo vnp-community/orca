@@ -678,6 +678,7 @@ func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.S
 func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
 	result, err := s.createWorktree.Execute(ctx, usecase.CreateWorktreeInput{
 		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(),
+		IdempotencyKey: req.GetIdempotencyKey(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

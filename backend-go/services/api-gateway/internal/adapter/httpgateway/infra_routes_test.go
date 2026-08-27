@@ -129,6 +129,18 @@ func (f *fakeInfraFleetServiceClient) InspectTerminalProcess(context.Context, *i
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+func (f *fakeInfraFleetServiceClient) GetAgentTerminalSession(context.Context, *infrafleetv1.GetAgentTerminalSessionRequest, ...grpc.CallOption) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) SendTerminalInput(context.Context, *infrafleetv1.SendTerminalInputRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) GetTerminalScrollback(context.Context, *infrafleetv1.GetTerminalScrollbackRequest, ...grpc.CallOption) (*infrafleetv1.GetTerminalScrollbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 func (f *fakeInfraFleetServiceClient) AttachPty(context.Context, ...grpc.CallOption) (grpc.BidiStreamingClient[infrafleetv1.PtyClientFrame, infrafleetv1.PtyServerFrame], error) {
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }

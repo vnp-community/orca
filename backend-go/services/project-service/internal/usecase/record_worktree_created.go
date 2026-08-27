@@ -11,10 +11,11 @@ import (
 )
 
 type RecordWorktreeCreatedInput struct {
-	ProjectID string
-	RepoID    string
-	Path      string
-	Branch    string
+	ProjectID      string
+	RepoID         string
+	Path           string
+	Branch         string
+	IdempotencyKey string
 }
 
 // RecordWorktreeCreated is called by git-gateway-service AFTER the real
@@ -34,7 +35,7 @@ func (uc *RecordWorktreeCreated) Execute(ctx context.Context, in RecordWorktreeC
 		return domain.Worktree{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
 	}
 
-	wt, err := domain.NewWorktree(uuid.NewString(), in.ProjectID, in.RepoID, in.Path, in.Branch)
+	wt, err := domain.NewWorktree(uuid.NewString(), in.ProjectID, in.RepoID, in.Path, in.Branch, in.IdempotencyKey)
 	if err != nil {
 		return domain.Worktree{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_WORKTREE_INVALID", err.Error(), err)
 	}

@@ -140,6 +140,7 @@ func run() error {
 	listWorktreesUC := usecase.NewListWorktrees(worktreeRepo, repo, opa)
 	setWorktreeActivationUC := usecase.NewSetWorktreeActivation(worktreeRepo)
 	renameWorktreeUC := usecase.NewRenameWorktree(worktreeRepo)
+	getWorktreeByIdempotencyKeyUC := usecase.NewGetWorktreeByIdempotencyKey(worktreeRepo)
 
 	createProjectGroupUC := usecase.NewCreateProjectGroup(projectGroupRepo)
 	updateProjectGroupUC := usecase.NewUpdateProjectGroup(projectGroupRepo)
@@ -177,11 +178,12 @@ func run() error {
 		RemoveRepo:   removeRepoUC,
 		UpdateRepo:   updateRepoUC,
 
-		RecordWorktreeCreated: recordWorktreeCreatedUC,
-		RecordWorktreeRemoved: recordWorktreeRemovedUC,
-		ListWorktrees:         listWorktreesUC,
-		SetWorktreeActivation: setWorktreeActivationUC,
-		RenameWorktree:        renameWorktreeUC,
+		RecordWorktreeCreated:       recordWorktreeCreatedUC,
+		RecordWorktreeRemoved:       recordWorktreeRemovedUC,
+		ListWorktrees:               listWorktreesUC,
+		SetWorktreeActivation:       setWorktreeActivationUC,
+		RenameWorktree:              renameWorktreeUC,
+		GetWorktreeByIdempotencyKey: getWorktreeByIdempotencyKeyUC,
 
 		CreateProjectGroup: createProjectGroupUC,
 		UpdateProjectGroup: updateProjectGroupUC,

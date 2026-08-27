@@ -29,6 +29,8 @@ type Worktree struct {
 	Path      string
 	Branch    string
 	Active    bool
+
+	IdempotencyKey *string // BR-CLI-01: caller-supplied dedupe key, nil when not set
 }
 
 // NewWorktree constructs a Worktree, enforcing the invariants a metadata
@@ -36,7 +38,7 @@ type Worktree struct {
 // Active — RecordWorktreeCreated is only ever called after the real `git
 // worktree add` already succeeded, so there is no "created but inactive"
 // state to represent at construction time.
-func NewWorktree(id, projectID, repoID, path, branch string) (Worktree, error) {
+func NewWorktree(id, projectID, repoID, path, branch, idempotencyKey string) (Worktree, error) {
 	if projectID == "" {
 		return Worktree{}, ErrEmptyProjectID
 	}
@@ -49,5 +51,18 @@ func NewWorktree(id, projectID, repoID, path, branch string) (Worktree, error) {
 	if branch == "" {
 		return Worktree{}, ErrEmptyWorktreeBranch
 	}
-	return Worktree{ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true}, nil
+	return Worktree{
+		ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true,
+		IdempotencyKey: nonEmptyPtr(idempotencyKey),
+	}, nil
+}
+
+// nonEmptyPtr returns nil for an empty string, otherwise a pointer to s —
+// the idiom used for every optional string field this package models as
+// "unset" rather than "empty".
+func nonEmptyPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

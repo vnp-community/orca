@@ -68,3 +68,23 @@ func (p *ProjectClient) RecordWorktreeRemoved(ctx context.Context, worktreeID st
 	_, err = p.client.RecordWorktreeRemoved(ctx, &projectv1.RecordWorktreeRemovedRequest{WorktreeId: worktreeID})
 	return err
 }
+
+// FindWorktreeByIdempotencyKey backs BR-CLI-01 — see
+// usecase.ProjectClient.FindWorktreeByIdempotencyKey's doc comment.
+func (p *ProjectClient) FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.WorktreeRecord, bool, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return domain.WorktreeRecord{}, false, err
+	}
+	resp, err := p.client.GetWorktreeByIdempotencyKey(ctx, &projectv1.GetWorktreeByIdempotencyKeyRequest{
+		ProjectId: projectID, IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		return domain.WorktreeRecord{}, false, err
+	}
+	if !resp.GetFound() {
+		return domain.WorktreeRecord{}, false, nil
+	}
+	wt := resp.GetWorktree()
+	return domain.WorktreeRecord{ID: wt.GetId(), Path: wt.GetPath(), Branch: wt.GetBranch()}, true, nil
+}

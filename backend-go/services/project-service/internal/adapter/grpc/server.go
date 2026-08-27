@@ -40,11 +40,12 @@ type Server struct {
 	removeRepo   *usecase.RemoveRepo
 	updateRepo   *usecase.UpdateRepo
 
-	recordWorktreeCreated *usecase.RecordWorktreeCreated
-	recordWorktreeRemoved *usecase.RecordWorktreeRemoved
-	listWorktrees         *usecase.ListWorktrees
-	setWorktreeActivation *usecase.SetWorktreeActivation
-	renameWorktree        *usecase.RenameWorktree
+	recordWorktreeCreated       *usecase.RecordWorktreeCreated
+	recordWorktreeRemoved       *usecase.RecordWorktreeRemoved
+	listWorktrees               *usecase.ListWorktrees
+	setWorktreeActivation       *usecase.SetWorktreeActivation
+	renameWorktree              *usecase.RenameWorktree
+	getWorktreeByIdempotencyKey *usecase.GetWorktreeByIdempotencyKey
 
 	createProjectGroup *usecase.CreateProjectGroup
 	updateProjectGroup *usecase.UpdateProjectGroup
@@ -85,11 +86,12 @@ type Deps struct {
 	RemoveRepo   *usecase.RemoveRepo
 	UpdateRepo   *usecase.UpdateRepo
 
-	RecordWorktreeCreated *usecase.RecordWorktreeCreated
-	RecordWorktreeRemoved *usecase.RecordWorktreeRemoved
-	ListWorktrees         *usecase.ListWorktrees
-	SetWorktreeActivation *usecase.SetWorktreeActivation
-	RenameWorktree        *usecase.RenameWorktree
+	RecordWorktreeCreated       *usecase.RecordWorktreeCreated
+	RecordWorktreeRemoved       *usecase.RecordWorktreeRemoved
+	ListWorktrees               *usecase.ListWorktrees
+	SetWorktreeActivation       *usecase.SetWorktreeActivation
+	RenameWorktree              *usecase.RenameWorktree
+	GetWorktreeByIdempotencyKey *usecase.GetWorktreeByIdempotencyKey
 
 	CreateProjectGroup *usecase.CreateProjectGroup
 	UpdateProjectGroup *usecase.UpdateProjectGroup
@@ -128,11 +130,12 @@ func New(deps Deps) *Server {
 		removeRepo:   deps.RemoveRepo,
 		updateRepo:   deps.UpdateRepo,
 
-		recordWorktreeCreated: deps.RecordWorktreeCreated,
-		recordWorktreeRemoved: deps.RecordWorktreeRemoved,
-		listWorktrees:         deps.ListWorktrees,
-		setWorktreeActivation: deps.SetWorktreeActivation,
-		renameWorktree:        deps.RenameWorktree,
+		recordWorktreeCreated:       deps.RecordWorktreeCreated,
+		recordWorktreeRemoved:       deps.RecordWorktreeRemoved,
+		listWorktrees:               deps.ListWorktrees,
+		setWorktreeActivation:       deps.SetWorktreeActivation,
+		renameWorktree:              deps.RenameWorktree,
+		getWorktreeByIdempotencyKey: deps.GetWorktreeByIdempotencyKey,
 
 		createProjectGroup: deps.CreateProjectGroup,
 		updateProjectGroup: deps.UpdateProjectGroup,
@@ -327,10 +330,11 @@ func (s *Server) UpdateRepo(ctx context.Context, req *projectv1.UpdateRepoReques
 
 func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.RecordWorktreeCreatedRequest) (*projectv1.RecordWorktreeCreatedResponse, error) {
 	wt, err := s.recordWorktreeCreated.Execute(ctx, usecase.RecordWorktreeCreatedInput{
-		ProjectID: req.GetProjectId(),
-		RepoID:    req.GetRepoId(),
-		Path:      req.GetPath(),
-		Branch:    req.GetBranch(),
+		ProjectID:      req.GetProjectId(),
+		RepoID:         req.GetRepoId(),
+		Path:           req.GetPath(),
+		Branch:         req.GetBranch(),
+		IdempotencyKey: req.GetIdempotencyKey(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -377,6 +381,18 @@ func (s *Server) RenameWorktree(ctx context.Context, req *projectv1.RenameWorktr
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.RenameWorktreeResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) GetWorktreeByIdempotencyKey(ctx context.Context, req *projectv1.GetWorktreeByIdempotencyKeyRequest) (*projectv1.GetWorktreeByIdempotencyKeyResponse, error) {
+	wt, found, err := s.getWorktreeByIdempotencyKey.Execute(ctx, req.GetProjectId(), req.GetIdempotencyKey())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &projectv1.GetWorktreeByIdempotencyKeyResponse{Found: found}
+	if found {
+		resp.Worktree = toProtoWorktree(wt)
+	}
+	return resp, nil
 }
 
 func (s *Server) CreateProjectGroup(ctx context.Context, req *projectv1.CreateProjectGroupRequest) (*projectv1.CreateProjectGroupResponse, error) {
@@ -578,12 +594,13 @@ func toProtoRepo(r domain.Repo) *projectv1.Repo {
 
 func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 	return &projectv1.Worktree{
-		Id:        wt.ID,
-		ProjectId: wt.ProjectID,
-		RepoId:    wt.RepoID,
-		Path:      wt.Path,
-		Branch:    wt.Branch,
-		Active:    wt.Active,
+		Id:             wt.ID,
+		ProjectId:      wt.ProjectID,
+		RepoId:         wt.RepoID,
+		Path:           wt.Path,
+		Branch:         wt.Branch,
+		Active:         wt.Active,
+		IdempotencyKey: wt.IdempotencyKey,
 	}
 }
 

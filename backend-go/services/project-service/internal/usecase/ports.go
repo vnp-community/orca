@@ -141,6 +141,10 @@ type WorktreeRepository interface {
 	ListWorktrees(ctx context.Context, projectID string) ([]domain.Worktree, error)
 	SetWorktreeActivation(ctx context.Context, worktreeID string, active bool) (domain.Worktree, error)
 	RenameWorktree(ctx context.Context, worktreeID, branch string) (domain.Worktree, error)
+	// FindWorktreeByIdempotencyKey backs BR-CLI-01 — see
+	// GetWorktreeByIdempotencyKey's doc comment. found=false, err=nil means
+	// "no match yet", not an error.
+	FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.Worktree, bool, error)
 }
 
 // ProjectGroupRepository is the persistence port for the folder-style

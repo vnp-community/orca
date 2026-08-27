@@ -20,7 +20,7 @@ func TestNewWorktree_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewWorktree("w1", tt.projectID, tt.repoID, tt.path, tt.branch)
+			_, err := NewWorktree("w1", tt.projectID, tt.repoID, tt.path, tt.branch, "")
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -32,11 +32,31 @@ func TestNewWorktree_ValidatesInvariants(t *testing.T) {
 }
 
 func TestNewWorktree_StartsActive(t *testing.T) {
-	wt, err := NewWorktree("w1", "p1", "r1", "/srv/worktrees/w1", "main")
+	wt, err := NewWorktree("w1", "p1", "r1", "/srv/worktrees/w1", "main", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !wt.Active {
 		t.Error("expected a freshly recorded worktree to start active")
+	}
+}
+
+func TestNewWorktree_IdempotencyKey_EmptyIsNil(t *testing.T) {
+	wt, err := NewWorktree("w1", "p1", "r1", "/srv/worktrees/w1", "main", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt.IdempotencyKey != nil {
+		t.Errorf("expected nil IdempotencyKey for empty input, got %v", *wt.IdempotencyKey)
+	}
+}
+
+func TestNewWorktree_IdempotencyKey_NonEmptyIsSet(t *testing.T) {
+	wt, err := NewWorktree("w1", "p1", "r1", "/srv/worktrees/w1", "main", "abc123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt.IdempotencyKey == nil || *wt.IdempotencyKey != "abc123" {
+		t.Errorf("expected IdempotencyKey=abc123, got %v", wt.IdempotencyKey)
 	}
 }

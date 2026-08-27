@@ -41,6 +41,11 @@ service ProjectService {
   rpc SetWorktreeActivation(SetWorktreeActivationRequest) returns (SetWorktreeActivationResponse);
   rpc RenameWorktree(RenameWorktreeRequest) returns (RenameWorktreeResponse);
 
+  // GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
+  // CreateWorktree saga calls this before running `git worktree add`.
+  // found=false means "no dedupe match yet", not an error.
+  rpc GetWorktreeByIdempotencyKey(GetWorktreeByIdempotencyKeyRequest) returns (GetWorktreeByIdempotencyKeyResponse);
+
   // ProjectGroup surface — self-referential tree via parent_group_id, per
   // project-service.md §4.
   rpc CreateProjectGroup(CreateProjectGroupRequest) returns (CreateProjectGroupResponse);
@@ -249,6 +254,7 @@ message Worktree {
   string path = 4;
   string branch = 5;
   bool active = 6;
+  optional string idempotency_key = 7; // BR-CLI-01: caller-supplied dedupe key, unset when not set
 }
 
 message RecordWorktreeCreatedRequest {
@@ -256,6 +262,7 @@ message RecordWorktreeCreatedRequest {
   string repo_id = 2;
   string path = 3;
   string branch = 4;
+  optional string idempotency_key = 5; // BR-CLI-01, see Worktree.idempotency_key
 }
 
 message RecordWorktreeCreatedResponse {
@@ -292,6 +299,15 @@ message RenameWorktreeRequest {
 
 message RenameWorktreeResponse {
   Worktree worktree = 1;
+}
+
+message GetWorktreeByIdempotencyKeyRequest {
+  string project_id = 1;
+  string idempotency_key = 2;
+}
+message GetWorktreeByIdempotencyKeyResponse {
+  bool found = 1;
+  Worktree worktree = 2; // unset when found=false
 }
 
 message ProjectGroup {

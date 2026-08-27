@@ -367,11 +367,12 @@ func (f *fakeRepoRepository) RemoveRepo(ctx context.Context, repoID string) erro
 type fakeWorktreeRepository struct {
 	worktrees map[string]domain.Worktree
 
-	recordCreatedErr error
-	recordRemovedErr error
-	listErr          error
-	setActivationErr error
-	renameErr        error
+	recordCreatedErr        error
+	recordRemovedErr        error
+	listErr                 error
+	setActivationErr        error
+	renameErr               error
+	findByIdempotencyKeyErr error
 }
 
 func newFakeWorktreeRepository() *fakeWorktreeRepository {
@@ -434,6 +435,18 @@ func (f *fakeWorktreeRepository) RenameWorktree(ctx context.Context, worktreeID,
 	wt.Branch = branch
 	f.worktrees[worktreeID] = wt
 	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.Worktree, bool, error) {
+	if f.findByIdempotencyKeyErr != nil {
+		return domain.Worktree{}, false, f.findByIdempotencyKeyErr
+	}
+	for _, wt := range f.worktrees {
+		if wt.ProjectID == projectID && wt.IdempotencyKey != nil && *wt.IdempotencyKey == idempotencyKey {
+			return wt, true, nil
+		}
+	}
+	return domain.Worktree{}, false, nil
 }
 
 // fakeProjectGroupRepository is an in-memory ProjectGroupRepository.

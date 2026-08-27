@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-CLI-02-02, TASK-CLI-02-03
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — Server struct/`New(...)`/handlers wired (reused the existing `toProtoTerminalSession` helper, per the task's own note); `cmd/server/main.go` updated. This package had no `server_test.go` at all yet, so one was created from scratch with local fakes for `ConnectionResolver`/`TerminalSessionRepository`/`DevServerAgentClient` (the existing fakes live unexported in `internal/usecase`); all 3 verify-listed contract cases pass.
 
 ---
 
