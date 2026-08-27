@@ -131,9 +131,9 @@ type fakeProjectServiceClient struct {
 	lastGetFolderWorkspacePathStatusReq *projectv1.GetFolderWorkspacePathStatusRequest
 	getFolderWorkspacePathStatusResp    *projectv1.GetFolderWorkspacePathStatusResponse
 	getFolderWorkspacePathStatusErr     error
-	lastListMembersReq *projectv1.ListMembersRequest
-	listMembersResp    *projectv1.ListMembersResponse
-	listMembersErr     error
+	lastListMembersReq                  *projectv1.ListMembersRequest
+	listMembersResp                     *projectv1.ListMembersResponse
+	listMembersErr                      error
 
 	lastRemoveMemberReq *projectv1.RemoveMemberRequest
 	removeMemberResp    *projectv1.RemoveMemberResponse

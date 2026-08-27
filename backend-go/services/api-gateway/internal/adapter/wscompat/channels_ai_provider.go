@@ -121,7 +121,7 @@ func handleAiProviderWriteCredential(client aiproviderv1.AiProviderServiceClient
 		type writeCredentialArgs struct {
 			AccountID     string `json:"accountId"`
 			EncryptedBlob string `json:"encryptedBlob"` // base64 in the JSON envelope
-			IV            string `json:"iv"`             // base64 in the JSON envelope
+			IV            string `json:"iv"`            // base64 in the JSON envelope
 		}
 		in, err := decodeArg[writeCredentialArgs](args, 0)
 		if err != nil {
