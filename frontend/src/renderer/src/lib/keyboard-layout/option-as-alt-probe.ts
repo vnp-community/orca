@@ -31,6 +31,7 @@ import {
   type LayoutMapLike
 } from './detect-option-as-alt'
 import { classifyInputSourceId } from './input-source-id'
+import { appGetKeyboardInputSourceId } from '@/runtime/runtime-app-client'
 
 type NavigatorWithKeyboard = Navigator & {
   keyboard?: {
@@ -63,21 +64,12 @@ type CreateProbeOptions = {
 
 function defaultInputSourceIdReader(): InputSourceIdReader {
   return async () => {
-    const api = (
-      globalThis as {
-        window?: { api?: { app?: { getKeyboardInputSourceId?: () => Promise<string | null> } } }
-      }
-    ).window?.api
-    const reader = api?.app?.getKeyboardInputSourceId
-    if (!reader) {
-      return null
-    }
+    // Why: guards both "no window" (SSR/tests) and a transient IPC/RPC
+    // rejection during main-process teardown (e.g. app quitting mid-probe) —
+    // either way, treat as no signal so the fingerprint remains the sole input.
     try {
-      return await reader()
+      return await appGetKeyboardInputSourceId()
     } catch {
-      // Why: the IPC can transiently reject during main-process teardown
-      // (e.g. app quitting mid-probe). Treat as no signal so the
-      // fingerprint remains the sole input.
       return null
     }
   }

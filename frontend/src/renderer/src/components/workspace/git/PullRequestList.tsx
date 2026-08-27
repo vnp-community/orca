@@ -1,61 +1,18 @@
 // NEW: src/renderer/src/components/workspace/git/PullRequestList.tsx
-import { useState, useEffect, useCallback } from 'react'
 import { useWorkspace } from '../../../context/WorkspaceContext'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '../../../runtime/runtime-rpc-client'
-import { useAppStore } from '../../../store'
-import { Badge } from '../../ui/badge'
-import { Button } from '../../ui/button'
-import { ExternalLink, GitPullRequest, RefreshCw } from 'lucide-react'
-import { toast } from 'sonner'
+import { GitPullRequest } from 'lucide-react'
 
-type PullRequest = {
-  number: number
-  title: string
-  state: 'open' | 'closed' | 'merged'
-  url: string
-  author: string
-  baseBranch: string
-  headBranch: string
-  createdAt: string
-  isDraft?: boolean
-  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null
-}
-
-const REVIEW_COLORS: Record<string, string> = {
-  APPROVED: 'text-green-600',
-  CHANGES_REQUESTED: 'text-red-600',
-  REVIEW_REQUIRED: 'text-yellow-600',
-}
-
+// Why: this used to call 'git.pr.list', which has never existed as an RPC
+// method (backend/src/main/runtime/rpc/methods/git.ts has no git.pr.* group —
+// hosted-review listing is 'hostedReview.forBranch', which needs a `repo`
+// selector resolved from the runtime's Repo/connection model. OrcaProject
+// (the Project Workspace / F38 multi-user model this panel belongs to) has no
+// such selector today, so wiring this up for real is separate, scoped
+// backend/design work — not a param/method-name fix like the rest of this
+// panel. Left as an honest "not available" state instead of a broken RPC call
+// (same crash class as the GitPanel.tsx push bug this investigation started from).
 export function PullRequestList() {
   const { project } = useWorkspace()
-  const [prs, setPrs] = useState<PullRequest[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
-  const fetchPRs = useCallback(async (isRefresh = false) => {
-    if (!project) {return}
-    if (isRefresh) {setIsRefreshing(true)}
-    else {setIsLoading(true)}
-
-    try {
-      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-      const result = await callRuntimeRpc<PullRequest[]>(target, 'git.pr.list', {
-        projectId: project.id,
-        state: 'open',
-      })
-      setPrs(result)
-    } catch (err: any) {
-      if (!isRefresh) {
-        toast.error(`Failed to load pull requests: ${  err.message ?? 'unknown error'}`)
-      }
-    } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
-    }
-  }, [project])
-
-  useEffect(() => { fetchPRs() }, [fetchPRs])
 
   if (!project) {
     return (
@@ -65,84 +22,20 @@ export function PullRequestList() {
     )
   }
 
-  if (isLoading) {
-    return (
-      <div className="p-3 text-xs text-muted-foreground" data-testid="pr-loading">
-        Loading pull requests...
-      </div>
-    )
-  }
-
   return (
     <div className="pr-list" data-testid="pr-list">
-      {/* Header with refresh */}
-      <div className="flex items-center justify-between px-3 py-2 border-b">
-        <span className="text-xs text-muted-foreground">
-          {prs.length} open pull request{prs.length !== 1 ? 's' : ''}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => fetchPRs(true)}
-          disabled={isRefreshing}
-          data-testid="pr-refresh"
-        >
-          <RefreshCw size={10} className={isRefreshing ? 'animate-spin' : ''} />
-        </Button>
-      </div>
-
-      {/* Empty state */}
-      {prs.length === 0 && (
-        <div className="flex flex-col items-center py-8 gap-2" data-testid="pr-empty">
-          <GitPullRequest size={24} className="text-muted-foreground opacity-30" />
-          <p className="text-sm text-muted-foreground">No open pull requests</p>
-        </div>
-      )}
-
-      {/* PR items */}
-      <div className="divide-y">
-        {prs.map(pr => (
-          <div
-            key={pr.number}
-            className="px-3 py-3 hover:bg-accent/30 transition-colors"
-            data-testid={`pr-item-${pr.number}`}
-          >
-            <div className="flex items-start gap-2">
-              <GitPullRequest
-                size={14}
-                className={`mt-0.5 shrink-0 ${pr.isDraft ? 'text-muted-foreground' : 'text-green-600'}`}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium leading-tight truncate">{pr.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  #{pr.number} · {pr.author} · {pr.headBranch} &rarr; {pr.baseBranch}
-                </p>
-                {pr.isDraft && (
-                  <Badge variant="outline" className="text-xs mt-1 text-muted-foreground">
-                    Draft
-                  </Badge>
-                )}
-                {pr.reviewDecision && (
-                  <span className={`text-xs mt-1 block ${REVIEW_COLORS[pr.reviewDecision] ?? ''}`}>
-                    {pr.reviewDecision.replace(/_/g, ' ').toLowerCase()}
-                  </span>
-                )}
-              </div>
-              <a
-                href={pr.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                data-testid={`pr-link-${pr.number}`}
-              >
-                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
-                  <ExternalLink size={10} />
-                </Button>
-              </a>
-            </div>
-          </div>
-        ))}
+      <div
+        className="flex flex-col items-center py-8 gap-2 px-3 text-center"
+        data-testid="pr-unavailable"
+      >
+        <GitPullRequest size={24} className="text-muted-foreground opacity-30" />
+        <p className="text-sm text-muted-foreground">
+          Pull requests are not available in this workspace yet
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Viewing hosted pull requests from a Project Workspace is not supported yet — this is a
+          known gap, not a bug.
+        </p>
       </div>
     </div>
   )

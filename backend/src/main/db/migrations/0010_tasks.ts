@@ -12,12 +12,16 @@
  */
 
 import type { Migration } from './types'
+import { autoIncrementPrimaryKeySql, nowEpochMsDefaultSql } from './sql-dialect'
 
 export const migration0010Tasks: Migration = {
   version: 10,
   name: 'tasks',
 
   async up(db) {
+    // BUG-BE-RPC-003: strftime()/AUTOINCREMENT are SQLite-only — see sql-dialect.ts.
+    const nowEpochMs = nowEpochMsDefaultSql(db.capabilities.dialect)
+    const autoIncrementPk = autoIncrementPrimaryKeySql(db.capabilities.dialect)
     // ── orca_tasks ────────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS orca_tasks (
@@ -37,9 +41,9 @@ export const migration0010Tasks: Migration = {
         progress_percent INTEGER NOT NULL DEFAULT 0,
         ai_context       TEXT,
         prompt_template  TEXT,
-        due_date         INTEGER,
-        created_at       INTEGER NOT NULL,
-        updated_at       INTEGER NOT NULL
+        due_date         BIGINT,
+        created_at       BIGINT NOT NULL,
+        updated_at       BIGINT NOT NULL
       )
     `)
     await db.exec(`
@@ -61,7 +65,7 @@ export const migration0010Tasks: Migration = {
         from_task_id TEXT    NOT NULL REFERENCES orca_tasks(id) ON DELETE CASCADE,
         to_task_id   TEXT    NOT NULL REFERENCES orca_tasks(id) ON DELETE CASCADE,
         edge_type    TEXT    NOT NULL DEFAULT 'depends_on',
-        created_at   INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+        created_at   BIGINT NOT NULL DEFAULT ${nowEpochMs},
         PRIMARY KEY (from_task_id, to_task_id, edge_type)
       )
     `)
@@ -84,8 +88,8 @@ export const migration0010Tasks: Migration = {
         permission  TEXT    NOT NULL,
         apply_tree  INTEGER NOT NULL DEFAULT 0,
         granted_by  TEXT    NOT NULL,
-        expires_at  INTEGER,
-        created_at  INTEGER NOT NULL
+        expires_at  BIGINT,
+        created_at  BIGINT NOT NULL
       )
     `)
     await db.exec(`
@@ -100,12 +104,12 @@ export const migration0010Tasks: Migration = {
     // ── orca_task_comments ────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS orca_task_comments (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          ${autoIncrementPk},
         task_id     TEXT    NOT NULL REFERENCES orca_tasks(id) ON DELETE CASCADE,
         user_id     TEXT    NOT NULL,
         content     TEXT    NOT NULL,
         type        TEXT    NOT NULL DEFAULT 'comment',
-        created_at  INTEGER NOT NULL
+        created_at  BIGINT NOT NULL
       )
     `)
     await db.exec(`
@@ -119,7 +123,7 @@ export const migration0010Tasks: Migration = {
         team_id  TEXT    NOT NULL,
         user_id  TEXT    NOT NULL REFERENCES orca_users(id) ON DELETE CASCADE,
         role     TEXT    NOT NULL DEFAULT 'member',
-        added_at INTEGER NOT NULL,
+        added_at BIGINT NOT NULL,
         PRIMARY KEY (team_id, user_id)
       )
     `)

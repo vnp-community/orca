@@ -4,6 +4,12 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Tracers } from '../../../../shared/trace/tracers'
+import { useAppStore } from '@/store'
+import {
+  getRuntimeCredentialStatus,
+  revokeRuntimeCredential,
+  setRuntimeCredential
+} from '@/runtime/runtime-credentials-client'
 
 // Why: In Web Server mode (ORCA_MULTI_USER=1), users cannot configure integrations
 // via env vars (shared process). This component provides a per-user credential input
@@ -69,7 +75,12 @@ export function CredentialInputForm({
         }
       }
 
-      await window.api.credentials.set(service, token, Object.keys(config).length ? config : undefined)
+      await setRuntimeCredential(
+        useAppStore.getState().settings,
+        service,
+        token,
+        Object.keys(config).length ? config : undefined
+      )
 
       // Clear sensitive data from state after successful save
       setValues({})
@@ -90,7 +101,7 @@ export function CredentialInputForm({
     setRevoking(true)
     const span = Tracers.uiRemoteIntegrationCredentialStoreFlow.start({ service, op: 'revoke' })
     try {
-      await window.api.credentials.revoke(service)
+      await revokeRuntimeCredential(useAppStore.getState().settings, service)
       onRevoked()
       span.ok({ service })
     } catch (err) {
@@ -179,8 +190,7 @@ export function useCredentialManager(service: CredentialService) {
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(() => {
-    window.api.credentials
-      .status(service)
+    getRuntimeCredentialStatus(useAppStore.getState().settings, service)
       .then(setStatus)
       .catch(() => setStatus(null))
       .finally(() => setLoading(false))

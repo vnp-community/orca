@@ -203,6 +203,54 @@ describe('keepalive', () => {
   })
 })
 
+// Why: AGENT_TIMEOUT_MS was declared as a wire-protocol constant but never
+// enforced — specs/agent/api/gaps-and-findings.md #8.
+describe('idle watchdog (AGENT_TIMEOUT_MS enforcement)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('closes the connection after 20s with no frames received', async () => {
+    const ws = new MockWs()
+    createTestSession(mockConfig).start(ws as any)
+    await Promise.resolve()  // drain microtask queue
+    ws.close.mockClear()
+
+    // Watchdog checks every 5s (AGENT_KEEPALIVE_INTERVAL_MS) — advance past
+    // the tick that lands at-or-after the 20s threshold.
+    vi.advanceTimersByTime(25001)
+
+    expect(ws.close).toHaveBeenCalledWith(1001, expect.stringContaining('idle timeout'))
+  })
+
+  it('does not close the connection while frames keep arriving', async () => {
+    const ws = new MockWs()
+    createTestSession(mockConfig).start(ws as any)
+    await Promise.resolve()  // drain microtask queue
+    ws.close.mockClear()
+
+    // Simulate the peer's own keepalive arriving every 5s, well under the
+    // 20s idle threshold each time — the watchdog should never trip.
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(5000)
+      ws.emit('message', buildKeepaliveFrame())
+    }
+
+    expect(ws.close).not.toHaveBeenCalled()
+  })
+
+  it('does not close an already-idle connection once ws is no longer OPEN', async () => {
+    const ws = new MockWs()
+    createTestSession(mockConfig).start(ws as any)
+    await Promise.resolve()  // drain microtask queue
+    ws.close.mockClear()
+    ws.readyState = 3  // WebSocket.CLOSED
+
+    vi.advanceTimersByTime(20001)
+
+    expect(ws.close).not.toHaveBeenCalled()
+  })
+})
+
 describe('message handling — handshake phase', () => {
   it('fires onHandshakeOk callback on result.ok=true', () => {
     const ws = new MockWs()

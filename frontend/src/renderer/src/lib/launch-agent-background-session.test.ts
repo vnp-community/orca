@@ -108,6 +108,10 @@ vi.mock('@/components/terminal-pane/pty-data-sidecar-subscriptions', () => ({
   subscribeToPtyData: mockSubscribeToPtyData
 }))
 
+vi.mock('@/runtime/runtime-agent-trust-client', () => ({
+  markRuntimeAgentTrusted: mockMarkTrusted
+}))
+
 describe('launchAgentBackgroundSession', () => {
   beforeEach(() => {
     resetRemoteRuntimeTerminalMultiplexersForTests()
@@ -162,9 +166,6 @@ describe('launchAgentBackgroundSession', () => {
           spawn: mockSpawn,
           write: mockWrite,
           kill: mockKill
-        },
-        agentTrust: {
-          markTrusted: mockMarkTrusted
         },
         runtime: {
           call: vi.fn()

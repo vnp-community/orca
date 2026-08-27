@@ -4,8 +4,8 @@
  *
  * The dev-server agent's PTY surface (src/relay/pty-agent-bridge.ts) is
  * narrower than the SSH relay daemon's, but it does support reattach
- * (2026-08): pty.create/write/resize/destroy/scrollback/sendSignal/attach,
- * plus real-time pty.data/pty.exit/pty.replay push notifications
+ * (2026-08): pty.create/write/resize/destroy/scrollback/sendSignal/attach/
+ * listProcesses, plus real-time pty.data/pty.exit/pty.replay push notifications
  * (src/relay/agent-rpc-dispatch.ts's makeNotifier). A dropped WebSocket does
  * not kill the shell — the agent arms a grace-period timer and only kills it
  * if no attach arrives in time (see scheduleGracePeriodCleanup). There is
@@ -198,8 +198,25 @@ export class DevServerPtyProvider implements IPtyProvider {
   }
 
   async listProcesses(): Promise<PtyProcessInfo[]> {
-    // Why: no agent-wide PTY enumeration RPC exists yet.
-    return []
+    // Why: mirrors SshPtyProvider.listProcesses() — lets the backend's
+    // liveness sweep (refreshPtyWorktreeRecordsFromController) detect a
+    // Dev-Server-hosted PTY that died on its own, instead of leaving
+    // session-tabs bookkeeping stuck reporting a dead ptyId as "ready"
+    // forever (BUG-FE-PTY-001). A relay failure here must not be read as
+    // "no PTYs exist" — surface it as a liveness-unknown empty result the
+    // same way withTimeoutResult's !ok path already does for the caller.
+    try {
+      const result = await this.relay.call<{ id: string; cwd: string; title: string }[]>(
+        'pty.listProcesses',
+        {}
+      )
+      return result.map((session) => ({
+        ...session,
+        id: this.toAppPtyId(session.id)
+      }))
+    } catch {
+      return []
+    }
   }
 
   async getDefaultShell(): Promise<string> {

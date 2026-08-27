@@ -1,8 +1,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { useTasks } from '../../hooks/useTasks'
 import { TaskTreeView } from './TaskTreeView'
-import { Input } from '../../ui/input'
-import type { OrcaTask } from '@shared/task-types'
+import { Input } from '../ui/input'
 
 const TaskDAGView = lazy(() => import('./TaskDAGView'))
 

@@ -8,6 +8,7 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import type { GrokAccountStatus } from '../../../../shared/rate-limit-types'
 import { SearchableSetting } from './SearchableSetting'
+import { getGrokAccountStatus } from '../../runtime/runtime-grok-accounts-client'
 const GROK_CLI_DOCS_URL = 'https://docs.x.ai/build/overview'
 
 export function GrokAccountsSection(): React.JSX.Element {
@@ -19,7 +20,7 @@ export function GrokAccountsSection(): React.JSX.Element {
 
   const loadStatus = useCallback(async (): Promise<void> => {
     try {
-      const next = await window.api.grokAccounts.getStatus()
+      const next = await getGrokAccountStatus()
       setStatus(next)
     } catch (error) {
       console.error('Failed to load Grok account status:', error)

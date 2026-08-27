@@ -30,6 +30,7 @@ import { findRepoForHost } from './repo-host-identity'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
+import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import {
   callRuntimeRpc,
   getActiveRuntimeTarget,
@@ -37,6 +38,7 @@ import {
   RuntimeRpcCallError
 } from '../../runtime/runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
+import { cleanupRuntimeEphemeralVmWorkspace } from '../../runtime/runtime-ephemeral-vm-client'
 import { getHostedReviewCacheKey, refreshHostedReviewCard } from './hosted-review'
 import { isPositiveHostedReviewNumber } from '../../../../shared/hosted-review'
 import { getGitHubPRCacheKey, getLegacyGitHubPRCacheKey } from './github-cache-key'
@@ -3212,14 +3214,14 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         cleanupVm &&
         entry.request.ephemeralVmRuntimeId &&
         typeof window !== 'undefined' &&
-        window.api?.ephemeralVm?.cleanup
+        window.api?.ephemeralVm
       ) {
-        void window.api.ephemeralVm
-          .cleanup({ runtimeId: entry.request.ephemeralVmRuntimeId })
-          .catch(() => {
-            // Best effort: cancellation should not block on provider cleanup,
-            // and the Settings runtime list still exposes retry/manual cleanup.
-          })
+        void cleanupRuntimeEphemeralVmWorkspace(s.settings, {
+          runtimeId: entry.request.ephemeralVmRuntimeId
+        }).catch(() => {
+          // Best effort: cancellation should not block on provider cleanup,
+          // and the Settings runtime list still exposes retry/manual cleanup.
+        })
       }
       const { [creationId]: _removed, ...rest } = s.pendingWorktreeCreations
       return {
@@ -3349,7 +3351,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       // so a still-mounted SSH terminal pane can't connect to an already-gone relay and surface a
       // spurious "SSH connection is not active" toast during delete.
       const destroyedRuntimeSshTargetIds = await cleanupEphemeralVmRuntimesForDeleted({
-        workspaceIds: [worktreeId]
+        workspaceIds: [worktreeId],
+        settings: settingsForWorktreeOwner(get(), worktreeId)
       })
       // Remove the now-orphaned project that pointed at the destroyed runtime-owned SSH target so it
       // can't surface as a dead, never-connectable project in the composer.
@@ -4582,11 +4585,40 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       //
       // Generation is still only bumped when tabs have no live PTY — a live
       // tab remount would kill the user's running shell.
+      //
+      // Why exclude tab.pendingActivationSpawn (BUG-FE-PTY-001): this same
+      // reducer can re-run for the SAME worktree while an earlier bump's fresh
+      // spawn is still connecting (e.g. a host-mirrored tab's id swaps from
+      // its local uuid to `web-terminal-<hostTabId>` mid-flight, which changes
+      // the computed activeTabId below and re-passes the hasStateChange guard).
+      // tabHasLivePty alone can't tell "still connecting" from "actually
+      // dead", so without this guard the tab gets bumped a second time and
+      // TerminalPane remounts mid-connect, orphaning the PTY it was about to
+      // attach to (live repro: "SSH_SESSION_EXPIRED: agent-pty-N not found").
+      // A tab already tagged from the prior bump is definitionally still
+      // respawning, so skip it until updateTabPtyId consumes the tag.
       const tabs = s.tabsByWorktree[worktreeId ?? ''] ?? []
       const allDead =
         worktreeId != null &&
         tabs.length > 0 &&
-        tabs.every((tab) => !tabHasLivePty(s.ptyIdsByTabId, tab.id))
+        tabs.every((tab) => !tab.pendingActivationSpawn && !tabHasLivePty(s.ptyIdsByTabId, tab.id))
+      // TEMP DIAG BUG-FE-PTY-001: confirm whether setActiveWorktree re-runs for
+      // the same worktree while an earlier bump's fresh spawn is still in
+      // flight (pendingActivationSpawn true), and whether the pendingActivationSpawn
+      // exclusion above actually prevents a double bump on live repro.
+      if (worktreeId != null && tabs.length > 0) {
+        logBugFePty001(
+          `setActiveWorktree allDead-check worktreeId=${worktreeId} allDead=${allDead} tabs=${JSON.stringify(
+            tabs.map((tab) => ({
+              id: tab.id,
+              generation: tab.generation ?? 0,
+              ptyId: tab.ptyId,
+              pendingActivationSpawn: tab.pendingActivationSpawn ?? false,
+              hasLivePty: tabHasLivePty(s.ptyIdsByTabId, tab.id)
+            }))
+          )}`
+        )
+      }
       const isFirstActivation = worktreeId != null && !s.everActivatedWorktreeIds.has(worktreeId)
       const shouldTagTabs = worktreeId != null && tabs.length > 0 && isFirstActivation
       // Why: when every PTY for the worktree's tabs is dead, the existing
@@ -4682,7 +4714,13 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           if (tabs.length === 0) {
             return {}
           }
-          const allDead = tabs.every((tab) => !tabHasLivePty(s.ptyIdsByTabId, tab.id))
+          // Why exclude pendingActivationSpawn: same race as the allDead
+          // check above (BUG-FE-PTY-001) — this deferred re-check must not
+          // double-bump a tab whose fresh spawn from the initial activation
+          // is still in flight.
+          const allDead = tabs.every(
+            (tab) => !tab.pendingActivationSpawn && !tabHasLivePty(s.ptyIdsByTabId, tab.id)
+          )
           if (!allDead && !shouldTagTerminalTabs) {
             return {}
           }

@@ -39,7 +39,9 @@ const CreateProjectParam = z.object({
   devServerId: z.string().min(1),
   repoPath: z.string().min(1),
   defaultBranch: z.string().optional(),
-  visibility: z.enum(['private', 'team', 'company']).optional(),
+  // Widened to 4 tiers (added 'department') — keep in sync with
+  // ProjectVisibility in shared/project-types.ts, the only other whitelist gate.
+  visibility: z.enum(['private', 'team', 'department', 'company']).optional(),
 })
 
 const UpdateProjectParam = z.object({
@@ -48,7 +50,7 @@ const UpdateProjectParam = z.object({
     name: z.string().min(1).optional(),
     description: z.string().optional(),
     defaultBranch: z.string().optional(),
-    visibility: z.enum(['private', 'team', 'company']).optional(),
+    visibility: z.enum(['private', 'team', 'department', 'company']).optional(),
     devServerId: z.string().min(1).optional(),
   }),
 })
@@ -255,7 +257,9 @@ type ProjectRole = 'owner' | 'member' | 'viewer'
 
 // FIX BUG-BE-HLD-002: thêm nhánh global-admin override — trước đây tên hàm hứa
 // "OrAdmin" nhưng userId chưa từng được dùng để check admin thật.
-async function requireOwnerOrAdmin(
+// Exported so orca-project-sharing-rpc-handler.ts can reuse the same owner-or-admin
+// gate instead of duplicating it (unlinkSourceProject is owner-only, same shape).
+export async function requireOwnerOrAdmin(
   role: ProjectRole,
   userId: string,
   getUserRole: UserRoleLookup

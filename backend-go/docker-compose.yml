@@ -1,0 +1,58 @@
+# Local development stack — one shared Postgres instance (17 logical
+# databases, one per service, matching architecture/05-data-architecture.md's
+# note that local dev doesn't need physical instance separation, only
+# staging/production do), a dev-mode Vault (auto-unsealed, root token —
+# NEVER use `vault server -dev` outside local dev), and NATS JetStream.
+#
+# Usage: docker compose up -d, then `make migrate-all`, then run any
+# service with `go run ./cmd/server` from its directory (see each
+# service's README for its env vars).
+name: orca-backend-go
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: orca
+      POSTGRES_PASSWORD: orca
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres-init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orca"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  vault:
+    image: hashicorp/vault:1.17
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health?standbyok=true"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-m", "8222"] # -js: JetStream (see common/eventbus); -m: HTTP monitoring endpoint the healthcheck below needs
+    ports:
+      - "4222:4222"
+      - "8222:8222" # monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:

@@ -14,6 +14,7 @@ import {
 import type { OrchestrationUsageExample } from '@/lib/orchestration-usage-examples'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const ORCHESTRATION_SKILL_SLASH_COMMAND = `/${ORCHESTRATION_SKILL_NAME}`
 
 function OrchestrationExamplePromptText(props: { prompt: string }): React.JSX.Element {
@@ -50,7 +51,7 @@ export function OrchestrationExampleDialog(props: {
 
   const copyPrompt = async (prompt: string): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(prompt)
+      await uiWriteClipboardText(prompt)
       toast.success(
         translate(
           'auto.components.settings.OrchestrationExamplesDialog.80c6f2feb8',

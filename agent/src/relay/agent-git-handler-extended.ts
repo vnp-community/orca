@@ -3,6 +3,13 @@
 // GitHandler class already has (git-handler.ts) but agent-rpc-dispatch.ts's
 // narrow git.exec-only router does not. Reuses the same decoupled ops
 // functions GitHandler calls internally — no logic duplicated.
+//
+// Why the TASK-227 methods (status/diff/commit/push/pull/stage/...) live in
+// sibling files instead of here: adding all 20 re-export handlers to this
+// file would push it past oxlint's 300-line max-lines budget. See
+// agent-git-handler-local-ops.ts (worktree/index-only methods) and
+// agent-git-handler-remote-ops.ts (methods that talk to a configured
+// remote) — both import the `git`/`gitBuffer` executors exported below.
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { AgentConfig } from './agent-config'
@@ -29,22 +36,28 @@ const MAX_GIT_BUFFER = 10 * 1024 * 1024
 // history, ...) — NOT exposed as free-form exec, so it does not need
 // agent-git-handler.ts's ALLOWED_GIT_SUBCOMMANDS whitelist (that whitelist
 // guards the generic git.exec passthrough only). Mirrors GitHandler.git()
-// in git-handler.ts, minus SSH-specific env knobs not needed here.
-async function git(
+// in git-handler.ts, minus SSH-specific env knobs not needed here. Exported
+// so agent-git-handler-local-ops.ts/agent-git-handler-remote-ops.ts share
+// this one executor instead of duplicating execFileAsync setup.
+export async function git(
   args: string[],
   cwd: string,
-  opts?: { stdin?: string; timeout?: number }
+  opts?: { stdin?: string; timeout?: number; extraEnv?: NodeJS.ProcessEnv }
 ): Promise<{ stdout: string; stderr: string }> {
   const { stdout, stderr } = await execFileAsync('git', args, {
     cwd,
     encoding: 'utf-8',
     maxBuffer: MAX_GIT_BUFFER,
-    timeout: opts?.timeout
+    timeout: opts?.timeout,
+    // Why: git.commit needs BUG-AG-HLD-003 per-connection author/committer
+    // identity applied as env, not global git config. No extraEnv means the
+    // same "inherit process.env" behavior every other call here already had.
+    env: opts?.extraEnv ? { ...process.env, ...opts.extraEnv } : process.env
   })
   return { stdout: String(stdout), stderr: String(stderr) }
 }
 
-async function gitBuffer(args: string[], cwd: string): Promise<Buffer> {
+export async function gitBuffer(args: string[], cwd: string): Promise<Buffer> {
   const { stdout } = (await execFileAsync('git', args, {
     cwd,
     encoding: 'buffer',

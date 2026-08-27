@@ -14,6 +14,10 @@
 
 ---
 
+> ⚠️ **Migration Numbering Collision (kiểm tra thực tế tháng 8/2026):** `backend/src/main/db/migrations/` đã có sẵn `0006_company_dept.ts`, `0007_projects.ts`, `0008_ai_providers.ts`, `0009_workflows.ts`, `0010_tasks.ts` — **cùng số thứ tự 0006–0010** và **cùng domain** (Company/Department/Profile, Project, AI Provider, Workflow, Task) như đề xuất dưới đây, nhưng schema chi tiết khác: bảng `orca_companies` (số nhiều, không phải singleton `orca_company`), có bảng riêng `orca_user_profiles` (thay vì cột `profile_json` gắn thẳng vào `orca_company`/`orca_departments`/`orca_users`), `orca_v5_projects`/`orca_v5_project_members` (prefix `v5_`, không phải `orca_projects`/`orca_project_members`), `orca_workflow_step_executions` (không phải `orca_step_executions`), và migration 0010 thật có thêm bảng `orca_team_members` không nằm trong đề xuất này. Migrations 0011–0013 thật (`terminal_sessions`, `port_forwards_push`, `workflow_trace_correlation`) không trùng domain với đề xuất. **Không thể áp dụng đề xuất này nguyên trạng — phải renumber (bắt đầu từ 0018+) hoặc reconcile field-by-field với schema 0006–0010 đã tồn tại trước khi implement.**
+
+---
+
 ## Bối cảnh
 
 ADR-002 đã quyết định dùng `IConnectionPool + MigrationRunner`. Migrations 0001–0005 đã được implement cho Web Server Mode (auth, users, sessions, fleet). HLD v6.0 bổ sung 5 new domains (Profile, Project, AI Provider, Workflow, Task Graph) đòi hỏi 5 migrations mới — mỗi migration phải:
@@ -268,7 +272,8 @@ CREATE INDEX idx_task_comments_task ON orca_task_comments(task_id);
 
 ## Trạng thái Implementation
 
-❌ Migrations 0006–0010 chưa được tạo  
+❌ Migrations 0006–0010 với schema **đề xuất trong ADR này** chưa được tạo  
+⚠️ Nhưng migration numbers 0006–0010 **đã bị chiếm** bởi schema khác — xem cảnh báo Migration Numbering Collision ở đầu file  
 🎯 `src/main/db/migrations/0006-profile.ts`  
 🎯 `src/main/db/migrations/0007-project.ts`  
 🎯 `src/main/db/migrations/0008-ai-providers.ts`  

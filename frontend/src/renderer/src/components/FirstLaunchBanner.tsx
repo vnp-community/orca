@@ -41,6 +41,7 @@ import { acknowledgeBanner, PRIVACY_URL, setOptIn as telemetrySetOptIn } from '.
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 type FirstLaunchBannerProps = {
   onResolve: () => void
   fetchSettings: () => Promise<void>
@@ -148,7 +149,7 @@ export function FirstLaunchBanner({
           <button
             type="button"
             className="underline underline-offset-2 hover:text-foreground"
-            onClick={() => void window.api.shell.openUrl(PRIVACY_URL)}
+            onClick={() => void shellOpenUrl(PRIVACY_URL)}
           >
             {translate('auto.components.FirstLaunchBanner.d1deebb050', 'Privacy policy')}
           </button>

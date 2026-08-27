@@ -3,30 +3,45 @@
 import { useEffect, useState } from 'react'
 import { DiffEditor } from '@monaco-editor/react'
 import { useWorkspace } from '../../../context/WorkspaceContext'
-import { callRuntimeRpc } from '../../../runtime/runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../../../runtime/runtime-rpc-client'
+import { toRuntimeWorktreeSelector } from '../../../runtime/runtime-worktree-selector'
 import { useAppStore } from '../../../store'
-import { getActiveRuntimeTarget } from '../../../runtime/runtime-rpc-client'
 import { Skeleton } from '../../ui/skeleton'
 import { Badge } from '../../ui/badge'
 import { FileCode } from 'lucide-react'
 import { Tracers } from '../../../../../shared/trace/tracers'
+import type { GitDiffResult } from '../../../../../shared/types'
 
 type DiffViewerProps = {
-  filePath:      string
+  filePath: string
   worktreePath?: string
-  staged?:       boolean
+  staged?: boolean
 }
 
 const LANGUAGE_MAP: Record<string, string> = {
-  ts: 'typescript', tsx: 'typescript',
-  js: 'javascript', jsx: 'javascript',
-  py: 'python',     go: 'go',         rs: 'rust',
-  css: 'css',       scss: 'scss',     less: 'less',
-  json: 'json',     yaml: 'yaml',     yml: 'yaml',
-  md: 'markdown',   mdx: 'markdown',
-  html: 'html',     xml: 'xml',       svg: 'xml',
-  sh: 'shell',      bash: 'shell',    zsh: 'shell',
-  sql: 'sql',       prisma: 'prisma',
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  py: 'python',
+  go: 'go',
+  rs: 'rust',
+  css: 'css',
+  scss: 'scss',
+  less: 'less',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  md: 'markdown',
+  mdx: 'markdown',
+  html: 'html',
+  xml: 'xml',
+  svg: 'xml',
+  sh: 'shell',
+  bash: 'shell',
+  zsh: 'shell',
+  sql: 'sql',
+  prisma: 'prisma'
 }
 
 function detectLanguage(filePath: string): string {
@@ -34,75 +49,47 @@ function detectLanguage(filePath: string): string {
   return LANGUAGE_MAP[ext] ?? 'plaintext'
 }
 
-export function DiffViewer({ filePath, worktreePath, staged = false }: DiffViewerProps) {
-  const { project }                       = useWorkspace()
-  const [originalContent, setOriginal]    = useState('')
-  const [modifiedContent, setModified]    = useState('')
-  const [isLoading, setIsLoading]         = useState(true)
-  const [error, setError]                 = useState<string | null>(null)
+export function DiffViewer({ filePath, staged = false }: DiffViewerProps) {
+  const { currentWorktree } = useWorkspace()
+  const [originalContent, setOriginal] = useState('')
+  const [modifiedContent, setModified] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
+  // Why (crash reported by user, same contract bug as GitPanel.tsx's push):
+  // this used to call the nonexistent 'git.getDiff' with a {projectId} shape
+  // via two separate hand-rolled branches (one of which also called the
+  // nonexistent 'fs.readFile'). The real 'git.diff' RPC
+  // (backend/src/main/runtime/rpc/methods/git.ts) takes a {worktree, filePath,
+  // staged, compareAgainstHead?} selector and already returns both
+  // originalContent/modifiedContent in one call — no need to fetch each side
+  // separately.
   useEffect(() => {
-    if (!project || !filePath) {return}
+    if (!currentWorktree || !filePath) {
+      return
+    }
     setIsLoading(true)
     setError(null)
 
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
     const span = Tracers.codeReviewDiffFlow.start({ filePath, staged, mode: target.kind })
 
-    // Use git.getDiff if staged mode; otherwise load HEAD + working tree separately
-    if (staged) {
-      // Staged diff: show index vs HEAD
-      callRuntimeRpc<string>(target, 'git.getDiff', {
-        projectId: project.id,
-        path: filePath,
-        staged: true,
-        traceId: span.id,
+    callRuntimeRpc<GitDiffResult>(target, 'git.diff', {
+      worktree: toRuntimeWorktreeSelector(currentWorktree.id),
+      filePath,
+      staged
+    })
+      .then((diff) => {
+        setOriginal(diff.originalContent)
+        setModified(diff.modifiedContent)
+        span.ok({ staged, kind: diff.kind })
       })
-        .then(diff => {
-          // For staged diff we show the raw diff text as context; split at first @@
-          const idx = diff.indexOf('@@')
-          setOriginal(idx >= 0 ? diff.slice(0, idx) : '')
-          setModified(diff)
-          span.ok({ staged: true })
-        })
-        .catch(err => {
-          setError(err?.message ?? 'Failed to load diff')
-          span.fail(err, { staged: true })
-        })
-        .finally(() => setIsLoading(false))
-    } else {
-      // Unstaged diff: load HEAD version and working tree version side-by-side
-      span.step('parallelFetch', { staged: false })
-      Promise.all([
-        // Original: HEAD version (empty string for new/untracked files)
-        callRuntimeRpc<string>(target, 'git.getDiff', {
-          projectId: project.id,
-          path: filePath,
-          staged: false,
-          side: 'original',   // returns HEAD content
-          traceId: span.id,
-        }).catch(() => ''),
-
-        // Modified: current working tree content
-        callRuntimeRpc<{ content: string }>(target, 'fs.readFile', {
-          projectId: project.id,
-          path: filePath,
-          encoding: 'utf-8',
-          traceId: span.id,
-        }).then(r => r.content).catch(() => ''),
-      ])
-        .then(([original, modified]) => {
-          setOriginal(original)
-          setModified(modified)
-          span.ok({ staged: false })
-        })
-        .catch(err => {
-          setError(err?.message ?? 'Failed to load diff')
-          span.fail(err, { staged: false })
-        })
-        .finally(() => setIsLoading(false))
-    }
-  }, [filePath, worktreePath, project, staged])
+      .catch((err) => {
+        setError(err?.message ?? 'Failed to load diff')
+        span.fail(err, { staged })
+      })
+      .finally(() => setIsLoading(false))
+  }, [filePath, currentWorktree, staged])
 
   const language = detectLanguage(filePath)
 
@@ -129,7 +116,9 @@ export function DiffViewer({ filePath, worktreePath, staged = false }: DiffViewe
       <div className="diff-viewer-header flex items-center gap-2 px-3 py-1 bg-muted border-b text-xs">
         <FileCode size={12} />
         <span className="font-mono flex-1 truncate">{filePath}</span>
-        <Badge variant="outline" className="text-xs shrink-0">{language}</Badge>
+        <Badge variant="outline" className="text-xs shrink-0">
+          {language}
+        </Badge>
       </div>
 
       {/* Monaco side-by-side diff */}
@@ -144,7 +133,7 @@ export function DiffViewer({ filePath, worktreePath, staged = false }: DiffViewe
           fontSize: 12,
           scrollBeyondLastLine: false,
           wordWrap: 'off',
-          lineNumbers: 'on',
+          lineNumbers: 'on'
         }}
         theme="vs-dark"
         height={350}

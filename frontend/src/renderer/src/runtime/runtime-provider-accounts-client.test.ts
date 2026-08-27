@@ -20,6 +20,21 @@ import { clearRuntimeCompatibilityCacheForTests } from './runtime-rpc-client'
 
 const LOCAL = { activeRuntimeEnvironmentId: null }
 const REMOTE = { activeRuntimeEnvironmentId: 'env-1' }
+const DEV_SERVER_PREFERENCE_KEY = 'orca.accountsDevServer.env-1'
+
+function createMemoryStorage(): Storage {
+  const map = new Map<string, string>()
+  return {
+    get length() {
+      return map.size
+    },
+    clear: () => map.clear(),
+    getItem: (key) => map.get(key) ?? null,
+    key: (index) => [...map.keys()][index] ?? null,
+    removeItem: (key) => map.delete(key),
+    setItem: (key, value) => map.set(key, value)
+  }
+}
 
 function emptyClaudeState(): ClaudeRateLimitAccountsState {
   return { accounts: [], activeAccountId: null, activeAccountIdsByRuntime: { host: null, wsl: {} } }
@@ -80,6 +95,18 @@ beforeEach(() => {
     mock.mockReset()
   }
   subscriptionCallbacks = null
+  // Why: the accounts.* environment branch now resolves a connectionId
+  // (TASK-023) before every mutation/subscribe call — default every test to
+  // "a dev server is picked and connected" so pre-existing tests that don't
+  // care about this new step keep passing; the dedicated
+  // connectionId-resolution tests below override this default explicitly.
+  vi.stubGlobal('localStorage', createMemoryStorage())
+  localStorage.setItem(DEV_SERVER_PREFERENCE_KEY, 'ds-1')
+  runtimeEnvironmentCall.mockImplementation((args: { method: string }) =>
+    args.method === 'accounts.resolveDevServerConnection'
+      ? { id: 'call', ok: true, result: { connected: true, connectionId: 'conn-1' } }
+      : { id: 'call', ok: true, result: null }
+  )
   runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
     return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
   })
@@ -238,7 +265,11 @@ describe('watchProviderAccounts', () => {
     await flushMicrotasks()
 
     expect(runtimeEnvironmentSubscribe).toHaveBeenCalledWith(
-      expect.objectContaining({ selector: 'env-1', method: 'accounts.subscribe' }),
+      expect.objectContaining({
+        selector: 'env-1',
+        method: 'accounts.subscribe',
+        params: { connectionId: 'conn-1' }
+      }),
       expect.any(Object)
     )
     subscriptionCallbacks?.onResponse({
@@ -260,6 +291,44 @@ describe('watchProviderAccounts', () => {
       result: { type: 'snapshot', snapshot: snapshotFixture('late') }
     })
     expect(snapshots).toHaveLength(2)
+  })
+
+  it('errors before subscribing when no dev server is picked for the remote target', async () => {
+    localStorage.removeItem(DEV_SERVER_PREFERENCE_KEY)
+    const errors: unknown[] = []
+
+    watchProviderAccounts(REMOTE, {
+      onSnapshot: () => {
+        throw new Error('unexpected snapshot')
+      },
+      onError: (error) => errors.push(error)
+    })
+    await flushMicrotasks()
+
+    expect(runtimeEnvironmentSubscribe).not.toHaveBeenCalled()
+    expect(errors).toHaveLength(1)
+    expect(String((errors[0] as Error).message)).toContain('Pick a dev server')
+  })
+
+  it('errors before subscribing when the picked dev server is not connected', async () => {
+    runtimeEnvironmentCall.mockImplementation((args: { method: string }) =>
+      args.method === 'accounts.resolveDevServerConnection'
+        ? { id: 'call', ok: true, result: { connected: false, connectionId: '' } }
+        : { id: 'call', ok: true, result: null }
+    )
+    const errors: unknown[] = []
+
+    watchProviderAccounts(REMOTE, {
+      onSnapshot: () => {
+        throw new Error('unexpected snapshot')
+      },
+      onError: (error) => errors.push(error)
+    })
+    await flushMicrotasks()
+
+    expect(runtimeEnvironmentSubscribe).not.toHaveBeenCalled()
+    expect(errors).toHaveLength(1)
+    expect(String((errors[0] as Error).message)).toContain('not currently connected')
   })
 
   it('surfaces remote subscription failures as errors', async () => {
@@ -347,11 +416,15 @@ describe('provider account mutations', () => {
   })
 
   it('routes select and remove through the active runtime accounts RPC when remote', async () => {
-    runtimeEnvironmentCall.mockImplementation((args: { method: string }) => ({
-      id: 'call',
-      ok: true,
-      result: args.method.startsWith('accounts.select') ? emptyCodexState() : emptyClaudeState()
-    }))
+    runtimeEnvironmentCall.mockImplementation((args: { method: string }) =>
+      args.method === 'accounts.resolveDevServerConnection'
+        ? { id: 'call', ok: true, result: { connected: true, connectionId: 'conn-1' } }
+        : {
+            id: 'call',
+            ok: true,
+            result: args.method.startsWith('accounts.select') ? emptyCodexState() : emptyClaudeState()
+          }
+    )
 
     await selectCodexProviderAccount(REMOTE, {
       accountId: 'server-codex-2',
@@ -366,24 +439,53 @@ describe('provider account mutations', () => {
     await removeCodexProviderAccount(REMOTE, 'server-codex-1')
     await removeClaudeProviderAccount(REMOTE, 'server-claude-1')
 
-    const methods = runtimeEnvironmentCall.mock.calls.map(
-      (call) => (call[0] as { method: string; params: unknown }).method
-    )
+    const mutationCalls = runtimeEnvironmentCall.mock.calls
+      .map((call) => call[0] as { method: string; params: unknown })
+      .filter((call) => call.method !== 'accounts.resolveDevServerConnection')
+    const methods = mutationCalls.map((call) => call.method)
     expect(methods).toEqual([
       'accounts.selectCodex',
       'accounts.selectClaude',
       'accounts.removeCodex',
       'accounts.removeClaude'
     ])
-    expect(runtimeEnvironmentCall.mock.calls[0]?.[0]).toMatchObject({
+    expect(mutationCalls[0]).toMatchObject({
       selector: 'env-1',
-      // Why this matters: the server API takes only accountId; host/WSL
-      // targeting is a desktop-local concept and must not leak into params.
-      params: { accountId: 'server-codex-2' }
+      // Why this matters: the server API takes only accountId + the
+      // resolved connectionId (TASK-023); host/WSL targeting is a
+      // desktop-local concept and must not leak into params.
+      params: { accountId: 'server-codex-2', connectionId: 'conn-1' }
     })
     expect(codexSelectLocal).not.toHaveBeenCalled()
     expect(claudeSelectLocal).not.toHaveBeenCalled()
     expect(codexRemoveLocal).not.toHaveBeenCalled()
     expect(claudeRemoveLocal).not.toHaveBeenCalled()
+  })
+
+  it('fails before calling accounts.* when no dev server is picked for the remote target', async () => {
+    localStorage.removeItem(DEV_SERVER_PREFERENCE_KEY)
+
+    await expect(
+      selectCodexProviderAccount(REMOTE, { accountId: 'acc-1', runtime: 'host', wslDistro: null })
+    ).rejects.toThrow('Pick a dev server')
+
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+  })
+
+  it('fails before calling accounts.* when the picked dev server is not connected', async () => {
+    runtimeEnvironmentCall.mockImplementation((args: { method: string }) =>
+      args.method === 'accounts.resolveDevServerConnection'
+        ? { id: 'call', ok: true, result: { connected: false, connectionId: '' } }
+        : { id: 'call', ok: true, result: null }
+    )
+
+    await expect(
+      removeClaudeProviderAccount(REMOTE, 'server-claude-1')
+    ).rejects.toThrow('not currently connected')
+
+    const methods = runtimeEnvironmentCall.mock.calls.map(
+      (call) => (call[0] as { method: string }).method
+    )
+    expect(methods).toEqual(['accounts.resolveDevServerConnection'])
   })
 })

@@ -1,6 +1,7 @@
 // src/renderer/src/components/mobile/paired-devices-panel.tsx
 // BL-MB-04: Manage paired devices — list, push toggle, revoke
-// Reuses window.api.mobile.listDevices and mobile.revokeDevice (already in preload)
+// Reuses listRuntimePairedDevices/revokeRuntimeMobileDevice (routes through
+// window.api.mobile.* locally, RPC remotely)
 
 import { useState, useEffect, useCallback } from 'react'
 import { Smartphone, Trash2, Loader2, RefreshCw, Tablet } from 'lucide-react'
@@ -8,24 +9,28 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
+import {
+  listRuntimePairedDevices,
+  revokeRuntimeMobileDevice
+} from '@/runtime/runtime-mobile-client'
 
 type PairedDevice = {
-  deviceId:   string
-  name:       string
-  pairedAt:   number
+  deviceId: string
+  name: string
+  pairedAt: number
   lastSeenAt: number
-  platform?:  'ios' | 'android' | string
+  platform?: 'ios' | 'android' | string
 }
 
 export function PairedDevicesPanel() {
-  const [devices, setDevices]       = useState<PairedDevice[]>([])
-  const [isLoading, setIsLoading]   = useState(false)
+  const [devices, setDevices] = useState<PairedDevice[]>([])
+  const [isLoading, setIsLoading] = useState(false)
   const [revokingId, setRevokingId] = useState<string | null>(null)
 
   const loadDevices = useCallback(async () => {
     setIsLoading(true)
     try {
-      const result = await window.api.mobile.listDevices()
+      const result = await listRuntimePairedDevices()
       setDevices((result?.devices ?? []) as PairedDevice[])
     } catch {
       toast.error('Failed to load paired devices')
@@ -34,13 +39,15 @@ export function PairedDevicesPanel() {
     }
   }, [])
 
-  useEffect(() => { loadDevices() }, [loadDevices])
+  useEffect(() => {
+    loadDevices()
+  }, [loadDevices])
 
   const revokeDevice = useCallback(async (deviceId: string, name: string) => {
     setRevokingId(deviceId)
     try {
-      await window.api.mobile.revokeDevice({ deviceId })
-      setDevices(prev => prev.filter(d => d.deviceId !== deviceId))
+      await revokeRuntimeMobileDevice(deviceId)
+      setDevices((prev) => prev.filter((d) => d.deviceId !== deviceId))
       toast.success(`Revoked "${name}"`)
     } catch {
       toast.error(`Failed to revoke "${name}"`)
@@ -51,7 +58,9 @@ export function PairedDevicesPanel() {
 
   function platformIcon(device: PairedDevice) {
     const p = device.platform?.toLowerCase() ?? ''
-    if (p === 'android') {return <Tablet size={16} className="text-muted-foreground shrink-0" />}
+    if (p === 'android') {
+      return <Tablet size={16} className="text-muted-foreground shrink-0" />
+    }
     return <Smartphone size={16} className="text-muted-foreground shrink-0" />
   }
 
@@ -68,10 +77,7 @@ export function PairedDevicesPanel() {
           disabled={isLoading}
           title="Refresh device list"
         >
-          {isLoading
-            ? <Loader2 size={14} className="animate-spin" />
-            : <RefreshCw size={14} />
-          }
+          {isLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
         </Button>
       </div>
 
@@ -87,11 +93,8 @@ export function PairedDevicesPanel() {
       )}
 
       <div className="space-y-2">
-        {devices.map(device => (
-          <div
-            key={device.deviceId}
-            className="flex items-center gap-3 rounded-lg border p-3"
-          >
+        {devices.map((device) => (
+          <div key={device.deviceId} className="flex items-center gap-3 rounded-lg border p-3">
             {platformIcon(device)}
 
             {/* Device info */}
@@ -111,10 +114,11 @@ export function PairedDevicesPanel() {
               disabled={revokingId === device.deviceId}
               title="Revoke device"
             >
-              {revokingId === device.deviceId
-                ? <Loader2 size={12} className="animate-spin" />
-                : <Trash2 size={12} />
-              }
+              {revokingId === device.deviceId ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <Trash2 size={12} />
+              )}
             </Button>
           </div>
         ))}

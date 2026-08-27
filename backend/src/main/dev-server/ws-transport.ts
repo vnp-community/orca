@@ -25,6 +25,10 @@ export type WsLike = {
   on(event: 'message', listener: (data: Buffer) => void): void
   on(event: 'close', listener: () => void): void
   on(event: 'error', listener: (err: Error) => void): void
+  // Why: ws-handshake.ts's handshake decoder listener must be detachable
+  // once the handshake settles — otherwise it keeps intercepting every
+  // later regular frame (BUG-FE-PTY-001).
+  off(event: 'message', listener: (data: Buffer) => void): void
   close(code?: number, reason?: string): void
   readyState: number
 }
@@ -34,7 +38,7 @@ export const WS_READY_STATE = {
   CONNECTING: 0,
   OPEN: 1,
   CLOSING: 2,
-  CLOSED: 3,
+  CLOSED: 3
 } as const
 
 /**
@@ -91,6 +95,6 @@ export function createWebSocketTransport(ws: WsLike): MultiplexerTransport {
     },
     close: () => {
       ws.close()
-    },
+    }
   }
 }

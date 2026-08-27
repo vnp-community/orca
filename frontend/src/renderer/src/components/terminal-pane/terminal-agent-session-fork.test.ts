@@ -10,8 +10,15 @@ const mockToast = {
   message: vi.fn(),
   success: vi.fn()
 }
-const mockWriteClipboardText = vi.fn(async () => undefined)
+const mockWriteClipboardText = vi.fn(async (_text: string) => undefined)
 const mockMarkTrusted = vi.fn(async () => undefined)
+
+vi.mock('@/runtime/runtime-agent-trust-client', () => ({
+  markRuntimeAgentTrusted: mockMarkTrusted
+}))
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiWriteClipboardText: (text: string) => mockWriteClipboardText(text)
+}))
 const LEAF_ID = '11111111-1111-4111-8111-111111111111'
 
 const store = {
@@ -104,12 +111,6 @@ describe('forkAgentSessionFromPane', () => {
     mockMarkTrusted.mockResolvedValue(undefined)
     vi.stubGlobal('window', {
       api: {
-        ui: {
-          writeClipboardText: mockWriteClipboardText
-        },
-        agentTrust: {
-          markTrusted: mockMarkTrusted
-        },
         platform: {
           get: () => ({ platform: 'win32' })
         }
@@ -520,9 +521,6 @@ describe('copyAgentSessionContextFromPane', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockWriteClipboardText.mockResolvedValue(undefined)
-    vi.stubGlobal('window', {
-      api: { ui: { writeClipboardText: mockWriteClipboardText } }
-    })
   })
 
   it('copies the bounded transcript without the fork prompt framing', async () => {
