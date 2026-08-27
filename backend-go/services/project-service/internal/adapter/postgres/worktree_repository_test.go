@@ -109,6 +109,46 @@ func TestWorktreeRepository_RecordWorktreeRemoved_HardDeletes(t *testing.T) {
 	}
 }
 
+func TestWorktreeRepository_ListLineage_ReturnsOnlyWorktreesWithCapturedParent(t *testing.T) {
+	pool := setupPool(t)
+	projectRepo := New(pool)
+	repoRepo := NewRepoRepository(pool)
+	worktreeRepo := NewWorktreeRepository(pool)
+	ctx := context.Background()
+
+	project, repo := setupRepoForWorktree(t, projectRepo, repoRepo)
+	parent, err := worktreeRepo.RecordWorktreeCreated(ctx, domain.Worktree{
+		ID: uuid.NewString(), ProjectID: project.ID, RepoID: repo.ID, Path: "/srv/w1", Branch: "main", Active: true,
+	})
+	if err != nil {
+		t.Fatalf("record parent worktree: %v", err)
+	}
+
+	origin := "cli"
+	explicit := "explicit"
+	child, err := worktreeRepo.RecordWorktreeCreated(ctx, domain.Worktree{
+		ID: uuid.NewString(), ProjectID: project.ID, RepoID: repo.ID, Path: "/srv/w2", Branch: "feature", Active: true,
+		ParentWorktreeID: &parent.ID, Origin: &origin, CaptureConfidence: &explicit,
+	})
+	if err != nil {
+		t.Fatalf("record child worktree: %v", err)
+	}
+
+	lineage, err := worktreeRepo.ListLineage(ctx)
+	if err != nil {
+		t.Fatalf("list lineage: %v", err)
+	}
+	if len(lineage) != 1 || lineage[0].ID != child.ID {
+		t.Fatalf("expected only the child worktree, got %+v", lineage)
+	}
+	if lineage[0].ParentWorktreeID == nil || *lineage[0].ParentWorktreeID != parent.ID {
+		t.Errorf("expected ParentWorktreeID=%q, got %v", parent.ID, lineage[0].ParentWorktreeID)
+	}
+	if lineage[0].CaptureConfidence == nil || *lineage[0].CaptureConfidence != "explicit" {
+		t.Errorf("expected CaptureConfidence=explicit, got %v", lineage[0].CaptureConfidence)
+	}
+}
+
 func TestWorktreeRepository_CascadesOnProjectDelete(t *testing.T) {
 	pool := setupPool(t)
 	projectRepo := New(pool)

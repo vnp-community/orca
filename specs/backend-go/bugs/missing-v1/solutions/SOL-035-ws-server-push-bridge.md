@@ -6,7 +6,7 @@
 - `backend-go/services/api-gateway/internal/adapter/wscompat/handler.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/push_bridge.go` (new)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (subscribe-channel registration)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 5 task(s) (TASK-012–016) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

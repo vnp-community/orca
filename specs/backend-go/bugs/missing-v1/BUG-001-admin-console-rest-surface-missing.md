@@ -4,7 +4,7 @@
 **File:** `internal/adapter/httpgateway/router.go` (missing entirely — no `mountAdminRoutes`)
 **Severity:** High — the entire admin console UI (`frontend/src/renderer/src/components/admin/*`) is non-functional against backend-go
 **Symptom:** Every `adminFetch()` call from the frontend's admin console 404s (chi's default `NotFound`, not even a structured `501` body) — there is no route registered under `/admin/api/*` at all
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-001–006 (6 task(s), all DONE) for implementation evidence.
 
 ---
 

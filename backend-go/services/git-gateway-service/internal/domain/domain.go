@@ -251,6 +251,22 @@ type WorktreeRecord struct {
 	Branch string
 }
 
+// WorktreeLineageCapture is optional lineage-capture context CreateWorktree
+// forwards to project-service's RecordWorktreeCreated — see
+// proto/orca/project/v1/project.proto's WorktreeLineageEntry doc comment
+// for what each field means. Every field empty means "no lineage captured",
+// the common case; project-service (not this service) decides
+// CaptureConfidence from whether any of these are set.
+type WorktreeLineageCapture struct {
+	ParentWorktreeID        string
+	Origin                  string
+	CaptureSource           string
+	TaskID                  string
+	OrchestrationRunID      string
+	CoordinatorHandle       string
+	CreatedByTerminalHandle string
+}
+
 // ResolvedBase is PrefetchCreateBase/ResolvePrBase/ResolveMrBase's answer:
 // a base branch name plus the local SHA it resolved to once fetched.
 type ResolvedBase struct {

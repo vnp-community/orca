@@ -10,10 +10,19 @@ reviewed — it introduces no backend gaps, since the RPC-transport-carrying
 namespaces it documents (`window.api.runtime`/`runtimeEnvironments`) are
 desktop-local IPC, not something a backend implements.
 
-> **Status: ❌ All 35 reports open.** This pass only documents gaps — no
-> code was changed and no `solutions/`/`tasks/` files were created (compare
-> `../api-v1/`, a separate, already-fixed set of bugs from a different
-> investigation).
+> **Status (updated 2026-08-27): ✅ 35/36 reports resolved, 1 partial.**
+> This was originally a documentation-only pass (no code, no `solutions/`/
+> `tasks/` files) — that's no longer true: `solutions/` (36 `SOL-XXX` design
+> docs) and `tasks/` (188 `TASK-XXX` execution units) now exist, and per
+> `tasks/README.md`'s own tracking, 187/188 tasks are `[x]` DONE. Only
+> `BUG-006`/`SOL-006` (`browser.*`) is partial — agent + backend-go layers
+> are done and tested end-to-end, but frontend dispatch to the new relay
+> path is a separate, still-open design decision (see `TASK-036`'s "Status
+> by layer" section). Each `BUG-XXX`/`SOL-XXX` file's own `**Status:**` line
+> is the authoritative per-item status — the tables below are this report's
+> original point-in-time snapshot and were NOT re-audited row-by-row for
+> exact "X/Y methods missing" counts; treat each linked report as ground
+> truth over these summary numbers, same caveat this file already carried.
 
 ## The headline number
 
@@ -53,9 +62,9 @@ Every report cites real `file:line`, matching the discipline
 
 | ID | Title | Severity | Status |
 |----|-------|----------|--------|
-| [BUG-001](./BUG-001-admin-console-rest-surface-missing.md) | `/admin/api/*` admin console REST surface does not exist | High | ❌ Open |
-| [BUG-002](./BUG-002-auth-sso-route-missing.md) | `GET /auth/sso/:provider` not registered (404 instead of 501 stub) | Low | ❌ Open |
-| [BUG-003](./BUG-003-web-push-endpoints-path-and-auth-mismatch.md) | `/api/push-*` at wrong path, wrong auth gate, missing `unsubscribe` | Medium | ❌ Open |
+| [BUG-001](./BUG-001-admin-console-rest-surface-missing.md) | `/admin/api/*` admin console REST surface does not exist | High | ✅ Resolved |
+| [BUG-002](./BUG-002-auth-sso-route-missing.md) | `GET /auth/sso/:provider` not registered (404 instead of 501 stub) | Low | ✅ Resolved |
+| [BUG-003](./BUG-003-web-push-endpoints-path-and-auth-mismatch.md) | `/api/push-*` at wrong path, wrong auth gate, missing `unsubscribe` | Medium | ✅ Resolved |
 
 ## RPC channel gaps (`rpc-catalog.md`) — fully unimplemented namespaces
 
@@ -102,8 +111,8 @@ Every report cites real `file:line`, matching the discipline
 
 | ID | Title | Severity | Status |
 |----|-------|----------|--------|
-| [BUG-035](./BUG-035-ws-server-push-not-implemented.md) | Server→client `push` frames never sent — `wscompat` is request/response only | High | ❌ Open |
-| [BUG-036](./BUG-036-git-relay-methods-unreachable-on-agent.md) | `git.*` relay calls target agent methods that don't exist on the transport backend-go uses — breaks even the 2 channels marked "wired" | **Critical** | ❌ Open |
+| [BUG-035](./BUG-035-ws-server-push-not-implemented.md) | Server→client `push` frames never sent — `wscompat` is request/response only | High | ✅ Resolved |
+| [BUG-036](./BUG-036-git-relay-methods-unreachable-on-agent.md) | `git.*` relay calls target agent methods that don't exist on the transport backend-go uses — breaks even the 2 channels marked "wired" | **Critical** | ✅ Resolved |
 
 `BUG-036` was found by tracing the full frontend→backend→agent→backend→frontend
 data flow for `git.status`/`git.diff` end to end against the real `agent/`

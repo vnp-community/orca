@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** High — task graph execution (including AI decompose/apply) is a headline feature, and it is currently 100% unreachable from the frontend's real call surface.
 **Symptom:** Every `task.*` call the frontend actually makes resolves through `notImplementedHandler` and errors out (see BUG-002 for the general "unregistered channel" failure mode).
-**Status: ❌ Open**
+**Status:** ✅ Resolved — see TASK-222–226 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

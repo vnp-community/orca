@@ -169,7 +169,7 @@ export type BrowserCommandParams = {
   page?: unknown
 }
 
-function requireWorktreeId(params: Record<string, unknown>): string {
+export function requireWorktreeId(params: Record<string, unknown>): string {
   const worktreeId = params.worktree
   if (typeof worktreeId !== 'string' || worktreeId.length === 0) {
     throw new Error('BROWSER_NO_WORKTREE: this operation requires a worktree selector')
@@ -181,7 +181,7 @@ function requireWorktreeId(params: Record<string, unknown>): string {
  * Runs one `agent-browser` CLI command scoped to a worktree's persistent
  * session, parses its `--json` envelope, and unwraps success/error.
  */
-async function runBrowserCommand(worktreeId: string, args: string[]): Promise<unknown> {
+export async function runBrowserCommand(worktreeId: string, args: string[]): Promise<unknown> {
   const bin = resolveAgentBrowserBin()
   const fullArgs = [bin, ...args, '--session', worktreeId, '--json']
   let stdout: string

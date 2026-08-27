@@ -50,6 +50,7 @@ type Server struct {
 	getTerminalAgentStatus *usecase.GetTerminalAgentStatus
 	inspectTerminalProcess *usecase.InspectTerminalProcess
 	attachPty              *usecase.AttachPty
+	attachScreencast       *usecase.AttachScreencast
 	listBrowserProfiles    *usecase.ListBrowserProfiles
 	createBrowserProfile   *usecase.CreateBrowserProfile
 	deleteBrowserProfile   *usecase.DeleteBrowserProfile
@@ -84,6 +85,7 @@ func New(
 	getTerminalAgentStatus *usecase.GetTerminalAgentStatus,
 	inspectTerminalProcess *usecase.InspectTerminalProcess,
 	attachPty *usecase.AttachPty,
+	attachScreencast *usecase.AttachScreencast,
 	listBrowserProfiles *usecase.ListBrowserProfiles,
 	createBrowserProfile *usecase.CreateBrowserProfile,
 	deleteBrowserProfile *usecase.DeleteBrowserProfile,
@@ -113,6 +115,7 @@ func New(
 		getTerminalAgentStatus: getTerminalAgentStatus,
 		inspectTerminalProcess: inspectTerminalProcess,
 		attachPty:              attachPty,
+		attachScreencast:       attachScreencast,
 		listBrowserProfiles:    listBrowserProfiles,
 		createBrowserProfile:   createBrowserProfile,
 		deleteBrowserProfile:   deleteBrowserProfile,
@@ -532,6 +535,64 @@ func pumpAttachPtyInbound(stream infrafleetv1.InfraFleetService_AttachPtyServer,
 	}
 }
 
+// AttachScreencast mirrors AttachPty's shape exactly (same tenant-extraction
+// workaround, same pump-inbound/pump-outbound structure) — see AttachPty's
+// doc comment for why the manual withTenantFromStreamMetadata call is
+// needed here too.
+func (s *Server) AttachScreencast(stream infrafleetv1.InfraFleetService_AttachScreencastServer) error {
+	ctx := withTenantFromStreamMetadata(stream.Context())
+
+	inbound := make(chan usecase.ScreencastClientMessage)
+	go pumpAttachScreencastInbound(stream, inbound)
+
+	outbound, errCh := s.attachScreencast.Execute(ctx, inbound)
+	for {
+		select {
+		case msg, ok := <-outbound:
+			if !ok {
+				outbound = nil
+				continue
+			}
+			if err := stream.Send(toProtoScreencastServerFrame(msg)); err != nil {
+				return err
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				return nil
+			}
+			if err != nil {
+				return apperrors.ToGRPCStatus(err)
+			}
+			return nil
+		}
+		if outbound == nil {
+			if err := <-errCh; err != nil {
+				return apperrors.ToGRPCStatus(err)
+			}
+			return nil
+		}
+	}
+}
+
+func pumpAttachScreencastInbound(stream infrafleetv1.InfraFleetService_AttachScreencastServer, inbound chan<- usecase.ScreencastClientMessage) {
+	defer close(inbound)
+	for {
+		frame, err := stream.Recv()
+		if err != nil {
+			return
+		}
+		msg, ok := toUsecaseScreencastClientMessage(frame)
+		if !ok {
+			continue
+		}
+		select {
+		case inbound <- msg:
+		case <-stream.Context().Done():
+			return
+		}
+	}
+}
+
 func withTenantFromStreamMetadata(ctx context.Context) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -564,6 +625,50 @@ func toProtoPtyServerFrame(msg usecase.PtyServerMessage) *infrafleetv1.PtyServer
 		return &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Exited{Exited: &infrafleetv1.PtyExited{ExitCode: msg.ExitCode}}}
 	}
 	return &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Out{Out: &infrafleetv1.PtyOutput{Data: msg.Output}}}
+}
+
+func toUsecaseScreencastClientMessage(frame *infrafleetv1.ScreencastClientFrame) (usecase.ScreencastClientMessage, bool) {
+	switch f := frame.GetFrame().(type) {
+	case *infrafleetv1.ScreencastClientFrame_Start:
+		start := f.Start
+		params := usecase.ScreencastParams{
+			WorktreeID: start.GetWorktreeId(), Page: start.GetPage(), Format: start.GetFormat(),
+			Quality: start.GetQuality(), MaxWidth: start.GetMaxWidth(), MaxHeight: start.GetMaxHeight(),
+			Mobile: start.GetMobile(), EveryNthFrame: start.GetEveryNthFrame(), MinFrameIntervalMs: start.GetMinFrameIntervalMs(),
+		}
+		if start.ViewportWidth != nil {
+			v := start.GetViewportWidth()
+			params.ViewportWidth = &v
+		}
+		if start.ViewportHeight != nil {
+			v := start.GetViewportHeight()
+			params.ViewportHeight = &v
+		}
+		if start.DeviceScaleFactor != nil {
+			v := start.GetDeviceScaleFactor()
+			params.DeviceScaleFactor = &v
+		}
+		return usecase.ScreencastClientMessage{Start: &usecase.ScreencastStartMessage{Params: params}}, true
+	case *infrafleetv1.ScreencastClientFrame_Stop:
+		return usecase.ScreencastClientMessage{Stop: true}, true
+	default:
+		return usecase.ScreencastClientMessage{}, false
+	}
+}
+
+func toProtoScreencastServerFrame(ev usecase.ScreencastEvent) *infrafleetv1.ScreencastServerFrame {
+	switch {
+	case ev.Ready:
+		return &infrafleetv1.ScreencastServerFrame{Frame: &infrafleetv1.ScreencastServerFrame_Ready{Ready: &infrafleetv1.ScreencastReady{
+			SubscriptionId: ev.SubscriptionID, BrowserPageId: ev.BrowserPageID, Format: ev.Format,
+		}}}
+	case ev.Ended:
+		return &infrafleetv1.ScreencastServerFrame{Frame: &infrafleetv1.ScreencastServerFrame_Ended{Ended: &infrafleetv1.ScreencastEnded{}}}
+	case ev.ErrorMsg != "":
+		return &infrafleetv1.ScreencastServerFrame{Frame: &infrafleetv1.ScreencastServerFrame_Error{Error: &infrafleetv1.ScreencastError{Message: ev.ErrorMsg}}}
+	default:
+		return &infrafleetv1.ScreencastServerFrame{Frame: &infrafleetv1.ScreencastServerFrame_FrameData{FrameData: &infrafleetv1.ScreencastFrame{Data: ev.Frame}}}
+	}
 }
 
 func toProtoTerminalSession(session domain.TerminalSession) *infrafleetv1.TerminalSession {

@@ -5,7 +5,7 @@
 **Affected files (proposed):**
 - `backend-go/services/api-gateway/internal/adapter/httpgateway/auth_routes.go`
 - `backend-go/services/api-gateway/internal/adapter/httpgateway/auth_routes_test.go` (new)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 2 task(s) (TASK-007–008) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

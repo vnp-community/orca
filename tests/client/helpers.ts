@@ -3,14 +3,38 @@
  *
  * Client tests focus on the web UI/SPA behaviour from the browser's perspective:
  *   - auth-api-client.ts calls
- *   - WebSocket RPC client connectivity
+ *   - WebSocket RPC client connectivity (see rpc-client.ts)
  *   - Connection status provider behaviour
  */
 
+import { RpcSession } from './rpc-client'
+
 export const BASE_URL = process.env['ORCA_SERVER_URL'] ?? 'http://172.20.2.39:6769'
-export const WS_BASE_URL = BASE_URL.replace(/^http/, 'ws').replace(':6769', ':6768')
+// Why: the browser SPA's RPC connection is proxied on the SAME port as HTTP —
+// any WS upgrade path other than /agent (backend/src/server/index.ts's
+// httpServer 'upgrade' handler → WsSessionRouter,
+// backend/src/main/session/ws-session-router.ts) resolves the user from the
+// request's Cookie header and proxies to that user's OrcaRuntimeRpcServer.
+// A separate port (ORCA_PORT, default 6768) exists for the E2EE/device-token
+// surface mobile pairing and remote-environment connections use
+// (backend/src/main/runtime/rpc/ws-transport.ts) — cookie auth doesn't apply
+// there, so it's the wrong port for this cookie-authenticated test client.
+export const WS_BASE_URL = BASE_URL.replace(/^http/, 'ws')
+export const RPC_WS_URL = `${WS_BASE_URL}/ws`
 export const ADMIN_EMAIL = process.env['ORCA_ADMIN_EMAIL'] ?? 'admin@b15.openledger.vn'
 export const ADMIN_PASSWORD = process.env['ORCA_ADMIN_PASSWORD'] ?? 'Orca@Adm1n#2025'
+
+// ─── RPC Client helpers ────────────────────────────────────────────────────────
+
+/**
+ * Open a cookie-authenticated RPC session against the backend's RPC method
+ * registry — the same registry specs/frontend/api/rpc-catalog.md and
+ * specs/frontend/api/mobile-rpc-catalog.md document. Callers own the returned
+ * session's lifecycle and must call `.close()` (e.g. in `afterAll`).
+ */
+export async function connectRpc(cookie: string): Promise<RpcSession> {
+  return RpcSession.connect(RPC_WS_URL, cookie)
+}
 
 // ─── Auth API Client helpers ──────────────────────────────────────────────────
 

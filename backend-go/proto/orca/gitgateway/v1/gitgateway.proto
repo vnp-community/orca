@@ -606,6 +606,19 @@ message CreateWorktreeRequest {
   string repo_id = 2;
   string branch = 3;      // new branch name for the worktree
   string base_ref = 4;    // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
+
+  // Optional lineage-capture context, forwarded as-is to project-service's
+  // RecordWorktreeCreated by the CreateWorktree saga — see
+  // project.proto's WorktreeLineageEntry doc comment for the shape this
+  // backs. Explicit-capture only; caller (wscompat's worktree.create) never
+  // needs to set capture_confidence.
+  optional string parent_worktree_id = 5;
+  optional string origin = 6;
+  optional string capture_source = 7;
+  optional string task_id = 8;
+  optional string orchestration_run_id = 9;
+  optional string coordinator_handle = 10;
+  optional string created_by_terminal_handle = 11;
 }
 message CreateWorktreeResponse {
   string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)

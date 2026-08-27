@@ -33,6 +33,25 @@ func TestCreateWorktree_HappyPath(t *testing.T) {
 	}
 }
 
+func TestCreateWorktree_ThreadsLineageThroughToRecordWorktreeCreated(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
+	uc := NewCreateWorktree(resolver, projects, local, relay)
+
+	lineage := domain.WorktreeLineageCapture{ParentWorktreeID: "wt-parent", Origin: "orchestration", TaskID: "task_abc123"}
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{
+		ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", Lineage: lineage,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if projects.gotRecordCreatedLineage != lineage {
+		t.Errorf("expected lineage %+v to reach RecordWorktreeCreated, got %+v", lineage, projects.gotRecordCreatedLineage)
+	}
+}
+
 func TestCreateWorktree_BookkeepingFails_CompensatesByRemovingWorktree(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}

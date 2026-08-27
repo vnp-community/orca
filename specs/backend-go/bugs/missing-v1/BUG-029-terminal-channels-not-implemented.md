@@ -4,7 +4,7 @@
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** High — terminal/PTY sessions are core to agent-driven workflows; this is the same PTY subsystem this repo's current branch (`fix/pty-session-expired-on-pane-remount`) is patching on the TS side
 **Symptom:** Every `terminal.*` call (create/send/close/list/focus/stop/wait/agentStatus/isRunningAgent/inspectProcess) falls through to `notImplementedHandler` and times out client-side — no agent-driven terminal work is possible against backend-go today
-**Status: ❌ Open**
+**Status:** ✅ Resolved — see TASK-180–187 (8 task(s), all DONE) for implementation evidence.
 
 ---
 

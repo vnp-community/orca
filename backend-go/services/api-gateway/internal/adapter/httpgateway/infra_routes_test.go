@@ -133,6 +133,10 @@ func (f *fakeInfraFleetServiceClient) AttachPty(context.Context, ...grpc.CallOpt
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+func (f *fakeInfraFleetServiceClient) AttachScreencast(context.Context, ...grpc.CallOption) (grpc.BidiStreamingClient[infrafleetv1.ScreencastClientFrame, infrafleetv1.ScreencastServerFrame], error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile: no
 // httpgateway route exercises these (they're wired through wscompat's
 // channels_browser.go instead) — same unconditional Unimplemented-stub

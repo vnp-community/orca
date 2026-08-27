@@ -64,6 +64,19 @@ service InfraFleetService {
   // (TASK-186) and piped into `push` frames via TASK-012's pipePush.
   rpc AttachPty(stream PtyClientFrame) returns (stream PtyServerFrame);
 
+  // AttachScreencast is browser.screencast's transport — the remote-
+  // headless-browser live-view stream, mirroring AttachPty's bidi shape
+  // exactly (see docs/execution-plan.md and TASK-036's "Status by layer"
+  // section for why this exists: the agent+backend-go layers of the 12-op
+  // browser.* relay were already real, but the live view was missing).
+  // frame_data carries opaque, already-encoded bytes produced agent-side
+  // by encodeBrowserScreencastFrame (frontend/src/shared/browser-screencast-protocol.ts,
+  // copied verbatim into agent/src/shared/) — infra-fleet-service and
+  // api-gateway never parse image bytes, they relay them byte-for-byte.
+  // dialog/dialogClosed are deliberately NOT modeled here — see
+  // channels_browser_screencast.go's doc comment for the scope cut.
+  rpc AttachScreencast(stream ScreencastClientFrame) returns (stream ScreencastServerFrame);
+
   // ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile back
   // api-gateway's browser.profileList/profileCreate/profileDelete channels
   // (SOL-006 Group C) — Postgres-backed metadata CRUD, mirroring
@@ -360,6 +373,51 @@ message PtyServerFrame {
 }
 message PtyOutput { bytes data = 1; }
 message PtyExited { int32 exit_code = 1; }
+
+message ScreencastClientFrame {
+  oneof frame {
+    StartScreencast start = 1;  // first frame only: what/how to capture
+    StopScreencast  stop  = 2;
+  }
+}
+// Field bounds mirror the OLD TS backend's clamp bounds exactly
+// (orca-runtime-browser.ts's clampInteger/clampOptionalInteger/
+// clampOptionalNumber calls) — both api-gateway's wscompat handler and
+// the agent-side capture loop clamp to these same ranges, so behavior is
+// byte-identical to the pre-backend-go implementation.
+message StartScreencast {
+  string worktree_id = 1;
+  string page = 2;
+  string format = 3;                     // "jpeg" | "png"
+  int32 quality = 4;                     // clamp 10-100, default 70
+  int32 max_width = 5;                   // clamp 320-3840, default 1440
+  int32 max_height = 6;                  // clamp 240-2160, default 1200
+  optional int32 viewport_width = 7;     // clamp 320-3840
+  optional int32 viewport_height = 8;    // clamp 240-2160
+  optional double device_scale_factor = 9; // clamp 1-4
+  bool mobile = 10;
+  int32 every_nth_frame = 11;            // clamp 1-10, default 2
+  int32 min_frame_interval_ms = 12;      // clamp 0-1000, default 0
+}
+message StopScreencast {}
+
+message ScreencastServerFrame {
+  oneof frame {
+    ScreencastReady ready = 1;
+    ScreencastFrame frame_data = 2;
+    ScreencastEnded ended = 3;
+    ScreencastError error = 4;
+  }
+}
+message ScreencastReady {
+  string subscription_id = 1;
+  string browser_page_id = 2;
+  string format = 3;
+}
+message ScreencastFrame { bytes data = 1; } // opaque — see AttachScreencast's doc comment
+message ScreencastEnded {}
+message ScreencastError { string message = 1; }
+
 message BrowserProfile {
   string id = 1;
   string tenant_id = 2;

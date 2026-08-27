@@ -4946,13 +4946,25 @@ func (x *ScanSetupScriptImportsResponse) GetImportedPaths() []string {
 }
 
 type CreateWorktreeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	RepoId        string                 `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
-	Branch        string                 `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`                  // new branch name for the worktree
-	BaseRef       string                 `protobuf:"bytes,4,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"` // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	RepoId    string                 `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	Branch    string                 `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`                  // new branch name for the worktree
+	BaseRef   string                 `protobuf:"bytes,4,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"` // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
+	// Optional lineage-capture context, forwarded as-is to project-service's
+	// RecordWorktreeCreated by the CreateWorktree saga — see
+	// project.proto's WorktreeLineageEntry doc comment for the shape this
+	// backs. Explicit-capture only; caller (wscompat's worktree.create) never
+	// needs to set capture_confidence.
+	ParentWorktreeId        *string `protobuf:"bytes,5,opt,name=parent_worktree_id,json=parentWorktreeId,proto3,oneof" json:"parent_worktree_id,omitempty"`
+	Origin                  *string `protobuf:"bytes,6,opt,name=origin,proto3,oneof" json:"origin,omitempty"`
+	CaptureSource           *string `protobuf:"bytes,7,opt,name=capture_source,json=captureSource,proto3,oneof" json:"capture_source,omitempty"`
+	TaskId                  *string `protobuf:"bytes,8,opt,name=task_id,json=taskId,proto3,oneof" json:"task_id,omitempty"`
+	OrchestrationRunId      *string `protobuf:"bytes,9,opt,name=orchestration_run_id,json=orchestrationRunId,proto3,oneof" json:"orchestration_run_id,omitempty"`
+	CoordinatorHandle       *string `protobuf:"bytes,10,opt,name=coordinator_handle,json=coordinatorHandle,proto3,oneof" json:"coordinator_handle,omitempty"`
+	CreatedByTerminalHandle *string `protobuf:"bytes,11,opt,name=created_by_terminal_handle,json=createdByTerminalHandle,proto3,oneof" json:"created_by_terminal_handle,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *CreateWorktreeRequest) Reset() {
@@ -5009,6 +5021,55 @@ func (x *CreateWorktreeRequest) GetBranch() string {
 func (x *CreateWorktreeRequest) GetBaseRef() string {
 	if x != nil {
 		return x.BaseRef
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetParentWorktreeId() string {
+	if x != nil && x.ParentWorktreeId != nil {
+		return *x.ParentWorktreeId
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetOrigin() string {
+	if x != nil && x.Origin != nil {
+		return *x.Origin
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetCaptureSource() string {
+	if x != nil && x.CaptureSource != nil {
+		return *x.CaptureSource
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetTaskId() string {
+	if x != nil && x.TaskId != nil {
+		return *x.TaskId
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetOrchestrationRunId() string {
+	if x != nil && x.OrchestrationRunId != nil {
+		return *x.OrchestrationRunId
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetCoordinatorHandle() string {
+	if x != nil && x.CoordinatorHandle != nil {
+		return *x.CoordinatorHandle
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetCreatedByTerminalHandle() string {
+	if x != nil && x.CreatedByTerminalHandle != nil {
+		return *x.CreatedByTerminalHandle
 	}
 	return ""
 }
@@ -7046,13 +7107,29 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\"G\n" +
 	"\x1eScanSetupScriptImportsResponse\x12%\n" +
-	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\x82\x01\n" +
+	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\xd9\x04\n" +
 	"\x15CreateWorktreeRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x17\n" +
 	"\arepo_id\x18\x02 \x01(\tR\x06repoId\x12\x16\n" +
 	"\x06branch\x18\x03 \x01(\tR\x06branch\x12\x19\n" +
-	"\bbase_ref\x18\x04 \x01(\tR\abaseRef\"h\n" +
+	"\bbase_ref\x18\x04 \x01(\tR\abaseRef\x121\n" +
+	"\x12parent_worktree_id\x18\x05 \x01(\tH\x00R\x10parentWorktreeId\x88\x01\x01\x12\x1b\n" +
+	"\x06origin\x18\x06 \x01(\tH\x01R\x06origin\x88\x01\x01\x12*\n" +
+	"\x0ecapture_source\x18\a \x01(\tH\x02R\rcaptureSource\x88\x01\x01\x12\x1c\n" +
+	"\atask_id\x18\b \x01(\tH\x03R\x06taskId\x88\x01\x01\x125\n" +
+	"\x14orchestration_run_id\x18\t \x01(\tH\x04R\x12orchestrationRunId\x88\x01\x01\x122\n" +
+	"\x12coordinator_handle\x18\n" +
+	" \x01(\tH\x05R\x11coordinatorHandle\x88\x01\x01\x12@\n" +
+	"\x1acreated_by_terminal_handle\x18\v \x01(\tH\x06R\x17createdByTerminalHandle\x88\x01\x01B\x15\n" +
+	"\x13_parent_worktree_idB\t\n" +
+	"\a_originB\x11\n" +
+	"\x0f_capture_sourceB\n" +
+	"\n" +
+	"\b_task_idB\x17\n" +
+	"\x15_orchestration_run_idB\x15\n" +
+	"\x13_coordinator_handleB\x1d\n" +
+	"\x1b_created_by_terminal_handle\"h\n" +
 	"\x16CreateWorktreeResponse\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x12\n" +
@@ -7518,6 +7595,7 @@ func file_orca_gitgateway_v1_gitgateway_proto_init() {
 	if File_orca_gitgateway_v1_gitgateway_proto != nil {
 		return
 	}
+	file_orca_gitgateway_v1_gitgateway_proto_msgTypes[89].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

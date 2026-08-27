@@ -13,7 +13,7 @@ rewrite — see "Out-of-scope dependency" below.
 - `backend-go/services/infra-fleet-service/internal/usecase/*.go` (new emulator usecases)
 - `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/methods.go`
 - `agent/src/relay/agent-rpc-dispatch.ts` and ADB/`xcrun simctl` driver modules (not part of `backend-go` — a different repo area, listed for completeness only)
-**Status:** 📋 Proposed — not yet implemented, and the full design cannot ship until an explicitly out-of-scope `agent/` change lands. Only the honest-stub half is implementable now.
+**Status:** ✅ Implemented — all 3 task(s) (TASK-046–048) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

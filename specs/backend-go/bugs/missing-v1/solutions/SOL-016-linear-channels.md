@@ -11,7 +11,7 @@
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_linear.go` (new file)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_linear_test.go` (new file)
 - `backend-go/services/api-gateway/cmd/server/main.go` (`registerLinearChannels` call alongside SOL-015's `registerJiraChannels`)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 6 task(s) (TASK-102–107) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

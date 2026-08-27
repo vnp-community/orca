@@ -11,7 +11,7 @@ below) + `api-gateway`
 - `backend-go/services/git-gateway-service/internal/adapter/devserveragent/` (extend the existing relay client's method set)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (new `registerFilesChannels`)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_test.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 12 task(s) (TASK-049–060) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

@@ -45,19 +45,41 @@ func (p *ProjectClient) GetRepo(ctx context.Context, repoID string) (domain.Repo
 		"project-service has no RPC to fetch a single repo by id yet (only ListRepos(project_id)); see project_client.go's GetRepo doc comment", nil)
 }
 
-func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error) {
+func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
 		return domain.WorktreeRecord{}, err
 	}
-	resp, err := p.client.RecordWorktreeCreated(ctx, &projectv1.RecordWorktreeCreatedRequest{
+	req := &projectv1.RecordWorktreeCreatedRequest{
 		ProjectId: projectID, RepoId: repoID, Path: path, Branch: branch,
-	})
+	}
+	// Optional string proto fields want a *string, not "" — nonEmptyPtr
+	// keeps every unsupplied lineage field genuinely unset on the wire
+	// rather than an empty-but-present string.
+	req.ParentWorktreeId = nonEmptyPtr(lineage.ParentWorktreeID)
+	req.Origin = nonEmptyPtr(lineage.Origin)
+	req.CaptureSource = nonEmptyPtr(lineage.CaptureSource)
+	req.TaskId = nonEmptyPtr(lineage.TaskID)
+	req.OrchestrationRunId = nonEmptyPtr(lineage.OrchestrationRunID)
+	req.CoordinatorHandle = nonEmptyPtr(lineage.CoordinatorHandle)
+	req.CreatedByTerminalHandle = nonEmptyPtr(lineage.CreatedByTerminalHandle)
+
+	resp, err := p.client.RecordWorktreeCreated(ctx, req)
 	if err != nil {
 		return domain.WorktreeRecord{}, err
 	}
 	wt := resp.GetWorktree()
 	return domain.WorktreeRecord{ID: wt.GetId(), Path: wt.GetPath(), Branch: wt.GetBranch()}, nil
+}
+
+// nonEmptyPtr returns nil for an empty string, else a pointer to it —
+// distinguishes "not supplied" from a genuinely empty value for every
+// optional lineage field on RecordWorktreeCreatedRequest.
+func nonEmptyPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (p *ProjectClient) RecordWorktreeRemoved(ctx context.Context, worktreeID string) error {

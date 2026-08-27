@@ -9,7 +9,7 @@
 - `backend-go/services/infra-fleet-service/migrations/000X_browser_profiles.up.sql` (new)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_browser.go` (new)
 - `agent/` (new browser-driving capability — **flagged out of scope**, see below)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** 🚧 Partially implemented — agent + backend-go layers implemented and tested end-to-end (2026-08 pass); frontend dispatch to the new relay path is a documented, separately-scoped open gap — see TASK-036's "Status by layer" section.
 
 ---
 

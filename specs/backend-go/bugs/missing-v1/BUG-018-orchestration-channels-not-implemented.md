@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** Low-Medium
 **Symptom:** `orchestration.dispatchShow` falls through to `registry.go`'s `notImplementedHandler` and returns an error immediately.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-110–112 (3 task(s), all DONE) for implementation evidence.
 
 ---
 

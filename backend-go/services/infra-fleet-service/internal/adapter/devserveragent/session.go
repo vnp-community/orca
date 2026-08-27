@@ -2,6 +2,7 @@ package devserveragent
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -80,6 +81,18 @@ type session struct {
 	// call()/readLoop's request-response bookkeeping.
 	ptyMu   sync.Mutex
 	ptySubs map[string][]chan rawPtyNotification
+
+	// screencastMu/screencastSubs is the same demux pattern as ptyMu/ptySubs,
+	// for browser.screencastReady/Frame/Ended/Error notifications
+	// (StreamScreencast) — keyed by worktree_id rather than a pty id, since
+	// (unlike a pty, which already exists by the time StreamPty subscribes)
+	// a screencast's subscription_id/browser_page_id are only assigned by
+	// the agent's browser.screencastReady response, so worktree_id (known
+	// up front, caller-supplied) is the only viable subscribe-before-call
+	// correlation key. Own mutex for the same never-contend-with-call()
+	// reason ptyMu has its own.
+	screencastMu   sync.Mutex
+	screencastSubs map[string][]chan rawScreencastNotification
 
 	reconnectAttempt int
 
@@ -292,10 +305,15 @@ type ptyNotificationParams struct {
 func (s *session) routeNotification(n JSONRPCNotification) {
 	switch n.Method {
 	case "pty.data", "pty.exit", "pty.replay":
+		s.routePtyNotification(n)
+	case "browser.screencastReady", "browser.screencastFrame", "browser.screencastEnded", "browser.screencastError":
+		s.routeScreencastNotification(n)
 	default:
-		return // not a pty notification this client demuxes, see package doc comment's "Two RPC surfaces" note
+		return // not a notification this client demuxes, see package doc comment's "Two RPC surfaces" note
 	}
+}
 
+func (s *session) routePtyNotification(n JSONRPCNotification) {
 	var p ptyNotificationParams
 	if len(n.Params) > 0 {
 		_ = json.Unmarshal(n.Params, &p) // best-effort, see ptyNotificationParams's FLAGGED doc comment
@@ -353,6 +371,115 @@ func (s *session) unsubscribePty(ptyID string, ch chan rawPtyNotification) {
 		delete(s.ptySubs, ptyID)
 	}
 	s.ptyMu.Unlock()
+	close(ch)
+}
+
+// rawScreencastNotification is session.go's internal decoding of one
+// browser.screencastReady/Frame/Ended/Error notification — StreamScreencast
+// (client.go) wraps this into the exported usecase.ScreencastEvent shape.
+// Exactly one of Ready/Frame/Ended/ErrorMsg is meaningfully set per value,
+// matching rawPtyNotification's "one raw struct, caller narrows by which
+// notification method produced it" convention.
+type rawScreencastNotification struct {
+	Ready          bool
+	SubscriptionID string
+	BrowserPageID  string
+	Format         string
+	Frame          []byte
+	Ended          bool
+	ErrorMsg       string
+}
+
+// screencastNotificationParams is this adapter's decoding of
+// browser.screencastReady/Frame/Ended/Error notification params — unlike
+// ptyNotificationParams, this shape is NOT a best-effort guess: both this
+// adapter and agent/src/relay/browser-screencast-handler.ts (this same
+// implementation pass) were written together, so the field names below are
+// the actual, verified contract, not a FLAGGED placeholder.
+type screencastNotificationParams struct {
+	WorktreeID     string `json:"worktreeId"`
+	SubscriptionID string `json:"subscriptionId"`
+	BrowserPageID  string `json:"browserPageId"`
+	Format         string `json:"format"`
+	DataBase64     string `json:"dataBase64"`
+	Message        string `json:"message"`
+}
+
+// routeScreencastNotification is routeNotification's screencast counterpart
+// — same demux-by-correlation-key-then-non-blocking-fanout shape as
+// routePtyNotification, keyed by worktree_id (see screencastSubs's doc
+// comment for why).
+func (s *session) routeScreencastNotification(n JSONRPCNotification) {
+	var p screencastNotificationParams
+	if len(n.Params) > 0 {
+		_ = json.Unmarshal(n.Params, &p)
+	}
+	if p.WorktreeID == "" {
+		return
+	}
+
+	raw := rawScreencastNotification{}
+	switch n.Method {
+	case "browser.screencastReady":
+		raw.Ready = true
+		raw.SubscriptionID = p.SubscriptionID
+		raw.BrowserPageID = p.BrowserPageID
+		raw.Format = p.Format
+	case "browser.screencastFrame":
+		decoded, err := base64.StdEncoding.DecodeString(p.DataBase64)
+		if err != nil {
+			return // malformed frame — drop rather than forward garbage bytes
+		}
+		raw.Frame = decoded
+	case "browser.screencastEnded":
+		raw.Ended = true
+	case "browser.screencastError":
+		raw.ErrorMsg = p.Message
+	}
+
+	s.screencastMu.Lock()
+	subs := append([]chan rawScreencastNotification(nil), s.screencastSubs[p.WorktreeID]...)
+	s.screencastMu.Unlock()
+
+	for _, ch := range subs {
+		select {
+		case ch <- raw:
+		default: // slow/gone consumer — drop rather than block the read loop
+		}
+	}
+}
+
+// subscribeScreencast registers a new listener for worktreeID's screencast
+// notifications — StreamScreencast's implementation. MUST be called BEFORE
+// issuing the browser.screencastStart call (see StreamScreencast) so a fast
+// agent response can never arrive before the subscription exists.
+func (s *session) subscribeScreencast(worktreeID string) chan rawScreencastNotification {
+	ch := make(chan rawScreencastNotification, 64)
+	s.screencastMu.Lock()
+	if s.screencastSubs == nil {
+		s.screencastSubs = make(map[string][]chan rawScreencastNotification)
+	}
+	s.screencastSubs[worktreeID] = append(s.screencastSubs[worktreeID], ch)
+	s.screencastMu.Unlock()
+	return ch
+}
+
+// unsubscribeScreencast removes and closes ch — MUST be called exactly once
+// by whoever called subscribeScreencast (see StreamScreencast's returned
+// unsubscribe func).
+func (s *session) unsubscribeScreencast(worktreeID string, ch chan rawScreencastNotification) {
+	s.screencastMu.Lock()
+	subs := s.screencastSubs[worktreeID]
+	for i, c := range subs {
+		if c == ch {
+			s.screencastSubs[worktreeID] = append(subs[:i], subs[i+1:]...)
+			break
+		}
+	}
+	if len(s.screencastSubs[worktreeID]) == 0 {
+		delete(s.screencastSubs, worktreeID)
+	}
+	s.screencastMu.Unlock()
 	close(ch)
 }
 

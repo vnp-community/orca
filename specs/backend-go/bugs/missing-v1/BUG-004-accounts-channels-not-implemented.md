@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** Medium — narrow surface (4 methods), but it's the only way a remote-environment user can switch/remove which Claude or Codex CLI account backs their session; without it the account switcher is silently broken whenever `target.kind === 'environment'` (any backend-go-connected dev server/web-mode target).
 **Symptom:** `accounts.selectClaude`, `accounts.selectCodex`, `accounts.removeClaude`, `accounts.removeCodex` all time out with `channel "accounts.X" is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-021–023 (3 task(s), all DONE) for implementation evidence.
 
 ---
 

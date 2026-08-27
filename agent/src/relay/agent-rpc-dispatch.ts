@@ -1407,6 +1407,33 @@ async function route(
       }
     }
 
+    // ── browser.screencast (live-view stream) ─────────────────────────────────
+    // Why this passes makeNotifier(ws, state) (unlike the request/response
+    // browser.* ops above): the CDP screencast session outlives this one
+    // dispatch call, pushing browser.screencastReady/Frame/Ended/Error
+    // notifications asynchronously for as long as it's attached — same
+    // shape as the pty.* cases' notifier binding below. See
+    // browser-screencast-handler.ts's header comment for the full design.
+    case 'browser.screencastStart': {
+      try {
+        const { handleBrowserScreencastStart } = await import('./browser-screencast-handler')
+        return (await handleBrowserScreencastStart(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.screencastStart unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.screencastStop': {
+      try {
+        const { handleBrowserScreencastStop } = await import('./browser-screencast-handler')
+        return handleBrowserScreencastStop(rpc.id, rpc.params ?? {}, makeNotifier(ws, state)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.screencastStop unavailable: ${msg}`)
+      }
+    }
+
     // ── fs.mkdir ─────────────────────────────────────────────────────────────
     // Creates a directory (recursive) on the agent's filesystem.
     case 'fs.mkdir': {

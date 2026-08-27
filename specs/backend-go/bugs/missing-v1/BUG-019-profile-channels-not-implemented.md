@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** High — `WorkspaceContext.tsx` calls `profile.getResolved` on bootstrap; this likely blocks basic app load
 **Symptom:** Every `profile.*` call from `WorkspaceContext.tsx`, `useProfile.ts`, `CompanyProfileAdmin.tsx`, `DeptProfileAdmin.tsx` times out with `channel "profile.X" is not yet implemented in backend-go`
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-126–130 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

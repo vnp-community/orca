@@ -55,6 +55,13 @@ type fakeDevServerAgentClient struct {
 	streamPtyErr          error
 	streamPtyUnsubscribed bool
 
+	// streamScreencastEvents/Err/Unsubscribed mirror streamPtyEvents's
+	// convention exactly, for StreamScreencast.
+	streamScreencastEvents       chan ScreencastEvent
+	streamScreencastErr          error
+	streamScreencastUnsubscribed bool
+	streamScreencastCalls        []ScreencastParams
+
 	agentStatusResult AgentStatusResult
 	agentStatusErr    error
 
@@ -134,6 +141,25 @@ func (f *fakeDevServerAgentClient) StreamPty(ctx context.Context, devServer doma
 	unsubscribe := func() {
 		f.mu.Lock()
 		f.streamPtyUnsubscribed = true
+		f.mu.Unlock()
+	}
+	return events, unsubscribe, nil
+}
+
+func (f *fakeDevServerAgentClient) StreamScreencast(ctx context.Context, devServer domain.DevServer, params ScreencastParams) (<-chan ScreencastEvent, func(), error) {
+	f.mu.Lock()
+	f.streamScreencastCalls = append(f.streamScreencastCalls, params)
+	f.mu.Unlock()
+	if f.streamScreencastErr != nil {
+		return nil, nil, f.streamScreencastErr
+	}
+	events := f.streamScreencastEvents
+	if events == nil {
+		events = make(chan ScreencastEvent)
+	}
+	unsubscribe := func() {
+		f.mu.Lock()
+		f.streamScreencastUnsubscribed = true
 		f.mu.Unlock()
 	}
 	return events, unsubscribe, nil

@@ -10,7 +10,7 @@
 - `backend-go/services/workflow-service/internal/adapter/postgres/template_repository.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_workflow_test.go` (new)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 4 task(s) (TASK-188–191) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

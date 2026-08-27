@@ -407,13 +407,22 @@ func registerSshChannels(r *Registry, client infrafleetv1.InfraFleetServiceClien
 //
 // Registered as a fast, LOCAL (no downstream call) response, same pattern
 // as registerPreflightChannels in channels.go — see SOL-025 for why:
-// status.get's only wscompat-reachable caller
-// (windows-terminal-capability-read.ts, target.kind==='local') reads
-// nothing but hostPlatform; its other nominal caller
-// (browser-pane-remote.tsx) always uses target.kind==='environment' and
-// never reaches this handler — that path goes through
-// window.api.runtimeEnvironments.call, an Electron-desktop-only IPC
-// surface out of scope for backend-go (api-gateway.md §10).
+// status.get's simplest caller (windows-terminal-capability-read.ts,
+// target.kind==='local') reads nothing but hostPlatform.
+//
+// CORRECTED (see TASK-036's "Status by layer" section): this doc comment
+// used to claim browser-pane-remote.tsx's target.kind==='environment' call
+// path was Electron-desktop-only and out of scope for backend-go. That was
+// wrong for the web/server-mode build api-gateway actually targets —
+// window.api.runtimeEnvironments.call/subscribe DOES reach this package's
+// /ws surface for a session-auth environment (WebSessionClient), proven by
+// accounts.subscribe (TASK-023). capabilities now reports
+// "browser.screencast.v1" for real, matching
+// frontend/src/shared/protocol-version.ts's RUNTIME_CAPABILITIES entry —
+// browser-pane-remote.tsx's capability gate
+// (status.capabilities.includes('browser.screencast.v1')) checks exactly
+// this before ever opening the browser.screencast subscription
+// (channels_browser_screencast.go).
 //
 // runtimeId/graphStatus/authoritativeWindowId/liveTabCount/liveLeafCount
 // mirror Electron's multi-window runtime-graph concept, which has no
@@ -430,7 +439,7 @@ func registerStatusChannels(r *Registry) {
 			"liveLeafCount":                     0,
 			"runtimeProtocolVersion":            currentRuntimeProtocolVersion,
 			"minCompatibleRuntimeClientVersion": minCompatibleRuntimeClientVersion,
-			"capabilities":                      []string{},
+			"capabilities":                      []string{"browser.screencast.v1"},
 			"hostPlatform":                      hostPlatformString(), // the one field windows-terminal-capability-read.ts actually reads
 		}, nil
 	})

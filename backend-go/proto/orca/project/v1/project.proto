@@ -40,6 +40,11 @@ service ProjectService {
   rpc ListWorktrees(ListWorktreesRequest) returns (ListWorktreesResponse);
   rpc SetWorktreeActivation(SetWorktreeActivationRequest) returns (SetWorktreeActivationResponse);
   rpc RenameWorktree(RenameWorktreeRequest) returns (RenameWorktreeResponse);
+  // ListWorktreeLineage returns every worktree with an explicitly-captured
+  // parent (tenant-scoped via RLS, no request params — mirrors the old TS
+  // backend's worktree.lineageList, explicit-capture only per
+  // docs/execution-plan.md's frontend-compatibility-layer coverage table).
+  rpc ListWorktreeLineage(ListWorktreeLineageRequest) returns (ListWorktreeLineageResponse);
 
   // ProjectGroup surface — self-referential tree via parent_group_id, per
   // project-service.md §4.
@@ -249,6 +254,19 @@ message Worktree {
   string path = 4;
   string branch = 5;
   bool active = 6;
+
+  // Lineage — explicit-capture only for now (see WorktreeLineageEntry's doc
+  // comment). Unset when this worktree wasn't created with a captured
+  // parent context.
+  optional string parent_worktree_id = 7;
+  optional string origin = 8;
+  optional string capture_source = 9;
+  optional string capture_confidence = 10;
+  optional string task_id = 11;
+  optional string orchestration_run_id = 12;
+  optional string coordinator_handle = 13;
+  optional string created_by_terminal_handle = 14;
+  int64 created_at_unix_ms = 15;
 }
 
 message RecordWorktreeCreatedRequest {
@@ -256,6 +274,19 @@ message RecordWorktreeCreatedRequest {
   string repo_id = 2;
   string path = 3;
   string branch = 4;
+
+  // Optional lineage-capture context, threaded through from the caller
+  // (git-gateway-service's CreateWorktree saga) when this worktree was
+  // branched from another one. capture_confidence is NOT a caller input —
+  // project-service always stamps "explicit" when any of these are set,
+  // since inferred capture (branch-description scanning) isn't ported yet.
+  optional string parent_worktree_id = 5;
+  optional string origin = 6;
+  optional string capture_source = 7;
+  optional string task_id = 8;
+  optional string orchestration_run_id = 9;
+  optional string coordinator_handle = 10;
+  optional string created_by_terminal_handle = 11;
 }
 
 message RecordWorktreeCreatedResponse {
@@ -292,6 +323,34 @@ message RenameWorktreeRequest {
 
 message RenameWorktreeResponse {
   Worktree worktree = 1;
+}
+
+message ListWorktreeLineageRequest {}
+
+message ListWorktreeLineageResponse {
+  repeated WorktreeLineageEntry lineage = 1;
+}
+
+// WorktreeLineageEntry mirrors frontend/src/shared/types.ts's WorktreeLineage
+// — one entry per worktree that has an explicitly-captured parent.
+// capture_confidence is always "explicit" today: inferring lineage from a
+// worktree's git branch description (the old TS backend's
+// extractOrchestrationTaskId) isn't ported — git-gateway-service has no RPC
+// to read a branch description yet. worktree_instance_id/
+// parent_worktree_instance_id from the TS shape are deliberately omitted:
+// backend-go has no separate "instance" concept, so wscompat mirrors
+// worktree_id/parent_worktree_id into both wire fields.
+message WorktreeLineageEntry {
+  string worktree_id = 1;
+  optional string parent_worktree_id = 2;
+  optional string origin = 3;
+  optional string capture_source = 4;
+  optional string capture_confidence = 5;
+  optional string task_id = 6;
+  optional string orchestration_run_id = 7;
+  optional string coordinator_handle = 8;
+  optional string created_by_terminal_handle = 9;
+  int64 created_at_unix_ms = 10;
 }
 
 message ProjectGroup {

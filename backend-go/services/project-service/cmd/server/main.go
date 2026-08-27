@@ -140,6 +140,7 @@ func run() error {
 	listWorktreesUC := usecase.NewListWorktrees(worktreeRepo, repo, opa)
 	setWorktreeActivationUC := usecase.NewSetWorktreeActivation(worktreeRepo)
 	renameWorktreeUC := usecase.NewRenameWorktree(worktreeRepo)
+	listWorktreeLineageUC := usecase.NewListWorktreeLineage(worktreeRepo)
 
 	createProjectGroupUC := usecase.NewCreateProjectGroup(projectGroupRepo)
 	updateProjectGroupUC := usecase.NewUpdateProjectGroup(projectGroupRepo)
@@ -182,6 +183,7 @@ func run() error {
 		ListWorktrees:         listWorktreesUC,
 		SetWorktreeActivation: setWorktreeActivationUC,
 		RenameWorktree:        renameWorktreeUC,
+		ListWorktreeLineage:   listWorktreeLineageUC,
 
 		CreateProjectGroup: createProjectGroupUC,
 		UpdateProjectGroup: updateProjectGroupUC,
@@ -189,9 +191,9 @@ func run() error {
 		ListProjectGroups:  listProjectGroupsUC,
 
 		FolderWorkspaces: folderWorkspaceUC,
-		MoveProject:        moveProjectUC,
-		ScanNested:         scanNestedUC,
-		ImportNested:       importNestedUC,
+		MoveProject:      moveProjectUC,
+		ScanNested:       scanNestedUC,
+		ImportNested:     importNestedUC,
 
 		CreateHostSetup:     createHostSetupUC,
 		ListHostSetups:      listHostSetupsUC,

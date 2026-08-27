@@ -4,7 +4,7 @@
 **File:** `internal/adapter/wscompat/channels.go`
 **Severity:** High — `repo.list`/`repo.add`/`repo.clone` are the core onboarding flow (adding your first repo); every method in this namespace currently fails.
 **Symptom:** Every `repo.*` `callRuntimeRpc` from the renderer falls through to `registry.go`'s `notImplementedHandler` and returns `channel "repo.X" is not yet implemented in backend-go`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-151–161 (11 task(s), all DONE) for implementation evidence.
 
 ---
 

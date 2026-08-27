@@ -4,7 +4,7 @@
 **File:** `internal/adapter/wscompat/channels.go`
 **Severity:** Medium — port scan/kill is used to detect and free stuck dev-server ports in a workspace.
 **Symptom:** `workspacePorts.scan`/`workspacePorts.kill` `callRuntimeRpc` calls fall through to `registry.go`'s `notImplementedHandler` and return `channel "workspacePorts.X" is not yet implemented in backend-go`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-169–173 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

@@ -23,6 +23,7 @@ type fakeProjectClient struct {
 	gotRecordCreatedRepo    string
 	gotRecordCreatedPath    string
 	gotRecordCreatedBranch  string
+	gotRecordCreatedLineage domain.WorktreeLineageCapture
 
 	recordRemovedErr    error
 	calledRecordRemoved bool
@@ -41,12 +42,13 @@ func (f *fakeProjectClient) GetRepo(ctx context.Context, repoID string) (domain.
 	return domain.RepoInfo{ID: repoID}, nil
 }
 
-func (f *fakeProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error) {
+func (f *fakeProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	f.calledRecordCreated = true
 	f.gotRecordCreatedProject = projectID
 	f.gotRecordCreatedRepo = repoID
 	f.gotRecordCreatedPath = path
 	f.gotRecordCreatedBranch = branch
+	f.gotRecordCreatedLineage = lineage
 	if f.recordCreatedErr != nil {
 		return domain.WorktreeRecord{}, f.recordCreatedErr
 	}

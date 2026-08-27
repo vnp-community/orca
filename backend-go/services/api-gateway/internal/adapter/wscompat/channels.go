@@ -108,6 +108,7 @@ func RegisterRealChannels(
 	registerRepoSshStatusWorkspaceChannels(r, projectClient, gitClient, infraFleetClient)
 	registerSCMChannels(r, scmClient)
 	registerBrowserChannels(r, infraFleetClient)
+	registerBrowserScreencastChannel(r, infraFleetClient)
 	registerBrowserProfileChannels(r, infraFleetClient)
 	// registerGitDeepChannels must be called after registerGitChannels:
 	// both register "git.diff", and only the deep version threads FilePath
@@ -118,6 +119,7 @@ func RegisterRealChannels(
 	registerAutomationTaskChannels(r, automationClient, taskClient)
 	registerWorktreeChannels(r, gitClient, projectClient)
 	registerWorkspaceChannels(r, gitClient, projectClient)
+	registerSessionTabsChannels(r, infraFleetClient)
 	registerEmulatorFolderWorkspaceHostChannels(r, projectClient, infraFleetClient)
 	registerTeamChannels(r, tenantClient)
 	registerTerminalChannels(r, infraFleetClient)

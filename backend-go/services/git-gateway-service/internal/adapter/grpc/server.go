@@ -34,14 +34,14 @@ type Server struct {
 	stage   *usecase.Stage
 	unstage *usecase.Unstage
 
-	history        *usecase.History
-	checkIgnored   *usecase.CheckIgnored
-	forkSync       *usecase.ForkSync
-	upstreamStatus *usecase.UpstreamStatus
-	commitCompare  *usecase.CommitCompare
-	branchCompare  *usecase.BranchCompare
-	commitDiff     *usecase.CommitDiff
-	branchDiff     *usecase.BranchDiff
+	history         *usecase.History
+	checkIgnored    *usecase.CheckIgnored
+	forkSync        *usecase.ForkSync
+	upstreamStatus  *usecase.UpstreamStatus
+	commitCompare   *usecase.CommitCompare
+	branchCompare   *usecase.BranchCompare
+	commitDiff      *usecase.CommitDiff
+	branchDiff      *usecase.BranchDiff
 	submoduleStatus *usecase.SubmoduleStatus
 
 	remoteCommitURL *usecase.RemoteCommitURL
@@ -85,16 +85,16 @@ type Server struct {
 	resolveMrBase      *usecase.ResolveMrBase
 
 	// Group A — branch/ref operations (TASK-207)
-	checkout           *usecase.Checkout
-	listLocalBranches  *usecase.ListLocalBranches
-	fastForward        *usecase.FastForward
-	rebaseFromBase     *usecase.RebaseFromBase
-	abortRebase        *usecase.AbortRebase
-	abortMerge         *usecase.AbortMerge
-	conflictOperation  *usecase.ConflictOperation
-	resolveConflict    *usecase.ResolveConflict
-	discard            *usecase.Discard
-	bulkDiscard        *usecase.BulkDiscard
+	checkout          *usecase.Checkout
+	listLocalBranches *usecase.ListLocalBranches
+	fastForward       *usecase.FastForward
+	rebaseFromBase    *usecase.RebaseFromBase
+	abortRebase       *usecase.AbortRebase
+	abortMerge        *usecase.AbortMerge
+	conflictOperation *usecase.ConflictOperation
+	resolveConflict   *usecase.ResolveConflict
+	discard           *usecase.Discard
+	bulkDiscard       *usecase.BulkDiscard
 }
 
 // New wires every usecase this server dispatches to. Parameter order
@@ -678,6 +678,15 @@ func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.S
 func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
 	result, err := s.createWorktree.Execute(ctx, usecase.CreateWorktreeInput{
 		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(),
+		Lineage: domain.WorktreeLineageCapture{
+			ParentWorktreeID:        req.GetParentWorktreeId(),
+			Origin:                  req.GetOrigin(),
+			CaptureSource:           req.GetCaptureSource(),
+			TaskID:                  req.GetTaskId(),
+			OrchestrationRunID:      req.GetOrchestrationRunId(),
+			CoordinatorHandle:       req.GetCoordinatorHandle(),
+			CreatedByTerminalHandle: req.GetCreatedByTerminalHandle(),
+		},
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

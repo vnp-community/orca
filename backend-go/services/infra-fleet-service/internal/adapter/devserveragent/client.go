@@ -53,6 +53,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/coder/websocket"
 
@@ -338,6 +339,94 @@ func (c *Client) StreamPty(ctx context.Context, devServer domain.DevServer, ptyI
 		})
 	}
 	return out, unsubscribe, nil
+}
+
+// StreamScreencast starts a browser.screencast capture and subscribes to
+// its notifications — see usecase.DevServerAgentClient.StreamScreencast's
+// doc comment for why this subscribes BEFORE issuing the start call
+// (avoids a race where a fast browser.screencastReady notification arrives
+// before subscribeScreencast has registered a channel for it).
+func (c *Client) StreamScreencast(ctx context.Context, devServer domain.DevServer, params usecase.ScreencastParams) (<-chan usecase.ScreencastEvent, func(), error) {
+	if devServer.Mode == domain.ConnectionModeRelaySSH {
+		return nil, nil, fmt.Errorf("%w: relay-ssh mode has no browser.* JSON-RPC surface (no relay.js deployed)", ErrConnectionModeNotImplemented)
+	}
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	raw := sess.subscribeScreencast(params.WorktreeID)
+
+	if _, err := sess.call(ctx, "browser.screencastStart", screencastStartParams(params)); err != nil {
+		sess.unsubscribeScreencast(params.WorktreeID, raw)
+		return nil, nil, err
+	}
+
+	out := make(chan usecase.ScreencastEvent, 64)
+	done := make(chan struct{})
+	var closeOnce sync.Once
+
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case n, ok := <-raw:
+				if !ok {
+					return
+				}
+				out <- usecase.ScreencastEvent{
+					Ready: n.Ready, SubscriptionID: n.SubscriptionID, BrowserPageID: n.BrowserPageID,
+					Format: n.Format, Frame: n.Frame, Ended: n.Ended, ErrorMsg: n.ErrorMsg,
+				}
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	unsubscribe := func() {
+		closeOnce.Do(func() {
+			close(done)
+			sess.unsubscribeScreencast(params.WorktreeID, raw)
+			// Best-effort: tell the agent to stop capturing — errors here
+			// are non-fatal (the connection may already be gone, which is
+			// exactly when unsubscribe is being called from).
+			stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, _ = sess.call(stopCtx, "browser.screencastStop", map[string]any{"worktreeId": params.WorktreeID})
+		})
+	}
+	return out, unsubscribe, nil
+}
+
+// screencastStartParams builds browser.screencastStart's JSON-RPC params
+// from usecase.ScreencastParams — field names match
+// browser-screencast-handler.ts's dispatch case exactly (both sides of this
+// contract were written together in this pass, not independently guessed).
+func screencastStartParams(p usecase.ScreencastParams) map[string]any {
+	params := map[string]any{
+		"worktreeId":         p.WorktreeID,
+		"page":               p.Page,
+		"format":             p.Format,
+		"quality":            p.Quality,
+		"maxWidth":           p.MaxWidth,
+		"maxHeight":          p.MaxHeight,
+		"mobile":             p.Mobile,
+		"everyNthFrame":      p.EveryNthFrame,
+		"minFrameIntervalMs": p.MinFrameIntervalMs,
+	}
+	if p.ViewportWidth != nil {
+		params["viewportWidth"] = *p.ViewportWidth
+	}
+	if p.ViewportHeight != nil {
+		params["viewportHeight"] = *p.ViewportHeight
+	}
+	if p.DeviceScaleFactor != nil {
+		params["deviceScaleFactor"] = *p.DeviceScaleFactor
+	}
+	return params
 }
 
 // Close tears down every open session — call on service shutdown.

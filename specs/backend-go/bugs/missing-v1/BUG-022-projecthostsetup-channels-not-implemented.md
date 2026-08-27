@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** Medium
 **Symptom:** Every `projectHostSetup.*` call from `repos.ts` times out with `channel "projectHostSetup.X" is not yet implemented in backend-go`
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-141–145 (5 task(s), all DONE) for implementation evidence.
 
 ---
 
