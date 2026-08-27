@@ -8,6 +8,8 @@ package grpc
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
@@ -31,6 +33,10 @@ type Server struct {
 	resolveTemplate     *usecase.ResolveTemplate
 	updateTemplate      *usecase.UpdateTemplate
 	cloneTemplate       *usecase.CloneTemplate
+
+	publishTemplate      *usecase.PublishTemplate
+	resolveApproval      *usecase.ResolveApproval
+	listPendingApprovals *usecase.ListPendingApprovals
 }
 
 func New(
@@ -46,20 +52,26 @@ func New(
 	resolveTemplate *usecase.ResolveTemplate,
 	updateTemplate *usecase.UpdateTemplate,
 	cloneTemplate *usecase.CloneTemplate,
+	publishTemplate *usecase.PublishTemplate,
+	resolveApproval *usecase.ResolveApproval,
+	listPendingApprovals *usecase.ListPendingApprovals,
 ) *Server {
 	return &Server{
-		createTemplate:      createTemplate,
-		execute:             execute,
-		getExecution:        getExecution,
-		pauseExecution:      pauseExecution,
-		resumeExecution:     resumeExecution,
-		executeAdHocStep:    executeAdHocStep,
-		hasActiveExecutions: hasActiveExecutions,
-		cancelExecution:     cancelExecution,
-		listTemplates:       listTemplates,
-		resolveTemplate:     resolveTemplate,
-		updateTemplate:      updateTemplate,
-		cloneTemplate:       cloneTemplate,
+		createTemplate:       createTemplate,
+		execute:              execute,
+		getExecution:         getExecution,
+		pauseExecution:       pauseExecution,
+		resumeExecution:      resumeExecution,
+		executeAdHocStep:     executeAdHocStep,
+		hasActiveExecutions:  hasActiveExecutions,
+		cancelExecution:      cancelExecution,
+		listTemplates:        listTemplates,
+		resolveTemplate:      resolveTemplate,
+		updateTemplate:       updateTemplate,
+		cloneTemplate:        cloneTemplate,
+		publishTemplate:      publishTemplate,
+		resolveApproval:      resolveApproval,
+		listPendingApprovals: listPendingApprovals,
 	}
 }
 
@@ -198,6 +210,57 @@ func (s *Server) CloneTemplate(ctx context.Context, req *workflowv1.CloneTemplat
 	return &workflowv1.CloneTemplateResponse{Template: toProtoTemplate(tmpl)}, nil
 }
 
+func (s *Server) PublishTemplate(ctx context.Context, req *workflowv1.PublishTemplateRequest) (*workflowv1.WorkflowTemplate, error) {
+	tmpl, err := s.publishTemplate.Execute(ctx, usecase.PublishTemplateInput{
+		TemplateID:    req.GetTemplateId(),
+		NewVisibility: domain.Visibility(req.GetNewVisibility()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoTemplate(tmpl), nil
+}
+
+func (s *Server) ListPendingApprovals(ctx context.Context, req *workflowv1.ListPendingApprovalsRequest) (*workflowv1.ListPendingApprovalsResponse, error) {
+	out, err := s.listPendingApprovals.Execute(ctx, usecase.ListPendingApprovalsInput{
+		PageToken: req.GetPageToken(),
+		PageSize:  req.GetPageSize(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	approvals := make([]*workflowv1.Approval, 0, len(out.Approvals))
+	for _, a := range out.Approvals {
+		approvals = append(approvals, toProtoApproval(a))
+	}
+	return &workflowv1.ListPendingApprovalsResponse{Approvals: approvals, NextPageToken: out.NextPageToken}, nil
+}
+
+func (s *Server) ResolveApproval(ctx context.Context, req *workflowv1.ResolveApprovalRequest) (*workflowv1.Approval, error) {
+	approval, err := s.resolveApproval.Execute(ctx, usecase.ResolveApprovalInput{
+		ApprovalID: req.GetApprovalId(),
+		Decision:   domain.ApprovalStatus(req.GetDecision()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoApproval(approval), nil
+}
+
+func toProtoApproval(a domain.Approval) *workflowv1.Approval {
+	out := &workflowv1.Approval{
+		Id:          a.ID,
+		TemplateId:  a.TemplateID,
+		RequestedBy: a.RequestedBy,
+		Status:      string(a.Status),
+		ResolvedBy:  a.ResolvedBy,
+	}
+	if a.ResolvedAt != nil {
+		out.ResolvedAt = timestamppb.New(*a.ResolvedAt)
+	}
+	return out
+}
+
 func toDomainStepType(t workflowv1.StepType) domain.StepType {
 	switch t {
 	case workflowv1.StepType_STEP_TYPE_AGENT:
@@ -236,6 +299,10 @@ func toProtoTemplate(t domain.WorkflowTemplate) *workflowv1.WorkflowTemplate {
 		RemoveStepsJson:      t.RemoveStepsJSON,
 		UsageCount:           t.UsageCount,
 		ClonedFromTemplateId: t.ClonedFromTemplateID,
+		Visibility:           string(t.Visibility),
+		ShareToken:           t.ShareToken,
+		RatingSum:            t.RatingSum,
+		RatingCount:          t.RatingCount,
 	}
 }
 

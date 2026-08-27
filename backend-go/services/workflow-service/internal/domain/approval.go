@@ -30,6 +30,12 @@ var (
 	// ErrApprovalNotFound is the sentinel adapter/postgres returns (wrapped)
 	// when a lookup finds no row — usecase maps it to apperrors.KindNotFound.
 	ErrApprovalNotFound = errors.New("domain: approval not found")
+	// ErrApprovalAlreadyPending is the sentinel adapter/postgres returns
+	// (wrapped) when a CreateTx would violate
+	// idx_workflow_approvals_one_pending_per_template (migrations/0008) —
+	// usecase.PublishTemplate maps it to apperrors.KindAlreadyExists, a
+	// clean typed conflict rather than a raw constraint-violation leak.
+	ErrApprovalAlreadyPending = errors.New("domain: a pending approval already exists for this template")
 )
 
 // Approval is a lead-requires-admin-approval gate row — mirrors

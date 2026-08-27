@@ -59,11 +59,23 @@ func (uc *ResolveTemplate) Execute(ctx context.Context, in ResolveTemplateInput)
 	if err != nil {
 		return ResolveTemplateOutput{}, apperrors.New(apperrors.KindUnauthenticated, "WORKFLOW_NO_TENANT", "no tenant in request context", err)
 	}
-	if in.TemplateID == "" {
+	return uc.Resolve(ctx, tenantID, in.TemplateID)
+}
+
+// Resolve is Execute's tenant-parameterized core — bypasses ctx's
+// tenant-scoping so usecase.ImportSharedTemplate can resolve a template
+// chain against the SOURCE template's own tenant_id (read off the
+// share-token lookup), not the importing caller's tenant. Every
+// same-tenant caller should go through Execute instead; this exists only
+// for that one deliberate cross-tenant case (see ImportSharedTemplate's
+// doc comment) — do not weaken Execute's ctx-derived tenantID to a
+// caller-supplied param for the normal path.
+func (uc *ResolveTemplate) Resolve(ctx context.Context, tenantID, templateID string) (ResolveTemplateOutput, error) {
+	if templateID == "" {
 		return ResolveTemplateOutput{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_TEMPLATE_ID_REQUIRED", "template_id is required", nil)
 	}
 
-	chain, err := uc.repo.ResolveChain(ctx, tenantID, in.TemplateID, maxTemplateChainDepth)
+	chain, err := uc.repo.ResolveChain(ctx, tenantID, templateID, maxTemplateChainDepth)
 	if err != nil {
 		if errors.Is(err, domain.ErrTemplateNotFound) {
 			return ResolveTemplateOutput{}, apperrors.New(apperrors.KindNotFound, "WORKFLOW_TEMPLATE_NOT_FOUND", "workflow template not found", err)

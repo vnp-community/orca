@@ -32,6 +32,11 @@ type Config struct {
 	// account an Agent step uses — mirrors git-gateway-service's
 	// identically-named config field.
 	AIProviderServiceAddr string
+	// AuthServiceAddr is where internal/adapter/opachecker dials
+	// auth-service's ListUsers RPC to answer "is this user an admin" —
+	// see usecase.OPAChecker's doc comment (BUG-WF-03's publish-approval
+	// gate).
+	AuthServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -45,6 +50,7 @@ func Load() (Config, error) {
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
+		AuthServiceAddr:       commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
 	}, nil
 }
 

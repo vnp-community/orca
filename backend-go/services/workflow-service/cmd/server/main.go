@@ -30,6 +30,7 @@ import (
 
 	workflowgrpc "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/infrafleetclient"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/opachecker"
 	workflowpostgres "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/providerresolver"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serverresolver"
@@ -37,6 +38,7 @@ import (
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
+	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
@@ -81,6 +83,7 @@ func run() error {
 	defer pool.Close()
 
 	repo := workflowpostgres.New(pool)
+	approvalStore := workflowpostgres.NewApprovalStore(pool)
 
 	infraFleetConn, err := infrafleetclient.Dial(cfg.InfraFleetServiceAddr)
 	if err != nil {
@@ -103,6 +106,13 @@ func run() error {
 	defer func() { _ = aiProviderConn.Close() }()
 	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
 
+	authConn, err := infrafleetclient.Dial(cfg.AuthServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing auth-service: %w", err)
+	}
+	defer func() { _ = authConn.Close() }()
+	authClient := authv1.NewAuthServiceClient(authConn)
+
 	// ServerResolver turns a step's Target string into a connectionId —
 	// see domain.AgentStepConfig.Target's doc comment for the four accepted
 	// shapes and internal/adapter/serverresolver's doc comment.
@@ -110,6 +120,9 @@ func run() error {
 	// ProviderResolver picks which ai-provider-service account an Agent
 	// step uses — see internal/adapter/providerresolver's doc comment.
 	provider := providerresolver.New(aiProviderClient)
+	// OPAChecker answers "is this user an admin" for BUG-WF-03's
+	// publish-approval gate — see internal/adapter/opachecker's doc comment.
+	opaChecker := opachecker.New(authClient)
 
 	// StepExecutorRegistry wiring — all seven step types, per
 	// workflow-service.md §4: Condition and Webhook are real, in-process
@@ -144,6 +157,9 @@ func run() error {
 	resolveTemplateUC := usecase.NewResolveTemplate(repo)
 	updateTemplateUC := usecase.NewUpdateTemplate(repo)
 	cloneTemplateUC := usecase.NewCloneTemplate(resolveTemplateUC, repo)
+	publishTemplateUC := usecase.NewPublishTemplate(repo, approvalStore, opaChecker)
+	resolveApprovalUC := usecase.NewResolveApproval(approvalStore, opaChecker)
+	listPendingApprovalsUC := usecase.NewListPendingApprovals(approvalStore, opaChecker)
 	recoverExecutionsUC := usecase.NewRecoverExecutions(repo, repo, repo, registry)
 
 	// Boot-time recovery scan (workflow-service.md §8: "before accepting
@@ -162,6 +178,7 @@ func run() error {
 	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowgrpc.New(
 		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
 		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC, cloneTemplateUC,
+		publishTemplateUC, resolveApprovalUC, listPendingApprovalsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

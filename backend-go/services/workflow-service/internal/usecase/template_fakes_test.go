@@ -220,9 +220,13 @@ func (tx *fakeTemplateRepositoryTx) current(id string) (domain.WorkflowTemplate,
 	return t, ok
 }
 
+// checkFailure returns a simulated error starting with this tx's
+// failAfterWrites'th write call (1-indexed; 0 disables failure injection
+// entirely) — e.g. failAfterWrites=1 fails on the very first write,
+// failAfterWrites=2 lets the first succeed and fails the second onward.
 func (tx *fakeTemplateRepositoryTx) checkFailure() error {
 	tx.writeCount++
-	if tx.failAfterWrites > 0 && tx.writeCount > tx.failAfterWrites {
+	if tx.failAfterWrites > 0 && tx.writeCount >= tx.failAfterWrites {
 		return errors.New("fakeTemplateRepositoryTx: simulated failure")
 	}
 	return nil

@@ -16,11 +16,17 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
+
+// pgUniqueViolation is Postgres's SQLSTATE for a unique-constraint
+// violation — see https://www.postgresql.org/docs/current/errcodes-appendix.html,
+// same convention as auth-service/project-service's own postgres adapters.
+const pgUniqueViolation = "23505"
 
 // ApprovalStore implements usecase.ApprovalRepository.
 type ApprovalStore struct {
@@ -165,6 +171,10 @@ func (t *approvalTx) CreateTx(ctx context.Context, approval domain.Approval) err
 		VALUES ($1, $2, $3, $4, $5)
 	`, approval.ID, approval.TenantID, approval.TemplateID, approval.RequestedBy, string(approval.Status))
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			return fmt.Errorf("postgres: insert approval: %w", domain.ErrApprovalAlreadyPending)
+		}
 		return fmt.Errorf("postgres: insert approval: %w", err)
 	}
 	return nil
