@@ -114,6 +114,14 @@ type EventPublisher interface {
 // normal runtime condition.
 var ErrStepExecutorNotRegistered = errors.New("usecase: no step executor registered for this step type")
 
+// ErrNoActionHandlerRegistered is returned by an Action step
+// (stepexecutors.ActionExecutor) when domain.ActionStepConfig.ActionName
+// names no registered handler — TASK-WF-02-07 wires the `action` StepType
+// itself but registers no concrete handlers, so this is the expected,
+// typed outcome for every ActionName today (a clear error, not a silent
+// no-op or a panic), until a future pass registers real handlers.
+var ErrNoActionHandlerRegistered = errors.New("usecase: no action handler registered for this action name")
+
 // StepExecutorRegistry resolves a StepType to the concrete StepExecutor
 // that runs it. Implemented by internal/adapter/stepexecutors and wired in
 // cmd/server/main.go with all five step types (Condition/Webhook real,

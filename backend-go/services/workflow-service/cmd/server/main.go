@@ -111,18 +111,26 @@ func run() error {
 	// step uses — see internal/adapter/providerresolver's doc comment.
 	provider := providerresolver.New(aiProviderClient)
 
-	// StepExecutorRegistry wiring — all five step types, per
+	// StepExecutorRegistry wiring — all seven step types, per
 	// workflow-service.md §4: Condition and Webhook are real, in-process
 	// implementations; Agent/Shell/Notification relay to infra-fleet-
 	// service's generic Relay RPC (internal/adapter/infrafleetclient) —
 	// see that package's doc comments for the best-effort method-name/
 	// param-shape caveats (no live Dev Server Agent to verify against).
+	// Action/Parallel (TASK-WF-02-07) round out the proto's StepType enum.
 	registry := stepexecutors.NewRegistry()
 	registry.Register(domain.StepTypeCondition, stepexecutors.NewConditionExecutor())
 	registry.Register(domain.StepTypeWebhook, stepexecutors.NewWebhookExecutor(cfg.WebhookAllowlistHosts, &http.Client{Timeout: 30 * time.Second}))
 	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, resolver, provider))
 	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient, resolver))
 	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient, resolver))
+	registry.Register(domain.StepTypeAction, stepexecutors.NewActionExecutor())
+	// Two-phase init: ParallelExecutor needs a reference back to the SAME
+	// registry it's about to be registered into (to recursively resolve
+	// each sub-step's own executor) — see ParallelExecutor's doc comment.
+	parallelExecutor := stepexecutors.NewParallelExecutor()
+	parallelExecutor.SetRegistry(registry)
+	registry.Register(domain.StepTypeParallel, parallelExecutor)
 
 	createTemplateUC := usecase.NewCreateTemplate(repo)
 	executeUC := usecase.NewExecute(repo, repo, repo, registry)

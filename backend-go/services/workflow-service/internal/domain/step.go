@@ -6,7 +6,10 @@
 // doc comment) no infra-fleet-service relay client either.
 package domain
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // StepType is the discriminator for a workflow step's kind — mirrors
 // workflowv1.StepType (proto) one-for-one, see
@@ -20,16 +23,47 @@ const (
 	StepTypeNotification StepType = "notification"
 	StepTypeWebhook      StepType = "webhook"
 	StepTypeCondition    StepType = "condition"
+	// StepTypeAction dispatches to a named, in-process action handler —
+	// see ActionStepConfig's doc comment. BUG-WF-02 found this type
+	// entirely absent (only 5 of 6 StepTypes were implemented).
+	StepTypeAction StepType = "action"
+	// StepTypeParallel fans a fixed list of sub-steps out concurrently —
+	// see ParallelStepConfig's doc comment.
+	StepTypeParallel StepType = "parallel"
 )
 
-// Valid reports whether t is one of the five known step types.
+// Valid reports whether t is one of the seven known step types.
 func (t StepType) Valid() bool {
 	switch t {
-	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition:
+	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeAction, StepTypeParallel:
 		return true
 	default:
 		return false
 	}
+}
+
+// ActionStepConfig is the Action step type's config shape: dispatches to a
+// named, in-process action handler (registered by
+// internal/adapter/stepexecutors.ActionExecutor). Neither
+// workflow-service.md §4 nor this task describes a concrete action
+// catalog, so this wires the minimal, extensible type system — no handlers
+// are registered by TASK-WF-02-07 itself — rather than inventing one:
+// an `action` step is recognized and fails with a clear, typed error
+// (usecase.ErrNoActionHandlerRegistered) instead of silently no-op-ing.
+type ActionStepConfig struct {
+	ActionName string          `json:"actionName"`
+	Params     json.RawMessage `json:"params,omitempty"`
+}
+
+// ParallelStepConfig is the Parallel step type's config shape: fans
+// SubSteps out concurrently and aggregates their results
+// (Promise.allSettled + allowPartialFailure semantics — see
+// stepexecutors.ParallelExecutor). SubSteps' own DependsOn is ignored:
+// sub-steps always run together in one fan-out, not wave-computed among
+// themselves the way a template's top-level Steps are.
+type ParallelStepConfig struct {
+	SubSteps            []Step `json:"subSteps"`
+	AllowPartialFailure bool   `json:"allowPartialFailure,omitempty"`
 }
 
 // ResultStatus is a StepResult's outcome — "completed" and "failed" only;

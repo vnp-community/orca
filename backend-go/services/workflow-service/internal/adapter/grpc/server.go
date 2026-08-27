@@ -210,6 +210,10 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 		return domain.StepTypeWebhook
 	case workflowv1.StepType_STEP_TYPE_CONDITION:
 		return domain.StepTypeCondition
+	case workflowv1.StepType_STEP_TYPE_ACTION:
+		return domain.StepTypeAction
+	case workflowv1.StepType_STEP_TYPE_PARALLEL:
+		return domain.StepTypeParallel
 	default:
 		return domain.StepTypeUnspecified
 	}
