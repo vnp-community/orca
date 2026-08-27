@@ -190,6 +190,21 @@ func (f *fakeInfraFleetServiceClient) DeleteBrowserProfile(context.Context, *inf
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+// CreateAgentToken/ListAgentTokens/RevokeAgentToken (TASK-AWS-03-08's
+// InfraFleetServiceClient additions) — not exercised by infra_routes_test.go,
+// stubbed only to keep this hand-rolled fake satisfying the interface.
+func (f *fakeInfraFleetServiceClient) CreateAgentToken(context.Context, *infrafleetv1.CreateAgentTokenRequest, ...grpc.CallOption) (*infrafleetv1.CreateAgentTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) ListAgentTokens(context.Context, *infrafleetv1.ListAgentTokensRequest, ...grpc.CallOption) (*infrafleetv1.ListAgentTokensResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) RevokeAgentToken(context.Context, *infrafleetv1.RevokeAgentTokenRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // testInfraRouter mounts mountInfraRoutes alone on a fresh chi router — no
 // authMiddleware, since these tests inject identity into the request
 // context directly the way authMiddleware would (withIdentity), mirroring

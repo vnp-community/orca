@@ -1,26 +1,3 @@
-# TASK-AWS-03-08: Wire `devServer.agentTokens.create/list/revoke` in `wscompat`
-
-**From Solution:** SOL-AWS-03
-**Priority:** P1
-**Service:** `api-gateway`
-**File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_devserver_agent_tokens.go` (new)
-**Depends on:** TASK-AWS-03-07
-**Status:** `[x]` DONE — channels_devserver_agent_tokens.go created, wired into RegisterRealChannels, 4 tests pass (create/list/revoke/no-devServerId + plaintext-token-never-in-list regression guard).
-
----
-
-## Context
-
-Exposes the new admin RPCs to the frontend's "DevServer Settings → Agent
-Tokens tab" — same shape as `registerAccountsChannels`
-(`channels_accounts.go`), decode args, attach identity, call the RPC, map
-the response.
-
-## Changes to make
-
-Create `backend-go/services/api-gateway/internal/adapter/wscompat/channels_devserver_agent_tokens.go`:
-
-```go
 // Package wscompat — devServer.agentTokens.* channels.
 //
 // create/list/revoke wire BL-AWS-03's persistent agent token admin surface
@@ -111,23 +88,3 @@ func registerDevServerAgentTokenChannels(r *Registry, client infrafleetv1.InfraF
 		return map[string]bool{"ok": err == nil}, err
 	})
 }
-```
-
-Add `registerDevServerAgentTokenChannels(r, infraFleetClient)` to
-`RegisterRealChannels` in `channels.go` (final integration pass block, same
-place `registerAccountsChannels`/`registerFleetChannels` are called —
-`infraFleetClient` is already dialed there, no new client needed).
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/api-gateway/...
-go test ./services/api-gateway/internal/adapter/wscompat/...
-```
-
-Expected: clean build/tests. Add
-`wscompat/channels_devserver_agent_tokens_test.go` per SOL-AWS-03's test
-plan: one test per channel using a fake `InfraFleetServiceClient`, plus a
-test asserting the plaintext token from `create` is never re-derivable from
-`list`'s response shape (i.e. `list`'s map never has a `"token"` key).

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_cli_auth.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE (partial, deliberate deviation) — proto extended (command/user_id on SpawnTerminalSessionRequest) and threaded end-to-end through infra-fleet-service (usecase.SpawnTerminalSessionInput/SpawnPtyInput, grpc server.go, devserveragent pty.create params); `github.checkAuthStatus`/`gitlab.checkAuthStatus` registered and tested. `github.startAuthLogin`/`gitlab.startAuthLogin` implemented (`registerCLIAuthLoginChannel`, unit-tested under a non-colliding test channel name) but **NOT wired** under those channel names: `channels_scm.go` already registers `github.startAuthLogin`/`gitlab.startAuthLogin` as OAuth-flow wrappers (`StartOAuthFlow`) that the frontend already depends on — `Registry.Register` overwrites on a repeated key, so wiring this task's PTY-spawning handler under the same name would silently replace that working flow. This collision was not anticipated by SOL-INT-01/this task's authors. Needs an explicit rename (e.g. `github.startCliAuthLogin`) or a product decision before landing — see channels_cli_auth.go's package doc comment.
 
 ---
 

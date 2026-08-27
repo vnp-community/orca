@@ -312,6 +312,17 @@ message SpawnTerminalSessionRequest {
   string shell = 3;          // optional; agent applies its own default if empty
   int32  cols = 4;
   int32  rows = 5;
+  // command, when set, is the initial command line the spawned shell runs
+  // (agent's pty.create `command` param) instead of an interactive shell
+  // prompt — added for github.startAuthLogin/gitlab.startAuthLogin
+  // (TASK-INT-01-01), which spawn `gh auth login`/`glab auth login`
+  // directly rather than typing it into an interactive shell.
+  string command = 6;
+  // user_id engages pty-handler.ts's per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR
+  // env isolation for a `gh `/`glab `-prefixed command — see
+  // pty-handler.ts:680-699. Always set from the caller's authenticated
+  // identity server-side (wscompat), never trusted from client args.
+  string user_id = 7;
 }
 message SpawnTerminalSessionResponse {
   TerminalSession session = 1;

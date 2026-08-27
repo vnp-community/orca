@@ -12,6 +12,7 @@ import (
 
 	"github.com/stablyai/orca-go/common/grpcmw"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
 // fakeInfraFleetClient is a minimal test double for
@@ -22,10 +23,11 @@ import (
 type fakeInfraFleetClient struct {
 	infrafleetv1.InfraFleetServiceClient
 
-	listDevServersFunc    func(ctx context.Context, in *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
-	registerDevServerFunc func(ctx context.Context, in *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
-	getFleetHealthFunc    func(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error)
-	relayFunc             func(ctx context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+	listDevServersFunc     func(ctx context.Context, in *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
+	registerDevServerFunc  func(ctx context.Context, in *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
+	getFleetHealthFunc     func(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error)
+	relayFunc              func(ctx context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+	scanWorkspacePortsFunc func(ctx context.Context, in *infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error)
 }
 
 func (f *fakeInfraFleetClient) Relay(ctx context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
@@ -42,6 +44,10 @@ func (f *fakeInfraFleetClient) RegisterDevServer(ctx context.Context, in *infraf
 
 func (f *fakeInfraFleetClient) GetFleetHealth(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest, _ ...grpc.CallOption) (*infrafleetv1.GetFleetHealthResponse, error) {
 	return f.getFleetHealthFunc(ctx, in)
+}
+
+func (f *fakeInfraFleetClient) ScanWorkspacePorts(ctx context.Context, in *infrafleetv1.ScanWorkspacePortsRequest, _ ...grpc.CallOption) (*infrafleetv1.ScanWorkspacePortsResponse, error) {
+	return f.scanWorkspacePortsFunc(ctx, in)
 }
 
 // outgoingTenantUser reads back the metadata AttachIdentity is expected to
@@ -496,74 +502,110 @@ func TestFleetHealthCheckAll_FailsFastWhenServiceSlow(t *testing.T) {
 	}
 }
 
-// ── TASK-010: preflight.check tests ─────────────────────────────────────────
+// ── TASK-INT-03-03: preflight.check tests ───────────────────────────────────
 
-// TestPreflightCheckChannel_CompletesInstantly verifies that preflight.check
-// returns within 50ms — it makes no downstream calls and should be sub-millisecond
-// in practice. Regression guard for BUG-004.
-func TestPreflightCheckChannel_CompletesInstantly(t *testing.T) {
+// TestPreflightCheckChannel_NoConnectionIDIsLocalOnly verifies that an empty
+// connectionId returns local-only results with zero RPC calls made — no
+// fake RPC funcs are set, so any call would panic on the nil-func deref.
+func TestPreflightCheckChannel_NoConnectionIDIsLocalOnly(t *testing.T) {
 	r := NewRegistry()
-	registerPreflightChannels(r)
+	registerPreflightChannels(r, &fakeInfraFleetClient{})
 
-	start := time.Now()
-	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "preflight.check", nil)
-	elapsed := time.Since(start)
-
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "preflight.check", argsJSON(t, map[string]any{}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if elapsed > 50*time.Millisecond {
-		t.Errorf("preflight.check took %s, want < 50ms (local handler, no gRPC call)", elapsed)
-	}
-
-	m, ok := result.(map[string]any)
+	results, ok := result.([]usecase.PreflightCheckResult)
 	if !ok {
-		t.Fatalf("unexpected result type %T, want map[string]any", result)
+		t.Fatalf("unexpected result type %T", result)
 	}
-
-	// Verify git key exists and installed=true (git-gateway-service uses real git binary).
-	gitInfo, ok := m["git"].(map[string]any)
-	if !ok {
-		t.Fatalf("result['git'] is %T, want map[string]any", m["git"])
-	}
-	if gitInfo["installed"] != true {
-		t.Errorf("result['git']['installed'] = %v, want true", gitInfo["installed"])
-	}
-
-	// Verify gh and glab report installed=false (no CLI wrappers in backend-go).
-	for _, tool := range []string{"gh", "glab"} {
-		info, ok := m[tool].(map[string]any)
-		if !ok {
-			t.Fatalf("result[%q] is %T, want map[string]any", tool, m[tool])
-		}
-		if info["installed"] != false {
-			t.Errorf("result[%q]['installed'] = %v, want false (no CLI in backend-go)", tool, info["installed"])
-		}
-		if info["authenticated"] != false {
-			t.Errorf("result[%q]['authenticated'] = %v, want false", tool, info["authenticated"])
-		}
+	if len(results) != 1 || results[0].ID != "git" || results[0].Source != usecase.PreflightSourceLocal {
+		t.Fatalf("expected local-only [git], got %+v", results)
 	}
 }
 
-// TestPreflightCheckChannel_ReturnsExpectedKeys verifies the response has
-// exactly the keys the frontend expects (git, gh, glab).
-func TestPreflightCheckChannel_ReturnsExpectedKeys(t *testing.T) {
+// TestPreflightCheckChannel_FleetHealthFailureProducesConnectivityWarning
+// verifies a hard GetFleetHealth failure degrades to the relay-connectivity
+// warning while the local git check is still present.
+func TestPreflightCheckChannel_FleetHealthFailureProducesConnectivityWarning(t *testing.T) {
+	fake := &fakeInfraFleetClient{
+		getFleetHealthFunc: func(context.Context, *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error) {
+			return nil, errors.New("connection refused")
+		},
+	}
 	r := NewRegistry()
-	registerPreflightChannels(r)
+	registerPreflightChannels(r, fake)
 
-	result, err := r.Dispatch(context.Background(), Identity{}, "preflight.check", nil)
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "preflight.check", argsJSON(t, map[string]any{"connectionId": "conn-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	results, ok := result.([]usecase.PreflightCheckResult)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	var sawGit, sawWarning bool
+	for _, c := range results {
+		if c.ID == "git" {
+			sawGit = true
+		}
+		if c.ID == "relay-connectivity" && c.Status == usecase.PreflightWarning {
+			sawWarning = true
+		}
+	}
+	if !sawGit || !sawWarning {
+		t.Fatalf("expected local git check + relay-connectivity warning, got %+v", results)
+	}
+}
 
-	m, ok := result.(map[string]any)
+// TestPreflightCheckChannel_AuthStatusRelayFailureIsPerCheckSkip simulates a
+// relay-ssh Dev Server (github.auth.status/gitlab.auth.status not
+// implemented) — those 2 checks must come back skip-status while
+// disk-space/port-availability still succeed, and every result must carry a
+// non-empty Source.
+func TestPreflightCheckChannel_AuthStatusRelayFailureIsPerCheckSkip(t *testing.T) {
+	fake := &fakeInfraFleetClient{
+		getFleetHealthFunc: func(context.Context, *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error) {
+			return &infrafleetv1.GetFleetHealthResponse{Statuses: []*infrafleetv1.DevServerHealth{
+				{DevServerId: "dev-1", DiskPercent: 10},
+			}}, nil
+		},
+		scanWorkspacePortsFunc: func(context.Context, *infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error) {
+			return &infrafleetv1.ScanWorkspacePortsResponse{}, nil
+		},
+		relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+			return nil, errors.New("agent method not found")
+		},
+	}
+	r := NewRegistry()
+	registerPreflightChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "preflight.check", argsJSON(t, map[string]any{"connectionId": "conn-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	results, ok := result.([]usecase.PreflightCheckResult)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	for _, key := range []string{"git", "gh", "glab"} {
-		if _, exists := m[key]; !exists {
-			t.Errorf("preflight.check response missing expected key %q", key)
+	byID := make(map[string]usecase.PreflightCheckResult, len(results))
+	for _, c := range results {
+		if c.Source == "" {
+			t.Errorf("PreflightCheckResult %q has empty Source — every result must be tagged", c.ID)
+		}
+		byID[c.ID] = c
+	}
+
+	if byID["disk-space"].Status != usecase.PreflightOK {
+		t.Errorf("disk-space = %+v, want ok", byID["disk-space"])
+	}
+	if byID["port-availability"].Status != usecase.PreflightOK {
+		t.Errorf("port-availability = %+v, want ok", byID["port-availability"])
+	}
+	for _, id := range []string{"github-cli-auth", "gitlab-cli-auth"} {
+		if byID[id].Status != usecase.PreflightSkip {
+			t.Errorf("%s = %+v, want skip", id, byID[id])
 		}
 	}
 }

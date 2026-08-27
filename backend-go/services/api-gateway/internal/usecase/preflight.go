@@ -1,26 +1,3 @@
-# TASK-INT-03-01: Add `PreflightCheckResult` type + `MergePreflightStatuses`
-
-**From Solution:** SOL-INT-03
-**Priority:** P1
-**Service:** `api-gateway`
-**File:** `backend-go/services/api-gateway/internal/usecase/preflight.go` (new)
-**Depends on:** none
-**Status:** `[x]` DONE — usecase/preflight.go created with PreflightCheckResult/MergePreflightStatuses; preflight_test.go covers relay-overrides-local, relay-only-append, relayErr-produces-connectivity-warning-only-even-with-nonempty-relay, stable ordering, and empty inputs — all pass.
-
----
-
-## Context
-
-BL-INT-03's `mergePreflightStatuses()` — the actual algorithmic core this
-bug centers on — has no Go port anywhere. This task adds it in isolation
-(pure function, no gRPC dependency) so it's independently testable before
-`TASK-INT-03-03` wires it into `wscompat`.
-
-## Changes to make
-
-Create `backend-go/services/api-gateway/internal/usecase/preflight.go`:
-
-```go
 package usecase
 
 // PreflightStatus is one check's outcome — mirrors BL-INT-03's status enum.
@@ -96,18 +73,3 @@ func MergePreflightStatuses(local, relay []PreflightCheckResult, relayErr error)
 	}
 	return out
 }
-```
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/api-gateway/internal/usecase/...
-```
-
-Expected: clean build. Add `preflight_test.go`: relay overrides local by
-id; relay-only ids are appended; a non-nil `relayErr` produces exactly the
-`relay-connectivity` warning and **no** relay results, even when a
-non-empty `relay` slice was passed (the "local checks only" contract);
-output order is stable (local order, then relay-only appends, then the
-warning).

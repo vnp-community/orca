@@ -428,6 +428,8 @@ func (s *Server) SpawnTerminalSession(ctx context.Context, req *infrafleetv1.Spa
 		Shell:        req.GetShell(),
 		Cols:         req.GetCols(),
 		Rows:         req.GetRows(),
+		Command:      req.GetCommand(),
+		UserID:       req.GetUserId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

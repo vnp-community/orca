@@ -192,6 +192,14 @@ type SpawnPtyInput struct {
 	Shell string
 	Cols  int32
 	Rows  int32
+	// Command, when set, is the pty.create `command` param — a full shell
+	// command line to run instead of an interactive prompt (TASK-INT-01-01,
+	// github.startAuthLogin/gitlab.startAuthLogin).
+	Command string
+	// UserID is the pty.create `userId` param — engages the agent's
+	// per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR isolation when Command starts
+	// with "gh "/"glab " (pty-handler.ts:680-699).
+	UserID string
 }
 
 // SpawnPtyResult carries pty.create's response fields — Cols/Rows/Cwd/Shell

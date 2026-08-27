@@ -1608,12 +1608,23 @@ func (x *Connection) GetEstablishedAtUnixMs() int64 {
 }
 
 type SpawnTerminalSessionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"` // empty = host-local; rejected in server-deployment mode, see usecase.SpawnTerminalSession
-	Cwd           string                 `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	Shell         string                 `protobuf:"bytes,3,opt,name=shell,proto3" json:"shell,omitempty"` // optional; agent applies its own default if empty
-	Cols          int32                  `protobuf:"varint,4,opt,name=cols,proto3" json:"cols,omitempty"`
-	Rows          int32                  `protobuf:"varint,5,opt,name=rows,proto3" json:"rows,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"` // empty = host-local; rejected in server-deployment mode, see usecase.SpawnTerminalSession
+	Cwd          string                 `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	Shell        string                 `protobuf:"bytes,3,opt,name=shell,proto3" json:"shell,omitempty"` // optional; agent applies its own default if empty
+	Cols         int32                  `protobuf:"varint,4,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows         int32                  `protobuf:"varint,5,opt,name=rows,proto3" json:"rows,omitempty"`
+	// command, when set, is the initial command line the spawned shell runs
+	// (agent's pty.create `command` param) instead of an interactive shell
+	// prompt — added for github.startAuthLogin/gitlab.startAuthLogin
+	// (TASK-INT-01-01), which spawn `gh auth login`/`glab auth login`
+	// directly rather than typing it into an interactive shell.
+	Command string `protobuf:"bytes,6,opt,name=command,proto3" json:"command,omitempty"`
+	// user_id engages pty-handler.ts's per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR
+	// env isolation for a `gh `/`glab `-prefixed command — see
+	// pty-handler.ts:680-699. Always set from the caller's authenticated
+	// identity server-side (wscompat), never trusted from client args.
+	UserId        string `protobuf:"bytes,7,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1681,6 +1692,20 @@ func (x *SpawnTerminalSessionRequest) GetRows() int32 {
 		return x.Rows
 	}
 	return 0
+}
+
+func (x *SpawnTerminalSessionRequest) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *SpawnTerminalSessionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
 }
 
 type SpawnTerminalSessionResponse struct {
@@ -4411,13 +4436,15 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\"\n" +
 	"\rdev_server_id\x18\x02 \x01(\tR\vdevServerId\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x123\n" +
-	"\x16established_at_unix_ms\x18\x04 \x01(\x03R\x13establishedAtUnixMs\"\x92\x01\n" +
+	"\x16established_at_unix_ms\x18\x04 \x01(\x03R\x13establishedAtUnixMs\"\xc5\x01\n" +
 	"\x1bSpawnTerminalSessionRequest\x12#\n" +
 	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x10\n" +
 	"\x03cwd\x18\x02 \x01(\tR\x03cwd\x12\x14\n" +
 	"\x05shell\x18\x03 \x01(\tR\x05shell\x12\x12\n" +
 	"\x04cols\x18\x04 \x01(\x05R\x04cols\x12\x12\n" +
-	"\x04rows\x18\x05 \x01(\x05R\x04rows\"]\n" +
+	"\x04rows\x18\x05 \x01(\x05R\x04rows\x12\x18\n" +
+	"\acommand\x18\x06 \x01(\tR\acommand\x12\x17\n" +
+	"\auser_id\x18\a \x01(\tR\x06userId\"]\n" +
 	"\x1cSpawnTerminalSessionResponse\x12=\n" +
 	"\asession\x18\x01 \x01(\v2#.orca.infrafleet.v1.TerminalSessionR\asession\"\xc0\x01\n" +
 	"\x0fTerminalSession\x12\x15\n" +

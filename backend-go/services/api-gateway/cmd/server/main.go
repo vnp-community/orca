@@ -44,6 +44,7 @@ import (
 	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
+	credentialbrokerv1 "github.com/stablyai/orca-go/proto/gen/go/orca/credentialbroker/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
@@ -202,6 +203,17 @@ func run() error {
 	defer func() { _ = workflowConn.Close() }()
 	workflowClient := workflowv1.NewWorkflowServiceClient(workflowConn)
 
+	// credentialBrokerClient — SOL-INT-02/TASK-INT-02-01. Previously
+	// reached only indirectly via infra-fleet-service's credential path
+	// (see registry.go's now-updated doc comment); dialed directly here so
+	// wscompat can call it for the credentials.* namespace.
+	credentialBrokerConn, err := gatewaygrpc.Dial(cfg.OtherServiceAddrs["credential-broker-service"])
+	if err != nil {
+		return fmt.Errorf("dialing credential-broker-service: %w", err)
+	}
+	defer func() { _ = credentialBrokerConn.Close() }()
+	credentialBrokerClient := credentialbrokerv1.NewCredentialBrokerServiceClient(credentialBrokerConn)
+
 	// jwksClient resolves auth-service's public signing keys (cached, short
 	// TTL — see authclient.JWKSClient) so authValidator can verify RS256
 	// JWT signatures for real, instead of trusting unverified claims.
@@ -247,6 +259,7 @@ func run() error {
 		wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient,
 		tenantClient, projectClient, issueTrackingClient, orchestrationClient, scmClient, workflowClient,
 		aiProviderClient,
+		credentialBrokerClient,
 		rateLimiter,
 	)
 	// RegisterPushChannels wires the StreamHandler-backed (push-capable)
