@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
@@ -30,6 +32,7 @@ import (
 
 	authbcrypt "github.com/stablyai/orca-go/services/auth-service/internal/adapter/bcrypt"
 	authgrpc "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpc"
+	authnatsconsumer "github.com/stablyai/orca-go/services/auth-service/internal/adapter/natsconsumer"
 	authopaclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/opaclient"
 	authpolicypublisher "github.com/stablyai/orca-go/services/auth-service/internal/adapter/policypublisher"
 	authpostgres "github.com/stablyai/orca-go/services/auth-service/internal/adapter/postgres"
@@ -131,6 +134,40 @@ func run() error {
 	deleteAccessPolicyUC := usecase.NewDeleteAccessPolicy(repo, repo, opaClient)
 	getAdminStatsUC := usecase.NewGetAdminStats(repo, repo, repo, clock, opaClient)
 
+	listSessionsUC := usecase.NewListSessions(repo, repo, opaClient)
+	updateUserUC := usecase.NewUpdateUser(repo, repo, clock, opaClient)
+
+	// ssh.connect audit ingestion (TASK-AUTH-05-08): durably subscribes to
+	// infra-fleet-service's ssh.connect outbox stream and appends an
+	// "ssh.connect" entry to this service's own audit log — per
+	// auth-service.md's "own + ingested from other services' outbox
+	// streams" framing. Uses a DURABLE consumer (not the ephemeral
+	// fan-out every other consumer in this codebase uses), since an
+	// audit-log append must happen exactly once cluster-wide, not once
+	// per auth-service replica — see internal/adapter/natsconsumer's doc
+	// comment. Graceful degradation: if NATS is unreachable at startup,
+	// this service still starts (no audit entries are ingested until a
+	// future restart finds NATS reachable), matching every other
+	// eventbus-consuming service's posture in this codebase.
+	handleSSHConnectedEventUC := usecase.NewHandleSSHConnectedEvent(repo)
+	var consumerWG sync.WaitGroup
+	_, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, continuing without event consumption", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		auditIngestConsumer := authnatsconsumer.New(handleSSHConnectedEventUC, logger)
+		consumerWG.Add(1)
+		go func() {
+			defer consumerWG.Done()
+			// Runs until ctx is cancelled — graceful shutdown for this
+			// background loop is "stop accepting new signal, let ctx
+			// cancellation propagate", the same mechanism the gRPC/HTTP
+			// servers below use.
+			auditIngestConsumer.Run(ctx, cons)
+		}()
+	}
+
 	// Runs once, before the server starts accepting traffic — see
 	// internal/usecase/bootstrap.go's doc comment for why this isn't an
 	// RPC. No-op unless BOOTSTRAP_TENANT_ID/BOOTSTRAP_ADMIN_EMAIL are set
@@ -152,6 +189,27 @@ func run() error {
 			slog.String("password", generatedPassword))
 	}
 
+	// Session reaper: purges rows expired/revoked more than 7 days ago.
+	// Operational hygiene, not correctness — domain.Session.IsValid already
+	// enforces expiry at read time (auth-service.md §8's reaper NFR).
+	reaper := usecase.NewReapExpiredSessions(repo, clock, 7*24*time.Hour)
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour) // frequent enough per the reaper's "operational, not correctness" NFR
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if n, err := reaper.Execute(ctx); err != nil {
+					logger.Error("session reaper failed", slog.Any("error", err))
+				} else if n > 0 {
+					logger.Info("session reaper purged rows", slog.Int64("count", n))
+				}
+			}
+		}
+	}()
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	authv1.RegisterAuthServiceServer(grpcServer, authgrpc.New(
 		loginUC, logoutUC, validateSessionUC,
@@ -160,6 +218,7 @@ func run() error {
 		deactivateUserUC, reactivateUserUC, listSessionsForUserUC, forceRevokeAllSessionsForUserUC,
 		createAccessPolicyUC, getAccessPolicyUC, listAccessPoliciesUC, updateAccessPolicyUC, deleteAccessPolicyUC,
 		getAdminStatsUC,
+		listSessionsUC, updateUserUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -219,6 +278,12 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	// Wait for the event-consumer background goroutine (if started) to
+	// observe ctx cancellation and return, so it doesn't outlive the rest
+	// of the server on shutdown — same pattern notification-service's
+	// main.go uses for its own background consumer.
+	consumerWG.Wait()
 
 	return nil
 }

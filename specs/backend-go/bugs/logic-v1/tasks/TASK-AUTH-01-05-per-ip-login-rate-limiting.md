@@ -5,7 +5,7 @@
 **Service:** `api-gateway` (httpgateway)
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/router.go`, `backend-go/services/api-gateway/internal/adapter/httpgateway/auth_routes.go`
 **Depends on:** TASK-AUTH-01-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `router.go` constructs a 10/min burst-10 `loginRateLimiter` keyed by IP and passes it into `mountAuthRoutes`; `/auth/local` now 429s past the budget without calling `Login`; `TestAuthRoutes_Login_RateLimitedAfter10AttemptsPerIP` and `TestAuthRoutes_Login_RateLimitTracksIPsIndependently` pass.
 
 ---
 

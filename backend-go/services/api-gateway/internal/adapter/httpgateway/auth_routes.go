@@ -2,10 +2,16 @@ package httpgateway
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 )
@@ -53,8 +59,14 @@ type loginRequestBody struct {
 // (paths, response shapes) so frontend/'s auth-api-client.ts works
 // unmodified. None of these run behind authMiddleware (see router.go) —
 // /auth/me and /auth/logout each validate their own cookie inline instead.
-func mountAuthRoutes(mux chi.Router, authClient authv1.AuthServiceClient, cookieValidator CookieSessionValidator) {
+func mountAuthRoutes(mux chi.Router, authClient authv1.AuthServiceClient, cookieValidator CookieSessionValidator, loginLimiter *usecase.RateLimiter) {
 	mux.Post("/auth/local", func(w http.ResponseWriter, r *http.Request) {
+		ip := clientIP(r)
+		if !loginLimiter.Allow(ip) {
+			writeJSONError(w, http.StatusTooManyRequests, "too_many_attempts", "too many login attempts, try again later")
+			return
+		}
+
 		var body loginRequestBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "INVALID_BODY", "invalid request body")
@@ -62,14 +74,22 @@ func mountAuthRoutes(mux chi.Router, authClient authv1.AuthServiceClient, cookie
 		}
 
 		resp, err := authClient.Login(r.Context(), &authv1.LoginRequest{
-			Email:    body.Email,
-			Password: body.Password,
+			Email:     body.Email,
+			Password:  body.Password,
+			Ip:        ip,
+			UserAgent: r.UserAgent(),
 		})
 		if err != nil {
-			// Deliberately generic — do not leak "user not found" vs "wrong
-			// password" distinctions to the client, matching standard
-			// login-endpoint practice.
-			writeJSONError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "invalid email or password")
+			st, _ := status.FromError(err)
+			switch st.Code() {
+			case codes.PermissionDenied:
+				writeJSONError(w, http.StatusForbidden, "account_inactive", "account is deactivated")
+			default:
+				// Deliberately generic for every other failure kind — do not leak
+				// "user not found" vs "wrong password" vs "malformed input"
+				// distinctions to the client.
+				writeJSONError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+			}
 			return
 		}
 
@@ -183,4 +203,24 @@ func cookieValue(r *http.Request) string {
 		return ""
 	}
 	return c.Value
+}
+
+// clientIP prefers the first X-Forwarded-For hop (this gateway may sit
+// behind a reverse proxy/load balancer — SSH/tunnel deployments are a
+// first-class use case per AGENTS.md, not just direct-connect), falling
+// back to r.RemoteAddr. Trusting X-Forwarded-For without a configured
+// trusted-proxy allowlist is a known, narrow spoofing surface for the
+// per-IP rate limiter only (TASK-AUTH-01-05) — acceptable for a
+// brute-force *throttle* (defense in depth, not the sole control) but
+// flagged so a future trusted-proxy-list config isn't mistaken for out of
+// scope.
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.TrimSpace(strings.SplitN(xff, ",", 2)[0])
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }

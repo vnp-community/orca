@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
@@ -279,6 +280,83 @@ func (r *Repository) CreateConnection(ctx context.Context, conn domain.Connectio
 		return domain.Connection{}, fmt.Errorf("postgres: insert connection: %w", err)
 	}
 	return conn, nil
+}
+
+// CreateConnectionWithOutbox inserts a new connection binding and enqueues
+// event as an infra.outbox_events row — both in ONE transaction (Epic G's
+// transactional-outbox pattern; see domain.OutboxEvent's doc comment).
+// common/outbox.Relay (wired in cmd/server/main.go) is the only thing that
+// reads infra.outbox_events afterward — this method's job ends at durably
+// committing the row, not publishing it.
+func (r *Repository) CreateConnectionWithOutbox(ctx context.Context, conn domain.Connection, event domain.OutboxEvent) (domain.Connection, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Connection{}, fmt.Errorf("postgres: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO infra.connections (id, tenant_id, dev_server_id, repo_path, worktree_id, status, last_activity_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, conn.ID, conn.TenantID, conn.DevServerID, conn.RepoPath, conn.WorktreeID, conn.Status, conn.LastActivityAt); err != nil {
+		return domain.Connection{}, fmt.Errorf("postgres: insert connection: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO infra.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+		VALUES ($1, $2, $3, $4, 1, $5)
+	`, event.ID, conn.TenantID, event.Subject, event.OccurredAt, event.PayloadJSON); err != nil {
+		return domain.Connection{}, fmt.Errorf("postgres: insert outbox event: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Connection{}, fmt.Errorf("postgres: commit tx: %w", err)
+	}
+	return conn, nil
+}
+
+// FetchUnpublished and MarkPublished implement common/outbox.Store — see
+// cmd/server/main.go for where the relay is wired. Kept on the same
+// Repository as CreateConnectionWithOutbox since both operate on this
+// service's own database; mirrors usage-service's Repository, which does
+// the same for SaveSession.
+func (r *Repository) FetchUnpublished(ctx context.Context, limit int) ([]outbox.Record, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, subject, occurred_at, version, payload
+		FROM infra.outbox_events
+		WHERE published_at IS NULL
+		ORDER BY created_at
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query unpublished outbox events: %w", err)
+	}
+	defer rows.Close()
+
+	var out []outbox.Record
+	for rows.Next() {
+		var rec outbox.Record
+		if err := rows.Scan(&rec.ID, &rec.Event.TenantID, &rec.Subject, &rec.Event.OccurredAt, &rec.Event.Version, &rec.Event.Payload); err != nil {
+			return nil, fmt.Errorf("postgres: scan outbox event row: %w", err)
+		}
+		rec.Event.ID = rec.ID
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate outbox event rows: %w", err)
+	}
+	return out, nil
+}
+
+func (r *Repository) MarkPublished(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `UPDATE infra.outbox_events SET published_at = now() WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return fmt.Errorf("postgres: mark outbox events published: %w", err)
+	}
+	return nil
 }
 
 // GetActiveByDevServer returns the most recent connection for devServerID

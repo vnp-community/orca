@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase)
 **File:** `backend-go/services/auth-service/internal/usecase/login.go`
 **Depends on:** TASK-AUTH-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `LoginInput.IP/UserAgent`, format pre-check, and `login.fail` audit on every failure branch implemented; `TestLogin_*` (incl. new `TestLogin_InvalidFormatFails`) pass.
 
 ---
 

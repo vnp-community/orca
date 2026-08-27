@@ -5,7 +5,7 @@
 **Service:** `auth-service` (proto)
 **File:** `backend-go/proto/orca/auth/v1/auth.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `CreateUserRequest.password`, `ListSessions`/`UpdateUser` RPCs + messages; `make proto-gen` regenerated stubs; `go build ./proto/...` clean.
 
 ---
 

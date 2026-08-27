@@ -10,13 +10,12 @@ import (
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 )
 
-// CreateUserInput mirrors CreateUserRequest 1:1. Note there is no password
-// field — see CreateUser.Execute's doc comment for how this scaffold
-// handles that.
+// CreateUserInput mirrors CreateUserRequest 1:1.
 type CreateUserInput struct {
 	Email    string
 	Name     string
 	TenantID string
+	Password string
 	Role     domain.Role
 }
 
@@ -44,18 +43,10 @@ func (uc *CreateUser) Execute(ctx context.Context, in CreateUserInput) (domain.U
 		in.Role = domain.RoleUser
 	}
 
-	// CreateUserRequest (see proto/orca/auth/v1/auth.proto) carries no
-	// password field — there is no invite/reset-link flow implemented in
-	// this scaffold to hand a chosen password to the new user (see
-	// README "Known gaps": SSO/first-run/invite flows are out of scope
-	// here). A random, never-returned password is generated and hashed so
-	// the account is unusable until a real credential-issuance flow (an
-	// invite email, a forced first-login password reset, or SSO) is wired.
-	randomPassword, err := generateRandomToken(24)
-	if err != nil {
-		return domain.User{}, apperrors.New(apperrors.KindInternal, "AUTH_PASSWORD_GEN_FAILED", "failed to generate initial password", err)
+	if len(in.Password) < 8 { // mirrors SOL-AUTH-01's login-side format floor
+		return domain.User{}, apperrors.New(apperrors.KindInvalidArgument, "AUTH_WEAK_PASSWORD", "password must be at least 8 characters", nil)
 	}
-	passwordHash, err := uc.hasher.Hash(randomPassword)
+	passwordHash, err := uc.hasher.Hash(in.Password)
 	if err != nil {
 		return domain.User{}, apperrors.New(apperrors.KindInternal, "AUTH_PASSWORD_HASH_FAILED", "failed to hash initial password", err)
 	}
@@ -74,7 +65,8 @@ func (uc *CreateUser) Execute(ctx context.Context, in CreateUserInput) (domain.U
 		return domain.User{}, apperrors.New(apperrors.KindInternal, "AUTH_USER_CREATE_FAILED", "failed to create user", err)
 	}
 
-	if entry, err := domain.NewAuditEntry(uuid.NewString(), created.TenantID, actor.ID, "user.created", created.ID, now); err == nil {
+	if entry, err := domain.NewAuditEntry(uuid.NewString(), created.TenantID, actor.ID, "user.created", "user", created.ID,
+		map[string]any{"targetEmail": created.Email, "role": string(created.Role)}, "", now); err == nil {
 		_ = uc.audit.Append(ctx, entry)
 	}
 

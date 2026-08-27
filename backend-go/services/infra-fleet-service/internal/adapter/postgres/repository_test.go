@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/common/testutil"
@@ -205,5 +206,65 @@ func TestRepository_RegisterAndGet_PersistsSSHTargetID(t *testing.T) {
 	}
 	if len(list) != 1 || list[0].SSHTargetID != testSshTarget2 {
 		t.Errorf("expected List to also carry SSHTargetID, got %+v", list)
+	}
+}
+
+// TestRepository_Outbox_EnqueueFetchMarkPublished exercises the Epic G
+// transactional-outbox round trip (TASK-AUTH-05-08):
+// CreateConnectionWithOutbox enqueues a row in the same tx as the
+// connection write, FetchUnpublished sees it, and MarkPublished removes it
+// from future fetches — the exact cycle common/outbox.Relay drives in
+// production. Mirrors usage-service's
+// TestRepository_Outbox_EnqueueFetchMarkPublished.
+func TestRepository_Outbox_EnqueueFetchMarkPublished(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds); err != nil {
+		t.Fatalf("registering dev server: %v", err)
+	}
+
+	conn, err := domain.NewConnection(uuid.NewString(), testTenant1, testDevServer1, "", "")
+	if err != nil {
+		t.Fatalf("building connection: %v", err)
+	}
+	conn.Status = "established"
+	event := domain.OutboxEvent{ID: uuid.NewString(), Subject: "orca.infrafleet.ssh.connected", OccurredAt: time.Now(), PayloadJSON: []byte(`{"connection_id":"` + conn.ID + `"}`)}
+
+	if _, err := repo.CreateConnectionWithOutbox(ctx, conn, event); err != nil {
+		t.Fatalf("create connection with outbox: %v", err)
+	}
+
+	unpublished, err := repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("fetch unpublished: %v", err)
+	}
+	if len(unpublished) != 1 || unpublished[0].ID != event.ID || unpublished[0].Subject != event.Subject {
+		t.Fatalf("expected exactly the just-enqueued event, got %+v", unpublished)
+	}
+
+	if err := repo.MarkPublished(ctx, []string{event.ID}); err != nil {
+		t.Fatalf("mark published: %v", err)
+	}
+
+	unpublished, err = repo.FetchUnpublished(ctx, 10)
+	if err != nil {
+		t.Fatalf("fetch unpublished after mark: %v", err)
+	}
+	if len(unpublished) != 0 {
+		t.Errorf("expected no unpublished events after MarkPublished, got %+v", unpublished)
+	}
+
+	// The connection itself must also have been committed by the same call.
+	active, found, err := repo.GetActiveByDevServer(ctx, testTenant1, testDevServer1)
+	if err != nil {
+		t.Fatalf("get active by dev server: %v", err)
+	}
+	if !found || active.ID != conn.ID {
+		t.Errorf("expected the connection written alongside the outbox event to be found, got found=%v %+v", found, active)
 	}
 }

@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase port)
 **File:** `backend-go/services/auth-service/internal/usecase/ports.go`
 **Depends on:** TASK-AUTH-05-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `AuditRepository.Query` widened to `AuditQueryFilter`; confirmed the expected build breakage points only at call-site/implementation mismatches (postgres adapter, `query_audit_log.go`), no struct-field typo.
 
 ---
 

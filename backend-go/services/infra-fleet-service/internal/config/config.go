@@ -24,6 +24,11 @@ type Config struct {
 	// fail-safe: an unrecognized value should not silently widen what
 	// host-local terminal spawning is allowed.
 	ServerDeployment bool
+	// NATSURL is where cmd/server/main.go's outbox relay (TASK-AUTH-05-08)
+	// connects to publish infra.outbox_events rows — see usage-service's
+	// internal/config.Config.NATSURL for the same field on the reference
+	// outbox-publishing service.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -34,5 +39,6 @@ func Load() (Config, error) {
 	return Config{
 		Base:             base,
 		ServerDeployment: os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		NATSURL:          commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

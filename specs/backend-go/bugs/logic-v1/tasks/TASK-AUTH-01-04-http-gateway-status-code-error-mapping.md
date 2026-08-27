@@ -5,7 +5,7 @@
 **Service:** `api-gateway` (httpgateway)
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/auth_routes.go`
 **Depends on:** TASK-AUTH-01-01, TASK-AUTH-01-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `auth_routes.go` now maps `codes.PermissionDenied` to 403 `account_inactive` and everything else to 401 `invalid_credentials`, resolves `clientIP`/`User-Agent` into `LoginRequest`; new tests in `auth_routes_test.go` (`TestClientIP_*`, `TestAuthRoutes_Login_*`) pass.
 
 ---
 

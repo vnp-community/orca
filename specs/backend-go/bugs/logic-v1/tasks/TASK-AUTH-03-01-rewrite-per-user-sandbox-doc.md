@@ -5,7 +5,7 @@
 **Service:** docs/logic (spec update)
 **File:** `docs/logic/auth/BL-AUTH-03-per-user-sandbox.md`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — replaced `docs/logic/auth/BL-AUTH-03-per-user-sandbox.md` in full with the stateless-isolation replacement doc; grep for fork/chroot/unix-socket/child-process terms returns only the two historical-reference sentences.
 
 ---
 
