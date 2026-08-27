@@ -37,7 +37,14 @@ func mountAIProviderRoutes(r chi.Router, client aiproviderv1.AiProviderServiceCl
 // from the validated Identity, never trusted from the request body, per
 // api-gateway.md §9.
 type createAccountRequestBody struct {
-	Type string `json:"type"`
+	Type          string   `json:"type"`
+	DevServerID   string   `json:"dev_server_id"`
+	Label         string   `json:"label"`
+	ModelHint     string   `json:"model_hint"`
+	BaseURL       string   `json:"base_url"`
+	QuotaLimitDay int32    `json:"quota_limit_day"`
+	Models        []string `json:"models"`
+	IsDefault     bool     `json:"is_default"`
 }
 
 func handleCreateAccount(client aiproviderv1.AiProviderServiceClient) http.HandlerFunc {
@@ -52,8 +59,15 @@ func handleCreateAccount(client aiproviderv1.AiProviderServiceClient) http.Handl
 
 		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
 		resp, err := client.CreateAccount(ctx, &aiproviderv1.CreateAccountRequest{
-			TenantId: identity.TenantID,
-			Type:     parseProviderType(body.Type),
+			TenantId:      identity.TenantID,
+			Type:          parseProviderType(body.Type),
+			DevServerId:   body.DevServerID,
+			Label:         body.Label,
+			ModelHint:     body.ModelHint,
+			BaseUrl:       body.BaseURL,
+			QuotaLimitDay: body.QuotaLimitDay,
+			Models:        body.Models,
+			IsDefault:     body.IsDefault,
 		})
 		if err != nil {
 			writeGRPCError(w, err)
@@ -74,11 +88,21 @@ func handleResolveProvider(client aiproviderv1.AiProviderServiceClient) http.Han
 		}
 
 		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
-		resp, err := client.ResolveProvider(ctx, &aiproviderv1.ResolveProviderRequest{
-			TenantId:  identity.TenantID,
-			UserId:    userID,
-			ProjectId: q.Get("project_id"),
-		})
+		req := &aiproviderv1.ResolveProviderRequest{
+			TenantId:    identity.TenantID,
+			UserId:      userID,
+			ProjectId:   q.Get("project_id"),
+			DevServerId: q.Get("dev_server_id"),
+			AccountId:   q.Get("account_id"),
+			ScopedRef:   q.Get("scoped_ref"),
+		}
+		// ModelHint is a proto3-optional *string — only set it when the query
+		// actually carries one, same nil-vs-empty convention as
+		// wscompat/channels_scm.go's *string fields.
+		if modelHint := q.Get("model_hint"); modelHint != "" {
+			req.ModelHint = &modelHint
+		}
+		resp, err := client.ResolveProvider(ctx, req)
 		if err != nil {
 			writeGRPCError(w, err)
 			return
