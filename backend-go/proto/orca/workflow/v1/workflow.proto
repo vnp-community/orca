@@ -53,6 +53,11 @@ service WorkflowService {
   // brand-new, disconnected root template — distinct from CreateTemplate,
   // which always takes caller-supplied dag_json.
   rpc CloneTemplate(CloneTemplateRequest) returns (CloneTemplateResponse);
+
+  // StreamExecutionEvents streams step/execution-level events for a running
+  // (or already-completed, for replay) execution — BUG-WF-02's live
+  // execution streaming gap.
+  rpc StreamExecutionEvents(StreamExecutionEventsRequest) returns (stream ExecutionEvent);
 }
 
 enum StepType {
@@ -62,6 +67,8 @@ enum StepType {
   STEP_TYPE_NOTIFICATION = 3;
   STEP_TYPE_WEBHOOK = 4;
   STEP_TYPE_CONDITION = 5;
+  STEP_TYPE_ACTION = 6;
+  STEP_TYPE_PARALLEL = 7;
 }
 
 message WorkflowTemplate {
@@ -113,11 +120,24 @@ message CloneTemplateResponse {
   WorkflowTemplate template = 1;
 }
 
+message StreamExecutionEventsRequest {
+  string execution_id = 1;
+}
+
+message ExecutionEvent {
+  string execution_id = 1;
+  string step_id = 2;       // empty for execution-level events
+  string type = 3;          // step.output | step.completed | execution.completed
+  string payload_json = 4;
+  int64 occurred_at_unix_ms = 5;
+}
+
 message ExecuteRequest {
   string template_id = 1;
   string project_id = 2;
   string root_trace_id = 3; // resumability across restart
   string request_id = 4;
+  string inputs_json = 5; // caller-supplied {{...}} values, e.g. {"feature_description": "..."}
 }
 
 message WorkflowExecution {

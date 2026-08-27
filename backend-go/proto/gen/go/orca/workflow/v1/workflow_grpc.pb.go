@@ -19,18 +19,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WorkflowService_CreateTemplate_FullMethodName      = "/orca.workflow.v1.WorkflowService/CreateTemplate"
-	WorkflowService_UpdateTemplate_FullMethodName      = "/orca.workflow.v1.WorkflowService/UpdateTemplate"
-	WorkflowService_Execute_FullMethodName             = "/orca.workflow.v1.WorkflowService/Execute"
-	WorkflowService_GetExecution_FullMethodName        = "/orca.workflow.v1.WorkflowService/GetExecution"
-	WorkflowService_PauseExecution_FullMethodName      = "/orca.workflow.v1.WorkflowService/PauseExecution"
-	WorkflowService_ResumeExecution_FullMethodName     = "/orca.workflow.v1.WorkflowService/ResumeExecution"
-	WorkflowService_ExecuteAdHocStep_FullMethodName    = "/orca.workflow.v1.WorkflowService/ExecuteAdHocStep"
-	WorkflowService_CancelExecution_FullMethodName     = "/orca.workflow.v1.WorkflowService/CancelExecution"
-	WorkflowService_ListTemplates_FullMethodName       = "/orca.workflow.v1.WorkflowService/ListTemplates"
-	WorkflowService_ResolveTemplate_FullMethodName     = "/orca.workflow.v1.WorkflowService/ResolveTemplate"
-	WorkflowService_HasActiveExecutions_FullMethodName = "/orca.workflow.v1.WorkflowService/HasActiveExecutions"
-	WorkflowService_CloneTemplate_FullMethodName       = "/orca.workflow.v1.WorkflowService/CloneTemplate"
+	WorkflowService_CreateTemplate_FullMethodName        = "/orca.workflow.v1.WorkflowService/CreateTemplate"
+	WorkflowService_UpdateTemplate_FullMethodName        = "/orca.workflow.v1.WorkflowService/UpdateTemplate"
+	WorkflowService_Execute_FullMethodName               = "/orca.workflow.v1.WorkflowService/Execute"
+	WorkflowService_GetExecution_FullMethodName          = "/orca.workflow.v1.WorkflowService/GetExecution"
+	WorkflowService_PauseExecution_FullMethodName        = "/orca.workflow.v1.WorkflowService/PauseExecution"
+	WorkflowService_ResumeExecution_FullMethodName       = "/orca.workflow.v1.WorkflowService/ResumeExecution"
+	WorkflowService_ExecuteAdHocStep_FullMethodName      = "/orca.workflow.v1.WorkflowService/ExecuteAdHocStep"
+	WorkflowService_CancelExecution_FullMethodName       = "/orca.workflow.v1.WorkflowService/CancelExecution"
+	WorkflowService_ListTemplates_FullMethodName         = "/orca.workflow.v1.WorkflowService/ListTemplates"
+	WorkflowService_ResolveTemplate_FullMethodName       = "/orca.workflow.v1.WorkflowService/ResolveTemplate"
+	WorkflowService_HasActiveExecutions_FullMethodName   = "/orca.workflow.v1.WorkflowService/HasActiveExecutions"
+	WorkflowService_CloneTemplate_FullMethodName         = "/orca.workflow.v1.WorkflowService/CloneTemplate"
+	WorkflowService_StreamExecutionEvents_FullMethodName = "/orca.workflow.v1.WorkflowService/StreamExecutionEvents"
 )
 
 // WorkflowServiceClient is the client API for WorkflowService service.
@@ -80,6 +81,10 @@ type WorkflowServiceClient interface {
 	// brand-new, disconnected root template — distinct from CreateTemplate,
 	// which always takes caller-supplied dag_json.
 	CloneTemplate(ctx context.Context, in *CloneTemplateRequest, opts ...grpc.CallOption) (*CloneTemplateResponse, error)
+	// StreamExecutionEvents streams step/execution-level events for a running
+	// (or already-completed, for replay) execution — BUG-WF-02's live
+	// execution streaming gap.
+	StreamExecutionEvents(ctx context.Context, in *StreamExecutionEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecutionEvent], error)
 }
 
 type workflowServiceClient struct {
@@ -210,6 +215,25 @@ func (c *workflowServiceClient) CloneTemplate(ctx context.Context, in *CloneTemp
 	return out, nil
 }
 
+func (c *workflowServiceClient) StreamExecutionEvents(ctx context.Context, in *StreamExecutionEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecutionEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &WorkflowService_ServiceDesc.Streams[0], WorkflowService_StreamExecutionEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamExecutionEventsRequest, ExecutionEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WorkflowService_StreamExecutionEventsClient = grpc.ServerStreamingClient[ExecutionEvent]
+
 // WorkflowServiceServer is the server API for WorkflowService service.
 // All implementations must embed UnimplementedWorkflowServiceServer
 // for forward compatibility.
@@ -257,6 +281,10 @@ type WorkflowServiceServer interface {
 	// brand-new, disconnected root template — distinct from CreateTemplate,
 	// which always takes caller-supplied dag_json.
 	CloneTemplate(context.Context, *CloneTemplateRequest) (*CloneTemplateResponse, error)
+	// StreamExecutionEvents streams step/execution-level events for a running
+	// (or already-completed, for replay) execution — BUG-WF-02's live
+	// execution streaming gap.
+	StreamExecutionEvents(*StreamExecutionEventsRequest, grpc.ServerStreamingServer[ExecutionEvent]) error
 	mustEmbedUnimplementedWorkflowServiceServer()
 }
 
@@ -302,6 +330,9 @@ func (UnimplementedWorkflowServiceServer) HasActiveExecutions(context.Context, *
 }
 func (UnimplementedWorkflowServiceServer) CloneTemplate(context.Context, *CloneTemplateRequest) (*CloneTemplateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CloneTemplate not implemented")
+}
+func (UnimplementedWorkflowServiceServer) StreamExecutionEvents(*StreamExecutionEventsRequest, grpc.ServerStreamingServer[ExecutionEvent]) error {
+	return status.Error(codes.Unimplemented, "method StreamExecutionEvents not implemented")
 }
 func (UnimplementedWorkflowServiceServer) mustEmbedUnimplementedWorkflowServiceServer() {}
 func (UnimplementedWorkflowServiceServer) testEmbeddedByValue()                         {}
@@ -540,6 +571,17 @@ func _WorkflowService_CloneTemplate_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkflowService_StreamExecutionEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamExecutionEventsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(WorkflowServiceServer).StreamExecutionEvents(m, &grpc.GenericServerStream[StreamExecutionEventsRequest, ExecutionEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WorkflowService_StreamExecutionEventsServer = grpc.ServerStreamingServer[ExecutionEvent]
+
 // WorkflowService_ServiceDesc is the grpc.ServiceDesc for WorkflowService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -596,6 +638,12 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _WorkflowService_CloneTemplate_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamExecutionEvents",
+			Handler:       _WorkflowService_StreamExecutionEvents_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "orca/workflow/v1/workflow.proto",
 }

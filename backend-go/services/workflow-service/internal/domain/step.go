@@ -51,39 +51,116 @@ type StepResult struct {
 	OutputJSON string
 }
 
+// Target is a dispatch-target string in one of four shapes — the
+// orchestrator resolves it to a concrete connectionId before relaying:
+//
+//	"connection:<id>"   — direct passthrough, today's ConnectionID shape (back-compat)
+//	"project:<id>"      — resolve via project-service.GetProject().dev_server_id, then infra-fleet-service.ResolveConnection
+//	"server:<id>"       — resolve via infra-fleet-service.ResolveConnection(dev_server_id=<id>) directly
+//	"fleet:tag:<tag>"   — load-balance across infra-fleet-service's healthy dev servers carrying <tag>
+//
+// ConnectionID is a deprecated alias: when Target is empty and
+// ConnectionID is set, it's treated as "connection:<ConnectionID>" — see
+// effectiveTarget.
+
 // AgentStepConfig is the Agent step type's config shape — the prompt-driven
 // agent invocation internal/adapter/infrafleetclient.AgentExecutor relays to
 // infra-fleet-service's Relay RPC (workflow-service.md §4).
 //
-// ConnectionID is a new field added in this pass: nothing in this scaffold
-// previously identified *which* infra-fleet-service connection (dev server +
-// worktree binding) an agent/shell/notification step should target — an
-// undocumented gap this build closes, naming the field to match
-// infra-fleet-service's own ConnectionID/connectionId convention (see its
-// internal/usecase/resolve_connection.go and relay.go).
+// ConnectionID is a new field added in an earlier pass: nothing in this
+// scaffold previously identified *which* infra-fleet-service connection
+// (dev server + worktree binding) an agent/shell/notification step should
+// target — an undocumented gap that build closed, naming the field to
+// match infra-fleet-service's own ConnectionID/connectionId convention
+// (see its internal/usecase/resolve_connection.go and relay.go). Target
+// (this pass) supersedes it with the four-shape resolver-friendly string
+// above; ConnectionID stays as a deprecated back-compat alias.
 type AgentStepConfig struct {
-	ConnectionID string `json:"connectionId"`
+	Target       string `json:"target,omitempty"`
+	ConnectionID string `json:"connectionId,omitempty"` // deprecated, see Target's doc comment
 	Prompt       string `json:"prompt"`
 	WorktreePath string `json:"worktreePath,omitempty"`
 	TrustPreset  string `json:"trustPreset,omitempty"`
+	// Provider pins a specific ai-provider-service account, bypassing the
+	// priority cascade — workflow-service.md §7: an explicit
+	// step.config.provider.accountId pin (validated active) beats
+	// ai-provider-service's priority-chain resolution.
+	Provider *ProviderPin `json:"provider,omitempty"`
+	Model    string       `json:"model,omitempty"` // pass-through param, not resolved server-side
+}
+
+// ProviderPin explicitly pins an agent step to a specific
+// ai-provider-service account, bypassing ai-provider-service's own
+// priority-cascade resolution — see AgentStepConfig.Provider's doc comment.
+type ProviderPin struct {
+	AccountID string `json:"accountId"`
+}
+
+// effectiveTarget resolves AgentStepConfig's dispatch target: Target when
+// set, else ConnectionID mapped to its "connection:<id>" equivalent (the
+// deprecated back-compat path), else empty (execute locally, unchanged
+// from before Target existed).
+func (c AgentStepConfig) effectiveTarget() string {
+	if c.Target != "" {
+		return c.Target
+	}
+	if c.ConnectionID != "" {
+		return "connection:" + c.ConnectionID
+	}
+	return ""
 }
 
 // ShellStepConfig is the Shell step type's config shape — a script relayed
 // to infra-fleet-service's Relay RPC for execution on the target connection.
-// ConnectionID: see AgentStepConfig's doc comment (same new-field rationale).
+// Target/ConnectionID: see AgentStepConfig's doc comment (identical
+// resolver-target shape; Shell has no Provider/Model — those are
+// agent-specific).
 type ShellStepConfig struct {
-	ConnectionID string            `json:"connectionId"`
+	Target       string            `json:"target,omitempty"`
+	ConnectionID string            `json:"connectionId,omitempty"` // deprecated, see AgentStepConfig.Target's doc comment
 	Script       string            `json:"script"`
 	Env          map[string]string `json:"env,omitempty"`
 }
 
+func (c ShellStepConfig) effectiveTarget() string {
+	if c.Target != "" {
+		return c.Target
+	}
+	if c.ConnectionID != "" {
+		return "connection:" + c.ConnectionID
+	}
+	return ""
+}
+
 // NotificationStepConfig is the Notification step type's config shape — a
 // message relayed to infra-fleet-service's Relay RPC for dispatch.
-// ConnectionID: see AgentStepConfig's doc comment (same new-field rationale).
+// Target/ConnectionID: see AgentStepConfig's doc comment.
 type NotificationStepConfig struct {
-	ConnectionID string `json:"connectionId"`
+	Target       string `json:"target,omitempty"`
+	ConnectionID string `json:"connectionId,omitempty"` // deprecated, see AgentStepConfig.Target's doc comment
 	Channel      string `json:"channel"`
 	Message      string `json:"message"`
+}
+
+func (c NotificationStepConfig) effectiveTarget() string {
+	if c.Target != "" {
+		return c.Target
+	}
+	if c.ConnectionID != "" {
+		return "connection:" + c.ConnectionID
+	}
+	return ""
+}
+
+// ExecutionEvent is a step/execution-level lifecycle event fanned out to
+// live StreamExecutionEvents subscribers — mirrors workflowv1.ExecutionEvent
+// (proto, added TASK-WF-02-01) one-for-one.
+type ExecutionEvent struct {
+	ExecutionID string
+	StepID      string // empty for execution-level events
+	Type        string // step.output | step.completed | execution.completed
+	PayloadJSON string
+	OccurredAt  int64 // unix ms
 }
 
 // StepExecutor is the domain-level strategy interface each step type

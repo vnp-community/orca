@@ -88,6 +88,26 @@ type StepExecutionRepository interface {
 	ListStepExecutions(ctx context.Context, tenantID, executionID string) ([]domain.StepExecution, error)
 }
 
+// ServerResolver turns a step's Target string into a connectionId ready
+// for infra-fleet-service.Relay — see domain.AgentStepConfig.Target's doc
+// comment for the four accepted shapes. An empty connectionId result
+// means "execute locally," unchanged from today.
+type ServerResolver interface {
+	Resolve(ctx context.Context, tenantID, target string) (connectionID string, err error)
+}
+
+// ProviderResolver resolves which ai-provider-service account an agent
+// step should use — workflow-service.md §7's priority note.
+type ProviderResolver interface {
+	Resolve(ctx context.Context, tenantID, userID, projectID string, pin *domain.ProviderPin) (accountID string, err error)
+}
+
+// EventPublisher fans a step/execution lifecycle event out to live
+// StreamExecutionEvents subscribers.
+type EventPublisher interface {
+	Publish(ctx context.Context, event domain.ExecutionEvent) error
+}
+
 // ErrStepExecutorNotRegistered is returned by StepExecutorRegistry.Resolve
 // when no StepExecutor is wired for the requested StepType — a composition
 // root bug (cmd/server/main.go didn't register all five types), not a
