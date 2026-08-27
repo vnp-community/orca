@@ -94,6 +94,19 @@ func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id,
 func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
 	panic("not implemented")
 }
+
+// UpdateLastExecutionOutput is real (not panicking) — SimpleExecutor.Execute
+// (TASK-TG-04-07) calls this unconditionally on every successful run, so
+// every existing test in this file needs it to succeed, not crash. Mutates
+// the fake's map so a later Get (e.g. a subsequent task's completed-deps
+// lookup) sees the persisted output.
+func (f *fakeTaskRepository) UpdateLastExecutionOutput(ctx context.Context, tenantID, id, output string) error {
+	if t, ok := f.tasks[id]; ok {
+		t.LastExecutionOutput = output
+		f.tasks[id] = t
+	}
+	return nil
+}
 func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
 	panic("not implemented")
 }

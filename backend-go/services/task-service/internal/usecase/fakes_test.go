@@ -201,6 +201,14 @@ func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenant
 	return nil
 }
 
+func (f *fakeTaskRepository) UpdateLastExecutionOutput(ctx context.Context, tenantID, id, output string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.LastExecutionOutput = output
+		f.tasks[id] = t
+	}
+	return nil
+}
+
 func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.PromptTemplate = promptTemplate

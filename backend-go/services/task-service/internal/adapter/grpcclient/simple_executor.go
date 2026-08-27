@@ -202,6 +202,11 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	if result.ExitCode == nil || *result.ExitCode != 0 {
 		return "", apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", fmt.Sprintf("agent.execPrompt exited non-zero: %s", result.Stderr), nil)
 	}
+	// TASK-TG-04-07: persist this run's stdout so a LATER ExecuteBatch
+	// wave's buildExecutePrompt can resolve `{{outputs.<taskId>.*}}`
+	// against this task once it's a completed dependency — best-effort,
+	// a write failure here must not fail an otherwise-successful run.
+	_ = s.tasks.UpdateLastExecutionOutput(ctx, tenantID, taskID, result.Stdout)
 	return fmt.Sprintf("task-exec:%s:%s", taskID, requestID), nil
 }
 
@@ -237,5 +242,26 @@ func buildExecutePrompt(task domain.Task, parent *domain.Task, completedDeps []d
 			fmt.Fprintf(&b, "- %s: %s\n", d.Title, d.Description)
 		}
 	}
-	return b.String()
+	return interpolateOutputs(b.String(), completedDeps)
+}
+
+// interpolateOutputs resolves `{{outputs.<taskId>.*}}` and
+// `{{outputs.<taskId>.stdout}}` tokens (SOL-TG-04's batch-wave prompt
+// interpolation, TASK-TG-04-07) against completedDeps' LastExecutionOutput
+// (persisted by a PRIOR ExecuteBatch wave's SimpleExecutor.Execute) — the
+// only field currently captured is stdout, so both the wildcard and the
+// explicit `.stdout` token resolve to the same value. A token naming a
+// task not in completedDeps (never ran, not yet finished, or not this
+// task's dependency at all) is left verbatim rather than silently
+// stripped, so a broken reference is visible in the dispatched prompt
+// instead of vanishing.
+func interpolateOutputs(prompt string, completedDeps []domain.Task) string {
+	if len(completedDeps) == 0 {
+		return prompt
+	}
+	for _, d := range completedDeps {
+		prompt = strings.ReplaceAll(prompt, fmt.Sprintf("{{outputs.%s.stdout}}", d.ID), d.LastExecutionOutput)
+		prompt = strings.ReplaceAll(prompt, fmt.Sprintf("{{outputs.%s.*}}", d.ID), d.LastExecutionOutput)
+	}
+	return prompt
 }

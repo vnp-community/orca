@@ -94,7 +94,14 @@ type Task struct {
 	// task was re-dispatched away from) rather than erroring on it, per
 	// 05-data-architecture.md's at-least-once consumer idempotence note.
 	ActiveExecutionID string
-	ProgressPercent   int
+	// LastExecutionOutput is this task's most recent successful run's
+	// stdout, truncated to 8KB at the application layer before persisting
+	// (SOL-TG-04's product-tradeoff decision, see migration 0007's doc
+	// comment) — read by a LATER batch wave's buildExecutePrompt
+	// (TASK-TG-04-06/07) to resolve `{{outputs.<taskId>.*}}` interpolation
+	// against an EARLIER wave's completed dependency.
+	LastExecutionOutput string
+	ProgressPercent     int
 }
 
 func validStatus(s string) bool {
