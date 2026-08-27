@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (proto + grpc adapter)
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`, `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-FLEET-02-05
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added BulkProvisionFleetRequest/Response, ProvisionOutcome messages, BulkProvisionFleet RPC, DevServer.status=6 (next free slot, not 8 as the task's stale draft assumed). Wired Server.BulkProvisionFleet handler + main.go bootstrap (with unavailableBulkProvisioner graceful-degrade when Vault/relay-ssh isn't configured, matching the existing ErrConnectionModeNotImplemented convention). `buf breaking` couldn't run against local `main` (this worktree's local main ref predates backend-go entirely — see the merge in the group commit); additive-only verified by construction (only new fields at next-free numbers, new messages, new RPC). server_test.go covers marshaling + error->gRPC-status. Full suite + `-race` pass.
 
 ---
 

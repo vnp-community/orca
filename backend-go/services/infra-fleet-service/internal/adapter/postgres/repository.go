@@ -13,12 +13,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 // Repository implements usecase.DevServerRepository, usecase.ConnectionRepository,
@@ -115,6 +116,41 @@ func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevSer
 	return out, nil
 }
 
+// ListAllForPolling returns every dev server across every tenant — the
+// health poller (usecase.PollFleetHealth) is not answering one tenant's
+// request, unlike every other DevServerRepository method's tenantID
+// parameter.
+func (r *Repository) ListAllForPolling(ctx context.Context) ([]domain.DevServer, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, status
+		FROM infra.dev_servers
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query dev servers for polling: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.DevServer
+	for rows.Next() {
+		var ds domain.DevServer
+		var mode, status string
+		var sshTargetID *string
+		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status); err != nil {
+			return nil, fmt.Errorf("postgres: scan dev server row for polling: %w", err)
+		}
+		ds.Mode = domain.ConnectionMode(mode)
+		ds.Status = domain.DevServerStatus(status)
+		if sshTargetID != nil {
+			ds.SSHTargetID = *sshTargetID
+		}
+		out = append(out, ds)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate dev server rows for polling: %w", err)
+	}
+	return out, nil
+}
+
 // SshTargetStore implements usecase.SshTargetRepository and
 // adapter/sshrelay.SshTargetResolver against the same infra.ssh_targets
 // table Repository's ResolveConnection/GetFleetHealth etc. read from — split
@@ -192,6 +228,44 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 		return domain.SshTarget{}, fmt.Errorf("postgres: query ssh target: %w", err)
 	}
 	return target, nil
+}
+
+// Upsert inserts or updates by (tenant_id, host, user_name) — the conflict
+// target migrations/0007's unique index establishes. The `xmax != 0` trick
+// is the standard Postgres idiom for "insert vs. update" in one round trip,
+// avoiding a separate SELECT ... FOR UPDATE per row on a bulk-import fan-in.
+func (s *SshTargetStore) Upsert(ctx context.Context, target domain.SshTarget) (domain.SshTarget, bool, error) {
+	const query = `
+		INSERT INTO infra.ssh_targets (id, tenant_id, host, user_name, vault_ssh_role, project, tags)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (tenant_id, host, user_name) DO UPDATE SET
+		  vault_ssh_role = EXCLUDED.vault_ssh_role,
+		  project = EXCLUDED.project,
+		  tags = EXCLUDED.tags
+		RETURNING id, (xmax != 0) AS updated`
+	var id string
+	var updated bool
+	if err := s.pool.QueryRow(ctx, query, target.ID, target.TenantID, target.Host, target.UserName, target.VaultSSHRole, target.Project, target.Tags).Scan(&id, &updated); err != nil {
+		return domain.SshTarget{}, false, fmt.Errorf("postgres: upsert ssh target: %w", err)
+	}
+	target.ID = id
+	return target, updated, nil
+}
+
+// GetByHostUser is a narrow existence-probe used only by the dry-run import
+// path (usecase.ImportFleetInventory) — it does not commit anything.
+func (s *SshTargetStore) GetByHostUser(ctx context.Context, tenantID, host, userName string) (domain.SshTarget, bool, error) {
+	const query = `SELECT id, tenant_id, host, user_name, vault_ssh_role, project, tags
+		FROM infra.ssh_targets WHERE tenant_id = $1 AND host = $2 AND user_name = $3`
+	var t domain.SshTarget
+	err := s.pool.QueryRow(ctx, query, tenantID, host, userName).Scan(&t.ID, &t.TenantID, &t.Host, &t.UserName, &t.VaultSSHRole, &t.Project, &t.Tags)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.SshTarget{}, false, nil
+	}
+	if err != nil {
+		return domain.SshTarget{}, false, fmt.Errorf("postgres: query ssh target by host/user: %w", err)
+	}
+	return t, true, nil
 }
 
 // ResolveConnection is the storage-backed half of THE core coordination
@@ -315,49 +389,10 @@ func (r *Repository) CreateConnectionWithOutbox(ctx context.Context, conn domain
 	return conn, nil
 }
 
-// FetchUnpublished and MarkPublished implement common/outbox.Store — see
-// cmd/server/main.go for where the relay is wired. Kept on the same
-// Repository as CreateConnectionWithOutbox since both operate on this
-// service's own database; mirrors usage-service's Repository, which does
-// the same for SaveSession.
-func (r *Repository) FetchUnpublished(ctx context.Context, limit int) ([]outbox.Record, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, subject, occurred_at, version, payload
-		FROM infra.outbox_events
-		WHERE published_at IS NULL
-		ORDER BY created_at
-		LIMIT $1
-	`, limit)
-	if err != nil {
-		return nil, fmt.Errorf("postgres: query unpublished outbox events: %w", err)
-	}
-	defer rows.Close()
-
-	var out []outbox.Record
-	for rows.Next() {
-		var rec outbox.Record
-		if err := rows.Scan(&rec.ID, &rec.Event.TenantID, &rec.Subject, &rec.Event.OccurredAt, &rec.Event.Version, &rec.Event.Payload); err != nil {
-			return nil, fmt.Errorf("postgres: scan outbox event row: %w", err)
-		}
-		rec.Event.ID = rec.ID
-		out = append(out, rec)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("postgres: iterate outbox event rows: %w", err)
-	}
-	return out, nil
-}
-
-func (r *Repository) MarkPublished(ctx context.Context, ids []string) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	_, err := r.pool.Exec(ctx, `UPDATE infra.outbox_events SET published_at = now() WHERE id = ANY($1)`, ids)
-	if err != nil {
-		return fmt.Errorf("postgres: mark outbox events published: %w", err)
-	}
-	return nil
-}
+// FetchUnpublished and MarkPublished (both implementing common/outbox.Store)
+// live in outbox.go alongside EnqueueOutboxEvent, not here — CreateConnectionWithOutbox
+// above and adapter/eventbus.HealthPublisher both enqueue into the same
+// infra.outbox_events table this Repository's pool already owns.
 
 // GetActiveByDevServer returns the most recent connection for devServerID
 // whose status is not "closed" — see Connection.Status's doc comment
@@ -404,6 +439,20 @@ func (r *Repository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID 
 	return ds, true, nil
 }
 
+// UpdateProvisionResult persists the outcome of one provisioning attempt —
+// see usecase.DevServerRepository.UpdateProvisionResult's doc comment.
+func (r *Repository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info usecase.HandshakeInfo, provisionedAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE infra.dev_servers
+		SET status = $3, platform = $4, arch = $5, node_version = $6, agent_version = $7, last_provisioned_at = $8
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, id, string(status), info.Platform, info.Arch, info.NodeVersion, info.AgentVersion, provisionedAt)
+	if err != nil {
+		return fmt.Errorf("postgres: update dev server provision result: %w", err)
+	}
+	return nil
+}
+
 // GetFleetHealth returns the latest fleet-health sample per dev server for
 // tenantID, joined through dev_servers since fleet_health has no tenant_id
 // column of its own (see migrations/0001_init.up.sql's comment on that
@@ -434,4 +483,74 @@ func (r *Repository) GetFleetHealth(ctx context.Context, tenantID string) ([]dom
 		return nil, fmt.Errorf("postgres: iterate fleet health rows: %w", err)
 	}
 	return out, nil
+}
+
+// UpsertFleetHealth implements usecase.FleetHealthWriter.UpsertFleetHealth —
+// dev_server_id is fleet_health's primary key (migrations/0001_init), so
+// this is a plain upsert-by-PK, one row per dev server, latest sample wins.
+func (r *Repository) UpsertFleetHealth(ctx context.Context, sample domain.DevServerHealth) error {
+	const query = `
+		INSERT INTO infra.fleet_health (dev_server_id, reachable, cpu_percent, ram_percent, disk_percent, latency_ms, status, checked_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+		ON CONFLICT (dev_server_id) DO UPDATE SET
+		  reachable = EXCLUDED.reachable, cpu_percent = EXCLUDED.cpu_percent,
+		  ram_percent = EXCLUDED.ram_percent, disk_percent = EXCLUDED.disk_percent,
+		  latency_ms = EXCLUDED.latency_ms, status = EXCLUDED.status, checked_at = now()`
+	_, err := r.pool.Exec(ctx, query, sample.DevServerID, sample.Reachable, sample.CPUPercent, sample.RAMPercent, sample.DiskPercent, sample.LatencyMS, string(sample.Status))
+	if err != nil {
+		return fmt.Errorf("postgres: upsert fleet health: %w", err)
+	}
+	return nil
+}
+
+// GetPrevious implements usecase.FleetHealthWriter.GetPrevious — the
+// last-persisted sample for devServerID, which PollFleetHealth diffs
+// against to detect a status_change.
+func (r *Repository) GetPrevious(ctx context.Context, devServerID string) (domain.DevServerHealth, bool, error) {
+	const query = `SELECT dev_server_id, reachable, cpu_percent, ram_percent, disk_percent, latency_ms, status
+		FROM infra.fleet_health WHERE dev_server_id = $1`
+	var h domain.DevServerHealth
+	var status string
+	err := r.pool.QueryRow(ctx, query, devServerID).Scan(&h.DevServerID, &h.Reachable, &h.CPUPercent, &h.RAMPercent, &h.DiskPercent, &h.LatencyMS, &status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DevServerHealth{}, false, nil
+	}
+	if err != nil {
+		return domain.DevServerHealth{}, false, fmt.Errorf("postgres: get previous fleet health: %w", err)
+	}
+	h.Status = domain.HealthStatus(status)
+	return h, true, nil
+}
+
+// TryLock implements usecase.PollLockPort.TryLock via a Postgres
+// session-level advisory lock keyed by hashtext(devServerID) — non-blocking
+// (pg_try_advisory_lock, not pg_advisory_lock), so a replica that loses the
+// race skips this server this tick rather than queueing. Uses a held
+// connection acquired from the pool (not a bare pool.Exec/QueryRow), since
+// advisory locks are session-scoped: the lock and its later unlock must run
+// on literally the same underlying connection, and unlock releases the
+// connection back to the pool.
+func (r *Repository) TryLock(ctx context.Context, devServerID string) (bool, func(), error) {
+	conn, err := r.pool.Acquire(ctx)
+	if err != nil {
+		return false, nil, fmt.Errorf("postgres: acquire connection for advisory lock: %w", err)
+	}
+	var locked bool
+	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(hashtext($1))`, devServerID).Scan(&locked); err != nil {
+		conn.Release()
+		return false, nil, fmt.Errorf("postgres: try advisory lock: %w", err)
+	}
+	if !locked {
+		conn.Release()
+		return false, nil, nil
+	}
+	unlock := func() {
+		// Why context.Background(): unlock typically runs in a defer after
+		// the caller's ctx may already be done (poll tick finished) —
+		// releasing the advisory lock must not be skipped just because the
+		// tick's own context expired.
+		_, _ = conn.Exec(context.Background(), `SELECT pg_advisory_unlock(hashtext($1))`, devServerID)
+		conn.Release()
+	}
+	return true, unlock, nil
 }

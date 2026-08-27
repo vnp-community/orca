@@ -282,6 +282,33 @@ func (c *Client) Health(ctx context.Context, devServer domain.DevServer) (bool, 
 	return sess.isHandshaked(), nil
 }
 
+// LastHandshakeInfo returns the HandshakeInfo captured at the most recent
+// successful attachTransport for devServerID, if a live, handshaked session
+// exists. Cheap in-memory lookup — no round trip to the remote host.
+// EstablishConnection (TASK-FLEET-04-03) uses this to persist
+// handshake-derived facts (platform/arch/node version) after a successful
+// connect, without a second round trip.
+func (c *Client) LastHandshakeInfo(devServerID string) (usecase.HandshakeInfo, bool) {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok {
+		return usecase.HandshakeInfo{}, false
+	}
+	info, found := sess.handshakeInfoSnapshot()
+	if !found {
+		return usecase.HandshakeInfo{}, false
+	}
+	// Convert at the adapter boundary — usecase.HandshakeInfo is a
+	// deliberate duplicate of this package's own HandshakeInfo (see
+	// usecase/ports.go's doc comment: usecase must never import this
+	// adapter package, which already imports usecase to implement
+	// DevServerAgentClient).
+	return usecase.HandshakeInfo{
+		Platform: info.Platform, Arch: info.Arch, NodeVersion: info.NodeVersion, AgentVersion: info.AgentVersion,
+	}, true
+}
+
 // Note: relay-ssh's liveness check is NOT a separate dial-and-probe path —
 // Health above already covers it uniformly via getOrCreateSession's
 // mode dispatch to getOrProvisionSession/sshProvisioner.Provision, the same

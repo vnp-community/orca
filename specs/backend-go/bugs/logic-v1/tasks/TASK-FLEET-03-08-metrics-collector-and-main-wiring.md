@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (metrics adapter + cmd/server)
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/metrics/fleet_collector.go` (new), `backend-go/services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-FLEET-03-05, TASK-FLEET-03-06, TASK-FLEET-03-07
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added `github.com/prometheus/client_golang` as a new dependency (zero prior Prometheus usage anywhere in this backend-go monorepo). Implemented FleetCollector verbatim to spec; added usecase.MetricsCollector port (Dependency Inversion — usecase never imports adapter/metrics) and threaded it through NewPollFleetHealth (nil-safe). Wired at bootstrap: NATS/outbox relay (mirrors usage-service's Connect/EnsureStream/Relay.Run pattern, graceful-degrades if NATS unreachable), HealthPublisher, webhook.Alerter (from FLEET_WEBHOOK_URL), FleetCollector registered on a dedicated prometheus.Registry, PollFleetHealth started via `go pollFleetHealthUC.Run(ctx, cfg.FleetPollInterval)`, `/health/metrics` mounted on the existing HTTP mux/port. Config gained FleetPollInterval (FLEET_POLL_INTERVAL_SEC, default 30, fail-safe on bad input) and FleetWebhookURL. All builds/vet/tests (incl. `-race`) pass across the whole service.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (proto)
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added project/tags to SshTarget, ImportFleetInventory RPC + messages, regenerated stubs via `make proto-gen`, `go build ./proto/...` clean.
 
 ---
 

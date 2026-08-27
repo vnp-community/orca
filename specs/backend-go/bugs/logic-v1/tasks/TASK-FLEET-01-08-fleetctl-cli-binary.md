@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (new CLI binary)
 **File:** `backend-go/services/infra-fleet-service/cmd/fleetctl/main.go` (new), `backend-go/services/infra-fleet-service/cmd/fleetctl/fleetyaml/parse.go` (new)
 **Depends on:** TASK-FLEET-01-07
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — implemented fleetyaml.Parse (hostname/IP validation, port drop-with-warning, project-declared check, identityFile rejection, defaults.vaultSshRole fallback) + fleetctl main.go (import/list/status against api-gateway REST, flag-based dispatch). Note: TASK-FLEET-01-07 (api-gateway REST routes this CLI targets) was out of scope for this batch, so the CLI compiles/builds and is fully unit-tested for parsing, but end-to-end HTTP calls are untested against a live api-gateway. `go build ./cmd/fleetctl/...` and `go test ./cmd/fleetctl/fleetyaml/...` both pass; promoted yaml.v3 to direct via `go mod tidy`.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/poll_fleet_health.go` (new)
 **Depends on:** TASK-FLEET-03-01, TASK-FLEET-03-03
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — implemented PollFleetHealth (Run/pollOnce/pollOne) + parseFleetMetrics. Deviation: reused the existing broader usecase.DevServerAgentClient interface instead of redeclaring a narrower same-named local interface (would have been a duplicate type in the usecase package — devserveragent.Client already implements the existing one, which includes Health/Exec). parseFleetMetrics: CPU = single-sample busy-since-boot from /proc/stat (no baseline diff available), RAM = used/total from `free -b`'s Mem: line, Disk = df -P's Capacity column parsed directly. All tests (healthy/degraded transition/no-transition/lock-denied/unreachable + parseFleetMetrics malformed-input-never-panics) pass under `-race`.
 
 ---
 

@@ -193,7 +193,7 @@ func TestConnectAndRunCommand_SucceedsAgainstFakeServer(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
 
-	target, err := domain.NewSshTarget("target-1", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("target-1", "tenant-1", "127.0.0.1", "deploy", "role-1", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestConnect_FailsWhenIssuerErrors(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
 
-	target, err := domain.NewSshTarget("target-2", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("target-2", "tenant-1", "127.0.0.1", "deploy", "role-1", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestConnect_FailsWhenServerRejectsCert(t *testing.T) {
 	wrongCA := newFakeCA(t)
 	server := startFakeSSHServer(t, realCA.signer.PublicKey(), "deploy") // server trusts realCA only
 
-	target, err := domain.NewSshTarget("target-3", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("target-3", "tenant-1", "127.0.0.1", "deploy", "role-1", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}

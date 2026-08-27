@@ -87,6 +87,18 @@ func (uc *EstablishConnection) Execute(ctx context.Context, in EstablishConnecti
 	if err != nil || !reachable {
 		return domain.Connection{}, apperrors.New(apperrors.KindFailedPrecondition, "INFRA_SSH_CONNECT_FAILED", "failed to establish SSH connection to target", err)
 	}
+	// Persist handshake-derived platform facts — session already holds them
+	// post-handshake (session.attachTransport receives HandshakeInfo at
+	// connect time), so this call site can persist without a second round
+	// trip. Defensive: LastHandshakeInfo's ok=false should not happen here
+	// (we just confirmed reachable==true), but is handled without erroring
+	// the whole Execute — this is the second write path into the
+	// platform/arch/node-version columns SOL-FLEET-02 introduces
+	// (BulkProvisionFleet is the first), both persist since both receive a
+	// HandshakeInfo.
+	if info, ok := uc.agent.LastHandshakeInfo(devServer.ID); ok {
+		_ = uc.devServers.UpdateProvisionResult(ctx, tenantID, devServer.ID, domain.DevServerStatusHealthy, info, time.Now())
+	}
 
 	conn, err := domain.NewConnection(uuid.NewString(), tenantID, devServer.ID, "", "")
 	if err != nil {

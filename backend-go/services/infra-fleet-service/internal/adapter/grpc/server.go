@@ -69,6 +69,12 @@ type Server struct {
 	getAgentTerminalSession *usecase.GetAgentTerminalSession
 	sendTerminalInput       *usecase.SendTerminalInput
 	getTerminalScrollback   *usecase.GetTerminalScrollback
+
+	importFleetInventory *usecase.ImportFleetInventory
+	bulkProvisionFleet   *usecase.BulkProvisionFleet
+
+	detectDevServerAgents   *usecase.DetectDevServerAgents
+	checkDevServerPreflight *usecase.CheckDevServerPreflight
 }
 
 func New(
@@ -105,6 +111,10 @@ func New(
 	getAgentTerminalSession *usecase.GetAgentTerminalSession,
 	sendTerminalInput *usecase.SendTerminalInput,
 	getTerminalScrollback *usecase.GetTerminalScrollback,
+	importFleetInventory *usecase.ImportFleetInventory,
+	bulkProvisionFleet *usecase.BulkProvisionFleet,
+	detectDevServerAgents *usecase.DetectDevServerAgents,
+	checkDevServerPreflight *usecase.CheckDevServerPreflight,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -142,6 +152,12 @@ func New(
 		getAgentTerminalSession: getAgentTerminalSession,
 		sendTerminalInput:       sendTerminalInput,
 		getTerminalScrollback:   getTerminalScrollback,
+
+		importFleetInventory: importFleetInventory,
+		bulkProvisionFleet:   bulkProvisionFleet,
+
+		detectDevServerAgents:   detectDevServerAgents,
+		checkDevServerPreflight: checkDevServerPreflight,
 	}
 }
 
@@ -282,6 +298,83 @@ func (s *Server) ListSshTargets(ctx context.Context, req *infrafleetv1.ListSshTa
 	return &infrafleetv1.ListSshTargetsResponse{SshTargets: out}, nil
 }
 
+// ImportFleetInventory is BL-FLEET-01's batch YAML-import entry point —
+// see usecase.ImportFleetInventory's doc comment for the upsert semantics.
+func (s *Server) ImportFleetInventory(ctx context.Context, req *infrafleetv1.ImportFleetInventoryRequest) (*infrafleetv1.ImportFleetInventoryResponse, error) {
+	servers := make([]usecase.FleetServerInput, 0, len(req.GetServers()))
+	for _, sv := range req.GetServers() {
+		servers = append(servers, usecase.FleetServerInput{
+			Host: sv.GetHost(), UserName: sv.GetUser(), VaultSSHRole: sv.GetVaultSshRole(),
+			Project: sv.GetProject(), Tags: sv.GetTags(),
+		})
+	}
+	result, err := s.importFleetInventory.Execute(ctx, usecase.ImportFleetInventoryInput{Servers: servers, DryRun: req.GetDryRun()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.ImportFleetInventoryResponse{
+		Imported: int32(result.Imported), Updated: int32(result.Updated), Skipped: int32(result.Skipped),
+	}
+	for _, e := range result.Errors {
+		resp.Errors = append(resp.Errors, &infrafleetv1.ImportFleetInventoryError{Host: e.Host, User: e.UserName, Reason: e.Reason})
+	}
+	return resp, nil
+}
+
+// BulkProvisionFleet is BL-FLEET-02's fan-out batch-provision entry point —
+// see usecase.BulkProvisionFleet's doc comment.
+func (s *Server) BulkProvisionFleet(ctx context.Context, req *infrafleetv1.BulkProvisionFleetRequest) (*infrafleetv1.BulkProvisionFleetResponse, error) {
+	result, err := s.bulkProvisionFleet.Execute(ctx, usecase.BulkProvisionFleetInput{
+		Project: req.GetProject(), Concurrency: int(req.GetConcurrency()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.BulkProvisionFleetResponse{
+		Success: int32(result.Success), Failed: int32(result.Failed), Skipped: int32(result.Skipped),
+	}
+	for _, o := range result.Outcomes {
+		resp.Outcomes = append(resp.Outcomes, &infrafleetv1.ProvisionOutcome{
+			DevServerId: o.DevServerID, Host: o.Host, Status: o.Status, Error: o.Error,
+		})
+	}
+	return resp, nil
+}
+
+// DetectDevServerAgents closes BL-FLEET-04 Step 3 — see
+// usecase.DetectDevServerAgents's doc comment.
+func (s *Server) DetectDevServerAgents(ctx context.Context, req *infrafleetv1.DetectDevServerAgentsRequest) (*infrafleetv1.DetectDevServerAgentsResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err))
+	}
+	result, err := s.detectDevServerAgents.Execute(ctx, tenantID, req.GetDevServerId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.DetectDevServerAgentsResponse{Agents: result.Agents, Platform: result.Platform}, nil
+}
+
+// CheckDevServerPreflight closes BL-FLEET-04 Step 4 — see
+// usecase.CheckDevServerPreflight's doc comment.
+func (s *Server) CheckDevServerPreflight(ctx context.Context, req *infrafleetv1.CheckDevServerPreflightRequest) (*infrafleetv1.CheckDevServerPreflightResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err))
+	}
+	result, err := s.checkDevServerPreflight.Execute(ctx, tenantID, req.GetDevServerId(), req.GetProbePort())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CheckDevServerPreflightResponse{
+		Git:  &infrafleetv1.CheckResult{Installed: result.Git.Installed, Version: result.Git.Version, MeetsMin: result.Git.MeetsMin},
+		Node: &infrafleetv1.CheckResult{Installed: result.Node.Installed, Version: result.Node.Version, MeetsMin: result.Node.MeetsMin},
+		Disk: &infrafleetv1.DiskCheckResult{FreeGb: result.Disk.FreeGB, MeetsMin: result.Disk.MeetsMin},
+		Port: &infrafleetv1.PortCheckResult{Port: result.Port.Port, Available: result.Port.Available},
+		Gh:   &infrafleetv1.CheckResult{Installed: result.GH.Installed, Version: result.GH.Version, MeetsMin: result.GH.MeetsMin},
+	}, nil
+}
+
 func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error) {
 	state, err := s.getSshState.Execute(ctx, usecase.SshStateInput{SshTargetID: req.GetSshTargetId()})
 	if err != nil {
@@ -385,11 +478,16 @@ func toProtoConnectionMode(m domain.ConnectionMode) infrafleetv1.ConnectionMode 
 
 func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 	return &infrafleetv1.DevServer{
-		Id:          ds.ID,
-		TenantId:    ds.TenantID,
-		Host:        ds.Host,
-		Mode:        toProtoConnectionMode(ds.Mode),
-		SshTargetId: ds.SSHTargetID,
+		Id:           ds.ID,
+		TenantId:     ds.TenantID,
+		Host:         ds.Host,
+		Mode:         toProtoConnectionMode(ds.Mode),
+		SshTargetId:  ds.SSHTargetID,
+		Status:       string(ds.Status),
+		Platform:     ds.Platform,
+		Arch:         ds.Arch,
+		NodeVersion:  ds.NodeVersion,
+		AgentVersion: ds.AgentVersion,
 	}
 }
 

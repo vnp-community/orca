@@ -18,6 +18,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -33,10 +35,14 @@ import (
 
 	infraagentwsserver "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/agentwsserver"
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
+	infraeventbus "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
+	inframetrics "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/metrics"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
+	infrawebhook "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/webhook"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -140,6 +146,10 @@ func run() error {
 	// even if deploy will fail until an operator sets the bundle path.
 	agentCfg := infradevserveragent.LoadConfigFromEnv()
 	var agentOpts []infradevserveragent.Option
+	// sshProvisioner is also BulkProvisionFleet's provisioning port
+	// (wrapped below) — hoisted out of the if/else so both wiring sites
+	// share the one instance instead of dialing SSH twice.
+	var sshProvisioner *infrasshrelay.Provisioner
 	vaultClient, err := secrets.NewClient()
 	if err != nil {
 		logger.Warn("failed to construct Vault client — relay-ssh mode will report ErrConnectionModeNotImplemented", slog.Any("error", err))
@@ -149,12 +159,24 @@ func run() error {
 		if sshRelayCfg.BundlePath == "" {
 			logger.Warn("ORCA_RELAY_BUNDLE_PATH is not set — relay-ssh dev servers will fail to provision until it points at a built agent/out/agent.js")
 		}
-		provisioner := infrasshrelay.NewProvisioner(sshConnector, sshTargetStore, sshRelayCfg)
-		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(provisioner))
+		sshProvisioner = infrasshrelay.NewProvisioner(sshConnector, sshTargetStore, sshRelayCfg)
+		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(sshProvisioner))
 	}
 
 	agentClient := infradevserveragent.New(agentCfg, logger, agentOpts...)
 	defer agentClient.Close()
+
+	// bulkProvisioner degrades the same way relay-ssh mode itself does when
+	// Vault isn't configured (see the warning above) — BulkProvisionFleet
+	// still constructs and serves, every call just fails with a typed,
+	// permanent error instead of the service crash-looping over one
+	// optional mode's dependency.
+	var bulkProvisioner usecase.Provisioner
+	if sshProvisioner != nil {
+		bulkProvisioner = infrasshrelay.NewBulkProvisioner(sshProvisioner)
+	} else {
+		bulkProvisioner = unavailableBulkProvisioner{}
+	}
 
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
@@ -202,6 +224,40 @@ func run() error {
 	sendTerminalInputUC := usecase.NewSendTerminalInput(terminalSessionStore, repo, agentClient)
 	getTerminalScrollbackUC := usecase.NewGetTerminalScrollback(terminalSessionStore, repo, agentClient)
 
+	importFleetInventoryUC := usecase.NewImportFleetInventory(sshTargetStore)
+	bulkProvisionFleetUC := usecase.NewBulkProvisionFleet(sshTargetStore, repo, bulkProvisioner)
+	detectDevServerAgentsUC := usecase.NewDetectDevServerAgents(repo, agentClient)
+	checkDevServerPreflightUC := usecase.NewCheckDevServerPreflight(repo, agentClient)
+
+	// --- Fleet health polling (SOL-FLEET-03) ---------------------------
+	// dev_server.health_degraded publishes through the SAME outbox relay
+	// constructed above for ssh.connect (TASK-AUTH-05-08) — both events
+	// land in the one infra_fleet.outbox_events table (migrations/0010_outbox)
+	// via the shared repo Store, so a second eventbus.Connect/outbox.Relay
+	// pair here would just be a redundant NATS connection polling the same
+	// rows. EnsureStream is still called per subject pattern this service
+	// publishes to, per that method's doc comment.
+	if pub != nil {
+		if err := pub.EnsureStream(ctx, "INFRA_FLEET", []string{"orca.infra_fleet.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		}
+	}
+
+	healthEventPublisherUC := infraeventbus.NewHealthPublisher(repo, logger)
+	webhookAlerterUC := infrawebhook.NewAlerter(cfg.FleetWebhookURL, nil)
+	if cfg.FleetWebhookURL == "" {
+		logger.Info("FLEET_WEBHOOK_URL is not set — fleet status-change webhook alerts are disabled")
+	}
+
+	fleetMetricsRegistry := prometheus.NewRegistry()
+	fleetCollector := inframetrics.NewFleetCollector()
+	fleetMetricsRegistry.MustRegister(fleetCollector)
+
+	pollFleetHealthUC := usecase.NewPollFleetHealth(
+		repo, repo, agentClient, repo, healthEventPublisherUC, webhookAlerterUC, fleetCollector, logger,
+	)
+	go pollFleetHealthUC.Run(ctx, cfg.FleetPollInterval)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -237,6 +293,10 @@ func run() error {
 		getAgentTerminalSessionUC,
 		sendTerminalInputUC,
 		getTerminalScrollbackUC,
+		importFleetInventoryUC,
+		bulkProvisionFleetUC,
+		detectDevServerAgentsUC,
+		checkDevServerPreflightUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -266,6 +326,9 @@ func run() error {
 	mux.Handle("/", healthSrv.Handler())
 	mux.Handle("/agent", agentWSServer)
 	mux.Handle("/api/agent-token", agentTokenIssuer)
+	// Same port as the liveness/agent-WS endpoints above, not a new one —
+	// see TASK-FLEET-03-08.
+	mux.Handle("/health/metrics", promhttp.HandlerFor(fleetMetricsRegistry, promhttp.HandlerOpts{}))
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
@@ -314,4 +377,15 @@ func run() error {
 	relayWG.Wait()
 
 	return nil
+}
+
+// unavailableBulkProvisioner implements usecase.Provisioner with a
+// permanent, typed failure — wired in when Vault (and therefore relay-ssh
+// mode entirely) isn't configured, matching relay-ssh's own
+// ErrConnectionModeNotImplemented degrade-not-crash convention (see
+// devserveragent.Client.getOrProvisionSession).
+type unavailableBulkProvisioner struct{}
+
+func (unavailableBulkProvisioner) Provision(ctx context.Context, devServer domain.DevServer) (usecase.HandshakeInfo, bool, error) {
+	return usecase.HandshakeInfo{}, false, fmt.Errorf("%w: relay-ssh support was not enabled (see WithRelaySSH)", infradevserveragent.ErrConnectionModeNotImplemented)
 }

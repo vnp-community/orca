@@ -241,6 +241,22 @@ func (f *fakeInfraFleetServiceClient) DeleteTerminalScrollbackSnapshots(context.
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+func (f *fakeInfraFleetServiceClient) ImportFleetInventory(context.Context, *infrafleetv1.ImportFleetInventoryRequest, ...grpc.CallOption) (*infrafleetv1.ImportFleetInventoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) BulkProvisionFleet(context.Context, *infrafleetv1.BulkProvisionFleetRequest, ...grpc.CallOption) (*infrafleetv1.BulkProvisionFleetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) DetectDevServerAgents(context.Context, *infrafleetv1.DetectDevServerAgentsRequest, ...grpc.CallOption) (*infrafleetv1.DetectDevServerAgentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) CheckDevServerPreflight(context.Context, *infrafleetv1.CheckDevServerPreflightRequest, ...grpc.CallOption) (*infrafleetv1.CheckDevServerPreflightResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // testInfraRouter mounts mountInfraRoutes alone on a fresh chi router — no
 // authMiddleware, since these tests inject identity into the request
 // context directly the way authMiddleware would (withIdentity), mirroring

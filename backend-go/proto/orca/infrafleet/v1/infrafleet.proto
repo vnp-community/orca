@@ -127,6 +127,24 @@ service InfraFleetService {
   // does not exist yet (confirmed absent as of this pass) — see
   // usecase.GetHostCapabilities's doc comment.
   rpc GetHostCapabilities(GetHostCapabilitiesRequest) returns (GetHostCapabilitiesResponse);
+
+  // ImportFleetInventory is the batch YAML-import entry point for BL-FLEET-01
+  // — upserts SshTargets by (tenant_id, host, user), see
+  // usecase.ImportFleetInventory's doc comment.
+  rpc ImportFleetInventory(ImportFleetInventoryRequest) returns (ImportFleetInventoryResponse);
+
+  // BulkProvisionFleet fans out provisioning across a tenant's SSH targets
+  // — unary (not streaming): bulk provisioning is N-servers-in-parallel,
+  // not one server's steps in sequence, and BL-FLEET-02's own contract is
+  // a single terminal summary object. See usecase.BulkProvisionFleet's doc
+  // comment.
+  rpc BulkProvisionFleet(BulkProvisionFleetRequest) returns (BulkProvisionFleetResponse);
+
+  // DetectDevServerAgents/CheckDevServerPreflight close BL-FLEET-04 Steps
+  // 3/4 (agent detection, remote preflight) — see usecase.DetectDevServerAgents
+  // / usecase.CheckDevServerPreflight doc comments.
+  rpc DetectDevServerAgents(DetectDevServerAgentsRequest) returns (DetectDevServerAgentsResponse);
+  rpc CheckDevServerPreflight(CheckDevServerPreflightRequest) returns (CheckDevServerPreflightResponse);
 }
 
 enum ConnectionMode {
@@ -147,6 +165,17 @@ message DevServer {
   // "DevServer<->SshTarget linkage the domain model doesn't have yet" gap
   // this service's README flagged (Epic A third pass).
   string ssh_target_id = 5;
+  // status is domain.DevServerStatus verbatim: pending|healthy|degraded|
+  // unhealthy — see BulkProvisionFleet's doc comment (SOL-FLEET-02).
+  string status = 6;
+  // platform/arch/node_version/agent_version are handshake-derived facts
+  // (SOL-FLEET-04) — the same columns SOL-FLEET-02's BulkProvisionFleet
+  // also persists into (domain.DevServer), see
+  // usecase.DevServerRepository.UpdateProvisionResult.
+  string platform = 7;
+  string arch = 8;
+  string node_version = 9;
+  string agent_version = 10;
 }
 
 message RegisterDevServerRequest {
@@ -154,6 +183,9 @@ message RegisterDevServerRequest {
   string host = 2;
   ConnectionMode mode = 3;
   string ssh_target_id = 4; // required when mode=CONNECTION_MODE_RELAY_SSH
+  // relay_port: 0 = no daemon port — foreground stdio session, honest
+  // placeholder until agent/ gains a daemon (see TASK-FLEET-02-08).
+  int32 relay_port = 5;
 }
 
 message RegisterDevServerResponse {
@@ -290,6 +322,8 @@ message SshTarget {
   string host = 3;
   string user = 4;
   string vault_ssh_role = 5; // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+  string project = 6;  // "" = ungrouped
+  repeated string tags = 7;
 }
 
 message ListSshTargetsRequest {
@@ -544,4 +578,70 @@ message GetHostCapabilitiesResponse {
   repeated string wsl_distros = 2;
   bool pwsh_available = 3;
   bool git_bash_available = 4;
+}
+
+// --- Fleet inventory import (BL-FLEET-01) ----------------------------------
+
+message FleetServerInput {
+  string host = 1;
+  string user = 2;
+  string vault_ssh_role = 3;
+  string project = 4;
+  repeated string tags = 5;
+}
+
+message ImportFleetInventoryRequest {
+  repeated FleetServerInput servers = 1;
+  bool dry_run = 2;
+}
+message ImportFleetInventoryError { string host = 1; string user = 2; string reason = 3; }
+message ImportFleetInventoryResponse {
+  int32 imported = 1;
+  int32 updated = 2;
+  int32 skipped = 3;
+  repeated ImportFleetInventoryError errors = 4;
+}
+
+// --- Bulk fleet provisioning (BL-FLEET-02) ---------------------------------
+
+message BulkProvisionFleetRequest {
+  string project = 1; // "" = all
+  int32 concurrency = 2; // 0 = default 5
+}
+message ProvisionOutcome { string dev_server_id = 1; string host = 2; string status = 3; string error = 4; }
+message BulkProvisionFleetResponse {
+  int32 success = 1; int32 failed = 2; int32 skipped = 3;
+  repeated ProvisionOutcome outcomes = 4;
+}
+
+// --- Dev server onboarding: agent detection + remote preflight (BL-FLEET-04) ---
+
+message AgentProbe {
+  string id = 1;
+  string cmd = 2;
+  repeated string required_commands = 3;
+  repeated string unsupported_runtimes = 4;
+}
+message DetectDevServerAgentsRequest {
+  string dev_server_id = 1;
+  repeated AgentProbe commands = 2;
+}
+message DetectDevServerAgentsResponse {
+  repeated string agents = 1;
+  string platform = 2;
+}
+
+message CheckDevServerPreflightRequest {
+  string dev_server_id = 1;
+  int32 probe_port = 2;
+}
+message CheckResult { bool installed = 1; string version = 2; bool meets_min = 3; }
+message DiskCheckResult { double free_gb = 1; bool meets_min = 2; }
+message PortCheckResult { int32 port = 1; bool available = 2; }
+message CheckDevServerPreflightResponse {
+  CheckResult git = 1;
+  CheckResult node = 2;
+  DiskCheckResult disk = 3;
+  PortCheckResult port = 4;
+  CheckResult gh = 5;
 }

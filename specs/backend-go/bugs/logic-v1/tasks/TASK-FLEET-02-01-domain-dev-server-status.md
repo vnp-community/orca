@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (domain)
 **File:** `backend-go/services/infra-fleet-service/internal/domain/dev_server.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added DevServerStatus type + Status/Platform/Arch/NodeVersion/AgentVersion/LastProvisionedAt fields; NewDevServer defaults Status to Pending. Full service test suite passes.
 
 ---
 

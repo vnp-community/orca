@@ -36,6 +36,48 @@ type DevServerRepository interface {
 	// in the usecase layer, not this adapter, matching every other `New*`
 	// call site in this service.
 	FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (ds domain.DevServer, found bool, err error)
+	// UpdateProvisionResult persists the outcome of one provisioning
+	// attempt — status plus the handshake facts SOL-FLEET-04 needs
+	// surfaced. Called once per server at the end of bulkProvisionOne
+	// (TASK-FLEET-02-05) and after EstablishConnection's handshake
+	// (TASK-FLEET-04-03), success or failure.
+	UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info HandshakeInfo, provisionedAt time.Time) error
+	// ListAllForPolling is cross-tenant by design (the poller is not
+	// answering one tenant's request), unlike every other
+	// DevServerRepository method's tenantID parameter.
+	ListAllForPolling(ctx context.Context) ([]domain.DevServer, error)
+}
+
+// HandshakeInfo is a usecase-owned mirror of
+// adapter/devserveragent.HandshakeInfo — duplicated here rather than
+// imported, since adapter/devserveragent already imports this package (to
+// implement DevServerAgentClient) and importing it back would create an
+// import cycle. adapter/devserveragent.Client.LastHandshakeInfo and
+// adapter/sshrelay's provisioner both convert into this shape at the
+// usecase boundary.
+type HandshakeInfo struct {
+	Platform     string
+	Arch         string
+	NodeVersion  string
+	AgentVersion string
+}
+
+// Provisioner is BulkProvisionFleet's narrow port onto relay-ssh
+// provisioning (adapter/sshrelay.Provisioner's SSH-connect ->
+// prereq-check -> deploy -> handshake pipeline) — deliberately not
+// DevServerAgentClient (whose Health/Exec double as an implicit
+// provision-on-demand for every OTHER usecase in this service):
+// BulkProvisionFleet needs the provisioning outcome itself (handshake
+// facts, prereq shortfall) as its primary result, not a side-effect of
+// some other call.
+type Provisioner interface {
+	// Provision runs the full pipeline for devServer. A prereq shortfall
+	// does NOT make this return an error — deploy is still attempted
+	// (BL-FLEET-02's "does not abort the pipeline"), and prereqsMet=false
+	// on an otherwise-successful call reports it, so bulkProvisionOne can
+	// tell "deployed but degraded" apart from "deploy/handshake genuinely
+	// failed" (a non-nil err, which DOES still consume a retry attempt).
+	Provision(ctx context.Context, devServer domain.DevServer) (info HandshakeInfo, prereqsMet bool, err error)
 }
 
 // SshTargetRepository is the persistence port for SSH target registration.
@@ -48,6 +90,15 @@ type SshTargetRepository interface {
 	// List returns every SSH target registered for tenantID — backs
 	// ssh.listTargets/ssh.getUserAccount.
 	List(ctx context.Context, tenantID string) ([]domain.SshTarget, error)
+	// Upsert inserts or updates by (tenant_id, host, user_name) — the
+	// conflict target migrations/0007's unique index establishes.
+	// updated=true means an existing row's vault_ssh_role/project/tags were
+	// overwritten; updated=false means a new row was inserted.
+	Upsert(ctx context.Context, target domain.SshTarget) (saved domain.SshTarget, updated bool, err error)
+	// GetByHostUser is a narrow existence-probe used only by the
+	// dry-run import path (usecase.ImportFleetInventory) — it does not
+	// commit anything.
+	GetByHostUser(ctx context.Context, tenantID, host, userName string) (domain.SshTarget, bool, error)
 }
 
 // ConnectionRepository is the persistence port for the write side of
@@ -109,12 +160,56 @@ type ConnectionResolver interface {
 	ResolveConnectionByWorktree(ctx context.Context, tenantID, worktreeID string) (connected bool, devServer domain.DevServer, conn domain.Connection, err error)
 }
 
-// FleetHealthPort is the read port over fleet health samples. The
-// health-polling writer side (the 30s-cadence poller from
-// specs/backend-go/services/infra-fleet-service.md §8) is not implemented in
-// this scaffold — see this service's README "Known gaps".
+// FleetHealthPort is the read port over fleet health samples.
 type FleetHealthPort interface {
 	GetFleetHealth(ctx context.Context, tenantID string) ([]domain.DevServerHealth, error)
+}
+
+// FleetHealthWriter is the write side PollFleetHealth (TASK-FLEET-03-05)
+// needs — split from FleetHealthPort the same way other narrow ports
+// already split a single Repository's read/write concerns in this file.
+type FleetHealthWriter interface {
+	UpsertFleetHealth(ctx context.Context, sample domain.DevServerHealth) error
+	// GetPrevious reads the last-persisted sample for devServerID —
+	// PollFleetHealth diffs against it to detect a status_change (BL-FLEET-03's
+	// poll-flow step 4). found=false means no prior sample exists yet.
+	GetPrevious(ctx context.Context, devServerID string) (sample domain.DevServerHealth, found bool, err error)
+}
+
+// PollLockPort wraps a Postgres session-level advisory lock keyed by a hash
+// of devServerID — TryLock is non-blocking (pg_try_advisory_lock, not
+// pg_advisory_lock): a replica that loses the race skips this server this
+// tick rather than queueing, so a multi-replica poller never double-polls
+// the same dev server concurrently.
+type PollLockPort interface {
+	// TryLock returns locked=false (with a nil unlock, nil err) when
+	// another poller already holds the lock for devServerID — the caller
+	// skips this server this tick. When locked=true, unlock MUST be called
+	// exactly once to release the advisory lock.
+	TryLock(ctx context.Context, devServerID string) (locked bool, unlock func(), err error)
+}
+
+// HealthEventPublisher fans a status_change out onto the event bus (see
+// adapter/eventbus's health publisher) — fire-and-forget from
+// PollFleetHealth's perspective, hence no error return.
+type HealthEventPublisher interface {
+	PublishStatusChange(ctx context.Context, ds domain.DevServer, from, to domain.HealthStatus)
+}
+
+// WebhookAlerter delivers a status_change to BL-FLEET-03's configured
+// webhook endpoint — also fire-and-forget from PollFleetHealth's
+// perspective (a webhook delivery failure must never fail the poll tick).
+type WebhookAlerter interface {
+	NotifyStatusChange(ctx context.Context, ds domain.DevServer, from, to domain.HealthStatus, sample domain.DevServerHealth)
+}
+
+// MetricsCollector receives every poll sample so Prometheus scrapes read
+// from an in-process cache instead of re-querying Postgres per scrape —
+// declared here (consumer-side), implemented by
+// adapter/metrics.FleetCollector, per this codebase's Dependency Inversion
+// convention (usecase must not import adapter packages).
+type MetricsCollector interface {
+	Update(devServerID, host string, sample domain.DevServerHealth)
 }
 
 // BrowserProfileRepository is the persistence port for browser profile
@@ -144,6 +239,13 @@ type DevServerAgentClient interface {
 	// Health performs an agent-level reachability/handshake check, distinct
 	// from the SSH-exec-based fleet health poll that GetFleetHealth reads.
 	Health(ctx context.Context, devServer domain.DevServer) (bool, error)
+	// LastHandshakeInfo returns the HandshakeInfo captured at the most
+	// recent successful handshake for devServerID, if a live session
+	// exists — a cheap in-memory lookup, no round trip to the remote host.
+	// EstablishConnection (SOL-FLEET-04) uses this right after a
+	// successful Health() call to persist platform/arch/node-version facts
+	// without a second round trip.
+	LastHandshakeInfo(devServerID string) (HandshakeInfo, bool)
 
 	// --- Terminal/PTY (TASK-180..187) ---
 	// The six methods below extend the same generic-Exec transport with
