@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemorySlice } from './memory'
 import type { AppState } from '../types'
 import type { MemorySnapshot } from '../../../../shared/types'
+import { getRuntimeMemorySnapshot } from '../../runtime/runtime-memory-client'
+
+vi.mock('../../runtime/runtime-memory-client', () => ({
+  getRuntimeMemorySnapshot: vi.fn()
+}))
 
 function makeMemorySnapshot(overrides: Partial<MemorySnapshot> = {}): MemorySnapshot {
   return {
@@ -38,18 +43,18 @@ function makeStore() {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.clearAllMocks()
 })
 
 describe('createMemorySlice', () => {
   it('dedupes concurrent memory snapshot IPC calls', async () => {
     let resolveSnapshot: (snapshot: MemorySnapshot) => void = () => {}
-    const getSnapshot = vi.fn(
+    const getSnapshot = vi.mocked(getRuntimeMemorySnapshot).mockImplementation(
       () =>
         new Promise<MemorySnapshot>((resolve) => {
           resolveSnapshot = resolve
         })
     )
-    vi.stubGlobal('window', { api: { memory: { getSnapshot } } })
 
     const store = makeStore()
     const first = store.getState().fetchMemorySnapshot()

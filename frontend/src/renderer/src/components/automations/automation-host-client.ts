@@ -141,6 +141,28 @@ export async function updateAutomationForTarget(
   return result.automation
 }
 
+// Why: fallback path when the automation being edited could not be re-fetched
+// (e.g. list refresh failed) — the caller only has an id, not a full
+// Automation to derive the owner target from, so the caller-resolved target
+// is used as-is instead of routing through getAutomationOwnerTarget.
+export async function updateAutomationByIdForTarget(
+  target: AutomationHostTarget | null | undefined,
+  id: string,
+  updates: AutomationUpdateInput
+): Promise<Automation> {
+  const resolvedTarget = target ?? { kind: 'local' }
+  if (resolvedTarget.kind === 'local') {
+    return await window.api.automations.update({ id, updates })
+  }
+  const result = await callRuntimeRpc<{ automation: Automation }>(
+    resolvedTarget,
+    'automation.update',
+    { id, updates: toRuntimeAutomationUpdateInput(updates) },
+    { timeoutMs: 15_000 }
+  )
+  return result.automation
+}
+
 export async function deleteAutomationForTarget(
   automation: Automation,
   sourceTarget?: AutomationHostTarget | null

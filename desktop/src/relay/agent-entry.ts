@@ -15,6 +15,22 @@ import { discoverTools } from './agent-tool-registry'
 import { connectDirect } from './agent-connection-direct'
 import { listenRelay } from './agent-connection-relay'
 
+// TEMP DIAG BUG-FE-PTY-001: the agent's own outbound WS to Orca sends a raw
+// TCP FIN (code 1005, no close frame) within ~6ms of processing 2 concurrent
+// pty.attach failures — confirmed via tcpdump the agent's SIDE initiates it,
+// but no explicit ws.close()/terminate() call site was found in
+// agent-session.ts/agent-rpc-dispatch.ts/agent-wire.ts. If something is
+// throwing and getting silently absorbed (or genuinely crashing the process
+// hard enough that the normal SIGINT/SIGTERM shutdown path never logs),
+// these two handlers are the last place that would ever see it.
+process.on('uncaughtException', (err) => {
+  process.stderr.write(`[DIAG BUG-FE-PTY-001] uncaughtException: ${err?.stack ?? err}\n`)
+})
+process.on('unhandledRejection', (reason) => {
+  const detail = reason instanceof Error ? reason.stack ?? reason.message : String(reason)
+  process.stderr.write(`[DIAG BUG-FE-PTY-001] unhandledRejection: ${detail}\n`)
+})
+
 async function main(): Promise<void> {
   // Why this branch runs before anything else: pty-daemon-client.ts spawns
   // this SAME agent.js file with ORCA_PTY_DAEMON_SOCKET set to run as the

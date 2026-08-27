@@ -109,7 +109,7 @@ describe('renderer startup runtime routing', () => {
     )
     expect(appSource).not.toContain("from './components/crash-report/CrashReportDialogSurface'")
     expect(hostSource).toContain("import('./CrashReportDialogSurface').then")
-    expect(hostSource).toContain('window.api.crashReports.getLatestPending()')
+    expect(hostSource).toContain('getRuntimeLatestPendingCrashReport()')
     expect(hostSource).toContain('window.api.ui.onOpenCrashReport')
     expect(hostSource).toContain('REACT_ERROR_BOUNDARY_REPORT_AVAILABLE_EVENT')
     expect(hostSource).toContain('if (!open) {')

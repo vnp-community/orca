@@ -14,13 +14,13 @@ import {
   encodeJsonRpcFrame,
   FrameDecoder,
   parseJsonRpcMessage,
-  MessageType,
+  MessageType
 } from '../ssh/relay-protocol'
 import type { AgentHandshakeParams } from '../../shared/agent-wire-protocol'
 import {
   AGENT_HANDSHAKE_METHOD,
   AGENT_TIMEOUT_MS,
-  AgentErrorCode,
+  AgentErrorCode
 } from '../../shared/agent-wire-protocol'
 
 export type WsHandshakeInfo = {
@@ -29,7 +29,7 @@ export type WsHandshakeInfo = {
   nodeVersion: string
   agentVersion: string
   sessionId: string
-  agentToken?: string  // set by receiver handshake; used by AgentWebSocketServer to find slot
+  agentToken?: string // set by receiver handshake; used by AgentWebSocketServer to find slot
   devServerId?: string // set by DevServerRelayBridge when it claims the connection (for tracing)
   /** Capabilities the agent advertised (e.g. 'pty', 'pty.stream', 'fs.watch').
    *  Read loosely as string[] — AgentHandshakeParams.capabilities is typed
@@ -56,49 +56,69 @@ export function runOrcaInitiatorHandshake(
   orcaVersion: string
 ): Promise<WsHandshakeInfo> {
   return new Promise((resolve, reject) => {
+    // FIX BUG-FE-PTY-001: this decoder+listener is only for the one-shot
+    // handshake exchange. Every settle path below must detach `onMessage`,
+    // or it keeps feeding every later regular frame (normal post-handshake
+    // RPC traffic) through handshake-only parsing logic that silently drops
+    // non-response frames — harmless here since it just `return`s, but see
+    // the receiver side for the destructive twin of this bug.
+    const onMessage = (data: Buffer): void => decoder.feed(data)
+    const detach = (): void => {
+      ws.off('message', onMessage)
+    }
+
     const timer = setTimeout(() => {
+      detach()
       ws.close()
-      reject(new Error(
-        `Agent handshake timed out after ${AGENT_TIMEOUT_MS}ms — ` +
-        `agent did not respond to agent.handshake request`
-      ))
+      reject(
+        new Error(
+          `Agent handshake timed out after ${AGENT_TIMEOUT_MS}ms — ` +
+            `agent did not respond to agent.handshake request`
+        )
+      )
     }, AGENT_TIMEOUT_MS)
 
     const decoder = new FrameDecoder((frame) => {
-      if (frame.type !== MessageType.Regular) {return}  // ignore keepalives
+      if (frame.type !== MessageType.Regular) {
+        return
+      } // ignore keepalives
 
       let msg: ReturnType<typeof parseJsonRpcMessage>
       try {
         msg = parseJsonRpcMessage(frame.payload)
       } catch {
-        return  // invalid JSON — wait for next frame
+        return // invalid JSON — wait for next frame
       }
 
       // Only process response to our handshake (must have id field, no method)
-      if (!('id' in msg) || 'method' in msg) {return}
+      if (!('id' in msg) || 'method' in msg) {
+        return
+      }
       clearTimeout(timer)
 
       if ('error' in msg && msg.error) {
+        detach()
         ws.close()
-        reject(new Error(
-          `Agent rejected handshake: ${msg.error.message} (code: ${msg.error.code})`
-        ))
+        reject(
+          new Error(`Agent rejected handshake: ${msg.error.message} (code: ${msg.error.code})`)
+        )
         return
       }
 
       const result = (msg as { result?: Record<string, unknown> }).result ?? {}
       const resultCapabilities = result['capabilities']
+      detach()
       resolve({
-        platform:     (result['platform'] as string)     ?? 'linux',
-        arch:         (result['arch'] as string)          ?? 'x64',
-        nodeVersion:  (result['nodeVersion'] as string)   ?? 'unknown',
-        agentVersion: (result['agentVersion'] as string)  ?? 'unknown',
-        sessionId:    (result['sessionId'] as string)     ?? `sess-${Date.now()}`,
-        capabilities: Array.isArray(resultCapabilities) ? resultCapabilities : undefined,
+        platform: (result['platform'] as string) ?? 'linux',
+        arch: (result['arch'] as string) ?? 'x64',
+        nodeVersion: (result['nodeVersion'] as string) ?? 'unknown',
+        agentVersion: (result['agentVersion'] as string) ?? 'unknown',
+        sessionId: (result['sessionId'] as string) ?? `sess-${Date.now()}`,
+        capabilities: Array.isArray(resultCapabilities) ? resultCapabilities : undefined
       })
     })
 
-    ws.on('message', (data: Buffer) => decoder.feed(data))
+    ws.on('message', onMessage)
 
     // Send handshake request: seq=1, ack=0
     const frame = encodeJsonRpcFrame(
@@ -106,7 +126,7 @@ export function runOrcaInitiatorHandshake(
         jsonrpc: '2.0',
         id: 1,
         method: AGENT_HANDSHAKE_METHOD,
-        params: { orcaVersion },
+        params: { orcaVersion }
       },
       1,
       0
@@ -137,24 +157,44 @@ export function runOrcaReceiverHandshake(
   orcaVersion: string
 ): Promise<WsHandshakeInfo> {
   return new Promise((resolve, reject) => {
+    // FIX BUG-FE-PTY-001: root cause of the repeating disconnect/reconnect
+    // storm, found via live agent-side logs — every single post-handshake
+    // regular frame (a normal RPC response/notification) was still being fed
+    // into THIS handshake decoder because `onMessage` was never detached
+    // from `ws`. Its "first message must be agent.handshake" check then
+    // rejected every one of them and called ws.close(), so any real traffic
+    // (a pty.attach response, an fs.readDir result, ...) tore the whole
+    // multi-tenant agent connection down seconds after it reconnected.
+    // Detach on every settle path (timeout/reject/resolve) below.
+    const onMessage = (data: Buffer): void => decoder.feed(data)
+    const detach = (): void => {
+      ws.off('message', onMessage)
+    }
+
     const timer = setTimeout(() => {
+      detach()
       ws.close()
-      reject(new Error(
-        `Agent did not send handshake within ${AGENT_TIMEOUT_MS}ms — ` +
-        `ensure agent sends agent.handshake as first message after connecting`
-      ))
+      reject(
+        new Error(
+          `Agent did not send handshake within ${AGENT_TIMEOUT_MS}ms — ` +
+            `ensure agent sends agent.handshake as first message after connecting`
+        )
+      )
     }, AGENT_TIMEOUT_MS)
 
     let outSeq = 0
 
     const decoder = new FrameDecoder((frame) => {
-      if (frame.type !== MessageType.Regular) {return}  // ignore keepalives
+      if (frame.type !== MessageType.Regular) {
+        return
+      } // ignore keepalives
 
       let msg: ReturnType<typeof parseJsonRpcMessage>
       try {
         msg = parseJsonRpcMessage(frame.payload)
       } catch {
         clearTimeout(timer)
+        detach()
         ws.close()
         reject(new Error('Protocol violation: received invalid JSON as first message'))
         return
@@ -163,11 +203,14 @@ export function runOrcaReceiverHandshake(
       // First message MUST be agent.handshake (a request with method, not a response)
       if (!('method' in msg) || msg.method !== AGENT_HANDSHAKE_METHOD) {
         clearTimeout(timer)
+        detach()
         ws.close()
-        reject(new Error(
-          `Protocol violation: first message must be '${AGENT_HANDSHAKE_METHOD}', ` +
-          `got '${('method' in msg ? msg.method : '[response]')}'`
-        ))
+        reject(
+          new Error(
+            `Protocol violation: first message must be '${AGENT_HANDSHAKE_METHOD}', ` +
+              `got '${'method' in msg ? msg.method : '[response]'}'`
+          )
+        )
         return
       }
 
@@ -185,13 +228,14 @@ export function runOrcaReceiverHandshake(
             id: requestId,
             error: {
               code: AgentErrorCode.AuthFailed,
-              message: 'Authentication failed: invalid or unregistered agent token',
-            },
+              message: 'Authentication failed: invalid or unregistered agent token'
+            }
           },
           outSeq,
           0
         )
         ws.send(errFrame)
+        detach()
         // FIX BUG-DS-AWS: explicit 1008 (Policy Violation) close code so the agent's
         // reconnect logic (agent-connection-direct.ts) can distinguish "token rejected"
         // from a generic drop and force a token renewal instead of retrying the same
@@ -209,24 +253,25 @@ export function runOrcaReceiverHandshake(
         {
           jsonrpc: '2.0',
           id: requestId,
-          result: { ok: true, orcaVersion, sessionId },
+          result: { ok: true, orcaVersion, sessionId }
         },
         outSeq,
         0
       )
       ws.send(okFrame)
+      detach()
 
       resolve({
-        platform:     params?.platform     ?? 'linux',
-        arch:         params?.arch         ?? 'x64',
-        nodeVersion:  params?.nodeVersion  ?? 'unknown',
+        platform: params?.platform ?? 'linux',
+        arch: params?.arch ?? 'x64',
+        nodeVersion: params?.nodeVersion ?? 'unknown',
         agentVersion: params?.agentVersion ?? 'unknown',
         sessionId,
         agentToken,
-        capabilities: Array.isArray(params?.capabilities) ? params.capabilities : undefined,
+        capabilities: Array.isArray(params?.capabilities) ? params.capabilities : undefined
       })
     })
 
-    ws.on('message', (data: Buffer) => decoder.feed(data))
+    ws.on('message', onMessage)
   })
 }

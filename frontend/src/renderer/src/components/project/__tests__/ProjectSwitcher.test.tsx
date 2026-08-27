@@ -1,21 +1,22 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, act } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { ProjectSwitcher } from '../ProjectSwitcher'
 import { useWorkspace } from '../../../context/WorkspaceContext'
+import { callRuntimeRpc } from '../../../runtime/runtime-rpc-client'
 
 vi.mock('../../../context/WorkspaceContext', () => ({
   useWorkspace: vi.fn()
 }))
 
+vi.mock('../../../runtime/runtime-rpc-client', () => ({
+  callRuntimeRpc: vi.fn(),
+  getActiveRuntimeTarget: vi.fn().mockReturnValue({ type: 'local' })
+}))
+
 vi.mock('../../../store', () => ({
-  useAppStore: vi.fn(selector => selector({
-    projects: [
-      { id: 'p1', name: 'Test Project 1', devServerId: 'local' },
-      { id: 'p2', name: 'Test Project 2', devServerId: 'remote' }
-    ]
-  }))
+  useAppStore: { getState: vi.fn().mockReturnValue({ settings: {} }) }
 }))
 
 vi.mock('../../ui/popover', () => ({
@@ -36,6 +37,11 @@ vi.mock('../../ui/command', () => ({
 
 vi.mock('../../ui/button', () => ({ Button: (p: any) => <button {...p} /> }))
 
+vi.mock('../CreateProjectDialog', () => ({
+  CreateProjectDialog: (p: any) =>
+    p.open ? <div data-testid="create-project-dialog" /> : null
+}))
+
 describe('ProjectSwitcher', () => {
   const switchProject = vi.fn()
 
@@ -46,22 +52,31 @@ describe('ProjectSwitcher', () => {
       switchProject,
       isInitializing: false,
     } as any)
+    vi.mocked(callRuntimeRpc).mockResolvedValue([
+      { id: 'p1', name: 'Test Project 1', devServerId: 'local' },
+      { id: 'p2', name: 'Test Project 2', devServerId: 'remote' }
+    ])
   })
 
   afterEach(cleanup)
+
+  it('fetches the project list via project.list RPC on mount', async () => {
+    await act(async () => { render(<ProjectSwitcher />) })
+    expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'project.list', null)
+  })
 
   it('renders current project name from context', () => {
     render(<ProjectSwitcher />)
     expect(screen.getByTestId('popover-trigger')).toHaveTextContent('Test Project 1')
   })
 
-  it('opens dropdown with full projects list', () => {
-    render(<ProjectSwitcher />)
+  it('opens dropdown with full projects list', async () => {
+    await act(async () => { render(<ProjectSwitcher />) })
     expect(screen.getByTestId('command-list')).toHaveTextContent('Test Project 2')
   })
 
-  it('calls switchProject(id) when project item clicked', () => {
-    render(<ProjectSwitcher />)
+  it('calls switchProject(id) when project item clicked', async () => {
+    await act(async () => { render(<ProjectSwitcher />) })
     const items = screen.getAllByTestId('command-item')
     fireEvent.click(items[1])
     expect(switchProject).toHaveBeenCalledWith('p2')
@@ -75,7 +90,7 @@ describe('ProjectSwitcher', () => {
   })
 
   it('search input filters project list by name', async () => {
-    render(<ProjectSwitcher />)
+    await act(async () => { render(<ProjectSwitcher />) })
     expect(screen.getByTestId('command-list')).toHaveTextContent('Test Project 2')
     const input = screen.getByTestId('command-input')
     fireEvent.change(input, { target: { value: 'Project 1' } })
@@ -83,5 +98,20 @@ describe('ProjectSwitcher', () => {
       expect(screen.getByTestId('command-list')).not.toHaveTextContent('Test Project 2')
       expect(screen.getByTestId('command-list')).toHaveTextContent('Test Project 1')
     })
+  })
+
+  it('falls back to an empty list when project.list rejects', async () => {
+    vi.mocked(callRuntimeRpc).mockRejectedValue(new Error('offline'))
+    await act(async () => { render(<ProjectSwitcher />) })
+    expect(screen.getByTestId('command-empty')).toBeInTheDocument()
+  })
+
+  it('"Create New Project" opens CreateProjectDialog and closes the popover', async () => {
+    await act(async () => { render(<ProjectSwitcher />) })
+    expect(screen.queryByTestId('create-project-dialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('create-project-item'))
+
+    expect(screen.getByTestId('create-project-dialog')).toBeInTheDocument()
   })
 })

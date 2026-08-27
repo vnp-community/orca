@@ -1,5 +1,5 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": ["./src/server/**/*", "./src/main/**/*", "./src/platform/**/*", "./src/shared/**/*", "./src/relay/**/*", "./src/types/**/*"],
+  "include": ["./src/server/**/*", "./src/main/**/*", "./src/platform/**/*", "./src/shared/**/*", "./src/types/**/*"],
   "compilerOptions": { "composite": true, "types": ["electron-vite/node"], "rootDir": "./src", "outDir": "./out" }
 }

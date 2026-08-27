@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react'
 import { AlertTriangle, Check, Copy } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export type QuickOpenInstallRgGuidanceParts = {
   reason: string
   command: string | null
@@ -76,9 +77,8 @@ export function QuickOpenInstallRgGuidance({
     // Why: use Electron's clipboard IPC instead of navigator.clipboard; the
     // latter often fails silently in the renderer due to focus/permission
     // quirks inside Radix dialogs. All other copy buttons in the app go
-    // through window.api.ui.writeClipboardText for consistency.
-    void window.api.ui
-      .writeClipboardText(command)
+    // through uiWriteClipboardText for consistency.
+    void uiWriteClipboardText(command)
       .then(() => {
         if (!isMountedRef.current) {
           return

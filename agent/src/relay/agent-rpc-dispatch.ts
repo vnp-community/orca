@@ -222,7 +222,18 @@ export function createRpcDispatcher(
       }
 
       if (ws.readyState === 1 /* WebSocket.OPEN */) {
-        ws.send(encodeDataFrame(state, JSON.stringify(response)))
+        // TEMP DIAG BUG-FE-PTY-001
+        const frame = encodeDataFrame(state, JSON.stringify(response))
+        log.info(
+          `[DIAG BUG-FE-PTY-001] send response id=${rpc.id} method=${rpc.method} bytes=${frame.length} bufferedAmount=${ws.bufferedAmount} t=${Date.now()}`
+        )
+        ws.send(frame, (err) => {
+          if (err) {
+            log.error(`[DIAG BUG-FE-PTY-001] ws.send callback ERROR id=${rpc.id}: ${err.stack ?? err.message}`)
+          }
+        })
+      } else {
+        log.error(`[DIAG BUG-FE-PTY-001] skipped send — readyState=${ws.readyState} id=${rpc.id} method=${rpc.method}`)
       }
     },
   }
@@ -299,7 +310,7 @@ async function route(
     case 'git.exec': {
       try {
         const { handleGitExec } = await import('./agent-git-handler')
-        return (await handleGitExec(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+        return (await handleGitExec(rpc.id, rpc.params ?? {}, config, log, ws)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `git.exec unavailable: ${msg}`)
@@ -407,6 +418,213 @@ async function route(
       }
     }
 
+    // ── TASK-227: git.status/diff/commit/push/pull/... ──────────────────────
+    // These 20 methods were fully implemented on Part B (git-handler.ts +
+    // its ops modules) but unreachable here, so relay-based git calls from
+    // backend-go's RelayExecutor failed with `Method not found` against a
+    // real Dev Server WS agent. See specs/backend-go/bugs/missing-v1/tasks/
+    // TASK-227-expose-git-status-diff-commit-on-agent-part-a.md.
+    case 'git.status': {
+      try {
+        const { handleGitStatus } = await import('./agent-git-handler-local-ops')
+        return (await handleGitStatus(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.status unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.diff': {
+      try {
+        const { handleGitDiff } = await import('./agent-git-handler-local-ops')
+        return (await handleGitDiff(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.diff unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.commit': {
+      try {
+        const { handleGitCommit } = await import('./agent-git-handler-local-ops')
+        return (await handleGitCommit(rpc.id, rpc.params ?? {}, ws)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.commit unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.push': {
+      try {
+        const { handleGitPush } = await import('./agent-git-handler-remote-ops')
+        return (await handleGitPush(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.push unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.pull': {
+      try {
+        const { handleGitPull } = await import('./agent-git-handler-remote-ops')
+        return (await handleGitPull(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.pull unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.checkout': {
+      try {
+        const { handleGitCheckout } = await import('./agent-git-handler-local-ops')
+        return (await handleGitCheckout(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.checkout unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.localBranches': {
+      try {
+        const { handleGitLocalBranches } = await import('./agent-git-handler-local-ops')
+        return (await handleGitLocalBranches(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.localBranches unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.fastForward': {
+      try {
+        const { handleGitFastForward } = await import('./agent-git-handler-remote-ops')
+        return (await handleGitFastForward(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.fastForward unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.rebaseFromBase': {
+      try {
+        const { handleGitRebaseFromBase } = await import('./agent-git-handler-remote-ops')
+        return (await handleGitRebaseFromBase(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.rebaseFromBase unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.abortRebase': {
+      try {
+        const { handleGitAbortRebase } = await import('./agent-git-handler-local-ops')
+        return (await handleGitAbortRebase(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.abortRebase unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.abortMerge': {
+      try {
+        const { handleGitAbortMerge } = await import('./agent-git-handler-local-ops')
+        return (await handleGitAbortMerge(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.abortMerge unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.conflictOperation': {
+      try {
+        const { handleGitConflictOperation } = await import('./agent-git-handler-local-ops')
+        return (await handleGitConflictOperation(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.conflictOperation unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.discard': {
+      try {
+        const { handleGitDiscard } = await import('./agent-git-handler-local-ops')
+        return (await handleGitDiscard(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.discard unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.bulkDiscard': {
+      try {
+        const { handleGitBulkDiscard } = await import('./agent-git-handler-local-ops')
+        return (await handleGitBulkDiscard(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.bulkDiscard unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.stage': {
+      try {
+        const { handleGitStage } = await import('./agent-git-handler-local-ops')
+        return (await handleGitStage(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.stage unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.unstage': {
+      try {
+        const { handleGitUnstage } = await import('./agent-git-handler-local-ops')
+        return (await handleGitUnstage(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.unstage unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.bulkStage': {
+      try {
+        const { handleGitBulkStage } = await import('./agent-git-handler-local-ops')
+        return (await handleGitBulkStage(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.bulkStage unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.bulkUnstage': {
+      try {
+        const { handleGitBulkUnstage } = await import('./agent-git-handler-local-ops')
+        return (await handleGitBulkUnstage(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.bulkUnstage unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.fetch': {
+      try {
+        const { handleGitFetch } = await import('./agent-git-handler-remote-ops')
+        return (await handleGitFetch(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.fetch unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.upstreamStatus': {
+      try {
+        const { handleGitUpstreamStatus } = await import('./agent-git-handler-remote-ops')
+        return (await handleGitUpstreamStatus(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.upstreamStatus unavailable: ${msg}`)
+      }
+    }
+    // ─── end TASK-227 ────────────────────────────────────────────────────────
+
     // ── v5.0: fs.readDir ─────────────────────────────────────────────────────
     case 'fs.readDir': {
       try {
@@ -473,6 +691,19 @@ async function route(
       }
     }
 
+    // ── ai.provider.testConnection ───────────────────────────────────────────
+    // Called by AIProviderService.ts. Previously unimplemented
+    // (specs/agent/api/gaps-and-findings.md #1).
+    case 'ai.provider.testConnection': {
+      try {
+        const { handleTestConnection } = await import('./agent-credential-store')
+        return (await handleTestConnection(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ai.provider.testConnection unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: preflight.check ────────────────────────────────────────────────
     case 'preflight.check': {
       try {
@@ -483,6 +714,119 @@ async function route(
         return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.check unavailable: ${msg}`)
       }
     }
+
+    // ── preflight.detectAgents ───────────────────────────────────────────────
+    // Called by dev-server-relay-bridge.ts's detectAgents() (onboarding-ipc.ts).
+    // Previously Part-B-only; see specs/agent/api/gaps-and-findings.md #5.
+    case 'preflight.detectAgents': {
+      try {
+        const { handleDetectAgents } = await import('./agent-preflight-handler')
+        return (await handleDetectAgents(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.detectAgents unavailable: ${msg}`)
+      }
+    }
+
+    // ── preflight.detectWindowsTerminalCapabilities ──────────────────────────
+    case 'preflight.detectWindowsTerminalCapabilities': {
+      try {
+        const { handleDetectWindowsTerminalCapabilities } = await import('./agent-preflight-handler')
+        return (await handleDetectWindowsTerminalCapabilities(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.detectWindowsTerminalCapabilities unavailable: ${msg}`)
+      }
+    }
+
+    // ── preflight.detectGhosttyConfig ────────────────────────────────────────
+    case 'preflight.detectGhosttyConfig': {
+      try {
+        const { handleDetectGhosttyConfig } = await import('./agent-preflight-handler')
+        return (await handleDetectGhosttyConfig(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.detectGhosttyConfig unavailable: ${msg}`)
+      }
+    }
+
+    // ── preflight.setGitIdentity ─────────────────────────────────────────────
+    // BUG-AG-HLD-003 parity for Part A — stores identity per-connection
+    // (git-identity-registry.ts), consumed by git.exec's `commit` subcommand.
+    case 'preflight.setGitIdentity': {
+      try {
+        const { handleSetGitIdentity } = await import('./agent-preflight-handler')
+        return (await handleSetGitIdentity(rpc.id, rpc.params ?? {}, ws)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `preflight.setGitIdentity unavailable: ${msg}`)
+      }
+    }
+
+    // ─── cli.* (Orca ADR — server-mode CLI install on Dev Server) ───────────
+    // Backend relays cli.* to the Dev Server Agent instead of running it on
+    // the Orca backend container — see backend/src/main/runtime/rpc/methods/cli.ts
+    // and agent-cli-handler.ts for the full rationale.
+    case 'cli.getInstallStatus': {
+      try {
+        const { handleCliGetInstallStatus } = await import('./agent-cli-handler')
+        return (await handleCliGetInstallStatus(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.getInstallStatus unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.install': {
+      try {
+        const { handleCliInstall } = await import('./agent-cli-handler')
+        return (await handleCliInstall(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.install unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.remove': {
+      try {
+        const { handleCliRemove } = await import('./agent-cli-handler')
+        return (await handleCliRemove(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.remove unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.getWslInstallStatus': {
+      try {
+        const { handleCliGetWslInstallStatus } = await import('./agent-cli-handler')
+        return (await handleCliGetWslInstallStatus(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.getWslInstallStatus unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.installWsl': {
+      try {
+        const { handleCliInstallWsl } = await import('./agent-cli-handler')
+        return (await handleCliInstallWsl(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.installWsl unavailable: ${msg}`)
+      }
+    }
+
+    case 'cli.removeWsl': {
+      try {
+        const { handleCliRemoveWsl } = await import('./agent-cli-handler')
+        return (await handleCliRemoveWsl(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `cli.removeWsl unavailable: ${msg}`)
+      }
+    }
+    // ─── end cli.* ───────────────────────────────────────────────────────────
 
     // ── v5.0: ai.provider.deleteCredential ───────────────────────────────────
     case 'ai.provider.deleteCredential': {
@@ -543,6 +887,20 @@ async function route(
       }
     }
 
+    // ── git.clone ─────────────────────────────────────────────────────────────
+    // Called by backend/src/main/ipc/repo-remote-ipc.ts's repo.cloneRemote,
+    // { url, targetPath }. Previously Part-B-only; see
+    // specs/agent/api/gaps-and-findings.md #5.
+    case 'git.clone': {
+      try {
+        const { handleGitClone } = await import('./agent-git-clone-handler')
+        return (await handleGitClone(rpc.id, rpc.params ?? {}, makeNotifier(ws, state))) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.clone unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: fs.stat ────────────────────────────────────────────────────────
     case 'fs.stat': {
       try {
@@ -575,6 +933,20 @@ async function route(
         return makeError(rpc.id, AgentErrorCode.ServerError, `fs.writeFile unavailable: ${msg}`)
       }
     }
+
+    // ─── fs.copyFile (web/server-mode DevServerFilePickerDialog support) ────
+    // Backs backend/src/main/runtime/rpc/methods/dev-server.ts's devServer.copyFile
+    // — see agent-shell-handler.ts for the full rationale.
+    case 'fs.copyFile': {
+      try {
+        const { handleFsCopyFile } = await import('./agent-shell-handler')
+        return (await handleFsCopyFile(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `fs.copyFile unavailable: ${msg}`)
+      }
+    }
+    // ─── end fs.copyFile ─────────────────────────────────────────────────────
 
     // ── v5.0: github.pr.create ───────────────────────────────────────────────
     case 'github.pr.create': {
@@ -672,6 +1044,32 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `gitlab.auth.status unavailable: ${msg}`)
+      }
+    }
+
+    // ── github.exec / gitlab.exec ────────────────────────────────────────────
+    // Generic, allowlist-validated gh/glab CLI passthrough — backs the
+    // ADR-018 migration: backend/src/main/git/runner.ts's ghExecFileAsync/
+    // glabExecFileAsync now route here via a connection-scoped provider
+    // instead of spawning gh/glab in the backend process. See
+    // specs/agent/api/gaps-and-findings.md.
+    case 'github.exec': {
+      try {
+        const { handleGithubExec } = await import('./agent-github-cli-handler')
+        return (await handleGithubExec(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `github.exec unavailable: ${msg}`)
+      }
+    }
+
+    case 'gitlab.exec': {
+      try {
+        const { handleGitlabExec } = await import('./agent-gitlab-cli-handler')
+        return (await handleGitlabExec(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `gitlab.exec unavailable: ${msg}`)
       }
     }
 
@@ -790,6 +1188,24 @@ async function route(
       }
     }
 
+    // ── agent.execPrompt ─────────────────────────────────────────────────────
+    // One-shot, non-interactive AI-CLI invocation from a workflow/task-step
+    // prompt request — distinct from agent.exec's generic "run this binary"
+    // contract above (which agent.exec's real callers depend on unchanged).
+    // Called by:
+    //   - StepExecutors.executeAgent() via relay.call('agent.execPrompt', {...})
+    //   - ProfileAwareAgentSpawner via relay.call('agent.execPrompt', {...})
+    // See specs/agent/api/gaps-and-findings.md.
+    case 'agent.execPrompt': {
+      try {
+        const { handleAgentExecPrompt } = await import('./agent-print-mode-exec')
+        return (await handleAgentExecPrompt(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `agent.execPrompt unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: ai.complete ─────────────────────────────────────────────────────
     // TG-002: Non-interactive AI completion for task planning (TaskAIPlanner.decompose)
     // and git commit message generation.
@@ -835,6 +1251,162 @@ async function route(
       }
     }
 
+    // ── shell.exec ───────────────────────────────────────────────────────────
+    // Workflow 'shell' step executor. Called by:
+    //   StepExecutors.executeShell() via relay.call('shell.exec', { script, env, traceId })
+    // Previously unimplemented (specs/agent/api/gaps-and-findings.md #1).
+    case 'shell.exec': {
+      try {
+        const { handleShellExec } = await import('./fs-agent-extensions')
+        return (await handleShellExec(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `shell.exec unavailable: ${msg}`)
+      }
+    }
+
+    // ── notification.send ────────────────────────────────────────────────────
+    // Workflow 'notification' step executor. Called by:
+    //   StepExecutors.executeNotification() via
+    //   relay.call('notification.send', { channel, message, traceId })
+    // Previously unimplemented (specs/agent/api/gaps-and-findings.md #1).
+    case 'notification.send': {
+      try {
+        const { handleNotificationSend } = await import('./notification-send-handler')
+        return (await handleNotificationSend(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `notification.send unavailable: ${msg}`)
+      }
+    }
+
+    // ── browser.* ────────────────────────────────────────────────────────────
+    // TASK-036 option b: drives a real headless Chromium process launched ON
+    // THIS HOST (via the vendored `agent-browser` CLI), relayed from
+    // backend-go's wscompat/channels_browser.go. See browser-handler.ts's
+    // header comment for the session-scoping/idle-timeout/cleanup model —
+    // this is a genuinely new capability, not a port of the old
+    // Electron-local `browser.*` (backend/src/main/browser/agent-browser-bridge.ts).
+    case 'browser.goto': {
+      try {
+        const { handleBrowserGoto } = await import('./browser-handler')
+        return (await handleBrowserGoto(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.goto unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.snapshot': {
+      try {
+        const { handleBrowserSnapshot } = await import('./browser-handler')
+        return (await handleBrowserSnapshot(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.snapshot unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.click': {
+      try {
+        const { handleBrowserClick } = await import('./browser-handler')
+        return (await handleBrowserClick(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.click unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.eval': {
+      try {
+        const { handleBrowserEval } = await import('./browser-handler')
+        return (await handleBrowserEval(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.eval unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.keypress': {
+      try {
+        const { handleBrowserKeypress } = await import('./browser-handler')
+        return (await handleBrowserKeypress(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.keypress unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.mouseMove': {
+      try {
+        const { handleBrowserMouseMove } = await import('./browser-handler')
+        return (await handleBrowserMouseMove(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.mouseMove unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.mouseDown': {
+      try {
+        const { handleBrowserMouseDown } = await import('./browser-handler')
+        return (await handleBrowserMouseDown(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.mouseDown unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.mouseUp': {
+      try {
+        const { handleBrowserMouseUp } = await import('./browser-handler')
+        return (await handleBrowserMouseUp(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.mouseUp unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.mouseWheel': {
+      try {
+        const { handleBrowserMouseWheel } = await import('./browser-handler')
+        return (await handleBrowserMouseWheel(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.mouseWheel unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.viewport': {
+      try {
+        const { handleBrowserViewport } = await import('./browser-handler')
+        return (await handleBrowserViewport(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.viewport unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.tabCreate': {
+      try {
+        const { handleBrowserTabCreate } = await import('./browser-handler')
+        return (await handleBrowserTabCreate(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.tabCreate unavailable: ${msg}`)
+      }
+    }
+
+    case 'browser.tabClose': {
+      try {
+        const { handleBrowserTabClose } = await import('./browser-handler')
+        return (await handleBrowserTabClose(rpc.id, rpc.params ?? {}, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `browser.tabClose unavailable: ${msg}`)
+      }
+    }
+
     // ── fs.mkdir ─────────────────────────────────────────────────────────────
     // Creates a directory (recursive) on the agent's filesystem.
     case 'fs.mkdir': {
@@ -856,6 +1428,20 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `fs.rmdir unavailable: ${msg}`)
+      }
+    }
+
+    // ── fs.listDirectory ─────────────────────────────────────────────────────
+    // Called by backend/src/main/ipc/repo-remote-ipc.ts's
+    // repo.listRemoteDirectory/repo.scanRemote, { path, includeGitStatus? }.
+    // Previously Part-B-only; see specs/agent/api/gaps-and-findings.md #5.
+    case 'fs.listDirectory': {
+      try {
+        const { handleFsListDirectory } = await import('./fs-agent-directory-browse')
+        return (await handleFsListDirectory(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `fs.listDirectory unavailable: ${msg}`)
       }
     }
 
@@ -977,6 +1563,81 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `pty.sendSignal unavailable: ${msg}`)
+      }
+    }
+
+    // ── pty.listProcesses ────────────────────────────────────────────────────
+    // Enumerate every PTY this daemon currently tracks. Backend's
+    // DevServerPtyProvider.listProcesses() uses this so its liveness sweep can
+    // detect a Dev-Server-hosted PTY that died without any client noticing
+    // (BUG-FE-PTY-001) — previously there was no agent-wide enumeration RPC.
+    case 'pty.listProcesses': {
+      try {
+        const { handlePtyListProcesses } = await import('./pty-daemon-client')
+        return (await handlePtyListProcesses(rpc.id, rpc.params ?? {}, log, makeNotifier(ws, state))) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `pty.listProcesses unavailable: ${msg}`)
+      }
+    }
+
+    // ── accounts.selectClaude / accounts.selectCodex / accounts.removeClaude /
+    //    accounts.removeCodex ──────────────────────────────────────────────
+    // TASK-023: backs infra-fleet-service's Relay RPC and api-gateway's
+    // wscompat channels_accounts.go, which forward {accountId} params
+    // straight through to these methods (see accounts-handler.ts's module
+    // doc comment for the single-pseudo-account design this implements).
+    case 'accounts.selectClaude': {
+      try {
+        const { handleAccountsSelectClaude } = await import('./accounts-handler')
+        return (await handleAccountsSelectClaude(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.selectClaude unavailable: ${msg}`)
+      }
+    }
+
+    case 'accounts.selectCodex': {
+      try {
+        const { handleAccountsSelectCodex } = await import('./accounts-handler')
+        return (await handleAccountsSelectCodex(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.selectCodex unavailable: ${msg}`)
+      }
+    }
+
+    case 'accounts.removeClaude': {
+      try {
+        const { handleAccountsRemoveClaude } = await import('./accounts-handler')
+        return (await handleAccountsRemoveClaude(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.removeClaude unavailable: ${msg}`)
+      }
+    }
+
+    case 'accounts.removeCodex': {
+      try {
+        const { handleAccountsRemoveCodex } = await import('./accounts-handler')
+        return (await handleAccountsRemoveCodex(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.removeCodex unavailable: ${msg}`)
+      }
+    }
+
+    // ── accounts.getSnapshot ─────────────────────────────────────────────────
+    // Backs api-gateway's accounts.subscribe poll loop (BUG-005/SOL-005's
+    // session-client push bridge) — read-only, no accountId param. See
+    // accounts-handler.ts's getAccountsSnapshot doc comment.
+    case 'accounts.getSnapshot': {
+      try {
+        const { handleAccountsGetSnapshot } = await import('./accounts-handler')
+        return (await handleAccountsGetSnapshot(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `accounts.getSnapshot unavailable: ${msg}`)
       }
     }
 

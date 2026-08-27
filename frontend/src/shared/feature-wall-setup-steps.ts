@@ -7,7 +7,7 @@ export type FeatureWallSetupStepId =
   | 'task-sources'
   | 'agent-capabilities'
   | 'setup-script'
-  | 'connect-dev-server'  // Phase 3 — TASK-040
+  | 'connect-dev-server' // Phase 3 — TASK-040
   | 'add-dev-server-repo' // Phase 3 — TASK-040
 
 export type FeatureWallSetupStep = {
@@ -25,6 +25,17 @@ export const FEATURE_WALL_SETUP_PARALLEL_WORK_STEP_IDS = [
 export type FeatureWallSetupSectionId = 'parallel-work' | 'setup'
 
 export const FEATURE_WALL_SETUP_STEPS: readonly FeatureWallSetupStep[] = [
+  // Why: dev-server selection gates which repos/worktrees/agent runtimes are
+  // even reachable, so every other setup step's options depend on it — keep
+  // this first in the array (getFirstIncompleteFeatureWallSetupStepId picks
+  // the earliest incomplete 'setup'-section step, in array order).
+  {
+    id: 'connect-dev-server',
+    name: 'Connect a dev server',
+    subtitle: 'Connect a dev server',
+    description:
+      'Pick or connect the machine that runs your repos and agents — this decides what shows up in every later step.'
+  },
   {
     id: 'two-worktrees',
     name: 'Multi-task',
@@ -146,7 +157,9 @@ export function isAddDevServerRepoComplete(
   repos: Repo[],
   activeDevServerId: string | null
 ): boolean {
-  if (!activeDevServerId) {return false}
+  if (!activeDevServerId) {
+    return false
+  }
   return repos.some((r) => r.devServerId === activeDevServerId)
 }
 
@@ -189,10 +202,14 @@ export function getFirstIncompleteDevServerStepId(
       continue
     }
     if (id === 'add-dev-server-repo') {
-      if (!isAddDevServerRepoComplete(repos, activeDevServerId)) {return id}
+      if (!isAddDevServerRepoComplete(repos, activeDevServerId)) {
+        return id
+      }
       continue
     }
-    if (!stepDone[id]) {return id}
+    if (!stepDone[id]) {
+      return id
+    }
   }
   return null
 }

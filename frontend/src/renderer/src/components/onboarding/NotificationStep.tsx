@@ -23,6 +23,7 @@ import { isWebClientLocation } from '@/lib/web-client-location'
 import { useBrowserNotificationPermission } from '@/hooks/useBrowserNotificationPermission'
 import { useWebPushSubscription } from '@/hooks/useWebPushSubscription'
 
+import { shellPickAudio } from '../../runtime/runtime-shell-client'
 type NotificationStepProps = {
   settings: GlobalSettings | null
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
@@ -117,7 +118,7 @@ export function NotificationStep({
   const handleChooseCustomSound = async (): Promise<void> => {
     setIsPickingSound(true)
     try {
-      const soundPath = await window.api.shell.pickAudio()
+      const soundPath = await shellPickAudio()
       if (soundPath) {
         await updateNotificationSettings({ customSoundId: 'custom', customSoundPath: soundPath })
         await previewSound('custom')
@@ -280,12 +281,15 @@ export function NotificationStep({
 
 // ── WebModeNotificationStep ───────────────────────────────────────────────────
 
-function WebModeNotificationStep({
-  settings,
-  updateSettings
-}: NotificationStepProps): React.JSX.Element {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- web-mode variant doesn't need desktop settings, kept for prop-type parity with caller
+function WebModeNotificationStep(_props: NotificationStepProps): React.JSX.Element {
   const { state: permState, requestPermission } = useBrowserNotificationPermission()
-  const { state: pushState, subscribe, unsubscribe, isSupported: isPushSupported } = useWebPushSubscription()
+  const {
+    state: pushState,
+    subscribe,
+    unsubscribe,
+    isSupported: isPushSupported
+  } = useWebPushSubscription()
 
   const sendTestNotification = useCallback(() => {
     if (permState === 'granted') {
@@ -358,12 +362,7 @@ function WebModeNotificationStep({
                 <Smartphone className="size-4" />
                 Push notifications active.
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void unsubscribe()}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={() => void unsubscribe()}>
                 Disable
               </Button>
             </div>
@@ -388,7 +387,8 @@ function WebModeNotificationStep({
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-foreground">Other Channels</h2>
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          Additional notification channels (Slack, email, webhooks) can be configured in server settings.
+          Additional notification channels (Slack, email, webhooks) can be configured in server
+          settings.
         </p>
       </section>
 

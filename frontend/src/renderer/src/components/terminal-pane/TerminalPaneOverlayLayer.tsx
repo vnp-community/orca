@@ -1,9 +1,11 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
+import { Loader2 } from 'lucide-react'
 import type { Tab, TabGroup, TerminalTab } from '../../../../shared/types'
 import { useAppStore } from '../../store'
 import { SYNC_FIT_PANES_EVENT } from '@/constants/terminal'
+import { translate } from '@/i18n/i18n'
 import { tabGroupBodyAnchorName } from '../tab-group/tab-group-body-anchor'
 import {
   findActivityTerminalPortal,
@@ -15,6 +17,8 @@ import { shouldMountBackgroundWorktreeTab } from '../terminal/background-termina
 import { useNativeChatToggleShortcut } from '../native-chat/use-native-chat-toggle-shortcut'
 import { shouldDeferParkedPtyExitTabClose } from './terminal-parked-tab-watchers'
 import { useTerminalTabColdParking } from './use-terminal-tab-cold-parking'
+import { useShouldDeferTerminalPaneMount } from './terminal-pending-host-mirror-mount-gate'
+import { getExplicitRuntimeEnvironmentIdForWorktree } from '../../lib/worktree-runtime-owner'
 
 type TerminalOverlayAssignment = {
   unifiedTabId: string
@@ -63,6 +67,14 @@ type TerminalOverlaySlotProps = {
   consumeSuppressedPtyExit: (ptyId: string) => boolean
   closeTab: (tabId: string) => void
   leaveWorktreeIfEmpty: () => void
+  // Why: mount-gate inputs (BUG-FE-PTY-001 #10) — see
+  // terminal-pending-host-mirror-mount-gate.ts. Passed as primitives rather
+  // than the whole TerminalTab, matching this component's existing pattern
+  // (terminalGeneration, startupCwd, ...).
+  pendingActivationSpawn: boolean | number | undefined
+  ptyId: string | null
+  createdAt: number
+  isHostMirroredEnvironment: boolean
 }
 
 const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
@@ -79,7 +91,11 @@ const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
   onFocusOwningGroup,
   consumeSuppressedPtyExit,
   closeTab,
-  leaveWorktreeIfEmpty
+  leaveWorktreeIfEmpty,
+  pendingActivationSpawn,
+  ptyId,
+  createdAt,
+  isHostMirroredEnvironment
 }: TerminalOverlaySlotProps): React.JSX.Element {
   const anchorName = groupId !== undefined ? tabGroupBodyAnchorName(groupId) : undefined
   const overlayRef = useRef<HTMLDivElement | null>(null)
@@ -223,7 +239,32 @@ const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     }
   }, [groupId, onFocusOwningGroup])
 
-  const terminalPane = (
+  // Why (BUG-FE-PTY-001 #10): a brand-new local tab on a Dev-Server-mirrored
+  // worktree starts life with a throwaway uuid `id`; once the host mirror
+  // arrives, web-session-tabs-sync.ts replaces it with a different id
+  // (`web-terminal-<hostTabId>`), which changes this component's key above
+  // and forces a full unmount/remount — tearing down the live PaneManager
+  // and PTY transport mid-flight (the terminal goes dead: no input, no
+  // echo). Deferring the TerminalPane mount until the id has settled means
+  // it only ever mounts once, under its final id.
+  const shouldDeferMount = useShouldDeferTerminalPaneMount(
+    { pendingActivationSpawn, ptyId, createdAt },
+    isHostMirroredEnvironment
+  )
+
+  const terminalPane = shouldDeferMount ? (
+    <div className="flex size-full items-center justify-center text-muted-foreground">
+      <div className="flex flex-col items-center gap-2">
+        <Loader2 className="size-4 animate-spin" />
+        <span className="text-xs">
+          {translate(
+            'auto.components.terminal.pane.TerminalPaneOverlayLayer.connecting',
+            'Connecting…'
+          )}
+        </span>
+      </div>
+    </div>
+  ) : (
     <TerminalPane
       key={`${terminalTabId}-${terminalGeneration ?? 0}`}
       tabId={terminalTabId}
@@ -315,6 +356,15 @@ const TerminalPaneOverlayLayer = memo(function TerminalPaneOverlayLayer({
   const closeTab = useAppStore((state) => state.closeTab)
   const setActiveWorktree = useAppStore((state) => state.setActiveWorktree)
   const reconcileWorktreeTabModel = useAppStore((state) => state.reconcileWorktreeTabModel)
+  // Why (BUG-FE-PTY-001 #10 mount gate): whether this worktree's terminals
+  // are synced from a Dev-Server host mirror — the exact predicate
+  // web-session-tabs-sync.ts already uses to decide whether a local tab will
+  // ever be replaced by a mirror tab. Reused here (not reimplemented) so the
+  // mount gate's answer always agrees with the reconcile logic that actually
+  // performs the swap.
+  const isHostMirroredEnvironment = useAppStore(
+    (state) => getExplicitRuntimeEnvironmentIdForWorktree(state, worktreeId) !== null
+  )
 
   useNativeChatToggleShortcut(worktreeId, isWorktreeActive)
 
@@ -413,6 +463,10 @@ const TerminalPaneOverlayLayer = memo(function TerminalPaneOverlayLayer({
               consumeSuppressedPtyExit={consumeSuppressedPtyExit}
               closeTab={closeTab}
               leaveWorktreeIfEmpty={leaveWorktreeIfEmpty}
+              pendingActivationSpawn={terminalTab.pendingActivationSpawn}
+              ptyId={terminalTab.ptyId}
+              createdAt={terminalTab.createdAt}
+              isHostMirroredEnvironment={isHostMirroredEnvironment}
             />
           )
         })}

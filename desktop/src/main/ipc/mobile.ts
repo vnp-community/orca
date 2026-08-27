@@ -21,7 +21,10 @@ export type NetworkInterface = {
 // connectable from a mobile device. We enumerate all non-internal IPv4
 // addresses so the user can choose which one to advertise in the QR code
 // (e.g. LAN vs Tailscale).
-function getNetworkInterfaces(): NetworkInterface[] {
+// Why: exported so rpc/methods/mobile.ts's listNetworkInterfaces RPC method
+// runs the exact same enumeration/sort logic as the ipcMain
+// 'mobile:listNetworkInterfaces' handler.
+export function getNetworkInterfaces(): NetworkInterface[] {
   const result: NetworkInterface[] = []
   const interfaces = networkInterfaces()
   for (const [name, addrs] of Object.entries(interfaces)) {
@@ -62,10 +65,21 @@ export type MobileHandlerDependencies = {
   openWindowsNetworkSettings?: () => Promise<void>
 }
 
+// Why: the RPC method registry (runtime/rpc/methods/mobile.ts) is a static
+// array evaluated at module load, before `rpcServer` exists — it reads this
+// singleton lazily inside each handler instead, the same pattern
+// getActiveStarNagService()/getActiveOnboardingStore() use.
+let activeRuntimeRpcServer: OrcaRuntimeRpcServer | null = null
+
+export function getActiveRuntimeRpcServer(): OrcaRuntimeRpcServer | null {
+  return activeRuntimeRpcServer
+}
+
 export function registerMobileHandlers(
   rpcServer: OrcaRuntimeRpcServer,
   dependencies: MobileHandlerDependencies = {}
 ): void {
+  activeRuntimeRpcServer = rpcServer
   const firewallEnvironment = dependencies.firewallEnvironment ?? {
     platform: process.platform,
     isPackaged: app.isPackaged,

@@ -9,6 +9,7 @@ import { useAppStore } from '../../store'
 import { PrivacyDiagnosticsSection } from './PrivacyDiagnosticsSection'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export type EnvBlockedReason = 'do_not_track' | 'orca_disabled' | 'ci'
 export type BlockedReason = { kind: 'env'; reason: EnvBlockedReason }
 
@@ -104,7 +105,7 @@ export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
             <button
               type="button"
               className="underline underline-offset-2 hover:text-foreground"
-              onClick={() => void window.api.shell.openUrl(PRIVACY_URL)}
+              onClick={() => void shellOpenUrl(PRIVACY_URL)}
             >
               {translate('auto.components.settings.PrivacyPane.77410e0566', 'Privacy policy')}
             </button>

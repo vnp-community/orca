@@ -2,7 +2,12 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalFiniteNumber, OptionalString, OptionalBoolean, requiredString } from '../schemas'
-import type { MessageType, MessagePriority, TaskStatus } from '../../orchestration/db'
+// ADR-021 — "chỉ dùng 1 database": OrchestrationDb (SQLite) → PgOrchestrationDb
+// (async). MessageType/MessagePriority/TaskStatus are dialect-agnostic
+// (runtime/orchestration/types.ts), imported directly instead of via either
+// db implementation. Every handler below is now `async` and awaits its
+// db.* calls — mechanical conversion, same order/logic as before.
+import type { MessageType, MessagePriority, TaskStatus, MessageRow } from '../../orchestration/types'
 import { buildDispatchPreamble } from '../../orchestration/preamble'
 import { formatMessageBanner } from '../../orchestration/formatter'
 import { isGroupAddress, resolveGroupAddress } from '../../orchestration/groups'
@@ -215,7 +220,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
 
       if (!isGroupAddress(params.to)) {
         // Point-to-point — existing single-recipient behavior
-        const msg = db.insertMessage({
+        const msg = await db.insertMessage({
           from,
           to: params.to,
           subject: params.subject,
@@ -231,14 +236,14 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         // immediately dispatch to the same terminal, which fails if the lock
         // is still held.
         if (msg.type === 'worker_done' || msg.type === 'heartbeat') {
-          const reconciled = reconcileLifecycleMessage(db, msg)
+          const reconciled = await reconcileLifecycleMessage(db, msg)
           // Why: a suppressed message is already read; waking a `check --wait`
           // waiter for it would return an empty result before the deadline.
           if (reconciled.action === 'suppressed') {
             return { message: msg }
           }
           if (reconciled.action === 'rejected') {
-            const rejection = db.getMessageById(msg.id) ?? msg
+            const rejection = (await db.getMessageById(msg.id)) ?? msg
             runtime.deliverPendingMessagesForHandle(params.to)
             runtime.notifyMessageArrived(params.to, rejection.type)
             return { message: rejection, lifecycle: reconciled }
@@ -262,19 +267,26 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       }
 
       const threadId = params.threadId ?? `thread_${Date.now()}`
-      const messages = handles.map((handle) =>
-        db.insertMessage({
-          from,
-          to: handle,
-          subject: params.subject,
-          body: params.body,
-          type: params.type as MessageType,
-          priority: params.priority as MessagePriority,
-          threadId,
-          payload: params.payload,
-          senderPaneKey
-        })
-      )
+      // Why sequential (for...of + await), not Promise.all: preserves the
+      // original synchronous loop's per-recipient ordering — later inserts
+      // build on the same threadId, and downstream notify/deliver calls
+      // below iterate `messages` in the same insert order.
+      const messages: MessageRow[] = []
+      for (const handle of handles) {
+        messages.push(
+          await db.insertMessage({
+            from,
+            to: handle,
+            subject: params.subject,
+            body: params.body,
+            type: params.type as MessageType,
+            priority: params.priority as MessagePriority,
+            threadId,
+            payload: params.payload,
+            senderPaneKey
+          })
+        )
+      }
       for (const message of messages) {
         runtime.deliverPendingMessagesForHandle(message.to_handle)
         runtime.notifyMessageArrived(message.to_handle, message.type)
@@ -308,23 +320,24 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       const showAll = params.all === true || (params.unread === false && params.peek !== true)
       const consumeUnread = !showAll && params.peek !== true
 
-      const readAndReturn = () => {
+      const readAndReturn = async () => {
         const messages = showAll
-          ? db.getAllMessagesForHandle(handle, undefined, typeFilter)
-          : db.getUnreadMessages(handle, typeFilter)
+          ? await db.getAllMessagesForHandle(handle, undefined, typeFilter)
+          : await db.getUnreadMessages(handle, typeFilter)
 
         let visibleMessages = messages
         if (consumeUnread && messages.length > 0) {
           // Why: manual coordinators can consume lifecycle messages before
           // the coordinator loop sees them, but unread `check` is still an
           // authoritative read path for worker_done/heartbeat.
-          visibleMessages = messages.map((message) => {
-            const reconciled = reconcileLifecycleMessage(db, message)
-            return reconciled.action === 'rejected'
-              ? (db.getMessageById(message.id) ?? message)
-              : message
-          })
-          db.markAsRead(messages.map((m) => m.id))
+          visibleMessages = []
+          for (const message of messages) {
+            const reconciled = await reconcileLifecycleMessage(db, message)
+            visibleMessages.push(
+              reconciled.action === 'rejected' ? ((await db.getMessageById(message.id)) ?? message) : message
+            )
+          }
+          await db.markAsRead(messages.map((m) => m.id))
         }
 
         if (params.inject) {
@@ -338,7 +351,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       if (signal?.aborted) {
         return { messages: [], count: 0 }
       }
-      const result = readAndReturn()
+      const result = await readAndReturn()
       if (result.count > 0 || !params.wait) {
         return result
       }
@@ -364,16 +377,16 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.reply',
     params: ReplyParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
-      const original = db.getMessageById(params.id)
+      const original = await db.getMessageById(params.id)
       if (!original) {
         throw new Error(`Message not found: ${params.id}`)
       }
 
-      db.markAsRead([original.id])
+      await db.markAsRead([original.id])
 
-      const reply = db.insertMessage({
+      const reply = await db.insertMessage({
         from: params.from ?? original.to_handle,
         to: original.from_handle,
         subject: `Re: ${original.subject}`,
@@ -389,15 +402,15 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.inbox',
     params: InboxParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
       // Why: when `terminal` is provided, mirror `check --all` output for that
       // handle (same rows in the same sequence order). Stale/unknown handles
       // return an empty list instead of erroring, matching the "historical
       // rows survive handle deletion" rule in design doc §3.3.
       const messages = params.terminal
-        ? db.getAllMessagesForHandle(params.terminal, params.limit)
-        : db.getInbox(params.limit)
+        ? await db.getAllMessagesForHandle(params.terminal, params.limit)
+        : await db.getInbox(params.limit)
       return { messages, count: messages.length }
     }
   }),
@@ -405,7 +418,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.taskCreate',
     params: TaskCreateParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
       let deps: string[] | undefined
       if (params.deps) {
@@ -419,7 +432,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           throw new Error('Invalid --deps: must be a JSON array of task IDs')
         }
       }
-      const task = db.createTask({
+      const task = await db.createTask({
         spec: params.spec,
         taskTitle: params.taskTitle,
         displayName: params.displayName,
@@ -434,13 +447,13 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.taskList',
     params: TaskListParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
       // Why: listTasksWithDispatch returns the same rows as listTasks plus
       // assignee_handle + dispatch_id joined in for tasks that currently have an
       // active dispatch. Non-dispatched tasks get NULL for those fields, so
       // consumers reading the legacy shape are unaffected.
-      const joined = db.listTasksWithDispatch({
+      const joined = await db.listTasksWithDispatch({
         status: params.status as TaskStatus,
         ready: params.ready
       })
@@ -461,9 +474,9 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.taskUpdate',
     params: TaskUpdateParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
-      const task = db.updateTaskStatus(params.id, params.status, params.result)
+      const task = await db.updateTaskStatus(params.id, params.status, params.result)
       if (!task) {
         throw new Error(`Task not found: ${params.id}`)
       }
@@ -476,7 +489,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
     params: DispatchParams,
     handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
-      const task = db.getTask(params.task)
+      const task = await db.getTask(params.task)
       if (!task) {
         throw new Error(`Task not found: ${params.task}`)
       }
@@ -524,7 +537,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         }
       }
 
-      const ctx = db.createDispatchContext(
+      const ctx = await db.createDispatchContext(
         params.task,
         to,
         runtime.getTerminalPaneKey(to) ?? undefined
@@ -549,7 +562,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           await runtime.sendTerminalAgentPrompt(to, preamble)
           injected = true
         } catch (err) {
-          db.failDispatch(ctx.id, err instanceof Error ? err.message : String(err))
+          await db.failDispatch(ctx.id, err instanceof Error ? err.message : String(err))
           throw err
         }
       }
@@ -567,19 +580,19 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.dispatchShow',
     params: DispatchShowParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
       if (!params.task) {
         throw new Error('Missing --task')
       }
-      const ctx = db.getDispatchContext(params.task)
+      const ctx = await db.getDispatchContext(params.task)
 
       // Why: --preamble lets callers inspect the exact preamble text that was
       // (or would be) injected for this task. The preamble is derived from the
       // current task spec, so even after dispatch completes the text can be
       // regenerated deterministically.
       if (params.preamble) {
-        const task = db.getTask(params.task)
+        const task = await db.getTask(params.task)
         if (!task) {
           throw new Error(`Task not found: ${params.task}`)
         }
@@ -627,7 +640,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           .filter(Boolean) ?? []
 
       const payload = JSON.stringify({ question: params.question, options })
-      const outbound = db.insertMessage({
+      const outbound = await db.insertMessage({
         from,
         to: params.to,
         subject: 'Question',
@@ -648,10 +661,10 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       // wake-up to separate "reply in my thread arrived" from "something
       // else was delivered to this handle."
       while (true) {
-        const replies = db.getThreadMessagesFor(threadId, from, afterSequence)
+        const replies = await db.getThreadMessagesFor(threadId, from, afterSequence)
         if (replies.length > 0) {
           const reply = replies[0]
-          db.markAsRead([reply.id])
+          await db.markAsRead([reply.id])
           return {
             answer: reply.body,
             messageId: reply.id,
@@ -678,18 +691,18 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
   defineMethod({
     name: 'orchestration.reset',
     params: ResetParams,
-    handler: (params, { runtime }) => {
+    handler: async (params, { runtime }) => {
       const db = runtime.getOrchestrationDb()
       if (params.all) {
-        db.resetAll()
+        await db.resetAll()
         return { reset: 'all' }
       }
       if (params.tasks) {
-        db.resetTasks()
+        await db.resetTasks()
         return { reset: 'tasks' }
       }
       if (params.messages) {
-        db.resetMessages()
+        await db.resetMessages()
         return { reset: 'messages' }
       }
       throw new Error('Invalid reset scope')

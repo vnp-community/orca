@@ -9,6 +9,15 @@ import { closeMobileSessionTabInStore } from '../../runtime/mobile-session-tab-c
 // Mock sonner (imported by repos.ts)
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 
+// Why: the ui store slice now calls the ui wrapper (runtime-ui-client), not
+// window.api.ui directly — mock it so persistence assertions below still work.
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiSet: vi.fn().mockResolvedValue(undefined),
+  uiRecordFeatureInteraction: vi
+    .fn()
+    .mockResolvedValue({ featureInteractions: {}, contextualToursSeenIds: [] })
+}))
+
 // Mock agent-status (imported by terminal-helpers)
 vi.mock('@/lib/agent-status', async (importOriginal) => {
   const actual = await importOriginal<typeof AgentStatusModule>()
@@ -42,9 +51,6 @@ const mockApi = {
   },
   settings: {
     get: vi.fn().mockResolvedValue({}),
-    set: vi.fn().mockResolvedValue(undefined)
-  },
-  ui: {
     set: vi.fn().mockResolvedValue(undefined)
   },
   cache: {
@@ -105,6 +111,7 @@ const mockApi = {
 globalThis.window = { api: mockApi }
 
 import { createTestStore, makeOpenFile, makeTabGroup, makeUnifiedTab } from './store-test-helpers'
+import { uiRecordFeatureInteraction, uiSet } from '@/runtime/runtime-ui-client'
 
 const WT = 'repo1::/tmp/feature'
 
@@ -224,19 +231,17 @@ describe('TabsSlice', () => {
 
   describe('terminal tab creation tracking', () => {
     it('records normal terminal tab creation without recording activation fallback tabs', () => {
-      const setMock = vi.mocked(window.api.ui.set)
+      // Why: recordFeatureInteraction persists via uiRecordFeatureInteraction
+      // (not uiSet directly) — see store/slices/ui.ts recordFeatureInteraction.
+      const recordMock = vi.mocked(uiRecordFeatureInteraction)
       store.getState().hydratePersistedUI(getDefaultUIState())
-      setMock.mockClear()
+      recordMock.mockClear()
 
       store.getState().createTab(WT)
       store.getState().createTab(WT, undefined, undefined, { pendingActivationSpawn: true })
 
-      expect(setMock).toHaveBeenCalledTimes(1)
-      expect(setMock).toHaveBeenCalledWith({
-        featureInteractions: {
-          'terminal-tabs': expect.objectContaining({ interactionCount: 1 })
-        }
-      })
+      expect(recordMock).toHaveBeenCalledTimes(1)
+      expect(recordMock).toHaveBeenCalledWith('terminal-tabs')
     })
   })
 
@@ -545,7 +550,7 @@ describe('TabsSlice', () => {
     })
 
     it('records generic pane interaction when creating an empty split group', () => {
-      const setMock = vi.mocked(window.api.ui.set)
+      const setMock = vi.mocked(uiSet)
       store.getState().hydratePersistedUI(getDefaultUIState())
       setMock.mockClear()
       store.getState().createUnifiedTab(WT, 'terminal')
@@ -1047,7 +1052,9 @@ describe('TabsSlice', () => {
     })
 
     it('merges a group into its sibling', () => {
-      const setMock = vi.mocked(window.api.ui.set)
+      // Why: recordFeatureInteraction persists via uiRecordFeatureInteraction
+      // (not uiSet directly) — see store/slices/ui.ts recordFeatureInteraction.
+      const recordMock = vi.mocked(uiRecordFeatureInteraction)
       const t1 = store.getState().createUnifiedTab(WT, 'editor', {
         id: 'file-a.ts',
         label: 'file-a.ts'
@@ -1061,7 +1068,7 @@ describe('TabsSlice', () => {
         targetGroupId: targetGroupId!
       })
       store.getState().hydratePersistedUI(getDefaultUIState())
-      setMock.mockClear()
+      recordMock.mockClear()
 
       const mergedInto = store.getState().mergeGroupIntoSibling(WT, targetGroupId!)
 
@@ -1070,12 +1077,8 @@ describe('TabsSlice', () => {
       expect(state.groupsByWorktree[WT]).toHaveLength(1)
       expect(state.groupsByWorktree[WT][0].tabOrder).toEqual([t1.id, 'file-b.ts'])
       expect(state.layoutByWorktree[WT]).toEqual({ type: 'leaf', groupId: sourceGroupId })
-      expect(setMock).toHaveBeenCalledTimes(1)
-      expect(setMock).toHaveBeenCalledWith({
-        featureInteractions: {
-          'terminal-panes': expect.objectContaining({ interactionCount: 1 })
-        }
-      })
+      expect(recordMock).toHaveBeenCalledTimes(1)
+      expect(recordMock).toHaveBeenCalledWith('terminal-panes')
     })
 
     it('drops a unified tab into another group and collapses an emptied source group', () => {

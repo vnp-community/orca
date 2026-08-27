@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package orca.notification.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1;notificationv1";
+
+import "google/protobuf/empty.proto";
+
+// NotificationService: push subscriptions + VAPID metadata + WS fan-out.
+// Primary consumer of the async event bus. See specs/backend-go/services/notification-service.md.
+service NotificationService {
+  rpc Subscribe(SubscribeRequest) returns (SubscribeResponse);
+  rpc UnregisterPushSubscription(UnregisterPushSubscriptionRequest) returns (google.protobuf.Empty);
+  rpc GetVapidPublicKey(GetVapidPublicKeyRequest) returns (GetVapidPublicKeyResponse);
+  // StreamNotifications is a server-streaming RPC api-gateway opens per
+  // connected WS client and pipes frames from directly to the browser/mobile.
+  rpc StreamNotifications(StreamNotificationsRequest) returns (stream NotificationServiceStreamNotificationsResponse);
+}
+
+message SubscribeRequest {
+  string user_id = 1;
+  string endpoint = 2;
+  string p256dh_key = 3;
+  string auth_key = 4;
+}
+
+message SubscribeResponse {
+  string subscription_id = 1;
+}
+
+message UnregisterPushSubscriptionRequest {
+  string endpoint = 1; // matches push_subscriptions.endpoint's unique index
+}
+
+message GetVapidPublicKeyRequest {}
+
+message GetVapidPublicKeyResponse {
+  string public_key = 1;
+}
+
+message StreamNotificationsRequest {
+  string user_id = 1;
+}
+
+message NotificationServiceStreamNotificationsResponse {
+  string id = 1;
+  string type = 2; // e.g. task.completed, workflow.execution.failed
+  string payload_json = 3;
+}
