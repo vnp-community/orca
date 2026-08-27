@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`, `backend-go/services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-MB-03-04
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `Server.DispatchPrompt`/`GetQueuedPrompt` handlers + `cmd/server/main.go` wiring added, sharing the single `queuedPromptStore` instance with `GetTerminalAgentStatus`'s drain hook; `go build`/`go vet`/`go test ./services/infra-fleet-service/...` all pass.
 
 ---
 

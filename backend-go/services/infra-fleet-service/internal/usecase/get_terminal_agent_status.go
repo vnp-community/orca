@@ -34,10 +34,16 @@ type GetTerminalAgentStatus struct {
 	agent      DevServerAgentClient
 	liveStates *sync.Map // map[string]*ptyLiveState — shared with AttachPty (TASK-MB-02-01), same registry instance, injected via cmd/server/main.go
 	events     LifecycleEventPublisher
+	// queue is the SAME QueuedPromptRepository instance DispatchPrompt uses
+	// (TASK-MB-03-04/05, shared via cmd/server/main.go) — nil-safe: a nil
+	// queue simply skips the drain below (matches events' nil-safety), so
+	// this constructor stays usable from tests that don't care about
+	// mobile prompt dispatch.
+	queue QueuedPromptRepository
 }
 
-func NewGetTerminalAgentStatus(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient, liveStates *sync.Map, events LifecycleEventPublisher) *GetTerminalAgentStatus {
-	return &GetTerminalAgentStatus{sessions: sessions, resolver: resolver, agent: agent, liveStates: liveStates, events: events}
+func NewGetTerminalAgentStatus(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient, liveStates *sync.Map, events LifecycleEventPublisher, queue QueuedPromptRepository) *GetTerminalAgentStatus {
+	return &GetTerminalAgentStatus{sessions: sessions, resolver: resolver, agent: agent, liveStates: liveStates, events: events, queue: queue}
 }
 
 func (uc *GetTerminalAgentStatus) Execute(ctx context.Context, ptyID string) (AgentStatusResult, error) {
@@ -68,6 +74,19 @@ func (uc *GetTerminalAgentStatus) Execute(ctx context.Context, ptyID string) (Ag
 					_ = uc.events.PublishAgentLifecycle(ctx, tenantID, eventbus.SubjectAgentWaiting, eventbus.AgentLifecyclePayload{
 						PtyID: ptyID, ConnectionID: session.ConnectionID, AgentKind: result.AgentKind, UserIDs: userIDsFor(session),
 					})
+				}
+				// Queue-drain (TASK-MB-03-04): this running->ready transition
+				// is the one moment a BR-MB-10-queued prompt actually gets
+				// delivered — not a separate poller. GetAndDelete is atomic,
+				// so a prompt racing in via a concurrent DispatchPrompt call
+				// is delivered at most once either way. Best-effort: a failed
+				// drain here just leaves the prompt queued for the next
+				// ready-transition (or a later poll after the row error
+				// clears), never fails this status read.
+				if uc.queue != nil {
+					if queued, hasQueued, err := uc.queue.GetAndDelete(ctx, ptyID); err == nil && hasQueued {
+						_ = uc.agent.WritePty(ctx, devServer, ptyID, []byte(queued.Prompt))
+					}
 				}
 			}
 		}

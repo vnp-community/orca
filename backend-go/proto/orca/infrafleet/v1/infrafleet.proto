@@ -55,6 +55,12 @@ service InfraFleetService {
   rpc GetTerminalAgentStatus(GetTerminalAgentStatusRequest) returns (GetTerminalAgentStatusResponse); // backs BOTH terminal.agentStatus and terminal.isRunningAgent
   rpc InspectTerminalProcess(InspectTerminalProcessRequest) returns (InspectTerminalProcessResponse); // best-effort — see message doc comment
 
+  // DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to:
+  // gate on agent readiness, queue if running, require confirmation to
+  // overwrite an existing queued prompt.
+  rpc DispatchPrompt(DispatchPromptRequest) returns (DispatchPromptResponse);
+  rpc GetQueuedPrompt(GetQueuedPromptRequest) returns (GetQueuedPromptResponse);
+
   // --- Terminal/PTY I/O ---
   // The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
   // names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -471,4 +477,30 @@ message GetHostCapabilitiesResponse {
   repeated string wsl_distros = 2;
   bool pwsh_available = 3;
   bool git_bash_available = 4;
+}
+
+// --- Mobile prompt dispatch (SOL-MB-03) ------------------------------------
+
+message DispatchPromptRequest {
+  string pty_id = 1;
+  string prompt = 2;          // already decrypted by the caller (api-gateway) before this RPC
+  bool   overwrite = 3;       // BR-MB-12: true only on a caller's explicit confirmation of a second dispatch
+  string dispatched_by_device_id = 4; // audit/attribution — which paired mobile device sent this
+}
+message DispatchPromptResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    INJECTED_IMMEDIATELY = 1;  // BR-MB-09: agent was idle/waiting, written straight to the PTY
+    QUEUED = 2;                // BR-MB-10: agent running, held for later
+    REJECTED_NEEDS_CONFIRMATION = 3; // BR-MB-12: a prompt is already queued and overwrite=false
+  }
+  Outcome outcome = 1;
+  string  existing_queued_prompt_preview = 2; // populated only for REJECTED_NEEDS_CONFIRMATION
+}
+
+message GetQueuedPromptRequest { string pty_id = 1; }
+message GetQueuedPromptResponse {
+  bool   has_queued_prompt = 1;
+  string prompt = 2;
+  int64  queued_at_unix_ms = 3;
 }

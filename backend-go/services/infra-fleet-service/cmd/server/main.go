@@ -89,6 +89,7 @@ func run() error {
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
 	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
 	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
+	queuedPromptStore := infrapostgres.NewQueuedPromptStore(pool)
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
 	// wired below via agentwsserver) are both real, and so is relay-ssh now
@@ -176,12 +177,17 @@ func run() error {
 	listTerminalSessionsUC := usecase.NewListTerminalSessions(terminalSessionStore)
 	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, agentClient)
 	focusTerminalSessionUC := usecase.NewFocusTerminalSession(terminalSessionStore)
-	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient, terminalLiveStates, lifecycleEvents)
+	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient, terminalLiveStates, lifecycleEvents, queuedPromptStore)
 	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
 	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter, terminalLiveStates, lifecycleEvents)
 	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
 	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
 	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
+	// dispatchPrompt/getQueuedPrompt (TASK-MB-03-05) share queuedPromptStore
+	// with getTerminalAgentStatusUC above — the SAME instance the
+	// ready-transition queue-drain hook needs.
+	dispatchPromptUC := usecase.NewDispatchPrompt(terminalSessionStore, repo, agentClient, queuedPromptStore)
+	getQueuedPromptUC := usecase.NewGetQueuedPrompt(terminalSessionStore, repo, queuedPromptStore)
 
 	// --- Emulator relay (TASK-048) / host capabilities relay (TASK-070) ---
 	// Shipped-but-honestly-inert until agent/ gains device.*/host.capabilities
@@ -218,6 +224,8 @@ func run() error {
 		deleteBrowserProfileUC,
 		emulatorRelayUC,
 		getHostCapabilitiesUC,
+		dispatchPromptUC,
+		getQueuedPromptUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

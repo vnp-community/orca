@@ -41,6 +41,8 @@ const (
 	InfraFleetService_FocusTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/FocusTerminalSession"
 	InfraFleetService_GetTerminalAgentStatus_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
 	InfraFleetService_InspectTerminalProcess_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
+	InfraFleetService_DispatchPrompt_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/DispatchPrompt"
+	InfraFleetService_GetQueuedPrompt_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/GetQueuedPrompt"
 	InfraFleetService_AttachPty_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
 	InfraFleetService_ListBrowserProfiles_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
 	InfraFleetService_CreateBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
@@ -106,6 +108,11 @@ type InfraFleetServiceClient interface {
 	FocusTerminalSession(ctx context.Context, in *FocusTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetTerminalAgentStatus(ctx context.Context, in *GetTerminalAgentStatusRequest, opts ...grpc.CallOption) (*GetTerminalAgentStatusResponse, error)
 	InspectTerminalProcess(ctx context.Context, in *InspectTerminalProcessRequest, opts ...grpc.CallOption) (*InspectTerminalProcessResponse, error)
+	// DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to:
+	// gate on agent readiness, queue if running, require confirmation to
+	// overwrite an existing queued prompt.
+	DispatchPrompt(ctx context.Context, in *DispatchPromptRequest, opts ...grpc.CallOption) (*DispatchPromptResponse, error)
+	GetQueuedPrompt(ctx context.Context, in *GetQueuedPromptRequest, opts ...grpc.CallOption) (*GetQueuedPromptResponse, error)
 	// --- Terminal/PTY I/O ---
 	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
 	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -368,6 +375,26 @@ func (c *infraFleetServiceClient) InspectTerminalProcess(ctx context.Context, in
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) DispatchPrompt(ctx context.Context, in *DispatchPromptRequest, opts ...grpc.CallOption) (*DispatchPromptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DispatchPromptResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_DispatchPrompt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetQueuedPrompt(ctx context.Context, in *GetQueuedPromptRequest, opts ...grpc.CallOption) (*GetQueuedPromptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetQueuedPromptResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetQueuedPrompt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_AttachPty_FullMethodName, cOpts...)
@@ -551,6 +578,11 @@ type InfraFleetServiceServer interface {
 	FocusTerminalSession(context.Context, *FocusTerminalSessionRequest) (*emptypb.Empty, error)
 	GetTerminalAgentStatus(context.Context, *GetTerminalAgentStatusRequest) (*GetTerminalAgentStatusResponse, error)
 	InspectTerminalProcess(context.Context, *InspectTerminalProcessRequest) (*InspectTerminalProcessResponse, error)
+	// DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to:
+	// gate on agent readiness, queue if running, require confirmation to
+	// overwrite an existing queued prompt.
+	DispatchPrompt(context.Context, *DispatchPromptRequest) (*DispatchPromptResponse, error)
+	GetQueuedPrompt(context.Context, *GetQueuedPromptRequest) (*GetQueuedPromptResponse, error)
 	// --- Terminal/PTY I/O ---
 	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
 	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -665,6 +697,12 @@ func (UnimplementedInfraFleetServiceServer) GetTerminalAgentStatus(context.Conte
 }
 func (UnimplementedInfraFleetServiceServer) InspectTerminalProcess(context.Context, *InspectTerminalProcessRequest) (*InspectTerminalProcessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InspectTerminalProcess not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DispatchPrompt(context.Context, *DispatchPromptRequest) (*DispatchPromptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DispatchPrompt not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetQueuedPrompt(context.Context, *GetQueuedPromptRequest) (*GetQueuedPromptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetQueuedPrompt not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) AttachPty(grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]) error {
 	return status.Error(codes.Unimplemented, "method AttachPty not implemented")
@@ -1104,6 +1142,42 @@ func _InfraFleetService_InspectTerminalProcess_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_DispatchPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DispatchPromptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DispatchPrompt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DispatchPrompt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DispatchPrompt(ctx, req.(*DispatchPromptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetQueuedPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetQueuedPromptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetQueuedPrompt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetQueuedPrompt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetQueuedPrompt(ctx, req.(*GetQueuedPromptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InfraFleetService_AttachPty_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(InfraFleetServiceServer).AttachPty(&grpc.GenericServerStream[PtyClientFrame, PtyServerFrame]{ServerStream: stream})
 }
@@ -1417,6 +1491,14 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InspectTerminalProcess",
 			Handler:    _InfraFleetService_InspectTerminalProcess_Handler,
+		},
+		{
+			MethodName: "DispatchPrompt",
+			Handler:    _InfraFleetService_DispatchPrompt_Handler,
+		},
+		{
+			MethodName: "GetQueuedPrompt",
+			Handler:    _InfraFleetService_GetQueuedPrompt_Handler,
 		},
 		{
 			MethodName: "ListBrowserProfiles",

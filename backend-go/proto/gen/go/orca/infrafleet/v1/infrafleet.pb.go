@@ -75,6 +75,58 @@ func (ConnectionMode) EnumDescriptor() ([]byte, []int) {
 	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{0}
 }
 
+type DispatchPromptResponse_Outcome int32
+
+const (
+	DispatchPromptResponse_OUTCOME_UNSPECIFIED         DispatchPromptResponse_Outcome = 0
+	DispatchPromptResponse_INJECTED_IMMEDIATELY        DispatchPromptResponse_Outcome = 1 // BR-MB-09: agent was idle/waiting, written straight to the PTY
+	DispatchPromptResponse_QUEUED                      DispatchPromptResponse_Outcome = 2 // BR-MB-10: agent running, held for later
+	DispatchPromptResponse_REJECTED_NEEDS_CONFIRMATION DispatchPromptResponse_Outcome = 3 // BR-MB-12: a prompt is already queued and overwrite=false
+)
+
+// Enum value maps for DispatchPromptResponse_Outcome.
+var (
+	DispatchPromptResponse_Outcome_name = map[int32]string{
+		0: "OUTCOME_UNSPECIFIED",
+		1: "INJECTED_IMMEDIATELY",
+		2: "QUEUED",
+		3: "REJECTED_NEEDS_CONFIRMATION",
+	}
+	DispatchPromptResponse_Outcome_value = map[string]int32{
+		"OUTCOME_UNSPECIFIED":         0,
+		"INJECTED_IMMEDIATELY":        1,
+		"QUEUED":                      2,
+		"REJECTED_NEEDS_CONFIRMATION": 3,
+	}
+)
+
+func (x DispatchPromptResponse_Outcome) Enum() *DispatchPromptResponse_Outcome {
+	p := new(DispatchPromptResponse_Outcome)
+	*p = x
+	return p
+}
+
+func (x DispatchPromptResponse_Outcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DispatchPromptResponse_Outcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_orca_infrafleet_v1_infrafleet_proto_enumTypes[1].Descriptor()
+}
+
+func (DispatchPromptResponse_Outcome) Type() protoreflect.EnumType {
+	return &file_orca_infrafleet_v1_infrafleet_proto_enumTypes[1]
+}
+
+func (x DispatchPromptResponse_Outcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DispatchPromptResponse_Outcome.Descriptor instead.
+func (DispatchPromptResponse_Outcome) EnumDescriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{70, 0}
+}
+
 type DevServer struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -3959,6 +4011,230 @@ func (x *GetHostCapabilitiesResponse) GetGitBashAvailable() bool {
 	return false
 }
 
+type DispatchPromptRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	PtyId                string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
+	Prompt               string                 `protobuf:"bytes,2,opt,name=prompt,proto3" json:"prompt,omitempty"`                                                             // already decrypted by the caller (api-gateway) before this RPC
+	Overwrite            bool                   `protobuf:"varint,3,opt,name=overwrite,proto3" json:"overwrite,omitempty"`                                                      // BR-MB-12: true only on a caller's explicit confirmation of a second dispatch
+	DispatchedByDeviceId string                 `protobuf:"bytes,4,opt,name=dispatched_by_device_id,json=dispatchedByDeviceId,proto3" json:"dispatched_by_device_id,omitempty"` // audit/attribution — which paired mobile device sent this
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *DispatchPromptRequest) Reset() {
+	*x = DispatchPromptRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DispatchPromptRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DispatchPromptRequest) ProtoMessage() {}
+
+func (x *DispatchPromptRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DispatchPromptRequest.ProtoReflect.Descriptor instead.
+func (*DispatchPromptRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *DispatchPromptRequest) GetPtyId() string {
+	if x != nil {
+		return x.PtyId
+	}
+	return ""
+}
+
+func (x *DispatchPromptRequest) GetPrompt() string {
+	if x != nil {
+		return x.Prompt
+	}
+	return ""
+}
+
+func (x *DispatchPromptRequest) GetOverwrite() bool {
+	if x != nil {
+		return x.Overwrite
+	}
+	return false
+}
+
+func (x *DispatchPromptRequest) GetDispatchedByDeviceId() string {
+	if x != nil {
+		return x.DispatchedByDeviceId
+	}
+	return ""
+}
+
+type DispatchPromptResponse struct {
+	state                       protoimpl.MessageState         `protogen:"open.v1"`
+	Outcome                     DispatchPromptResponse_Outcome `protobuf:"varint,1,opt,name=outcome,proto3,enum=orca.infrafleet.v1.DispatchPromptResponse_Outcome" json:"outcome,omitempty"`
+	ExistingQueuedPromptPreview string                         `protobuf:"bytes,2,opt,name=existing_queued_prompt_preview,json=existingQueuedPromptPreview,proto3" json:"existing_queued_prompt_preview,omitempty"` // populated only for REJECTED_NEEDS_CONFIRMATION
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *DispatchPromptResponse) Reset() {
+	*x = DispatchPromptResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DispatchPromptResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DispatchPromptResponse) ProtoMessage() {}
+
+func (x *DispatchPromptResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DispatchPromptResponse.ProtoReflect.Descriptor instead.
+func (*DispatchPromptResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *DispatchPromptResponse) GetOutcome() DispatchPromptResponse_Outcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return DispatchPromptResponse_OUTCOME_UNSPECIFIED
+}
+
+func (x *DispatchPromptResponse) GetExistingQueuedPromptPreview() string {
+	if x != nil {
+		return x.ExistingQueuedPromptPreview
+	}
+	return ""
+}
+
+type GetQueuedPromptRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PtyId         string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetQueuedPromptRequest) Reset() {
+	*x = GetQueuedPromptRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetQueuedPromptRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetQueuedPromptRequest) ProtoMessage() {}
+
+func (x *GetQueuedPromptRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetQueuedPromptRequest.ProtoReflect.Descriptor instead.
+func (*GetQueuedPromptRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *GetQueuedPromptRequest) GetPtyId() string {
+	if x != nil {
+		return x.PtyId
+	}
+	return ""
+}
+
+type GetQueuedPromptResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	HasQueuedPrompt bool                   `protobuf:"varint,1,opt,name=has_queued_prompt,json=hasQueuedPrompt,proto3" json:"has_queued_prompt,omitempty"`
+	Prompt          string                 `protobuf:"bytes,2,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	QueuedAtUnixMs  int64                  `protobuf:"varint,3,opt,name=queued_at_unix_ms,json=queuedAtUnixMs,proto3" json:"queued_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetQueuedPromptResponse) Reset() {
+	*x = GetQueuedPromptResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetQueuedPromptResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetQueuedPromptResponse) ProtoMessage() {}
+
+func (x *GetQueuedPromptResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetQueuedPromptResponse.ProtoReflect.Descriptor instead.
+func (*GetQueuedPromptResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *GetQueuedPromptResponse) GetHasQueuedPrompt() bool {
+	if x != nil {
+		return x.HasQueuedPrompt
+	}
+	return false
+}
+
+func (x *GetQueuedPromptResponse) GetPrompt() string {
+	if x != nil {
+		return x.Prompt
+	}
+	return ""
+}
+
+func (x *GetQueuedPromptResponse) GetQueuedAtUnixMs() int64 {
+	if x != nil {
+		return x.QueuedAtUnixMs
+	}
+	return 0
+}
+
 var File_orca_infrafleet_v1_infrafleet_proto protoreflect.FileDescriptor
 
 const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
@@ -4225,12 +4501,32 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\vwsl_distros\x18\x02 \x03(\tR\n" +
 	"wslDistros\x12%\n" +
 	"\x0epwsh_available\x18\x03 \x01(\bR\rpwshAvailable\x12,\n" +
-	"\x12git_bash_available\x18\x04 \x01(\bR\x10gitBashAvailable*\x9b\x01\n" +
+	"\x12git_bash_available\x18\x04 \x01(\bR\x10gitBashAvailable\"\x9b\x01\n" +
+	"\x15DispatchPromptRequest\x12\x15\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\x12\x16\n" +
+	"\x06prompt\x18\x02 \x01(\tR\x06prompt\x12\x1c\n" +
+	"\toverwrite\x18\x03 \x01(\bR\toverwrite\x125\n" +
+	"\x17dispatched_by_device_id\x18\x04 \x01(\tR\x14dispatchedByDeviceId\"\x96\x02\n" +
+	"\x16DispatchPromptResponse\x12L\n" +
+	"\aoutcome\x18\x01 \x01(\x0e22.orca.infrafleet.v1.DispatchPromptResponse.OutcomeR\aoutcome\x12C\n" +
+	"\x1eexisting_queued_prompt_preview\x18\x02 \x01(\tR\x1bexistingQueuedPromptPreview\"i\n" +
+	"\aOutcome\x12\x17\n" +
+	"\x13OUTCOME_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14INJECTED_IMMEDIATELY\x10\x01\x12\n" +
+	"\n" +
+	"\x06QUEUED\x10\x02\x12\x1f\n" +
+	"\x1bREJECTED_NEEDS_CONFIRMATION\x10\x03\"/\n" +
+	"\x16GetQueuedPromptRequest\x12\x15\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"\x88\x01\n" +
+	"\x17GetQueuedPromptResponse\x12*\n" +
+	"\x11has_queued_prompt\x18\x01 \x01(\bR\x0fhasQueuedPrompt\x12\x16\n" +
+	"\x06prompt\x18\x02 \x01(\tR\x06prompt\x12)\n" +
+	"\x11queued_at_unix_ms\x18\x03 \x01(\x03R\x0equeuedAtUnixMs*\x9b\x01\n" +
 	"\x0eConnectionMode\x12\x1f\n" +
 	"\x1bCONNECTION_MODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CONNECTION_MODE_RELAY_SSH\x10\x01\x12#\n" +
 	"\x1fCONNECTION_MODE_RELAY_WEBSOCKET\x10\x02\x12$\n" +
-	" CONNECTION_MODE_DIRECT_WEBSOCKET\x10\x032\xce\x1c\n" +
+	" CONNECTION_MODE_DIRECT_WEBSOCKET\x10\x032\xa3\x1e\n" +
 	"\x11InfraFleetService\x12p\n" +
 	"\x11RegisterDevServer\x12,.orca.infrafleet.v1.RegisterDevServerRequest\x1a-.orca.infrafleet.v1.RegisterDevServerResponse\x12p\n" +
 	"\x11ResolveConnection\x12,.orca.infrafleet.v1.ResolveConnectionRequest\x1a-.orca.infrafleet.v1.ResolveConnectionResponse\x12j\n" +
@@ -4252,7 +4548,9 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x13WaitTerminalSession\x12..orca.infrafleet.v1.WaitTerminalSessionRequest\x1a/.orca.infrafleet.v1.WaitTerminalSessionResponse\x12_\n" +
 	"\x14FocusTerminalSession\x12/.orca.infrafleet.v1.FocusTerminalSessionRequest\x1a\x16.google.protobuf.Empty\x12\x7f\n" +
 	"\x16GetTerminalAgentStatus\x121.orca.infrafleet.v1.GetTerminalAgentStatusRequest\x1a2.orca.infrafleet.v1.GetTerminalAgentStatusResponse\x12\x7f\n" +
-	"\x16InspectTerminalProcess\x121.orca.infrafleet.v1.InspectTerminalProcessRequest\x1a2.orca.infrafleet.v1.InspectTerminalProcessResponse\x12W\n" +
+	"\x16InspectTerminalProcess\x121.orca.infrafleet.v1.InspectTerminalProcessRequest\x1a2.orca.infrafleet.v1.InspectTerminalProcessResponse\x12g\n" +
+	"\x0eDispatchPrompt\x12).orca.infrafleet.v1.DispatchPromptRequest\x1a*.orca.infrafleet.v1.DispatchPromptResponse\x12j\n" +
+	"\x0fGetQueuedPrompt\x12*.orca.infrafleet.v1.GetQueuedPromptRequest\x1a+.orca.infrafleet.v1.GetQueuedPromptResponse\x12W\n" +
 	"\tAttachPty\x12\".orca.infrafleet.v1.PtyClientFrame\x1a\".orca.infrafleet.v1.PtyServerFrame(\x010\x01\x12v\n" +
 	"\x13ListBrowserProfiles\x12..orca.infrafleet.v1.ListBrowserProfilesRequest\x1a/.orca.infrafleet.v1.ListBrowserProfilesResponse\x12y\n" +
 	"\x14CreateBrowserProfile\x12/.orca.infrafleet.v1.CreateBrowserProfileRequest\x1a0.orca.infrafleet.v1.CreateBrowserProfileResponse\x12_\n" +
@@ -4279,174 +4577,184 @@ func file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP() []byte {
 	return file_orca_infrafleet_v1_infrafleet_proto_rawDescData
 }
 
-var file_orca_infrafleet_v1_infrafleet_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_infrafleet_v1_infrafleet_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
+var file_orca_infrafleet_v1_infrafleet_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_orca_infrafleet_v1_infrafleet_proto_msgTypes = make([]protoimpl.MessageInfo, 73)
 var file_orca_infrafleet_v1_infrafleet_proto_goTypes = []any{
 	(ConnectionMode)(0),                     // 0: orca.infrafleet.v1.ConnectionMode
-	(*DevServer)(nil),                       // 1: orca.infrafleet.v1.DevServer
-	(*RegisterDevServerRequest)(nil),        // 2: orca.infrafleet.v1.RegisterDevServerRequest
-	(*RegisterDevServerResponse)(nil),       // 3: orca.infrafleet.v1.RegisterDevServerResponse
-	(*ResolveConnectionRequest)(nil),        // 4: orca.infrafleet.v1.ResolveConnectionRequest
-	(*ResolveConnectionResponse)(nil),       // 5: orca.infrafleet.v1.ResolveConnectionResponse
-	(*ListDevServersRequest)(nil),           // 6: orca.infrafleet.v1.ListDevServersRequest
-	(*ListDevServersResponse)(nil),          // 7: orca.infrafleet.v1.ListDevServersResponse
-	(*CreateConnectionRequest)(nil),         // 8: orca.infrafleet.v1.CreateConnectionRequest
-	(*CreateConnectionResponse)(nil),        // 9: orca.infrafleet.v1.CreateConnectionResponse
-	(*RelayRequest)(nil),                    // 10: orca.infrafleet.v1.RelayRequest
-	(*RelayResponse)(nil),                   // 11: orca.infrafleet.v1.RelayResponse
-	(*CreateSshTargetRequest)(nil),          // 12: orca.infrafleet.v1.CreateSshTargetRequest
-	(*CreateSshTargetResponse)(nil),         // 13: orca.infrafleet.v1.CreateSshTargetResponse
-	(*GetFleetHealthRequest)(nil),           // 14: orca.infrafleet.v1.GetFleetHealthRequest
-	(*DevServerHealth)(nil),                 // 15: orca.infrafleet.v1.DevServerHealth
-	(*GetFleetHealthResponse)(nil),          // 16: orca.infrafleet.v1.GetFleetHealthResponse
-	(*ScanWorkspacePortsRequest)(nil),       // 17: orca.infrafleet.v1.ScanWorkspacePortsRequest
-	(*ScanWorkspacePortsResponse)(nil),      // 18: orca.infrafleet.v1.ScanWorkspacePortsResponse
-	(*KillWorkspacePortRequest)(nil),        // 19: orca.infrafleet.v1.KillWorkspacePortRequest
-	(*KillWorkspacePortResponse)(nil),       // 20: orca.infrafleet.v1.KillWorkspacePortResponse
-	(*SshTarget)(nil),                       // 21: orca.infrafleet.v1.SshTarget
-	(*ListSshTargetsRequest)(nil),           // 22: orca.infrafleet.v1.ListSshTargetsRequest
-	(*ListSshTargetsResponse)(nil),          // 23: orca.infrafleet.v1.ListSshTargetsResponse
-	(*GetSshStateRequest)(nil),              // 24: orca.infrafleet.v1.GetSshStateRequest
-	(*GetSshStateResponse)(nil),             // 25: orca.infrafleet.v1.GetSshStateResponse
-	(*EstablishConnectionRequest)(nil),      // 26: orca.infrafleet.v1.EstablishConnectionRequest
-	(*Connection)(nil),                      // 27: orca.infrafleet.v1.Connection
-	(*SpawnTerminalSessionRequest)(nil),     // 28: orca.infrafleet.v1.SpawnTerminalSessionRequest
-	(*SpawnTerminalSessionResponse)(nil),    // 29: orca.infrafleet.v1.SpawnTerminalSessionResponse
-	(*TerminalSession)(nil),                 // 30: orca.infrafleet.v1.TerminalSession
-	(*ResizeTerminalSessionRequest)(nil),    // 31: orca.infrafleet.v1.ResizeTerminalSessionRequest
-	(*KillTerminalSessionRequest)(nil),      // 32: orca.infrafleet.v1.KillTerminalSessionRequest
-	(*StopTerminalProcessRequest)(nil),      // 33: orca.infrafleet.v1.StopTerminalProcessRequest
-	(*ListTerminalSessionsRequest)(nil),     // 34: orca.infrafleet.v1.ListTerminalSessionsRequest
-	(*ListTerminalSessionsResponse)(nil),    // 35: orca.infrafleet.v1.ListTerminalSessionsResponse
-	(*WaitTerminalSessionRequest)(nil),      // 36: orca.infrafleet.v1.WaitTerminalSessionRequest
-	(*WaitTerminalSessionResponse)(nil),     // 37: orca.infrafleet.v1.WaitTerminalSessionResponse
-	(*FocusTerminalSessionRequest)(nil),     // 38: orca.infrafleet.v1.FocusTerminalSessionRequest
-	(*GetTerminalAgentStatusRequest)(nil),   // 39: orca.infrafleet.v1.GetTerminalAgentStatusRequest
-	(*GetTerminalAgentStatusResponse)(nil),  // 40: orca.infrafleet.v1.GetTerminalAgentStatusResponse
-	(*InspectTerminalProcessRequest)(nil),   // 41: orca.infrafleet.v1.InspectTerminalProcessRequest
-	(*InspectTerminalProcessResponse)(nil),  // 42: orca.infrafleet.v1.InspectTerminalProcessResponse
-	(*PtyClientFrame)(nil),                  // 43: orca.infrafleet.v1.PtyClientFrame
-	(*AttachToSession)(nil),                 // 44: orca.infrafleet.v1.AttachToSession
-	(*PtyInput)(nil),                        // 45: orca.infrafleet.v1.PtyInput
-	(*PtyResize)(nil),                       // 46: orca.infrafleet.v1.PtyResize
-	(*PtyServerFrame)(nil),                  // 47: orca.infrafleet.v1.PtyServerFrame
-	(*PtyOutput)(nil),                       // 48: orca.infrafleet.v1.PtyOutput
-	(*PtyExited)(nil),                       // 49: orca.infrafleet.v1.PtyExited
-	(*BrowserProfile)(nil),                  // 50: orca.infrafleet.v1.BrowserProfile
-	(*ListBrowserProfilesRequest)(nil),      // 51: orca.infrafleet.v1.ListBrowserProfilesRequest
-	(*ListBrowserProfilesResponse)(nil),     // 52: orca.infrafleet.v1.ListBrowserProfilesResponse
-	(*CreateBrowserProfileRequest)(nil),     // 53: orca.infrafleet.v1.CreateBrowserProfileRequest
-	(*CreateBrowserProfileResponse)(nil),    // 54: orca.infrafleet.v1.CreateBrowserProfileResponse
-	(*DeleteBrowserProfileRequest)(nil),     // 55: orca.infrafleet.v1.DeleteBrowserProfileRequest
-	(*EmulatorDevice)(nil),                  // 56: orca.infrafleet.v1.EmulatorDevice
-	(*ListEmulatorDevicesRequest)(nil),      // 57: orca.infrafleet.v1.ListEmulatorDevicesRequest
-	(*ListEmulatorDevicesResponse)(nil),     // 58: orca.infrafleet.v1.ListEmulatorDevicesResponse
-	(*GetEmulatorAvailabilityRequest)(nil),  // 59: orca.infrafleet.v1.GetEmulatorAvailabilityRequest
-	(*GetEmulatorAvailabilityResponse)(nil), // 60: orca.infrafleet.v1.GetEmulatorAvailabilityResponse
-	(*EmulatorSession)(nil),                 // 61: orca.infrafleet.v1.EmulatorSession
-	(*AttachEmulatorSessionRequest)(nil),    // 62: orca.infrafleet.v1.AttachEmulatorSessionRequest
-	(*SendEmulatorTapRequest)(nil),          // 63: orca.infrafleet.v1.SendEmulatorTapRequest
-	(*SendEmulatorGestureRequest)(nil),      // 64: orca.infrafleet.v1.SendEmulatorGestureRequest
-	(*SendEmulatorButtonRequest)(nil),       // 65: orca.infrafleet.v1.SendEmulatorButtonRequest
-	(*RotateEmulatorRequest)(nil),           // 66: orca.infrafleet.v1.RotateEmulatorRequest
-	(*ShutdownEmulatorRequest)(nil),         // 67: orca.infrafleet.v1.ShutdownEmulatorRequest
-	(*GetHostCapabilitiesRequest)(nil),      // 68: orca.infrafleet.v1.GetHostCapabilitiesRequest
-	(*GetHostCapabilitiesResponse)(nil),     // 69: orca.infrafleet.v1.GetHostCapabilitiesResponse
-	(*timestamppb.Timestamp)(nil),           // 70: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                   // 71: google.protobuf.Empty
+	(DispatchPromptResponse_Outcome)(0),     // 1: orca.infrafleet.v1.DispatchPromptResponse.Outcome
+	(*DevServer)(nil),                       // 2: orca.infrafleet.v1.DevServer
+	(*RegisterDevServerRequest)(nil),        // 3: orca.infrafleet.v1.RegisterDevServerRequest
+	(*RegisterDevServerResponse)(nil),       // 4: orca.infrafleet.v1.RegisterDevServerResponse
+	(*ResolveConnectionRequest)(nil),        // 5: orca.infrafleet.v1.ResolveConnectionRequest
+	(*ResolveConnectionResponse)(nil),       // 6: orca.infrafleet.v1.ResolveConnectionResponse
+	(*ListDevServersRequest)(nil),           // 7: orca.infrafleet.v1.ListDevServersRequest
+	(*ListDevServersResponse)(nil),          // 8: orca.infrafleet.v1.ListDevServersResponse
+	(*CreateConnectionRequest)(nil),         // 9: orca.infrafleet.v1.CreateConnectionRequest
+	(*CreateConnectionResponse)(nil),        // 10: orca.infrafleet.v1.CreateConnectionResponse
+	(*RelayRequest)(nil),                    // 11: orca.infrafleet.v1.RelayRequest
+	(*RelayResponse)(nil),                   // 12: orca.infrafleet.v1.RelayResponse
+	(*CreateSshTargetRequest)(nil),          // 13: orca.infrafleet.v1.CreateSshTargetRequest
+	(*CreateSshTargetResponse)(nil),         // 14: orca.infrafleet.v1.CreateSshTargetResponse
+	(*GetFleetHealthRequest)(nil),           // 15: orca.infrafleet.v1.GetFleetHealthRequest
+	(*DevServerHealth)(nil),                 // 16: orca.infrafleet.v1.DevServerHealth
+	(*GetFleetHealthResponse)(nil),          // 17: orca.infrafleet.v1.GetFleetHealthResponse
+	(*ScanWorkspacePortsRequest)(nil),       // 18: orca.infrafleet.v1.ScanWorkspacePortsRequest
+	(*ScanWorkspacePortsResponse)(nil),      // 19: orca.infrafleet.v1.ScanWorkspacePortsResponse
+	(*KillWorkspacePortRequest)(nil),        // 20: orca.infrafleet.v1.KillWorkspacePortRequest
+	(*KillWorkspacePortResponse)(nil),       // 21: orca.infrafleet.v1.KillWorkspacePortResponse
+	(*SshTarget)(nil),                       // 22: orca.infrafleet.v1.SshTarget
+	(*ListSshTargetsRequest)(nil),           // 23: orca.infrafleet.v1.ListSshTargetsRequest
+	(*ListSshTargetsResponse)(nil),          // 24: orca.infrafleet.v1.ListSshTargetsResponse
+	(*GetSshStateRequest)(nil),              // 25: orca.infrafleet.v1.GetSshStateRequest
+	(*GetSshStateResponse)(nil),             // 26: orca.infrafleet.v1.GetSshStateResponse
+	(*EstablishConnectionRequest)(nil),      // 27: orca.infrafleet.v1.EstablishConnectionRequest
+	(*Connection)(nil),                      // 28: orca.infrafleet.v1.Connection
+	(*SpawnTerminalSessionRequest)(nil),     // 29: orca.infrafleet.v1.SpawnTerminalSessionRequest
+	(*SpawnTerminalSessionResponse)(nil),    // 30: orca.infrafleet.v1.SpawnTerminalSessionResponse
+	(*TerminalSession)(nil),                 // 31: orca.infrafleet.v1.TerminalSession
+	(*ResizeTerminalSessionRequest)(nil),    // 32: orca.infrafleet.v1.ResizeTerminalSessionRequest
+	(*KillTerminalSessionRequest)(nil),      // 33: orca.infrafleet.v1.KillTerminalSessionRequest
+	(*StopTerminalProcessRequest)(nil),      // 34: orca.infrafleet.v1.StopTerminalProcessRequest
+	(*ListTerminalSessionsRequest)(nil),     // 35: orca.infrafleet.v1.ListTerminalSessionsRequest
+	(*ListTerminalSessionsResponse)(nil),    // 36: orca.infrafleet.v1.ListTerminalSessionsResponse
+	(*WaitTerminalSessionRequest)(nil),      // 37: orca.infrafleet.v1.WaitTerminalSessionRequest
+	(*WaitTerminalSessionResponse)(nil),     // 38: orca.infrafleet.v1.WaitTerminalSessionResponse
+	(*FocusTerminalSessionRequest)(nil),     // 39: orca.infrafleet.v1.FocusTerminalSessionRequest
+	(*GetTerminalAgentStatusRequest)(nil),   // 40: orca.infrafleet.v1.GetTerminalAgentStatusRequest
+	(*GetTerminalAgentStatusResponse)(nil),  // 41: orca.infrafleet.v1.GetTerminalAgentStatusResponse
+	(*InspectTerminalProcessRequest)(nil),   // 42: orca.infrafleet.v1.InspectTerminalProcessRequest
+	(*InspectTerminalProcessResponse)(nil),  // 43: orca.infrafleet.v1.InspectTerminalProcessResponse
+	(*PtyClientFrame)(nil),                  // 44: orca.infrafleet.v1.PtyClientFrame
+	(*AttachToSession)(nil),                 // 45: orca.infrafleet.v1.AttachToSession
+	(*PtyInput)(nil),                        // 46: orca.infrafleet.v1.PtyInput
+	(*PtyResize)(nil),                       // 47: orca.infrafleet.v1.PtyResize
+	(*PtyServerFrame)(nil),                  // 48: orca.infrafleet.v1.PtyServerFrame
+	(*PtyOutput)(nil),                       // 49: orca.infrafleet.v1.PtyOutput
+	(*PtyExited)(nil),                       // 50: orca.infrafleet.v1.PtyExited
+	(*BrowserProfile)(nil),                  // 51: orca.infrafleet.v1.BrowserProfile
+	(*ListBrowserProfilesRequest)(nil),      // 52: orca.infrafleet.v1.ListBrowserProfilesRequest
+	(*ListBrowserProfilesResponse)(nil),     // 53: orca.infrafleet.v1.ListBrowserProfilesResponse
+	(*CreateBrowserProfileRequest)(nil),     // 54: orca.infrafleet.v1.CreateBrowserProfileRequest
+	(*CreateBrowserProfileResponse)(nil),    // 55: orca.infrafleet.v1.CreateBrowserProfileResponse
+	(*DeleteBrowserProfileRequest)(nil),     // 56: orca.infrafleet.v1.DeleteBrowserProfileRequest
+	(*EmulatorDevice)(nil),                  // 57: orca.infrafleet.v1.EmulatorDevice
+	(*ListEmulatorDevicesRequest)(nil),      // 58: orca.infrafleet.v1.ListEmulatorDevicesRequest
+	(*ListEmulatorDevicesResponse)(nil),     // 59: orca.infrafleet.v1.ListEmulatorDevicesResponse
+	(*GetEmulatorAvailabilityRequest)(nil),  // 60: orca.infrafleet.v1.GetEmulatorAvailabilityRequest
+	(*GetEmulatorAvailabilityResponse)(nil), // 61: orca.infrafleet.v1.GetEmulatorAvailabilityResponse
+	(*EmulatorSession)(nil),                 // 62: orca.infrafleet.v1.EmulatorSession
+	(*AttachEmulatorSessionRequest)(nil),    // 63: orca.infrafleet.v1.AttachEmulatorSessionRequest
+	(*SendEmulatorTapRequest)(nil),          // 64: orca.infrafleet.v1.SendEmulatorTapRequest
+	(*SendEmulatorGestureRequest)(nil),      // 65: orca.infrafleet.v1.SendEmulatorGestureRequest
+	(*SendEmulatorButtonRequest)(nil),       // 66: orca.infrafleet.v1.SendEmulatorButtonRequest
+	(*RotateEmulatorRequest)(nil),           // 67: orca.infrafleet.v1.RotateEmulatorRequest
+	(*ShutdownEmulatorRequest)(nil),         // 68: orca.infrafleet.v1.ShutdownEmulatorRequest
+	(*GetHostCapabilitiesRequest)(nil),      // 69: orca.infrafleet.v1.GetHostCapabilitiesRequest
+	(*GetHostCapabilitiesResponse)(nil),     // 70: orca.infrafleet.v1.GetHostCapabilitiesResponse
+	(*DispatchPromptRequest)(nil),           // 71: orca.infrafleet.v1.DispatchPromptRequest
+	(*DispatchPromptResponse)(nil),          // 72: orca.infrafleet.v1.DispatchPromptResponse
+	(*GetQueuedPromptRequest)(nil),          // 73: orca.infrafleet.v1.GetQueuedPromptRequest
+	(*GetQueuedPromptResponse)(nil),         // 74: orca.infrafleet.v1.GetQueuedPromptResponse
+	(*timestamppb.Timestamp)(nil),           // 75: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                   // 76: google.protobuf.Empty
 }
 var file_orca_infrafleet_v1_infrafleet_proto_depIdxs = []int32{
 	0,  // 0: orca.infrafleet.v1.DevServer.mode:type_name -> orca.infrafleet.v1.ConnectionMode
 	0,  // 1: orca.infrafleet.v1.RegisterDevServerRequest.mode:type_name -> orca.infrafleet.v1.ConnectionMode
-	1,  // 2: orca.infrafleet.v1.RegisterDevServerResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
-	1,  // 3: orca.infrafleet.v1.ResolveConnectionResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
-	1,  // 4: orca.infrafleet.v1.ListDevServersResponse.dev_servers:type_name -> orca.infrafleet.v1.DevServer
-	15, // 5: orca.infrafleet.v1.GetFleetHealthResponse.statuses:type_name -> orca.infrafleet.v1.DevServerHealth
-	21, // 6: orca.infrafleet.v1.ListSshTargetsResponse.ssh_targets:type_name -> orca.infrafleet.v1.SshTarget
-	30, // 7: orca.infrafleet.v1.SpawnTerminalSessionResponse.session:type_name -> orca.infrafleet.v1.TerminalSession
-	30, // 8: orca.infrafleet.v1.ListTerminalSessionsResponse.sessions:type_name -> orca.infrafleet.v1.TerminalSession
-	44, // 9: orca.infrafleet.v1.PtyClientFrame.attach:type_name -> orca.infrafleet.v1.AttachToSession
-	45, // 10: orca.infrafleet.v1.PtyClientFrame.input:type_name -> orca.infrafleet.v1.PtyInput
-	46, // 11: orca.infrafleet.v1.PtyClientFrame.resize:type_name -> orca.infrafleet.v1.PtyResize
-	48, // 12: orca.infrafleet.v1.PtyServerFrame.out:type_name -> orca.infrafleet.v1.PtyOutput
-	49, // 13: orca.infrafleet.v1.PtyServerFrame.exited:type_name -> orca.infrafleet.v1.PtyExited
-	70, // 14: orca.infrafleet.v1.BrowserProfile.created_at:type_name -> google.protobuf.Timestamp
-	50, // 15: orca.infrafleet.v1.ListBrowserProfilesResponse.profiles:type_name -> orca.infrafleet.v1.BrowserProfile
-	50, // 16: orca.infrafleet.v1.CreateBrowserProfileResponse.profile:type_name -> orca.infrafleet.v1.BrowserProfile
-	56, // 17: orca.infrafleet.v1.ListEmulatorDevicesResponse.devices:type_name -> orca.infrafleet.v1.EmulatorDevice
-	2,  // 18: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:input_type -> orca.infrafleet.v1.RegisterDevServerRequest
-	4,  // 19: orca.infrafleet.v1.InfraFleetService.ResolveConnection:input_type -> orca.infrafleet.v1.ResolveConnectionRequest
-	12, // 20: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:input_type -> orca.infrafleet.v1.CreateSshTargetRequest
-	14, // 21: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:input_type -> orca.infrafleet.v1.GetFleetHealthRequest
-	17, // 22: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:input_type -> orca.infrafleet.v1.ScanWorkspacePortsRequest
-	6,  // 23: orca.infrafleet.v1.InfraFleetService.ListDevServers:input_type -> orca.infrafleet.v1.ListDevServersRequest
-	8,  // 24: orca.infrafleet.v1.InfraFleetService.CreateConnection:input_type -> orca.infrafleet.v1.CreateConnectionRequest
-	10, // 25: orca.infrafleet.v1.InfraFleetService.Relay:input_type -> orca.infrafleet.v1.RelayRequest
-	22, // 26: orca.infrafleet.v1.InfraFleetService.ListSshTargets:input_type -> orca.infrafleet.v1.ListSshTargetsRequest
-	24, // 27: orca.infrafleet.v1.InfraFleetService.GetSshState:input_type -> orca.infrafleet.v1.GetSshStateRequest
-	26, // 28: orca.infrafleet.v1.InfraFleetService.EstablishConnection:input_type -> orca.infrafleet.v1.EstablishConnectionRequest
-	19, // 29: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:input_type -> orca.infrafleet.v1.KillWorkspacePortRequest
-	28, // 30: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:input_type -> orca.infrafleet.v1.SpawnTerminalSessionRequest
-	31, // 31: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:input_type -> orca.infrafleet.v1.ResizeTerminalSessionRequest
-	32, // 32: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:input_type -> orca.infrafleet.v1.KillTerminalSessionRequest
-	33, // 33: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:input_type -> orca.infrafleet.v1.StopTerminalProcessRequest
-	34, // 34: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:input_type -> orca.infrafleet.v1.ListTerminalSessionsRequest
-	36, // 35: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:input_type -> orca.infrafleet.v1.WaitTerminalSessionRequest
-	38, // 36: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:input_type -> orca.infrafleet.v1.FocusTerminalSessionRequest
-	39, // 37: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:input_type -> orca.infrafleet.v1.GetTerminalAgentStatusRequest
-	41, // 38: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:input_type -> orca.infrafleet.v1.InspectTerminalProcessRequest
-	43, // 39: orca.infrafleet.v1.InfraFleetService.AttachPty:input_type -> orca.infrafleet.v1.PtyClientFrame
-	51, // 40: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:input_type -> orca.infrafleet.v1.ListBrowserProfilesRequest
-	53, // 41: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:input_type -> orca.infrafleet.v1.CreateBrowserProfileRequest
-	55, // 42: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:input_type -> orca.infrafleet.v1.DeleteBrowserProfileRequest
-	57, // 43: orca.infrafleet.v1.InfraFleetService.ListEmulatorDevices:input_type -> orca.infrafleet.v1.ListEmulatorDevicesRequest
-	59, // 44: orca.infrafleet.v1.InfraFleetService.GetEmulatorAvailability:input_type -> orca.infrafleet.v1.GetEmulatorAvailabilityRequest
-	62, // 45: orca.infrafleet.v1.InfraFleetService.AttachEmulatorSession:input_type -> orca.infrafleet.v1.AttachEmulatorSessionRequest
-	63, // 46: orca.infrafleet.v1.InfraFleetService.SendEmulatorTap:input_type -> orca.infrafleet.v1.SendEmulatorTapRequest
-	64, // 47: orca.infrafleet.v1.InfraFleetService.SendEmulatorGesture:input_type -> orca.infrafleet.v1.SendEmulatorGestureRequest
-	65, // 48: orca.infrafleet.v1.InfraFleetService.SendEmulatorButton:input_type -> orca.infrafleet.v1.SendEmulatorButtonRequest
-	66, // 49: orca.infrafleet.v1.InfraFleetService.RotateEmulator:input_type -> orca.infrafleet.v1.RotateEmulatorRequest
-	67, // 50: orca.infrafleet.v1.InfraFleetService.ShutdownEmulator:input_type -> orca.infrafleet.v1.ShutdownEmulatorRequest
-	68, // 51: orca.infrafleet.v1.InfraFleetService.GetHostCapabilities:input_type -> orca.infrafleet.v1.GetHostCapabilitiesRequest
-	3,  // 52: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:output_type -> orca.infrafleet.v1.RegisterDevServerResponse
-	5,  // 53: orca.infrafleet.v1.InfraFleetService.ResolveConnection:output_type -> orca.infrafleet.v1.ResolveConnectionResponse
-	13, // 54: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:output_type -> orca.infrafleet.v1.CreateSshTargetResponse
-	16, // 55: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:output_type -> orca.infrafleet.v1.GetFleetHealthResponse
-	18, // 56: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:output_type -> orca.infrafleet.v1.ScanWorkspacePortsResponse
-	7,  // 57: orca.infrafleet.v1.InfraFleetService.ListDevServers:output_type -> orca.infrafleet.v1.ListDevServersResponse
-	9,  // 58: orca.infrafleet.v1.InfraFleetService.CreateConnection:output_type -> orca.infrafleet.v1.CreateConnectionResponse
-	11, // 59: orca.infrafleet.v1.InfraFleetService.Relay:output_type -> orca.infrafleet.v1.RelayResponse
-	23, // 60: orca.infrafleet.v1.InfraFleetService.ListSshTargets:output_type -> orca.infrafleet.v1.ListSshTargetsResponse
-	25, // 61: orca.infrafleet.v1.InfraFleetService.GetSshState:output_type -> orca.infrafleet.v1.GetSshStateResponse
-	27, // 62: orca.infrafleet.v1.InfraFleetService.EstablishConnection:output_type -> orca.infrafleet.v1.Connection
-	20, // 63: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:output_type -> orca.infrafleet.v1.KillWorkspacePortResponse
-	29, // 64: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:output_type -> orca.infrafleet.v1.SpawnTerminalSessionResponse
-	71, // 65: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:output_type -> google.protobuf.Empty
-	71, // 66: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:output_type -> google.protobuf.Empty
-	71, // 67: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:output_type -> google.protobuf.Empty
-	35, // 68: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:output_type -> orca.infrafleet.v1.ListTerminalSessionsResponse
-	37, // 69: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:output_type -> orca.infrafleet.v1.WaitTerminalSessionResponse
-	71, // 70: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:output_type -> google.protobuf.Empty
-	40, // 71: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:output_type -> orca.infrafleet.v1.GetTerminalAgentStatusResponse
-	42, // 72: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:output_type -> orca.infrafleet.v1.InspectTerminalProcessResponse
-	47, // 73: orca.infrafleet.v1.InfraFleetService.AttachPty:output_type -> orca.infrafleet.v1.PtyServerFrame
-	52, // 74: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:output_type -> orca.infrafleet.v1.ListBrowserProfilesResponse
-	54, // 75: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:output_type -> orca.infrafleet.v1.CreateBrowserProfileResponse
-	71, // 76: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:output_type -> google.protobuf.Empty
-	58, // 77: orca.infrafleet.v1.InfraFleetService.ListEmulatorDevices:output_type -> orca.infrafleet.v1.ListEmulatorDevicesResponse
-	60, // 78: orca.infrafleet.v1.InfraFleetService.GetEmulatorAvailability:output_type -> orca.infrafleet.v1.GetEmulatorAvailabilityResponse
-	61, // 79: orca.infrafleet.v1.InfraFleetService.AttachEmulatorSession:output_type -> orca.infrafleet.v1.EmulatorSession
-	71, // 80: orca.infrafleet.v1.InfraFleetService.SendEmulatorTap:output_type -> google.protobuf.Empty
-	71, // 81: orca.infrafleet.v1.InfraFleetService.SendEmulatorGesture:output_type -> google.protobuf.Empty
-	71, // 82: orca.infrafleet.v1.InfraFleetService.SendEmulatorButton:output_type -> google.protobuf.Empty
-	71, // 83: orca.infrafleet.v1.InfraFleetService.RotateEmulator:output_type -> google.protobuf.Empty
-	71, // 84: orca.infrafleet.v1.InfraFleetService.ShutdownEmulator:output_type -> google.protobuf.Empty
-	69, // 85: orca.infrafleet.v1.InfraFleetService.GetHostCapabilities:output_type -> orca.infrafleet.v1.GetHostCapabilitiesResponse
-	52, // [52:86] is the sub-list for method output_type
-	18, // [18:52] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	2,  // 2: orca.infrafleet.v1.RegisterDevServerResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
+	2,  // 3: orca.infrafleet.v1.ResolveConnectionResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
+	2,  // 4: orca.infrafleet.v1.ListDevServersResponse.dev_servers:type_name -> orca.infrafleet.v1.DevServer
+	16, // 5: orca.infrafleet.v1.GetFleetHealthResponse.statuses:type_name -> orca.infrafleet.v1.DevServerHealth
+	22, // 6: orca.infrafleet.v1.ListSshTargetsResponse.ssh_targets:type_name -> orca.infrafleet.v1.SshTarget
+	31, // 7: orca.infrafleet.v1.SpawnTerminalSessionResponse.session:type_name -> orca.infrafleet.v1.TerminalSession
+	31, // 8: orca.infrafleet.v1.ListTerminalSessionsResponse.sessions:type_name -> orca.infrafleet.v1.TerminalSession
+	45, // 9: orca.infrafleet.v1.PtyClientFrame.attach:type_name -> orca.infrafleet.v1.AttachToSession
+	46, // 10: orca.infrafleet.v1.PtyClientFrame.input:type_name -> orca.infrafleet.v1.PtyInput
+	47, // 11: orca.infrafleet.v1.PtyClientFrame.resize:type_name -> orca.infrafleet.v1.PtyResize
+	49, // 12: orca.infrafleet.v1.PtyServerFrame.out:type_name -> orca.infrafleet.v1.PtyOutput
+	50, // 13: orca.infrafleet.v1.PtyServerFrame.exited:type_name -> orca.infrafleet.v1.PtyExited
+	75, // 14: orca.infrafleet.v1.BrowserProfile.created_at:type_name -> google.protobuf.Timestamp
+	51, // 15: orca.infrafleet.v1.ListBrowserProfilesResponse.profiles:type_name -> orca.infrafleet.v1.BrowserProfile
+	51, // 16: orca.infrafleet.v1.CreateBrowserProfileResponse.profile:type_name -> orca.infrafleet.v1.BrowserProfile
+	57, // 17: orca.infrafleet.v1.ListEmulatorDevicesResponse.devices:type_name -> orca.infrafleet.v1.EmulatorDevice
+	1,  // 18: orca.infrafleet.v1.DispatchPromptResponse.outcome:type_name -> orca.infrafleet.v1.DispatchPromptResponse.Outcome
+	3,  // 19: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:input_type -> orca.infrafleet.v1.RegisterDevServerRequest
+	5,  // 20: orca.infrafleet.v1.InfraFleetService.ResolveConnection:input_type -> orca.infrafleet.v1.ResolveConnectionRequest
+	13, // 21: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:input_type -> orca.infrafleet.v1.CreateSshTargetRequest
+	15, // 22: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:input_type -> orca.infrafleet.v1.GetFleetHealthRequest
+	18, // 23: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:input_type -> orca.infrafleet.v1.ScanWorkspacePortsRequest
+	7,  // 24: orca.infrafleet.v1.InfraFleetService.ListDevServers:input_type -> orca.infrafleet.v1.ListDevServersRequest
+	9,  // 25: orca.infrafleet.v1.InfraFleetService.CreateConnection:input_type -> orca.infrafleet.v1.CreateConnectionRequest
+	11, // 26: orca.infrafleet.v1.InfraFleetService.Relay:input_type -> orca.infrafleet.v1.RelayRequest
+	23, // 27: orca.infrafleet.v1.InfraFleetService.ListSshTargets:input_type -> orca.infrafleet.v1.ListSshTargetsRequest
+	25, // 28: orca.infrafleet.v1.InfraFleetService.GetSshState:input_type -> orca.infrafleet.v1.GetSshStateRequest
+	27, // 29: orca.infrafleet.v1.InfraFleetService.EstablishConnection:input_type -> orca.infrafleet.v1.EstablishConnectionRequest
+	20, // 30: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:input_type -> orca.infrafleet.v1.KillWorkspacePortRequest
+	29, // 31: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:input_type -> orca.infrafleet.v1.SpawnTerminalSessionRequest
+	32, // 32: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:input_type -> orca.infrafleet.v1.ResizeTerminalSessionRequest
+	33, // 33: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:input_type -> orca.infrafleet.v1.KillTerminalSessionRequest
+	34, // 34: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:input_type -> orca.infrafleet.v1.StopTerminalProcessRequest
+	35, // 35: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:input_type -> orca.infrafleet.v1.ListTerminalSessionsRequest
+	37, // 36: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:input_type -> orca.infrafleet.v1.WaitTerminalSessionRequest
+	39, // 37: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:input_type -> orca.infrafleet.v1.FocusTerminalSessionRequest
+	40, // 38: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:input_type -> orca.infrafleet.v1.GetTerminalAgentStatusRequest
+	42, // 39: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:input_type -> orca.infrafleet.v1.InspectTerminalProcessRequest
+	71, // 40: orca.infrafleet.v1.InfraFleetService.DispatchPrompt:input_type -> orca.infrafleet.v1.DispatchPromptRequest
+	73, // 41: orca.infrafleet.v1.InfraFleetService.GetQueuedPrompt:input_type -> orca.infrafleet.v1.GetQueuedPromptRequest
+	44, // 42: orca.infrafleet.v1.InfraFleetService.AttachPty:input_type -> orca.infrafleet.v1.PtyClientFrame
+	52, // 43: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:input_type -> orca.infrafleet.v1.ListBrowserProfilesRequest
+	54, // 44: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:input_type -> orca.infrafleet.v1.CreateBrowserProfileRequest
+	56, // 45: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:input_type -> orca.infrafleet.v1.DeleteBrowserProfileRequest
+	58, // 46: orca.infrafleet.v1.InfraFleetService.ListEmulatorDevices:input_type -> orca.infrafleet.v1.ListEmulatorDevicesRequest
+	60, // 47: orca.infrafleet.v1.InfraFleetService.GetEmulatorAvailability:input_type -> orca.infrafleet.v1.GetEmulatorAvailabilityRequest
+	63, // 48: orca.infrafleet.v1.InfraFleetService.AttachEmulatorSession:input_type -> orca.infrafleet.v1.AttachEmulatorSessionRequest
+	64, // 49: orca.infrafleet.v1.InfraFleetService.SendEmulatorTap:input_type -> orca.infrafleet.v1.SendEmulatorTapRequest
+	65, // 50: orca.infrafleet.v1.InfraFleetService.SendEmulatorGesture:input_type -> orca.infrafleet.v1.SendEmulatorGestureRequest
+	66, // 51: orca.infrafleet.v1.InfraFleetService.SendEmulatorButton:input_type -> orca.infrafleet.v1.SendEmulatorButtonRequest
+	67, // 52: orca.infrafleet.v1.InfraFleetService.RotateEmulator:input_type -> orca.infrafleet.v1.RotateEmulatorRequest
+	68, // 53: orca.infrafleet.v1.InfraFleetService.ShutdownEmulator:input_type -> orca.infrafleet.v1.ShutdownEmulatorRequest
+	69, // 54: orca.infrafleet.v1.InfraFleetService.GetHostCapabilities:input_type -> orca.infrafleet.v1.GetHostCapabilitiesRequest
+	4,  // 55: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:output_type -> orca.infrafleet.v1.RegisterDevServerResponse
+	6,  // 56: orca.infrafleet.v1.InfraFleetService.ResolveConnection:output_type -> orca.infrafleet.v1.ResolveConnectionResponse
+	14, // 57: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:output_type -> orca.infrafleet.v1.CreateSshTargetResponse
+	17, // 58: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:output_type -> orca.infrafleet.v1.GetFleetHealthResponse
+	19, // 59: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:output_type -> orca.infrafleet.v1.ScanWorkspacePortsResponse
+	8,  // 60: orca.infrafleet.v1.InfraFleetService.ListDevServers:output_type -> orca.infrafleet.v1.ListDevServersResponse
+	10, // 61: orca.infrafleet.v1.InfraFleetService.CreateConnection:output_type -> orca.infrafleet.v1.CreateConnectionResponse
+	12, // 62: orca.infrafleet.v1.InfraFleetService.Relay:output_type -> orca.infrafleet.v1.RelayResponse
+	24, // 63: orca.infrafleet.v1.InfraFleetService.ListSshTargets:output_type -> orca.infrafleet.v1.ListSshTargetsResponse
+	26, // 64: orca.infrafleet.v1.InfraFleetService.GetSshState:output_type -> orca.infrafleet.v1.GetSshStateResponse
+	28, // 65: orca.infrafleet.v1.InfraFleetService.EstablishConnection:output_type -> orca.infrafleet.v1.Connection
+	21, // 66: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:output_type -> orca.infrafleet.v1.KillWorkspacePortResponse
+	30, // 67: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:output_type -> orca.infrafleet.v1.SpawnTerminalSessionResponse
+	76, // 68: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:output_type -> google.protobuf.Empty
+	76, // 69: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:output_type -> google.protobuf.Empty
+	76, // 70: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:output_type -> google.protobuf.Empty
+	36, // 71: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:output_type -> orca.infrafleet.v1.ListTerminalSessionsResponse
+	38, // 72: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:output_type -> orca.infrafleet.v1.WaitTerminalSessionResponse
+	76, // 73: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:output_type -> google.protobuf.Empty
+	41, // 74: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:output_type -> orca.infrafleet.v1.GetTerminalAgentStatusResponse
+	43, // 75: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:output_type -> orca.infrafleet.v1.InspectTerminalProcessResponse
+	72, // 76: orca.infrafleet.v1.InfraFleetService.DispatchPrompt:output_type -> orca.infrafleet.v1.DispatchPromptResponse
+	74, // 77: orca.infrafleet.v1.InfraFleetService.GetQueuedPrompt:output_type -> orca.infrafleet.v1.GetQueuedPromptResponse
+	48, // 78: orca.infrafleet.v1.InfraFleetService.AttachPty:output_type -> orca.infrafleet.v1.PtyServerFrame
+	53, // 79: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:output_type -> orca.infrafleet.v1.ListBrowserProfilesResponse
+	55, // 80: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:output_type -> orca.infrafleet.v1.CreateBrowserProfileResponse
+	76, // 81: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:output_type -> google.protobuf.Empty
+	59, // 82: orca.infrafleet.v1.InfraFleetService.ListEmulatorDevices:output_type -> orca.infrafleet.v1.ListEmulatorDevicesResponse
+	61, // 83: orca.infrafleet.v1.InfraFleetService.GetEmulatorAvailability:output_type -> orca.infrafleet.v1.GetEmulatorAvailabilityResponse
+	62, // 84: orca.infrafleet.v1.InfraFleetService.AttachEmulatorSession:output_type -> orca.infrafleet.v1.EmulatorSession
+	76, // 85: orca.infrafleet.v1.InfraFleetService.SendEmulatorTap:output_type -> google.protobuf.Empty
+	76, // 86: orca.infrafleet.v1.InfraFleetService.SendEmulatorGesture:output_type -> google.protobuf.Empty
+	76, // 87: orca.infrafleet.v1.InfraFleetService.SendEmulatorButton:output_type -> google.protobuf.Empty
+	76, // 88: orca.infrafleet.v1.InfraFleetService.RotateEmulator:output_type -> google.protobuf.Empty
+	76, // 89: orca.infrafleet.v1.InfraFleetService.ShutdownEmulator:output_type -> google.protobuf.Empty
+	70, // 90: orca.infrafleet.v1.InfraFleetService.GetHostCapabilities:output_type -> orca.infrafleet.v1.GetHostCapabilitiesResponse
+	55, // [55:91] is the sub-list for method output_type
+	19, // [19:55] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_orca_infrafleet_v1_infrafleet_proto_init() }
@@ -4468,8 +4776,8 @@ func file_orca_infrafleet_v1_infrafleet_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_infrafleet_v1_infrafleet_proto_rawDesc), len(file_orca_infrafleet_v1_infrafleet_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   69,
+			NumEnums:      2,
+			NumMessages:   73,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

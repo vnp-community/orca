@@ -59,6 +59,10 @@ type Server struct {
 	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
 	emulatorRelay       *usecase.EmulatorRelay
 	getHostCapabilities *usecase.GetHostCapabilities
+
+	// --- Mobile prompt dispatch (SOL-MB-03) ---
+	dispatchPrompt  *usecase.DispatchPrompt
+	getQueuedPrompt *usecase.GetQueuedPrompt
 }
 
 func New(
@@ -89,6 +93,8 @@ func New(
 	deleteBrowserProfile *usecase.DeleteBrowserProfile,
 	emulatorRelay *usecase.EmulatorRelay,
 	getHostCapabilities *usecase.GetHostCapabilities,
+	dispatchPrompt *usecase.DispatchPrompt,
+	getQueuedPrompt *usecase.GetQueuedPrompt,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -118,6 +124,8 @@ func New(
 		deleteBrowserProfile:   deleteBrowserProfile,
 		emulatorRelay:          emulatorRelay,
 		getHostCapabilities:    getHostCapabilities,
+		dispatchPrompt:         dispatchPrompt,
+		getQueuedPrompt:        getQueuedPrompt,
 	}
 }
 
@@ -456,6 +464,31 @@ func (s *Server) InspectTerminalProcess(ctx context.Context, req *infrafleetv1.I
 		Command: result.Command,
 		Cwd:     result.Cwd,
 	}, nil
+}
+
+// --- Mobile prompt dispatch (SOL-MB-03) ------------------------------------
+
+// DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to —
+// see usecase.DispatchPrompt's doc comment.
+func (s *Server) DispatchPrompt(ctx context.Context, req *infrafleetv1.DispatchPromptRequest) (*infrafleetv1.DispatchPromptResponse, error) {
+	result, err := s.dispatchPrompt.Execute(ctx, usecase.DispatchPromptInput{
+		PtyID: req.GetPtyId(), Prompt: req.GetPrompt(), Overwrite: req.GetOverwrite(), DeviceID: req.GetDispatchedByDeviceId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.DispatchPromptResponse{
+		Outcome:                     infrafleetv1.DispatchPromptResponse_Outcome(infrafleetv1.DispatchPromptResponse_Outcome_value[result.Outcome]),
+		ExistingQueuedPromptPreview: result.ExistingPreview,
+	}, nil
+}
+
+func (s *Server) GetQueuedPrompt(ctx context.Context, req *infrafleetv1.GetQueuedPromptRequest) (*infrafleetv1.GetQueuedPromptResponse, error) {
+	has, prompt, queuedAt, err := s.getQueuedPrompt.Execute(ctx, req.GetPtyId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.GetQueuedPromptResponse{HasQueuedPrompt: has, Prompt: prompt, QueuedAtUnixMs: queuedAt}, nil
 }
 
 // AttachPty implements the bidirectional streaming RPC: pumps

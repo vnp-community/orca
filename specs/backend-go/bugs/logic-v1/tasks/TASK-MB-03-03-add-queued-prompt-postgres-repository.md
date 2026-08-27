@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/migrations/0007_queued_prompts.up.sql`, `backend-go/services/infra-fleet-service/internal/adapter/postgres/queued_prompt_repository.go`
 **Depends on:** TASK-MB-03-02
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — migration `0008_queued_prompts` (renumbered from the spec's 0007 since 0007 was already taken by `terminal_session_created_by`; `pty_id` typed TEXT to match `terminal_sessions.pty_id`'s real type, not UUID) + `QueuedPromptStore` (Get/Upsert/Delete/GetAndDelete) + `QueuedPromptRepository` port added; `go build`/`go vet` pass.
 
 ---
 

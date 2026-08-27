@@ -264,6 +264,23 @@ type TerminalSessionRepository interface {
 	Close(ctx context.Context, tenantID, ptyID string, closedAt time.Time) error
 }
 
+// QueuedPromptRepository is the persistence port for infra.queued_prompts
+// (migrations/0008_queued_prompts) — durable storage for a mobile-dispatched
+// prompt held until the agent becomes ready (BR-MB-10), outliving the
+// per-pod in-memory liveStates registry AttachPty/GetTerminalAgentStatus
+// share. One row per PtyID; Get/GetAndDelete's found=false with a nil error
+// means "no prompt currently queued", matching this codebase's other
+// found-bool repository conventions (see TerminalSessionRepository.Get).
+type QueuedPromptRepository interface {
+	Get(ctx context.Context, ptyID string) (domain.QueuedPrompt, bool, error)
+	Upsert(ctx context.Context, p domain.QueuedPrompt) error
+	Delete(ctx context.Context, ptyID string) error
+	// GetAndDelete atomically reads and removes the row — see
+	// postgres.QueuedPromptStore.GetAndDelete's doc comment for the
+	// double-delivery race it guards against.
+	GetAndDelete(ctx context.Context, ptyID string) (domain.QueuedPrompt, bool, error)
+}
+
 // LifecycleEventPublisher publishes terminal-session agent-lifecycle
 // events for notification-service to translate into mobile pushes
 // (BL-MB-02). Best-effort — a publish failure must never fail the PTY
