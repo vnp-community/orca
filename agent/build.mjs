@@ -46,7 +46,10 @@ const buildOptions = {
   external: ['node-pty', 'better-sqlite3', 'keytar', '@parcel/watcher', 'electron'],
   sourcemap: false,
   minify: false,
-  define: { 'process.env.NODE_ENV': '"production"' },
+  define: {
+    'process.env.NODE_ENV': '"production"',
+    __AGENT_VERSION__: JSON.stringify(AGENT_VERSION)
+  },
   logLevel: 'info'
 }
 

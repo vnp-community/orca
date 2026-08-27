@@ -171,10 +171,14 @@ func NewSshTargetStore(pool *pgxpool.Pool) *SshTargetStore {
 
 // Create inserts a new SSH target and returns the persisted row.
 func (s *SshTargetStore) Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error) {
+	var jumpHostID *string
+	if target.JumpHostTargetID != "" {
+		jumpHostID = &target.JumpHostTargetID
+	}
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO infra.ssh_targets (id, tenant_id, host, user_name, vault_ssh_role)
-		VALUES ($1, $2, $3, $4, $5)
-	`, target.ID, target.TenantID, target.Host, target.UserName, target.VaultSSHRole)
+		INSERT INTO infra.ssh_targets (id, tenant_id, host, port, user_name, vault_ssh_role, known_hosts_fingerprint, jump_host_target_id, project, tags)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, target.ID, target.TenantID, target.Host, target.Port, target.UserName, target.VaultSSHRole, target.KnownHostsFingerprint, jumpHostID, target.Project, target.Tags)
 	if err != nil {
 		return domain.SshTarget{}, fmt.Errorf("postgres: insert ssh target: %w", err)
 	}
@@ -184,7 +188,7 @@ func (s *SshTargetStore) Create(ctx context.Context, target domain.SshTarget) (d
 // List returns every SSH target registered for tenantID.
 func (s *SshTargetStore) List(ctx context.Context, tenantID string) ([]domain.SshTarget, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, tenant_id, host, user_name, vault_ssh_role
+		SELECT id, tenant_id, host, port, user_name, vault_ssh_role, known_hosts_fingerprint, jump_host_target_id, project, tags
 		FROM infra.ssh_targets
 		WHERE tenant_id = $1
 		ORDER BY host
@@ -197,8 +201,12 @@ func (s *SshTargetStore) List(ctx context.Context, tenantID string) ([]domain.Ss
 	var out []domain.SshTarget
 	for rows.Next() {
 		var t domain.SshTarget
-		if err := rows.Scan(&t.ID, &t.TenantID, &t.Host, &t.UserName, &t.VaultSSHRole); err != nil {
+		var jumpHostID *string
+		if err := rows.Scan(&t.ID, &t.TenantID, &t.Host, &t.Port, &t.UserName, &t.VaultSSHRole, &t.KnownHostsFingerprint, &jumpHostID, &t.Project, &t.Tags); err != nil {
 			return nil, fmt.Errorf("postgres: scan ssh target row: %w", err)
+		}
+		if jumpHostID != nil {
+			t.JumpHostTargetID = *jumpHostID
 		}
 		out = append(out, t)
 	}
@@ -214,38 +222,52 @@ func (s *SshTargetStore) List(ctx context.Context, tenantID string) ([]domain.Ss
 // before dialing via sshconn.Connector for relay-ssh mode).
 func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.SshTarget, error) {
 	row := s.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, host, user_name, vault_ssh_role
+		SELECT id, tenant_id, host, port, user_name, vault_ssh_role, known_hosts_fingerprint, jump_host_target_id, project, tags
 		FROM infra.ssh_targets
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
 	var target domain.SshTarget
-	err := row.Scan(&target.ID, &target.TenantID, &target.Host, &target.UserName, &target.VaultSSHRole)
+	var jumpHostID *string
+	err := row.Scan(&target.ID, &target.TenantID, &target.Host, &target.Port, &target.UserName, &target.VaultSSHRole, &target.KnownHostsFingerprint, &jumpHostID, &target.Project, &target.Tags)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.SshTarget{}, fmt.Errorf("postgres: ssh target %q not found for tenant: %w", id, err)
 	}
 	if err != nil {
 		return domain.SshTarget{}, fmt.Errorf("postgres: query ssh target: %w", err)
 	}
+	if jumpHostID != nil {
+		target.JumpHostTargetID = *jumpHostID
+	}
 	return target, nil
 }
 
 // Upsert inserts or updates by (tenant_id, host, user_name) — the conflict
-// target migrations/0007's unique index establishes. The `xmax != 0` trick
-// is the standard Postgres idiom for "insert vs. update" in one round trip,
-// avoiding a separate SELECT ... FOR UPDATE per row on a bulk-import fan-in.
+// target migrations/0007_ssh_target_project_tags's unique index establishes.
+// The `xmax != 0` trick is the standard Postgres idiom for "insert vs.
+// update" in one round trip, avoiding a separate SELECT ... FOR UPDATE per
+// row on a bulk-import fan-in. Port/known-hosts/jump-host (SOL-SSH-01) are
+// included so a re-import doesn't silently reset them to their column
+// defaults on every upsert of an existing row.
 func (s *SshTargetStore) Upsert(ctx context.Context, target domain.SshTarget) (domain.SshTarget, bool, error) {
+	var jumpHostID *string
+	if target.JumpHostTargetID != "" {
+		jumpHostID = &target.JumpHostTargetID
+	}
 	const query = `
-		INSERT INTO infra.ssh_targets (id, tenant_id, host, user_name, vault_ssh_role, project, tags)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO infra.ssh_targets (id, tenant_id, host, port, user_name, vault_ssh_role, known_hosts_fingerprint, jump_host_target_id, project, tags)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (tenant_id, host, user_name) DO UPDATE SET
 		  vault_ssh_role = EXCLUDED.vault_ssh_role,
+		  port = EXCLUDED.port,
+		  known_hosts_fingerprint = EXCLUDED.known_hosts_fingerprint,
+		  jump_host_target_id = EXCLUDED.jump_host_target_id,
 		  project = EXCLUDED.project,
 		  tags = EXCLUDED.tags
 		RETURNING id, (xmax != 0) AS updated`
 	var id string
 	var updated bool
-	if err := s.pool.QueryRow(ctx, query, target.ID, target.TenantID, target.Host, target.UserName, target.VaultSSHRole, target.Project, target.Tags).Scan(&id, &updated); err != nil {
+	if err := s.pool.QueryRow(ctx, query, target.ID, target.TenantID, target.Host, target.Port, target.UserName, target.VaultSSHRole, target.KnownHostsFingerprint, jumpHostID, target.Project, target.Tags).Scan(&id, &updated); err != nil {
 		return domain.SshTarget{}, false, fmt.Errorf("postgres: upsert ssh target: %w", err)
 	}
 	target.ID = id
@@ -255,15 +277,19 @@ func (s *SshTargetStore) Upsert(ctx context.Context, target domain.SshTarget) (d
 // GetByHostUser is a narrow existence-probe used only by the dry-run import
 // path (usecase.ImportFleetInventory) — it does not commit anything.
 func (s *SshTargetStore) GetByHostUser(ctx context.Context, tenantID, host, userName string) (domain.SshTarget, bool, error) {
-	const query = `SELECT id, tenant_id, host, user_name, vault_ssh_role, project, tags
+	const query = `SELECT id, tenant_id, host, port, user_name, vault_ssh_role, known_hosts_fingerprint, jump_host_target_id, project, tags
 		FROM infra.ssh_targets WHERE tenant_id = $1 AND host = $2 AND user_name = $3`
 	var t domain.SshTarget
-	err := s.pool.QueryRow(ctx, query, tenantID, host, userName).Scan(&t.ID, &t.TenantID, &t.Host, &t.UserName, &t.VaultSSHRole, &t.Project, &t.Tags)
+	var jumpHostID *string
+	err := s.pool.QueryRow(ctx, query, tenantID, host, userName).Scan(&t.ID, &t.TenantID, &t.Host, &t.Port, &t.UserName, &t.VaultSSHRole, &t.KnownHostsFingerprint, &jumpHostID, &t.Project, &t.Tags)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.SshTarget{}, false, nil
 	}
 	if err != nil {
 		return domain.SshTarget{}, false, fmt.Errorf("postgres: query ssh target by host/user: %w", err)
+	}
+	if jumpHostID != nil {
+		t.JumpHostTargetID = *jumpHostID
 	}
 	return t, true, nil
 }
@@ -417,6 +443,49 @@ func (r *Repository) GetActiveByDevServer(ctx context.Context, tenantID, devServ
 	return conn, true, nil
 }
 
+// UpdateStatus sets connectionID's status column — TeardownConnection's
+// "mark closed" step (BR-SSH-13).
+func (r *Repository) UpdateStatus(ctx context.Context, tenantID, connectionID, status string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE infra.connections
+		SET status = $1
+		WHERE tenant_id = $2 AND id = $3
+	`, status, tenantID, connectionID)
+	if err != nil {
+		return fmt.Errorf("postgres: update connection status: %w", err)
+	}
+	return nil
+}
+
+// GetDevServerByConnection resolves connectionID's owning DevServer —
+// mirrors ResolveConnection's join shape but returns only the DevServer
+// half, since TeardownConnection only needs devServer.ID for
+// CancelReconnect.
+func (r *Repository) GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (domain.DevServer, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT ds.id, ds.tenant_id, ds.host, ds.connection_mode, ds.ssh_target_id
+		FROM infra.connections c
+		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
+		WHERE c.tenant_id = $1 AND c.id = $2
+	`, tenantID, connectionID)
+
+	var devServer domain.DevServer
+	var mode string
+	var sshTargetID *string
+	err := row.Scan(&devServer.ID, &devServer.TenantID, &devServer.Host, &mode, &sshTargetID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DevServer{}, false, nil
+	}
+	if err != nil {
+		return domain.DevServer{}, false, fmt.Errorf("postgres: get dev server by connection: %w", err)
+	}
+	devServer.Mode = domain.ConnectionMode(mode)
+	if sshTargetID != nil {
+		devServer.SSHTargetID = *sshTargetID
+	}
+	return devServer, true, nil
+}
+
 // FindBySshTarget returns the DevServer bound to sshTargetID, if any.
 func (r *Repository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (domain.DevServer, bool, error) {
 	row := r.pool.QueryRow(ctx, `
@@ -503,6 +572,46 @@ func (r *Repository) UpsertFleetHealth(ctx context.Context, sample domain.DevSer
 	return nil
 }
 
+// PortForwardStore is domain.PortForward's storage — same
+// own-Go-value-not-the-same-as-Repository shape as SshTargetStore, sharing
+// the same connection pool.
+type PortForwardStore struct {
+	pool *pgxpool.Pool
+}
+
+// NewPortForwardStore builds a PortForwardStore over the same pool
+// Repository/SshTargetStore use.
+func NewPortForwardStore(pool *pgxpool.Pool) *PortForwardStore {
+	return &PortForwardStore{pool: pool}
+}
+
+// Create inserts a new port forward and returns the persisted row.
+func (s *PortForwardStore) Create(ctx context.Context, pf domain.PortForward) (domain.PortForward, error) {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO infra.port_forwards (id, tenant_id, connection_id, local_port, remote_port, process_name, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, pf.ID, pf.TenantID, pf.ConnectionID, pf.LocalPort, pf.RemotePort, pf.ProcessName, string(pf.Status))
+	if err != nil {
+		return domain.PortForward{}, fmt.Errorf("postgres: insert port forward: %w", err)
+	}
+	return pf, nil
+}
+
+// UpdateStatus sets id's status column — PollWorkspacePorts' teardown step
+// (BR-SSH-18) writes "closed" here rather than deleting the row, keeping a
+// history of forwards for the connection's lifetime.
+func (s *PortForwardStore) UpdateStatus(ctx context.Context, tenantID, id string, status domain.PortForwardStatus) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE infra.port_forwards
+		SET status = $1
+		WHERE tenant_id = $2 AND id = $3
+	`, string(status), tenantID, id)
+	if err != nil {
+		return fmt.Errorf("postgres: update port forward status: %w", err)
+	}
+	return nil
+}
+
 // GetPrevious implements usecase.FleetHealthWriter.GetPrevious — the
 // last-persisted sample for devServerID, which PollFleetHealth diffs
 // against to detect a status_change.
@@ -553,4 +662,34 @@ func (r *Repository) TryLock(ctx context.Context, devServerID string) (bool, fun
 		conn.Release()
 	}
 	return true, unlock, nil
+}
+
+// ListActiveByConnection returns every non-closed port forward for
+// connectionID.
+func (s *PortForwardStore) ListActiveByConnection(ctx context.Context, tenantID, connectionID string) ([]domain.PortForward, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, tenant_id, connection_id, local_port, remote_port, process_name, status
+		FROM infra.port_forwards
+		WHERE tenant_id = $1 AND connection_id = $2 AND status <> 'closed'
+		ORDER BY created_at DESC
+	`, tenantID, connectionID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query port forwards: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.PortForward
+	for rows.Next() {
+		var pf domain.PortForward
+		var status string
+		if err := rows.Scan(&pf.ID, &pf.TenantID, &pf.ConnectionID, &pf.LocalPort, &pf.RemotePort, &pf.ProcessName, &status); err != nil {
+			return nil, fmt.Errorf("postgres: scan port forward row: %w", err)
+		}
+		pf.Status = domain.PortForwardStatus(status)
+		out = append(out, pf)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate port forward rows: %w", err)
+	}
+	return out, nil
 }

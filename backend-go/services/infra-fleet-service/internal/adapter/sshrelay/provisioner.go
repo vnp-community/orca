@@ -24,6 +24,7 @@ package sshrelay
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -114,6 +115,10 @@ func (p *Provisioner) Provision(ctx context.Context, devServer domain.DevServer)
 	if err != nil {
 		return nil, devserveragent.HandshakeInfo{}, fmt.Errorf("sshrelay: dialing ssh target %q: %w", devServer.SSHTargetID, err)
 	}
+	// BR-SSH-03: a plain SSH transport keepalive so a silently-dropped TCP
+	// connection is detected promptly. Started against a Provisioner-lifetime
+	// context (not ctx) since conn outlives this Provision call.
+	conn.StartKeepAlive(context.Background(), 30*time.Second)
 
 	// Prerequisite checks run over the raw SSH connection, before the agent
 	// exists to relay a JSON-RPC call to — matches BL-FLEET-02's step
@@ -127,13 +132,22 @@ func (p *Provisioner) Provision(ctx context.Context, devServer domain.DevServer)
 		p.prereqMu.Unlock()
 	}
 
-	remoteDir, err := deploy(ctx, conn, p.cfg)
-	if err != nil {
+	// BR-SSH-07: skip the SFTP upload entirely when the already-deployed
+	// bundle's AGENT_VERSION matches this backend's OrcaVersion. A
+	// version-probe failure (verr != nil) or version mismatch falls through
+	// to deployWithRetry as before — deploying is always the safe default,
+	// skipping it is the optimization.
+	remoteAgentDir := remoteDir
+	if version, present, verr := remoteVersionAndPresence(ctx, conn); verr == nil && present && version == p.cfg.OrcaVersion {
+		// already current — no deploy needed
+	} else if dir, derr := deployWithRetry(ctx, conn, p.cfg); derr != nil {
 		_ = conn.Close()
-		return nil, devserveragent.HandshakeInfo{}, err
+		return nil, devserveragent.HandshakeInfo{}, derr
+	} else {
+		remoteAgentDir = dir
 	}
 
-	transport, err := launch(conn, remoteDir, devServer.ID)
+	transport, sockPath, stderrBuf, err := launch(ctx, conn, remoteAgentDir, devServer.ID)
 	if err != nil {
 		_ = conn.Close()
 		return nil, devserveragent.HandshakeInfo{}, err
@@ -142,10 +156,47 @@ func (p *Provisioner) Provision(ctx context.Context, devServer domain.DevServer)
 	info, err := p.receiveHandshake(ctx, transport)
 	if err != nil {
 		_ = transport.Close("handshake failed")
-		return nil, devserveragent.HandshakeInfo{}, err
+		diag := collectDiagnostics(ctx, conn, stderrBuf)
+		return nil, devserveragent.HandshakeInfo{}, fmt.Errorf("%w\n%s", err, diag)
 	}
+	// SockPath (SOL-SSH-03) is cached on the resulting *session so
+	// relaySSHReconnect can call Reattach again later without re-resolving
+	// the SshTarget or re-deploying — see devserveragent.HandshakeInfo's doc
+	// comment.
+	info.SockPath = sockPath
 
 	return transport, info, nil
+}
+
+// Reattach re-dials devServer's SshTarget and bridges onto the already-
+// running detached relay process at sockPath — the cheap path
+// relaySSHReconnect takes on every retry after the first. Returns
+// ErrDetachedProcessGone (wrapped) when the detached process itself is no
+// longer alive, the caller's cue to fall back to a full Provision instead.
+func (p *Provisioner) Reattach(ctx context.Context, devServer domain.DevServer, sockPath string) (devserveragent.Transport, error) {
+	target, err := p.resolver.Get(ctx, devServer.TenantID, devServer.SSHTargetID)
+	if err != nil {
+		return nil, fmt.Errorf("sshrelay: resolving ssh target %q: %w", devServer.SSHTargetID, err)
+	}
+	conn, err := p.connector.Connect(ctx, target)
+	if err != nil {
+		return nil, fmt.Errorf("sshrelay: dialing ssh target %q: %w", devServer.SSHTargetID, err)
+	}
+	conn.StartKeepAlive(context.Background(), 30*time.Second)
+	transport, _, _, err := reattach(ctx, conn, remoteDir, sockPath)
+	if err != nil {
+		_ = conn.Close()
+		if errors.Is(err, ErrDetachedProcessGone) {
+			// devserveragent must not import adapter/sshrelay (wrong
+			// dependency direction) — wrap in its own local sentinel so
+			// session.relaySSHReconnect can detect this cause via
+			// errors.Is(err, devserveragent.ErrRelayDetachedProcessGone)
+			// without depending on this package's error type.
+			return nil, fmt.Errorf("%w: %w", devserveragent.ErrRelayDetachedProcessGone, err)
+		}
+		return nil, err
+	}
+	return transport, nil
 }
 
 // receiveHandshake waits for the launched agent's agent.handshake request

@@ -65,6 +65,10 @@ type fakeDevServerAgentClient struct {
 	// answer — used by establish_connection_test.go.
 	lastHandshakeInfo HandshakeInfo
 	lastHandshakeOK   bool
+
+	// cancelReconnectCalls records every CancelReconnect(devServerID) call —
+	// used by teardown_connection_test.go.
+	cancelReconnectCalls []string
 }
 
 // LastHandshakeInfo implements usecase.DevServerAgentClient.LastHandshakeInfo.
@@ -163,6 +167,14 @@ func (f *fakeDevServerAgentClient) InspectProcess(ctx context.Context, devServer
 	return f.inspectResult, nil
 }
 
+// CancelReconnect implements usecase.DevServerAgentClient.CancelReconnect —
+// used by teardown_connection_test.go.
+func (f *fakeDevServerAgentClient) CancelReconnect(devServerID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.cancelReconnectCalls = append(f.cancelReconnectCalls, devServerID)
+}
+
 func TestScanWorkspacePorts_RequiresTenantContext(t *testing.T) {
 	uc := NewScanWorkspacePorts(&fakeConnectionResolver{}, &fakeDevServerAgentClient{})
 	_, err := uc.Execute(context.Background(), ScanWorkspacePortsInput{})
@@ -197,7 +209,13 @@ func TestScanWorkspacePorts_ConnectionIDBound_AlwaysRelays(t *testing.T) {
 		t.Fatalf("building dev server: %v", err)
 	}
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
-	agent := &fakeDevServerAgentClient{execResult: map[string]any{"openPorts": []any{float64(3000), float64(8080)}}}
+	agent := &fakeDevServerAgentClient{execResult: map[string]any{
+		"ports": []any{
+			map[string]any{"port": float64(3000), "host": "127.0.0.1", "pid": float64(1234), "processName": "node"},
+			map[string]any{"port": float64(8080), "host": "0.0.0.0", "pid": float64(5678), "processName": "python"},
+		},
+		"platform": "linux",
+	}}
 	uc := NewScanWorkspacePorts(resolver, agent)
 
 	ctx := withTenant(context.Background(), "tenant-1")
@@ -205,11 +223,15 @@ func TestScanWorkspacePorts_ConnectionIDBound_AlwaysRelays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(agent.execCalls) != 1 || agent.execCalls[0] != "ports.scan" {
-		t.Fatalf("expected exactly one ports.scan relay call, got %v", agent.execCalls)
+	if len(agent.execCalls) != 1 || agent.execCalls[0] != "ports.detect" {
+		t.Fatalf("expected exactly one ports.detect relay call, got %v", agent.execCalls)
 	}
-	if len(ports) != 2 || ports[0] != 3000 || ports[1] != 8080 {
-		t.Errorf("expected [3000 8080], got %v", ports)
+	want := []DetectedPort{
+		{Port: 3000, Host: "127.0.0.1", PID: 1234, ProcessName: "node"},
+		{Port: 8080, Host: "0.0.0.0", PID: 5678, ProcessName: "python"},
+	}
+	if len(ports) != len(want) || ports[0] != want[0] || ports[1] != want[1] {
+		t.Errorf("expected %+v, got %+v", want, ports)
 	}
 }
 

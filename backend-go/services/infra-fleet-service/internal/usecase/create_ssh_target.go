@@ -13,9 +13,12 @@ import (
 // CreateSshTargetInput mirrors the gRPC request 1:1 by design, see
 // register_dev_server.go's comment for the rationale.
 type CreateSshTargetInput struct {
-	Host         string
-	UserName     string
-	VaultSSHRole string
+	Host                  string
+	Port                  int
+	UserName              string
+	VaultSSHRole          string
+	KnownHostsFingerprint string
+	JumpHostTargetID      string
 }
 
 // CreateSshTarget registers a new SSH target — host/user plus a pointer
@@ -35,7 +38,7 @@ func (uc *CreateSshTarget) Execute(ctx context.Context, in CreateSshTargetInput)
 		return domain.SshTarget{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	target, err := domain.NewSshTarget(uuid.NewString(), tenantID, in.Host, in.UserName, in.VaultSSHRole, "", nil)
+	target, err := domain.NewSshTarget(uuid.NewString(), tenantID, in.Host, in.Port, in.UserName, in.VaultSSHRole, in.KnownHostsFingerprint, in.JumpHostTargetID, "", nil)
 	if err != nil {
 		return domain.SshTarget{}, apperrors.New(apperrors.KindInvalidArgument, "INFRA_INVALID_SSH_TARGET", err.Error(), err)
 	}

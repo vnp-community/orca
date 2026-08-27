@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — added port/known_hosts_fingerprint/jump_host_target_id to CreateSshTargetRequest+SshTarget, buf generate + buf breaking (vs base commit with backend-go) clean`
 
 ---
 

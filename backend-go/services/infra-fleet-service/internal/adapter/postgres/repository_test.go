@@ -40,6 +40,8 @@ const (
 
 	testSshTarget1 = "55555555-5555-5555-5555-555555555555"
 	testSshTarget2 = "66666666-6666-6666-6666-666666666666"
+	testSshTarget3 = "88888888-8888-8888-8888-888888888888" // bastion
+	testSshTarget4 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" // target behind testSshTarget3
 )
 
 func setupRepository(t *testing.T) *Repository {
@@ -144,7 +146,7 @@ func TestSshTargetStore_Get_FoundAndNotFound(t *testing.T) {
 	_, store := setupSshTargetStore(t)
 	ctx := context.Background()
 
-	target, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", "deploy", "role-1", "", nil)
+	target, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", 0, "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("building ssh target: %v", err)
 	}
@@ -171,14 +173,15 @@ func TestSshTargetStore_Get_FoundAndNotFound(t *testing.T) {
 }
 
 // TestSshTargetStore_Upsert covers the (tenant_id, host, user_name) upsert
-// path migrations/0007's unique index enables — first call inserts
-// (updated=false), second call with a changed vault_ssh_role updates the
-// same row in place (updated=true), row count stays 1.
+// path migrations/0007_ssh_target_project_tags's unique index enables —
+// first call inserts (updated=false), second call with a changed
+// vault_ssh_role updates the same row in place (updated=true), row count
+// stays 1.
 func TestSshTargetStore_Upsert(t *testing.T) {
 	_, store := setupSshTargetStore(t)
 	ctx := context.Background()
 
-	first, err := domain.NewSshTarget(uuid.NewString(), testTenant1, "10.0.0.42", "deploy", "role-1", "team-a", []string{"prod"})
+	first, err := domain.NewSshTarget(uuid.NewString(), testTenant1, "10.0.0.42", 0, "deploy", "role-1", "", "", "team-a", []string{"prod"})
 	if err != nil {
 		t.Fatalf("building ssh target: %v", err)
 	}
@@ -190,7 +193,7 @@ func TestSshTargetStore_Upsert(t *testing.T) {
 		t.Error("expected updated=false on first insert")
 	}
 
-	second, err := domain.NewSshTarget(uuid.NewString(), testTenant1, "10.0.0.42", "deploy", "role-2", "team-b", []string{"prod", "canary"})
+	second, err := domain.NewSshTarget(uuid.NewString(), testTenant1, "10.0.0.42", 0, "deploy", "role-2", "", "", "team-b", []string{"prod", "canary"})
 	if err != nil {
 		t.Fatalf("building ssh target: %v", err)
 	}
@@ -228,6 +231,199 @@ func TestSshTargetStore_Upsert(t *testing.T) {
 	}
 }
 
+// TestSshTargetStore_PersistsPortKnownHostsAndJumpHost is the round-trip
+// regression for the port/known_hosts_fingerprint/jump_host_target_id
+// columns added in migrations/0007_ssh_targets_port_knownhosts_jumphost —
+// TASK-SSH-01-04.
+func TestSshTargetStore_PersistsPortKnownHostsAndJumpHost(t *testing.T) {
+	_, store := setupSshTargetStore(t)
+	ctx := context.Background()
+
+	bastion, err := domain.NewSshTarget(testSshTarget3, testTenant1, "10.0.0.10", 2200, "deploy", "role-1", "SHA256:bastionfingerprint", "", "", nil)
+	if err != nil {
+		t.Fatalf("building bastion ssh target: %v", err)
+	}
+	if _, err := store.Create(ctx, bastion); err != nil {
+		t.Fatalf("creating bastion ssh target: %v", err)
+	}
+
+	behindBastion, err := domain.NewSshTarget(testSshTarget4, testTenant1, "192.168.1.5", 2222, "deploy", "role-2", "SHA256:targetfingerprint", testSshTarget3, "", nil)
+	if err != nil {
+		t.Fatalf("building ssh target behind bastion: %v", err)
+	}
+	if _, err := store.Create(ctx, behindBastion); err != nil {
+		t.Fatalf("creating ssh target behind bastion: %v", err)
+	}
+
+	gotBastion, err := store.Get(ctx, testTenant1, testSshTarget3)
+	if err != nil {
+		t.Fatalf("get bastion: %v", err)
+	}
+	if gotBastion != bastion {
+		t.Errorf("expected bastion %+v, got %+v", bastion, gotBastion)
+	}
+	if gotBastion.JumpHostTargetID != "" {
+		t.Errorf("expected bastion to have no jump host, got %q", gotBastion.JumpHostTargetID)
+	}
+
+	gotBehind, err := store.Get(ctx, testTenant1, testSshTarget4)
+	if err != nil {
+		t.Fatalf("get target behind bastion: %v", err)
+	}
+	if gotBehind != behindBastion {
+		t.Errorf("expected %+v, got %+v", behindBastion, gotBehind)
+	}
+	if gotBehind.Port != 2222 {
+		t.Errorf("expected port 2222 to round-trip, got %d", gotBehind.Port)
+	}
+	if gotBehind.KnownHostsFingerprint != "SHA256:targetfingerprint" {
+		t.Errorf("expected known-hosts fingerprint to round-trip, got %q", gotBehind.KnownHostsFingerprint)
+	}
+	if gotBehind.JumpHostTargetID != testSshTarget3 {
+		t.Errorf("expected jump_host_target_id to round-trip, got %q", gotBehind.JumpHostTargetID)
+	}
+
+	list, err := store.List(ctx, testTenant1)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	foundBehind := false
+	for _, target := range list {
+		if target.ID == testSshTarget4 {
+			foundBehind = true
+			if target.JumpHostTargetID != testSshTarget3 {
+				t.Errorf("expected List to also carry jump_host_target_id, got %+v", target)
+			}
+		}
+	}
+	if !foundBehind {
+		t.Errorf("expected List to include %q, got %+v", testSshTarget4, list)
+	}
+}
+
+// TestRepository_UpdateStatusAndGetDevServerByConnection is
+// TASK-SSH-03-07's regression: TeardownConnection's two new repository
+// methods against a real connections/dev_servers join.
+func TestRepository_UpdateStatusAndGetDevServerByConnection(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.9", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds); err != nil {
+		t.Fatalf("registering dev server: %v", err)
+	}
+
+	conn, err := domain.NewConnection("cccccccc-cccc-cccc-cccc-cccccccccccc", testTenant1, testDevServer1, "", "")
+	if err != nil {
+		t.Fatalf("building connection: %v", err)
+	}
+	created, err := repo.CreateConnection(ctx, conn)
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+
+	gotDS, found, err := repo.GetDevServerByConnection(ctx, testTenant1, created.ID)
+	if err != nil {
+		t.Fatalf("GetDevServerByConnection: %v", err)
+	}
+	if !found || gotDS.ID != testDevServer1 {
+		t.Errorf("expected to resolve dev server %q, got found=%v ds=%+v", testDevServer1, found, gotDS)
+	}
+
+	if err := repo.UpdateStatus(ctx, testTenant1, created.ID, "closed"); err != nil {
+		t.Fatalf("UpdateStatus: %v", err)
+	}
+
+	// A closed connection no longer shows up as "active" (matches
+	// GetActiveByDevServer's status <> 'closed' filter).
+	if _, found, err := repo.GetActiveByDevServer(ctx, testTenant1, testDevServer1); err != nil || found {
+		t.Errorf("expected no active connection after closing, found=%v err=%v", found, err)
+	}
+
+	// GetDevServerByConnection should still resolve the (now-closed)
+	// connection — TeardownConnection's idempotent-close path relies on this.
+	if _, found, err := repo.GetDevServerByConnection(ctx, testTenant1, created.ID); err != nil || !found {
+		t.Errorf("expected GetDevServerByConnection to still resolve a closed connection, found=%v err=%v", found, err)
+	}
+
+	// An unknown connection id is a clean not-found, not an error.
+	if _, found, err := repo.GetDevServerByConnection(ctx, testTenant1, testUnknownID); err != nil || found {
+		t.Errorf("expected not-found for an unknown connection id, found=%v err=%v", found, err)
+	}
+}
+
+// TestPortForwardStore_CreateThenListActiveByConnection_RoundTripsProcessNameAndStatus
+// is TASK-SSH-04-03's regression: PortForwardStore.Create then
+// ListActiveByConnection must round-trip ProcessName/Status, and a
+// UpdateStatus(closed) row must drop out of ListActiveByConnection.
+func TestPortForwardStore_CreateThenListActiveByConnection_RoundTripsProcessNameAndStatus(t *testing.T) {
+	repo, sshTargetStore := setupSshTargetStore(t)
+	portForwardStore := NewPortForwardStore(repo.pool)
+	ctx := context.Background()
+
+	// infra.port_forwards.connection_id FKs to infra.connections, which FKs
+	// to infra.dev_servers — build the full chain, same as
+	// TestRepository_RegisterAndGet_PersistsSSHTargetID does.
+	sshTarget, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", 0, "deploy", "role-1", "", "", "", nil)
+	if err != nil {
+		t.Fatalf("building ssh target: %v", err)
+	}
+	if _, err := sshTargetStore.Create(ctx, sshTarget); err != nil {
+		t.Fatalf("creating ssh target: %v", err)
+	}
+	ds, err := domain.NewDevServer(testDevServerRS, testTenant1, "10.0.0.5", domain.ConnectionModeRelaySSH, testSshTarget1)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds); err != nil {
+		t.Fatalf("registering dev server: %v", err)
+	}
+	conn, err := domain.NewConnection("dddddddd-dddd-dddd-dddd-dddddddddddd", testTenant1, testDevServerRS, "", "")
+	if err != nil {
+		t.Fatalf("building connection: %v", err)
+	}
+	createdConn, err := repo.CreateConnection(ctx, conn)
+	if err != nil {
+		t.Fatalf("creating connection: %v", err)
+	}
+
+	pf := domain.PortForward{
+		ID: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", TenantID: testTenant1, ConnectionID: createdConn.ID,
+		LocalPort: 3001, RemotePort: 3000, ProcessName: "node", Status: domain.PortForwardStatusActive,
+	}
+	if _, err := portForwardStore.Create(ctx, pf); err != nil {
+		t.Fatalf("creating port forward: %v", err)
+	}
+
+	active, err := portForwardStore.ListActiveByConnection(ctx, testTenant1, createdConn.ID)
+	if err != nil {
+		t.Fatalf("ListActiveByConnection: %v", err)
+	}
+	if len(active) != 1 {
+		t.Fatalf("expected 1 active port forward, got %d: %+v", len(active), active)
+	}
+	if active[0].ProcessName != "node" || active[0].Status != domain.PortForwardStatusActive {
+		t.Errorf("expected ProcessName=node Status=active to round-trip, got %+v", active[0])
+	}
+	if active[0].LocalPort != 3001 || active[0].RemotePort != 3000 {
+		t.Errorf("expected LocalPort/RemotePort to round-trip, got %+v", active[0])
+	}
+
+	if err := portForwardStore.UpdateStatus(ctx, testTenant1, pf.ID, domain.PortForwardStatusClosed); err != nil {
+		t.Fatalf("UpdateStatus: %v", err)
+	}
+	afterClose, err := portForwardStore.ListActiveByConnection(ctx, testTenant1, createdConn.ID)
+	if err != nil {
+		t.Fatalf("ListActiveByConnection after close: %v", err)
+	}
+	if len(afterClose) != 0 {
+		t.Errorf("expected a closed port forward to drop out of ListActiveByConnection, got %+v", afterClose)
+	}
+}
+
 // TestRepository_RegisterAndGet_PersistsSSHTargetID is the round-trip
 // regression for the ssh_target_id column added in
 // migrations/0003_dev_server_ssh_target — a relay-ssh DevServer must come
@@ -237,7 +433,7 @@ func TestRepository_RegisterAndGet_PersistsSSHTargetID(t *testing.T) {
 	repo, store := setupSshTargetStore(t)
 	ctx := context.Background()
 
-	target, err := domain.NewSshTarget(testSshTarget2, testTenant1, "10.0.0.9", "deploy", "role-1", "", nil)
+	target, err := domain.NewSshTarget(testSshTarget2, testTenant1, "10.0.0.9", 0, "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("building ssh target: %v", err)
 	}

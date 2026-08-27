@@ -40,6 +40,8 @@ import (
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infragrpcclient "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpcclient"
 	inframetrics "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/metrics"
+	infraportalloc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portalloc"
+	infraportevents "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portevents"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
@@ -170,7 +172,8 @@ func run() error {
 	if err != nil {
 		logger.Warn("failed to construct Vault client — relay-ssh mode will report ErrConnectionModeNotImplemented", slog.Any("error", err))
 	} else {
-		sshConnector := infrasshconn.NewConnector(vaultClient, infrasshconn.LoadConfigFromEnv())
+		sshConnectionCap := infrasshconn.NewCap()
+		sshConnector := infrasshconn.NewConnector(vaultClient, sshTargetStore, infrasshconn.LoadConfigFromEnv(), sshConnectionCap)
 		sshRelayCfg := infrasshrelay.LoadConfigFromEnv(agentCfg.OrcaVersion)
 		if sshRelayCfg.BundlePath == "" {
 			logger.Warn("ORCA_RELAY_BUNDLE_PATH is not set — relay-ssh dev servers will fail to provision until it points at a built agent/out/agent.js")
@@ -280,6 +283,29 @@ func run() error {
 	listAgentTokensUC := usecase.NewListAgentTokens(agentTokenStore)
 	revokeAgentTokenUC := usecase.NewRevokeAgentToken(agentTokenStore, agentClient)
 
+	// BR-SSH-13: cancel an in-flight relaySSHReconnect/backgroundReconnect
+	// loop and mark the connection closed.
+	teardownConnectionUC := usecase.NewTeardownConnection(repo, agentClient)
+
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	portForwardStore := infrapostgres.NewPortForwardStore(pool)
+	portAllocator := infraportalloc.NewAllocator()
+	createPortForwardUC := usecase.NewCreatePortForward(portForwardStore, portAllocator)
+	listPortForwardsUC := usecase.NewListPortForwards(portForwardStore)
+	deletePortForwardUC := usecase.NewDeletePortForward(portForwardStore)
+
+	// --- Port-forward push notifications (TASK-SSH-04-08, BR-SSH-15) ---
+	// One shared Broadcaster: usecase.PollWorkspacePorts.Run's future caller
+	// gets it as its PortForwardEventPublisher (see
+	// usecase.NewPollWorkspacePorts), and StreamPortForwardEvents subscribes
+	// to it per connectionId. NOTE: PollWorkspacePorts.Run() is not yet
+	// started anywhere in this composition root — its EstablishConnection
+	// wiring is a separate, already-flagged follow-up (see
+	// TASK-SSH-04-06-poll-workspace-ports-loop.md's Status note) — so no
+	// events flow yet in production, but the broadcaster/RPC plumbing this
+	// task owns is complete and ready for that wiring once it lands.
+	portEventsBroadcaster := infraportevents.NewBroadcaster()
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -322,6 +348,11 @@ func run() error {
 		createAgentTokenUC,
 		listAgentTokensUC,
 		revokeAgentTokenUC,
+		teardownConnectionUC,
+		createPortForwardUC,
+		listPortForwardsUC,
+		deletePortForwardUC,
+		portEventsBroadcaster,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -345,7 +376,7 @@ func run() error {
 	slotRegistry := infraagentwsserver.NewRegistry(infraagentwsserver.DefaultConnectTimeout)
 	defer slotRegistry.Stop()
 	agentWSServer := infraagentwsserver.New(slotRegistry, agentClient, agentWSCfg, logger)
-	agentWSServer.Sessions = agentClient // TASK-AWS-02-03: agentClient already implements LiveSessionCount
+	agentWSServer.Sessions = agentClient                              // TASK-AWS-02-03: agentClient already implements LiveSessionCount
 	agentWSServer.Tokens = agentTokenValidator{repo: agentTokenStore} // TASK-AWS-03-06: persistent-token handshake fallback
 	agentTokenIssuer := infraagentwsserver.NewTokenIssuer(slotRegistry, agentWSCfg, logger)
 

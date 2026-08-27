@@ -225,12 +225,12 @@ func connectPrereqFakeServer(t *testing.T, responses map[string]string) *sshconn
 	ca := newPrereqFakeCA(t)
 	server := startPrereqFakeSSHServer(t, ca.signer.PublicKey(), "deploy", responses)
 
-	target, err := domain.NewSshTarget("target-1", "tenant-1", "127.0.0.1", "deploy", "role-1", "", nil)
+	target, err := domain.NewSshTarget("target-1", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 	issuer := &prereqFakeIssuer{ca: ca, principal: "deploy"}
-	connector := sshconn.NewConnector(issuer, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(issuer, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

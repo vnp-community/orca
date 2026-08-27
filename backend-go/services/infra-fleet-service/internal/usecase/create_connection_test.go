@@ -25,6 +25,18 @@ type fakeConnectionRepository struct {
 	found      bool
 	activeConn domain.Connection
 	activeErr  error
+
+	// updatedStatuses records every UpdateStatus call — used by
+	// teardown_connection_test.go.
+	updatedStatuses []string
+	updateStatusErr error
+
+	// devServerByConnection/devServerByConnectionFound/devServerByConnectionErr
+	// drive GetDevServerByConnection's fake answer — used by
+	// teardown_connection_test.go.
+	devServerByConnection      domain.DevServer
+	devServerByConnectionFound bool
+	devServerByConnectionErr   error
 }
 
 func (f *fakeConnectionRepository) CreateConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error) {
@@ -54,6 +66,26 @@ func (f *fakeConnectionRepository) GetActiveByDevServer(ctx context.Context, ten
 		return domain.Connection{}, false, nil
 	}
 	return f.activeConn, true, nil
+}
+
+// UpdateStatus implements usecase.ConnectionRepository.UpdateStatus.
+func (f *fakeConnectionRepository) UpdateStatus(ctx context.Context, tenantID, connectionID, status string) error {
+	if f.updateStatusErr != nil {
+		return f.updateStatusErr
+	}
+	f.updatedStatuses = append(f.updatedStatuses, connectionID+":"+status)
+	return nil
+}
+
+// GetDevServerByConnection implements usecase.ConnectionRepository.GetDevServerByConnection.
+func (f *fakeConnectionRepository) GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (domain.DevServer, bool, error) {
+	if f.devServerByConnectionErr != nil {
+		return domain.DevServer{}, false, f.devServerByConnectionErr
+	}
+	if !f.devServerByConnectionFound {
+		return domain.DevServer{}, false, nil
+	}
+	return f.devServerByConnection, true, nil
 }
 
 func TestCreateConnection_RequiresTenantContext(t *testing.T) {

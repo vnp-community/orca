@@ -31,10 +31,15 @@ const (
 	InfraFleetService_ListSshTargets_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
 	InfraFleetService_GetSshState_FullMethodName                       = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
 	InfraFleetService_EstablishConnection_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
+	InfraFleetService_TeardownConnection_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/TeardownConnection"
 	InfraFleetService_KillWorkspacePort_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
 	InfraFleetService_CreateAgentToken_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/CreateAgentToken"
 	InfraFleetService_ListAgentTokens_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/ListAgentTokens"
 	InfraFleetService_RevokeAgentToken_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/RevokeAgentToken"
+	InfraFleetService_CreatePortForward_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/CreatePortForward"
+	InfraFleetService_ListPortForwards_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/ListPortForwards"
+	InfraFleetService_DeletePortForward_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/DeletePortForward"
+	InfraFleetService_StreamPortForwardEvents_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/StreamPortForwardEvents"
 	InfraFleetService_SpawnTerminalSession_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
 	InfraFleetService_ResizeTerminalSession_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
 	InfraFleetService_KillTerminalSession_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
@@ -108,6 +113,9 @@ type InfraFleetServiceClient interface {
 	// handshake synchronously — it IS the connection-establishment act, not
 	// a record of one requested. See usecase.EstablishConnection's doc comment.
 	EstablishConnection(ctx context.Context, in *EstablishConnectionRequest, opts ...grpc.CallOption) (*Connection, error)
+	// TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
+	// closed and stops any in-flight relaySSHReconnect backoff loop.
+	TeardownConnection(ctx context.Context, in *TeardownConnectionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error)
 	// CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
 	// persistent, named, per-DevServer agent token admin surface — see
@@ -115,6 +123,14 @@ type InfraFleetServiceClient interface {
 	CreateAgentToken(ctx context.Context, in *CreateAgentTokenRequest, opts ...grpc.CallOption) (*CreateAgentTokenResponse, error)
 	ListAgentTokens(ctx context.Context, in *ListAgentTokensRequest, opts ...grpc.CallOption) (*ListAgentTokensResponse, error)
 	RevokeAgentToken(ctx context.Context, in *RevokeAgentTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	CreatePortForward(ctx context.Context, in *CreatePortForwardRequest, opts ...grpc.CallOption) (*PortForward, error)
+	ListPortForwards(ctx context.Context, in *ListPortForwardsRequest, opts ...grpc.CallOption) (*ListPortForwardsResponse, error)
+	DeletePortForward(ctx context.Context, in *DeletePortForwardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// StreamPortForwardEvents pushes port_opened/port_closed lifecycle events
+	// for one connectionId — BR-SSH-15's "live push, no polling" requirement
+	// (TASK-SSH-04-08), fed by internal/adapter/portevents.Broadcaster.
+	StreamPortForwardEvents(ctx context.Context, in *StreamPortForwardEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PortForwardEvent], error)
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error)
 	ResizeTerminalSession(ctx context.Context, in *ResizeTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -325,6 +341,16 @@ func (c *infraFleetServiceClient) EstablishConnection(ctx context.Context, in *E
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) TeardownConnection(ctx context.Context, in *TeardownConnectionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_TeardownConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *infraFleetServiceClient) KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(KillWorkspacePortResponse)
@@ -364,6 +390,55 @@ func (c *infraFleetServiceClient) RevokeAgentToken(ctx context.Context, in *Revo
 	}
 	return out, nil
 }
+
+func (c *infraFleetServiceClient) CreatePortForward(ctx context.Context, in *CreatePortForwardRequest, opts ...grpc.CallOption) (*PortForward, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PortForward)
+	err := c.cc.Invoke(ctx, InfraFleetService_CreatePortForward_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ListPortForwards(ctx context.Context, in *ListPortForwardsRequest, opts ...grpc.CallOption) (*ListPortForwardsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPortForwardsResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListPortForwards_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DeletePortForward(ctx context.Context, in *DeletePortForwardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_DeletePortForward_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) StreamPortForwardEvents(ctx context.Context, in *StreamPortForwardEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PortForwardEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_StreamPortForwardEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamPortForwardEventsRequest, PortForwardEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_StreamPortForwardEventsClient = grpc.ServerStreamingClient[PortForwardEvent]
 
 func (c *infraFleetServiceClient) SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -517,7 +592,7 @@ func (c *infraFleetServiceClient) GetTerminalScrollback(ctx context.Context, in 
 
 func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_AttachPty_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[1], InfraFleetService_AttachPty_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -727,6 +802,9 @@ type InfraFleetServiceServer interface {
 	// handshake synchronously — it IS the connection-establishment act, not
 	// a record of one requested. See usecase.EstablishConnection's doc comment.
 	EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error)
+	// TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
+	// closed and stops any in-flight relaySSHReconnect backoff loop.
+	TeardownConnection(context.Context, *TeardownConnectionRequest) (*emptypb.Empty, error)
 	KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error)
 	// CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
 	// persistent, named, per-DevServer agent token admin surface — see
@@ -734,6 +812,14 @@ type InfraFleetServiceServer interface {
 	CreateAgentToken(context.Context, *CreateAgentTokenRequest) (*CreateAgentTokenResponse, error)
 	ListAgentTokens(context.Context, *ListAgentTokensRequest) (*ListAgentTokensResponse, error)
 	RevokeAgentToken(context.Context, *RevokeAgentTokenRequest) (*emptypb.Empty, error)
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	CreatePortForward(context.Context, *CreatePortForwardRequest) (*PortForward, error)
+	ListPortForwards(context.Context, *ListPortForwardsRequest) (*ListPortForwardsResponse, error)
+	DeletePortForward(context.Context, *DeletePortForwardRequest) (*emptypb.Empty, error)
+	// StreamPortForwardEvents pushes port_opened/port_closed lifecycle events
+	// for one connectionId — BR-SSH-15's "live push, no polling" requirement
+	// (TASK-SSH-04-08), fed by internal/adapter/portevents.Broadcaster.
+	StreamPortForwardEvents(*StreamPortForwardEventsRequest, grpc.ServerStreamingServer[PortForwardEvent]) error
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error)
 	ResizeTerminalSession(context.Context, *ResizeTerminalSessionRequest) (*emptypb.Empty, error)
@@ -867,6 +953,9 @@ func (UnimplementedInfraFleetServiceServer) GetSshState(context.Context, *GetSsh
 func (UnimplementedInfraFleetServiceServer) EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error) {
 	return nil, status.Error(codes.Unimplemented, "method EstablishConnection not implemented")
 }
+func (UnimplementedInfraFleetServiceServer) TeardownConnection(context.Context, *TeardownConnectionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method TeardownConnection not implemented")
+}
 func (UnimplementedInfraFleetServiceServer) KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method KillWorkspacePort not implemented")
 }
@@ -878,6 +967,18 @@ func (UnimplementedInfraFleetServiceServer) ListAgentTokens(context.Context, *Li
 }
 func (UnimplementedInfraFleetServiceServer) RevokeAgentToken(context.Context, *RevokeAgentTokenRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeAgentToken not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CreatePortForward(context.Context, *CreatePortForwardRequest) (*PortForward, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePortForward not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListPortForwards(context.Context, *ListPortForwardsRequest) (*ListPortForwardsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPortForwards not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DeletePortForward(context.Context, *DeletePortForwardRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeletePortForward not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) StreamPortForwardEvents(*StreamPortForwardEventsRequest, grpc.ServerStreamingServer[PortForwardEvent]) error {
+	return status.Error(codes.Unimplemented, "method StreamPortForwardEvents not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SpawnTerminalSession not implemented")
@@ -1194,6 +1295,24 @@ func _InfraFleetService_EstablishConnection_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_TeardownConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TeardownConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).TeardownConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_TeardownConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).TeardownConnection(ctx, req.(*TeardownConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InfraFleetService_KillWorkspacePort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(KillWorkspacePortRequest)
 	if err := dec(in); err != nil {
@@ -1265,6 +1384,71 @@ func _InfraFleetService_RevokeAgentToken_Handler(srv interface{}, ctx context.Co
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _InfraFleetService_CreatePortForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePortForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CreatePortForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CreatePortForward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CreatePortForward(ctx, req.(*CreatePortForwardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ListPortForwards_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPortForwardsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListPortForwards(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListPortForwards_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListPortForwards(ctx, req.(*ListPortForwardsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DeletePortForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePortForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DeletePortForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DeletePortForward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DeletePortForward(ctx, req.(*DeletePortForwardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_StreamPortForwardEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamPortForwardEventsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(InfraFleetServiceServer).StreamPortForwardEvents(m, &grpc.GenericServerStream[StreamPortForwardEventsRequest, PortForwardEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_StreamPortForwardEventsServer = grpc.ServerStreamingServer[PortForwardEvent]
 
 func _InfraFleetService_SpawnTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SpawnTerminalSessionRequest)
@@ -1883,6 +2067,10 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _InfraFleetService_EstablishConnection_Handler,
 		},
 		{
+			MethodName: "TeardownConnection",
+			Handler:    _InfraFleetService_TeardownConnection_Handler,
+		},
+		{
 			MethodName: "KillWorkspacePort",
 			Handler:    _InfraFleetService_KillWorkspacePort_Handler,
 		},
@@ -1897,6 +2085,18 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeAgentToken",
 			Handler:    _InfraFleetService_RevokeAgentToken_Handler,
+		},
+		{
+			MethodName: "CreatePortForward",
+			Handler:    _InfraFleetService_CreatePortForward_Handler,
+		},
+		{
+			MethodName: "ListPortForwards",
+			Handler:    _InfraFleetService_ListPortForwards_Handler,
+		},
+		{
+			MethodName: "DeletePortForward",
+			Handler:    _InfraFleetService_DeletePortForward_Handler,
 		},
 		{
 			MethodName: "SpawnTerminalSession",
@@ -2024,6 +2224,11 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamPortForwardEvents",
+			Handler:       _InfraFleetService_StreamPortForwardEvents_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "AttachPty",
 			Handler:       _InfraFleetService_AttachPty_Handler,

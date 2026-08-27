@@ -79,6 +79,15 @@ type SshProvisioner interface {
 	Provision(ctx context.Context, devServer domain.DevServer) (Transport, HandshakeInfo, error)
 }
 
+// sshReattacherAndProvisioner is what WithRelaySSH actually requires: a
+// single concrete value (adapter/sshrelay.Provisioner) implementing both
+// narrow ports — SshProvisioner for the first connect, SshReattacher for
+// every reconnect after (relaySSHReconnect, session.go).
+type sshReattacherAndProvisioner interface {
+	SshProvisioner
+	SshReattacher
+}
+
 // Client implements usecase.DevServerAgentClient for all three connection
 // modes, keeping one persistent session per dev server ID (reused across
 // calls; established lazily on first use). A dropped relay-websocket
@@ -97,6 +106,12 @@ type Client struct {
 	// sshProvisioner is nil unless WithRelaySSH was passed to New —
 	// relay-ssh mode returns ErrConnectionModeNotImplemented until it is.
 	sshProvisioner SshProvisioner
+
+	// sshReattacher is the same value as sshProvisioner (both narrow ports
+	// implemented by the one *sshrelay.Provisioner WithRelaySSH is given) —
+	// getOrProvisionSession sets it on every relay-ssh session so
+	// relaySSHReconnect can call Reattach later.
+	sshReattacher SshReattacher
 
 	// tokens resolves relay-websocket bearer tokens per dial — nil means
 	// relay-websocket dev servers always fail to connect (WithAgentTokens
@@ -127,10 +142,13 @@ type Option func(*Client)
 // WithRelaySSH enables relay-ssh mode by supplying the provisioner that
 // deploys/launches/attaches a session for a given DevServer — see
 // adapter/sshrelay.Provisioner (the production implementation, over a real
-// SSH connection via adapter/sshconn) and SshProvisioner's doc comment.
-func WithRelaySSH(provisioner SshProvisioner) Option {
+// SSH connection via adapter/sshconn), which implements both SshProvisioner
+// (first connect) and SshReattacher (every reconnect after — see
+// session.go's relaySSHReconnect).
+func WithRelaySSH(provisioner sshReattacherAndProvisioner) Option {
 	return func(c *Client) {
 		c.sshProvisioner = provisioner
+		c.sshReattacher = provisioner
 	}
 }
 
@@ -246,10 +264,18 @@ func (c *Client) getOrProvisionSession(ctx context.Context, devServer domain.Dev
 	sess, ok = c.sessions[devServer.ID]
 	if !ok {
 		sess = newSession(devServer.Host, c.cfg, c.logger)
-		sess.managedExternally = true
 		c.sessions[devServer.ID] = sess
 	}
 	c.mu.Unlock()
+
+	// s.mu-guarded: relaySSHReconnect (a goroutine spawned by a PRIOR
+	// attachTransport, if this session already existed) may concurrently
+	// read managedMode/relaySSHDevServer/reattacher.
+	sess.mu.Lock()
+	sess.managedMode = managedModeRelaySSHReattach
+	sess.relaySSHDevServer = devServer
+	sess.reattacher = c.sshReattacher
+	sess.mu.Unlock()
 
 	sess.attachTransport(t, info)
 	return sess, nil
@@ -269,10 +295,13 @@ func (c *Client) AttachInboundSession(devServerID, host string, conn *websocket.
 	sess, ok := c.sessions[devServerID]
 	if !ok {
 		sess = newSession(host, c.cfg, c.logger)
-		sess.managedExternally = true
 		c.sessions[devServerID] = sess
 	}
 	c.mu.Unlock()
+
+	sess.mu.Lock()
+	sess.managedMode = managedModeInboundOnly
+	sess.mu.Unlock()
 
 	sess.attachTransport(newWSTransport(conn, c.logger), info)
 }
@@ -319,6 +348,22 @@ func (c *Client) HandshakeInfoFor(devServerID string) (HandshakeInfo, bool) {
 		return HandshakeInfo{}, false
 	}
 	return sess.handshakeInfoSnapshot()
+}
+
+// CancelReconnect stops devServerID's session's relaySSHReconnect (or
+// relay-websocket backgroundReconnect) loop immediately, mirroring
+// session.close()'s existing closeCh-signaling shape — the session itself
+// is not closed, only its in-flight reconnect attempt is abandoned, so a
+// later Exec/Health call still triggers a fresh getOrProvisionSession/
+// getOrDialSession rather than staying permanently dead.
+func (c *Client) CancelReconnect(devServerID string) {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok {
+		return
+	}
+	sess.cancelReconnect()
 }
 
 // Exec dispatches one JSON-RPC method call (e.g. "ports.scan",

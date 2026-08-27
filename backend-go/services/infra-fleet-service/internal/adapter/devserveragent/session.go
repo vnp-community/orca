@@ -3,6 +3,7 @@ package devserveragent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -11,7 +12,22 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
+
+// ErrRelayDetachedProcessGone is devserveragent's local sentinel for
+// sshrelay.ErrDetachedProcessGone — wrapped at the adapter boundary by
+// SshReattacher implementations (see adapter/sshrelay.Provisioner.Reattach)
+// so this package never has to import adapter/sshrelay directly (wrong
+// dependency direction per this codebase's Dependency Inversion convention).
+var ErrRelayDetachedProcessGone = errors.New("devserveragent: relay-ssh detached process is no longer running")
+
+// SshReattacher is relay-ssh's background-reconnect port, mirroring
+// SshProvisioner's shape — implemented by adapter/sshrelay.Provisioner.
+type SshReattacher interface {
+	Reattach(ctx context.Context, devServer domain.DevServer, sockPath string) (Transport, error)
+}
 
 // handshakeParams mirrors AgentHandshakeParams as sent by
 // runOrcaInitiatorHandshake (ws-handshake.ts) — only the orcaVersion field,
@@ -34,6 +50,12 @@ type HandshakeInfo struct {
 	AgentVersion string   `json:"agentVersion"`
 	SessionID    string   `json:"sessionId"`
 	Capabilities []string `json:"capabilities"`
+	// SockPath is relay-ssh mode's Unix socket path for the detached agent
+	// process (see adapter/sshrelay's launch/reattach — SOL-SSH-03), cached
+	// on *session so relaySSHReconnect can call reattach() again without
+	// re-resolving the SshTarget or re-deploying. Empty for
+	// relay-websocket/direct-websocket, which have no detached process.
+	SockPath string `json:"-"`
 }
 
 // pendingCall is one in-flight JSON-RPC request awaiting its response.
@@ -50,7 +72,15 @@ type pendingCall struct {
 // inbound wsTransport, relay-ssh gets a Transport from adapter/sshrelay's
 // SSH-exec-channel deploy+launch pipeline — everything past
 // attachTransport is identical across all three; only how the Transport was
-// obtained differs, tracked by managedExternally.
+// obtained differs, tracked by managedMode.
+type managedMode int
+
+const (
+	managedModeNone             managedMode = iota // relay-websocket: backgroundReconnect dials as before
+	managedModeInboundOnly                          // direct-websocket: agent re-dials on its own
+	managedModeRelaySSHReattach                     // relay-ssh: relaySSHReconnect (reattach, not redeploy)
+)
+
 type session struct {
 	cfg    Config
 	host   string
@@ -66,12 +96,16 @@ type session struct {
 	pending        map[uint32]*pendingCall
 	closed         bool
 
-	// managedExternally marks a session this package doesn't own
-	// re-establishing on its own — direct-websocket's inbound accept (the
-	// agent must dial in again) and relay-ssh's active provision (a fresh
-	// deploy+launch, not a reconnect). backgroundReconnect no-ops for both;
-	// there is nothing for it to dial.
-	managedExternally bool
+	// managedMode marks a session this package doesn't reconnect the plain
+	// relay-websocket way — direct-websocket's inbound accept (the agent
+	// must dial in again) and relay-ssh's reattach-to-a-detached-process
+	// loop (relaySSHReconnect), as opposed to relay-websocket's plain
+	// backgroundReconnect redial.
+	managedMode managedMode
+	// relaySSHDevServer/reattacher are set only for managedModeRelaySSHReattach
+	// sessions (by Client.getOrProvisionSession) — relaySSHReconnect's inputs.
+	relaySSHDevServer domain.DevServer
+	reattacher        SshReattacher
 
 	// ptyMu/ptySubs implement the notification demux TASK-183 adds: routing
 	// pty.data/pty.exit/pty.replay notifications (see routeNotification) to
@@ -420,22 +454,33 @@ func (s *session) handleDisconnect(t Transport, cause error) {
 	go s.backgroundReconnect()
 }
 
-// backgroundReconnect retries connect() with backoffDelay-paced attempts
-// (mirroring DevServerRelayBridge's exponential-backoff loop) until it
-// succeeds or the session is closed. getOrCreateSession's existing lazy
-// redial remains the fallback for a call that arrives mid-backoff — this
-// loop just means a dropped session doesn't sit dead until one does.
-// relay-websocket only — see managedExternally's doc comment.
+// backgroundReconnect dispatches by managedMode: relay-websocket retries
+// connect() itself (below); direct-websocket is a true no-op (the agent
+// re-dials on its own — specs/agent/api/connection-modes.md §7's
+// RECONNECT_DELAYS_MS — and re-attaches via Client.AttachInboundSession);
+// relay-ssh runs relaySSHReconnect, a real reconnect loop now that the
+// detached process (SOL-SSH-03) survives an SSH drop.
 func (s *session) backgroundReconnect() {
-	if s.managedExternally {
-		// direct-websocket: there is nothing to dial, the agent owns
-		// reconnection on its side (specs/agent/api/connection-modes.md §7's
-		// RECONNECT_DELAYS_MS) and re-attaches via Client.AttachInboundSession.
-		// relay-ssh: reconnecting means redeploying+relaunching, not dialing
-		// this same transport again — the next Exec/Health call re-provisions
-		// via Client.getOrProvisionSession instead of this loop.
+	s.mu.Lock()
+	mode := s.managedMode
+	s.mu.Unlock()
+	switch mode {
+	case managedModeInboundOnly:
+		return // agent must dial in again — see AttachInboundSession
+	case managedModeRelaySSHReattach:
+		s.relaySSHReconnect()
 		return
 	}
+	s.backgroundReconnectRelayWebSocket()
+}
+
+// backgroundReconnectRelayWebSocket retries connect() with
+// backoffDelay-paced attempts (mirroring DevServerRelayBridge's
+// exponential-backoff loop) until it succeeds or the session is closed.
+// getOrCreateSession's existing lazy redial remains the fallback for a call
+// that arrives mid-backoff — this loop just means a dropped session doesn't
+// sit dead until one does. relay-websocket only.
+func (s *session) backgroundReconnectRelayWebSocket() {
 	for {
 		s.mu.Lock()
 		alreadyLive := s.handshaked && s.transport != nil
@@ -485,6 +530,90 @@ func (s *session) backgroundReconnect() {
 		if s.logger != nil {
 			s.logger.Warn("devserveragent: background reconnect attempt failed", slog.String("host", s.host), slog.Int("attempt", attempt), slog.Any("error", err))
 		}
+	}
+}
+
+// relaySSHReconnect mirrors backgroundReconnectRelayWebSocket's loop
+// structure exactly (same backoffDelay call, same closed/superseded checks)
+// but calls reattacher.Reattach instead of connect() — the detached agent
+// process's in-memory state (its AgentSession, its pty-daemon children)
+// survived the SSH drop untouched, only the bridge died, so no fresh
+// agent.handshake is needed: this just confirms the bridge is live and
+// reuses the HandshakeInfo captured at first Provision (cached via
+// s.handshakeInfo).
+func (s *session) relaySSHReconnect() {
+	for {
+		s.mu.Lock()
+		alreadyLive := s.handshaked && s.transport != nil
+		closed := s.closed
+		attempt := s.reconnectAttempt
+		sockPath := s.handshakeInfo.SockPath
+		devServer := s.relaySSHDevServer
+		reattacher := s.reattacher
+		s.mu.Unlock()
+		if alreadyLive || closed {
+			return
+		}
+
+		delay := backoffDelay(s.cfg, attempt)
+		select {
+		case <-time.After(delay):
+		case <-s.closeCh:
+			return
+		}
+
+		s.mu.Lock()
+		if s.closed || (s.handshaked && s.transport != nil) {
+			s.mu.Unlock()
+			return
+		}
+		s.mu.Unlock()
+
+		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.DialTimeout+s.cfg.HandshakeTimeout)
+		conn, err := reattacher.Reattach(ctx, devServer, sockPath)
+		cancel()
+
+		if errors.Is(err, ErrRelayDetachedProcessGone) {
+			// Detached process itself is gone — reattach can never succeed
+			// again; the next Exec/Health call's getOrProvisionSession will
+			// do a full re-Provision (redeploy+relaunch) once this loop exits.
+			return
+		}
+
+		s.mu.Lock()
+		if err != nil {
+			s.reconnectAttempt++
+		} else {
+			s.reconnectAttempt = 0
+		}
+		s.mu.Unlock()
+
+		if err == nil {
+			s.attachTransport(conn, s.handshakeInfo) // reuse cached info, only transport/liveness changed
+			return
+		}
+		if s.logger != nil {
+			s.logger.Warn("devserveragent: relay-ssh reattach attempt failed", slog.String("host", s.host), slog.Int("attempt", attempt), slog.Any("error", err))
+		}
+	}
+}
+
+// cancelReconnect unblocks a waiting backgroundReconnectRelayWebSocket/
+// relaySSHReconnect loop without closing the session outright —
+// TeardownConnection's cancel path (BR-SSH-13). Safe to call when no
+// reconnect loop is running. Reuses closeMu the same way close() does to
+// guard against re-closing an already-closed channel.
+func (s *session) cancelReconnect() {
+	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
+	select {
+	case <-s.closeCh:
+		return // already closed/cancelled
+	default:
+		close(s.closeCh)
+		s.mu.Lock()
+		s.closeCh = make(chan struct{}) // replace so a FUTURE reconnect loop (next drop) gets a fresh channel
+		s.mu.Unlock()
 	}
 }
 

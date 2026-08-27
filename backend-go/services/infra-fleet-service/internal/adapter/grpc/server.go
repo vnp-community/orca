@@ -16,6 +16,7 @@ import (
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portevents"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
@@ -80,6 +81,18 @@ type Server struct {
 	createAgentToken *usecase.CreateAgentToken
 	listAgentTokens  *usecase.ListAgentTokens
 	revokeAgentToken *usecase.RevokeAgentToken
+
+	// --- BR-SSH-13 reconnect cancellation ---
+	teardownConnection *usecase.TeardownConnection
+
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	createPortForward *usecase.CreatePortForward
+	listPortForwards  *usecase.ListPortForwards
+	deletePortForward *usecase.DeletePortForward
+
+	// --- Port-forward push notifications (TASK-SSH-04-08) --- shared with
+	// PollWorkspacePorts as its usecase.PortForwardEventPublisher.
+	portEvents *portevents.Broadcaster
 }
 
 func New(
@@ -123,6 +136,11 @@ func New(
 	createAgentToken *usecase.CreateAgentToken,
 	listAgentTokens *usecase.ListAgentTokens,
 	revokeAgentToken *usecase.RevokeAgentToken,
+	teardownConnection *usecase.TeardownConnection,
+	createPortForward *usecase.CreatePortForward,
+	listPortForwards *usecase.ListPortForwards,
+	deletePortForward *usecase.DeletePortForward,
+	portEvents *portevents.Broadcaster,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -170,6 +188,12 @@ func New(
 		createAgentToken: createAgentToken,
 		listAgentTokens:  listAgentTokens,
 		revokeAgentToken: revokeAgentToken,
+
+		teardownConnection: teardownConnection,
+		createPortForward:  createPortForward,
+		listPortForwards:   listPortForwards,
+		deletePortForward:  deletePortForward,
+		portEvents:         portEvents,
 	}
 }
 
@@ -264,9 +288,12 @@ func (s *Server) Relay(ctx context.Context, req *infrafleetv1.RelayRequest) (*in
 
 func (s *Server) CreateSshTarget(ctx context.Context, req *infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error) {
 	target, err := s.createSshTarget.Execute(ctx, usecase.CreateSshTargetInput{
-		Host:         req.GetHost(),
-		UserName:     req.GetUser(),
-		VaultSSHRole: req.GetVaultSshRole(),
+		Host:                  req.GetHost(),
+		Port:                  int(req.GetPort()),
+		UserName:              req.GetUser(),
+		VaultSSHRole:          req.GetVaultSshRole(),
+		KnownHostsFingerprint: req.GetKnownHostsFingerprint(),
+		JumpHostTargetID:      req.GetJumpHostTargetId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -287,14 +314,23 @@ func (s *Server) GetFleetHealth(ctx context.Context, req *infrafleetv1.GetFleetH
 }
 
 func (s *Server) ScanWorkspacePorts(ctx context.Context, req *infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error) {
-	ports, err := s.scanWorkspacePorts.Execute(ctx, usecase.ScanWorkspacePortsInput{
+	detected, err := s.scanWorkspacePorts.Execute(ctx, usecase.ScanWorkspacePortsInput{
 		ConnectionID: req.GetConnectionId(),
 		WorktreeID:   req.GetWorktreeId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &infrafleetv1.ScanWorkspacePortsResponse{OpenPorts: ports}, nil
+	out := make([]*infrafleetv1.DetectedPortProto, 0, len(detected))
+	for _, d := range detected {
+		out = append(out, &infrafleetv1.DetectedPortProto{
+			Port:        d.Port,
+			Host:        d.Host,
+			Pid:         d.PID,
+			ProcessName: d.ProcessName,
+		})
+	}
+	return &infrafleetv1.ScanWorkspacePortsResponse{Ports: out}, nil
 }
 
 func (s *Server) ListSshTargets(ctx context.Context, req *infrafleetv1.ListSshTargetsRequest) (*infrafleetv1.ListSshTargetsResponse, error) {
@@ -305,7 +341,14 @@ func (s *Server) ListSshTargets(ctx context.Context, req *infrafleetv1.ListSshTa
 	out := make([]*infrafleetv1.SshTarget, 0, len(targets))
 	for _, t := range targets {
 		out = append(out, &infrafleetv1.SshTarget{
-			Id: t.ID, TenantId: t.TenantID, Host: t.Host, User: t.UserName, VaultSshRole: t.VaultSSHRole,
+			Id:                    t.ID,
+			TenantId:              t.TenantID,
+			Host:                  t.Host,
+			Port:                  int32(t.Port),
+			User:                  t.UserName,
+			VaultSshRole:          t.VaultSSHRole,
+			KnownHostsFingerprint: t.KnownHostsFingerprint,
+			JumpHostTargetId:      t.JumpHostTargetID,
 		})
 	}
 	return &infrafleetv1.ListSshTargetsResponse{SshTargets: out}, nil
@@ -393,7 +436,7 @@ func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateR
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	resp := &infrafleetv1.GetSshStateResponse{Connected: state.Connected, ConnectionId: state.ConnectionID}
+	resp := &infrafleetv1.GetSshStateResponse{Connected: state.Connected, ConnectionId: state.ConnectionID, Status: state.Status}
 	if state.LastActivity != nil {
 		resp.LastActivityUnixMs = state.LastActivity.UnixMilli()
 	}
@@ -410,6 +453,13 @@ func (s *Server) EstablishConnection(ctx context.Context, req *infrafleetv1.Esta
 		resp.EstablishedAtUnixMs = conn.LastActivityAt.UnixMilli()
 	}
 	return resp, nil
+}
+
+func (s *Server) TeardownConnection(ctx context.Context, req *infrafleetv1.TeardownConnectionRequest) (*emptypb.Empty, error) {
+	if err := s.teardownConnection.Execute(ctx, usecase.TeardownConnectionInput{ConnectionID: req.GetConnectionId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) KillWorkspacePort(ctx context.Context, req *infrafleetv1.KillWorkspacePortRequest) (*infrafleetv1.KillWorkspacePortResponse, error) {
@@ -461,6 +511,72 @@ func (s *Server) RevokeAgentToken(ctx context.Context, req *infrafleetv1.RevokeA
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) CreatePortForward(ctx context.Context, req *infrafleetv1.CreatePortForwardRequest) (*infrafleetv1.PortForward, error) {
+	pf, err := s.createPortForward.Execute(ctx, usecase.CreatePortForwardInput{
+		ConnectionID: req.GetConnectionId(),
+		RemotePort:   int(req.GetRemotePort()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoPortForward(pf), nil
+}
+
+func (s *Server) ListPortForwards(ctx context.Context, req *infrafleetv1.ListPortForwardsRequest) (*infrafleetv1.ListPortForwardsResponse, error) {
+	forwards, err := s.listPortForwards.Execute(ctx, usecase.ListPortForwardsInput{ConnectionID: req.GetConnectionId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.PortForward, 0, len(forwards))
+	for _, pf := range forwards {
+		out = append(out, toProtoPortForward(pf))
+	}
+	return &infrafleetv1.ListPortForwardsResponse{PortForwards: out}, nil
+}
+
+func (s *Server) DeletePortForward(ctx context.Context, req *infrafleetv1.DeletePortForwardRequest) (*emptypb.Empty, error) {
+	if err := s.deletePortForward.Execute(ctx, usecase.DeletePortForwardInput{ID: req.GetId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func toProtoPortForward(pf domain.PortForward) *infrafleetv1.PortForward {
+	return &infrafleetv1.PortForward{
+		Id:           pf.ID,
+		ConnectionId: pf.ConnectionID,
+		LocalPort:    int32(pf.LocalPort),
+		RemotePort:   int32(pf.RemotePort),
+		ProcessName:  pf.ProcessName,
+		Status:       string(pf.Status),
+	}
+}
+
+// StreamPortForwardEvents pushes portevents.Broadcaster's per-connectionId
+// port_opened/port_closed events to the caller for as long as the stream
+// stays open — BR-SSH-15's live-push requirement (TASK-SSH-04-08), the same
+// "open a stream, forward each item" shape AttachPty already uses.
+func (s *Server) StreamPortForwardEvents(req *infrafleetv1.StreamPortForwardEventsRequest, stream infrafleetv1.InfraFleetService_StreamPortForwardEventsServer) error {
+	events, unsubscribe := s.portEvents.Subscribe(req.GetConnectionId())
+	defer unsubscribe()
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(&infrafleetv1.PortForwardEvent{
+				Kind:    ev.Kind,
+				Forward: toProtoPortForward(ev.Forward),
+			}); err != nil {
+				return err
+			}
+		case <-stream.Context().Done():
+			return nil
+		}
+	}
 }
 
 // ListBrowserProfiles backs the frontend's browser.profileList channel —

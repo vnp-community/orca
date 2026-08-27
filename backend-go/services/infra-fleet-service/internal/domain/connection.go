@@ -28,7 +28,7 @@ type Connection struct {
 	// SOL-024/TASK-164) — empty/nil for connections predating this field
 	// (worktree-bound connections created via CreateConnection, not
 	// EstablishConnection). See migrations/0004_connection_status.
-	Status         string // "established" | "degraded" | "closed"
+	Status         string // "established" | "degraded" | "reconnecting" | "closed"
 	LastActivityAt *time.Time
 }
 

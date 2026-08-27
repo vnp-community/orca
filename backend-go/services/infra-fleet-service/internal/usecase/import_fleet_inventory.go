@@ -58,7 +58,7 @@ func (uc *ImportFleetInventory) Execute(ctx context.Context, in ImportFleetInven
 	}
 	var result ImportFleetInventoryResult
 	for _, s := range in.Servers {
-		target, err := domain.NewSshTarget(uuid.NewString(), tenantID, s.Host, s.UserName, s.VaultSSHRole, s.Project, s.Tags)
+		target, err := domain.NewSshTarget(uuid.NewString(), tenantID, s.Host, 0, s.UserName, s.VaultSSHRole, "", "", s.Project, s.Tags)
 		if err != nil {
 			result.Skipped++
 			result.Errors = append(result.Errors, ImportFleetInventoryError{Host: s.Host, UserName: s.UserName, Reason: err.Error()})

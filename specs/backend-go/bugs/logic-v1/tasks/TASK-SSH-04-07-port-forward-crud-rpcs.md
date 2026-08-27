@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** TASK-SSH-04-01, TASK-SSH-04-03
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — CreatePortForward/ListPortForwards/DeletePortForward RPCs+usecases+grpc handlers added; ScanWorkspacePortsResponse replaced with {ports: DetectedPortProto[]} (buf breaking confirmed vs the real backend-go baseline, open_ports had no live consumer); go build/test clean`
 
 ---
 

@@ -499,7 +499,10 @@ func TestRegisterWorkspacePortsChannels(t *testing.T) {
 		var gotReq *infrafleetv1.ScanWorkspacePortsRequest
 		fake.scanWorkspacePortsFunc = func(ctx context.Context, in *infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error) {
 			gotReq = in
-			return &infrafleetv1.ScanWorkspacePortsResponse{OpenPorts: []int32{3000, 8080}}, nil
+			return &infrafleetv1.ScanWorkspacePortsResponse{Ports: []*infrafleetv1.DetectedPortProto{
+				{Port: 3000, Host: "127.0.0.1", Pid: 1234, ProcessName: "node"},
+				{Port: 8080, Host: "0.0.0.0", Pid: 5678, ProcessName: "python"},
+			}}, nil
 		}
 		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "workspacePorts.scan",
 			argsJSON(t, map[string]any{"connectionId": "c1", "worktreeId": "wt1"}))
@@ -512,6 +515,13 @@ func TestRegisterWorkspacePortsChannels(t *testing.T) {
 		view, ok := result.(map[string]any)
 		if !ok || view["platform"] != "unknown" {
 			t.Errorf("unexpected result: %+v", result)
+		}
+		ports, ok := view["ports"].([]map[string]any)
+		if !ok || len(ports) != 2 {
+			t.Fatalf("expected 2 decoded ports, got: %+v", view["ports"])
+		}
+		if ports[0]["port"] != int32(3000) || ports[0]["processName"] != "node" {
+			t.Errorf("unexpected first port entry: %+v", ports[0])
 		}
 	})
 

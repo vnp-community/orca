@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` + `api-gateway`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/portevents/broadcaster.go` (new)
 **Depends on:** TASK-SSH-04-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — portevents.Broadcaster added (per-connectionId fan-out, drop-on-full-buffer discipline, TestBroadcaster_* pass); infrafleet.proto gained StreamPortForwardEvents/StreamPortForwardEventsRequest/PortForwardEvent (buf generate ran clean); grpc.Server.StreamPortForwardEvents streams Broadcaster.Subscribe to the caller; main.go constructs one shared *portevents.Broadcaster and passes it to the gRPC server (PollWorkspacePorts.Run() itself is still not started anywhere in production — pre-existing gap flagged by TASK-SSH-04-06's own Status note, unchanged by this task); api-gateway's wscompat gained workspacePorts.subscribe (registerWorkspacePortsStreamChannel + toWorkspacePortForwardResult in channels_push.go), wired into RegisterPushChannels/main.go; TestWorkspacePortsSubscribe_DeliversOpenedAndClosedPushFrames (end-to-end fake-stream WS push test) and TestRegisterWorkspacePortsStreamChannel_RecvErrorClosesOutputChannel pass. go build/vet/test clean across infra-fleet-service and api-gateway (and the rest of go.work's modules).`
 
 ---
 

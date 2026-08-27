@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/diagnostics.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — diagnostics.go's diagnosticStderr (capped, tail-truncating) + collectDiagnostics added; tests pass`
 
 ---
 

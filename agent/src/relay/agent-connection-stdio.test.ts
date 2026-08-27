@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { StdioWebSocketAdapter, connectStdio } from './agent-connection-stdio'
+import { StdioWebSocketAdapter, connectStdio, runDetachedStdioMode } from './agent-connection-stdio'
+import { runConnectBridgeMode } from './relay-detach-bridge'
+import { existsSync, readFileSync } from 'node:fs'
 import { createSession } from './agent-session'
 import { HEADER_SIZE, createWireState, decodeFrame, encodeDataFrame, parseJsonPayload } from './agent-wire'
 import type { AgentConfig } from './agent-config'
@@ -252,5 +254,219 @@ describe('connectStdio', () => {
 
     expect(typeof connectStdio).toBe('function')
     expect(connectStdio.length).toBe(3)
+  })
+})
+
+// ─── runDetachedStdioMode's CHILD half (TASK-SSH-03-01) ────────────────────
+// Exercised for real (no mocking): the same function, invoked with
+// ORCA_RELAY_DETACHED_CHILD=1 already set, takes the child branch directly
+// — a real net.Server listening on a real Unix socket, a real pidfile, a
+// real stale-socket cleanup — without needing to actually re-exec/spawn a
+// second process (that half is covered separately below via a mocked
+// `spawn`).
+describe('runDetachedStdioMode: child branch (real socket, no spawn)', () => {
+  let tmpDir: string
+  let sockPath: string
+  const prevEnv = process.env['ORCA_RELAY_DETACHED_CHILD']
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'orca-detach-test-'))
+    sockPath = join(tmpDir, 'relay.sock')
+    process.env['ORCA_RELAY_DETACHED_CHILD'] = '1'
+  })
+
+  afterEach(() => {
+    if (prevEnv === undefined) {
+      delete process.env['ORCA_RELAY_DETACHED_CHILD']
+    } else {
+      process.env['ORCA_RELAY_DETACHED_CHILD'] = prevEnv
+    }
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('listens on sockPath, writes a pidfile, and stays connectable', async () => {
+    // runDetachedStdioMode's child branch never resolves on its own (it
+    // awaits a Promise that never settles — see agent-connection-stdio.ts's
+    // doc comment) — race it against "the socket became connectable" rather
+    // than awaiting the call itself.
+    void runDetachedStdioMode(sockPath, mockConfig, [mockTool], mockLog)
+
+    await vi.waitFor(() => {
+      if (!existsSync(sockPath)) {
+        throw new Error('socket not yet created')
+      }
+    })
+
+    const client = connect(sockPath)
+    await new Promise<void>((resolve, reject) => {
+      client.once('connect', resolve)
+      client.once('error', reject)
+    })
+    client.destroy()
+
+    await vi.waitFor(() => {
+      if (!existsSync(`${sockPath}.pid`)) {
+        throw new Error('pidfile not yet written')
+      }
+    })
+    const pid = readFileSync(`${sockPath}.pid`, 'utf8')
+    expect(Number(pid)).toBe(process.pid)
+  })
+
+  it('a client connecting to the listener can complete an agent.handshake over it', async () => {
+    void runDetachedStdioMode(sockPath, mockConfig, [mockTool], mockLog)
+    await vi.waitFor(() => {
+      if (!existsSync(sockPath)) {
+        throw new Error('socket not yet created')
+      }
+    })
+
+    const client = connect(sockPath)
+    await new Promise<void>((resolve) => client.once('connect', resolve))
+
+    const received = await collectOneFrame(client)
+    const wireState = createWireState()
+    const frame = decodeFrame(wireState, received)
+    const rpc = parseJsonPayload<{ method?: string }>(frame!.payload)
+    expect(rpc?.method).toBe('agent.handshake')
+    client.destroy()
+  })
+})
+
+// ─── runDetachedStdioMode's PARENT half (spawn + wait-for-listening) ───────
+describe('runDetachedStdioMode: parent branch (mocked spawn)', () => {
+  it('resolves once the child reports "listening", and unrefs/disconnects the child', async () => {
+    const { EventEmitter } = await import('node:events')
+    const fakeChild = Object.assign(new EventEmitter(), {
+      pid: 4242,
+      unref: vi.fn(),
+      disconnect: vi.fn(),
+    })
+    const spawnMock = vi.fn().mockReturnValue(fakeChild)
+    vi.doMock('node:child_process', () => ({ spawn: spawnMock }))
+    vi.resetModules()
+    const { runDetachedStdioMode: freshRunDetachedStdioMode } = await import('./agent-connection-stdio')
+
+    const prevEnv = process.env['ORCA_RELAY_DETACHED_CHILD']
+    delete process.env['ORCA_RELAY_DETACHED_CHILD'] // force the parent branch
+
+    const promise = freshRunDetachedStdioMode('/tmp/fake.sock', mockConfig, [mockTool], mockLog)
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled())
+    fakeChild.emit('message', 'listening')
+    await promise
+
+    expect(fakeChild.unref).toHaveBeenCalledOnce()
+    expect(fakeChild.disconnect).toHaveBeenCalledOnce()
+    const [, args] = spawnMock.mock.calls[0]!
+    expect(args).toEqual(expect.arrayContaining(['--detach', '--sock-path', '/tmp/fake.sock']))
+
+    if (prevEnv !== undefined) {
+      process.env['ORCA_RELAY_DETACHED_CHILD'] = prevEnv
+    }
+    vi.doUnmock('node:child_process')
+    vi.resetModules()
+  })
+
+  it('rejects when the child emits an error before reporting listening', async () => {
+    const { EventEmitter } = await import('node:events')
+    const fakeChild = Object.assign(new EventEmitter(), {
+      pid: 4243,
+      unref: vi.fn(),
+      disconnect: vi.fn(),
+    })
+    const spawnMock = vi.fn().mockReturnValue(fakeChild)
+    vi.doMock('node:child_process', () => ({ spawn: spawnMock }))
+    vi.resetModules()
+    const { runDetachedStdioMode: freshRunDetachedStdioMode } = await import('./agent-connection-stdio')
+
+    const prevEnv = process.env['ORCA_RELAY_DETACHED_CHILD']
+    delete process.env['ORCA_RELAY_DETACHED_CHILD']
+
+    const promise = freshRunDetachedStdioMode('/tmp/fake2.sock', mockConfig, [mockTool], mockLog)
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled())
+    fakeChild.emit('error', new Error('spawn failed'))
+
+    await expect(promise).rejects.toThrow('spawn failed')
+
+    if (prevEnv !== undefined) {
+      process.env['ORCA_RELAY_DETACHED_CHILD'] = prevEnv
+    }
+    vi.doUnmock('node:child_process')
+    vi.resetModules()
+  })
+})
+
+// ─── runConnectBridgeMode (TASK-SSH-03-02) ─────────────────────────────────
+describe('runConnectBridgeMode', () => {
+  let server: Server
+  let sockPath: string
+  let tmpDir: string
+  let peerPromise: Promise<Socket>
+  let peerReceivedChunks: Buffer[]
+
+  beforeEach(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'orca-connect-bridge-test-'))
+    sockPath = join(tmpDir, 'bridge.sock')
+    peerReceivedChunks = []
+    peerPromise = new Promise<Socket>((resolve) => {
+      server = createServer((sock) => {
+        sock.on('data', (c: Buffer) => peerReceivedChunks.push(c))
+        resolve(sock)
+      })
+    })
+    await new Promise<void>((resolve) => server.listen(sockPath, resolve))
+  })
+
+  afterEach(async () => {
+    await new Promise<void>((r) => server.close(() => r()))
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('pipes process.stdin bytes to the socket and socket bytes to process.stdout, both directions', async () => {
+    const { PassThrough } = await import('node:stream')
+    const fakeStdin = new PassThrough()
+    const fakeStdout = new PassThrough()
+    const stdinSpy = vi.spyOn(process, 'stdin', 'get').mockReturnValue(fakeStdin as unknown as typeof process.stdin)
+    const stdoutSpy = vi.spyOn(process, 'stdout', 'get').mockReturnValue(fakeStdout as unknown as typeof process.stdout)
+
+    const bridgeDone = runConnectBridgeMode(sockPath)
+    const peerSock = await peerPromise
+
+    const fromStdoutChunks: Buffer[] = []
+    fakeStdout.on('data', (c: Buffer) => fromStdoutChunks.push(c))
+
+    fakeStdin.write('hello from local\n')
+    await vi.waitFor(() => {
+      if (!Buffer.concat(peerReceivedChunks).toString().includes('hello from local\n')) {
+        throw new Error('not yet received')
+      }
+    })
+
+    peerSock.write('hello from remote\n')
+    await vi.waitFor(() => expect(Buffer.concat(fromStdoutChunks).toString()).toContain('hello from remote\n'))
+
+    fakeStdin.end()
+    await bridgeDone
+    peerSock.destroy()
+
+    stdinSpy.mockRestore()
+    stdoutSpy.mockRestore()
+  })
+
+  it('resolves cleanly when the socket peer closes', async () => {
+    const { PassThrough } = await import('node:stream')
+    const fakeStdin = new PassThrough()
+    const fakeStdout = new PassThrough()
+    const stdinSpy = vi.spyOn(process, 'stdin', 'get').mockReturnValue(fakeStdin as unknown as typeof process.stdin)
+    const stdoutSpy = vi.spyOn(process, 'stdout', 'get').mockReturnValue(fakeStdout as unknown as typeof process.stdout)
+
+    const bridgeDone = runConnectBridgeMode(sockPath)
+    const peerSock = await peerPromise
+
+    peerSock.end()
+    await bridgeDone
+
+    stdinSpy.mockRestore()
+    stdoutSpy.mockRestore()
   })
 })

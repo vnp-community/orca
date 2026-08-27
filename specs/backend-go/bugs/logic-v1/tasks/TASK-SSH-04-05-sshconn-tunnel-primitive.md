@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshconn/tunnel.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — sshconn.Connection.Forward/Tunnel added (with in-flight connection tracking so Close() actually terminates live copies, beyond the spec's listener-only close); TestTunnel_* pass`
 
 ---
 

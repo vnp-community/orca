@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/provisioner.go`
 **Depends on:** TASK-SSH-02-02, TASK-SSH-02-03
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — Provision skips deploy when remote AGENT_VERSION matches OrcaVersion, else calls deployWithRetry; TestProvision_VersionMatches_SkipsDeploy/VersionMismatch_StillDeploys pass`
 
 ---
 

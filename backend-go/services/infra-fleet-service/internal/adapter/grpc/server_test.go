@@ -34,6 +34,9 @@ func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sen
 		getAgentTerminalSession, sendTerminalInput, getTerminalScrollback,
 		nil, nil, nil, nil, // fleet import/bulk-provision/detect/preflight usecases, unused here
 		nil, nil, nil, // persistent agent-token usecases (BL-AWS-03), unused here
+		nil,           // teardown-connection usecase (BR-SSH-13), unused here
+		nil, nil, nil, // port-forward CRUD usecases (SOL-SSH-04), unused here
+		nil, // port-forward event broadcaster (TASK-SSH-04-08), unused here
 	)
 }
 
@@ -135,6 +138,7 @@ func (f *fakeDevServerAgentClient) AgentStatus(ctx context.Context, devServer do
 func (f *fakeDevServerAgentClient) InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (usecase.InspectProcessResult, error) {
 	return usecase.InspectProcessResult{}, nil
 }
+func (f *fakeDevServerAgentClient) CancelReconnect(devServerID string) {}
 
 func withTenant(ctx context.Context, tenantID string) context.Context {
 	return tenant.WithTenantID(ctx, tenantID)
@@ -395,6 +399,7 @@ func (f *fakeDevServerAgent) AgentStatus(ctx context.Context, devServer domain.D
 func (f *fakeDevServerAgent) InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (usecase.InspectProcessResult, error) {
 	return usecase.InspectProcessResult{}, nil
 }
+func (f *fakeDevServerAgent) CancelReconnect(devServerID string) {}
 
 func TestServer_DetectDevServerAgents_RequestToResponseMarshaling(t *testing.T) {
 	agent := &fakeDevServerAgent{execResult: map[string]any{"agents": []any{"claude"}, "platform": "linux"}}

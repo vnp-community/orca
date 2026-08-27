@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/launch.go`
 **Depends on:** TASK-SSH-03-01, TASK-SSH-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — launch() now starts the detached process (--detach) and tail-calls reattach() (--connect); reattach() probes `test -S` and skips SFTP; new tests pass`
 
 ---
 

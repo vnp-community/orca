@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/portalloc/allocator.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — portalloc.Allocator added; TestAllocator_* pass (exclusion, range, namespacing, release, exhaustion)`
 
 ---
 
