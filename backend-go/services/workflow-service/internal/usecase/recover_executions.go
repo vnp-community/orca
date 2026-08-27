@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -174,7 +175,23 @@ func (uc *RecoverExecutions) recoverOne(ctx context.Context, exec domain.Workflo
 // machinery (dispatchWavesFrom, see wave_dispatcher.go) instead of a
 // bespoke recovery-only dispatch loop.
 func (uc *RecoverExecutions) resumeToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step, resumeWave int, existingRows map[string]domain.StepExecution) {
-	succeeded := uc.dispatcher.dispatchWavesFrom(ctx, exec.ID, waves, resumeWave, existingRows)
+	// Inputs are NOT recoverable here — ExecuteRequest.inputs_json is
+	// never persisted (see execute.go), so a resumed-after-crash execution
+	// loses access to {{...}} input tokens for its remaining waves; earlier
+	// waves' {{outputs.*}} ARE recoverable, reconstructed from each
+	// completed step's persisted OutputJSON below. Documented as a known
+	// gap alongside recoverOne's ad-hoc-execution one, not a silent loss.
+	execCtx := newExecutionContext(domain.ExecutionContext{ProjectID: exec.ProjectID})
+	for stepID, se := range existingRows {
+		if se.Status != domain.StepExecutionStatusCompleted {
+			continue
+		}
+		var parsed map[string]any
+		_ = json.Unmarshal([]byte(se.OutputJSON), &parsed)
+		execCtx.recordOutput(stepID, parsed)
+	}
+
+	succeeded := uc.dispatcher.dispatchWavesFrom(ctx, exec.ID, waves, resumeWave, existingRows, execCtx)
 	uc.finish(ctx, exec, succeeded)
 }
 

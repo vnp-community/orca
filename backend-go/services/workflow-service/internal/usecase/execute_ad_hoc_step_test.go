@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -11,8 +12,14 @@ import (
 
 // fakeStepExecutor is an in-memory domain.StepExecutor — the "test against
 // fakes, not real infra" pattern from
-// specs/backend-go/standards/testing-strategy.md's unit-test section.
+// specs/backend-go/standards/testing-strategy.md's unit-test section. A
+// single instance is commonly registered for one StepType and invoked
+// concurrently by multiple steps within a wave (see wave_dispatcher_test.go),
+// so its bookkeeping fields are mutex-guarded — TASK-WF-02-06 found this
+// unguarded, causing a data race under -race whenever a test dispatched
+// more than one step through the same fake concurrently.
 type fakeStepExecutor struct {
+	mu          sync.Mutex
 	result      domain.StepResult
 	err         error
 	lastConfig  string
@@ -20,12 +27,15 @@ type fakeStepExecutor struct {
 }
 
 func (f *fakeStepExecutor) Execute(ctx context.Context, stepConfigJSON string) (domain.StepResult, error) {
+	f.mu.Lock()
 	f.invocations++
 	f.lastConfig = stepConfigJSON
-	if f.err != nil {
-		return domain.StepResult{}, f.err
+	result, err := f.result, f.err
+	f.mu.Unlock()
+	if err != nil {
+		return domain.StepResult{}, err
 	}
-	return f.result, nil
+	return result, nil
 }
 
 // fakeRegistry is an in-memory StepExecutorRegistry.

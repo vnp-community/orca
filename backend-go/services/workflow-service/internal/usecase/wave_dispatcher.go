@@ -2,13 +2,55 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"sync"
 
 	"github.com/google/uuid"
 
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 )
+
+// executionContext bundles a domain.ExecutionContext with the mutex
+// guarding concurrent writes to its Outputs map — steps within one wave
+// dispatch concurrently (see dispatchWave). Deliberately NOT a waveDispatcher
+// field: waveDispatcher is a single instance shared across every execution
+// this process runs (constructed once in NewExecute/NewExecuteAdHocStep/
+// NewRecoverExecutions), so per-execution state must be threaded explicitly
+// through the dispatch call chain instead, or concurrent executions would
+// corrupt each other's Inputs/Outputs.
+type executionContext struct {
+	mu  sync.Mutex
+	ctx domain.ExecutionContext
+}
+
+// newExecutionContext builds a fresh executionContext for one Execute/
+// RecoverExecutions run.
+func newExecutionContext(execCtx domain.ExecutionContext) *executionContext {
+	if execCtx.Outputs == nil {
+		execCtx.Outputs = make(map[string]map[string]any)
+	}
+	return &executionContext{ctx: execCtx}
+}
+
+// snapshot returns a lock-protected copy of the current ExecutionContext —
+// safe to pass to domain.Interpolate (which takes it by value) without
+// holding execCtx's mutex for the duration of interpolation.
+func (e *executionContext) snapshot() domain.ExecutionContext {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.ctx
+}
+
+// recordOutput stores stepID's parsed output — called after a step
+// completes, guarded since sibling steps in the same wave finish and write
+// concurrently.
+func (e *executionContext) recordOutput(stepID string, output map[string]any) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.ctx.Outputs[stepID] = output
+}
 
 // defaultMaxConcurrentSteps bounds in-flight step dispatch per execution —
 // workflow-service.md §8: a bounded worker pool, not one unbounded
@@ -55,8 +97,8 @@ func newWaveDispatcher(stepExecutions StepExecutionRepository, registry StepExec
 // ctx's lifetime must outlive the RPC that triggered dispatch when called
 // from Execute's background goroutine — see that type's doc comment; the
 // context passed here is NOT the inbound RPC's context in that path.
-func (d *waveDispatcher) dispatchWaves(ctx context.Context, executionID string, waves [][]domain.Step) bool {
-	return d.dispatchWavesFrom(ctx, executionID, waves, 0, nil)
+func (d *waveDispatcher) dispatchWaves(ctx context.Context, executionID string, waves [][]domain.Step, execCtx *executionContext) bool {
+	return d.dispatchWavesFrom(ctx, executionID, waves, 0, nil, execCtx)
 }
 
 // dispatchWavesFrom is dispatchWaves' resume variant, used by
@@ -72,7 +114,7 @@ func (d *waveDispatcher) dispatchWaves(ctx context.Context, executionID string, 
 // step_executions' (execution_id, step_id) UNIQUE constraint. Waves after
 // startWave have no pre-existing rows and dispatch fresh, identical to
 // dispatchWaves.
-func (d *waveDispatcher) dispatchWavesFrom(ctx context.Context, executionID string, waves [][]domain.Step, startWave int, existingRows map[string]domain.StepExecution) bool {
+func (d *waveDispatcher) dispatchWavesFrom(ctx context.Context, executionID string, waves [][]domain.Step, startWave int, existingRows map[string]domain.StepExecution, execCtx *executionContext) bool {
 	succeeded := true
 	for waveIdx := startWave; waveIdx < len(waves); waveIdx++ {
 		if !succeeded {
@@ -82,7 +124,7 @@ func (d *waveDispatcher) dispatchWavesFrom(ctx context.Context, executionID stri
 		if waveIdx == startWave {
 			existing = existingRows
 		}
-		if !d.dispatchWave(ctx, executionID, waveIdx, waves[waveIdx], existing) {
+		if !d.dispatchWave(ctx, executionID, waveIdx, waves[waveIdx], existing, execCtx) {
 			succeeded = false
 		}
 	}
@@ -110,7 +152,7 @@ func (d *waveDispatcher) dispatchWavesFrom(ctx context.Context, executionID stri
 // left alone: a running row's real-world outcome is unknown after a
 // crash, and treating a failed row as equally uncertain keeps this rule
 // uniform rather than adding a second special case.
-func (d *waveDispatcher) dispatchWave(ctx context.Context, executionID string, waveIdx int, wave []domain.Step, existing map[string]domain.StepExecution) bool {
+func (d *waveDispatcher) dispatchWave(ctx context.Context, executionID string, waveIdx int, wave []domain.Step, existing map[string]domain.StepExecution, execCtx *executionContext) bool {
 	type dispatchable struct {
 		resultIdx int
 		step      domain.Step
@@ -154,7 +196,7 @@ func (d *waveDispatcher) dispatchWave(ctx context.Context, executionID string, w
 		go func(dsp dispatchable) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			results[dsp.resultIdx] = d.dispatchStep(ctx, dsp.step, dsp.row)
+			results[dsp.resultIdx] = d.dispatchStep(ctx, dsp.step, dsp.row, execCtx)
 		}(dsp)
 	}
 	wg.Wait()
@@ -169,7 +211,16 @@ func (d *waveDispatcher) dispatchWave(ctx context.Context, executionID string, w
 
 // dispatchStep resolves step's StepExecutor and runs it, persisting se's
 // running->terminal transitions, and reports whether the step succeeded.
-func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se domain.StepExecution) bool {
+//
+// Before dispatch, step.Config is interpolated (domain.Interpolate)
+// against execCtx's current snapshot — resolving {{...}} tokens referencing
+// ExecuteRequest.inputs_json values or an earlier wave's step outputs
+// (TASK-WF-02-06). ctx is also enriched with the triggering user/project
+// (tenant.WithUserID/WithProjectID) so a StepExecutor needing that scope
+// (e.g. AgentExecutor's ProviderResolver — see TASK-WF-02-05) can read it
+// without its own signature changing. On success, the step's parsed
+// OutputJSON is recorded into execCtx.Outputs for later waves to reference.
+func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se domain.StepExecution, execCtx *executionContext) bool {
 	se.MarkRunning()
 	if err := d.stepExecutions.UpdateStepExecution(ctx, se); err != nil {
 		// A persistence hiccup on the pending->running transition doesn't
@@ -177,6 +228,24 @@ func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se 
 		// and final execution status actually depend on.
 		slog.ErrorContext(ctx, "workflow: marking step execution running failed", slog.String("step_execution_id", se.ID), slog.Any("error", err))
 	}
+
+	snapshot := execCtx.snapshot()
+	ctx = tenant.WithUserID(tenant.WithProjectID(ctx, snapshot.ProjectID), snapshot.UserID)
+
+	interpolated, ierr := domain.Interpolate(string(step.Config), snapshot)
+	if ierr != nil {
+		// domain.Interpolate's own contract never actually returns a
+		// non-nil error today (unresolvable tokens are left as literal
+		// text, not failed) — handled defensively in case that contract
+		// changes, using the same fail-closed shape runStep's own errors
+		// use below.
+		se.Fail(ierr.Error())
+		if uerr := d.stepExecutions.UpdateStepExecution(ctx, se); uerr != nil {
+			slog.ErrorContext(ctx, "workflow: persisting terminal step execution failed", slog.String("step_execution_id", se.ID), slog.Any("error", uerr))
+		}
+		return false
+	}
+	step.Config = json.RawMessage(interpolated)
 
 	result, err := d.runStep(ctx, step, &se)
 
@@ -186,6 +255,11 @@ func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se 
 
 	if err != nil {
 		return false
+	}
+	if result.Status == domain.ResultStatusCompleted {
+		var parsed map[string]any
+		_ = json.Unmarshal([]byte(result.OutputJSON), &parsed) // best-effort — see ExecutionContext.Outputs' doc comment
+		execCtx.recordOutput(step.ID, parsed)
 	}
 	return result.Status == domain.ResultStatusCompleted
 }

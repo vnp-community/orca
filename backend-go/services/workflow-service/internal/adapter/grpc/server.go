@@ -82,6 +82,7 @@ func (s *Server) Execute(ctx context.Context, req *workflowv1.ExecuteRequest) (*
 		ProjectID:   req.GetProjectId(),
 		RootTraceID: req.GetRootTraceId(),
 		RequestID:   req.GetRequestId(),
+		InputsJSON:  req.GetInputsJson(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
