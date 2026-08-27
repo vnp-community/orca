@@ -262,5 +262,14 @@ export const WORKTREE_METHODS: RpcMethod[] = [
     params: WorktreeForceDeleteBranch,
     handler: async (params, { runtime }) =>
       runtime.forceDeletePreservedBranch(params.worktree, params.branchName, params.expectedHead)
+  }),
+  defineMethod({
+    // Why: forget-locally drops a workspace from Orca without any remote Git
+    // or filesystem work (mirrors desktop's worktrees:forgetLocal IPC) — it
+    // never had RPC coverage, so paired web/mobile clients could not clear a
+    // workspace pinned to a removed/disconnected host.
+    name: 'worktree.forgetLocal',
+    params: WorktreeSelector,
+    handler: async (params, { runtime }) => runtime.forgetLocalManagedWorktree(params.worktree)
   })
 ]

@@ -1,20 +1,21 @@
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
 import { Tracers } from '../../../shared/trace/tracers'
-import type { OrcaTask } from '../types/task-types'
+import type { OrcaTask } from '../../../shared/task-types'
 
 export function useTask(taskId: string) {
-  const task = useAppStore(s => s.tasks.find((t: OrcaTask) => t.id === taskId))
+  const task = useAppStore((s) => s.tasks.find((t: OrcaTask) => t.id === taskId))
 
   const updateTask = async (patch: Partial<OrcaTask>) => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    await callRuntimeRpc(target, 'tasks.update', { taskId, ...patch }) // Corrected to tasks.update
+    // task.update expects the patch nested under `patch`, not spread at the top level.
+    await callRuntimeRpc(target, 'task.update', { taskId, patch })
     useAppStore.getState().updateTask(taskId, patch)
   }
 
   const deleteTask = async () => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    await callRuntimeRpc(target, 'tasks.delete', { taskId }) // Corrected to tasks.delete
+    await callRuntimeRpc(target, 'task.delete', { taskId })
     useAppStore.getState().removeTask(taskId)
   }
 
@@ -28,12 +29,16 @@ export function useTask(taskId: string) {
       promptLength: instruction?.length ?? 0
     })
     try {
-      // Corrected to tasks.aiPlan per TASK-FE-015
-      const result = await callRuntimeRpc(target, 'tasks.aiPlan', { taskId, instruction, traceId: span.id }) as {
-        subtasks: Partial<OrcaTask>[]
-      }
-      span.ok({ taskId, subtaskCount: result.subtasks.length })
-      return result.subtasks
+      // task.aiDecompose has no `instruction` param — the backend derives the prompt
+      // from the task's own fields (TaskAIPlanner.buildDecomposePrompt) and returns
+      // the proposed subtasks as OrcaTask[] directly (not wrapped in `{ subtasks }`).
+      const subtasks = (await callRuntimeRpc(target, 'task.aiDecompose', {
+        taskId,
+        projectId: task?.projectId ?? '',
+        traceId: span.id
+      })) as OrcaTask[]
+      span.ok({ taskId, subtaskCount: subtasks.length })
+      return subtasks
     } catch (err) {
       span.fail(err, { taskId })
       throw err
@@ -42,11 +47,13 @@ export function useTask(taskId: string) {
 
   const acceptSubtasks = async (subtasks: Partial<OrcaTask>[], projectId: string) => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    // Corrected to tasks.createSubtasks per TASK-FE-015
-    const createdSubtasks = await callRuntimeRpc(target, 'tasks.createSubtasks', {
+    // task.aiApply looks up the parent task's projectId server-side; kept as a param
+    // here only to preserve this hook's existing call signature for callers.
+    void projectId
+    const createdSubtasks = (await callRuntimeRpc(target, 'task.aiApply', {
       taskId,
       subtasks
-    }) as OrcaTask[]
+    })) as OrcaTask[]
     for (const created of createdSubtasks) {
       useAppStore.getState().addTask(created)
     }

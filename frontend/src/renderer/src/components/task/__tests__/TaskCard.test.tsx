@@ -25,7 +25,7 @@ describe('TaskCard', () => {
     type: 'feature',
     status: 'todo',
     priority: 'high',
-    progress: 50,
+    progressPercent: 50,
   } as any
 
   beforeEach(() => {
@@ -38,6 +38,11 @@ describe('TaskCard', () => {
     render(<TaskCard task={mockTask} depth={0} isExpanded={false} onToggle={vi.fn()} onSelect={vi.fn()} />)
     expect(screen.getByText('Test Task')).toBeInTheDocument()
     expect(screen.getByText('feature')).toBeInTheDocument()
+  })
+
+  it('renders progressPercent when > 0', () => {
+    render(<TaskCard task={mockTask} depth={0} isExpanded={false} onToggle={vi.fn()} onSelect={vi.fn()} />)
+    expect(screen.getByText('50%')).toBeInTheDocument()
   })
 
   it('shows expand chevron when task has children', () => {

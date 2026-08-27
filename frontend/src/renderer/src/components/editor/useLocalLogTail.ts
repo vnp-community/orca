@@ -50,7 +50,10 @@ function stopTailSession(session: TailSession): void {
     return
   }
   session.closed = true
-  // Why: start IPC can still be resolving when a tab closes. Stop only after
+  // Why: local log tail streams the client-local main process's own file watcher
+  // (gated to runtimeEnvironmentId === null by isLocalLiveLog); there is no
+  // files.* RPC equivalent, so this stays a direct main-process IPC call.
+  // Start IPC can still be resolving when a tab closes. Stop only after
   // start settles so a late-created main-process watcher cannot escape cleanup.
   void session.startPromise
     .then(() => window.api.fs.stopLocalLogTail({ subscriptionId: session.subscriptionId }))

@@ -5,12 +5,15 @@
  */
 
 import type { Migration } from './types'
+import { nowTextDefaultSql } from './sql-dialect'
 
 export const migration0003AddWorkspaceSessions: Migration = {
   version: 3,
   name: 'add_workspace_sessions',
 
   async up(db) {
+    // BUG-BE-RPC-003: datetime('now') is SQLite-only — see sql-dialect.ts.
+    const now = nowTextDefaultSql(db.capabilities.dialect)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS workspace_sessions (
         id           TEXT PRIMARY KEY,
@@ -18,7 +21,7 @@ export const migration0003AddWorkspaceSessions: Migration = {
         repo_id      TEXT REFERENCES repos(id) ON DELETE SET NULL,
         agent        TEXT NOT NULL,
         status       TEXT NOT NULL DEFAULT 'active',
-        started_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        started_at   TEXT NOT NULL DEFAULT ${now},
         ended_at     TEXT,
         metadata     TEXT NOT NULL DEFAULT '{}'
       )

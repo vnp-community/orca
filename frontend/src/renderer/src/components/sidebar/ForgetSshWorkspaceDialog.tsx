@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { connectRuntimeSsh } from '@/runtime/runtime-ssh-client'
 import { runWorktreeDeleteWithToast } from './delete-worktree-flow'
 import type { SshWorkspaceForgetResolution } from './ssh-workspace-forget-resolution'
 
@@ -66,7 +67,7 @@ export function ForgetSshWorkspaceDialog(): React.JSX.Element | null {
     }
     setBusy('reconnect')
     try {
-      await window.api.ssh.connect({ targetId: resolution.targetId })
+      await connectRuntimeSsh(useAppStore.getState().settings, resolution.targetId)
     } catch (err) {
       if (mountedRef.current) {
         setBusy(null)

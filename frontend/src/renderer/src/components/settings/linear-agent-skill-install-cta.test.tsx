@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
     refresh: vi.fn(async () => true)
   },
   useInstalledAgentSkillNames: vi.fn(),
-  clipboardWrite: vi.fn(async () => {}),
+  clipboardWrite: vi.fn(async (_text: string) => {}),
   toastSuccess: vi.fn(),
   toastError: vi.fn()
 }))
@@ -32,6 +32,10 @@ vi.mock('./CliSkillRuntimeSetup', () => ({
 
 vi.mock('sonner', () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError }
+}))
+
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiWriteClipboardText: (text: string) => mocks.clipboardWrite(text)
 }))
 
 let root: Root | null = null
@@ -89,10 +93,6 @@ describe('LinearAgentSkillInstallCta', () => {
     mocks.clipboardWrite.mockClear()
     mocks.toastSuccess.mockClear()
     mocks.toastError.mockClear()
-    Object.defineProperty(window, 'api', {
-      configurable: true,
-      value: { ui: { writeClipboardText: mocks.clipboardWrite } }
-    })
   })
 
   afterEach(async () => {

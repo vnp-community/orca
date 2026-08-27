@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useAppStore } from '@/store'
+import { addRuntimeRepoRemote } from '@/runtime/runtime-repo-client'
 import type { Repo } from '../../../../shared/types'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
 import { finishProjectAddWithDefaultCheckout } from './project-added-default-checkout'
@@ -67,7 +68,7 @@ const AddProjectFromFolderDialog = React.memo(function AddProjectFromFolderDialo
     try {
       let repo: Repo | null
       if (connectionId) {
-        const result = await window.api.repos.addRemote({
+        const result = await addRuntimeRepoRemote(useAppStore.getState().settings, {
           connectionId,
           remotePath: folderPath
         })

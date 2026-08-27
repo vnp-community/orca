@@ -40,6 +40,8 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { DevServerRelayConnection } from './dev-server-relay-connection'
 import { DevServerFilesystemProvider } from './dev-server-filesystem-provider'
 import { DevServerGitProvider } from './dev-server-git-provider'
+import { DevServerGithubCliProvider } from './dev-server-github-cli-provider'
+import { DevServerGitlabCliProvider } from './dev-server-gitlab-cli-provider'
 import { DevServerPtyProvider } from './dev-server-pty-provider'
 import {
   createServerPtyController,
@@ -50,6 +52,12 @@ import {
   unregisterRemoteFilesystemProvider
 } from './ssh-filesystem-dispatch'
 import { registerRemoteGitProvider, unregisterRemoteGitProvider } from './ssh-git-dispatch'
+import {
+  registerRemoteGithubCliProvider,
+  unregisterRemoteGithubCliProvider,
+  registerRemoteGitlabCliProvider,
+  unregisterRemoteGitlabCliProvider
+} from './hosted-cli-dispatch'
 import { registerRemotePtyProvider, unregisterRemotePtyProvider } from '../ipc/pty'
 
 export type DevServerProviderLifecycle = {
@@ -95,6 +103,8 @@ export function wireDevServerProviders(
     }
     registerRemoteFilesystemProvider(id, new DevServerFilesystemProvider(id, relay))
     registerRemoteGitProvider(id, new DevServerGitProvider(id, relay))
+    registerRemoteGithubCliProvider(id, new DevServerGithubCliProvider(id, relay))
+    registerRemoteGitlabCliProvider(id, new DevServerGitlabCliProvider(id, relay))
 
     // Why await list() (not get()): GatewayDevServerManagerProxy.get() throws
     // synchronously ("not supported in User Process") — list() is the one
@@ -140,6 +150,8 @@ export function wireDevServerProviders(
   const unregisterFor = (id: string): void => {
     unregisterRemoteFilesystemProvider(id)
     unregisterRemoteGitProvider(id)
+    unregisterRemoteGithubCliProvider(id)
+    unregisterRemoteGitlabCliProvider(id)
     for (const unsubscribe of ptyUnsubscribersByDevServerId.get(id) ?? []) {
       unsubscribe()
     }

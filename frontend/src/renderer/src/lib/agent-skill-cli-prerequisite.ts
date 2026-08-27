@@ -1,6 +1,7 @@
 import { toast } from 'sonner'
 import type { CliInstallStatus } from '../../../shared/cli-install-types'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeCliInstallStatus, installRuntimeCli } from '@/runtime/runtime-cli-client'
 
 type EnsureOrcaCliAvailableOptions = {
   onStatusChange?: (status: CliInstallStatus) => void
@@ -23,7 +24,7 @@ export async function ensureOrcaCliAvailableForAgentSkillTerminal({
   registrationPromptDelayMs = 700
 }: EnsureOrcaCliAvailableOptions = {}): Promise<CliInstallStatus | null> {
   try {
-    const status = await window.api.cli.getInstallStatus()
+    const status = await getRuntimeCliInstallStatus()
     onStatusChange?.(status)
 
     if (!status.supported) {
@@ -35,7 +36,7 @@ export async function ensureOrcaCliAvailableForAgentSkillTerminal({
       // Why: macOS may immediately show a native authorization prompt, so the
       // user needs app-level context before that OS dialog appears.
       await showOrcaCliRegistrationPromptToast(registrationPromptDelayMs)
-      const next = await window.api.cli.install()
+      const next = await installRuntimeCli()
       onStatusChange?.(next)
       showCliPrerequisiteWarning(next)
       return next

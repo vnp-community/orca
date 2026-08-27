@@ -38,7 +38,7 @@ export class MigrationRunner {
   async getApplied(): Promise<AppliedMigration[]> {
     await this.ensureTable()
     const rows = await this.db.query(
-      `SELECT version, name, applied_at as appliedAt FROM ${MIGRATIONS_TABLE} ORDER BY version ASC`
+      `SELECT version, name, applied_at as "appliedAt" FROM ${MIGRATIONS_TABLE} ORDER BY version ASC`
     )
     return rows.map((r) => ({
       version: r['version'] as number,

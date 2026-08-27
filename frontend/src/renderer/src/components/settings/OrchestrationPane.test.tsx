@@ -116,7 +116,27 @@ describe('OrchestrationPane', () => {
           isAvailable: vi.fn().mockResolvedValue(false)
         },
         runtime: {
-          getStatus: vi.fn().mockResolvedValue({ hostPlatform: 'win32' })
+          getStatus: vi.fn().mockResolvedValue({ hostPlatform: 'win32' }),
+          call: vi.fn(async ({ method }: { method: string }) => {
+            switch (method) {
+              case 'host.wsl.isAvailable':
+                return { ok: true, result: false }
+              case 'host.wsl.listDistros':
+                return { ok: true, result: [] }
+              case 'host.pwsh.isAvailable':
+                return { ok: true, result: false }
+              case 'host.gitBash.isAvailable':
+                return { ok: true, result: false }
+              case 'status.get':
+                return { ok: true, result: { hostPlatform: 'win32' } }
+              case 'cli.getInstallStatus':
+                return { ok: true, result: { state: 'not_installed' } }
+              case 'cli.getWslInstallStatus':
+                return { ok: true, result: { state: 'not_installed' } }
+              default:
+                throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+            }
+          })
         }
       }
     })

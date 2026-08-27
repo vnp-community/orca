@@ -30,7 +30,9 @@ import {
 import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import { isGitRepoKind } from '../../../shared/repo-kind'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { listRuntimeEphemeralVmRecipes } from '@/runtime/runtime-ephemeral-vm-client'
 import { resolveWorktreeCreateBaseBranch } from '@/runtime/worktree-create-base'
+import { connectRuntimeSsh } from '@/runtime/runtime-ssh-client'
 import {
   buildTaskSourceContextFromRepo,
   type TaskSourceContext
@@ -178,6 +180,7 @@ import {
 } from './composer-drop-upload-result'
 import { translate } from '@/i18n/i18n'
 
+import { shellPickAttachment } from '../runtime/runtime-shell-client'
 export function canResolveFolderSmartGitHubSubmit({
   hasFolderSourceRepos
 }: {
@@ -873,8 +876,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         cancelled = true
       }
     }
-    void window.api.ephemeralVm
-      .listRecipes({ repoId: selectedRecipeRepoId })
+    void listRuntimeEphemeralVmRecipes(selectedRepoSettings, { repoId: selectedRecipeRepoId })
       .then((result) => {
         if (cancelled) {
           return
@@ -913,7 +915,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     isProjectGroupTarget,
     selectedRecipeRepoConnectionId,
     selectedRecipeRepoId,
-    selectedRepoIsGit
+    selectedRepoIsGit,
+    selectedRepoSettings
   ])
   const selectedRepoConnectionId = selectedRepo?.connectionId ?? null
   const selectedRepoSshState = selectedRepoConnectionId
@@ -1824,7 +1827,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     }
 
     try {
-      await window.api.ssh.connect({ targetId })
+      await connectRuntimeSsh(liveState.settings, targetId)
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -1845,7 +1848,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       return
     }
     try {
-      await window.api.ssh.connect({ targetId: folderTargetConnectionId })
+      await connectRuntimeSsh(useAppStore.getState().settings, folderTargetConnectionId)
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -2509,7 +2512,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
 
   const handleAddAttachment = useCallback(async (): Promise<void> => {
     try {
-      const selectedPath = await window.api.shell.pickAttachment()
+      const selectedPath = await shellPickAttachment()
       if (!selectedPath) {
         return
       }
@@ -2528,6 +2531,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
 
   const applyLocalComposerDrop = useCallback(
     async (paths: string[], canApply: () => boolean = () => true): Promise<void> => {
+      // Why: only reached when uploadComposerPaths found no remote runtime/SSH
+      // target, so these dropped paths are on the client-local host with no
+      // worktree context — attach them directly rather than via the runtime client.
       const fileAttachments: string[] = []
       const folderPaths: string[] = []
       for (const filePath of paths) {

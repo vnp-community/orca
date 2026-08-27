@@ -29,6 +29,7 @@ import {
 } from './integration-card-presentation'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type LinearAgentSkillInstallCtaProps = {
   settings: LinearAgentSkillPromptSettings | null | undefined
 }
@@ -69,7 +70,7 @@ export function LinearAgentSkillInstallCta({
 
   const copyCommand = async (): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(command)
+      await uiWriteClipboardText(command)
       toast.success(
         translate(
           'auto.components.settings.linear.agent.skill.install.cta.copiedCommand',

@@ -10,6 +10,7 @@ import { useCheckRunDetailsFixWithAI } from './check-run-details-fix-with-ai'
 import { CheckRunAnnotations } from './CheckRunAnnotations'
 import { CheckRunJobs } from './CheckRunJobs'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 function formatCheckTimestamp(value: string | null | undefined): string | null {
   if (!value) {
     return null
@@ -305,12 +306,7 @@ export function CheckRunDetailsPanel({
 
       {openUrl && (
         <div className="flex justify-end border-t border-border px-5 py-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => window.api.shell.openUrl(openUrl)}
-          >
+          <Button type="button" variant="outline" size="sm" onClick={() => shellOpenUrl(openUrl)}>
             {translate('auto.components.editor.CheckRunDetailsPanel.a916648574', 'Open details')}
             <ExternalLink className="size-3.5" />
           </Button>

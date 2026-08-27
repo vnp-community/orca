@@ -9,8 +9,9 @@
 
 import type { PersistedDevServer } from './dev-server-types'
 
-/** Visibility scopes for projects */
-export type ProjectVisibility = 'private' | 'team' | 'company'
+/** Visibility scopes for projects. 4-tier per docs/guides/user-profile-team-department-rbac.md
+ *  §5.3 — 'team' resolves via orca_team_members, 'department' via orca_users.department_id. */
+export type ProjectVisibility = 'private' | 'team' | 'department' | 'company'
 
 /** Member roles within a project */
 export type ProjectRole = 'owner' | 'member' | 'viewer'

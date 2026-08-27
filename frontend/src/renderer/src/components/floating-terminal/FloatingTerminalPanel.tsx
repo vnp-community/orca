@@ -85,7 +85,12 @@ import {
 } from './floating-terminal-panel-bounds'
 import { translate } from '@/i18n/i18n'
 import { consumeFloatingTerminalOpenMaximizedIntent } from '@/lib/floating-terminal'
+import {
+  appGetFloatingMarkdownDirectory,
+  appPickFloatingMarkdownDocument
+} from '@/runtime/runtime-app-client'
 import { selectFloatingTerminalPanelInputs } from './floating-terminal-panel-inputs'
+import { getRuntimeCliInstallStatus } from '@/runtime/runtime-cli-client'
 const LOCAL_RUNTIME_SETTINGS = { activeRuntimeEnvironmentId: null } as const
 
 const EditorPanel = lazy(() => import('@/components/editor/EditorPanel'))
@@ -564,7 +569,7 @@ export function FloatingTerminalPanel({
 
   useEffect(() => {
     let cancelled = false
-    void window.api.app.getFloatingMarkdownDirectory().then((nextMarkdownCwd) => {
+    void appGetFloatingMarkdownDirectory().then((nextMarkdownCwd) => {
       if (!cancelled) {
         setMarkdownCwd(nextMarkdownCwd)
       }
@@ -600,7 +605,7 @@ export function FloatingTerminalPanel({
       return
     }
     try {
-      const status = await window.api.cli.getInstallStatus()
+      const status = await getRuntimeCliInstallStatus()
       if (mountedRef.current) {
         setShowOrchestrationSetup(!isOrcaCliAvailableOnPath(status))
       }
@@ -706,7 +711,7 @@ export function FloatingTerminalPanel({
   const openFloatingMarkdownTab = useCallback(() => {
     void (async () => {
       try {
-        const document = await window.api.app.pickFloatingMarkdownDocument()
+        const document = await appPickFloatingMarkdownDocument()
         if (!document) {
           return
         }

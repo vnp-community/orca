@@ -40,8 +40,24 @@ import {
 } from '../orca-profiles/profile-cloud-service'
 import { registerOrcaProfileOrgMemberHandlers } from './orca-profile-org-members-handlers'
 
-type RegisterOrcaProfileHandlersOptions = {
+export type RegisterOrcaProfileHandlersOptions = {
   onBeforeRelaunch?: () => void | Promise<void>
+}
+
+// Why: runtime/rpc/methods/orca-profiles.ts runs in this same main process and
+// needs the exact same Store + relaunch-cleanup hook the ipcMain handlers were
+// registered with, so profile switch/create/transfer over RPC produce
+// identical relaunch and telemetry-seeding side effects as the IPC path.
+let activeOrcaProfileHandlerContext: {
+  store: Store
+  options: RegisterOrcaProfileHandlersOptions
+} | null = null
+
+export function getActiveOrcaProfileHandlerContext(): {
+  store: Store
+  options: RegisterOrcaProfileHandlersOptions
+} | null {
+  return activeOrcaProfileHandlerContext
 }
 
 function profileIdFromArgs(args: unknown): string {
@@ -134,7 +150,7 @@ function createCloudLinkedProfileArgsFromUnknown(args: unknown): CreateCloudLink
   }
 }
 
-async function runBeforeProfileRelaunch(
+export async function runBeforeProfileRelaunch(
   onBeforeRelaunch?: () => void | Promise<void>
 ): Promise<void> {
   try {
@@ -147,7 +163,7 @@ async function runBeforeProfileRelaunch(
   }
 }
 
-function scheduleProfileRelaunch(): void {
+export function scheduleProfileRelaunch(): void {
   setTimeout(() => {
     app.relaunch()
     // Why: app.quit() (not app.exit) so before-quit/will-quit still run —
@@ -161,6 +177,8 @@ export function registerOrcaProfileHandlers(
   store: Store,
   options: RegisterOrcaProfileHandlersOptions = {}
 ): void {
+  activeOrcaProfileHandlerContext = { store, options }
+
   ipcMain.handle(
     'orcaProfiles:list',
     (): OrcaProfileListResult => ({

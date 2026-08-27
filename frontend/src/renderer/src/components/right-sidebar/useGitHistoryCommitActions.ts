@@ -19,6 +19,7 @@ import {
 } from './source-control-split-open'
 import type { GitHistoryCommitAction } from './GitHistoryCommitContextMenu'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const EMPTY_BRANCH_CHANGE_ENTRIES: GitBranchChangeEntry[] = []
 
 type GitHistoryCommitActions = {
@@ -167,7 +168,7 @@ export function useGitHistoryCommitActions({
 
   const copyCommitText = useCallback(async (text: string, label: string): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(text)
+      await uiWriteClipboardText(text)
       toast.success(
         translate('auto.components.right.sidebar.SourceControl.bf5082de46', '{{value0}} copied', {
           value0: label

@@ -118,21 +118,24 @@ export class ProfileAwareAgentSpawner {
         // Removed: Object.assign(profileEnv, provider.credentials)
       }
 
-      // 6. Get relay and send agent.exec
-      // FIX TASK-TG-001: relay agent.exec expects { binary, args, cwd } not { command, workdir }.
-      // agent-rpc-dispatch.ts:506-508 reads p.binary, p.args, p.cwd respectively.
+      // 6. Get relay and send agent.execPrompt
+      // FIX TASK-TG-001 previously renamed fields to match agent.exec's
+      // {binary, args, cwd} contract, but `command` here is free-text (e.g.
+      // buildTaskAgentPrompt(task)'s markdown), not a shell command line —
+      // command.split(/\s+/) produced nonsense (e.g. binary="#" for a
+      // markdown heading). agent.execPrompt takes the prompt as-is and
+      // resolves binary/args/credentials agent-side. See
+      // specs/agent/api/gaps-and-findings.md.
       const relay = await this.router.getRelayForProject(projectId, userId)
-      const commandParts = command.trim().split(/\s+/).filter(Boolean)
-      const binary = commandParts[0] ?? ''
-      const args   = commandParts.slice(1)
 
-      span.step('relay-agent-exec', { binary, devServerId: project.devServerId })
-      const result = await relay.call('agent.exec', {
-        binary,                            // was: command (wrong field name)
-        args,                              // was: missing
-        cwd: workdir ?? project.repoPath,  // was: workdir (wrong field name)
+      span.step('relay-agent-exec-prompt', { devServerId: project.devServerId })
+      const result = await relay.call('agent.execPrompt', {
+        prompt: command,
+        worktreePath: workdir ?? project.repoPath,
+        model: provider?.modelId,
+        accountId: provider?.providerId,
         env: profileEnv,
-        timeoutMs: 5 * 60 * 1000,         // 5 minutes
+        timeoutMs: 5 * 60 * 1000, // 5 minutes
         // CR-TRACE-002: 2 parallel fields — required by the resolved convention split
         // between relay.call() infra (flat `traceId`, read by relayCallTracer in
         // DevServerRelayBridge.callWithTimeout()) and Agent WS JSON-RPC 2.0 (nested

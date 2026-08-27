@@ -12,6 +12,7 @@ import {
   handleGitWorktreeAdd,
   handleGitWorktreeRemove,
 } from '../agent-git-handler'
+import { setConnectionGitIdentity } from '../git-identity-registry'
 import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 import type { AgentConfig } from '../agent-config'
 import type { AgentLogger } from '../agent-logger'
@@ -321,5 +322,61 @@ describe('agent-git-handler — worktree tracing', () => {
     const gitStart     = events.find(e => e.flow === 'agent:git' && e.level === 'start')
     expect(deleteStart?.id).toBe('xyz789')
     expect(gitStart?.id).toBe('xyz789') // nối tiếp id xuống agent:git qua _trace forward
+  })
+})
+
+// ─── git.exec 'commit' — per-connection identity (BUG-AG-HLD-003 parity) ─────
+// Why: previously handleGitExec had no way to apply preflight.setGitIdentity's
+// stored identity at all — it always used config.toolEnv verbatim. See
+// specs/agent/api/gaps-and-findings.md #5.
+describe('agent-git-handler — commit identity injection', () => {
+  let repoDir: string
+
+  beforeEach(() => {
+    repoDir = mkdtempSync(join(tmpdir(), 'commit-identity-test-'))
+    execSync('git init -q', { cwd: repoDir })
+    // Deliberately different from the per-connection identity below, so a
+    // passing test proves the per-connection value won, not the ambient one.
+    execSync('git config user.email repo-default@example.com', { cwd: repoDir })
+    execSync('git config user.name "Repo Default"', { cwd: repoDir })
+  })
+  afterEach(() => {
+    rmSync(repoDir, { recursive: true, force: true })
+  })
+
+  it('uses the per-connection identity set via preflight.setGitIdentity, not the repo default', async () => {
+    const ws = {} as never
+    setConnectionGitIdentity(ws, { name: 'Ada Lovelace', email: 'ada@example.com' })
+
+    const resp = await handleGitExec(
+      1, { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir }, mockConfig, mockLog, ws
+    ) as any
+    expect(resp.result.exitCode).toBe(0)
+
+    const author = execSync("git log -1 --format='%an|%ae'", { cwd: repoDir }).toString().trim()
+    expect(author).toBe('Ada Lovelace|ada@example.com')
+  })
+
+  it('falls back to the ambient env when no ws is passed (backward-compatible)', async () => {
+    const resp = await handleGitExec(
+      1, { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir }, mockConfig, mockLog
+    ) as any
+    expect(resp.result.exitCode).toBe(0)
+
+    const author = execSync("git log -1 --format='%an|%ae'", { cwd: repoDir }).toString().trim()
+    expect(author).toBe('Repo Default|repo-default@example.com')
+  })
+
+  it('does not leak one connection identity into a commit made without ws', async () => {
+    const otherWs = {} as never
+    setConnectionGitIdentity(otherWs, { name: 'Someone Else', email: 'else@example.com' })
+
+    const resp = await handleGitExec(
+      1, { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir }, mockConfig, mockLog
+    ) as any
+    expect(resp.result.exitCode).toBe(0)
+
+    const author = execSync("git log -1 --format='%an|%ae'", { cwd: repoDir }).toString().trim()
+    expect(author).not.toContain('Someone Else')
   })
 })

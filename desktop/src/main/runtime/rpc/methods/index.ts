@@ -38,6 +38,46 @@ import { GITHUB_AUTH_METHODS } from './github-auth'
 import { GITLAB_AUTH_METHODS } from './gitlab-auth'
 import { CREDENTIAL_METHODS } from './credentials'
 import { DEV_SERVER_METHODS } from './dev-server'
+// Below: added while migrating window.api.* (Electron IPC) call sites in
+// frontend/ to callRuntimeRpc() — each wraps the exact function its ipcMain
+// handler already calls, so desktop's local RPC dispatcher can reach the
+// same native-only capabilities without duplicating logic.
+import { SHELL_METHODS } from './shell'
+import { APP_METHODS } from './app'
+import { UPDATER_METHODS } from './updater'
+import { PLATFORM_METHODS } from './platform'
+import { AGENT_TRUST_METHODS } from './agent-trust'
+import { COMPUTER_USE_PERMISSIONS_METHODS } from './computer-use-permissions'
+import { DEVELOPER_PERMISSIONS_METHODS } from './developer-permissions'
+import { CRASH_REPORTS_METHODS } from './crash-reports'
+import { DIAGNOSTICS_CRASH_BUNDLE_METHODS } from './diagnostics-crash-bundle'
+import { TELEMETRY_METHODS } from './telemetry'
+import { MEMORY_METHODS } from './memory'
+import { E2E_METHODS } from './e2e'
+import { CACHE_METHODS } from './cache'
+import { MINIMAX_CREDENTIALS_METHODS } from './minimax-credentials'
+import { GROK_ACCOUNTS_METHODS } from './grok-accounts'
+import { CLAUDE_USAGE_METHODS } from './claude-usage'
+import { CODEX_USAGE_METHODS } from './codex-usage'
+import { OPEN_CODE_USAGE_METHODS } from './opencode-usage'
+import { RATE_LIMIT_METHODS } from './rate-limits'
+import { CLAUDE_ACCOUNTS_METHODS } from './claude-accounts'
+import { CODEX_ACCOUNTS_METHODS } from './codex-accounts'
+import { AGENT_STATUS_METHODS } from './agent-status'
+import { MOBILE_METHODS } from './mobile'
+import { STAR_NAG_METHODS } from './star-nag'
+import { ORCA_PROFILES_METHODS } from './orca-profiles'
+import { ONBOARDING_METHODS } from './onboarding'
+import { WORKSPACE_SPACE_METHODS } from './workspace-space'
+import { WORKSPACE_CLEANUP_METHODS } from './workspace-cleanup'
+import { REMOTE_WORKSPACE_METHODS } from './remote-workspace'
+import { SPARSE_PRESET_METHODS } from './sparse-presets'
+import { LOCALHOST_WORKTREE_LABEL_METHODS } from './localhost-worktree-labels'
+import { CLI_METHODS } from './cli'
+import { EPHEMERAL_VM_METHODS } from './ephemeral-vm'
+import { PET_METHODS } from './pet'
+import { FEEDBACK_METHODS } from './feedback'
+import { EXPORT_METHODS } from './export'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -81,5 +121,41 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...GITHUB_AUTH_METHODS,
   ...GITLAB_AUTH_METHODS,
   ...CREDENTIAL_METHODS,
-  ...DEV_SERVER_METHODS
+  ...DEV_SERVER_METHODS,
+  ...SHELL_METHODS,
+  ...APP_METHODS,
+  ...UPDATER_METHODS,
+  ...PLATFORM_METHODS,
+  ...AGENT_TRUST_METHODS,
+  ...COMPUTER_USE_PERMISSIONS_METHODS,
+  ...DEVELOPER_PERMISSIONS_METHODS,
+  ...CRASH_REPORTS_METHODS,
+  ...DIAGNOSTICS_CRASH_BUNDLE_METHODS,
+  ...TELEMETRY_METHODS,
+  ...MEMORY_METHODS,
+  ...E2E_METHODS,
+  ...CACHE_METHODS,
+  ...MINIMAX_CREDENTIALS_METHODS,
+  ...GROK_ACCOUNTS_METHODS,
+  ...CLAUDE_USAGE_METHODS,
+  ...CODEX_USAGE_METHODS,
+  ...OPEN_CODE_USAGE_METHODS,
+  ...RATE_LIMIT_METHODS,
+  ...CLAUDE_ACCOUNTS_METHODS,
+  ...CODEX_ACCOUNTS_METHODS,
+  ...AGENT_STATUS_METHODS,
+  ...MOBILE_METHODS,
+  ...STAR_NAG_METHODS,
+  ...ORCA_PROFILES_METHODS,
+  ...ONBOARDING_METHODS,
+  ...WORKSPACE_SPACE_METHODS,
+  ...WORKSPACE_CLEANUP_METHODS,
+  ...REMOTE_WORKSPACE_METHODS,
+  ...SPARSE_PRESET_METHODS,
+  ...LOCALHOST_WORKTREE_LABEL_METHODS,
+  ...CLI_METHODS,
+  ...EPHEMERAL_VM_METHODS,
+  ...PET_METHODS,
+  ...FEEDBACK_METHODS,
+  ...EXPORT_METHODS
 ]

@@ -297,7 +297,8 @@ export default function RichMarkdownEditor({
     worktreeRoot
   })
 
-  const handleLocalImagePick = useLocalImagePick(editor, filePath, worktreeId, runtimeEnvironmentId)
+  const { pickImage: handleLocalImagePick, pickerDialog: localImagePickerDialog } =
+    useLocalImagePick(editor, filePath, worktreeId, runtimeEnvironmentId)
   handleLocalImagePickRef.current = handleLocalImagePick
 
   const {
@@ -351,6 +352,7 @@ export default function RichMarkdownEditor({
   )
 
   return (
+    <>
     <RichMarkdownEditorSurface
       editor={editor}
       editorFontZoomLevel={editorFontZoomLevel}
@@ -429,5 +431,7 @@ export default function RichMarkdownEditor({
       onNavigateTableOfContentsItem={navigateToTableOfContentsItem}
       onCloseTableOfContents={onCloseTableOfContents}
     />
+    {localImagePickerDialog}
+    </>
   )
 }

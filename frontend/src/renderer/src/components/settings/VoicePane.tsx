@@ -13,6 +13,7 @@ import { VoiceSpeechModelSection } from './VoiceSpeechModelSection'
 import { matchesSettingsSearch } from './settings-search'
 import { getOpenaiTranscriptionSearchEntry } from './voice-pane-search'
 import { translate } from '@/i18n/i18n'
+import { requestRuntimeDeveloperPermission } from '@/runtime/runtime-developer-permissions-client'
 
 export { handleVoiceDictationToggle }
 
@@ -88,8 +89,14 @@ export function VoicePane({ settings, updateSettings }: VoicePaneProps): React.J
       voiceEnabled: voiceSettings.enabled,
       markFeatureTipsSeen,
       updateVoiceSettings,
-      requestMicrophonePermission: () =>
-        window.api.developerPermissions.request({ id: 'microphone' }),
+      // Why: mirror web's own "unsupported" preload stub result when the
+      // wrapper no-ops to null (web is gated out of the desktop-only RPC path).
+      requestMicrophonePermission: async () =>
+        (await requestRuntimeDeveloperPermission('microphone')) ?? {
+          id: 'microphone',
+          status: 'unsupported' as const,
+          openedSystemSettings: false
+        },
       setPermissionPending,
       isMounted: () => mountedRef.current,
       notifyPermissionGranted: () =>

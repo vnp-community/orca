@@ -17,6 +17,8 @@ import { useAppStore } from '../../store'
 import { BUNDLED_PET, BUNDLED_PETS, findBundledPet, isBundledPetId } from '../pet/pet-models'
 import { PET_SIZE_MAX, PET_SIZE_MIN } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '@/lib/web-client-location'
+import { importRuntimePet, importRuntimePetBundle } from '@/runtime/runtime-pet-client'
 
 // Why: cluster pet-related controls (show/hide, character picker, custom
 // upload + removal, jump-to-settings) behind a single status-bar segment. Only
@@ -44,8 +46,20 @@ function PetStatusSegmentInner(): React.JSX.Element {
 
   const handleImport = async (): Promise<void> => {
     console.log('[pet-overlay] upload: click')
-    if (!window.api?.pet?.import) {
-      console.warn('[pet-overlay] upload: window.api.pet.import missing — restart Orca')
+    // Why: custom pet storage is local Node fs work with no runtime RPC
+    // equivalent — the web build's window.api.pet has no real implementation,
+    // so check this explicitly rather than relying on the silent fallback proxy.
+    if (isWebClientLocation()) {
+      toast.error(
+        translate(
+          'auto.components.status.bar.PetStatusSegment.webUnavailable',
+          'Custom pet upload is unavailable in the web client.'
+        )
+      )
+      return
+    }
+    if (!window.api?.runtime?.call) {
+      console.warn('[pet-overlay] upload: window.api.runtime.call missing — restart Orca')
       toast.error(
         translate(
           'auto.components.status.bar.PetStatusSegment.e6234bcc17',
@@ -55,7 +69,7 @@ function PetStatusSegmentInner(): React.JSX.Element {
       return
     }
     try {
-      const model = await window.api.pet.import()
+      const model = await importRuntimePet()
       console.log('[pet-overlay] upload: result', model)
       if (!model) {
         return
@@ -79,7 +93,16 @@ function PetStatusSegmentInner(): React.JSX.Element {
   }
 
   const handleImportPetBundle = async (): Promise<void> => {
-    if (!window.api?.pet?.importPetBundle) {
+    if (isWebClientLocation()) {
+      toast.error(
+        translate(
+          'auto.components.status.bar.PetStatusSegment.bundleWebUnavailable',
+          'Pet bundle import is unavailable in the web client.'
+        )
+      )
+      return
+    }
+    if (!window.api?.runtime?.call) {
       toast.error(
         translate(
           'auto.components.status.bar.PetStatusSegment.2021d4f6db',
@@ -89,7 +112,7 @@ function PetStatusSegmentInner(): React.JSX.Element {
       return
     }
     try {
-      const model = await window.api.pet.importPetBundle()
+      const model = await importRuntimePetBundle()
       if (!model) {
         return
       }

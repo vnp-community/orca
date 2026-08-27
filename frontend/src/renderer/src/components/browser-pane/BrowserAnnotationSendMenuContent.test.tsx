@@ -94,12 +94,14 @@ describe('BrowserAnnotationSendMenuContent', () => {
   })
 
   it('is wired into both browser annotation send surfaces', () => {
-    const browserPaneSource = readFileSync(
-      fileURLToPath(new URL('./BrowserPane.tsx', import.meta.url)),
+    // Why: BrowserPagePane (and its <BrowserAnnotationSendMenuContent/> JSX)
+    // moved to browser-pane-local.tsx in TASK-BIGFILE-016; scan its new home.
+    const browserPaneLocalSource = readFileSync(
+      fileURLToPath(new URL('./browser-pane-local.tsx', import.meta.url)),
       'utf8'
     )
 
-    expect(browserPaneSource.match(/<BrowserAnnotationSendMenuContent\b/g)).toHaveLength(2)
-    expect(browserPaneSource).not.toContain('<QuickLaunchAgentMenuItems')
+    expect(browserPaneLocalSource.match(/<BrowserAnnotationSendMenuContent\b/g)).toHaveLength(2)
+    expect(browserPaneLocalSource).not.toContain('<QuickLaunchAgentMenuItems')
   })
 })

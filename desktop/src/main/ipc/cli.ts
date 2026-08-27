@@ -56,63 +56,87 @@ async function hydrateLocalShellPathForCli(force = false): Promise<void> {
   }
 }
 
+// Why: extracted as standalone exported functions (rather than inline
+// ipcMain.handle closures) so the desktop-local RPC registry can invoke the
+// exact same logic the Electron IPC channel uses, instead of duplicating it.
+export async function getCliInstallStatus(): Promise<CliInstallStatus> {
+  await hydrateLocalShellPathForCli()
+  return new CliInstaller().getStatus()
+}
+
+export async function installCli(): Promise<CliInstallStatus> {
+  await hydrateLocalShellPathForCli(true)
+  return new CliInstaller().install()
+}
+
+export async function removeCli(): Promise<CliInstallStatus> {
+  await hydrateLocalShellPathForCli()
+  return new CliInstaller().remove()
+}
+
+export async function getWslCliInstallStatus(args?: {
+  distro?: string | null
+}): Promise<CliInstallStatus> {
+  // Why: status is a read-only probe; queuing it behind a long-running
+  // repair/install would hang the Settings spinner for its duration, and
+  // Settings re-polls, so a rare transient read self-corrects.
+  return new WslCliInstaller({ distro: resolveWslCliDistro(args) }).getStatus()
+}
+
+export async function installWslCli(args?: {
+  distro?: string | null
+}): Promise<CliInstallStatus> {
+  const distro = resolveWslCliDistro(args)
+  return runWslCliRegistrationOperation(distro, async () => {
+    const status = await new WslCliInstaller({ distro }).install()
+    if (distro && status.state === 'installed') {
+      await persistWslCliRegistration(
+        () => recordWslCliRegistrationInstalled(getCanonicalUserDataPath(), distro),
+        'install'
+      )
+    }
+    return status
+  })
+}
+
+export async function removeWslCli(args?: {
+  distro?: string | null
+}): Promise<CliInstallStatus> {
+  const distro = resolveWslCliDistro(args)
+  return runWslCliRegistrationOperation(distro, async () => {
+    const status = await new WslCliInstaller({ distro }).remove()
+    if (distro && status.state === 'not_installed') {
+      await persistWslCliRegistration(
+        () => recordWslCliRegistrationRemoved(getCanonicalUserDataPath(), distro),
+        'remove'
+      )
+    }
+    return status
+  })
+}
+
 export function registerCliHandlers(): void {
-  ipcMain.handle('cli:getInstallStatus', async (): Promise<CliInstallStatus> => {
-    await hydrateLocalShellPathForCli()
-    return new CliInstaller().getStatus()
-  })
+  ipcMain.handle('cli:getInstallStatus', (): Promise<CliInstallStatus> => getCliInstallStatus())
 
-  ipcMain.handle('cli:install', async (): Promise<CliInstallStatus> => {
-    await hydrateLocalShellPathForCli(true)
-    return new CliInstaller().install()
-  })
+  ipcMain.handle('cli:install', (): Promise<CliInstallStatus> => installCli())
 
-  ipcMain.handle('cli:remove', async (): Promise<CliInstallStatus> => {
-    await hydrateLocalShellPathForCli()
-    return new CliInstaller().remove()
-  })
+  ipcMain.handle('cli:remove', (): Promise<CliInstallStatus> => removeCli())
 
   ipcMain.handle(
     'cli:getWslInstallStatus',
-    async (_event, args?: { distro?: string | null }): Promise<CliInstallStatus> => {
-      // Why: status is a read-only probe; queuing it behind a long-running
-      // repair/install would hang the Settings spinner for its duration, and
-      // Settings re-polls, so a rare transient read self-corrects.
-      return new WslCliInstaller({ distro: resolveWslCliDistro(args) }).getStatus()
-    }
+    (_event, args?: { distro?: string | null }): Promise<CliInstallStatus> =>
+      getWslCliInstallStatus(args)
   )
 
   ipcMain.handle(
     'cli:installWsl',
-    async (_event, args?: { distro?: string | null }): Promise<CliInstallStatus> => {
-      const distro = resolveWslCliDistro(args)
-      return runWslCliRegistrationOperation(distro, async () => {
-        const status = await new WslCliInstaller({ distro }).install()
-        if (distro && status.state === 'installed') {
-          await persistWslCliRegistration(
-            () => recordWslCliRegistrationInstalled(getCanonicalUserDataPath(), distro),
-            'install'
-          )
-        }
-        return status
-      })
-    }
+    (_event, args?: { distro?: string | null }): Promise<CliInstallStatus> =>
+      installWslCli(args)
   )
 
   ipcMain.handle(
     'cli:removeWsl',
-    async (_event, args?: { distro?: string | null }): Promise<CliInstallStatus> => {
-      const distro = resolveWslCliDistro(args)
-      return runWslCliRegistrationOperation(distro, async () => {
-        const status = await new WslCliInstaller({ distro }).remove()
-        if (distro && status.state === 'not_installed') {
-          await persistWslCliRegistration(
-            () => recordWslCliRegistrationRemoved(getCanonicalUserDataPath(), distro),
-            'remove'
-          )
-        }
-        return status
-      })
-    }
+    (_event, args?: { distro?: string | null }): Promise<CliInstallStatus> =>
+      removeWslCli(args)
   )
 }

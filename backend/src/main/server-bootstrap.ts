@@ -17,11 +17,13 @@ import { DevServerManager } from './dev-server/dev-server-manager'
 import { registerDevServerIpcHandlers } from './ipc/dev-server-ipc'
 import { registerOnboardingIpcHandlers } from './ipc/onboarding-ipc'
 import { registerRepoRemoteIpcHandlers } from './ipc/repo-remote-ipc'
+import { StarNagService, setActiveStarNagService } from './star-nag/service'
 import { WebPushManager } from './notifications/web-push-manager'
 import { AuthManager } from './auth/auth-manager'
 import { initWebCredentialStore } from './credentials'
 import type { DatabaseConfig } from './db/config'
 import type { IConnectionPool } from './db/pool'
+import type { IDatabase } from './db/types'
 import { AgentWebSocketServer } from './dev-server/agent-ws-server'
 
 export type ServerBootstrapResult = {
@@ -85,6 +87,17 @@ export type ServerBootstrapResult = {
    * WebSocket messages over the Unix socket.
    */
   rpcAuthToken: string
+  /**
+   * AutomationService — scheduler + dispatch for `automation.*` RPC methods.
+   * (D1 fix — docs/guides/fix-proposals-per-issue.md §D1)
+   */
+  automationService: import('./automations/service').AutomationService
+  /** ClaudeUsageStore — usage attribution for automation runs. */
+  claudeUsage: import('./claude-usage/store').ClaudeUsageStore
+  /** CodexUsageStore — usage attribution for automation runs. */
+  codexUsage: import('./codex-usage/store').CodexUsageStore
+  /** OpenCodeUsageStore — backs openCodeUsage.* RPC methods. */
+  openCodeUsage: import('./opencode-usage/store').OpenCodeUsageStore
 }
 
 
@@ -138,16 +151,19 @@ export async function initializeOrcaServices(
   initDataPath()
   console.log('[ServerBootstrap] ✅ Data path initialized')
 
+  // 1a. Best-effort crash capture for this server process (no Electron
+  // crashReporter in server mode — see crash-report-store.ts's header
+  // comment). Must run after initDataPath() so the store's default file path
+  // resolves under the correct userData dir. Additive only: still exits the
+  // process on a fatal error, same as Node's default uncaught-exception
+  // behavior, so the process supervisor's restart semantics are unchanged.
+  const { installServerCrashReportProcessHandlers } = await import('./crash-reporting/crash-report-store')
+  installServerCrashReportProcessHandlers()
+
   // 2. Initialize SQLite Store (legacy Electron-compatible persistence)
   const { Store } = await import('./persistence')
   const store = new Store()
   console.log('[ServerBootstrap] ✅ SQLite store initialized')
-
-  // 2a-pre. Initialize WebPushManager (Phase 3 — TASK-035)
-  // Why: initialized right after store so it can persist VAPID keys before any
-  // other service touches the store. pushManager is returned to server/index.ts.
-  const pushManager = new WebPushManager(store)
-  console.log('[ServerBootstrap] ✅ WebPushManager initialized')
 
   // 2a. Initialize DevServerManager + AgentWebSocketServer
   const { SshConnectionManager } = await import('./ssh/ssh-connection-manager')
@@ -258,6 +274,78 @@ export async function initializeOrcaServices(
     console.warn('[ServerBootstrap] Migration failed (non-fatal):', (err as Error)?.message)
   }
 
+  // Why: annotation.list/annotation.create (BL-CR-02) need a DB handle but
+  // aren't constructor-injected like ProjectService — pool always exists by
+  // this point regardless of Electron/Web mode, so init unconditionally.
+  const { initAnnotationStore } = await import('./code-review/annotation-store')
+  initAnnotationStore(pool)
+
+  // ADR-021 §3 — resolve this process's tenantId before constructing the RPC
+  // server below, so it can be forwarded into every RpcContext the same way
+  // ORCA_USER_ID's userId already is (see OrcaRuntimeRpcServerOptions.tenantId
+  // doc comment). ProfileService is instantiated here (earlier than its other
+  // use below at step 9) purely to run this lookup — constructing it has no
+  // side effects (it only stores the pool reference), so hoisting it is safe;
+  // the same instance is reused at step 9 instead of creating a second one.
+  const { ProfileService: EarlyProfileService } = await import('./profile/ProfileService')
+  const profileServiceForTenantResolution = new EarlyProfileService(pool)
+  const { resolveTenantId } = await import('./tenancy/tenant-resolver')
+  const resolvedTenantId = await resolveTenantId(
+    profileServiceForTenantResolution,
+    process.env['ORCA_USER_ID']
+  )
+  if (process.env['ORCA_USER_ID']) {
+    console.log(
+      `[ServerBootstrap] ${resolvedTenantId ? '✅' : '⚠️ '} tenantId resolved for userId=${process.env['ORCA_USER_ID']}: ${resolvedTenantId ?? '(none — user has no department/company yet)'}`
+    )
+  }
+
+  // ADR-021 §"chỉ dùng 1 database" — switches the already-constructed `store`
+  // (step 2 above — constructed before `pool` existed, see
+  // Store.hydrateFromPostgres()'s doc comment for why) onto Postgres for all
+  // future reads/writes. Before rpcServer.start(), so no real request ever
+  // sees the pre-hydration state.
+  // FIX 2026-08-16: userId was missing here — every process (main AND every
+  // per-user child, since this call runs unconditionally regardless of
+  // isUserProcess) defaulted to PgOrcaDataStatePersistence's userId=''
+  // fallback, so ALL processes shared the exact same
+  // (tenant_id, user_id='') row. Real users would have silently seen (and
+  // overwritten) each other's Project/Repo/Worktree/Tab state.
+  const { PgOrcaDataStatePersistence } = await import('./orca-data-state-persistence')
+  const storeStateUserId = process.env['ORCA_USER_ID'] ?? ''
+  try {
+    await store.hydrateFromPostgres(
+      new PgOrcaDataStatePersistence(pool, resolvedTenantId, storeStateUserId)
+    )
+    console.log(`[ServerBootstrap] ✅ Store hydrated from Postgres (backend: postgres, userId=${storeStateUserId || '(main)'})`)
+  } catch (err) {
+    // Non-fatal, same posture as migrations/tenant-resolution above — a
+    // hydration failure must not take down the whole (user-)process. Falls
+    // back to whatever Store's own synchronous file-based load() already
+    // populated `this.state` with.
+    console.error(
+      `[ServerBootstrap] ⚠️  Store.hydrateFromPostgres failed (non-fatal, using in-memory/file state instead), userId=${storeStateUserId || '(main)'}:`,
+      (err as Error)?.message
+    )
+  }
+
+  // 2a-pre. Initialize WebPushManager (Phase 3 — TASK-035; ADR-021 §"chỉ dùng 1
+  // database duy nhất" — Postgres-backed by default now, no more Store/JSON).
+  // Why moved here (was right after `store` construction, step 2): needs
+  // `pool`/`resolvedTenantId`, which don't exist that early. WebPushManager's
+  // methods are already async (ADR-021 Phase 1) so nothing downstream cares
+  // about the later construction point.
+  const { PgWebPushStore } = await import('./notifications/pg-web-push-store')
+  const { VapidKeySecretStore } = await import('./notifications/vapid-key-secret-store')
+  const vapidKeySecretStore = new VapidKeySecretStore(
+    userDataPath,
+    serverSecret ?? `orca-fallback-${userDataPath}`
+  )
+  const pushManager = new WebPushManager(
+    new PgWebPushStore(pool, vapidKeySecretStore, resolvedTenantId)
+  )
+  console.log('[ServerBootstrap] ✅ WebPushManager initialized (backend: postgres)')
+
   // Create state repository
   const { createStateRepository } = await import('./repositories/factory')
   const stateRepo = dbConfig
@@ -282,12 +370,25 @@ export async function initializeOrcaServices(
   void stateRepo
 
   // 2c. Initialize AuthManager (auth subsystem — always initialized, routes active when ORCA_MULTI_USER=1)
-  // Opens a dedicated SQLite connection (not from pool) so sessions survive pool recycles.
-  const { SqliteAdapter: SqliteAuthAdapter } = await import('./db/sqlite/sqlite-adapter')
-  const authDbPath = dbConfig?.dialect === 'sqlite' && (dbConfig as Record<string, unknown>)['path']
-    ? (dbConfig as Record<string, unknown>)['path'] as string
-    : join(userDataPath, 'orca-server.db')
-  const authDb = new SqliteAuthAdapter(authDbPath)
+  // BUG-BE-RPC-003: when a shared network database is configured (dbConfig set, non-sqlite —
+  // same condition that picked GenericConnectionPool for `pool` above), auth MUST use that
+  // same shared pool too — orca_users/orca_sessions otherwise stay pinned to this process's
+  // own per-userData-path SQLite file (see docs/guides/postgres-shared-database-design.md),
+  // which breaks FK-referencing v5.0 tables (project_members, team_members, ...) for any
+  // user whose per-process SQLite orca_users row doesn't match the row created via login.
+  // Fall back to the original dedicated-SQLite-connection behavior otherwise (sessions
+  // surviving pool recycles) — zero behavior change for SQLite-fallback deployments.
+  let authDb: IDatabase
+  if (dbConfig && dbConfig.dialect !== 'sqlite') {
+    const { PooledDatabaseAdapter } = await import('./db/pooled-database-adapter')
+    authDb = await PooledDatabaseAdapter.create(pool)
+  } else {
+    const { SqliteAdapter: SqliteAuthAdapter } = await import('./db/sqlite/sqlite-adapter')
+    const authDbPath = dbConfig?.dialect === 'sqlite' && (dbConfig as Record<string, unknown>)['path']
+      ? (dbConfig as Record<string, unknown>)['path'] as string
+      : join(userDataPath, 'orca-server.db')
+    authDb = new SqliteAuthAdapter(authDbPath)
+  }
   const authManager = new AuthManager(authDb)
   // Seed initial admin user on first server boot (idempotent, non-fatal)
   try {
@@ -366,7 +467,12 @@ export async function initializeOrcaServices(
 
   // 6. Create OrcaRuntimeService
   const { OrcaRuntimeService } = await import('./runtime/orca-runtime')
-  const runtime = new OrcaRuntimeService(store, stats)
+  // ADR-021 §3 — lets getOrchestrationDb() construct a PgOrchestrationDb
+  // (pool/tenantId resolved above, before this point).
+  const runtime = new OrcaRuntimeService(store, stats, {
+    orchestrationPool: pool,
+    orchestrationTenantId: resolvedTenantId
+  })
   // Wire push manager so the runtime can dispatch web push on agent task complete.
   runtime.setPushManager(pushManager)
   console.log('[ServerBootstrap] ✅ OrcaRuntimeService created')
@@ -392,6 +498,15 @@ export async function initializeOrcaServices(
     // overrides the default userData-derived socket so the process binds exactly
     // where SessionManager expects it (ORCA_SOCKET_PATH).
     ...(socketPath ? { socketPath } : {}),
+    // BUG-BE-RPC-001: SessionManager.spawnUserProcess() injects ORCA_USER_ID into
+    // this per-user child's env (session-manager.ts) — undefined outside
+    // multi-user mode, matching credUserId's own env read above. Without this,
+    // ctx.userId is always undefined for every request on this socket, so
+    // project.*/team.*/task.*/orcaProjects.* throw UNAUTHENTICATED for real
+    // web sessions no matter how the user actually authenticated.
+    userId: process.env['ORCA_USER_ID'],
+    // ADR-021 §3 — resolved above, before this constructor call.
+    tenantId: resolvedTenantId,
     // Why: proxy methods (preflight.check, github.startAuthLogin, etc.) need
     // to reach the active relay for a given Dev Server.
     devServerManager
@@ -404,9 +519,12 @@ export async function initializeOrcaServices(
   }
 
   // 9. ProfileService + ProfileResolver [v5.0 TDD-14]
-  const { ProfileService } = await import('./profile/ProfileService')
+  // Why reused, not `new`'d again: this is the same ProfileService instance
+  // constructed above for tenantId resolution (ADR-021 §3) — a second
+  // instance would work identically (constructor has no state beyond `pool`)
+  // but there's no reason to allocate one.
   const { ProfileResolver } = await import('./profile/ProfileResolver')
-  const profileService = new ProfileService(pool)
+  const profileService = profileServiceForTenantResolution
   const profileResolver = new ProfileResolver(profileService)
   console.log('[ServerBootstrap] ✅ ProfileService + ProfileResolver initialized (v5.0)')
 
@@ -426,10 +544,20 @@ export async function initializeOrcaServices(
   const _projectRouter = new ProjectServerRouter(projectService, devServerManager, relayConnectionPool)
   console.log('[ServerBootstrap] ✅ ProjectService + ProjectServerRouter initialized (v5.0)')
 
-  // Register project RPC methods [T01]
-  const { createProjectMethods } = await import('./project/project-rpc-handler')
-  rpcServer.addMethods(createProjectMethods(projectService, getUserRole))
-  console.log('[ServerBootstrap] ✅ Project RPC methods registered (v5.0)')
+  // 10a. TeamService [Giai đoạn 2a] — org-level team CRUD + membership RPC.
+  const { TeamService } = await import('./team/TeamService')
+  const { createTeamMethods } = await import('./team/team-rpc-handler')
+  const teamService = new TeamService(pool)
+  rpcServer.addMethods(createTeamMethods(teamService, getUserRole))
+  console.log('[ServerBootstrap] ✅ TeamService + Team RPC methods registered (Giai đoạn 2a)')
+
+  // 10b. OrcaProjectSourceProjectService [Giai đoạn 2c] — OrcaProject sharing
+  // against a source Project/Repo. Reuses the projectService constructed above.
+  const { OrcaProjectSourceProjectService } = await import('./project/OrcaProjectSourceProjectService')
+  const { createOrcaProjectSharingMethods } = await import('./project/orca-project-sharing-rpc-handler')
+  const sourceProjectService = new OrcaProjectSourceProjectService(pool)
+  rpcServer.addMethods(createOrcaProjectSharingMethods(sourceProjectService, projectService, getUserRole))
+  console.log('[ServerBootstrap] ✅ OrcaProjectSourceProjectService + sharing RPC methods registered (Giai đoạn 2c)')
 
   // 11. AIProviderService + ProviderResolver + ProviderHealthChecker [v5.0 TDD-16]
   const { AIProviderService } = await import('./ai-providers/AIProviderService')
@@ -462,6 +590,18 @@ export async function initializeOrcaServices(
   rpcServer.addMethods(createAIProviderMethods(aiProviderService, providerResolver))
   console.log('[ServerBootstrap] ✅ AIProviderService + ProviderResolver + ProviderHealthChecker initialized (v5.0)')
 
+  // B1 fix (docs/guides/fix-proposals-per-issue.md §B1): ProfileAwareAgentSpawner must exist
+  // before project RPC methods are registered — createProjectMethods' 3rd (optional) param
+  // wires project.agentSpawn; leaving it undefined made project.agentSpawn always throw
+  // AGENT_SPAWNER_NOT_AVAILABLE. Needs _projectRouter (step 10) + aiProviderService (step 11),
+  // so it can only be created here — TaskAgentExecutor (step 13) now reuses this instance.
+  const { ProfileAwareAgentSpawner } = await import('./project/ProfileAwareAgentSpawner')
+  const agentSpawner = new ProfileAwareAgentSpawner(_projectRouter, profileResolver, aiProviderService)
+
+  // Register project RPC methods [T01]
+  const { createProjectMethods } = await import('./project/project-rpc-handler')
+  rpcServer.addMethods(createProjectMethods(projectService, getUserRole, agentSpawner))
+  console.log('[ServerBootstrap] ✅ Project RPC methods registered (v5.0)')
 
   // 12. WorkflowOrchestrator + TemplateResolver + StepExecutors [v5.0 TDD-17]
   const { DAGBuilder } = await import('./workflow/DAGBuilder')
@@ -490,14 +630,19 @@ export async function initializeOrcaServices(
   const { TaskGrantService } = await import('./task/TaskGrantService')
   const { TaskAIPlanner } = await import('./task/TaskAIPlanner')
   const { TaskAgentExecutor } = await import('./task/TaskAgentExecutor')
-  const { ProfileAwareAgentSpawner } = await import('./project/ProfileAwareAgentSpawner')
+  const { TaskOrchestrationBridge } = await import('./task/TaskOrchestrationBridge')
   const { createTaskMethods } = await import('./task/task-rpc-handler')
   const taskDagValidator = new TaskDAGValidator(pool)
   const taskService = new TaskService(pool, taskDagValidator)
   const taskGrantService = new TaskGrantService(pool, taskService)
   const taskAIPlanner = new TaskAIPlanner(taskService, aiProviderService, _projectRouter)
-  const agentSpawner = new ProfileAwareAgentSpawner(_projectRouter, profileResolver, aiProviderService)
-  const taskAgentExecutor = new TaskAgentExecutor(taskService, agentSpawner, taskGrantService)
+  // Why: reuse the same agentSpawner instance wired into project.agentSpawn above (B1 fix)
+  // instead of constructing a second one. `runtime` (OrcaRuntimeService, step 6 above)
+  // structurally satisfies TaskOrchestrationRuntime as-is — see TaskOrchestrationBridge.ts.
+  const taskOrchestrationBridge = new TaskOrchestrationBridge(taskService, runtime)
+  const taskAgentExecutor = new TaskAgentExecutor(
+    taskService, agentSpawner, taskGrantService, taskOrchestrationBridge
+  )
   rpcServer.addMethods(createTaskMethods(taskService, taskGrantService, taskAIPlanner, taskAgentExecutor))
   console.log('[ServerBootstrap] ✅ TaskService + TaskAgentExecutor initialized (v5.0)')
 
@@ -509,6 +654,84 @@ export async function initializeOrcaServices(
   )
   rpcServer.addMethods(createWorkspaceMethods(workspaceService))
   console.log('[ServerBootstrap] ✅ WorkspaceService initialized (v5.0)')
+
+  // 15. AutomationService [D1 fix — docs/guides/fix-proposals-per-issue.md §D1 /
+  // docs/guides/audit-backend-agent-2026-08-13.md §D3]: this was never instantiated in
+  // backend/src, so automation.runNow always threw runtime_unavailable and the rrule
+  // scheduler never ran on the server. Mirrors desktop/src/main/index.ts's wiring.
+  const { ClaudeUsageStore } = await import('./claude-usage/store')
+  const { CodexUsageStore } = await import('./codex-usage/store')
+  const { OpenCodeUsageStore } = await import('./opencode-usage/store')
+  // ADR-021 — "chỉ dùng 1 database": Postgres-backed by default in server
+  // mode now (migration 0023's whole-state-blob tables for claude/codex,
+  // migration 0025 for opencode), replacing orca-{claude,codex,opencode}-usage.json.
+  // See usage-state-persistence.ts's module doc comment.
+  const { PgUsageStatePersistence } = await import('./usage/pg-usage-state-persistence')
+  const claudeUsage = new ClaudeUsageStore(
+    store,
+    new PgUsageStatePersistence(pool, 'claude', resolvedTenantId)
+  )
+  const codexUsage = new CodexUsageStore(
+    store,
+    new PgUsageStatePersistence(pool, 'codex', resolvedTenantId)
+  )
+  const openCodeUsage = new OpenCodeUsageStore(
+    store,
+    new PgUsageStatePersistence(pool, 'opencode', resolvedTenantId)
+  )
+  // Why: claudeUsage.*/codexUsage.*/openCodeUsage.* RPC methods
+  // (runtime/rpc/methods/) read through
+  // runtime.getClaudeUsageStore()/getCodexUsageStore()/getOpenCodeUsageStore()
+  // — wire them in now that all three stores exist (see those getters' doc
+  // comments for why this is a post-construction setter, not a constructor dep).
+  runtime.setClaudeUsageStore(claudeUsage)
+  runtime.setCodexUsageStore(codexUsage)
+  runtime.setOpenCodeUsageStore(openCodeUsage)
+
+  // Why: mirrors desktop/src/main/index.ts's StarNagService wiring — same
+  // placement, right after the usage stores are wired to runtime, since
+  // StarNagService only needs `store` + `stats` (both already constructed
+  // above). Registers the lazy singleton getActiveStarNagService() reads
+  // from runtime/rpc/methods/star-nag.ts's requireStarNagService() before
+  // any starNag.* RPC call lands.
+  const starNag = new StarNagService(store, stats)
+  setActiveStarNagService(starNag)
+  starNag.start()
+  starNag.registerIpcHandlers()
+  console.log('[ServerBootstrap] ✅ StarNagService initialized')
+
+  const { AutomationService } = await import('./automations/service')
+  // ADR-021 — automation persistence backend selection. Now defaults to
+  // 'postgres': PgAutomationStore.getRepo()/getProjectHostSetups() delegate
+  // to `store` (Postgres-hydrated as of Store.hydrateFromPostgres() above),
+  // which resolves the gap that used to block this default (see
+  // pg-automation-store.ts's module doc comment — "RESOLVED"). Escape hatch
+  // (`ORCA_AUTOMATION_BACKEND=json`) kept for rollback, not because the
+  // Postgres path is known-incomplete anymore.
+  const automationBackend = process.env['ORCA_AUTOMATION_BACKEND'] === 'json' ? 'json' : 'postgres'
+  const automationStoreDependency =
+    automationBackend === 'postgres'
+      ? new (await import('./automations/pg-automation-store')).PgAutomationStore(pool, resolvedTenantId, store)
+      : (await import('./automations/automation-store-store-adapter')).wrapStoreAsAutomationStoreDependency(store)
+  console.log(`[ServerBootstrap] AutomationService persistence backend: ${automationBackend}`)
+  const automationService = new AutomationService(automationStoreDependency, {
+    claudeUsage,
+    codexUsage,
+    // Why: unlike desktop (which only mirrors remote-host automations), this process
+    // IS the server that owns executing schedules for `remote_host_service` targets.
+    allowRemoteHostScheduling: true
+    // TODO(D1, docs/guides/fix-proposals-per-issue.md §D1): headlessDispatcher is
+    // intentionally left unset. Desktop's dispatcher (desktop/src/main/index.ts:~1810)
+    // creates a managed worktree and spawns an agent via runtimeService — porting
+    // that to this headless server needs its own design pass and is out of scope
+    // here. Without it, a due run simply falls back to `skipped_unavailable`
+    // (AutomationService.requestDispatch's existing no-dispatcher path) instead of
+    // throwing — still a strict improvement over today's 100%-throw state, since
+    // list/CRUD/precheck and the rrule scheduler itself now work.
+  })
+  automationService.start()
+  runtime.setAutomationService(automationService)
+  console.log('[ServerBootstrap] ✅ AutomationService initialized + scheduler started (D1 fix)')
 
   // 8. Wire FleetHealthMonitor (SOL-005 — CR-005: fleet health wiring)
   try {
@@ -573,8 +796,26 @@ export async function initializeOrcaServices(
     workflowOrchestrator,                                                         // TASK-029 ✅
     taskService,                                                                  // TASK-041 ✅
     rpcAuthToken: rpcServer.getAuthToken(),                                       // BUG-PC-001 ✅
+    automationService,                                                            // D1 fix ✅
+    claudeUsage,                                                                  // D1 fix ✅
+    codexUsage,                                                                   // D1 fix ✅
+    openCodeUsage,
     async shutdown() {
       console.log('[ServerBootstrap] Shutting down...')
+      try {
+        starNag.stop()
+        setActiveStarNagService(null)
+        console.log('[ServerBootstrap] ✅ StarNagService stopped')
+      } catch (err) {
+        console.warn('[ServerBootstrap] StarNagService stop error:', err)
+      }
+      // Stop AutomationService's scheduler first, before rpcServer/db teardown below.
+      try {
+        automationService.stop()
+        console.log('[ServerBootstrap] ✅ AutomationService stopped')
+      } catch (err) {
+        console.warn('[ServerBootstrap] AutomationService stop error:', err)
+      }
       // Stop agent WS server first (clear pending slots)
       try {
         agentWsServer.stop()
