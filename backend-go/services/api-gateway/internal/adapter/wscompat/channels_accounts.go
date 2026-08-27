@@ -39,6 +39,60 @@ func registerAccountsChannels(r *Registry, client infrafleetv1.InfraFleetService
 	registerAccountsRelay(r, client, "accounts.removeClaude", "accounts.removeClaude")
 	registerAccountsRelay(r, client, "accounts.removeCodex", "accounts.removeCodex")
 	registerAccountsSubscribeChannel(r, client)
+	registerAccountsResolveDevServerConnectionChannel(r, client)
+}
+
+// accountsResolveDevServerConnectionArgs — TASK-023's frontend dev-server
+// picker sends the devServerId the user explicitly chose; this channel is
+// the missing link turning that choice into the connectionId the 4 relay
+// channels/accounts.subscribe above require. Named specifically for
+// accounts.*'s picker rather than a bare generic "resolve any devServerId"
+// channel, per this task's naming guidance.
+type accountsResolveDevServerConnectionArgs struct {
+	DevServerID string `json:"devServerId"`
+}
+
+// accountsResolveDevServerConnectionResult mirrors only
+// ResolveConnectionResponse's connected/connection_id fields — the picker
+// needs nothing else, and returning less than the full proto response
+// avoids leaking DevServer/repo_path/worktree details this channel was
+// never asked to expose.
+type accountsResolveDevServerConnectionResult struct {
+	Connected    bool   `json:"connected"`
+	ConnectionID string `json:"connectionId"`
+}
+
+// registerAccountsResolveDevServerConnectionChannel resolves a chosen dev
+// server to its current live connectionId via ResolveConnection's
+// dev_server_id lookup (infrafleet.proto: "dev_server_id resolves the dev
+// server's current active connectionId") — the same RPC
+// registerBrowserRelay (channels_browser.go) already uses for its
+// worktree_id variant, reused here rather than duplicated. Deliberately
+// does NOT fail when Connected is false: "this dev server has no live
+// connection right now" is a legitimate, displayable picker state, not an
+// error — callers (runtime-provider-accounts-client.ts) check `connected`
+// themselves before attempting a relay call.
+func registerAccountsResolveDevServerConnectionChannel(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
+	r.Register("accounts.resolveDevServerConnection", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		in, err := decodeArg[accountsResolveDevServerConnectionArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if in.DevServerID == "" {
+			return nil, fmt.Errorf("ACCOUNTS_NO_DEV_SERVER: devServerId is required")
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resolved, err := client.ResolveConnection(rpcCtx, &infrafleetv1.ResolveConnectionRequest{DevServerId: in.DevServerID})
+		if err != nil {
+			return nil, err
+		}
+		return accountsResolveDevServerConnectionResult{
+			Connected:    resolved.GetConnected(),
+			ConnectionID: resolved.GetConnectionId(),
+		}, nil
+	})
 }
 
 // accountsRelayArgs is shared by all 4 channels — accountId plus the
