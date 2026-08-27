@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/grant_resolution.go`, `backend-go/services/task-service/internal/usecase/resolve_permission.go`
 **Depends on:** TASK-TG-01-01 (`Task.OwnerID`), TASK-TG-03-04 (proto `Grant.ID`/`expires_at`/`ResolvePermissionRequest.action`), TASK-TG-03-05 (migration)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain.Grant widened (ID/ExpiresAt); ResolveGrant now takes explicit 'now' and filters expired grants (boundary: !After); a shared Clock/SystemClock port added (mirrors auth-service) and injected into ResolvePermission/GetSubtree; grpc ResolvePermission handler threads the real req.GetAction() instead of hardcoding "read". go test ./internal/domain/... -run TestResolveGrant, ./internal/usecase/... -run TestResolvePermission, and ./internal/adapter/grpc/... all pass.
 
 ---
 

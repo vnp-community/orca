@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`
 **Depends on:** TASK-TG-01-01 (both touch `task.proto` — land this after to avoid conflicting field-number allocation)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — SubtaskProposal widened, AIDecomposeResponse.raw_response/notes added, AIApplyRequest.raw_ai_response added, GenerateAgentPrompt RPC added; buf generate + buf breaking (vs origin/main) clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/ai_decompose.go`
 **Depends on:** TASK-TG-01-04 (Task.Description/AIContext/EstimatedHours columns), TASK-TG-02-02 (domain SubtaskProposal widen), TASK-TG-02-03 (TechStackDetector)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — AIDecompose rewritten for the 5-source context bundle + structured JSON parsing; new ProjectContextResolver (project-service adapter) and VelocityResolver (repo-local, RecentCompletedTasks) added and wired in main.go; go test ./internal/usecase/... -run TestAIDecompose passes (prompt-source-inclusion, best-effort tech-stack-failure, malformed-JSON cases).
 
 ---
 

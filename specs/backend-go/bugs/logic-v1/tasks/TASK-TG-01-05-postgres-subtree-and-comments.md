@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/adapter/postgres/subtree.go` (new), `backend-go/services/task-service/internal/adapter/postgres/comments.go` (new)
 **Depends on:** TASK-TG-01-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — subtree.go (GetSubtree/GetSubtreeWithChildPercents/BatchUpdateProgress) + comments.go (AddComment/ListComments) added; CommentRepository port added; go build clean.
 
 ---
 

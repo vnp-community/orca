@@ -5,7 +5,7 @@
 **Service:** `task-service` (client) + `tenant-service` (server, see `TASK-TG-03-02`)
 **File:** `backend-go/services/task-service/internal/adapter/grpcclient/team_scope_resolver.go`
 **Depends on:** TASK-TG-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — TeamScopeResolver now dials tenant-service.ListTeamsForUser for real (StubTeamScopeResolver kept but unwired); main.go wired with a new tenant-service client dial + TenantServiceAddr config. go test ./internal/adapter/grpcclient/... -run TestTeamScopeResolver and ./internal/usecase/... -run TestResolvePermission both pass.
 
 ---
 

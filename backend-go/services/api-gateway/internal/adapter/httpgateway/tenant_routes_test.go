@@ -48,6 +48,9 @@ type fakeTenantServiceClient struct {
 	listTeamMembersResp *tenantv1.ListTeamMembersResponse
 	listTeamMembersErr  error
 
+	listTeamsForUserResp *tenantv1.ListTeamsForUserResponse
+	listTeamsForUserErr  error
+
 	getUserProfileResp *tenantv1.GetUserProfileResponse
 	getUserProfileErr  error
 
@@ -119,6 +122,13 @@ func (f *fakeTenantServiceClient) ListTeamMembers(_ context.Context, _ *tenantv1
 		return nil, f.listTeamMembersErr
 	}
 	return f.listTeamMembersResp, nil
+}
+
+func (f *fakeTenantServiceClient) ListTeamsForUser(_ context.Context, _ *tenantv1.ListTeamsForUserRequest, _ ...grpc.CallOption) (*tenantv1.ListTeamsForUserResponse, error) {
+	if f.listTeamsForUserErr != nil {
+		return nil, f.listTeamsForUserErr
+	}
+	return f.listTeamsForUserResp, nil
 }
 
 func (f *fakeTenantServiceClient) GetUserProfile(_ context.Context, _ *tenantv1.GetUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.GetUserProfileResponse, error) {

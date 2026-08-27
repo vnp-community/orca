@@ -29,6 +29,23 @@ func TestCreateTask_CreatesARootTask(t *testing.T) {
 	}
 }
 
+// TestCreateTask_SetsOwnerIDToCreatingUser is TASK-TG-03-01's bootstrap
+// fix: without OwnerID set at creation, a brand-new task's creator would be
+// locked out of Grant's new manage-access check (no grant rows exist yet).
+func TestCreateTask_SetsOwnerIDToCreatingUser(t *testing.T) {
+	repo := newFakeTaskRepository()
+	uc := NewCreateTask(repo)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	got, err := uc.Execute(ctx, CreateTaskInput{ID: "t1", Title: "Title"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.OwnerID != "user-1" {
+		t.Errorf("expected OwnerID=user-1, got %q", got.OwnerID)
+	}
+}
+
 func TestCreateTask_RejectsAMissingParent(t *testing.T) {
 	repo := newFakeTaskRepository()
 	uc := NewCreateTask(repo)

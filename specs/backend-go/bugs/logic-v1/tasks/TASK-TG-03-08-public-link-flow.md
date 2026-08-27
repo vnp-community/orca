@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `backend-go/services/task-service/internal/usecase/public_link.go` (new)
 **Depends on:** TASK-TG-03-05 (migration — `task.task_share_links` table)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — CreatePublicLink/RevokePublicLink/ResolvePublicLink RPCs + usecases + ShareLinkStore (postgres) added; api-gateway intentionally NOT wired (out of scope per this task's own Context section). go test ./internal/usecase/... -run 'TestCreatePublicLink\|TestResolvePublicLink\|TestRevokePublicLink' and ./internal/adapter/postgres/... -run TestShareLinks both pass (plaintext-never-stored, revoked/expired-token-not-found, manage-gate cases).
 
 ---
 

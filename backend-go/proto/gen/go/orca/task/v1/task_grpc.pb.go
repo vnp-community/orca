@@ -20,19 +20,30 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TaskService_CreateTask_FullMethodName          = "/orca.task.v1.TaskService/CreateTask"
-	TaskService_GetTask_FullMethodName             = "/orca.task.v1.TaskService/GetTask"
-	TaskService_AddEdge_FullMethodName             = "/orca.task.v1.TaskService/AddEdge"
-	TaskService_Grant_FullMethodName               = "/orca.task.v1.TaskService/Grant"
-	TaskService_ResolvePermission_FullMethodName   = "/orca.task.v1.TaskService/ResolvePermission"
-	TaskService_Execute_FullMethodName             = "/orca.task.v1.TaskService/Execute"
-	TaskService_HasActiveExecutions_FullMethodName = "/orca.task.v1.TaskService/HasActiveExecutions"
-	TaskService_ListTasks_FullMethodName           = "/orca.task.v1.TaskService/ListTasks"
-	TaskService_UpdateTask_FullMethodName          = "/orca.task.v1.TaskService/UpdateTask"
-	TaskService_DeleteTask_FullMethodName          = "/orca.task.v1.TaskService/DeleteTask"
-	TaskService_GetDependencies_FullMethodName     = "/orca.task.v1.TaskService/GetDependencies"
-	TaskService_AIDecompose_FullMethodName         = "/orca.task.v1.TaskService/AIDecompose"
-	TaskService_AIApply_FullMethodName             = "/orca.task.v1.TaskService/AIApply"
+	TaskService_CreateTask_FullMethodName                = "/orca.task.v1.TaskService/CreateTask"
+	TaskService_GetTask_FullMethodName                   = "/orca.task.v1.TaskService/GetTask"
+	TaskService_AddEdge_FullMethodName                   = "/orca.task.v1.TaskService/AddEdge"
+	TaskService_Grant_FullMethodName                     = "/orca.task.v1.TaskService/Grant"
+	TaskService_ResolvePermission_FullMethodName         = "/orca.task.v1.TaskService/ResolvePermission"
+	TaskService_Execute_FullMethodName                   = "/orca.task.v1.TaskService/Execute"
+	TaskService_HasActiveExecutions_FullMethodName       = "/orca.task.v1.TaskService/HasActiveExecutions"
+	TaskService_ListTasks_FullMethodName                 = "/orca.task.v1.TaskService/ListTasks"
+	TaskService_UpdateTask_FullMethodName                = "/orca.task.v1.TaskService/UpdateTask"
+	TaskService_DeleteTask_FullMethodName                = "/orca.task.v1.TaskService/DeleteTask"
+	TaskService_GetDependencies_FullMethodName           = "/orca.task.v1.TaskService/GetDependencies"
+	TaskService_AIDecompose_FullMethodName               = "/orca.task.v1.TaskService/AIDecompose"
+	TaskService_AIApply_FullMethodName                   = "/orca.task.v1.TaskService/AIApply"
+	TaskService_GetSubtree_FullMethodName                = "/orca.task.v1.TaskService/GetSubtree"
+	TaskService_RecalculateProgress_FullMethodName       = "/orca.task.v1.TaskService/RecalculateProgress"
+	TaskService_AddComment_FullMethodName                = "/orca.task.v1.TaskService/AddComment"
+	TaskService_ListComments_FullMethodName              = "/orca.task.v1.TaskService/ListComments"
+	TaskService_GenerateAgentPrompt_FullMethodName       = "/orca.task.v1.TaskService/GenerateAgentPrompt"
+	TaskService_RevokeGrant_FullMethodName               = "/orca.task.v1.TaskService/RevokeGrant"
+	TaskService_ListGrants_FullMethodName                = "/orca.task.v1.TaskService/ListGrants"
+	TaskService_CreatePublicLink_FullMethodName          = "/orca.task.v1.TaskService/CreatePublicLink"
+	TaskService_RevokePublicLink_FullMethodName          = "/orca.task.v1.TaskService/RevokePublicLink"
+	TaskService_ResolvePublicLink_FullMethodName         = "/orca.task.v1.TaskService/ResolvePublicLink"
+	TaskService_ReportTaskExecutionResult_FullMethodName = "/orca.task.v1.TaskService/ReportTaskExecutionResult"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -73,6 +84,20 @@ type TaskServiceClient interface {
 	// AIDecompose call, creating one subtask + parent_child edge per
 	// proposal.
 	AIApply(ctx context.Context, in *AIApplyRequest, opts ...grpc.CallOption) (*AIApplyResponse, error)
+	GetSubtree(ctx context.Context, in *GetSubtreeRequest, opts ...grpc.CallOption) (*GetSubtreeResponse, error)
+	RecalculateProgress(ctx context.Context, in *RecalculateProgressRequest, opts ...grpc.CallOption) (*RecalculateProgressResponse, error)
+	AddComment(ctx context.Context, in *AddCommentRequest, opts ...grpc.CallOption) (*AddCommentResponse, error)
+	ListComments(ctx context.Context, in *ListCommentsRequest, opts ...grpc.CallOption) (*ListCommentsResponse, error)
+	GenerateAgentPrompt(ctx context.Context, in *GenerateAgentPromptRequest, opts ...grpc.CallOption) (*GenerateAgentPromptResponse, error)
+	RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error)
+	CreatePublicLink(ctx context.Context, in *CreatePublicLinkRequest, opts ...grpc.CallOption) (*CreatePublicLinkResponse, error)
+	RevokePublicLink(ctx context.Context, in *RevokePublicLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ResolvePublicLink(ctx context.Context, in *ResolvePublicLinkRequest, opts ...grpc.CallOption) (*ResolvePublicLinkResponse, error)
+	// ReportTaskExecutionResult is called BY orchestration-service only — see
+	// this RPC's usecase doc comment for the service-identity check this
+	// handler must perform. api-gateway never routes to it.
+	ReportTaskExecutionResult(ctx context.Context, in *ReportTaskExecutionResultRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type taskServiceClient struct {
@@ -213,6 +238,116 @@ func (c *taskServiceClient) AIApply(ctx context.Context, in *AIApplyRequest, opt
 	return out, nil
 }
 
+func (c *taskServiceClient) GetSubtree(ctx context.Context, in *GetSubtreeRequest, opts ...grpc.CallOption) (*GetSubtreeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSubtreeResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetSubtree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) RecalculateProgress(ctx context.Context, in *RecalculateProgressRequest, opts ...grpc.CallOption) (*RecalculateProgressResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecalculateProgressResponse)
+	err := c.cc.Invoke(ctx, TaskService_RecalculateProgress_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) AddComment(ctx context.Context, in *AddCommentRequest, opts ...grpc.CallOption) (*AddCommentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddCommentResponse)
+	err := c.cc.Invoke(ctx, TaskService_AddComment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ListComments(ctx context.Context, in *ListCommentsRequest, opts ...grpc.CallOption) (*ListCommentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCommentsResponse)
+	err := c.cc.Invoke(ctx, TaskService_ListComments_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GenerateAgentPrompt(ctx context.Context, in *GenerateAgentPromptRequest, opts ...grpc.CallOption) (*GenerateAgentPromptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateAgentPromptResponse)
+	err := c.cc.Invoke(ctx, TaskService_GenerateAgentPrompt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_RevokeGrant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListGrantsResponse)
+	err := c.cc.Invoke(ctx, TaskService_ListGrants_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) CreatePublicLink(ctx context.Context, in *CreatePublicLinkRequest, opts ...grpc.CallOption) (*CreatePublicLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreatePublicLinkResponse)
+	err := c.cc.Invoke(ctx, TaskService_CreatePublicLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) RevokePublicLink(ctx context.Context, in *RevokePublicLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_RevokePublicLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ResolvePublicLink(ctx context.Context, in *ResolvePublicLinkRequest, opts ...grpc.CallOption) (*ResolvePublicLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolvePublicLinkResponse)
+	err := c.cc.Invoke(ctx, TaskService_ResolvePublicLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ReportTaskExecutionResult(ctx context.Context, in *ReportTaskExecutionResultRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_ReportTaskExecutionResult_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -251,6 +386,20 @@ type TaskServiceServer interface {
 	// AIDecompose call, creating one subtask + parent_child edge per
 	// proposal.
 	AIApply(context.Context, *AIApplyRequest) (*AIApplyResponse, error)
+	GetSubtree(context.Context, *GetSubtreeRequest) (*GetSubtreeResponse, error)
+	RecalculateProgress(context.Context, *RecalculateProgressRequest) (*RecalculateProgressResponse, error)
+	AddComment(context.Context, *AddCommentRequest) (*AddCommentResponse, error)
+	ListComments(context.Context, *ListCommentsRequest) (*ListCommentsResponse, error)
+	GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error)
+	RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error)
+	ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error)
+	CreatePublicLink(context.Context, *CreatePublicLinkRequest) (*CreatePublicLinkResponse, error)
+	RevokePublicLink(context.Context, *RevokePublicLinkRequest) (*emptypb.Empty, error)
+	ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error)
+	// ReportTaskExecutionResult is called BY orchestration-service only — see
+	// this RPC's usecase doc comment for the service-identity check this
+	// handler must perform. api-gateway never routes to it.
+	ReportTaskExecutionResult(context.Context, *ReportTaskExecutionResultRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -299,6 +448,39 @@ func (UnimplementedTaskServiceServer) AIDecompose(context.Context, *AIDecomposeR
 }
 func (UnimplementedTaskServiceServer) AIApply(context.Context, *AIApplyRequest) (*AIApplyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AIApply not implemented")
+}
+func (UnimplementedTaskServiceServer) GetSubtree(context.Context, *GetSubtreeRequest) (*GetSubtreeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSubtree not implemented")
+}
+func (UnimplementedTaskServiceServer) RecalculateProgress(context.Context, *RecalculateProgressRequest) (*RecalculateProgressResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecalculateProgress not implemented")
+}
+func (UnimplementedTaskServiceServer) AddComment(context.Context, *AddCommentRequest) (*AddCommentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddComment not implemented")
+}
+func (UnimplementedTaskServiceServer) ListComments(context.Context, *ListCommentsRequest) (*ListCommentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListComments not implemented")
+}
+func (UnimplementedTaskServiceServer) GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateAgentPrompt not implemented")
+}
+func (UnimplementedTaskServiceServer) RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeGrant not implemented")
+}
+func (UnimplementedTaskServiceServer) ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListGrants not implemented")
+}
+func (UnimplementedTaskServiceServer) CreatePublicLink(context.Context, *CreatePublicLinkRequest) (*CreatePublicLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePublicLink not implemented")
+}
+func (UnimplementedTaskServiceServer) RevokePublicLink(context.Context, *RevokePublicLinkRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokePublicLink not implemented")
+}
+func (UnimplementedTaskServiceServer) ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolvePublicLink not implemented")
+}
+func (UnimplementedTaskServiceServer) ReportTaskExecutionResult(context.Context, *ReportTaskExecutionResultRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportTaskExecutionResult not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -555,6 +737,204 @@ func _TaskService_AIApply_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_GetSubtree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubtreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetSubtree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetSubtree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetSubtree(ctx, req.(*GetSubtreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_RecalculateProgress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecalculateProgressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RecalculateProgress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RecalculateProgress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RecalculateProgress(ctx, req.(*RecalculateProgressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_AddComment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddCommentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).AddComment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_AddComment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).AddComment(ctx, req.(*AddCommentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ListComments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCommentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ListComments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ListComments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ListComments(ctx, req.(*ListCommentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GenerateAgentPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateAgentPromptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GenerateAgentPrompt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GenerateAgentPrompt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GenerateAgentPrompt(ctx, req.(*GenerateAgentPromptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_RevokeGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeGrantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RevokeGrant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RevokeGrant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RevokeGrant(ctx, req.(*RevokeGrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ListGrants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGrantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ListGrants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ListGrants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ListGrants(ctx, req.(*ListGrantsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_CreatePublicLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePublicLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).CreatePublicLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_CreatePublicLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).CreatePublicLink(ctx, req.(*CreatePublicLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_RevokePublicLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokePublicLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RevokePublicLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RevokePublicLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RevokePublicLink(ctx, req.(*RevokePublicLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ResolvePublicLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolvePublicLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ResolvePublicLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ResolvePublicLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ResolvePublicLink(ctx, req.(*ResolvePublicLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ReportTaskExecutionResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportTaskExecutionResultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ReportTaskExecutionResult(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ReportTaskExecutionResult_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ReportTaskExecutionResult(ctx, req.(*ReportTaskExecutionResultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -613,6 +993,50 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AIApply",
 			Handler:    _TaskService_AIApply_Handler,
+		},
+		{
+			MethodName: "GetSubtree",
+			Handler:    _TaskService_GetSubtree_Handler,
+		},
+		{
+			MethodName: "RecalculateProgress",
+			Handler:    _TaskService_RecalculateProgress_Handler,
+		},
+		{
+			MethodName: "AddComment",
+			Handler:    _TaskService_AddComment_Handler,
+		},
+		{
+			MethodName: "ListComments",
+			Handler:    _TaskService_ListComments_Handler,
+		},
+		{
+			MethodName: "GenerateAgentPrompt",
+			Handler:    _TaskService_GenerateAgentPrompt_Handler,
+		},
+		{
+			MethodName: "RevokeGrant",
+			Handler:    _TaskService_RevokeGrant_Handler,
+		},
+		{
+			MethodName: "ListGrants",
+			Handler:    _TaskService_ListGrants_Handler,
+		},
+		{
+			MethodName: "CreatePublicLink",
+			Handler:    _TaskService_CreatePublicLink_Handler,
+		},
+		{
+			MethodName: "RevokePublicLink",
+			Handler:    _TaskService_RevokePublicLink_Handler,
+		},
+		{
+			MethodName: "ResolvePublicLink",
+			Handler:    _TaskService_ResolvePublicLink_Handler,
+		},
+		{
+			MethodName: "ReportTaskExecutionResult",
+			Handler:    _TaskService_ReportTaskExecutionResult_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

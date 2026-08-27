@@ -5,7 +5,7 @@
 **Service:** `task-service` + `api-gateway`
 **File:** `backend-go/services/task-service/internal/adapter/grpc/server.go`, `backend-go/services/api-gateway/internal/adapter/httpgateway/task_routes.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-TG-01-01, TASK-TG-01-06, TASK-TG-01-07
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — GetSubtree/RecalculateProgress/AddComment/ListComments wired into grpc server.go+main.go, REST (task_routes.go), and wscompat (registerTaskChannels); BUG-034's task.list/update/delete/getDependencies gap was found ALREADY closed by channels_automation_task.go's registerTaskCRUDChannels (a concurrent pass), so those were left as-is rather than duplicate-registered. `go build ./services/task-service/... ./services/api-gateway/...` clean; grpc/httpgateway/wscompat test suites pass, including new TestServer_GetSubtree/RecalculateProgress/AddComment_And_ListComments, TestTaskRoutes_* (4), and TestTaskChannels_* (4).
 
 ---
 

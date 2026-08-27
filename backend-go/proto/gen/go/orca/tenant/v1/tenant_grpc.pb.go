@@ -28,6 +28,7 @@ const (
 	TenantService_CreateTeam_FullMethodName         = "/orca.tenant.v1.TenantService/CreateTeam"
 	TenantService_AddTeamMember_FullMethodName      = "/orca.tenant.v1.TenantService/AddTeamMember"
 	TenantService_ListTeamMembers_FullMethodName    = "/orca.tenant.v1.TenantService/ListTeamMembers"
+	TenantService_ListTeamsForUser_FullMethodName   = "/orca.tenant.v1.TenantService/ListTeamsForUser"
 	TenantService_GetUserProfile_FullMethodName     = "/orca.tenant.v1.TenantService/GetUserProfile"
 	TenantService_ListDepartments_FullMethodName    = "/orca.tenant.v1.TenantService/ListDepartments"
 	TenantService_UpdateCompany_FullMethodName      = "/orca.tenant.v1.TenantService/UpdateCompany"
@@ -52,6 +53,7 @@ type TenantServiceClient interface {
 	CreateTeam(ctx context.Context, in *CreateTeamRequest, opts ...grpc.CallOption) (*CreateTeamResponse, error)
 	AddTeamMember(ctx context.Context, in *AddTeamMemberRequest, opts ...grpc.CallOption) (*AddTeamMemberResponse, error)
 	ListTeamMembers(ctx context.Context, in *ListTeamMembersRequest, opts ...grpc.CallOption) (*ListTeamMembersResponse, error)
+	ListTeamsForUser(ctx context.Context, in *ListTeamsForUserRequest, opts ...grpc.CallOption) (*ListTeamsForUserResponse, error)
 	// ── profile.* surface (tenant-service.md §3) ──────────────────────────
 	GetUserProfile(ctx context.Context, in *GetUserProfileRequest, opts ...grpc.CallOption) (*GetUserProfileResponse, error)
 	ListDepartments(ctx context.Context, in *ListDepartmentsRequest, opts ...grpc.CallOption) (*ListDepartmentsResponse, error)
@@ -154,6 +156,16 @@ func (c *tenantServiceClient) ListTeamMembers(ctx context.Context, in *ListTeamM
 	return out, nil
 }
 
+func (c *tenantServiceClient) ListTeamsForUser(ctx context.Context, in *ListTeamsForUserRequest, opts ...grpc.CallOption) (*ListTeamsForUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTeamsForUserResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListTeamsForUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *tenantServiceClient) GetUserProfile(ctx context.Context, in *GetUserProfileRequest, opts ...grpc.CallOption) (*GetUserProfileResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetUserProfileResponse)
@@ -239,6 +251,7 @@ type TenantServiceServer interface {
 	CreateTeam(context.Context, *CreateTeamRequest) (*CreateTeamResponse, error)
 	AddTeamMember(context.Context, *AddTeamMemberRequest) (*AddTeamMemberResponse, error)
 	ListTeamMembers(context.Context, *ListTeamMembersRequest) (*ListTeamMembersResponse, error)
+	ListTeamsForUser(context.Context, *ListTeamsForUserRequest) (*ListTeamsForUserResponse, error)
 	// ── profile.* surface (tenant-service.md §3) ──────────────────────────
 	GetUserProfile(context.Context, *GetUserProfileRequest) (*GetUserProfileResponse, error)
 	ListDepartments(context.Context, *ListDepartmentsRequest) (*ListDepartmentsResponse, error)
@@ -284,6 +297,9 @@ func (UnimplementedTenantServiceServer) AddTeamMember(context.Context, *AddTeamM
 }
 func (UnimplementedTenantServiceServer) ListTeamMembers(context.Context, *ListTeamMembersRequest) (*ListTeamMembersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTeamMembers not implemented")
+}
+func (UnimplementedTenantServiceServer) ListTeamsForUser(context.Context, *ListTeamsForUserRequest) (*ListTeamsForUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTeamsForUser not implemented")
 }
 func (UnimplementedTenantServiceServer) GetUserProfile(context.Context, *GetUserProfileRequest) (*GetUserProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUserProfile not implemented")
@@ -471,6 +487,24 @@ func _TenantService_ListTeamMembers_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_ListTeamsForUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTeamsForUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListTeamsForUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListTeamsForUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListTeamsForUser(ctx, req.(*ListTeamsForUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _TenantService_GetUserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetUserProfileRequest)
 	if err := dec(in); err != nil {
@@ -635,6 +669,10 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTeamMembers",
 			Handler:    _TenantService_ListTeamMembers_Handler,
+		},
+		{
+			MethodName: "ListTeamsForUser",
+			Handler:    _TenantService_ListTeamsForUser_Handler,
 		},
 		{
 			MethodName: "GetUserProfile",

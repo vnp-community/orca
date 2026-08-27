@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/grant.go`
 **Depends on:** none — this fix stands alone, does not require any other TG-03 task
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Grant now requires the caller to already have OPA-authorized 'manage' access via ResolvePermission before writing; CreateTask sets Task.OwnerID at creation and ResolvePermission gained the owner-intrinsic short-circuit (pulled forward from TASK-TG-03-06) so the creating user is never locked out; added "manage" to task_grant.rego's level_actions (owner/admin only). go test ./internal/usecase/... -run TestGrant and opa test policy/orca-authz/ both pass; regression test TestGrant_DeniesWhenCallerHasNoManageAccessToTarget confirms the self-service privilege-escalation gap is closed.
 
 ---
 

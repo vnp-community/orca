@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"sort"
+	"time"
 
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -27,6 +29,21 @@ type fakeTaskRepository struct {
 	updateErr         error
 	deleteErr         error
 	updateStatusCalls []updateStatusCall
+	// batchUpdateProgressCalls records every BatchUpdateProgress call — lets
+	// recalculate_progress_test.go assert it's called exactly once (N+1
+	// regression guard).
+	batchUpdateProgressCalls []map[string]int
+	completeExecutionCalls   []completeExecutionCall
+	completeExecutionErr     error
+}
+
+// completeExecutionCall records one CompleteExecution invocation — used by
+// execute_task_test.go's inline-completion assertions.
+type completeExecutionCall struct {
+	tenantID    string
+	id          string
+	status      string
+	actualHours float64
 }
 
 // updateStatusCall records one UpdateStatus invocation — used by
@@ -165,6 +182,153 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 	return nil
 }
 
+// UpdateWorktreeID, UpdatePromptTemplate, UpdateAIPlanJSON are permissive,
+// map-mutating fakes — same posture as UpdateStatus above (no not-found
+// error) since no test in this package needs that fidelity yet.
+func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.WorktreeID = worktreeID
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.ActiveExecutionID = activeExecutionID
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+func (f *fakeTaskRepository) UpdateLastExecutionOutput(ctx context.Context, tenantID, id, output string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.LastExecutionOutput = output
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.PromptTemplate = promptTemplate
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+func (f *fakeTaskRepository) UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJSON string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.AIPlanJSON = aiPlanJSON
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+// GetSubtree walks ParentID pointers DOWNWARD from rootID within the fake's
+// map — a permissive, N^2-but-correct-enough-for-tests stand-in for the
+// real WITH RECURSIVE query.
+func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
+	root, ok := f.tasks[rootID]
+	if !ok || root.TenantID != tenantID {
+		return nil, nil, errNotFound
+	}
+	if maxDepth <= 0 {
+		maxDepth = domain.DefaultMaxAncestorDepth
+	}
+	var out []domain.Task
+	frontier := []domain.Task{root}
+	depth := 0
+	for len(frontier) > 0 && depth < maxDepth {
+		out = append(out, frontier...)
+		var next []domain.Task
+		for _, parent := range frontier {
+			for _, t := range f.tasks {
+				if t.TenantID == tenantID && t.ParentID == parent.ID {
+					next = append(next, t)
+				}
+			}
+		}
+		frontier = next
+		depth++
+	}
+	return out, nil, nil
+}
+
+// GetSubtreeWithChildPercents mirrors GetSubtree but folds in ChildPercents
+// and orders deepest-first — enough fidelity for recalculate_progress_test.go's
+// fixtures without depending on GetSubtree's frontier order.
+func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, rootID string) ([]SubtreeProgressNode, error) {
+	nodes, _, err := f.GetSubtree(ctx, tenantID, rootID, 0)
+	if err != nil {
+		return nil, err
+	}
+	depthOf := map[string]int{}
+	byID := map[string]domain.Task{}
+	for _, n := range nodes {
+		byID[n.ID] = n
+	}
+	var depth func(id string) int
+	depth = func(id string) int {
+		if d, ok := depthOf[id]; ok {
+			return d
+		}
+		t := byID[id]
+		d := 0
+		if t.ParentID != "" {
+			if _, ok := byID[t.ParentID]; ok {
+				d = depth(t.ParentID) + 1
+			}
+		}
+		depthOf[id] = d
+		return d
+	}
+	childPercents := map[string][]int{}
+	for _, n := range nodes {
+		if n.ParentID != "" {
+			childPercents[n.ParentID] = append(childPercents[n.ParentID], n.ProgressPercent)
+		}
+	}
+	out := make([]SubtreeProgressNode, len(nodes))
+	for i, n := range nodes {
+		out[i] = SubtreeProgressNode{Task: n, Depth: depth(n.ID), ChildPercents: childPercents[n.ID]}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Depth > out[j].Depth })
+	return out, nil
+}
+
+// BatchUpdateProgress records every call for regression assertions
+// (N+1 guard) and mutates the fake's map.
+func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error {
+	f.batchUpdateProgressCalls = append(f.batchUpdateProgressCalls, updates)
+	for id, p := range updates {
+		if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+			t.ProgressPercent = p
+			f.tasks[id] = t
+		}
+	}
+	return nil
+}
+
+// CompleteExecution mirrors the real repository's terminal write — mutates
+// status/actual_hours/agent_session_id in the fake's map and records the
+// call for TestExecuteTask's inline-completion assertions.
+func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+	f.completeExecutionCalls = append(f.completeExecutionCalls, completeExecutionCall{tenantID: tenantID, id: id, status: status, actualHours: actualHours})
+	if f.completeExecutionErr != nil {
+		return f.completeExecutionErr
+	}
+	t, ok := f.tasks[id]
+	if !ok || t.TenantID != tenantID {
+		return errNotFound
+	}
+	t.Status = status
+	t.ActualHours = &actualHours
+	t.AgentSessionID = ""
+	f.tasks[id] = t
+	return nil
+}
+
 var errNotFound = &notFoundError{}
 
 type notFoundError struct{}
@@ -218,18 +382,44 @@ func (f *fakeEdgeRepository) ListFrom(ctx context.Context, tenantID, fromTaskID 
 	return out, nil
 }
 
-type fakeGrantRepository struct {
-	grants   []domain.Grant
-	grantErr error
-	listErr  error
+// ListByKindForUpdate is a permissive fake: no real row-locking (there is
+// no real database here), just ListByKind's filter — enough to exercise
+// AddEdge's cycle-check call site.
+func (f *fakeEdgeRepository) ListByKindForUpdate(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	return f.ListByKind(ctx, tenantID, kind)
 }
 
-func (f *fakeGrantRepository) Grant(ctx context.Context, tenantID string, grant domain.Grant) error {
-	if f.grantErr != nil {
-		return f.grantErr
+// ListTo returns the edges of kind terminating AT toTaskID — used by
+// UpdateTask's un-block step.
+func (f *fakeEdgeRepository) ListTo(ctx context.Context, tenantID, toTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
 	}
+	var out []domain.TaskEdge
+	for _, e := range f.edges {
+		if e.Kind == kind && e.ToTaskID == toTaskID {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+type fakeGrantRepository struct {
+	grants    []domain.Grant
+	grantErr  error
+	listErr   error
+	revokeErr error
+	nextID    int
+}
+
+func (f *fakeGrantRepository) Grant(ctx context.Context, tenantID string, grant domain.Grant) (string, error) {
+	if f.grantErr != nil {
+		return "", f.grantErr
+	}
+	f.nextID++
+	grant.ID = fmt.Sprintf("grant-%d", f.nextID)
 	f.grants = append(f.grants, grant)
-	return nil
+	return grant.ID, nil
 }
 
 func (f *fakeGrantRepository) ListGrantsForAncestors(ctx context.Context, tenantID string, taskIDs []string) (map[string][]domain.Grant, error) {
@@ -242,11 +432,61 @@ func (f *fakeGrantRepository) ListGrantsForAncestors(ctx context.Context, tenant
 	}
 	out := map[string][]domain.Grant{}
 	for _, g := range f.grants {
-		if ids[g.TaskID] {
-			out[g.TaskID] = append(out[g.TaskID], g)
+		if !ids[g.TaskID] {
+			continue
+		}
+		if g.ExpiresAt != nil && !g.ExpiresAt.After(time.Now()) {
+			continue // defense-in-depth expiry filter, mirroring the real SQL WHERE clause (TASK-TG-03-07)
+		}
+		out[g.TaskID] = append(out[g.TaskID], g)
+	}
+	return out, nil
+}
+
+// Revoke removes a grant by id — a nonexistent id is a real error, never a
+// silent no-op, mirroring the real repository's RowsAffected==0 check.
+func (f *fakeGrantRepository) Revoke(ctx context.Context, tenantID, grantID string) error {
+	if f.revokeErr != nil {
+		return f.revokeErr
+	}
+	for i, g := range f.grants {
+		if g.ID == grantID {
+			f.grants = append(f.grants[:i], f.grants[i+1:]...)
+			return nil
+		}
+	}
+	return errNotFound
+}
+
+// ListGrantsForTask returns only the grants recorded directly against
+// taskID — NOT the ancestor chain, mirroring the real repository.
+func (f *fakeGrantRepository) ListGrantsForTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.Grant
+	for _, g := range f.grants {
+		if g.TaskID == taskID {
+			out = append(out, g)
 		}
 	}
 	return out, nil
+}
+
+// fakeEventPublisher records every published event — backs Grant/RevokeGrant's
+// audit-event assertions without a real outbox/NATS.
+type fakeEventPublisher struct {
+	events []publishedEvent
+}
+
+type publishedEvent struct {
+	tenantID  string
+	eventType string
+	payload   map[string]any
+}
+
+func (f *fakeEventPublisher) Publish(ctx context.Context, tenantID, eventType string, payload map[string]any) {
+	f.events = append(f.events, publishedEvent{tenantID: tenantID, eventType: eventType, payload: payload})
 }
 
 type fakeTeamScopeResolver struct {
@@ -317,6 +557,96 @@ func (f *fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context,
 	return nil
 }
 
+// fakeClock backs Clock-dependent tests (grant-expiry assertions) with a
+// deterministic `now` — mirrors auth-service/internal/usecase/fakes_test.go's
+// identical fakeClock.
+type fakeClock struct{ now time.Time }
+
+func (f *fakeClock) Now() time.Time { return f.now }
+
+// fakeShareLinkRepository backs the public-link usecases' tests without a
+// database — stores only the token hash it's given, never a plaintext, the
+// same discipline the real ShareLinkStore keeps.
+type fakeShareLinkRepository struct {
+	links     map[string]fakeShareLink
+	nextID    int
+	createErr error
+}
+
+type fakeShareLink struct {
+	tenantID  string
+	taskID    string
+	tokenHash string
+	revoked   bool
+	expiresAt *time.Time
+}
+
+func newFakeShareLinkRepository() *fakeShareLinkRepository {
+	return &fakeShareLinkRepository{links: map[string]fakeShareLink{}}
+}
+
+func (f *fakeShareLinkRepository) Create(ctx context.Context, tenantID, taskID, tokenHash, createdBy string) (string, error) {
+	if f.createErr != nil {
+		return "", f.createErr
+	}
+	f.nextID++
+	id := fmt.Sprintf("link-%d", f.nextID)
+	f.links[id] = fakeShareLink{tenantID: tenantID, taskID: taskID, tokenHash: tokenHash}
+	return id, nil
+}
+
+func (f *fakeShareLinkRepository) ResolveActive(ctx context.Context, tenantID, tokenHash string) (string, error) {
+	now := time.Now()
+	for _, l := range f.links {
+		if l.tenantID != tenantID || l.tokenHash != tokenHash || l.revoked {
+			continue
+		}
+		if l.expiresAt != nil && !l.expiresAt.After(now) {
+			continue
+		}
+		return l.taskID, nil
+	}
+	return "", errNotFound
+}
+
+func (f *fakeShareLinkRepository) Revoke(ctx context.Context, tenantID, linkID string) error {
+	l, ok := f.links[linkID]
+	if !ok || l.tenantID != tenantID || l.revoked {
+		return errNotFound
+	}
+	l.revoked = true
+	f.links[linkID] = l
+	return nil
+}
+
+func (f *fakeShareLinkRepository) TaskIDFor(ctx context.Context, tenantID, linkID string) (string, error) {
+	l, ok := f.links[linkID]
+	if !ok || l.tenantID != tenantID {
+		return "", errNotFound
+	}
+	return l.taskID, nil
+}
+
+// fakeWorktreeProvisioner backs ExecuteTask's worktree-reuse-or-create
+// tests without a real git-gateway-service call.
+type fakeWorktreeProvisioner struct {
+	worktreeID string
+	path       string
+	err        error
+	called     bool
+}
+
+func (f *fakeWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (string, string, error) {
+	f.called = true
+	if f.err != nil {
+		return "", "", f.err
+	}
+	if task.WorktreeID != "" {
+		return task.WorktreeID, "", nil
+	}
+	return f.worktreeID, f.path, nil
+}
+
 type fakeExecutor struct {
 	ref    string
 	err    error
@@ -329,4 +659,57 @@ func (f *fakeExecutor) Execute(ctx context.Context, tenantID, taskID, requestID 
 		return "", f.err
 	}
 	return f.ref, nil
+}
+
+// fakeComplexExecutor backs ExecuteTask's complex-path tests — a separate
+// type from fakeExecutor since usecase.ComplexExecutor's Execute takes an
+// extra worktreeID argument (TASK-TG-04-04) that usecase.SimpleExecutor's
+// doesn't.
+type fakeComplexExecutor struct {
+	ref           string
+	err           error
+	called        bool
+	gotWorktreeID string
+}
+
+func (f *fakeComplexExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreeID string) (string, error) {
+	f.called = true
+	f.gotWorktreeID = worktreeID
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.ref, nil
+}
+
+// fakeCommentRepository backs AddComment/ListComments' tests without a
+// database — id assignment mirrors postgres.Repository.AddComment
+// (server-generated id, not client-supplied).
+type fakeCommentRepository struct {
+	comments []domain.TaskComment
+	addErr   error
+	listErr  error
+	nextID   int
+}
+
+func (f *fakeCommentRepository) AddComment(ctx context.Context, tenantID string, c domain.TaskComment) (domain.TaskComment, error) {
+	if f.addErr != nil {
+		return domain.TaskComment{}, f.addErr
+	}
+	f.nextID++
+	c.ID = fmt.Sprintf("comment-%d", f.nextID)
+	f.comments = append(f.comments, c)
+	return c, nil
+}
+
+func (f *fakeCommentRepository) ListComments(ctx context.Context, tenantID, taskID, pageToken string, pageSize int32) ([]domain.TaskComment, string, error) {
+	if f.listErr != nil {
+		return nil, "", f.listErr
+	}
+	var out []domain.TaskComment
+	for _, c := range f.comments {
+		if c.TaskID == taskID {
+			out = append(out, c)
+		}
+	}
+	return out, "", nil
 }

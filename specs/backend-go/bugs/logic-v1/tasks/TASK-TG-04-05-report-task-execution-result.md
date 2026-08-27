@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `backend-go/services/task-service/internal/usecase/report_execution_result.go` (new)
 **Depends on:** TASK-TG-04-04 (`coordinator_run_id`/`ActiveExecutionID` produced by `ComplexExecutor`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0006 adds task.tasks.active_execution_id (0005 was already claimed by TG-03-07's outbox migration); domain.Task/taskColumns/scanTask/GetAncestors widened; ComplexExecutor.Execute now persists active_execution_id via UpdateActiveExecutionID right after StartCoordinatorRun succeeds; ReportTaskExecutionResult usecase + RPC + handler + main.go wiring added. Security note honestly flagged, not guessed at: common/grpcmw has no mTLS/mesh-identity interceptor in this codebase to reuse, so the service-identity check is an open gap, documented in both the usecase and handler doc comments. go test ./internal/usecase/... -run TestReportTaskExecutionResult passes (stale-callback-no-op, success-to-review, failure-to-blocked-not-reverted cases); full backend-go build/vet clean, buf breaking clean.
 
 ---
 

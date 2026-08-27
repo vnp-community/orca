@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/revoke_grant.go` (new), `backend-go/services/task-service/internal/usecase/list_grants.go` (new), `backend-go/services/task-service/internal/adapter/postgres/grants.go`
 **Depends on:** TASK-TG-03-01, TASK-TG-03-04, TASK-TG-03-05, TASK-TG-03-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — RevokeGrant/ListGrants usecases added (both manage-gated); postgres Grant widened (expires_at + RETURNING id), Revoke, ListGrantsForTask added, ListGrantsForAncestors filters expired rows at SQL layer too; migration 0005 adds task.outbox_events; internal/adapter/eventbus.Publisher + common/outbox.Relay wired in main.go (mirrors usage-service's transactional-outbox pattern — real pattern lives in its postgres repo, not a separate eventbus package as the task doc named; followed the REAL pattern). NOTE: Grant/RevokeGrant's event publish is a separate call after the DB write, not same-transaction — flagged as a follow-up per this task's own Verify note. go test ./internal/usecase/... -run 'TestRevokeGrant\|TestListGrants\|TestGrant' and ./internal/adapter/postgres/... -run TestRepository (grants/revoke/expiry cases) both pass.
 
 ---
 

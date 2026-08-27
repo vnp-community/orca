@@ -99,14 +99,15 @@ import (
 // "executionRef" pointing at a run that already finished.
 type SimpleExecutor struct {
 	tasks    usecase.TaskRepository
+	edges    usecase.EdgeRepository
 	resolver usecase.ProjectExecutionResolver
 	relay    infrafleetv1.InfraFleetServiceClient
 	profiles usecase.ProfileResolver        // NEW
 	projects usecase.ProjectContextResolver // NEW
 }
 
-func NewSimpleExecutor(tasks usecase.TaskRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient, profiles usecase.ProfileResolver, projects usecase.ProjectContextResolver) *SimpleExecutor {
-	return &SimpleExecutor{tasks: tasks, resolver: resolver, relay: relay, profiles: profiles, projects: projects}
+func NewSimpleExecutor(tasks usecase.TaskRepository, edges usecase.EdgeRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient, profiles usecase.ProfileResolver, projects usecase.ProjectContextResolver) *SimpleExecutor {
+	return &SimpleExecutor{tasks: tasks, edges: edges, resolver: resolver, relay: relay, profiles: profiles, projects: projects}
 }
 
 // agentExecPromptParams mirrors agent-print-mode-exec.ts's handled fields —
@@ -126,7 +127,7 @@ type agentExecPromptParams struct {
 	StepID       string            `json:"stepId,omitempty"`
 	TrustPreset  string            `json:"trustPreset,omitempty"` // NEW
 	Model        string            `json:"model,omitempty"`       // NEW
-	Env          map[string]string `json:"env,omitempty"`         // NEW
+	Env          map[string]string `json:"env,omitempty"`         // NEW / TASK-TG-04-06 — already-supported field, simply never populated before
 	InitFile     string            `json:"initFile,omitempty"`    // NEW — see workflow-service's agent_step_executor.go for the same field-name caveat
 }
 
@@ -145,7 +146,28 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: load task: %w", err)
 	}
-	connectionID, worktreePath, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
+
+	// Context preamble inputs (TASK-TG-04-06): parent is ancestors[1] (the
+	// immediate parent, nil for a root task — ancestors[0] is task itself,
+	// GetAncestors' own convention); completedDeps is this task's
+	// depends_on targets currently Status == StatusDone. Both are
+	// best-effort — a lookup failure here degrades the prompt, it must
+	// never fail the whole dispatch.
+	var parent *domain.Task
+	if ancestors, err := s.tasks.GetAncestors(ctx, tenantID, taskID, 0); err == nil && len(ancestors) > 1 {
+		p := ancestors[1]
+		parent = &p
+	}
+	var completedDeps []domain.Task
+	if deps, err := s.edges.ListFrom(ctx, tenantID, taskID, domain.EdgeKindDependsOn); err == nil {
+		for _, e := range deps {
+			if t, err := s.tasks.Get(ctx, tenantID, e.ToTaskID); err == nil && t.Status == domain.StatusDone {
+				completedDeps = append(completedDeps, t)
+			}
+		}
+	}
+
+	connectionID, worktreePath, _, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: resolve connection: %w", err)
 	}
@@ -165,7 +187,19 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 		return "", apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_WORKTREE_PATH", "task's connected dev server has no worktree path recorded", nil)
 	}
 
-	params := agentExecPromptParams{Prompt: buildExecutePrompt(task), WorktreePath: worktreePath, StepID: requestID}
+	// TASK-TG-04-06's context preamble (parent/completedDeps) and
+	// TASK-PRF-04-08's profile-aware env/model/init-file resolution are
+	// independent enhancements to the same dispatched prompt — composed
+	// here rather than picking one: the prompt always carries the task's
+	// dependency context, and the env always at least carries the base
+	// ORCA_TASK_ID/ORCA_PROJECT_ID pair (TASK-TG-04-06) even when no
+	// profile resolves.
+	params := agentExecPromptParams{
+		Prompt:       buildExecutePrompt(task, parent, completedDeps),
+		WorktreePath: worktreePath,
+		StepID:       requestID,
+		Env:          map[string]string{"ORCA_TASK_ID": task.ID, "ORCA_PROJECT_ID": task.ProjectID},
+	}
 
 	// userID: task-service's domain.Task carries no per-task assignee field
 	// (confirmed against the real domain.Task shape — see this task's
@@ -174,13 +208,14 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	if userID != "" {
 		userCtx := tenant.WithUserID(ctx, userID) // explicit, for the resolvers' outbound-metadata forwarding below
 		resolved, err := s.profiles.GetResolvedProfile(userCtx, userID)
-		if err == nil { // best-effort — a profile-resolve failure degrades to the legacy bare passthrough, never blocks task execution
+		if err == nil { // best-effort — a profile-resolve failure degrades to the legacy bare passthrough (still carrying TG-04-06's base env above), never blocks task execution
 			if agent, ok := resolved["agent"].(map[string]any); ok {
 				if model, ok := agent["preferredModel"].(string); ok {
 					params.Model = model
 				}
 			}
 			env := domain.BuildAgentEnv(resolved, userID, task.ProjectID, "", "")
+			env["ORCA_TASK_ID"] = task.ID // preserve TASK-TG-04-06's task-id env var alongside the profile-resolved env
 			if task.ProjectID != "" {
 				if pctx, err := s.projects.GetProjectContext(userCtx, task.ProjectID); err == nil {
 					env["ORCA_PROJECT_NAME"] = pctx.ProjectName
@@ -214,16 +249,66 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	if result.ExitCode == nil || *result.ExitCode != 0 {
 		return "", apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", fmt.Sprintf("agent.execPrompt exited non-zero: %s", result.Stderr), nil)
 	}
+	// TASK-TG-04-07: persist this run's stdout so a LATER ExecuteBatch
+	// wave's buildExecutePrompt can resolve `{{outputs.<taskId>.*}}`
+	// against this task once it's a completed dependency — best-effort,
+	// a write failure here must not fail an otherwise-successful run.
+	_ = s.tasks.UpdateLastExecutionOutput(ctx, tenantID, taskID, result.Stdout)
 	return fmt.Sprintf("task-exec:%s:%s", taskID, requestID), nil
 }
 
-// buildExecutePrompt assembles the agent.execPrompt prompt from task — see
-// this file's doc comment for why this follows ai_decompose.go's
-// buildDecomposePrompt plain-text convention rather than a new one.
-func buildExecutePrompt(task domain.Task) string {
+// buildExecutePrompt assembles the agent.execPrompt prompt from task,
+// parent (nil if task is a root task), and completedDeps (this task's
+// depends_on targets currently Status == StatusDone) — see this file's doc
+// comment for why this follows ai_decompose.go's buildDecomposePrompt
+// plain-text convention rather than a new one. Uses task.PromptTemplate
+// verbatim when set — a task with an AI-generated or user-edited prompt
+// template should use it as-is (SOL-TG-01/SOL-TG-02) — falling back to the
+// generic "Complete the following task" opener only when empty.
+func buildExecutePrompt(task domain.Task, parent *domain.Task, completedDeps []domain.Task) string {
 	var b strings.Builder
-	b.WriteString("Complete the following task.\n\n")
-	b.WriteString("Task: ")
-	b.WriteString(task.Title)
-	return b.String()
+	if task.PromptTemplate != "" {
+		b.WriteString(task.PromptTemplate)
+		b.WriteString("\n\n")
+	} else {
+		b.WriteString("Complete the following task.\n\n")
+	}
+	fmt.Fprintf(&b, "Task: %s\n", task.Title)
+	if task.Description != "" {
+		fmt.Fprintf(&b, "Description: %s\n", task.Description)
+	}
+	if task.AIContext != "" {
+		fmt.Fprintf(&b, "Context: %s\n", task.AIContext)
+	}
+	if parent != nil {
+		fmt.Fprintf(&b, "\nParent task: %s\n%s\n", parent.Title, parent.Description)
+	}
+	if len(completedDeps) > 0 {
+		b.WriteString("\nCompleted dependencies:\n")
+		for _, d := range completedDeps {
+			fmt.Fprintf(&b, "- %s: %s\n", d.Title, d.Description)
+		}
+	}
+	return interpolateOutputs(b.String(), completedDeps)
+}
+
+// interpolateOutputs resolves `{{outputs.<taskId>.*}}` and
+// `{{outputs.<taskId>.stdout}}` tokens (SOL-TG-04's batch-wave prompt
+// interpolation, TASK-TG-04-07) against completedDeps' LastExecutionOutput
+// (persisted by a PRIOR ExecuteBatch wave's SimpleExecutor.Execute) — the
+// only field currently captured is stdout, so both the wildcard and the
+// explicit `.stdout` token resolve to the same value. A token naming a
+// task not in completedDeps (never ran, not yet finished, or not this
+// task's dependency at all) is left verbatim rather than silently
+// stripped, so a broken reference is visible in the dispatched prompt
+// instead of vanishing.
+func interpolateOutputs(prompt string, completedDeps []domain.Task) string {
+	if len(completedDeps) == 0 {
+		return prompt
+	}
+	for _, d := range completedDeps {
+		prompt = strings.ReplaceAll(prompt, fmt.Sprintf("{{outputs.%s.stdout}}", d.ID), d.LastExecutionOutput)
+		prompt = strings.ReplaceAll(prompt, fmt.Sprintf("{{outputs.%s.*}}", d.ID), d.LastExecutionOutput)
+	}
+	return prompt
 }

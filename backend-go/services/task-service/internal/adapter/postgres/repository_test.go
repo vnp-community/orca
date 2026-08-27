@@ -46,6 +46,54 @@ func setupRepository(t *testing.T) *Repository {
 	return New(pool)
 }
 
+// TestRepository_Create_PersistsAllFields round-trips every widened
+// column (TASK-TG-01-04) through a real Postgres — Create's INSERT and
+// Get's SELECT must agree on taskColumns' order.
+func TestRepository_Create_PersistsAllFields(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+	dueDate := time.Now().Truncate(time.Second).UTC()
+	estimatedHours := 4.5
+
+	task := domain.Task{
+		ID: uuid.NewString(), TenantID: tenantID, Title: "Widened task", Status: domain.StatusOpen,
+		Description: "a description", Type: "bug", Priority: "high", AssigneeID: uuid.NewString(),
+		OwnerID: uuid.NewString(), DueDate: &dueDate, EstimatedHours: &estimatedHours,
+		PromptTemplate: "do the thing", AIContext: "extra context", Visibility: "private",
+	}
+	created, err := repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+	if created.ID != task.ID {
+		t.Fatalf("expected Create to return the task as given, got %+v", created)
+	}
+
+	got, err := repo.Get(ctx, tenantID, task.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Description != task.Description || got.Type != task.Type || got.Priority != task.Priority {
+		t.Errorf("unexpected description/type/priority: %+v", got)
+	}
+	if got.AssigneeID != task.AssigneeID || got.OwnerID != task.OwnerID {
+		t.Errorf("unexpected assignee/owner: %+v", got)
+	}
+	if got.PromptTemplate != task.PromptTemplate || got.AIContext != task.AIContext || got.Visibility != task.Visibility {
+		t.Errorf("unexpected prompt_template/ai_context/visibility: %+v", got)
+	}
+	if got.DueDate == nil || !got.DueDate.Equal(dueDate) {
+		t.Errorf("expected DueDate=%v, got %v", dueDate, got.DueDate)
+	}
+	if got.EstimatedHours == nil || *got.EstimatedHours != estimatedHours {
+		t.Errorf("expected EstimatedHours=%v, got %v", estimatedHours, got.EstimatedHours)
+	}
+	if got.ProgressPercent != 0 {
+		t.Errorf("expected default ProgressPercent=0, got %d", got.ProgressPercent)
+	}
+}
+
 func TestRepository_GetAncestors_WalksParentChainToRoot(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
@@ -120,8 +168,12 @@ func TestRepository_Grant_And_ListGrantsForAncestors(t *testing.T) {
 	_, _ = repo.Create(ctx, task)
 
 	grant := domain.Grant{TaskID: task.ID, SubjectID: uuid.NewString(), Level: domain.GrantLevelOwner, ApplyTree: true}
-	if err := repo.Grant(ctx, tenantID, grant); err != nil {
+	grantID, err := repo.Grant(ctx, tenantID, grant)
+	if err != nil {
 		t.Fatalf("granting: %v", err)
+	}
+	if grantID == "" {
+		t.Error("expected a non-empty grant id")
 	}
 
 	byTask, err := repo.ListGrantsForAncestors(ctx, tenantID, []string{task.ID})
@@ -131,6 +183,91 @@ func TestRepository_Grant_And_ListGrantsForAncestors(t *testing.T) {
 	got := byTask[task.ID]
 	if len(got) != 1 || got[0].Level != domain.GrantLevelOwner || !got[0].ApplyTree {
 		t.Errorf("unexpected grants: %+v", got)
+	}
+}
+
+// TestRepository_ListGrantsForAncestors_ExcludesExpiredRows locks in
+// TASK-TG-03-07's SQL-layer defense-in-depth expiry filter — a grant whose
+// expires_at is in the past must never come back from
+// ListGrantsForAncestors, even before domain.ResolveGrant's own filter
+// ever sees it.
+func TestRepository_ListGrantsForAncestors_ExcludesExpiredRows(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "task", domain.StatusOpen, "", "")
+	_, _ = repo.Create(ctx, task)
+
+	past := time.Now().Add(-time.Hour)
+	future := time.Now().Add(time.Hour)
+	if _, err := repo.Grant(ctx, tenantID, domain.Grant{TaskID: task.ID, SubjectID: uuid.NewString(), Level: domain.GrantLevelOwner, ExpiresAt: &past}); err != nil {
+		t.Fatalf("granting expired: %v", err)
+	}
+	if _, err := repo.Grant(ctx, tenantID, domain.Grant{TaskID: task.ID, SubjectID: uuid.NewString(), Level: domain.GrantLevelUser, ExpiresAt: &future}); err != nil {
+		t.Fatalf("granting non-expired: %v", err)
+	}
+	if _, err := repo.Grant(ctx, tenantID, domain.Grant{TaskID: task.ID, SubjectID: uuid.NewString(), Level: domain.GrantLevelAdmin}); err != nil {
+		t.Fatalf("granting never-expires: %v", err)
+	}
+
+	byTask, err := repo.ListGrantsForAncestors(ctx, tenantID, []string{task.ID})
+	if err != nil {
+		t.Fatalf("listing grants: %v", err)
+	}
+	got := byTask[task.ID]
+	if len(got) != 2 {
+		t.Fatalf("expected 2 non-expired grants, got %d: %+v", len(got), got)
+	}
+	for _, g := range got {
+		if g.Level == domain.GrantLevelOwner {
+			t.Errorf("expected the expired Owner grant to be excluded, got %+v", g)
+		}
+	}
+}
+
+// TestRepository_Revoke_And_ListGrantsForTask round-trips the widened
+// grant lifecycle: Grant -> ListGrantsForTask -> Revoke -> gone.
+func TestRepository_Revoke_And_ListGrantsForTask(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	task, _ := domain.NewTask(uuid.NewString(), tenantID, "task", domain.StatusOpen, "", "")
+	_, _ = repo.Create(ctx, task)
+
+	grantID, err := repo.Grant(ctx, tenantID, domain.Grant{TaskID: task.ID, SubjectID: uuid.NewString(), Level: domain.GrantLevelUser})
+	if err != nil {
+		t.Fatalf("granting: %v", err)
+	}
+
+	got, err := repo.ListGrantsForTask(ctx, tenantID, task.ID)
+	if err != nil {
+		t.Fatalf("listing grants for task: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != grantID {
+		t.Fatalf("unexpected grants: %+v", got)
+	}
+
+	if err := repo.Revoke(ctx, tenantID, grantID); err != nil {
+		t.Fatalf("revoking: %v", err)
+	}
+
+	got2, err := repo.ListGrantsForTask(ctx, tenantID, task.ID)
+	if err != nil {
+		t.Fatalf("listing grants for task after revoke: %v", err)
+	}
+	if len(got2) != 0 {
+		t.Errorf("expected no grants after revoke, got %+v", got2)
+	}
+}
+
+func TestRepository_Revoke_NonexistentGrant_Fails(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	if err := repo.Revoke(ctx, uuid.NewString(), uuid.NewString()); err == nil {
+		t.Fatal("expected an error revoking a nonexistent grant")
 	}
 }
 
