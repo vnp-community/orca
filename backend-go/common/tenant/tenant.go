@@ -15,8 +15,9 @@ import (
 type contextKey struct{ name string }
 
 var (
-	tenantIDKey = &contextKey{"tenant_id"}
-	userIDKey   = &contextKey{"user_id"}
+	tenantIDKey  = &contextKey{"tenant_id"}
+	userIDKey    = &contextKey{"user_id"}
+	projectIDKey = &contextKey{"project_id"}
 )
 
 // ErrNoTenant is returned by RequireTenantID when the context carries no
@@ -35,6 +36,16 @@ func WithUserID(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, userIDKey, userID)
 }
 
+// WithProjectID attaches the current request/execution's project scope to
+// ctx — added for workflow-service's step-dispatch context (TASK-WF-02-05/
+// 06): a wave-dispatched step's ctx is rebuilt from tenantID alone (see
+// usecase.Execute's dispatchCtx), so provider/server resolution that needs
+// "which project is this step running for" reads it from here rather than
+// re-deriving it, once the dispatch path is enriched with it.
+func WithProjectID(ctx context.Context, projectID string) context.Context {
+	return context.WithValue(ctx, projectIDKey, projectID)
+}
+
 // TenantID returns the tenant ID and whether one was present.
 func TenantID(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(tenantIDKey).(string)
@@ -44,6 +55,13 @@ func TenantID(ctx context.Context) (string, bool) {
 // UserID returns the acting user ID and whether one was present.
 func UserID(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(userIDKey).(string)
+	return v, ok && v != ""
+}
+
+// ProjectID returns the current project scope and whether one was present —
+// see WithProjectID's doc comment.
+func ProjectID(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(projectIDKey).(string)
 	return v, ok && v != ""
 }
 

@@ -27,6 +27,11 @@ type Config struct {
 	// into a dev_server_id — mirrors git-gateway-service's identically-named
 	// config field.
 	ProjectServiceAddr string
+	// AIProviderServiceAddr is where internal/adapter/providerresolver dials
+	// ai-provider-service's ResolveProvider/ListAccounts RPCs to pick which
+	// account an Agent step uses — mirrors git-gateway-service's
+	// identically-named config field.
+	AIProviderServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -39,6 +44,7 @@ func Load() (Config, error) {
 		WebhookAllowlistHosts: splitCSV(commonconfig.StringEnv("WEBHOOK_ALLOWLIST_HOSTS", "")),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
+		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 	}, nil
 }
 

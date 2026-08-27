@@ -31,10 +31,12 @@ import (
 	workflowgrpc "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/infrafleetclient"
 	workflowpostgres "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/postgres"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/providerresolver"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serverresolver"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/stepexecutors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
@@ -94,10 +96,20 @@ func run() error {
 	defer func() { _ = projectConn.Close() }()
 	projectClient := projectv1.NewProjectServiceClient(projectConn)
 
+	aiProviderConn, err := infrafleetclient.Dial(cfg.AIProviderServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing ai-provider-service: %w", err)
+	}
+	defer func() { _ = aiProviderConn.Close() }()
+	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
+
 	// ServerResolver turns a step's Target string into a connectionId —
 	// see domain.AgentStepConfig.Target's doc comment for the four accepted
 	// shapes and internal/adapter/serverresolver's doc comment.
 	resolver := serverresolver.New(projectClient, infraFleetClient)
+	// ProviderResolver picks which ai-provider-service account an Agent
+	// step uses — see internal/adapter/providerresolver's doc comment.
+	provider := providerresolver.New(aiProviderClient)
 
 	// StepExecutorRegistry wiring — all five step types, per
 	// workflow-service.md §4: Condition and Webhook are real, in-process
@@ -108,7 +120,7 @@ func run() error {
 	registry := stepexecutors.NewRegistry()
 	registry.Register(domain.StepTypeCondition, stepexecutors.NewConditionExecutor())
 	registry.Register(domain.StepTypeWebhook, stepexecutors.NewWebhookExecutor(cfg.WebhookAllowlistHosts, &http.Client{Timeout: 30 * time.Second}))
-	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, resolver))
+	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, resolver, provider))
 	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient, resolver))
 	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient, resolver))
 
