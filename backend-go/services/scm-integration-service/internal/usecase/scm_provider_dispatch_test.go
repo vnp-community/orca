@@ -54,9 +54,10 @@ type fakeProvider struct {
 	review    domain.Review
 	reviewErr error
 
-	lastCred Credential
-	lastRepo string
-	calls    int
+	lastCred   Credential
+	lastRepo   string
+	lastFilter IssueFilter
+	calls      int
 }
 
 func (f *fakeProvider) MergePullRequest(ctx context.Context, cred Credential, repo string, number int32, input MergePullRequestInput) (domain.PullRequest, bool, string, error) {
@@ -150,7 +151,7 @@ func (f *fakeProvider) SubmitReview(ctx context.Context, cred Credential, repo s
 }
 
 func (f *fakeProvider) ListIssues(ctx context.Context, cred Credential, repo string, filter IssueFilter) ([]domain.Issue, error) {
-	f.lastCred, f.lastRepo = cred, repo
+	f.lastCred, f.lastRepo, f.lastFilter = cred, repo, filter
 	f.calls++
 	if f.issuesErr != nil {
 		return nil, f.issuesErr

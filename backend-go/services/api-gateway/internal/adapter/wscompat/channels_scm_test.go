@@ -50,6 +50,10 @@ type fakeScmIntegrationClient struct {
 	addIssueCommentBySlugFunc         func(ctx context.Context, in *scmintegrationv1.AddIssueCommentBySlugRequest) (*scmintegrationv1.ProjectComment, error)
 	updateIssueCommentBySlugFunc      func(ctx context.Context, in *scmintegrationv1.UpdateIssueCommentBySlugRequest) (*scmintegrationv1.ProjectComment, error)
 
+	// TASK-PI-01-07 additions.
+	listIssuesFunc              func(ctx context.Context, in *scmintegrationv1.ListIssuesRequest) (*scmintegrationv1.ListIssuesResponse, error)
+	listIssueCommentsBySlugFunc func(ctx context.Context, in *scmintegrationv1.ListIssueCommentsBySlugRequest) (*scmintegrationv1.ListIssueCommentsBySlugResponse, error)
+
 	// credentials.* group (channels_credentials_test.go, TASK-042).
 	setIntegrationCredentialFunc       func(ctx context.Context, in *scmintegrationv1.SetIntegrationCredentialRequest) (*scmintegrationv1.SetIntegrationCredentialResponse, error)
 	getIntegrationCredentialStatusFunc func(ctx context.Context, in *scmintegrationv1.GetIntegrationCredentialStatusRequest) (*scmintegrationv1.GetIntegrationCredentialStatusResponse, error)
@@ -190,6 +194,14 @@ func (f *fakeScmIntegrationClient) AddIssueCommentBySlug(ctx context.Context, in
 
 func (f *fakeScmIntegrationClient) UpdateIssueCommentBySlug(ctx context.Context, in *scmintegrationv1.UpdateIssueCommentBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ProjectComment, error) {
 	return f.updateIssueCommentBySlugFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ListIssues(ctx context.Context, in *scmintegrationv1.ListIssuesRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIssuesResponse, error) {
+	return f.listIssuesFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) ListIssueCommentsBySlug(ctx context.Context, in *scmintegrationv1.ListIssueCommentsBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIssueCommentsBySlugResponse, error) {
+	return f.listIssueCommentsBySlugFunc(ctx, in)
 }
 
 // ── github.* ──────────────────────────────────────────────────────────────
@@ -917,6 +929,72 @@ func TestGitHubProjectUpdateIssueCommentBySlugChannel_Success(t *testing.T) {
 	}
 }
 
+func TestGitHubIssuesChannel_FiltersAndForceRefreshForwarded(t *testing.T) {
+	var gotReq *scmintegrationv1.ListIssuesRequest
+	fake := &fakeScmIntegrationClient{
+		listIssuesFunc: func(ctx context.Context, in *scmintegrationv1.ListIssuesRequest) (*scmintegrationv1.ListIssuesResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.ListIssuesResponse{Issues: []*scmintegrationv1.Issue{{Id: "1", Number: 42}}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.issues",
+		argsJSON(t, map[string]any{
+			"repo": "o/r", "state": "open", "assignee": "octocat",
+			"labels": []string{"bug", "p0"}, "milestone": "v1", "refresh": true,
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.ListIssuesResponse)
+	if !ok || len(resp.GetIssues()) != 1 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB {
+		t.Errorf("expected SCM_PROVIDER_GITHUB, got %v", gotReq.GetProvider())
+	}
+	f := gotReq.GetFilter()
+	if f.GetState() != "open" || f.GetAssignee() != "octocat" || f.GetMilestone() != "v1" {
+		t.Fatalf("unexpected filter forwarded: %+v", f)
+	}
+	if len(f.GetLabels()) != 2 || f.GetLabels()[0] != "bug" || f.GetLabels()[1] != "p0" {
+		t.Fatalf("expected labels to reach Filter.Labels, got %v", f.GetLabels())
+	}
+	if !gotReq.GetForceRefresh() {
+		t.Fatal("expected refresh=true to map to ForceRefresh")
+	}
+}
+
+func TestGitHubIssueCommentsChannel_Success(t *testing.T) {
+	var gotReq *scmintegrationv1.ListIssueCommentsBySlugRequest
+	fake := &fakeScmIntegrationClient{
+		listIssueCommentsBySlugFunc: func(ctx context.Context, in *scmintegrationv1.ListIssueCommentsBySlugRequest) (*scmintegrationv1.ListIssueCommentsBySlugResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.ListIssueCommentsBySlugResponse{Comments: []*scmintegrationv1.ProjectComment{{Id: "c-1", Body: "lgtm"}}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.issueComments",
+		argsJSON(t, map[string]any{"itemSlug": "o/r#42"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.ListIssueCommentsBySlugResponse)
+	if !ok || len(resp.GetComments()) != 1 || resp.GetComments()[0].GetId() != "c-1" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if gotReq.GetItemSlug() != "o/r#42" {
+		t.Errorf("expected itemSlug=o/r#42, got %q", gotReq.GetItemSlug())
+	}
+	if gotReq.GetTenantId() != "tenant-1" {
+		t.Errorf("expected tenant_id=tenant-1, got %q", gotReq.GetTenantId())
+	}
+}
+
 // ── gitlab.* ──────────────────────────────────────────────────────────────
 
 func TestGitLabListMRsChannel_Success(t *testing.T) {
@@ -1019,6 +1097,30 @@ func TestGitLabRateLimitChannelMatchesRESTContract(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, direct) {
 		t.Fatalf("expected channel result to match a direct GetRateLimitStatus call, got %+v vs %+v", result, direct)
+	}
+}
+
+func TestGitLabIssuesChannel_UsesGitlabProvider(t *testing.T) {
+	var gotReq *scmintegrationv1.ListIssuesRequest
+	fake := &fakeScmIntegrationClient{
+		listIssuesFunc: func(ctx context.Context, in *scmintegrationv1.ListIssuesRequest) (*scmintegrationv1.ListIssuesResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.ListIssuesResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "gitlab.issues",
+		argsJSON(t, map[string]any{"repo": "group/project", "state": "opened"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB {
+		t.Errorf("expected SCM_PROVIDER_GITLAB, got %v", gotReq.GetProvider())
+	}
+	if gotReq.GetFilter().GetState() != "opened" {
+		t.Errorf("expected filter state=opened, got %q", gotReq.GetFilter().GetState())
 	}
 }
 

@@ -66,6 +66,54 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		return resp, nil
 	})
 
+	// github.issues — BUG-PI-01's fix: filters/force_refresh now actually
+	// reach the RPC, was previously a hardcoded empty IssueFilter{}.
+	r.Register("github.issues", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type issuesArgs struct {
+			Repo      string   `json:"repo"`
+			State     string   `json:"state"`
+			Assignee  string   `json:"assignee"`
+			Labels    []string `json:"labels"`
+			Milestone string   `json:"milestone"`
+			Refresh   bool     `json:"refresh"`
+		}
+		in, err := decodeArg[issuesArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.ListIssues(attachSCMIdentity(rpcCtx, id), &scmintegrationv1.ListIssuesRequest{
+			TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB, Repo: in.Repo,
+			Filter:       &scmintegrationv1.IssueFilter{State: in.State, Assignee: in.Assignee, Labels: in.Labels, Milestone: in.Milestone},
+			ForceRefresh: in.Refresh,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// github.issueComments — completes the *BySlug comment RPC group's read
+	// side (BUG-PI-01 step 6), same registration pattern as github.rateLimit.
+	r.Register("github.issueComments", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type commentsArgs struct {
+			ItemSlug string `json:"itemSlug"`
+		}
+		in, err := decodeArg[commentsArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.ListIssueCommentsBySlug(attachSCMIdentity(rpcCtx, id),
+			&scmintegrationv1.ListIssueCommentsBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
 	r.Register("github.mergePR", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type mergeArgs struct {
 			Repo          string `json:"repo"`
@@ -625,6 +673,37 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		defer cancel()
 		resp, err := client.GetRateLimitStatus(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.GetRateLimitStatusRequest{TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// gitlab.issues — ListIssues is provider-generic (BUG-PI-01), so unlike
+	// gitlab.issueComments (deliberately NOT added below — ListIssueCommentsBySlug
+	// is GitHub Projects v2-only, see list_issue_comments_by_slug.go's doc
+	// comment; a gitlab.issueComments channel would just resolve to
+	// SCM_PROVIDER_UNSUPPORTED on every call), this one has a real backing RPC.
+	r.Register("gitlab.issues", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type issuesArgs struct {
+			Repo      string   `json:"repo"`
+			State     string   `json:"state"`
+			Assignee  string   `json:"assignee"`
+			Labels    []string `json:"labels"`
+			Milestone string   `json:"milestone"`
+			Refresh   bool     `json:"refresh"`
+		}
+		in, err := decodeArg[issuesArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.ListIssues(attachSCMIdentity(rpcCtx, id), &scmintegrationv1.ListIssuesRequest{
+			TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB, Repo: in.Repo,
+			Filter:       &scmintegrationv1.IssueFilter{State: in.State, Assignee: in.Assignee, Labels: in.Labels, Milestone: in.Milestone},
+			ForceRefresh: in.Refresh,
+		})
 		if err != nil {
 			return nil, err
 		}
