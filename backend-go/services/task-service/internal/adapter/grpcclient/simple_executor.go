@@ -98,12 +98,13 @@ import (
 // "executionRef" pointing at a run that already finished.
 type SimpleExecutor struct {
 	tasks    usecase.TaskRepository
+	edges    usecase.EdgeRepository
 	resolver usecase.ProjectExecutionResolver
 	relay    infrafleetv1.InfraFleetServiceClient
 }
 
-func NewSimpleExecutor(tasks usecase.TaskRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient) *SimpleExecutor {
-	return &SimpleExecutor{tasks: tasks, resolver: resolver, relay: relay}
+func NewSimpleExecutor(tasks usecase.TaskRepository, edges usecase.EdgeRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient) *SimpleExecutor {
+	return &SimpleExecutor{tasks: tasks, edges: edges, resolver: resolver, relay: relay}
 }
 
 // agentExecPromptParams mirrors agent-print-mode-exec.ts's handled fields —
@@ -114,9 +115,10 @@ func NewSimpleExecutor(tasks usecase.TaskRepository, resolver usecase.ProjectExe
 // same way StepExecutors.ts's spread omits accountId/model, not be sent as
 // an explicit empty string.
 type agentExecPromptParams struct {
-	Prompt       string `json:"prompt"`
-	WorktreePath string `json:"worktreePath"`
-	StepID       string `json:"stepId,omitempty"`
+	Prompt       string            `json:"prompt"`
+	WorktreePath string            `json:"worktreePath"`
+	StepID       string            `json:"stepId,omitempty"`
+	Env          map[string]string `json:"env,omitempty"` // TASK-TG-04-06 — already-supported field, simply never populated before
 }
 
 // agentExecPromptResult mirrors agent-print-mode-exec.ts's real
@@ -134,6 +136,27 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: load task: %w", err)
 	}
+
+	// Context preamble inputs (TASK-TG-04-06): parent is ancestors[1] (the
+	// immediate parent, nil for a root task — ancestors[0] is task itself,
+	// GetAncestors' own convention); completedDeps is this task's
+	// depends_on targets currently Status == StatusDone. Both are
+	// best-effort — a lookup failure here degrades the prompt, it must
+	// never fail the whole dispatch.
+	var parent *domain.Task
+	if ancestors, err := s.tasks.GetAncestors(ctx, tenantID, taskID, 0); err == nil && len(ancestors) > 1 {
+		p := ancestors[1]
+		parent = &p
+	}
+	var completedDeps []domain.Task
+	if deps, err := s.edges.ListFrom(ctx, tenantID, taskID, domain.EdgeKindDependsOn); err == nil {
+		for _, e := range deps {
+			if t, err := s.tasks.Get(ctx, tenantID, e.ToTaskID); err == nil && t.Status == domain.StatusDone {
+				completedDeps = append(completedDeps, t)
+			}
+		}
+	}
+
 	connectionID, worktreePath, _, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: resolve connection: %w", err)
@@ -155,9 +178,10 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	}
 
 	paramsJSON, err := json.Marshal(agentExecPromptParams{
-		Prompt:       buildExecutePrompt(task),
+		Prompt:       buildExecutePrompt(task, parent, completedDeps),
 		WorktreePath: worktreePath,
 		StepID:       requestID,
+		Env:          map[string]string{"ORCA_TASK_ID": task.ID, "ORCA_PROJECT_ID": task.ProjectID},
 	})
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: marshal params: %w", err)
