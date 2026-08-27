@@ -57,6 +57,16 @@ type SshTargetRepository interface {
 // ConnectionResolver already are two narrow ports over one Repository.
 type ConnectionRepository interface {
 	CreateConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error)
+	// CreateConnectionWithOutbox inserts a new connection binding and
+	// enqueues event as an infra.outbox_events row — both in ONE Postgres
+	// transaction (Epic G's transactional-outbox pattern, see
+	// domain.OutboxEvent's doc comment). Used by EstablishConnection to
+	// publish its ssh.connect event exactly once alongside the connection
+	// write, mirroring usage-service's Repository.SaveSession(session,
+	// event) shape. Kept as a separate method from CreateConnection rather
+	// than adding an event parameter there, since CreateConnection's other
+	// caller (the plain worktree-bind usecase) has no event to enqueue.
+	CreateConnectionWithOutbox(ctx context.Context, conn domain.Connection, event domain.OutboxEvent) (domain.Connection, error)
 	// GetActiveByDevServer returns the most recent non-closed connection
 	// bound to devServerID, if any — backs ssh.getState's local read.
 	// found=false, err=nil means "no active connection", not an error.

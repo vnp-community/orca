@@ -43,6 +43,13 @@ type Config struct {
 	BootstrapTenantID      string
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
+
+	// NATSURL is where cmd/server/main.go's natsconsumer.AuditIngestConsumer
+	// (TASK-AUTH-05-08) connects to durably subscribe to infra-fleet-service's
+	// ssh.connect outbox stream — see usage-service/notification-service's
+	// internal/config.Config.NATSURL for the same field on the reference
+	// eventbus-consuming services.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -75,6 +82,7 @@ func Load() (Config, error) {
 		BootstrapTenantID:      os.Getenv("BOOTSTRAP_TENANT_ID"),
 		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
 		BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
+		NATSURL:                commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }
 

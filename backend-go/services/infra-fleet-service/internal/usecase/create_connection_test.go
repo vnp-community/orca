@@ -13,6 +13,13 @@ type fakeConnectionRepository struct {
 	created []domain.Connection
 	err     error
 
+	// outboxCreated/outboxEvents record CreateConnectionWithOutbox calls —
+	// used by establish_connection_test.go to assert the outbox publish is
+	// attempted after a successful connection.
+	outboxCreated []domain.Connection
+	outboxEvents  []domain.OutboxEvent
+	outboxErr     error
+
 	// found/activeConn/activeErr drive GetActiveByDevServer's fake answer —
 	// used by get_ssh_state_test.go.
 	found      bool
@@ -25,6 +32,16 @@ func (f *fakeConnectionRepository) CreateConnection(ctx context.Context, conn do
 		return domain.Connection{}, f.err
 	}
 	f.created = append(f.created, conn)
+	return conn, nil
+}
+
+// CreateConnectionWithOutbox implements usecase.ConnectionRepository.CreateConnectionWithOutbox.
+func (f *fakeConnectionRepository) CreateConnectionWithOutbox(ctx context.Context, conn domain.Connection, event domain.OutboxEvent) (domain.Connection, error) {
+	if f.outboxErr != nil {
+		return domain.Connection{}, f.outboxErr
+	}
+	f.outboxCreated = append(f.outboxCreated, conn)
+	f.outboxEvents = append(f.outboxEvents, event)
 	return conn, nil
 }
 

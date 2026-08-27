@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,9 +21,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
@@ -86,6 +89,37 @@ func run() error {
 	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
 	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
 	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
+
+	// Transactional-outbox relay (Epic G, docs/execution-plan.md;
+	// TASK-AUTH-05-08): EstablishConnection durably enqueues an outbox row
+	// in the SAME Postgres transaction as the connection write
+	// (internal/adapter/postgres.Repository.CreateConnectionWithOutbox) —
+	// this relay is what actually gets those rows to NATS. Mirrors
+	// usage-service's cmd/server/main.go exactly: if NATS is unreachable at
+	// startup, connection writes still succeed (the request path never
+	// touches NATS directly), rows just queue up unpublished until an
+	// operator restarts this process once NATS recovers.
+	var relay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "INFRAFLEET", []string{"orca.infrafleet.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+		}
+	}
+
+	var relayWG sync.WaitGroup
+	if relay != nil {
+		relayWG.Add(1)
+		go func() {
+			defer relayWG.Done()
+			relay.Run(ctx)
+		}()
+	}
 
 	// relay-websocket (outbound dial) and direct-websocket (inbound accept,
 	// wired below via agentwsserver) are both real, and so is relay-ssh now
@@ -256,6 +290,11 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	// Wait for the outbox relay goroutine (if started) to observe ctx
+	// cancellation and return, so it doesn't outlive the rest of the
+	// server on shutdown — same pattern usage-service's main.go uses.
+	relayWG.Wait()
 
 	return nil
 }

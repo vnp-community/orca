@@ -361,10 +361,14 @@ func (f *fakePolicyPublisher) PublishPolicyChange(ctx context.Context, policy do
 
 // fakeAuditRepository is an in-memory AuditRepository.
 type fakeAuditRepository struct {
-	entries []domain.AuditEntry
+	entries   []domain.AuditEntry
+	appendErr error // used by handle_ssh_connected_event_test.go to simulate a write failure
 }
 
 func (f *fakeAuditRepository) Append(ctx context.Context, entry domain.AuditEntry) error {
+	if f.appendErr != nil {
+		return f.appendErr
+	}
 	f.entries = append(f.entries, entry)
 	return nil
 }
