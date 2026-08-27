@@ -5,6 +5,7 @@ import { issueCacheKey as getIssueCacheKey } from '@/store/slices/github'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { parseExplicitGitHubIssueUrl } from './worktree-meta-updates'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 /** Resolves the "open linked issue" affordance for the worktree meta dialog:
  *  explicit URLs open directly, numbers resolve via the issue cache or an
  *  owner-routed fetch. */
@@ -62,7 +63,7 @@ export function useWorktreeIssueLink(args: { worktreeId: string; issueInput: str
     }
 
     if (issueUrlFromInput) {
-      void window.api.shell.openUrl(issueUrlFromInput)
+      void shellOpenUrl(issueUrlFromInput)
       return
     }
 
@@ -71,7 +72,7 @@ export function useWorktreeIssueLink(args: { worktreeId: string; issueInput: str
     }
 
     if (cachedIssueUrl) {
-      void window.api.shell.openUrl(cachedIssueUrl)
+      void shellOpenUrl(cachedIssueUrl)
       return
     }
 
@@ -83,7 +84,7 @@ export function useWorktreeIssueLink(args: { worktreeId: string; issueInput: str
     try {
       const issue = await fetchIssue(issueRepo.path, issueNumber, { repoId: issueRepo.id })
       if (issue?.url) {
-        void window.api.shell.openUrl(issue.url)
+        void shellOpenUrl(issue.url)
       }
     } finally {
       if (mountedRef.current) {

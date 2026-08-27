@@ -16,6 +16,7 @@ import {
   showOrcaCliRegistrationPromptToast
 } from '@/lib/agent-skill-cli-prerequisite'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeWslCliInstallStatus, installRuntimeWslCli } from '@/runtime/runtime-cli-client'
 
 export type LocalAgentRuntime = {
   runtime: 'host' | 'wsl'
@@ -175,7 +176,7 @@ export async function ensureWslCliAvailableForAgentSkillTerminal(
 ): Promise<CliInstallStatus | null> {
   const args = getWslCliDistroRequest(runtime)
   try {
-    const status = await window.api.cli.getWslInstallStatus(args)
+    const status = await getRuntimeWslCliInstallStatus(args)
     if (!status.supported) {
       toast.warning(
         translate(
@@ -195,7 +196,7 @@ export async function ensureWslCliAvailableForAgentSkillTerminal(
     }
     if (status.state !== 'installed' || !status.pathConfigured) {
       await showOrcaCliRegistrationPromptToast()
-      const next = await window.api.cli.installWsl(args)
+      const next = await installRuntimeWslCli(args)
       if (!isOrcaCliAvailableOnPath(next)) {
         toast.warning(
           translate(

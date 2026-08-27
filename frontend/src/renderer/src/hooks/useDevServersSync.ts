@@ -22,7 +22,7 @@ export function useDevServersSync(): void {
     })
 
     // Restore active dev server from persisted settings
-    void window.api.settings.getGlobalSettings?.().then((settings) => {
+    void window.api.settings.get().then((settings) => {
       const id = settings?.activeDevServerId
       if (id) {setActiveDevServerId(id)}
     })

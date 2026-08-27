@@ -6,6 +6,7 @@ import { useMountedRef } from '../../hooks/useMountedRef'
 import { translate } from '../../i18n/i18n'
 import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
+import { getRuntimeMobileWindowsFirewallStatus } from '@/runtime/runtime-mobile-client'
 
 type WindowsFirewallNoticeProps = {
   pairingReady: boolean
@@ -28,9 +29,7 @@ export function WindowsFirewallNotice({
       return
     }
     try {
-      const next = await window.api.mobile.getWindowsFirewallStatus(
-        address ? { address } : undefined
-      )
+      const next = await getRuntimeMobileWindowsFirewallStatus(address ? { address } : undefined)
       if (mountedRef.current) {
         setStatus(next)
       }

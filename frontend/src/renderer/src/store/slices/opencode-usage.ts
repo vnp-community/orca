@@ -10,6 +10,12 @@ import type {
   OpenCodeUsageSummary
 } from '../../../../shared/opencode-usage-types'
 import type { AppState } from '../types'
+import {
+  getOpenCodeUsageScanState as rpcGetOpenCodeUsageScanState,
+  getOpenCodeUsageSnapshot as rpcGetOpenCodeUsageSnapshot,
+  refreshOpenCodeUsage as rpcRefreshOpenCodeUsage,
+  setOpenCodeUsageEnabled as rpcSetOpenCodeUsageEnabled
+} from '../../runtime/runtime-opencode-usage-client'
 
 export type OpenCodeUsageSlice = {
   openCodeUsageScope: OpenCodeUsageScope
@@ -43,9 +49,7 @@ export const createOpenCodeUsageSlice: StateCreator<AppState, [], [], OpenCodeUs
 
   setOpenCodeUsageEnabled: async (enabled) => {
     try {
-      const nextScanState = (await window.api.openCodeUsage.setEnabled({
-        enabled
-      })) as OpenCodeUsageScanState
+      const nextScanState = (await rpcSetOpenCodeUsageEnabled(enabled)) as OpenCodeUsageScanState
       set({
         openCodeUsageScanState: enabled
           ? {
@@ -81,7 +85,7 @@ export const createOpenCodeUsageSlice: StateCreator<AppState, [], [], OpenCodeUs
 
   fetchOpenCodeUsage: async (opts) => {
     try {
-      const scanState = (await window.api.openCodeUsage.getScanState()) as OpenCodeUsageScanState
+      const scanState = (await rpcGetOpenCodeUsageScanState()) as OpenCodeUsageScanState
       const currentScanState = get().openCodeUsageScanState
       const shouldPreserveLoadingState =
         opts?.forceRefresh === true &&
@@ -102,11 +106,11 @@ export const createOpenCodeUsageSlice: StateCreator<AppState, [], [], OpenCodeUs
       }
 
       const { openCodeUsageScope, openCodeUsageRange } = get()
-      const snapshot = (await window.api.openCodeUsage.getSnapshot({
-        scope: openCodeUsageScope,
-        range: openCodeUsageRange,
-        limit: 10
-      })) as OpenCodeUsageSnapshot
+      const snapshot = (await rpcGetOpenCodeUsageSnapshot(
+        openCodeUsageScope,
+        openCodeUsageRange,
+        10
+      )) as OpenCodeUsageSnapshot
       const hasCachedSnapshot =
         snapshot.scanState.lastScanCompletedAt !== null || snapshot.scanState.hasAnyOpenCodeData
 
@@ -132,15 +136,13 @@ export const createOpenCodeUsageSlice: StateCreator<AppState, [], [], OpenCodeUs
         })
       }
 
-      await window.api.openCodeUsage.refresh({
-        force: opts?.forceRefresh ?? false
-      })
+      await rpcRefreshOpenCodeUsage(opts?.forceRefresh ?? false)
       const { openCodeUsageScope: refreshedScope, openCodeUsageRange: refreshedRange } = get()
-      const refreshedSnapshot = (await window.api.openCodeUsage.getSnapshot({
-        scope: refreshedScope,
-        range: refreshedRange,
-        limit: 10
-      })) as OpenCodeUsageSnapshot
+      const refreshedSnapshot = (await rpcGetOpenCodeUsageSnapshot(
+        refreshedScope,
+        refreshedRange,
+        10
+      )) as OpenCodeUsageSnapshot
 
       set({
         openCodeUsageScanState: refreshedSnapshot.scanState,

@@ -13,6 +13,8 @@ import type {
 } from '../../../../../shared/types'
 import { getFeatureWallUsageProviderConnection } from '../feature-wall-usage-tracking'
 import { translate } from '@/i18n/i18n'
+import { addClaudeAccount } from '@/runtime/runtime-claude-accounts-client'
+import { addCodexAccount } from '@/runtime/runtime-codex-accounts-client'
 
 type ConnectAction = 'idle' | 'adding'
 
@@ -154,7 +156,7 @@ export function UsageAccountsCard(props: {
     }
     setClaudeAction('adding')
     try {
-      const next = await window.api.claudeAccounts.add()
+      const next = await addClaudeAccount()
       if (mountedRef.current) {
         setClaudeAccounts(next)
       }
@@ -195,7 +197,7 @@ export function UsageAccountsCard(props: {
     }
     setCodexAction('adding')
     try {
-      const next = await window.api.codexAccounts.add()
+      const next = await addCodexAccount()
       if (mountedRef.current) {
         setCodexAccounts(next)
       }

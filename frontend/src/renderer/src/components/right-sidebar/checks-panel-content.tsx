@@ -105,6 +105,8 @@ import { translate } from '@/i18n/i18n'
 import { useActiveWorktree } from '@/store/selectors'
 import { useAppStore } from '@/store'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export const PullRequestIcon = GitPullRequest
 
 type PRCommentsListDisplayMode = 'triage' | 'timeline'
@@ -267,8 +269,7 @@ function MergeabilityRecalculationCommandBox({
   )
 
   const copyCommands = useCallback((): void => {
-    void window.api.ui
-      .writeClipboardText(commands)
+    void uiWriteClipboardText(commands)
       .then(() => {
         if (!isMountedRef.current) {
           return
@@ -1281,7 +1282,7 @@ export function ChecksList({
                               )}
                               onClick={(event) => {
                                 event.stopPropagation()
-                                window.api.shell.openUrl(openUrl)
+                                shellOpenUrl(openUrl)
                               }}
                             >
                               <ExternalLink className="size-3" />
@@ -1371,7 +1372,7 @@ function CopyButton({
   const handleCopy = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
-      void window.api.ui.writeClipboardText(text).then(() => {
+      void uiWriteClipboardText(text).then(() => {
         if (!isMountedRef.current) {
           return
         }
@@ -1533,7 +1534,7 @@ function CommentMoreMenu({
         ) : null}
         {hasQueue && (hasGoToComment || hasEdit || hasDelete) ? <DropdownMenuSeparator /> : null}
         {hasGoToComment && (
-          <DropdownMenuItem onSelect={() => window.api.shell.openUrl(comment.url)}>
+          <DropdownMenuItem onSelect={() => shellOpenUrl(comment.url)}>
             <ExternalLink />
             {translate(
               'auto.components.right.sidebar.checks.panel.content.d3923d18fe',

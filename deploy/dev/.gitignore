@@ -1,21 +1,7 @@
-# ── Build artifacts ──────────────────────────────────────────
-dist/
-
-# ── TLS certs (chứa private key) ─────────────────────────────
-docker/nginx/certs/*.key
-docker/nginx/certs/*.crt
-docker/nginx/certs/*.pem
-
-# ── SSH keys (PRIVATE key phải gitignore) ──────────────────
-# Private key không commit
-docker/orca/ssh/id_ed25519
-# Public key + config + known_hosts có thể commit (không chứa secret)
-# docker/orca/ssh/id_ed25519.pub
-# docker/orca/ssh/config
-# docker/orca/ssh/known_hosts
-
-# ── Environment (chứa secrets) ───────────────────────────────
+# Real secrets — never commit
 .env
 
-# ── Logs ─────────────────────────────────────────────────────
-*.log
+# Build output (scripts/build-local.sh) — binaries + frontend bundle,
+# rebuilt on every deploy, not source
+bin/
+dist/

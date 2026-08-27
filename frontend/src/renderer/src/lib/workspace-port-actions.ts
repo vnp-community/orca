@@ -6,6 +6,7 @@ import {
   type RuntimeClientTarget
 } from '@/runtime/runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
 import type {
   WorkspacePort,
@@ -14,6 +15,7 @@ import type {
 } from '../../../shared/workspace-ports'
 import type { LocalhostWorktreeLabelRoute } from '../../../shared/localhost-worktree-labels'
 import { browserUrlForPort } from './workspace-port-urls'
+import { registerLocalhostWorktreeLabel } from '@/runtime/runtime-localhost-worktree-labels-client'
 
 export { addressForPort } from './workspace-port-urls'
 
@@ -25,17 +27,13 @@ export function canStopWorkspacePort(
   return port.kind === 'workspace' && Boolean(port.pid) && port.processName !== 'Electron'
 }
 
-type BrowserTabCreator = ReturnType<typeof useAppStore.getState>['createBrowserTab']
-type RemoteBrowserPageHandleSetter = ReturnType<
-  typeof useAppStore.getState
->['setRemoteBrowserPageHandle']
-type WorkspacePortScanSetter = ReturnType<typeof useAppStore.getState>['setWorkspacePortScan']
-type WorkspacePortScanByKeySetter = ReturnType<
-  typeof useAppStore.getState
->['setWorkspacePortScanForKey']
-type WorkspacePortScanRefreshingSetter = ReturnType<
-  typeof useAppStore.getState
->['setWorkspacePortScanRefreshing']
+type WorkspacePortActionsStoreState = ReturnType<typeof useAppStore.getState>
+type BrowserTabCreator = WorkspacePortActionsStoreState['createBrowserTab']
+type RemoteBrowserPageHandleSetter = WorkspacePortActionsStoreState['setRemoteBrowserPageHandle']
+type WorkspacePortScanSetter = WorkspacePortActionsStoreState['setWorkspacePortScan']
+type WorkspacePortScanByKeySetter = WorkspacePortActionsStoreState['setWorkspacePortScanForKey']
+type WorkspacePortScanRefreshingSetter =
+  WorkspacePortActionsStoreState['setWorkspacePortScanRefreshing']
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -100,14 +98,14 @@ export async function openWorkspacePortInBrowser(args: {
   let url = rawUrl
   if (args.runtimeTarget.kind === 'local' && args.localhostLabelRoute) {
     try {
-      url = (await window.api.localhostWorktreeLabels.register(args.localhostLabelRoute)).url
+      url = (await registerLocalhostWorktreeLabel(undefined, args.localhostLabelRoute)).url
     } catch {
       url = rawUrl
     }
   }
   if (args.openInOrcaBrowser === false && args.runtimeTarget.kind === 'local') {
     try {
-      await window.api.shell.openUrl(url)
+      await shellOpenUrl(url)
       return { ok: true }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

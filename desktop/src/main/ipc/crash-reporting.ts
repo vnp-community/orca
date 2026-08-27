@@ -37,6 +37,35 @@ const inFlightSubmissions = new Set<string>()
 const submittedReportIds = new Set<string>()
 const recentRendererErrorReportKeys = new Map<string, number>()
 
+// Why: the RPC surface (desktop/src/main/runtime/rpc/methods/crash-reports.ts)
+// runs in this same main process and needs the exact CrashReportStore instance
+// `registerCrashReportingHandlers` was wired with — not a second store — so
+// crash-report reads/writes stay consistent across both calling conventions.
+let crashReportStoreRef: CrashReportStore | null = null
+
+export function getCrashReportStoreForRpc(): CrashReportStore | null {
+  return crashReportStoreRef
+}
+
+// Why: exposed so the RPC surface can honor the same duplicate-submission and
+// in-flight guards the ipcMain handlers below enforce, instead of forking a
+// second set of dedupe state for the same underlying reports.
+export function isCrashReportSubmissionInFlight(reportId: string): boolean {
+  return inFlightSubmissions.has(reportId)
+}
+
+export function isCrashReportAlreadySubmitted(reportId: string): boolean {
+  return submittedReportIds.has(reportId)
+}
+
+export function markCrashReportSubmissionInFlight(reportId: string): void {
+  inFlightSubmissions.add(reportId)
+}
+
+export function clearCrashReportSubmissionInFlight(reportId: string): void {
+  inFlightSubmissions.delete(reportId)
+}
+
 const RENDERER_ERROR_DEDUPE_MS = 10 * 60 * 1000
 const MAX_RENDERER_ERROR_KEY_AGE_MS = RENDERER_ERROR_DEDUPE_MS * 2
 const MAX_RECENT_RENDERER_ERROR_REPORT_KEYS = 256
@@ -144,7 +173,7 @@ function getRendererErrorReportKey(args: ReactErrorBoundaryReportArgs): string {
   }).slice(0, 12_000)
 }
 
-function rememberSubmittedReportId(reportId: string): void {
+export function rememberSubmittedReportId(reportId: string): void {
   // Why: report ids are IPC input. Keep duplicate-send suppression useful for
   // recent reports without retaining every id a broken renderer can vary.
   submittedReportIds.delete(reportId)
@@ -158,7 +187,7 @@ function rememberSubmittedReportId(reportId: string): void {
   }
 }
 
-async function recordRendererErrorReport(
+export async function recordRendererErrorReport(
   store: CrashReportStore,
   args: unknown
 ): Promise<ReactErrorBoundaryReportResult> {
@@ -233,7 +262,7 @@ export function _getCrashReportingStateSizesForTests(): {
   }
 }
 
-async function getLatestPendingReport(
+export async function getLatestPendingReport(
   store: CrashReportStore
 ): Promise<Awaited<ReturnType<CrashReportStore['getLatestPending']>>> {
   const reports = await store.listRecent()
@@ -243,7 +272,7 @@ async function getLatestPendingReport(
   )
 }
 
-async function getLatestSendableReport(
+export async function getLatestSendableReport(
   store: CrashReportStore
 ): Promise<Awaited<ReturnType<CrashReportStore['getLatestPending']>>> {
   const reports = await store.listRecent()
@@ -256,7 +285,7 @@ async function getLatestSendableReport(
   )
 }
 
-async function getRequestedCrashReport(
+export async function getRequestedCrashReport(
   store: CrashReportStore,
   args?: { reportId?: string }
 ): Promise<Awaited<ReturnType<CrashReportStore['getLatestPending']>>> {
@@ -268,7 +297,9 @@ async function getRequestedCrashReport(
   return args ? null : getLatestPendingReport(store)
 }
 
-function sanitizeRendererBreadcrumbData(value: unknown): CrashReportBreadcrumbData | undefined {
+export function sanitizeRendererBreadcrumbData(
+  value: unknown
+): CrashReportBreadcrumbData | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined
   }
@@ -284,7 +315,7 @@ function sanitizeRendererBreadcrumbData(value: unknown): CrashReportBreadcrumbDa
   return Object.keys(sanitized).length > 0 ? sanitized : undefined
 }
 
-function recordRendererBreadcrumbTrace(
+export function recordRendererBreadcrumbTrace(
   name: string,
   data: CrashReportBreadcrumbData | undefined
 ): void {
@@ -300,7 +331,7 @@ function recordRendererBreadcrumbTrace(
   span.end()
 }
 
-function buildUncapturedCrashReportText(
+export function buildUncapturedCrashReportText(
   notes: string | undefined,
   diagnosticBundle?: CrashReportDiagnosticBundle
 ): string {
@@ -320,6 +351,7 @@ function buildUncapturedCrashReportText(
 }
 
 export function registerCrashReportingHandlers(store: CrashReportStore): void {
+  crashReportStoreRef = store
   ipcMain.removeHandler('crashReports:getLatestPending')
   ipcMain.handle('crashReports:getLatestPending', () => getLatestPendingReport(store))
 

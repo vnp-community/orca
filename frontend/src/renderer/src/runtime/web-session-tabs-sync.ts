@@ -489,7 +489,25 @@ function shouldReplaceTerminalTab(
     // stream handle, otherwise paired web keeps stale handles or drops parity.
     return true
   }
-  if (tab.pendingActivationSpawn && tab.ptyId === null && nextRemotePtyIds.size > 0) {
+  // FIX BUG-FE-PTY-001: `nextRemotePtyIds.size > 0` alone ("is ANY ready pty
+  // present anywhere in the snapshot") is the right fallback for a host that
+  // mints its own tab id unrelated to this client's local UUID (the host
+  // can't be correlated by id at all yet, so "something is ready" is the
+  // best signal available) — kept below, unchanged. But it false-negatives
+  // when THIS tab's own mirror surface exists yet isn't 'ready' yet (still
+  // spawning server-side) while some OTHER, unrelated tab happens to already
+  // be ready or not: buildMirroredTerminalTabs builds a tab for every surface
+  // group regardless of readiness, so without retiring the original here,
+  // both the original ('<uuid>') and its mirror ('web-terminal-<uuid>') tab
+  // coexist for one reconcile pass — two TerminalPane instances for the same
+  // leaf, both torn down together when React reconciles the tab list
+  // (confirmed live via a destroy() diagnostic). Add the precise id-matched
+  // check as an OR, not a replacement, so both correlation paths work.
+  if (
+    tab.pendingActivationSpawn &&
+    tab.ptyId === null &&
+    (nextRemotePtyIds.size > 0 || nextMirroredTerminalIds.has(toWebTerminalSurfaceTabId(tab.id)))
+  ) {
     return true
   }
   if (!isRuntimeTerminalTabForEnvironment(tab, environmentId)) {
@@ -592,6 +610,13 @@ function buildMirroredTerminalTabs(
         ...(quickCommandLabel ? { quickCommandLabel } : {}),
         ...(startupCwd ? { startupCwd } : {}),
         customTitle: existing?.customTitle ?? null,
+        // Why (BUG-FE-PTY-001): every reconcile pass rebuilds this tab object
+        // from scratch (isMirroredTerminalSurfaceId unconditionally retires
+        // the current mirror tab above), so a dropped generation here would
+        // silently reset TerminalPane's remount key even when the id itself
+        // doesn't change — forwarding it keeps setActiveWorktree's bump (see
+        // worktrees.ts) from being erased by the very next snapshot.
+        generation: existing?.generation,
         color,
         isPinned,
         ...(viewMode ? { viewMode } : {}),

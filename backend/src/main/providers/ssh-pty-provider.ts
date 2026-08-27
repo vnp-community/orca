@@ -174,6 +174,11 @@ export class SshPtyProvider implements IPtyProvider {
         ...(opts.startupCommandDelivery
           ? { startupCommandDelivery: opts.startupCommandDelivery }
           : {}),
+        // Why: BUG-BE-HLD-005 — the relay namespaces GH_CONFIG_DIR/
+        // GLAB_CONFIG_DIR per userId for gh/glab auth-login PTYs so one
+        // user's CLI credentials never leak into another's on a shared Dev
+        // Server. See specs/agent/api/gaps-and-findings.md #5.
+        ...(opts.userId ? { userId: opts.userId } : {}),
         // Why: main may strip ORCA_PANE_KEY/ORCA_TAB_ID from the shell env when
         // remote hooks are disabled, but the relay still needs attach identity
         // metadata to reject cross-generation PTY id collisions.

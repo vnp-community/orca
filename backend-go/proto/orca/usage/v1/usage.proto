@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package orca.usage.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/usage/v1;usagev1";
+
+import "google/protobuf/timestamp.proto";
+
+// UsageService tracks AI-CLI usage/cost per session, per tenant.
+// See specs/backend-go/services/usage-service.md for the full design.
+service UsageService {
+  rpc RecordUsageSession(RecordUsageSessionRequest) returns (RecordUsageSessionResponse);
+  rpc GetDailyUsage(GetDailyUsageRequest) returns (GetDailyUsageResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+}
+
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  PROVIDER_CLAUDE = 1;
+  PROVIDER_CODEX = 2;
+  PROVIDER_OPENCODE = 3;
+}
+
+message UsageSession {
+  string id = 1;
+  string tenant_id = 2;
+  string user_id = 3;
+  Provider provider = 4;
+  string worktree_id = 5;
+  int64 input_tokens = 6;
+  int64 output_tokens = 7;
+  int64 cache_read_tokens = 8;
+  int64 cache_write_tokens = 9;
+  double cost_usd = 10;
+  google.protobuf.Timestamp started_at = 11;
+  google.protobuf.Timestamp ended_at = 12;
+  string request_id = 13; // idempotency key
+}
+
+message RecordUsageSessionRequest {
+  UsageSession session = 1;
+}
+
+message RecordUsageSessionResponse {
+  UsageSession session = 1;
+}
+
+message GetDailyUsageRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  Provider provider = 3;
+  google.protobuf.Timestamp day = 4;
+}
+
+message DailyUsageRollup {
+  string tenant_id = 1;
+  string user_id = 2;
+  Provider provider = 3;
+  google.protobuf.Timestamp day = 4;
+  int64 total_input_tokens = 5;
+  int64 total_output_tokens = 6;
+  double total_cost_usd = 7;
+  int64 session_count = 8;
+}
+
+message GetDailyUsageResponse {
+  DailyUsageRollup rollup = 1;
+}
+
+message ListSessionsRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string page_token = 3;
+  int32 page_size = 4;
+}
+
+message ListSessionsResponse {
+  repeated UsageSession sessions = 1;
+  string next_page_token = 2;
+}

@@ -14,12 +14,20 @@ type CustomToastOptions = {
 
 const toastDismissMock = vi.hoisted(() => vi.fn())
 const customToastMock = vi.hoisted(() => vi.fn())
+// Why: StarNagToastHost now calls the shell wrapper (runtime-shell-client),
+// not window.api.shell directly — mock it so assertions on the "open GitHub
+// fallback" URL still observe the call.
+const shellOpenUrlMock = vi.hoisted(() => vi.fn())
 
 vi.mock('sonner', () => ({
   toast: {
     custom: customToastMock,
     dismiss: toastDismissMock
   }
+}))
+
+vi.mock('@/runtime/runtime-shell-client', () => ({
+  shellOpenUrl: shellOpenUrlMock
 }))
 
 type StarNagApi = {
@@ -81,6 +89,7 @@ describe('StarNagToastHost', () => {
     customToastMock.mockReset()
     customToastMock.mockImplementation(() => `toast-${++toastIdCounter}`)
     toastDismissMock.mockReset()
+    shellOpenUrlMock.mockReset().mockResolvedValue(undefined)
     showCallback = null
     hideCallback = null
     toastIdCounter = 0
@@ -99,7 +108,7 @@ describe('StarNagToastHost', () => {
       starOrca: vi.fn().mockResolvedValue(true)
     }
     shell = {
-      openUrl: vi.fn().mockResolvedValue(undefined)
+      openUrl: shellOpenUrlMock
     }
     setApi({ starNag, shell })
   })

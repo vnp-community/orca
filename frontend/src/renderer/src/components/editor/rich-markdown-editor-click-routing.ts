@@ -18,6 +18,7 @@ import {
   type RichMarkdownHtmlSuperscriptLinkContext
 } from './rich-markdown-html-superscript-link-context'
 
+import { shellOpenFileUri, shellPathExists } from '../../runtime/runtime-shell-client'
 export type ActivateMarkdownLink = (
   href: string,
   context: {
@@ -221,7 +222,7 @@ function openMarkdownLinkInClientOs({
     return
   }
   if (classified.kind === 'markdown') {
-    void window.api.shell.pathExists(classified.absolutePath).then((exists) => {
+    void shellPathExists(classified.absolutePath).then((exists) => {
       if (!exists) {
         toast.error(
           translate(
@@ -232,9 +233,9 @@ function openMarkdownLinkInClientOs({
         )
         return
       }
-      void window.api.shell.openFileUri(toFileUrlForOsEscape(classified.absolutePath))
+      void shellOpenFileUri(toFileUrlForOsEscape(classified.absolutePath))
     })
     return
   }
-  void window.api.shell.openFileUri(classified.uri)
+  void shellOpenFileUri(classified.uri)
 }

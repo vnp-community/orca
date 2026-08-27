@@ -203,6 +203,7 @@ async function pasteLocalDropPaths(
 ): Promise<void> {
   // Why: local WSL worktrees run POSIX shells despite a Windows host, so
   // dropped paths must use the distro-aware resolver before terminal paste.
+  // No files.* RPC covers OS-drop path resolution, so this stays a direct call.
   if (isWslUncPath(args.worktreePath)) {
     try {
       const { resolvedPaths, skipped, failed } = await window.api.fs.resolveDroppedPathsForAgent({
@@ -237,6 +238,8 @@ async function uploadRemoteDropPaths(
     )
   )
   try {
+    // Why: SSH drop resolution is IPC-only (main process owns the connection);
+    // no files.* RPC covers OS-drop path resolution, so this stays a direct call.
     const { resolvedPaths, skipped, failed } = await window.api.fs.resolveDroppedPathsForAgent({
       paths: args.dataPaths,
       worktreePath: args.worktreePath,

@@ -22,6 +22,8 @@ import {
 import { toAppSshPtyId, toRelaySshPtyId } from '../providers/ssh-pty-id'
 import { SshFilesystemProvider } from '../providers/ssh-filesystem-provider'
 import { SshGitProvider } from '../providers/ssh-git-provider'
+import { SshGithubCliProvider } from '../providers/ssh-github-cli-provider'
+import { SshGitlabCliProvider } from '../providers/ssh-gitlab-cli-provider'
 import { agentHookServer } from '../agent-hooks/server'
 import { installRemoteManagedAgentHooks } from '../agent-hooks/remote-managed-hook-installers'
 import { isAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
@@ -55,6 +57,12 @@ import {
   getRemoteFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
 import { registerRemoteGitProvider, unregisterRemoteGitProvider } from '../providers/ssh-git-dispatch'
+import {
+  registerRemoteGithubCliProvider,
+  unregisterRemoteGithubCliProvider,
+  registerRemoteGitlabCliProvider,
+  unregisterRemoteGitlabCliProvider
+} from '../providers/hosted-cli-dispatch'
 import { notifyRemoteWorkspaceHandlers } from '../ipc/remote-workspace-events'
 import { PortScanner } from './ssh-port-scanner'
 import { isMainWindowVisible, onMainWindowBecameVisible } from '../window/main-window-visibility'
@@ -703,6 +711,8 @@ export class SshRelaySession {
       this.remoteCliBridgeEnv?.hostPlatform ?? null
     )
     registerRemoteGitProvider(this.targetId, gitProvider)
+    registerRemoteGithubCliProvider(this.targetId, new SshGithubCliProvider(this.targetId, mux))
+    registerRemoteGitlabCliProvider(this.targetId, new SshGitlabCliProvider(this.targetId, mux))
 
     this.wireUpPtyEvents(ptyProvider)
     this.wireUpAgentHookEvents(mux)
@@ -1018,6 +1028,8 @@ export class SshRelaySession {
     unregisterRemotePtyProvider(this.targetId)
     unregisterRemoteFilesystemProvider(this.targetId)
     unregisterRemoteGitProvider(this.targetId)
+    unregisterRemoteGithubCliProvider(this.targetId)
+    unregisterRemoteGitlabCliProvider(this.targetId)
   }
 
   // Why: kept for back-compat with old relay binaries during the upgrade

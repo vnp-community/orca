@@ -15,7 +15,12 @@ import { FileAudio, Upload, Volume2 } from 'lucide-react'
 import { getNotificationSoundOptions } from '@/components/notification-sound-options'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '../../lib/web-client-location'
+import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { DevServerFilePickerDialog } from '../remote-browser/DevServerFilePickerDialog'
 
+import { shellPickAudio } from '../../runtime/runtime-shell-client'
+const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'aac', 'flac']
 const CHOOSE_CUSTOM_SOUND_VALUE = 'choose-custom-file'
 
 type NotificationSoundSelectValue =
@@ -47,6 +52,8 @@ export function NotificationSoundSection({
 }: NotificationSoundSectionProps): React.JSX.Element {
   const mountedRef = useMountedRef()
   const [isPickingSound, setIsPickingSound] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const activeDevServer = useActiveDevServer()
 
   const previewSound = async (
     customSoundId: GlobalSettings['notifications']['customSoundId']
@@ -69,13 +76,36 @@ export function NotificationSoundSection({
   }
 
   const handleChooseCustomSound = async (): Promise<void> => {
+    // Why: there is no OS-native file dialog in server/web mode — browse the
+    // connected Dev Server's filesystem instead (see DevServerFilePickerDialog).
+    if (isWebClientLocation()) {
+      if (!activeDevServer) {
+        toast.error('Connect a Dev Server to browse its files.')
+        return
+      }
+      setPickerOpen(true)
+      return
+    }
     setIsPickingSound(true)
     try {
-      const soundPath = await window.api.shell.pickAudio()
+      const soundPath = await shellPickAudio()
       if (soundPath) {
         await onUpdateNotificationSettings({ customSoundId: 'custom', customSoundPath: soundPath })
         await previewSound('custom')
       }
+    } finally {
+      if (mountedRef.current) {
+        setIsPickingSound(false)
+      }
+    }
+  }
+
+  const handlePickerSelect = async (soundPath: string): Promise<void> => {
+    setPickerOpen(false)
+    setIsPickingSound(true)
+    try {
+      await onUpdateNotificationSettings({ customSoundId: 'custom', customSoundPath: soundPath })
+      await previewSound('custom')
     } finally {
       if (mountedRef.current) {
         setIsPickingSound(false)
@@ -96,6 +126,7 @@ export function NotificationSoundSection({
   const soundOptions = getNotificationSoundOptions(notificationSettings.customSoundPath)
 
   return (
+    <>
     <div className="space-y-2 py-2">
       <div className="space-y-0.5">
         <div className="flex items-center gap-2">
@@ -186,5 +217,14 @@ export function NotificationSoundSection({
         </div>
       ) : null}
     </div>
+    <DevServerFilePickerDialog
+      open={pickerOpen}
+      mode="file"
+      extensions={AUDIO_EXTENSIONS}
+      title="Choose a notification sound"
+      onSelect={(path) => void handlePickerSelect(path)}
+      onClose={() => setPickerOpen(false)}
+    />
+    </>
   )
 }

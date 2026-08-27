@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type AutoRenameFailedDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -77,7 +78,7 @@ export function AutoRenameFailedDialog({
       // Why: Electron's clipboard IPC, not navigator.clipboard, which fails
       // silently inside Radix dialogs — and an inline icon swap (no toast),
       // matching the app's other inline copy buttons.
-      await window.api.ui.writeClipboardText(detailText)
+      await uiWriteClipboardText(detailText)
       setCopied(true)
       if (copiedResetTimerRef.current !== null) {
         window.clearTimeout(copiedResetTimerRef.current)

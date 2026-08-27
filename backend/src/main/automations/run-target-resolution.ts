@@ -1,4 +1,10 @@
-import type { Store } from '../persistence'
+// ADR-021 Phase 1: narrowed from `Store` to the methods actually used
+// (getRepo, getProjectHostSetups) — see automation-store-dependency.ts's
+// module doc comment. Both are async on the interface (Postgres I/O), so this
+// whole module is async now too — `Store`'s synchronous versions still work
+// fine through `wrapStoreAsAutomationStoreDependency()`'s Promise.resolve()
+// wrapping (automation-store-store-adapter.ts).
+import type { AutomationStoreDependency } from './automation-store-dependency'
 import type { Automation } from '../../shared/automations-types'
 import { getAutomationLegacyRepoId } from '../../shared/automation-run-identity'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../shared/execution-host'
@@ -13,25 +19,29 @@ type AutomationRunTargetOptions = {
   allowRemoteHostScheduling?: boolean
 }
 
-function getLegacyPrecheckCwd(store: Store, automation: Automation): string | null {
+async function getLegacyPrecheckCwd(
+  store: AutomationStoreDependency,
+  automation: Automation
+): Promise<string | null> {
   if (automation.workspaceMode === 'existing') {
     const parsed = automation.workspaceId
       ? splitWorktreeIdForFilesystem(automation.workspaceId)
       : null
     return parsed?.worktreePath ?? null
   }
-  return store.getRepo(getAutomationLegacyRepoId(automation))?.path ?? null
+  const repo = await store.getRepo(getAutomationLegacyRepoId(automation))
+  return repo?.path ?? null
 }
 
-export function resolveAutomationRunTarget(
-  store: Store,
+export async function resolveAutomationRunTarget(
+  store: AutomationStoreDependency,
   automation: Automation,
   options: AutomationRunTargetOptions = {}
-): AutomationRunTargetResult {
+): Promise<AutomationRunTargetResult> {
   const context = automation.runContext ?? null
   if (!context) {
-    const repo = store.getRepo(getAutomationLegacyRepoId(automation))
-    const cwd = getLegacyPrecheckCwd(store, automation)
+    const repo = await store.getRepo(getAutomationLegacyRepoId(automation))
+    const cwd = await getLegacyPrecheckCwd(store, automation)
     if (!repo || !cwd) {
       return { ok: false, error: 'Automation run target is no longer available.' }
     }
@@ -49,9 +59,8 @@ export function resolveAutomationRunTarget(
     }
   }
 
-  const setup = store
-    .getProjectHostSetups()
-    .find((candidate) => candidate.id === context.projectHostSetupId)
+  const projectHostSetups = await store.getProjectHostSetups()
+  const setup = projectHostSetups.find((candidate) => candidate.id === context.projectHostSetupId)
   if (!setup) {
     return {
       ok: false,
@@ -74,7 +83,7 @@ export function resolveAutomationRunTarget(
     }
   }
 
-  const repo = store.getRepo(context.repoId)
+  const repo = await store.getRepo(context.repoId)
   if (!repo) {
     return {
       ok: false,

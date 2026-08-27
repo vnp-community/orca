@@ -21,6 +21,7 @@ import { keybindingMatchesAction } from '../../../../shared/keybindings'
 import { translate } from '@/i18n/i18n'
 import { isEditableTarget } from '@/lib/editable-target'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function shouldIgnoreFileExplorerKeyTarget(target: EventTarget | null): boolean {
   return (
     isEditableTarget(target) ||
@@ -274,17 +275,13 @@ export function useFileExplorerKeys(opts: {
       // ⌥⇧⌘C (Mac) / Ctrl+Shift+Alt+C (Win) — Copy Relative Path
       if (wantsCopyRelativePath) {
         e.preventDefault()
-        window.api.ui.writeClipboardText(
-          formatFileExplorerPathsForClipboard(fallbackNodes, 'relative')
-        )
+        uiWriteClipboardText(formatFileExplorerPathsForClipboard(fallbackNodes, 'relative'))
         return
       }
       // ⌥⌘C (Mac) / Shift+Alt+C (Win) — Copy Path
       if (wantsCopyPath) {
         e.preventDefault()
-        window.api.ui.writeClipboardText(
-          formatFileExplorerPathsForClipboard(fallbackNodes, 'absolute')
-        )
+        uiWriteClipboardText(formatFileExplorerPathsForClipboard(fallbackNodes, 'absolute'))
       }
     }
 

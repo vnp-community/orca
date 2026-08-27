@@ -82,7 +82,7 @@ const MAIN_OWNED_TELEMETRY_EVENTS = new Set<EventName>([
  * `telemetry_opted_in`, which the ✕-as-silent-acknowledge semantics
  * forbid.
  */
-function deriveOptInVia(store: Store, incomingOptedIn: boolean): OptInVia {
+export function deriveOptInVia(store: Store, incomingOptedIn: boolean): OptInVia {
   const telemetry = store.getSettings().telemetry
   const existedBefore = telemetry?.existedBeforeTelemetryRelease === true
   const currentOptedIn = telemetry?.optedIn
@@ -103,6 +103,13 @@ function deriveOptInVia(store: Store, incomingOptedIn: boolean): OptInVia {
   }
 
   return 'settings'
+}
+
+// Why: the RPC surface (desktop/src/main/runtime/rpc/methods/telemetry.ts)
+// runs in this same main process and must read the same settings snapshot
+// these ipcMain handlers use, not a second store reference.
+export function getTelemetryStoreForRpc(): Store | null {
+  return storeRef
 }
 
 export function registerTelemetryHandlers(store: Store): void {

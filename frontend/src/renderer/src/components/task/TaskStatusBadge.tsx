@@ -1,4 +1,4 @@
-import type { TaskStatus, TaskPriority } from '@shared/task-types'
+import type { TaskStatus, TaskPriority } from '../../../../shared/task-types'
 
 const STATUS_CONFIG = {
   todo:        { label: 'Todo',        icon: '⏳', className: 'text-gray-500' },

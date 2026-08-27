@@ -40,7 +40,6 @@ import type { BootstrapSlice } from './slices/bootstrap'
 import type { AuthSlice } from './slices/auth'
 import type { DevServerSlice } from './slices/dev-servers'
 import type { OnboardingChecklistSlice } from './slices/onboarding-checklist'
-import type { WorkspaceSlice } from './slices/workspace-slice'
 import type { ProfileSlice } from './slices/profile-slice'
 import type { AIProviderSlice } from './slices/ai-provider-slice'
 import type { GitPanelSlice } from './slices/git-panel'
@@ -101,7 +100,6 @@ export type AppState = RepoSlice &
   AuthSlice &
   DevServerSlice &
   OnboardingChecklistSlice &
-  WorkspaceSlice &
   ProfileSlice &
   AIProviderSlice &
   GitPanelSlice &

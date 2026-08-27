@@ -26,6 +26,7 @@ import {
 } from './WorktreeCardDetailSection'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type WorktreeCardPortsProps = {
   ports: WorkspacePort[]
 }
@@ -170,7 +171,7 @@ function WorktreePortRow({ port }: { port: WorkspacePort }): React.JSX.Element {
       event.stopPropagation()
       recordFeatureInteraction('ports')
       const address = addressForPort(port)
-      void window.api.ui.writeClipboardText(address)
+      void uiWriteClipboardText(address)
       toast.success(
         translate('auto.components.sidebar.WorktreeCardPorts.c89f290e25', 'Copied {{value0}}', {
           value0: address

@@ -8,6 +8,7 @@ import {
 } from './mobile-settings-search'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 export { getMobileSettingsPaneSearchEntries }
 
 const ORCA_IOS_APP_STORE_URL = 'https://apps.apple.com/app/orca-ide/id6766130217'
@@ -36,7 +37,7 @@ export function MobileSettingsPane(): React.JSX.Element {
           )}{' '}
           <button
             type="button"
-            onClick={() => void window.api.shell.openUrl(ORCA_IOS_APP_STORE_URL)}
+            onClick={() => void shellOpenUrl(ORCA_IOS_APP_STORE_URL)}
             className="cursor-pointer underline underline-offset-2 hover:text-foreground"
           >
             {translate('auto.components.settings.MobileSettingsPane.b5a2ed83ff', 'App Store')}
@@ -49,7 +50,7 @@ export function MobileSettingsPane(): React.JSX.Element {
             type="button"
             // Why: Android is moving to Google Play soon, but until then
             // link directly to the pinned APK asset for the current mobile release.
-            onClick={() => void window.api.shell.openUrl(ORCA_ANDROID_APK_URL)}
+            onClick={() => void shellOpenUrl(ORCA_ANDROID_APK_URL)}
             className="cursor-pointer underline underline-offset-2 hover:text-foreground"
           >
             {translate('auto.components.settings.MobileSettingsPane.9a3c280e49', 'GitHub Releases')}

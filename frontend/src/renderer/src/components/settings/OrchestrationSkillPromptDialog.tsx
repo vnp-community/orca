@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function OrchestrationSkillPromptDialog(props: {
   command: string
   open: boolean
@@ -20,7 +21,7 @@ export function OrchestrationSkillPromptDialog(props: {
 
   const copyCommand = async (): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(command)
+      await uiWriteClipboardText(command)
       toast.success(
         translate(
           'auto.components.settings.OrchestrationSkillPromptDialog.239bf9132b',

@@ -48,6 +48,18 @@ import {
   getAccountsOpencodeSearchEntries,
   getAccountsPaneSearchEntries
 } from './accounts-search'
+import {
+  addClaudeAccount,
+  cancelPendingClaudeAccountLogin,
+  reauthenticateClaudeAccount
+} from '../../runtime/runtime-claude-accounts-client'
+import { addCodexAccount, reauthenticateCodexAccount } from '../../runtime/runtime-codex-accounts-client'
+import {
+  clearMiniMaxCredentialsCookie,
+  getMiniMaxCredentialsStatus,
+  saveMiniMaxCredentialsCookie
+} from '../../runtime/runtime-minimax-credentials-client'
+import { AccountsDevServerPicker } from './AccountsDevServerPicker'
 import { GrokAccountsSection } from './GrokAccountsSection'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
@@ -319,6 +331,11 @@ export function AccountsPane({
   // Why: with a Remote Orca Server active the server owns provider accounts
   // (see #7973); every list/select/remove below must scope to it, not host/WSL.
   const isRemoteAccountScope = hasRemoteProviderAccountOwner(settings)
+  // Why default true: only meaningful once isRemoteAccountScope is true —
+  // AccountsDevServerPicker reports its real readiness via onReadyChange as
+  // soon as it mounts; defaulting true avoids a one-frame false "blocked"
+  // flash in the local (non-remote) case where the picker never renders.
+  const [remoteAccountsReady, setRemoteAccountsReady] = useState(true)
   const activeRuntimeEnvironmentId = settings.activeRuntimeEnvironmentId?.trim() || null
   const remoteServerLabel = isRemoteAccountScope
     ? (runtimeEnvironments.find((environment) => environment.id === activeRuntimeEnvironmentId)
@@ -399,8 +416,14 @@ export function AccountsPane({
       : null
   const systemCodexNeedsReauthentication =
     activeCodexAccountId === null && Boolean(activeCodexAuthWarning)
+  // Why folded into one flag: every select/remove control below already
+  // disables on accountRuntimeUnavailable, so widening it to also cover
+  // "remote scope, but no connected dev server picked yet" (TASK-023) gates
+  // every one of those controls without threading a second condition through
+  // each button.
   const accountRuntimeUnavailable =
-    accountRuntime.runtime === 'wsl' && !wslAvailable && !wslCapabilitiesLoading
+    (accountRuntime.runtime === 'wsl' && !wslAvailable && !wslCapabilitiesLoading) ||
+    (isRemoteAccountScope && !remoteAccountsReady)
 
   const recordOpenCodeSettingEdit = (field: 'cookie' | 'workspaceId'): void => {
     if (recordedOpenCodeSettingEditsRef.current.has(field)) {
@@ -412,7 +435,7 @@ export function AccountsPane({
 
   const refreshMiniMaxCredentialStatus = async (): Promise<void> => {
     try {
-      const status = await window.api.minimaxCredentials.getStatus()
+      const status = await getMiniMaxCredentialsStatus()
       setMiniMaxConfigured(status.configured)
     } catch (error) {
       console.error('Failed to load MiniMax credential status:', error)
@@ -428,7 +451,7 @@ export function AccountsPane({
     }
     setMiniMaxCredentialBusy(true)
     try {
-      const status = await window.api.minimaxCredentials.saveCookie(miniMaxCookieDraft.trim())
+      const status = await saveMiniMaxCredentialsCookie(miniMaxCookieDraft.trim())
       if (!status.configured) {
         throw new Error(
           translate(
@@ -459,7 +482,7 @@ export function AccountsPane({
   const clearMiniMaxCookie = async (): Promise<void> => {
     setMiniMaxCredentialBusy(true)
     try {
-      const status = await window.api.minimaxCredentials.clearCookie()
+      const status = await clearMiniMaxCredentialsCookie()
       setMiniMaxConfigured(status.configured)
       setMiniMaxCookieDraft('')
       recordFeatureInteraction('usage-tracking')
@@ -727,6 +750,17 @@ export function AccountsPane({
   }
 
   const visibleSections = [
+    // Why unconditional (not search-gated): this picker determines whether
+    // every remote account action below even runs (TASK-023) — it must stay
+    // visible whenever isRemoteAccountScope is true, regardless of the
+    // settings search filter.
+    isRemoteAccountScope ? (
+      <AccountsDevServerPicker
+        key="accounts-dev-server"
+        settings={settings}
+        onReadyChange={setRemoteAccountsReady}
+      />
+    ) : null,
     wslSupportedPlatform &&
     !isRemoteAccountScope &&
     matchesSettingsSearch(searchQuery, getAccountsLocationSearchEntries()) ? (
@@ -783,7 +817,7 @@ export function AccountsPane({
                 size="xs"
                 onClick={() =>
                   void runClaudeAccountAction('adding', () =>
-                    window.api.claudeAccounts.add({
+                    addClaudeAccount({
                       runtime: accountRuntime.runtime,
                       wslDistro: accountRuntime.wslDistro
                     })
@@ -810,7 +844,7 @@ export function AccountsPane({
                 <Button
                   variant="ghost"
                   size="xs"
-                  onClick={() => void window.api.claudeAccounts.cancelPendingLogin()}
+                  onClick={() => void cancelPendingClaudeAccountLogin()}
                   className="gap-1.5 text-muted-foreground hover:text-foreground"
                 >
                   <X className="size-3" />
@@ -952,9 +986,7 @@ export function AccountsPane({
                             void runClaudeAccountAction(
                               `reauth:${account.id}`,
                               () =>
-                                window.api.claudeAccounts.reauthenticate({
-                                  accountId: account.id
-                                }),
+                                reauthenticateClaudeAccount(account.id),
                               getProviderAccountRuntime(account)
                             )
                           }}
@@ -1087,7 +1119,7 @@ export function AccountsPane({
               size="xs"
               onClick={() =>
                 void runCodexAccountAction('adding', () =>
-                  window.api.codexAccounts.add({
+                  addCodexAccount({
                     runtime: accountRuntime.runtime,
                     wslDistro: accountRuntime.wslDistro
                   })
@@ -1314,9 +1346,7 @@ export function AccountsPane({
                             void runCodexAccountAction(
                               `reauth:${account.id}`,
                               () =>
-                                window.api.codexAccounts.reauthenticate({
-                                  accountId: account.id
-                                }),
+                                reauthenticateCodexAccount(account.id),
                               getProviderAccountRuntime(account)
                             )
                           }}

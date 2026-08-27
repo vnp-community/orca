@@ -75,7 +75,10 @@ export function execFileCaptured(
 // that go through ghExecFileAsync. Adapts its throw-on-nonzero-exit contract
 // back to this file's { stdout, stderr, exitCode } shape so callers below
 // don't need a second error-handling style.
-async function execGhCaptured(
+// Exported for reuse by agent-github-cli-handler.ts (github.exec RPC) — the
+// generic, validated CLI-passthrough handler backing the ADR-018 gh/glab
+// migration. See specs/agent/api/gaps-and-findings.md.
+export async function execGhCaptured(
   args: string[],
   opts: { cwd: string; env: NodeJS.ProcessEnv; timeout: number; idempotent?: boolean }
 ): Promise<ExecResult> {
@@ -93,7 +96,9 @@ async function execGhCaptured(
 // ─── glab via runner.ts (circuit breaker + retry) ──────────────────────────────
 // Why: BUG-AG-HLD-005 — mirrors the gh adapter: retry + WSL-aware resolution
 // for glab, translated back to this file's { stdout, stderr, exitCode } shape.
-async function execGlabCaptured(
+// Exported for reuse by agent-gitlab-cli-handler.ts (gitlab.exec RPC) — see
+// execGhCaptured's export comment above.
+export async function execGlabCaptured(
   args: string[],
   opts: { cwd: string; env: NodeJS.ProcessEnv; timeout: number; idempotent?: boolean }
 ): Promise<ExecResult> {

@@ -1549,11 +1549,15 @@ export function notifyWorktreeHeadIdentitiesChanged(
 export function emitCreateWorktreeProgress(
   mainWindow: BrowserWindow,
   phase: 'fetching' | 'creating',
-  creationId?: string
+  creationId?: string,
+  runtime?: OrcaRuntimeService | null
 ): void {
   if (!mainWindow.isDestroyed()) {
     mainWindow.webContents.send('createWorktree:progress', { creationId, phase })
   }
+  // Why: paired web/mobile runtime clients have no Electron IPC channel for
+  // createWorktree:progress — bridge it onto the client-events RPC stream.
+  runtime?.notifyWorktreeCreateProgress(creationId, phase)
 }
 
 export async function createRemoteWorktree(
@@ -2094,7 +2098,7 @@ export async function createLocalWorktree(
       if (!hasRemoteTrackingBaseRef && hasLocalBaseRef) {
         remoteTrackingBase = null
       } else {
-        emitCreateWorktreeProgress(mainWindow, 'fetching', args.creationId)
+        emitCreateWorktreeProgress(mainWindow, 'fetching', args.creationId, runtime)
         remoteTrackingRefresh = {
           base: remoteTrackingBase,
           hadLocalBaseRef: hasRemoteTrackingBaseRef,
@@ -2116,7 +2120,7 @@ export async function createLocalWorktree(
         .fetchRemoteWithCache(repo.path, 'origin', ...localWorktreeGitOptionArgs)
         .then(() => undefined)
         .catch(() => undefined)
-      emitCreateWorktreeProgress(mainWindow, 'fetching', args.creationId)
+      emitCreateWorktreeProgress(mainWindow, 'fetching', args.creationId, runtime)
     }
   } else {
     if (
@@ -2128,7 +2132,7 @@ export async function createLocalWorktree(
       })
         .then(() => undefined)
         .catch(() => undefined)
-      emitCreateWorktreeProgress(mainWindow, 'fetching', args.creationId)
+      emitCreateWorktreeProgress(mainWindow, 'fetching', args.creationId, runtime)
     }
   }
   const workspaceRoot = computeWorkspaceRoot(repo.path, worktreePathSettings)
@@ -2345,7 +2349,7 @@ export async function createLocalWorktree(
       await legacyFetchPromise
     })
   }
-  emitCreateWorktreeProgress(mainWindow, 'creating', args.creationId)
+  emitCreateWorktreeProgress(mainWindow, 'creating', args.creationId, runtime)
 
   let preparedPushTarget: GitPushTarget | undefined
   if (args.pushTarget) {

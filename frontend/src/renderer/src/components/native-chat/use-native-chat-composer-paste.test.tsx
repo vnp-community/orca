@@ -22,14 +22,13 @@ vi.mock('./native-chat-attachment-upload', () => ({
   nativeChatWorktreeNotReadyNotice: () => 'Worktree not ready — try again in a moment.'
 }))
 
-vi.stubGlobal('window', {
-  api: {
-    ui: {
-      saveClipboardImageAsTempFile: mocks.saveClipboardImageAsTempFile,
-      readClipboardText: mocks.readClipboardText
-    }
-  }
-})
+vi.mock('@/runtime/runtime-ui-client', () => ({
+  uiSaveClipboardImageAsTempFile: (
+    args?: Parameters<(typeof mocks)['saveClipboardImageAsTempFile']>[0]
+  ) => mocks.saveClipboardImageAsTempFile(args),
+  uiReadClipboardText: (options?: Parameters<(typeof mocks)['readClipboardText']>[0]) =>
+    mocks.readClipboardText(options)
+}))
 
 import { useNativeChatComposerPaste } from './use-native-chat-composer-paste'
 

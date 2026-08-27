@@ -89,6 +89,17 @@ describe('EphemeralVmsPane', () => {
             .fn()
             .mockResolvedValue({ state: 'installed', pathConfigured: true })
         },
+        runtime: {
+          call: vi.fn(async ({ method, params }: { method: string; params?: unknown }) => {
+            if (method === 'cli.getInstallStatus') {
+              return { ok: true, result: { state: 'installed', pathConfigured: true } }
+            }
+            if (method === 'cli.getWslInstallStatus') {
+              return { ok: true, result: { state: 'installed', pathConfigured: true } }
+            }
+            throw new Error(`Unexpected runtime.call method in test stub: ${method}, ${JSON.stringify(params)}`)
+          })
+        },
         platform: {
           get: vi.fn().mockReturnValue({ platform: 'darwin' })
         },

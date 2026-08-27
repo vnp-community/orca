@@ -7,6 +7,7 @@ import { useAppStore } from '../../store'
 import { STATUS_LABELS, statusColor } from '../settings/SshTargetCard'
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'
 import type { RemoteWorkspaceSyncStatus } from '../../store/slices/ssh'
+import { connectRuntimeSsh, disconnectRuntimeSsh } from '@/runtime/runtime-ssh-client'
 
 function isReconnectable(status: SshConnectionStatus): boolean {
   return ['disconnected', 'reconnection-failed', 'error', 'auth-failed'].includes(status)
@@ -67,7 +68,7 @@ export function SshTargetStatusRow({
   const handleConnect = useCallback(async () => {
     setBusy(true)
     try {
-      await window.api.ssh.connect({ targetId })
+      await connectRuntimeSsh(useAppStore.getState().settings, targetId)
       recordFeatureInteraction('ssh')
     } catch (err) {
       toast.error(
@@ -85,7 +86,7 @@ export function SshTargetStatusRow({
   const handleDisconnect = useCallback(async () => {
     setBusy(true)
     try {
-      await window.api.ssh.disconnect({ targetId })
+      await disconnectRuntimeSsh(useAppStore.getState().settings, targetId)
       recordFeatureInteraction('ssh')
     } catch (err) {
       toast.error(

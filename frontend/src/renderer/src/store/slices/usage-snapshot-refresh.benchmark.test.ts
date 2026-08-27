@@ -8,6 +8,18 @@ import type {
   CodexUsageSummary
 } from '../../../../shared/codex-usage-types'
 import { createCodexUsageSlice } from './codex-usage'
+import * as runtimeCodexUsageClient from '../../runtime/runtime-codex-usage-client'
+
+vi.mock('../../runtime/runtime-codex-usage-client', () => ({
+  getCodexUsageScanState: vi.fn(),
+  getCodexUsageSnapshot: vi.fn(),
+  refreshCodexUsage: vi.fn(),
+  setCodexUsageEnabled: vi.fn(),
+  getCodexUsageSummary: vi.fn(),
+  getCodexUsageDaily: vi.fn(),
+  getCodexUsageBreakdown: vi.fn(),
+  getCodexUsageRecentSessions: vi.fn()
+}))
 
 type Deferred<T> = {
   promise: Promise<T>
@@ -95,20 +107,9 @@ describe('Codex usage cached snapshot benchmark', () => {
       .mockResolvedValueOnce(createSnapshot(200, createScanState({ lastScanCompletedAt: 300 })))
     const refresh = vi.fn(() => slowRefresh.promise)
 
-    vi.stubGlobal('window', {
-      api: {
-        codexUsage: {
-          getScanState: vi.fn(() => Promise.resolve(createScanState())),
-          getSnapshot,
-          refresh,
-          setEnabled: vi.fn(),
-          getSummary: vi.fn(),
-          getDaily: vi.fn(),
-          getBreakdown: vi.fn(),
-          getRecentSessions: vi.fn()
-        }
-      }
-    })
+    vi.mocked(runtimeCodexUsageClient.getCodexUsageScanState).mockResolvedValue(createScanState())
+    vi.mocked(runtimeCodexUsageClient.getCodexUsageSnapshot).mockImplementation(getSnapshot)
+    vi.mocked(runtimeCodexUsageClient.refreshCodexUsage).mockImplementation(refresh)
 
     const store = createCodexOnlyStore()
     const startedAt = performance.now()
@@ -127,9 +128,9 @@ describe('Codex usage cached snapshot benchmark', () => {
 
     expect(store.getState().codexUsageSummary?.totalTokens).toBe(200)
     expect(getSnapshot).toHaveBeenCalledTimes(2)
-    expect(window.api.codexUsage.getSummary).not.toHaveBeenCalled()
-    expect(window.api.codexUsage.getDaily).not.toHaveBeenCalled()
-    expect(window.api.codexUsage.getBreakdown).not.toHaveBeenCalled()
-    expect(window.api.codexUsage.getRecentSessions).not.toHaveBeenCalled()
+    expect(runtimeCodexUsageClient.getCodexUsageSummary).not.toHaveBeenCalled()
+    expect(runtimeCodexUsageClient.getCodexUsageDaily).not.toHaveBeenCalled()
+    expect(runtimeCodexUsageClient.getCodexUsageBreakdown).not.toHaveBeenCalled()
+    expect(runtimeCodexUsageClient.getCodexUsageRecentSessions).not.toHaveBeenCalled()
   })
 })
