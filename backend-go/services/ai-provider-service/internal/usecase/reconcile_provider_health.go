@@ -1,32 +1,3 @@
-# TASK-AIP-03-04: Add `ReconcileProviderHealth` usecase
-
-**From Solution:** SOL-AIP-03
-**Priority:** P1
-**Service:** `ai-provider-service`
-**File:** `backend-go/services/ai-provider-service/internal/usecase/reconcile_provider_health.go` (new)
-**Depends on:** TASK-AIP-03-03, TASK-AIP-01-05 (reuses `verifyConnection`), TASK-AIP-SHARED-01
-**Status:** `[x] DONE — reconcile_provider_health.go added (HealthDetailOrEmpty naming, per this task's own tie-break note); all 5 requested tests + a claim-error-propagation test pass.`
-
----
-
-## Context
-
-§8's 15-minute health-check job: claim a batch of due accounts, ping each
-via the same relay call `TestConnection`/`CreateAccount`'s test-before-save
-gate already use (`verifyConnection`, `TASK-AIP-01-05` — one agent method
-to build and maintain, not three), classify the result, and alert on a
-**new** failure classification only (not every re-confirmation of an
-already-known-bad account, to avoid paging on every tick for a
-still-broken key). A `quota_exceeded` classification is re-checked against
-today's actual usage rollup rather than carried forward blindly, so a UTC
-day rollover naturally clears it without a separate midnight job.
-
-## Changes to make
-
-Create
-`backend-go/services/ai-provider-service/internal/usecase/reconcile_provider_health.go`:
-
-```go
 package usecase
 
 import (
@@ -76,10 +47,10 @@ func (uc *ReconcileProviderHealth) Execute(ctx context.Context, batchSize int32)
 		if detail != nil && *detail != account.HealthDetailOrEmpty() &&
 			(*detail == domain.HealthDetailInvalidKey || *detail == domain.HealthDetailUnreachable || *detail == domain.HealthDetailQuotaExceeded) {
 			payload := map[string]any{
-				"account_id":     account.ID,
-				"provider_type":  string(account.ProviderType),
-				"dev_server_id":  account.DevServerID,
-				"health_detail":  *detail,
+				"account_id":    account.ID,
+				"provider_type": string(account.ProviderType),
+				"dev_server_id": account.DevServerID,
+				"health_detail": *detail,
 			}
 			if err := uc.outbox.Enqueue(ctx, "ai_provider.account.health_degraded", account.TenantID, payload); err != nil {
 				return fmt.Errorf("enqueue health-degraded event for account %s: %w", account.ID, err)
@@ -109,33 +80,3 @@ func classifyHealthResult(account domain.ProviderAccount, result ConnectionTestR
 	detail := domain.HealthDetailHealthy
 	return domain.AccountStatusActive, &detail
 }
-```
-
-Rename the domain helper referenced here to match `TASK-AIP-03-02`'s
-actual naming — this file assumes `ProviderAccount.HealthDetailOrEmpty()`;
-if `TASK-AIP-03-02` named it `derefHealthDetail()` instead, use that name
-here for consistency (align on one name across both tasks — whichever
-lands first wins the name).
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/ai-provider-service/...
-go test ./services/ai-provider-service/internal/usecase/... -run TestReconcileProviderHealth
-```
-
-Add to a new `reconcile_provider_health_test.go`:
-- `TestReconcileProviderHealth_ClassifiesUnreachable` — fake
-  `InfraFleetClient.Relay` returns an error → `AccountStatusError` +
-  `HealthDetailUnreachable`, one outbox event enqueued.
-- `TestReconcileProviderHealth_ClassifiesInvalidKey` — relay succeeds,
-  `result.Success=false` → `HealthDetailInvalidKey`.
-- `TestReconcileProviderHealth_NoAlertOnRepeatFailure` — account already
-  `HealthDetailUnreachable`, stays `unreachable` this tick → outbox
-  `Enqueue` NOT called.
-- `TestReconcileProviderHealth_QuotaExceededSurvivesHealthyPing` — account
-  is `AccountStatusError`/`HealthDetailQuotaExceeded`; connection test
-  succeeds; status stays unchanged.
-- `TestReconcileProviderHealth_LatencyRecorded` — successful check records
-  a non-nil `latency_ms`.

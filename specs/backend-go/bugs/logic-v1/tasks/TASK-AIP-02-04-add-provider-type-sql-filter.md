@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/adapter/postgres/repository.go`
 **Depends on:** TASK-AIP-02-03
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — provider_type WHERE clause added to List; TestRepository_List_FiltersByProviderType passes against real Postgres.`
 
 ---
 

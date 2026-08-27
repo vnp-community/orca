@@ -103,6 +103,12 @@ func (f *fakeAIProviderServiceClient) TestConnection(context.Context, *aiprovide
 	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
 }
 
+// RecordTokenUsage is service-to-service only (TASK-AIP-03-08) — never
+// routed through api-gateway, so this fake never expects a call either.
+func (f *fakeAIProviderServiceClient) RecordTokenUsage(context.Context, *aiproviderv1.RecordTokenUsageRequest, ...grpc.CallOption) (*aiproviderv1.RecordTokenUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
+}
+
 // testAIProviderRouter mounts mountAIProviderRoutes alone on a fresh chi
 // router — no auth middleware — since these tests inject identity directly
 // into the request context, the same way authMiddleware would have (see

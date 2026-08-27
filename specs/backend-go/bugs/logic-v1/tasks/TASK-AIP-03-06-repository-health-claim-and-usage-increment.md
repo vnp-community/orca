@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/adapter/postgres/repository.go`
 **Depends on:** TASK-AIP-03-01, TASK-AIP-03-03, TASK-AIP-03-05, TASK-AIP-01-07 (shares the `ai_provider.outbox` table SOL-AIP-01 creates)
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — ClaimDue/IncrementUsage/MarkQuotaWarningSent/Enqueue implemented (fixed a real interval-arithmetic type-ambiguity bug and a nil-slice NOT NULL bug found via integration tests); TestClaimDue_NoDoubleClaimUnderConcurrency (deterministic barrier) + TestIncrementUsage_AdditiveAcrossCalls pass against real Postgres.`
 
 ---
 

@@ -1,32 +1,3 @@
-# TASK-AIP-03-05: Add `RecordTokenUsage` usecase (quota enforcement write path)
-
-**From Solution:** SOL-AIP-03
-**Priority:** P1
-**Service:** `ai-provider-service`
-**File:** `backend-go/services/ai-provider-service/internal/usecase/record_token_usage.go` (new)
-**Depends on:** TASK-AIP-03-03, TASK-AIP-03-02
-**Status:** `[x] DONE — record_token_usage.go added, MarkQuotaWarningSent + UpdateStatusInput.HealthDetail added; all 3 requested tests pass.`
-
----
-
-## Context
-
-§8: quota writes are off the `Resolve` hot path — "`usage_daily` upserts
-happen when the agent execution reports token counts back, not
-synchronously inside `Resolve`." No code path anywhere calls
-`IncrementUsage` today (this bug's own finding: "no code path anywhere
-increments `ai_provider.usage`"). This adds the synchronous
-`RecordTokenUsage` entry point — called by whichever service dispatched
-the agent execution (`task-service`/`workflow-service`, per §7's "Called
-by" table) right after a spawn completes — with 80%-warning and
-100%-quota-exceeded alerting.
-
-## Changes to make
-
-Create
-`backend-go/services/ai-provider-service/internal/usecase/record_token_usage.go`:
-
-```go
 package usecase
 
 import (
@@ -88,7 +59,7 @@ func (uc *RecordTokenUsage) Execute(ctx context.Context, in RecordTokenUsageInpu
 	case ratio >= 1.0:
 		detail := domain.HealthDetailQuotaExceeded
 		if _, err := uc.accounts.UpdateStatus(ctx, UpdateStatusInput{
-			TenantID: tenantID, AccountID: in.AccountID, Status: domain.AccountStatusError,
+			TenantID: tenantID, AccountID: in.AccountID, Status: domain.AccountStatusError, HealthDetail: &detail,
 		}); err != nil {
 			return state, apperrors.New(apperrors.KindInternal, "AIPROVIDER_QUOTA_FLIP_FAILED", "usage recorded but failed to flip status on quota exceeded", err)
 		}
@@ -96,7 +67,6 @@ func (uc *RecordTokenUsage) Execute(ctx context.Context, in RecordTokenUsageInpu
 		if err := uc.outbox.Enqueue(ctx, "ai_provider.usage.quota_exceeded", tenantID, payload); err != nil {
 			return state, apperrors.New(apperrors.KindInternal, "AIPROVIDER_QUOTA_ALERT_FAILED", "usage recorded but failed to enqueue quota-exceeded alert", err)
 		}
-		_ = detail // set via a dedicated MarkHealthDetail-style repo call if UpdateStatusInput doesn't carry HealthDetail yet — see TASK-AIP-03-03's port shape
 	case ratio >= 0.8:
 		if account.QuotaWarningSentDate == nil || !account.QuotaWarningSentDate.Equal(today) {
 			if err := uc.accounts.MarkQuotaWarningSent(ctx, tenantID, in.AccountID, today); err != nil {
@@ -110,50 +80,3 @@ func (uc *RecordTokenUsage) Execute(ctx context.Context, in RecordTokenUsageInpu
 	}
 	return state, nil
 }
-```
-
-`MarkQuotaWarningSent` is a new one-off method needed on
-`ProviderAccountRepository` (`ports.go`) — add it alongside the other
-interface methods in this same task:
-
-```go
-// MarkQuotaWarningSent implements the 80%-warning idempotency guard — see
-// TASK-AIP-03-01's quota_warning_sent_date column.
-MarkQuotaWarningSent(ctx context.Context, tenantID, accountID string, day time.Time) error
-```
-
-`UpdateStatusInput` (`ports.go`) needs a `HealthDetail *string` field
-added so the quota-exceeded flip can set `health_detail='quota_exceeded'`
-in the same call as the status flip — extend it in this task:
-
-```go
-type UpdateStatusInput struct {
-	TenantID           string
-	AccountID          string
-	Status             domain.AccountStatus
-	HealthDetail       *string // NEW — nil = leave unchanged
-	CredentialRef      string
-	RotationGraceUntil *time.Time
-}
-```
-Then set `HealthDetail: &detail` in the `UpdateStatus` call above instead
-of the placeholder `_ = detail` line.
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/ai-provider-service/...
-go test ./services/ai-provider-service/internal/usecase/... -run TestRecordTokenUsage
-```
-
-Add to a new `record_token_usage_test.go`:
-- `TestRecordTokenUsage_UnlimitedQuotaNeverFlips` — `QuotaLimitDay=0`,
-  arbitrarily large `TokensUsed` → status untouched, no outbox event.
-- `TestRecordTokenUsage_80PercentWarningOnce` — two calls crossing 80% in
-  the same UTC day → exactly one `quota_warning` outbox event; a third
-  call the next day (mocked `now`) → a second warning is allowed.
-- `TestRecordTokenUsage_QuotaExceededFlipsStatusAndAlerts` — a call
-  pushing the total to/over 100% → `UpdateStatus` called with
-  `AccountStatusError`/`HealthDetailQuotaExceeded`, one `quota_exceeded`
-  outbox event, `Resolvable()` on the refetched account is `false`.

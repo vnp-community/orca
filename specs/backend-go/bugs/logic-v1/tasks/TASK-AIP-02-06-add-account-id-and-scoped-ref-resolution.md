@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/resolve_scoped_ref.go` (new)
 **Depends on:** TASK-AIP-02-05
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — AccountID (Case 1) + ScopedRef (Case 2, resolve_scoped_ref.go) added; TestResolveProvider_ExplicitAccountID + TestResolveScopedRef (table-driven) pass.`
 
 ---
 

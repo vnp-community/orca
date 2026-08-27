@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service` proto
 **File:** `backend-go/proto/orca/aiprovider/v1/aiprovider.proto`
 **Depends on:** TASK-AIP-03-05
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — RecordTokenUsage RPC added to proto + grpc server.go + main.go wiring; go build ./... clean, fakeAIProviderServiceClient updated where it broke compilation.`
 
 ---
 

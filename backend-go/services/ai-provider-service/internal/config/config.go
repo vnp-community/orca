@@ -16,6 +16,10 @@ type Config struct {
 	// InfraFleetServiceAddr is infra-fleet-service's gRPC target — dialed
 	// by TestConnection's InfraFleetClient (TASK-028).
 	InfraFleetServiceAddr string
+	// NATSURL is the JetStream endpoint the outbox relay publishes to —
+	// same convention as usage-service's cmd/server/main.go wiring
+	// (TASK-AIP-01-07).
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -27,5 +31,6 @@ func Load() (Config, error) {
 		Base:                  base,
 		CredentialBrokerAddr:  commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

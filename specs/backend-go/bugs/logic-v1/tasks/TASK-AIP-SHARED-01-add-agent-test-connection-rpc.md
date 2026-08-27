@@ -5,7 +5,7 @@
 **Service:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-rpc-dispatch.ts`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — handleTestProviderConnection added to agent-credential-store.ts + routed in agent-rpc-dispatch.ts; tsc/vitest green (4 new tests).`
 
 ---
 

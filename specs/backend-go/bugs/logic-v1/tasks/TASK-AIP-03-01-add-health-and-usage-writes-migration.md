@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/migrations/0005_health_and_usage_writes.up.sql` (new)
 **Depends on:** TASK-AIP-01-01 (numbered after SOL-AIP-01's `0003`/`0004`; `last_health_check_at`/`quota_limit_day` must already exist)
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — 0005_health_and_usage_writes up/down migrations added; verified via go build + integration tests exercising latency_ms/health_detail/tokens_used.`
 
 ---
 

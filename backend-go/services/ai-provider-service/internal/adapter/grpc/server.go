@@ -8,6 +8,7 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -22,15 +23,16 @@ import (
 type Server struct {
 	aiproviderv1.UnimplementedAiProviderServiceServer
 
-	createAccount   *usecase.CreateAccount
-	resolveProvider *usecase.ResolveProvider
-	rotateKey       *usecase.RotateKey
-	getUsageToday   *usecase.GetUsageToday
-	listAccounts    *usecase.ListAccounts
-	updateAccount   *usecase.UpdateAccount
-	deleteAccount   *usecase.DeleteAccount
-	writeCredential *usecase.WriteCredential
-	testConnection  *usecase.TestConnection
+	createAccount    *usecase.CreateAccount
+	resolveProvider  *usecase.ResolveProvider
+	rotateKey        *usecase.RotateKey
+	getUsageToday    *usecase.GetUsageToday
+	listAccounts     *usecase.ListAccounts
+	updateAccount    *usecase.UpdateAccount
+	deleteAccount    *usecase.DeleteAccount
+	writeCredential  *usecase.WriteCredential
+	testConnection   *usecase.TestConnection
+	recordTokenUsage *usecase.RecordTokenUsage
 }
 
 func New(
@@ -43,24 +45,33 @@ func New(
 	del *usecase.DeleteAccount,
 	writeCredential *usecase.WriteCredential,
 	testConnection *usecase.TestConnection,
+	recordTokenUsage *usecase.RecordTokenUsage,
 ) *Server {
 	return &Server{
-		createAccount:   create,
-		resolveProvider: resolve,
-		rotateKey:       rotate,
-		getUsageToday:   usage,
-		listAccounts:    list,
-		updateAccount:   update,
-		deleteAccount:   del,
-		writeCredential: writeCredential,
-		testConnection:  testConnection,
+		createAccount:    create,
+		resolveProvider:  resolve,
+		rotateKey:        rotate,
+		getUsageToday:    usage,
+		listAccounts:     list,
+		updateAccount:    update,
+		deleteAccount:    del,
+		writeCredential:  writeCredential,
+		testConnection:   testConnection,
+		recordTokenUsage: recordTokenUsage,
 	}
 }
 
 func (s *Server) CreateAccount(ctx context.Context, req *aiproviderv1.CreateAccountRequest) (*aiproviderv1.CreateAccountResponse, error) {
 	account, err := s.createAccount.Execute(ctx, usecase.CreateAccountInput{
-		TenantID:     req.GetTenantId(),
-		ProviderType: toDomainProviderType(req.GetType()),
+		TenantID:      req.GetTenantId(),
+		ProviderType:  toDomainProviderType(req.GetType()),
+		DevServerID:   req.GetDevServerId(),
+		Label:         req.GetLabel(),
+		ModelHint:     req.GetModelHint(),
+		BaseURL:       req.GetBaseUrl(),
+		QuotaLimitDay: int(req.GetQuotaLimitDay()),
+		Models:        req.GetModels(),
+		IsDefault:     req.GetIsDefault(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -70,13 +81,32 @@ func (s *Server) CreateAccount(ctx context.Context, req *aiproviderv1.CreateAcco
 
 func (s *Server) ResolveProvider(ctx context.Context, req *aiproviderv1.ResolveProviderRequest) (*aiproviderv1.ResolveProviderResponse, error) {
 	account, err := s.resolveProvider.Resolve(ctx, usecase.ResolveProviderInput{
-		UserID:    req.GetUserId(),
-		ProjectID: req.GetProjectId(),
+		UserID:      req.GetUserId(),
+		ProjectID:   req.GetProjectId(),
+		DevServerID: req.GetDevServerId(),
+		ModelHint:   req.GetModelHint(),
+		AccountID:   req.GetAccountId(),
+		ScopedRef:   req.GetScopedRef(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(mapDomainError(err))
 	}
 	return &aiproviderv1.ResolveProviderResponse{Account: toProtoAccount(account)}, nil
+}
+
+func (s *Server) RecordTokenUsage(ctx context.Context, req *aiproviderv1.RecordTokenUsageRequest) (*aiproviderv1.RecordTokenUsageResponse, error) {
+	state, err := s.recordTokenUsage.Execute(ctx, usecase.RecordTokenUsageInput{
+		AccountID:    req.GetAccountId(),
+		TokensUsed:   req.GetTokensUsed(),
+		RequestCount: req.GetRequestCount(),
+		CostUSD:      req.GetCostUsd(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &aiproviderv1.RecordTokenUsageResponse{
+		TokensUsed: state.TokensUsed, CostUsd: state.CostUSD, RequestCount: state.RequestCount,
+	}, nil
 }
 
 func (s *Server) RotateKey(ctx context.Context, req *aiproviderv1.RotateKeyRequest) (*aiproviderv1.RotateKeyResponse, error) {
@@ -210,16 +240,28 @@ func toProtoProviderType(t domain.ProviderType) aiproviderv1.ProviderType {
 }
 
 // toProtoAccount maps domain.ProviderAccount onto the wire ProviderAccount
-// message — id, tenant_id, type, status, credential_ref ONLY. There is no
-// field on the wire message this could populate with a secret even by
-// mistake; the proto simply has none.
+// message — metadata and a credential pointer ONLY. There is no field on
+// the wire message this could populate with a secret even by mistake; the
+// proto simply has none.
 func toProtoAccount(a domain.ProviderAccount) *aiproviderv1.ProviderAccount {
+	var lastHealthCheckAt string
+	if a.LastHealthCheckAt != nil {
+		lastHealthCheckAt = a.LastHealthCheckAt.Format(time.RFC3339)
+	}
 	return &aiproviderv1.ProviderAccount{
-		Id:            a.ID,
-		TenantId:      a.TenantID,
-		Type:          toProtoProviderType(a.ProviderType),
-		Status:        string(a.Status),
-		CredentialRef: a.CredentialRef,
-		DevServerId:   a.DevServerID,
+		Id:                a.ID,
+		TenantId:          a.TenantID,
+		Type:              toProtoProviderType(a.ProviderType),
+		Status:            string(a.Status),
+		CredentialRef:     a.CredentialRef,
+		DevServerId:       a.DevServerID,
+		Label:             a.Label,
+		ModelHint:         a.ModelHint,
+		BaseUrl:           a.BaseURL,
+		QuotaLimitDay:     int32(a.QuotaLimitDay),
+		Models:            a.Models,
+		IsDefault:         a.IsDefault,
+		LastHealthCheckAt: lastHealthCheckAt,
+		CreatedBy:         a.CreatedBy,
 	}
 }
