@@ -369,7 +369,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		addEdgeUC,
 		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}),
 		resolvePermissionUC,
-		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}),
+		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, resolvePermissionUC),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
 		usecase.NewUpdateTask(tasks, edges),

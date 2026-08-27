@@ -185,7 +185,7 @@ func run() error {
 	grantUC := usecase.NewGrant(repo, resolvePermissionUC, eventPublisher)
 	revokeGrantUC := usecase.NewRevokeGrant(repo, resolvePermissionUC, eventPublisher)
 	listGrantsUC := usecase.NewListGrants(repo, resolvePermissionUC)
-	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor)
+	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, resolvePermissionUC)
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)
 	updateTaskUC := usecase.NewUpdateTask(repo, repo)
