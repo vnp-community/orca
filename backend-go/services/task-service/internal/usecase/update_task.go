@@ -25,11 +25,12 @@ type UpdateTaskInput struct {
 // still-running task done early or fake a dispatch it never made. See
 // TASK-223's Context note.
 type UpdateTask struct {
-	repo TaskRepository
+	repo  TaskRepository
+	edges EdgeRepository
 }
 
-func NewUpdateTask(repo TaskRepository) *UpdateTask {
-	return &UpdateTask{repo: repo}
+func NewUpdateTask(repo TaskRepository, edges EdgeRepository) *UpdateTask {
+	return &UpdateTask{repo: repo, edges: edges}
 }
 
 func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.Task, error) {
@@ -57,6 +58,36 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 	}
 	if err := uc.repo.Update(ctx, tenantID, current); err != nil {
 		return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_UPDATE_FAILED", "failed to persist update", err)
+	}
+
+	// Un-block step: a task transitioning to Done may unblock direct
+	// dependents whose every depends_on edge is now satisfied.
+	if in.Status != nil && *in.Status == domain.StatusDone {
+		dependents, err := uc.edges.ListTo(ctx, tenantID, current.ID, domain.EdgeKindDependsOn)
+		if err != nil {
+			return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_UNBLOCK_LOOKUP_FAILED", "failed to list dependents for unblock check", err)
+		}
+		for _, dep := range dependents {
+			dependent, err := uc.repo.Get(ctx, tenantID, dep.FromTaskID)
+			if err != nil || dependent.Status != domain.StatusBlocked {
+				continue
+			}
+			blockers, err := uc.edges.ListFrom(ctx, tenantID, dependent.ID, domain.EdgeKindDependsOn)
+			if err != nil {
+				continue
+			}
+			allDone := true
+			for _, b := range blockers {
+				blocker, err := uc.repo.Get(ctx, tenantID, b.ToTaskID)
+				if err != nil || (blocker.Status != domain.StatusDone && blocker.Status != domain.StatusCancelled) {
+					allDone = false
+					break
+				}
+			}
+			if allDone {
+				_ = uc.repo.UpdateStatus(ctx, tenantID, dependent.ID, domain.StatusOpen)
+			}
+		}
 	}
 	return current, nil
 }

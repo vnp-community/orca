@@ -134,7 +134,7 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: load task: %w", err)
 	}
-	connectionID, worktreePath, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
+	connectionID, worktreePath, _, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: resolve connection: %w", err)
 	}

@@ -24,6 +24,15 @@ type Config struct {
 	// AIProviderServiceAddr is where AIDecompose's AIProviderContextResolver
 	// dials ai-provider-service's ResolveProvider RPC.
 	AIProviderServiceAddr string
+	// GitGatewayServiceAddr is where TechStackDetector (TASK-TG-02-03) and
+	// WorktreeProvisioner (TASK-TG-04-02) dial git-gateway-service's
+	// ReadFile/CreateWorktree RPCs — a genuine scope addition (a new
+	// task-service -> git-gateway-service dependency edge, flagged
+	// explicitly in both tasks' Context sections).
+	GitGatewayServiceAddr string
+	// ProjectServiceAddr is where ProjectContextResolver (TASK-TG-02-04)
+	// dials project-service's GetProject/ListRepos RPCs.
+	ProjectServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -36,5 +45,7 @@ func Load() (Config, error) {
 		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
+		GitGatewayServiceAddr: commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
+		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 	}, nil
 }

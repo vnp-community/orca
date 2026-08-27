@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/adapter/postgres/repository.go`
 **Depends on:** TASK-TG-01-02 (migration), TASK-TG-01-03 (domain fields)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Create/Get/List/Update/GetAncestors widened via taskColumns/scanTask; UpdateWorktreeID/UpdatePromptTemplate/UpdateAIPlanJSON added; go build+test clean (integration tests pass individually; some flake under parallel Docker load, pre-existing testutil issue).
 
 ---
 

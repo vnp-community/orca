@@ -5,7 +5,7 @@
 **Service:** `task-service` (client) + `git-gateway-service` (existing `ReadFile` RPC, reused as-is)
 **File:** `backend-go/services/task-service/internal/adapter/grpcclient/tech_stack_detector.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — TechStackDetector adapter added against git-gateway-service.ReadFile; ProjectExecutionResolver widened to also surface worktree_id (the open question flagged in Context, resolved via ResolveConnectionResponse.worktree_id which already existed on the wire); go test ./internal/adapter/grpcclient/... -run TestTechStackDetector passes.
 
 ---
 

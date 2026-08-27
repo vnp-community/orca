@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/subtask_proposal.go`, `backend-go/services/task-service/internal/domain/critical_path.go` (new)
 **Depends on:** none (pure domain)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain.SubtaskProposal widened; CalculateCriticalPath (Kahn topo-sort + longest-path) added with a tie-break fix (>= not >) so an all-zero-hours chain still walks the full path; go test ./internal/domain/... -run TestCalculateCriticalPath passes (diamond DAG, parallel chains, empty, all-zero-hours, parent_child-ignored cases).
 
 ---
 

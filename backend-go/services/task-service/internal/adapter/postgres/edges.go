@@ -61,6 +61,41 @@ func (r *Repository) ListFrom(ctx context.Context, tenantID, fromTaskID string, 
 	return scanEdges(rows)
 }
 
+// ListByKindForUpdate is ListByKind's transaction-scoped, row-locked
+// variant — SELECT ... FOR UPDATE over the kind-scoped edge set, closing
+// the check-then-write race AddEdge's prior two-call shape allowed. Only
+// meaningful when called through TxRunner.RunInTx's fn (r.db is a pgx.Tx
+// there); called outside a transaction it behaves like ListByKind.
+func (r *Repository) ListByKindForUpdate(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT from_task_id, to_task_id, edge_type
+		FROM task.task_edges
+		WHERE tenant_id = $1 AND edge_type = $2
+		FOR UPDATE
+	`, tenantID, string(kind))
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query edges by kind for update: %w", err)
+	}
+	defer rows.Close()
+	return scanEdges(rows)
+}
+
+// ListTo returns the edges of the given kind terminating AT toTaskID — the
+// symmetric counterpart to ListFrom, used by UpdateTask's un-block step to
+// find a task's dependents.
+func (r *Repository) ListTo(ctx context.Context, tenantID, toTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT from_task_id, to_task_id, edge_type
+		FROM task.task_edges
+		WHERE tenant_id = $1 AND to_task_id = $2 AND edge_type = $3
+	`, tenantID, toTaskID, string(kind))
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query edges to task: %w", err)
+	}
+	defer rows.Close()
+	return scanEdges(rows)
+}
+
 // edgeRows is the minimal interface both pgx.Rows results here satisfy —
 // lets scanEdges be shared by ListByKind and ListFrom without depending on
 // pgx.Rows's full surface.

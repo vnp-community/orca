@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -33,6 +34,7 @@ type Server struct {
 	getDependencies     *usecase.GetDependencies
 	aiDecompose         *usecase.AIDecompose
 	aiApply             *usecase.AIApply
+	generateAgentPrompt *usecase.GenerateAgentPrompt
 }
 
 func New(
@@ -49,6 +51,7 @@ func New(
 	getDependencies *usecase.GetDependencies,
 	aiDecompose *usecase.AIDecompose,
 	aiApply *usecase.AIApply,
+	generateAgentPrompt *usecase.GenerateAgentPrompt,
 ) *Server {
 	return &Server{
 		createTask:          createTask,
@@ -64,7 +67,16 @@ func New(
 		getDependencies:     getDependencies,
 		aiDecompose:         aiDecompose,
 		aiApply:             aiApply,
+		generateAgentPrompt: generateAgentPrompt,
 	}
+}
+
+func (s *Server) GenerateAgentPrompt(ctx context.Context, req *taskv1.GenerateAgentPromptRequest) (*taskv1.GenerateAgentPromptResponse, error) {
+	prompt, err := s.generateAgentPrompt.Execute(ctx, usecase.GenerateAgentPromptInput{TaskID: req.GetTaskId(), Save: req.GetSave()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.GenerateAgentPromptResponse{Prompt: prompt}, nil
 }
 
 func (s *Server) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error) {
@@ -203,17 +215,21 @@ func (s *Server) GetDependencies(ctx context.Context, req *taskv1.GetDependencie
 }
 
 func (s *Server) AIDecompose(ctx context.Context, req *taskv1.AIDecomposeRequest) (*taskv1.AIDecomposeResponse, error) {
-	proposals, err := s.aiDecompose.Execute(ctx, usecase.AIDecomposeInput{TaskID: req.GetTaskId()})
+	result, err := s.aiDecompose.Execute(ctx, usecase.AIDecomposeInput{TaskID: req.GetTaskId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &taskv1.AIDecomposeResponse{Proposals: toProtoSubtaskProposals(proposals)}, nil
+	return &taskv1.AIDecomposeResponse{
+		Proposals:   toProtoSubtaskProposals(result.Proposals),
+		RawResponse: result.RawResponse,
+	}, nil
 }
 
 func (s *Server) AIApply(ctx context.Context, req *taskv1.AIApplyRequest) (*taskv1.AIApplyResponse, error) {
 	created, err := s.aiApply.Execute(ctx, usecase.AIApplyInput{
-		TaskID:    req.GetTaskId(),
-		Proposals: toDomainSubtaskProposals(req.GetProposals()),
+		TaskID:        req.GetTaskId(),
+		Proposals:     toDomainSubtaskProposals(req.GetProposals()),
+		RawAIResponse: req.GetRawAiResponse(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -228,7 +244,14 @@ func (s *Server) AIApply(ctx context.Context, req *taskv1.AIApplyRequest) (*task
 func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.SubtaskProposal {
 	out := make([]*taskv1.SubtaskProposal, 0, len(proposals))
 	for _, p := range proposals {
-		out = append(out, &taskv1.SubtaskProposal{Title: p.Title, Description: p.Description})
+		wire := &taskv1.SubtaskProposal{
+			Title: p.Title, Description: p.Description, Type: p.Type,
+			DependsOnIndices: toInt32Slice(p.DependsOnIndices), PromptTemplate: p.PromptTemplate,
+		}
+		if p.EstimatedHours != nil {
+			wire.EstimatedHours = wrapperspb.Double(*p.EstimatedHours)
+		}
+		out = append(out, wire)
 	}
 	return out
 }
@@ -236,7 +259,31 @@ func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.Subta
 func toDomainSubtaskProposals(proposals []*taskv1.SubtaskProposal) []domain.SubtaskProposal {
 	out := make([]domain.SubtaskProposal, 0, len(proposals))
 	for _, p := range proposals {
-		out = append(out, domain.SubtaskProposal{Title: p.GetTitle(), Description: p.GetDescription()})
+		proposal := domain.SubtaskProposal{
+			Title: p.GetTitle(), Description: p.GetDescription(), Type: p.GetType(),
+			DependsOnIndices: toIntSlice(p.GetDependsOnIndices()), PromptTemplate: p.GetPromptTemplate(),
+		}
+		if p.GetEstimatedHours() != nil {
+			v := p.GetEstimatedHours().GetValue()
+			proposal.EstimatedHours = &v
+		}
+		out = append(out, proposal)
+	}
+	return out
+}
+
+func toInt32Slice(in []int) []int32 {
+	out := make([]int32, len(in))
+	for i, v := range in {
+		out[i] = int32(v)
+	}
+	return out
+}
+
+func toIntSlice(in []int32) []int {
+	out := make([]int, len(in))
+	for i, v := range in {
+		out[i] = int(v)
 	}
 	return out
 }

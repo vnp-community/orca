@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -27,6 +28,10 @@ type fakeTaskRepository struct {
 	updateErr         error
 	deleteErr         error
 	updateStatusCalls []updateStatusCall
+	// batchUpdateProgressCalls records every BatchUpdateProgress call — lets
+	// recalculate_progress_test.go assert it's called exactly once (N+1
+	// regression guard).
+	batchUpdateProgressCalls []map[string]int
 }
 
 // updateStatusCall records one UpdateStatus invocation — used by
@@ -165,6 +170,118 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 	return nil
 }
 
+// UpdateWorktreeID, UpdatePromptTemplate, UpdateAIPlanJSON are permissive,
+// map-mutating fakes — same posture as UpdateStatus above (no not-found
+// error) since no test in this package needs that fidelity yet.
+func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.WorktreeID = worktreeID
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.PromptTemplate = promptTemplate
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+func (f *fakeTaskRepository) UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJSON string) error {
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.AIPlanJSON = aiPlanJSON
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+// GetSubtree walks ParentID pointers DOWNWARD from rootID within the fake's
+// map — a permissive, N^2-but-correct-enough-for-tests stand-in for the
+// real WITH RECURSIVE query.
+func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
+	root, ok := f.tasks[rootID]
+	if !ok || root.TenantID != tenantID {
+		return nil, nil, errNotFound
+	}
+	if maxDepth <= 0 {
+		maxDepth = domain.DefaultMaxAncestorDepth
+	}
+	var out []domain.Task
+	frontier := []domain.Task{root}
+	depth := 0
+	for len(frontier) > 0 && depth < maxDepth {
+		out = append(out, frontier...)
+		var next []domain.Task
+		for _, parent := range frontier {
+			for _, t := range f.tasks {
+				if t.TenantID == tenantID && t.ParentID == parent.ID {
+					next = append(next, t)
+				}
+			}
+		}
+		frontier = next
+		depth++
+	}
+	return out, nil, nil
+}
+
+// GetSubtreeWithChildPercents mirrors GetSubtree but folds in ChildPercents
+// and orders deepest-first — enough fidelity for recalculate_progress_test.go's
+// fixtures without depending on GetSubtree's frontier order.
+func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, rootID string) ([]SubtreeProgressNode, error) {
+	nodes, _, err := f.GetSubtree(ctx, tenantID, rootID, 0)
+	if err != nil {
+		return nil, err
+	}
+	depthOf := map[string]int{}
+	byID := map[string]domain.Task{}
+	for _, n := range nodes {
+		byID[n.ID] = n
+	}
+	var depth func(id string) int
+	depth = func(id string) int {
+		if d, ok := depthOf[id]; ok {
+			return d
+		}
+		t := byID[id]
+		d := 0
+		if t.ParentID != "" {
+			if _, ok := byID[t.ParentID]; ok {
+				d = depth(t.ParentID) + 1
+			}
+		}
+		depthOf[id] = d
+		return d
+	}
+	childPercents := map[string][]int{}
+	for _, n := range nodes {
+		if n.ParentID != "" {
+			childPercents[n.ParentID] = append(childPercents[n.ParentID], n.ProgressPercent)
+		}
+	}
+	out := make([]SubtreeProgressNode, len(nodes))
+	for i, n := range nodes {
+		out[i] = SubtreeProgressNode{Task: n, Depth: depth(n.ID), ChildPercents: childPercents[n.ID]}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Depth > out[j].Depth })
+	return out, nil
+}
+
+// BatchUpdateProgress records every call for regression assertions
+// (N+1 guard) and mutates the fake's map.
+func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error {
+	f.batchUpdateProgressCalls = append(f.batchUpdateProgressCalls, updates)
+	for id, p := range updates {
+		if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+			t.ProgressPercent = p
+			f.tasks[id] = t
+		}
+	}
+	return nil
+}
+
 var errNotFound = &notFoundError{}
 
 type notFoundError struct{}
@@ -212,6 +329,28 @@ func (f *fakeEdgeRepository) ListFrom(ctx context.Context, tenantID, fromTaskID 
 	var out []domain.TaskEdge
 	for _, e := range f.edges {
 		if e.Kind == kind && e.FromTaskID == fromTaskID {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+// ListByKindForUpdate is a permissive fake: no real row-locking (there is
+// no real database here), just ListByKind's filter — enough to exercise
+// AddEdge's cycle-check call site.
+func (f *fakeEdgeRepository) ListByKindForUpdate(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	return f.ListByKind(ctx, tenantID, kind)
+}
+
+// ListTo returns the edges of kind terminating AT toTaskID — used by
+// UpdateTask's un-block step.
+func (f *fakeEdgeRepository) ListTo(ctx context.Context, tenantID, toTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.TaskEdge
+	for _, e := range f.edges {
+		if e.Kind == kind && e.ToTaskID == toTaskID {
 			out = append(out, e)
 		}
 	}
@@ -329,4 +468,37 @@ func (f *fakeExecutor) Execute(ctx context.Context, tenantID, taskID, requestID 
 		return "", f.err
 	}
 	return f.ref, nil
+}
+
+// fakeCommentRepository backs AddComment/ListComments' tests without a
+// database — id assignment mirrors postgres.Repository.AddComment
+// (server-generated id, not client-supplied).
+type fakeCommentRepository struct {
+	comments []domain.TaskComment
+	addErr   error
+	listErr  error
+	nextID   int
+}
+
+func (f *fakeCommentRepository) AddComment(ctx context.Context, tenantID string, c domain.TaskComment) (domain.TaskComment, error) {
+	if f.addErr != nil {
+		return domain.TaskComment{}, f.addErr
+	}
+	f.nextID++
+	c.ID = fmt.Sprintf("comment-%d", f.nextID)
+	f.comments = append(f.comments, c)
+	return c, nil
+}
+
+func (f *fakeCommentRepository) ListComments(ctx context.Context, tenantID, taskID, pageToken string, pageSize int32) ([]domain.TaskComment, string, error) {
+	if f.listErr != nil {
+		return nil, "", f.listErr
+	}
+	var out []domain.TaskComment
+	for _, c := range f.comments {
+		if c.TaskID == taskID {
+			out = append(out, c)
+		}
+	}
+	return out, "", nil
 }

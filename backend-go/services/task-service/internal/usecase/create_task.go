@@ -23,6 +23,19 @@ type CreateTaskInput struct {
 	Title     string
 	ParentID  string
 	ProjectID string
+
+	// The remaining fields are optional, client-settable widened fields
+	// (TASK-TG-01-01's proto/domain widen) — AIApply (TASK-TG-02-05) is the
+	// first caller to set any of them, carrying a SubtaskProposal's fields
+	// straight through to the created subtask.
+	Description    string
+	Type           string
+	Priority       string
+	AssigneeID     string
+	EstimatedHours *float64
+	PromptTemplate string
+	AIContext      string
+	Visibility     string
 }
 
 type CreateTask struct {
@@ -47,6 +60,17 @@ func (uc *CreateTask) Execute(ctx context.Context, in CreateTaskInput) (domain.T
 	if err != nil {
 		return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID", err.Error(), err)
 	}
+	// Widened fields are set directly (not part of NewTask's signature,
+	// which stays backward compatible per TASK-TG-01-03) — every one of
+	// them is optional, zero-value-valid.
+	task.Description = in.Description
+	task.Type = in.Type
+	task.Priority = in.Priority
+	task.AssigneeID = in.AssigneeID
+	task.EstimatedHours = in.EstimatedHours
+	task.PromptTemplate = in.PromptTemplate
+	task.AIContext = in.AIContext
+	task.Visibility = in.Visibility
 
 	if task.ParentID != "" {
 		if _, err := uc.repo.Get(ctx, tenantID, task.ParentID); err != nil {

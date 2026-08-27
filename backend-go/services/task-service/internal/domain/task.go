@@ -4,14 +4,19 @@
 // database, no gRPC, no framework, no context.Context.
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // Status values a Task can hold. Kept as an open-ish small set matching the
 // TS source's status strings (see specs/backend-go/services/task-service.md
 // §10 — faithful port, not a redesign).
 const (
 	StatusOpen       = "open"
+	StatusBlocked    = "blocked" // new — see TASK-TG-01-07's auto-block design
 	StatusInProgress = "in_progress"
+	StatusReview     = "review" // new — SOL-TG-04's completion target
 	StatusDone       = "done"
 	StatusCancelled  = "cancelled"
 )
@@ -66,11 +71,27 @@ type Task struct {
 	// task currently in_progress" — see that usecase's doc comment for the
 	// honest limit on what "in_progress" currently means here.
 	ProjectID string
+
+	Description     string
+	Type            string // task|bug|feature|epic
+	Priority        string
+	AssigneeID      string
+	OwnerID         string // see SOL-TG-03 — intrinsic-owner short-circuit
+	DueDate         *time.Time
+	EstimatedHours  *float64
+	ActualHours     *float64 // see SOL-TG-04
+	PromptTemplate  string   // see SOL-TG-02
+	AIContext       string
+	AIPlanJSON      string // see SOL-TG-02
+	Visibility      string
+	WorktreeID      string // see SOL-TG-04
+	AgentSessionID  string // see SOL-TG-04
+	ProgressPercent int
 }
 
 func validStatus(s string) bool {
 	switch s {
-	case StatusOpen, StatusInProgress, StatusDone, StatusCancelled:
+	case StatusOpen, StatusBlocked, StatusInProgress, StatusReview, StatusDone, StatusCancelled:
 		return true
 	default:
 		return false

@@ -34,7 +34,9 @@ import (
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
+	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 )
 
@@ -104,6 +106,29 @@ func run() error {
 	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
 	aiProviderContextResolver := taskgrpcclient.NewAIProviderContextResolver(aiProviderClient)
 
+	// git-gateway-service dependency: TechStackDetector's ReadFile probes
+	// (TASK-TG-02-03) and WorktreeProvisioner's CreateWorktree calls
+	// (TASK-TG-04-02) — both a genuine scope addition, flagged in their own
+	// task Context sections.
+	gitGatewayConn, err := taskgrpcclient.Dial(cfg.GitGatewayServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing git-gateway-service: %w", err)
+	}
+	defer func() { _ = gitGatewayConn.Close() }()
+	gitGatewayClient := gitgatewayv1.NewGitGatewayServiceClient(gitGatewayConn)
+	techStackDetector := taskgrpcclient.NewTechStackDetector(gitGatewayClient, projectExecutionResolver)
+
+	// project-service dependency: ProjectContextResolver's GetProject/
+	// ListRepos calls (TASK-TG-02-04) — task-service never reads
+	// project-service's tables directly.
+	projectConn, err := taskgrpcclient.Dial(cfg.ProjectServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing project-service: %w", err)
+	}
+	defer func() { _ = projectConn.Close() }()
+	projectClient := projectv1.NewProjectServiceClient(projectConn)
+	projectContextResolver := taskgrpcclient.NewProjectContextResolver(projectClient)
+
 	// opaEvaluator loads/compiles the orca-authz bundle once per distinct
 	// query string (common/policy.Evaluator's own cache) and is shared by
 	// every ResolvePermission call for this process's lifetime.
@@ -118,21 +143,28 @@ func run() error {
 	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor)
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)
-	updateTaskUC := usecase.NewUpdateTask(repo)
+	updateTaskUC := usecase.NewUpdateTask(repo, repo)
 	deleteTaskUC := usecase.NewDeleteTask(repo)
 	getDependenciesUC := usecase.NewGetDependencies(repo, repo)
-	aiDecomposeUC := usecase.NewAIDecompose(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter)
+	// repo also implements usecase.VelocityResolver (RecentCompletedTasks is
+	// task-service's own data — no client adapter needed, see
+	// adapter/postgres/velocity.go's doc comment).
+	aiDecomposeUC := usecase.NewAIDecompose(
+		repo, repo, aiProviderContextResolver, projectExecutionResolver,
+		projectContextResolver, techStackDetector, repo, aiCompleter,
+	)
 	// repo also implements usecase.TxRunner (internal/adapter/postgres's
 	// RunInTx) — AIApply needs its create-subtask+add-edge loop to run in
 	// one transaction (TASK-224 Gap 2), not the standalone createTaskUC/
 	// addEdgeUC instances above (those stay wired to the plain CreateTask/
 	// AddEdge RPCs, which don't need a shared transaction).
 	aiApplyUC := usecase.NewAIApply(repo)
+	generateAgentPromptUC := usecase.NewGenerateAgentPrompt(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
-		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC,
+		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, generateAgentPromptUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

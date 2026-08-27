@@ -44,6 +44,36 @@ type TaskRepository interface {
 	// with ON DELETE CASCADE (migrations/0001_init.up.sql) — no explicit
 	// edge/grant cleanup needed.
 	Delete(ctx context.Context, tenantID, id string) error
+	// UpdateWorktreeID persists the provisioned worktree a task's execution
+	// is running in — see SOL-TG-04.
+	UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error
+	// UpdatePromptTemplate persists the "Generate Agent Prompt" output — see
+	// SOL-TG-02.
+	UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error
+	// UpdateAIPlanJSON persists the raw AIDecompose response for later
+	// inspection/replay — see SOL-TG-02.
+	UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJSON string) error
+	// GetSubtree walks tasks.parent_id DOWNWARD from rootID — the mirror
+	// image of GetAncestors — returning every descendant task plus every
+	// depends_on edge originating from one of those tasks. See SOL-TG-01.
+	GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error)
+	// GetSubtreeWithChildPercents mirrors GetSubtree but orders
+	// deepest-first and folds in each node's direct children's current
+	// progress_percent — the shape usecase.RecalculateProgress reduces
+	// bottom-up through domain.CalculateProgress.
+	GetSubtreeWithChildPercents(ctx context.Context, tenantID, rootID string) ([]SubtreeProgressNode, error)
+	// BatchUpdateProgress persists every (taskID -> progress_percent) pair
+	// in one call — task-service.md §8's N+1 guard.
+	BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error
+}
+
+// SubtreeProgressNode is one GetSubtreeWithChildPercents result row: the
+// task itself, its depth (root=0), and its direct children's CURRENT
+// progress_percent values as persisted.
+type SubtreeProgressNode struct {
+	Task          domain.Task
+	Depth         int
+	ChildPercents []int
 }
 
 // EdgeRepository is the persistence port for task_edges rows. Cycle
@@ -67,6 +97,16 @@ type EdgeRepository interface {
 	// and reused as-is by GetDependencies (TASK-223) for the identical
 	// depends_on edge kind.
 	ListFrom(ctx context.Context, tenantID, fromTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error)
+	// ListByKindForUpdate is ListByKind's transaction-scoped, row-locked
+	// variant — SELECT ... FOR UPDATE over the kind-scoped edge set, closing
+	// the check-then-write race AddEdge's prior two-call shape allowed. Only
+	// meaningful when called through TxRunner.RunInTx's fn (r.db is a
+	// pgx.Tx there); called outside a transaction it behaves like ListByKind.
+	ListByKindForUpdate(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error)
+	// ListTo returns the edges of the given kind terminating AT toTaskID —
+	// the symmetric counterpart to ListFrom, used by UpdateTask's un-block
+	// step to find a task's dependents.
+	ListTo(ctx context.Context, tenantID, toTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error)
 }
 
 // GrantRepository is the persistence port for task_grants rows.
@@ -76,6 +116,13 @@ type GrantRepository interface {
 	// taskIDs, grouped by task ID — the input ResolveGrant's BFS walk
 	// (domain/grant_resolution.go) consumes.
 	ListGrantsForAncestors(ctx context.Context, tenantID string, taskIDs []string) (map[string][]domain.Grant, error)
+}
+
+// CommentRepository is the persistence port for task.task_comments rows —
+// see SOL-TG-01's AddComment/ListComments design.
+type CommentRepository interface {
+	AddComment(ctx context.Context, tenantID string, c domain.TaskComment) (domain.TaskComment, error)
+	ListComments(ctx context.Context, tenantID, taskID, pageToken string, pageSize int32) ([]domain.TaskComment, string, error)
 }
 
 // TeamScopeResolver resolves a user's team memberships by calling
@@ -144,8 +191,37 @@ type ComplexExecutor interface {
 // to operate against. SimpleExecutor (TASK-224 Gap 1) needs this same value
 // as agent.execPrompt's required worktreePath field — see
 // simple_executor.go's doc comment for the full citation trail.
+// worktreeID (the 3rd return value) is infra-fleet-service's
+// ResolveConnectionResponse.worktree_id echoed straight through — added
+// alongside worktreePath so callers that need git-gateway-service's
+// worktree-ID-keyed RPCs (TechStackDetector's ReadFile, TASK-TG-02-03) have
+// it without a second resolution call. worktreePath and worktreeID name
+// different things (a filesystem path vs. git-gateway-service's own ID) —
+// keep both rather than conflating them.
+// TechStackDetector probes a project's worktree for common ecosystem
+// marker files (package.json, go.mod, ...) to enrich AIDecompose's prompt
+// — best-effort by design: a detection failure must never fail Execute
+// outright, since this is an enrichment, not a precondition for producing
+// a plan at all.
+type TechStackDetector interface {
+	Detect(ctx context.Context, tenantID, projectID string) (domain.TechStack, error)
+}
+
 type ProjectExecutionResolver interface {
-	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID, worktreePath string, connected bool, err error)
+	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID, worktreePath, worktreeID string, connected bool, err error)
+}
+
+// ProjectContextResolver resolves a project's name/repo URL via
+// project-service — task-service never reads project-service's tables
+// directly.
+type ProjectContextResolver interface {
+	Resolve(ctx context.Context, tenantID, projectID string) (name, repoURL string, err error)
+}
+
+// VelocityResolver returns the last n Done tasks in a project (title +
+// actual hours), used to give the AI a sense of this team's real pace.
+type VelocityResolver interface {
+	RecentCompletedTasks(ctx context.Context, tenantID, projectID string, n int) ([]domain.Task, error)
 }
 
 // AIProviderContextResolver resolves AI provider/account context for a

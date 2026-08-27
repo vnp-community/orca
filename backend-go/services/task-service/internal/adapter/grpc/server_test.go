@@ -105,6 +105,42 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 	delete(f.tasks, id)
 	return nil
 }
+func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	t, ok := f.tasks[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	t.WorktreeID = worktreeID
+	f.tasks[id] = t
+	return nil
+}
+func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
+	t, ok := f.tasks[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	t.PromptTemplate = promptTemplate
+	f.tasks[id] = t
+	return nil
+}
+func (f *fakeTaskRepository) UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJSON string) error {
+	t, ok := f.tasks[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	t.AIPlanJSON = aiPlanJSON
+	f.tasks[id] = t
+	return nil
+}
+func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
+	return nil, nil, errors.New("not implemented")
+}
+func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, rootID string) ([]usecase.SubtreeProgressNode, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error {
+	return errors.New("not implemented")
+}
 
 // fakeEdgeRepository is a minimal usecase.EdgeRepository for this file's
 // contract tests.
@@ -134,6 +170,18 @@ func (f *fakeEdgeRepository) ListFrom(ctx context.Context, tenantID, fromTaskID 
 	}
 	return out, nil
 }
+func (f *fakeEdgeRepository) ListByKindForUpdate(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	return f.ListByKind(ctx, tenantID, kind)
+}
+func (f *fakeEdgeRepository) ListTo(ctx context.Context, tenantID, toTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	var out []domain.TaskEdge
+	for _, e := range f.edges {
+		if e.Kind == kind && e.ToTaskID == toTaskID {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
 
 // fakeAIProviderContextResolver/fakeProjectExecutionResolver/fakeAICompleter
 // back this file's AIDecompose contract tests.
@@ -148,8 +196,26 @@ type fakeProjectExecutionResolver struct {
 	connected    bool
 }
 
-func (f fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, bool, error) {
-	return f.connectionID, "", f.connected, nil
+func (f fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, bool, error) {
+	return f.connectionID, "", "", f.connected, nil
+}
+
+type fakeProjectContextResolver struct{}
+
+func (fakeProjectContextResolver) Resolve(ctx context.Context, tenantID, projectID string) (string, string, error) {
+	return "", "", nil
+}
+
+type fakeTechStackDetector struct{}
+
+func (fakeTechStackDetector) Detect(ctx context.Context, tenantID, projectID string) (domain.TechStack, error) {
+	return domain.TechStack{}, nil
+}
+
+type fakeVelocityResolver struct{}
+
+func (fakeVelocityResolver) RecentCompletedTasks(ctx context.Context, tenantID, projectID string, n int) ([]domain.Task, error) {
+	return nil, nil
 }
 
 type fakeAICompleter struct {
@@ -185,7 +251,7 @@ func (f fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context, 
 
 func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server {
 	createTaskUC := usecase.NewCreateTask(tasks)
-	addEdgeUC := usecase.NewAddEdge(edges)
+	addEdgeUC := usecase.NewAddEdge(fakeTxRunner{tasks: tasks, edges: edges})
 	return New(
 		createTaskUC,
 		usecase.NewGetTask(tasks),
@@ -195,11 +261,16 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
-		usecase.NewUpdateTask(tasks),
+		usecase.NewUpdateTask(tasks, edges),
 		usecase.NewDeleteTask(tasks),
 		usecase.NewGetDependencies(tasks, edges),
-		usecase.NewAIDecompose(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "1. Do X"}),
+		usecase.NewAIDecompose(
+			tasks, edges, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true},
+			fakeProjectContextResolver{}, fakeTechStackDetector{}, fakeVelocityResolver{},
+			fakeAICompleter{content: `{"subtasks":[{"title":"Do X"}]}`},
+		),
 		usecase.NewAIApply(fakeTxRunner{tasks: tasks, edges: edges}),
+		usecase.NewGenerateAgentPrompt(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "generated prompt text"}),
 	)
 }
 
@@ -330,6 +401,74 @@ func TestServer_AIApply(t *testing.T) {
 	}
 	if len(edges.edges) != 1 || edges.edges[0].Kind != domain.EdgeKindParentChild {
 		t.Errorf("expected one parent_child edge, got %+v", edges.edges)
+	}
+}
+
+// TestServer_AIDecompose_ReturnsRawResponse confirms the widened
+// AIDecomposeResponse carries raw_response through, not just proposals.
+func TestServer_AIDecompose_ReturnsRawResponse(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
+	s := newTestServer(tasks, &fakeEdgeRepository{})
+
+	resp, err := s.AIDecompose(ctxWithTenant(t), &taskv1.AIDecomposeRequest{TaskId: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetRawResponse() == "" {
+		t.Error("expected a non-empty raw_response")
+	}
+}
+
+// TestServer_AIApplyAIDecompose_ProposalFieldsSurviveProtoRoundTrip locks
+// in TASK-TG-02-06's widened proposal shape: type/estimated_hours/
+// depends_on_indices/prompt_template all survive proto <-> domain
+// conversion, not just title/description.
+func TestServer_AIApplyAIDecompose_ProposalFieldsSurviveProtoRoundTrip(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1"}
+	edges := &fakeEdgeRepository{}
+	s := newTestServer(tasks, edges)
+
+	resp, err := s.AIApply(ctxWithTenant(t), &taskv1.AIApplyRequest{
+		TaskId: "parent",
+		Proposals: []*taskv1.SubtaskProposal{
+			{Title: "Design API", Description: "the design", Type: "task", EstimatedHours: wrapperspb.Double(2.5), PromptTemplate: "do the design"},
+		},
+		RawAiResponse: `{"subtasks":[]}`,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetCreatedSubtasks()) != 1 {
+		t.Fatalf("expected 1 created subtask, got %+v", resp.GetCreatedSubtasks())
+	}
+	created := tasks.tasks[resp.GetCreatedSubtasks()[0].GetId()]
+	if created.Description != "the design" || created.Type != "task" || created.PromptTemplate != "do the design" {
+		t.Errorf("expected widened proposal fields to survive round-trip, got %+v", created)
+	}
+	if created.EstimatedHours == nil || *created.EstimatedHours != 2.5 {
+		t.Errorf("expected EstimatedHours=2.5, got %+v", created.EstimatedHours)
+	}
+	if tasks.tasks["parent"].AIPlanJSON != `{"subtasks":[]}` {
+		t.Errorf("expected raw_ai_response to persist to ai_plan_json, got %q", tasks.tasks["parent"].AIPlanJSON)
+	}
+}
+
+func TestServer_GenerateAgentPrompt(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
+	s := newTestServer(tasks, &fakeEdgeRepository{})
+
+	resp, err := s.GenerateAgentPrompt(ctxWithTenant(t), &taskv1.GenerateAgentPromptRequest{TaskId: "t1", Save: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetPrompt() != "generated prompt text" {
+		t.Errorf("expected the generated prompt text to be returned, got %q", resp.GetPrompt())
+	}
+	if tasks.tasks["t1"].PromptTemplate != "generated prompt text" {
+		t.Errorf("expected Save=true to persist PromptTemplate, got %q", tasks.tasks["t1"].PromptTemplate)
 	}
 }
 

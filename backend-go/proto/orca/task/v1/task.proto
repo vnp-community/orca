@@ -3,6 +3,7 @@ syntax = "proto3";
 package orca.task.v1;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv1";
@@ -44,6 +45,13 @@ service TaskService {
   // AIDecompose call, creating one subtask + parent_child edge per
   // proposal.
   rpc AIApply(AIApplyRequest) returns (AIApplyResponse);
+
+  rpc GetSubtree(GetSubtreeRequest) returns (GetSubtreeResponse);
+  rpc RecalculateProgress(RecalculateProgressRequest) returns (RecalculateProgressResponse);
+  rpc AddComment(AddCommentRequest) returns (AddCommentResponse);
+  rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse);
+
+  rpc GenerateAgentPrompt(GenerateAgentPromptRequest) returns (GenerateAgentPromptResponse);
 }
 
 message Task {
@@ -53,6 +61,22 @@ message Task {
   string status = 4;
   string parent_id = 5;
   string project_id = 6; // added for Epic C's HasActiveExecutions — see that RPC's doc comment
+
+  string description = 7;
+  string task_type = 8;
+  string priority = 9;
+  string assignee_id = 10;
+  string owner_id = 11; // see SOL-TG-03's owner-intrinsic short-circuit
+  google.protobuf.Timestamp due_date = 12;
+  google.protobuf.DoubleValue estimated_hours = 13;
+  google.protobuf.DoubleValue actual_hours = 14; // see SOL-TG-04
+  string prompt_template = 15;                   // see SOL-TG-02
+  string ai_context = 16;
+  string ai_plan_json = 17;                      // see SOL-TG-02
+  string visibility = 18;
+  string worktree_id = 19;                       // see SOL-TG-04
+  string agent_session_id = 20;                   // see SOL-TG-04
+  int32 progress_percent = 21;
 }
 
 message CreateTaskRequest {
@@ -60,6 +84,15 @@ message CreateTaskRequest {
   string title = 2;
   string parent_id = 3;
   string project_id = 4;
+  string description = 5;
+  string task_type = 6;
+  string priority = 7;
+  string assignee_id = 8;
+  google.protobuf.Timestamp due_date = 9;
+  google.protobuf.DoubleValue estimated_hours = 10;
+  string prompt_template = 11;
+  string ai_context = 12;
+  string visibility = 13;
 }
 
 message CreateTaskResponse {
@@ -157,6 +190,15 @@ message UpdateTaskRequest {
   string id = 1;
   google.protobuf.StringValue title = 2;
   google.protobuf.StringValue status = 3;
+  google.protobuf.StringValue description = 4;
+  google.protobuf.StringValue task_type = 5;
+  google.protobuf.StringValue priority = 6;
+  google.protobuf.StringValue assignee_id = 7;
+  google.protobuf.Timestamp due_date = 8;
+  google.protobuf.DoubleValue estimated_hours = 9;
+  google.protobuf.StringValue prompt_template = 10;
+  google.protobuf.StringValue ai_context = 11;
+  google.protobuf.StringValue visibility = 12;
 }
 message UpdateTaskResponse {
   Task task = 1;
@@ -182,9 +224,18 @@ message AIDecomposeRequest {
 message SubtaskProposal {
   string title = 1;
   string description = 2;
+  string type = 3; // task|bug|feature — mirrors Task.task_type
+  google.protobuf.DoubleValue estimated_hours = 4;
+  // DependsOnIndices names OTHER proposals in the SAME AIDecompose response
+  // by their 0-based position — proposals have no Task.ID until AIApply
+  // creates them.
+  repeated int32 depends_on_indices = 5;
+  string prompt_template = 6;
 }
 message AIDecomposeResponse {
   repeated SubtaskProposal proposals = 1; // review-before-commit — not yet written to task_edges
+  string raw_response = 2; // unparsed AI JSON — persisted to ai_plan_json, shown on parse failure
+  string notes = 3;
 }
 
 // AIApply commits a (possibly user-edited) proposal set from a prior
@@ -192,7 +243,25 @@ message AIDecomposeResponse {
 message AIApplyRequest {
   string task_id = 1;
   repeated SubtaskProposal proposals = 2;
+  string raw_ai_response = 3; // echoed back from AIDecomposeResponse.raw_response
 }
 message AIApplyResponse {
   repeated Task created_subtasks = 1;
 }
+
+message GetSubtreeRequest { string root_id = 1; }
+message GetSubtreeResponse {
+  repeated Task tasks = 1;
+  repeated AddEdgeRequest depends_on_edges = 2; // reuses the existing edge shape rather than a new message
+}
+
+message RecalculateProgressRequest { string root_id = 1; }
+message RecalculateProgressResponse { int32 progress_percent = 1; }
+
+message AddCommentRequest { string task_id = 1; string content = 2; }
+message AddCommentResponse { string id = 1; string author_id = 2; string content = 3; string created_at = 4; }
+message ListCommentsRequest { string task_id = 1; string page_token = 2; int32 page_size = 3; }
+message ListCommentsResponse { repeated AddCommentResponse comments = 1; string next_page_token = 2; }
+
+message GenerateAgentPromptRequest { string task_id = 1; bool save = 2; }
+message GenerateAgentPromptResponse { string prompt = 1; }

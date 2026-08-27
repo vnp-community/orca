@@ -11,6 +11,7 @@ import (
 	"github.com/stablyai/orca-go/common/apperrors"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
+	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 )
 
 // fakeInfraFleetServiceClient implements infrafleetv1.InfraFleetServiceClient
@@ -80,18 +81,37 @@ func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task d
 func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) error {
 	panic("not implemented")
 }
+func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJSON string) error {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, rootID string) ([]usecase.SubtreeProgressNode, error) {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error {
+	panic("not implemented")
+}
 
 // fakeProjectExecutionResolver backs SimpleExecutor's tests without a real
 // infra-fleet-service call.
 type fakeProjectExecutionResolver struct {
 	connectionID string
 	worktreePath string
+	worktreeID   string
 	connected    bool
 	err          error
 }
 
-func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, bool, error) {
-	return f.connectionID, f.worktreePath, f.connected, f.err
+func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, bool, error) {
+	return f.connectionID, f.worktreePath, f.worktreeID, f.connected, f.err
 }
 
 // TestSimpleExecutor_Execute_RelaysAgentExecPrompt locks in TASK-224 Gap 1's

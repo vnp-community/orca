@@ -66,11 +66,78 @@ func (r *Repository) RunInTx(ctx context.Context, fn func(ctx context.Context, t
 	})
 }
 
+// taskColumns is the widened column list every query in this file that
+// reads a full Task row must select, in the exact order scanTask expects —
+// keeps Create/Get/List/GetAncestors's scanning consistent as fields are
+// added. Nullable/optional columns come back through COALESCE (or, for
+// due_date/estimated_hours/actual_hours, scanned directly into pointer
+// fields — pgx scans SQL NULL into a nil *time.Time/*float64 natively).
+const taskColumns = `
+	id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, ''),
+	COALESCE(description, ''), task_type, priority, COALESCE(assignee_id::text, ''), COALESCE(owner_id::text, ''),
+	due_date, estimated_hours, actual_hours, COALESCE(prompt_template, ''), COALESCE(ai_context, ''),
+	COALESCE(ai_plan_json::text, ''), visibility, COALESCE(worktree_id::text, ''), COALESCE(agent_session_id, ''),
+	progress_percent
+`
+
+// rowScanner abstracts over pgx.Row/pgx.Rows — both satisfy Scan(...any)
+// error, letting scanTask serve both a single-row QueryRow result and a
+// Rows cursor's per-iteration Scan.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanTask scans one row shaped like taskColumns into a domain.Task — the
+// single place that must change when taskColumns' order changes.
+func scanTask(row rowScanner) (domain.Task, error) {
+	var t domain.Task
+	err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID,
+		&t.Description, &t.Type, &t.Priority, &t.AssigneeID, &t.OwnerID,
+		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
+		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent)
+	return t, err
+}
+
+// scanTaskAndTrailing scans a row shaped like taskColumns followed by
+// caller-supplied trailing columns (e.g. depth, an aggregated array) into a
+// domain.Task plus those extra destinations — used by queries that widen
+// taskColumns with extra computed columns (GetSubtreeWithChildPercents).
+func scanTaskAndTrailing(row rowScanner, extra ...any) (domain.Task, error) {
+	var t domain.Task
+	dest := []any{&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID,
+		&t.Description, &t.Type, &t.Priority, &t.AssigneeID, &t.OwnerID,
+		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
+		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent}
+	dest = append(dest, extra...)
+	err := row.Scan(dest...)
+	return t, err
+}
+
+// prefixedTaskColumns returns taskColumns with every bare column reference
+// qualified by alias — used by a recursive CTE's recursive term, which
+// joins task.tasks (aliased) against the CTE itself and needs its column
+// references disambiguated.
+func prefixedTaskColumns(alias string) string {
+	return `
+	` + alias + `.id, ` + alias + `.tenant_id, ` + alias + `.title, ` + alias + `.status, COALESCE(` + alias + `.parent_id::text, ''), COALESCE(` + alias + `.project_id::text, ''),
+	COALESCE(` + alias + `.description, ''), ` + alias + `.task_type, ` + alias + `.priority, COALESCE(` + alias + `.assignee_id::text, ''), COALESCE(` + alias + `.owner_id::text, ''),
+	` + alias + `.due_date, ` + alias + `.estimated_hours, ` + alias + `.actual_hours, COALESCE(` + alias + `.prompt_template, ''), COALESCE(` + alias + `.ai_context, ''),
+	COALESCE(` + alias + `.ai_plan_json::text, ''), ` + alias + `.visibility, COALESCE(` + alias + `.worktree_id::text, ''), COALESCE(` + alias + `.agent_session_id, ''),
+	` + alias + `.progress_percent
+`
+}
+
 func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
 	_, err := r.db.Exec(ctx, `
-		INSERT INTO task.tasks (id, tenant_id, title, status, parent_id, project_id)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID))
+		INSERT INTO task.tasks (
+			id, tenant_id, title, status, parent_id, project_id,
+			description, task_type, priority, assignee_id, due_date,
+			estimated_hours, prompt_template, ai_context, visibility
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID),
+		task.Description, orDefault(task.Type, "task"), orDefault(task.Priority, "medium"), nullableUUID(task.AssigneeID),
+		task.DueDate, task.EstimatedHours, task.PromptTemplate, task.AIContext, orDefault(task.Visibility, "team"))
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("postgres: insert task: %w", err)
 	}
@@ -79,13 +146,13 @@ func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task,
 
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Task, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, '')
+		SELECT `+taskColumns+`
 		FROM task.tasks
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
-	var t domain.Task
-	if err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID); err != nil {
+	t, err := scanTask(row)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Task{}, fmt.Errorf("postgres: task %s not found: %w", id, err)
 		}
@@ -105,18 +172,28 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 
 	rows, err := r.db.Query(ctx, `
 		WITH RECURSIVE ancestors AS (
-			SELECT id, tenant_id, title, status, parent_id, project_id, 0 AS depth
+			SELECT id, tenant_id, title, status, parent_id, project_id,
+				description, task_type, priority, assignee_id, owner_id,
+				due_date, estimated_hours, actual_hours, prompt_template, ai_context,
+				ai_plan_json, visibility, worktree_id, agent_session_id, progress_percent, 0 AS depth
 			FROM task.tasks
 			WHERE tenant_id = $1 AND id = $2
 
 			UNION ALL
 
-			SELECT t.id, t.tenant_id, t.title, t.status, t.parent_id, t.project_id, a.depth + 1
+			SELECT t.id, t.tenant_id, t.title, t.status, t.parent_id, t.project_id,
+				t.description, t.task_type, t.priority, t.assignee_id, t.owner_id,
+				t.due_date, t.estimated_hours, t.actual_hours, t.prompt_template, t.ai_context,
+				t.ai_plan_json, t.visibility, t.worktree_id, t.agent_session_id, t.progress_percent, a.depth + 1
 			FROM task.tasks t
 			JOIN ancestors a ON t.id = a.parent_id
 			WHERE a.depth + 1 < $3
 		)
-		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, '')
+		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, ''),
+			COALESCE(description, ''), task_type, priority, COALESCE(assignee_id::text, ''), COALESCE(owner_id::text, ''),
+			due_date, estimated_hours, actual_hours, COALESCE(prompt_template, ''), COALESCE(ai_context, ''),
+			COALESCE(ai_plan_json::text, ''), visibility, COALESCE(worktree_id::text, ''), COALESCE(agent_session_id, ''),
+			progress_percent
 		FROM ancestors
 		ORDER BY depth
 	`, tenantID, id, maxDepth)
@@ -127,8 +204,8 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 
 	var out []domain.Task
 	for rows.Next() {
-		var t domain.Task
-		if err := rows.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID); err != nil {
+		t, err := scanTask(rows)
+		if err != nil {
 			return nil, fmt.Errorf("postgres: scan ancestor row: %w", err)
 		}
 		out = append(out, t)
@@ -177,7 +254,7 @@ func (r *Repository) List(ctx context.Context, tenantID, projectID, pageToken st
 		pageSize = 50
 	}
 	rows, err := r.db.Query(ctx, `
-		SELECT id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, '')
+		SELECT `+taskColumns+`
 		FROM task.tasks
 		WHERE tenant_id = $1
 		  AND ($2 = '' OR project_id::text = $2)
@@ -192,8 +269,8 @@ func (r *Repository) List(ctx context.Context, tenantID, projectID, pageToken st
 
 	var out []domain.Task
 	for rows.Next() {
-		var t domain.Task
-		if err := rows.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID); err != nil {
+		t, err := scanTask(rows)
+		if err != nil {
 			return nil, "", fmt.Errorf("postgres: scan task row: %w", err)
 		}
 		out = append(out, t)
@@ -213,14 +290,48 @@ func (r *Repository) List(ctx context.Context, tenantID, projectID, pageToken st
 // ever called; this is a plain UPDATE of both columns unconditionally.
 func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task) error {
 	tag, err := r.db.Exec(ctx, `
-		UPDATE task.tasks SET title = $3, status = $4, updated_at = now()
+		UPDATE task.tasks SET
+			title = $3, status = $4, description = $5, task_type = $6, priority = $7,
+			assignee_id = $8, due_date = $9, estimated_hours = $10, prompt_template = $11,
+			ai_context = $12, visibility = $13, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
-	`, tenantID, t.ID, t.Title, t.Status)
+	`, tenantID, t.ID, t.Title, t.Status, t.Description, orDefault(t.Type, "task"), orDefault(t.Priority, "medium"),
+		nullableUUID(t.AssigneeID), t.DueDate, t.EstimatedHours, t.PromptTemplate, t.AIContext, orDefault(t.Visibility, "team"))
 	if err != nil {
 		return fmt.Errorf("postgres: update task: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("postgres: task %s not found for tenant %s", t.ID, tenantID)
+	}
+	return nil
+}
+
+// UpdateWorktreeID persists the provisioned worktree a task's execution is
+// running in — see SOL-TG-04.
+func (r *Repository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET worktree_id = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, nullableUUID(worktreeID))
+	if err != nil {
+		return fmt.Errorf("postgres: update task worktree_id: %w", err)
+	}
+	return nil
+}
+
+// UpdatePromptTemplate persists the "Generate Agent Prompt" output — see
+// SOL-TG-02.
+func (r *Repository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
+	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET prompt_template = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, promptTemplate)
+	if err != nil {
+		return fmt.Errorf("postgres: update task prompt_template: %w", err)
+	}
+	return nil
+}
+
+// UpdateAIPlanJSON persists the raw AIDecompose response for later
+// inspection/replay — see SOL-TG-02.
+func (r *Repository) UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJSON string) error {
+	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET ai_plan_json = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, aiPlanJSON)
+	if err != nil {
+		return fmt.Errorf("postgres: update task ai_plan_json: %w", err)
 	}
 	return nil
 }
@@ -244,4 +355,13 @@ func nullableUUID(id string) any {
 		return nil
 	}
 	return id
+}
+
+// orDefault returns fallback when s is empty — used for columns with a
+// NOT NULL DEFAULT that a client-facing request may still omit.
+func orDefault(s, fallback string) string {
+	if s == "" {
+		return fallback
+	}
+	return s
 }
