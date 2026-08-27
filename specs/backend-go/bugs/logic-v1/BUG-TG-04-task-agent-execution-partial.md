@@ -1,0 +1,46 @@
+# BUG-TG-04: Task→Agent execution has real dispatch branching and one working (synchronous, minimal-context) relay path, but no context preamble, no session linkage, no streaming, no auto-advance, no batch execution, and the complex-task path is a pure stub
+
+**Business Logic:** [BL-TG-04](../../../../docs/logic/task-graph/BL-TG-04-task-agent-execution.md) — Task Prompt → Agent Execution
+**Priority (per spec):** P0
+**Status:** PARTIAL
+**Severity:** Critical
+**Symptom:** Clicking "Run Agent" on a simple (no subtasks/dependencies) task's `execute` REST endpoint really does mark the task `in_progress` and really does dispatch a prompt to the Dev Server Agent — but the prompt is just `"Complete the following task.\n\nTask: {title}"` (no description, `aiContext`, parent context, or completed-dependency summaries), no worktree is created if none exists, no `agent_session_id`/`worktree_id` gets linked to the task (those fields don't exist), no output streams anywhere (the call blocks until the whole process exits), the task never auto-advances to `review` on completion (there is no completion callback at all — status is a one-way trip into `in_progress`), and running it on any task *with* subtasks or dependencies ("complex") hits `StubComplexExecutor`, which does nothing but fabricate a fake execution reference.
+
+---
+
+## Spec summary
+
+BL-TG-04 specifies the full "Run Agent from Task" flow: a pre-check (permission + dev-server-online), worktree reuse-or-create, AI provider resolution, a rich task-context preamble (task metadata + description + `aiContext` + parent-task context + completed-dependency summaries), spawning the agent with task-scoped env vars (`ORCA_TASK_ID`, `ORCA_PROJECT_ID`, etc.), linking the resulting `agent_session_id`/`worktree_id` back onto the task, streaming PTY output into a Task Activity Feed over WebSocket, and auto-advancing `task.status` to `review` (with `actual_hours` computed from elapsed time) on completion. It also specifies batch multi-task execution in topological/dependency order with limited parallelism.
+
+## What backend-go has
+
+- **A real, tested dispatch-branch decision.** `ExecuteTask.Execute` (`backend-go/services/task-service/internal/usecase/execute_task.go:48-76`) determines "simple vs. complex" by checking for any outgoing `parent_child` or `depends_on` edge (`isComplex`, lines 80-94) — a real, unit-tested (`execute_task_test.go`) implementation of §3.1's branch rule, and persists `StatusInProgress` via `TaskRepository.UpdateStatus` before dispatching (a real, persisted state transition, added for Epic C).
+- **A real (if minimal) simple-task relay.** `SimpleExecutor.Execute` (`internal/adapter/grpcclient/simple_executor.go:132-182`) resolves the task's dev-server connection + worktree path via `ProjectExecutionResolver` (real gRPC to infra-fleet-service), builds a prompt, and relays it via a real `infrafleetv1.InfraFleetServiceClient.Relay` call using the `agent.execPrompt` method — genuinely reaching the Dev Server Agent, not a stub, and correctly surfacing non-zero-exit/timeout as real errors (lines 175-180).
+- **Fully wired end-to-end for the RPC layer**: proto (`task.proto:98-111`), gRPC server (`internal/adapter/grpc/server.go:134-143`), REST (`httpgateway/task_routes.go:203-233`, `POST /v1/tasks/{id}/execute`). Not yet wired into `wscompat`'s WebSocket surface (`channels.go` only has `task.create`/`task.get`) — see BUG-034.
+
+## What's missing
+
+- **`ComplexExecutor` is a pure stub.** `StubComplexExecutor.Execute` (`internal/adapter/grpcclient/complex_executor.go:24-26`) does nothing but `return fmt.Sprintf("stub-orchestration-exec:%s:%s", taskID, requestID), nil` — no call to orchestration-service, no worker dispatch, no actual execution of any kind. Any task with subtasks or dependencies (i.e. anything an AI-decompose flow — BUG-TG-02 — would have just created) silently "succeeds" with a fabricated reference and never actually runs.
+- **No task-context preamble.** `buildExecutePrompt` (`simple_executor.go:187-193`) sends only the task's bare title. None of the spec's preamble sections exist: no description, no `aiContext`, no parent-task context, no completed-dependency summaries (`{{#each completedDeps}}`) — largely because `domain.Task` has none of these fields to source them from (see BUG-TG-01).
+- **No worktree reuse-or-create decision.** The spec's "IF task.worktreeId exists: use existing worktree ELSE: prompt user to create one" has no equivalent — `SimpleExecutor` only *reads* whatever `worktreePath` `ProjectExecutionResolver.ResolveConnection` already reports for the project's dev server and errors out if none exists (`simple_executor.go:149-155`); it never creates one, and there is no per-task worktree concept at all (`task.worktree_id` doesn't exist).
+- **No session/worktree linkage.** The spec's `UPDATE orca_tasks SET agent_session_id=sessionId, worktree_id=worktreeId` has no analogue — neither field exists on `domain.Task` (see BUG-TG-01), and `agent.execPrompt`'s real result shape has no session-id concept to link even if the field existed (per `simple_executor.go`'s own doc comment, lines 41-58).
+- **No env-var injection matching the spec.** `agentExecPromptParams` (`simple_executor.go:116-120`) sends only `{prompt, worktreePath, stepId}` — no `ORCA_TASK_ID`, `ORCA_PROJECT_ID`, `ANTHROPIC_MODEL`, `GH_CONFIG_DIR`, or profile-derived env vars of any kind.
+- **No PTY output streaming / Task Activity Feed.** `agent.execPrompt` (as this codebase calls it) blocks synchronously until the whole CLI process exits and returns one final `{stdout, stderr, exitCode, timedOut}` result (`simple_executor.go:122-130`) — there is no incremental output stream, no WebSocket push of any `task.agent_output`-shaped event, and no Activity Feed concept anywhere in `task-service`. The entire `TaskActivityEvent` union the spec defines (`status_changed`, `agent_started`, `agent_output`, `agent_completed`, `comment_added`, `grant_added`, `subtask_done`, `estimate_updated`) has zero backend representation.
+- **No completion callback, so no auto-advance to `review` and no `actual_hours`.** Per the service's own README (`internal/usecase/execute_task.go:28-36`, `README.md:177-188`): task-service has no execution-completion callback at all, and the generated proto has no RPC to drive one — `status='in_progress'` is a one-way trip. The spec's "on agent complete: status='review', actual_hours=elapsed, agent_session_id=null" step cannot happen because nothing ever calls back into task-service when execution finishes, and `actual_hours` doesn't exist as a field regardless.
+- **No batch/multi-task execution.** No topological-order or parallel-dispatch logic exists anywhere in `task-service` — `ExecuteTask` only ever handles one `task_id` at a time; the spec's "Run All with Agent" (group-by-dev-server, topological order, bounded concurrency, `{{outputs.<taskId>.*}}` interpolation) has no code path.
+- **No pre-check for dev-server-online / permission gating before dispatch.** `ExecuteTask.Execute` does not call `ResolvePermission` itself before proceeding (permission enforcement, if any, would have to happen at a caller layer not visible in this usecase) and does not check `FleetHealthMonitor`-equivalent liveness before marking the task `in_progress` and dispatching — a call against an offline dev server fails only when `SimpleExecutor`'s relay itself errors, not via an explicit pre-check.
+
+## See also
+
+- `specs/backend-go/bugs/missing-v1/BUG-034-task-channels-not-implemented.md` — the original, still-accurate finding that `SimpleExecutor`/`ComplexExecutor` are stubs and that `task.execute` isn't wired into `wscompat`'s WebSocket surface. This report supersedes BUG-034's claim that `SimpleExecutor` is unwired: it is now real (TASK-224) for the simple/no-dependencies path; `ComplexExecutor` remains exactly the stub BUG-034 described.
+
+## References
+
+- `docs/logic/task-graph/BL-TG-04-task-agent-execution.md` — full spec (run-agent flow, context preamble, activity feed, batch execution)
+- `backend-go/services/task-service/internal/usecase/execute_task.go:16-94` — `ExecuteTask` (real branch logic + one-way `in_progress` transition, doc comment states both executors are stubs at that layer's original writing)
+- `backend-go/services/task-service/internal/adapter/grpcclient/simple_executor.go:99-193` — `SimpleExecutor` (real relay, minimal prompt, no session linkage)
+- `backend-go/services/task-service/internal/adapter/grpcclient/complex_executor.go:8-26` — `StubComplexExecutor` (pure stub)
+- `backend-go/proto/orca/task/v1/task.proto:98-111` — `Execute`/`TaskServiceExecuteRequest` (complexity-branch design doc comment)
+- `backend-go/services/api-gateway/internal/adapter/httpgateway/task_routes.go:203-233` — REST `/v1/tasks/{id}/execute`
+- `backend-go/services/task-service/README.md:102-125,177-188` — "3 stubbed cross-service ports" and "Epic C" sections (one-way `in_progress`, stub executors)
+- `specs/backend-go/bugs/logic-v1/BUG-TG-01-task-graph-structural-management-partial.md` — documents the missing `worktree_id`/`agent_session_id`/`estimated_hours`/`actual_hours`/`description`/`aiContext` fields this bug's gaps depend on
