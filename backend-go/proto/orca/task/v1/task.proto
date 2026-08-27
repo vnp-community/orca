@@ -172,6 +172,7 @@ message TaskServiceExecuteRequest {
 
 message TaskServiceExecuteResponse {
   string execution_ref = 1; // opaque handle into infra-fleet-service or orchestration-service
+  bool async = 2; // true = complex path (orchestration-service, async completion via ReportTaskExecutionResult); false = simple path (completed inline, same call)
 }
 
 message HasActiveExecutionsRequest {

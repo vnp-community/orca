@@ -231,14 +231,14 @@ func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermi
 }
 
 func (s *Server) Execute(ctx context.Context, req *taskv1.TaskServiceExecuteRequest) (*taskv1.TaskServiceExecuteResponse, error) {
-	ref, err := s.executeTask.Execute(ctx, usecase.ExecuteTaskInput{
+	result, err := s.executeTask.Execute(ctx, usecase.ExecuteTaskInput{
 		TaskID:    req.GetTaskId(),
 		RequestID: req.GetRequestId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &taskv1.TaskServiceExecuteResponse{ExecutionRef: ref}, nil
+	return &taskv1.TaskServiceExecuteResponse{ExecutionRef: result.ExecutionRef, Async: result.Async}, nil
 }
 
 func (s *Server) HasActiveExecutions(ctx context.Context, req *taskv1.HasActiveExecutionsRequest) (*taskv1.HasActiveExecutionsResponse, error) {

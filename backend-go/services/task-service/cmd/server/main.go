@@ -185,7 +185,11 @@ func run() error {
 	grantUC := usecase.NewGrant(repo, resolvePermissionUC, eventPublisher)
 	revokeGrantUC := usecase.NewRevokeGrant(repo, resolvePermissionUC, eventPublisher)
 	listGrantsUC := usecase.NewListGrants(repo, resolvePermissionUC)
-	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, resolvePermissionUC)
+	// worktreeProvisioner implements Execute's reuse-or-create worktree step
+	// (TASK-TG-04-02/03) against git-gateway-service's existing
+	// CreateWorktree saga, resolving repo_id itself via project-service.
+	worktreeProvisioner := taskgrpcclient.NewWorktreeProvisioner(gitGatewayClient, projectClient)
+	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, resolvePermissionUC, worktreeProvisioner, projectExecutionResolver, usecase.SystemClock{})
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)
 	updateTaskUC := usecase.NewUpdateTask(repo, repo)

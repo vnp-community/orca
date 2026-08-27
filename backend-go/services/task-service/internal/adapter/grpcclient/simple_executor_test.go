@@ -99,6 +99,9 @@ func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, te
 func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error {
 	panic("not implemented")
 }
+func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+	panic("not implemented")
+}
 
 // fakeProjectExecutionResolver backs SimpleExecutor's tests without a real
 // infra-fleet-service call.

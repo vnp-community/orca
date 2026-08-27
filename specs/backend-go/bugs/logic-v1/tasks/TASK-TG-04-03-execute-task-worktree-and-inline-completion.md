@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/execute_task.go`
 **Depends on:** TASK-TG-04-01, TASK-TG-04-02, TASK-TG-01-04 (`actual_hours`/`worktree_id` columns, `CompleteExecution` repo method)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — ExecuteTask now resolves dev-server connectivity + worktree reuse-or-create (via WorktreeProvisioner) before the in_progress write, and completes the simple path INLINE (StatusReview + actual_hours via CompleteExecution) in the same call; the complex path returns ExecuteResult{Async:true} with no inline completion. TaskServiceExecuteResponse gained an `async` proto field; Repository.CompleteExecution implemented. `go test ./services/task-service/internal/usecase/... -run TestExecuteTask` passes (16/16, including new worktree-reuse/-create and inline-completion regression tests); `go build` clean across every backend-go service.
 
 ---
 

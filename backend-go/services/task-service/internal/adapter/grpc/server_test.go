@@ -223,6 +223,18 @@ func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID s
 	return nil
 }
 
+func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+	t, ok := f.tasks[id]
+	if !ok || t.TenantID != tenantID {
+		return errors.New("not found")
+	}
+	t.Status = status
+	t.ActualHours = &actualHours
+	t.AgentSessionID = ""
+	f.tasks[id] = t
+	return nil
+}
+
 // fakeCommentRepository backs AddComment/ListComments' wiring/contract
 // tests without a database.
 type fakeCommentRepository struct {
@@ -369,7 +381,8 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		addEdgeUC,
 		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}),
 		resolvePermissionUC,
-		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, resolvePermissionUC),
+		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, resolvePermissionUC,
+			stubWorktreeProvisioner{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, usecase.SystemClock{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
 		usecase.NewUpdateTask(tasks, edges),
@@ -464,6 +477,18 @@ type stubExecutor struct{}
 
 func (stubExecutor) Execute(ctx context.Context, tenantID, taskID, requestID string) (string, error) {
 	return "ref", nil
+}
+
+// stubWorktreeProvisioner backs this file's ExecuteTask wiring tests —
+// always reuses the task's existing WorktreeID (or a fixed stand-in id/path
+// when empty), never calling out to git-gateway-service for real.
+type stubWorktreeProvisioner struct{}
+
+func (stubWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (string, string, error) {
+	if task.WorktreeID != "" {
+		return task.WorktreeID, "", nil
+	}
+	return "wt-1", "/srv/worktrees/wt-1", nil
 }
 
 func TestServer_ListTasks(t *testing.T) {

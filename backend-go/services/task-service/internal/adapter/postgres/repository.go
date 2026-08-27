@@ -336,6 +336,24 @@ func (r *Repository) UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJ
 	return nil
 }
 
+// CompleteExecution is the simple path's (TASK-TG-04-03) and, via
+// TASK-TG-04-05's ReportTaskExecutionResult, the complex path's terminal
+// write: sets status, actual_hours, and clears agent_session_id in one
+// statement.
+func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE task.tasks SET status = $3, actual_hours = $4, agent_session_id = NULL, updated_at = now()
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, id, status, actualHours)
+	if err != nil {
+		return fmt.Errorf("postgres: complete task execution: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: task %s not found", id)
+	}
+	return nil
+}
+
 // Delete removes a task row. task_edges/task_grants reference tasks(id)
 // with ON DELETE CASCADE (migrations/0001_init.up.sql) — no explicit
 // edge/grant cleanup needed here.

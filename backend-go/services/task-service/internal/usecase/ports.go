@@ -80,6 +80,11 @@ type TaskRepository interface {
 	// BatchUpdateProgress persists every (taskID -> progress_percent) pair
 	// in one call — task-service.md §8's N+1 guard.
 	BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error
+	// CompleteExecution is the simple path's (TASK-TG-04-03) and, via
+	// TASK-TG-04-05's ReportTaskExecutionResult, the complex path's terminal
+	// write: sets status, actual_hours, and clears agent_session_id in one
+	// statement.
+	CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error
 }
 
 // SubtreeProgressNode is one GetSubtreeWithChildPercents result row: the

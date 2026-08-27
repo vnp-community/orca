@@ -988,6 +988,7 @@ func (x *TaskServiceExecuteRequest) GetRequestId() string {
 type TaskServiceExecuteResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ExecutionRef  string                 `protobuf:"bytes,1,opt,name=execution_ref,json=executionRef,proto3" json:"execution_ref,omitempty"` // opaque handle into infra-fleet-service or orchestration-service
+	Async         bool                   `protobuf:"varint,2,opt,name=async,proto3" json:"async,omitempty"`                                  // true = complex path (orchestration-service, async completion via ReportTaskExecutionResult); false = simple path (completed inline, same call)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1027,6 +1028,13 @@ func (x *TaskServiceExecuteResponse) GetExecutionRef() string {
 		return x.ExecutionRef
 	}
 	return ""
+}
+
+func (x *TaskServiceExecuteResponse) GetAsync() bool {
+	if x != nil {
+		return x.Async
+	}
+	return false
 }
 
 type HasActiveExecutionsRequest struct {
@@ -2902,9 +2910,10 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\x19TaskServiceExecuteRequest\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x02 \x01(\tR\trequestId\"A\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\"W\n" +
 	"\x1aTaskServiceExecuteResponse\x12#\n" +
-	"\rexecution_ref\x18\x01 \x01(\tR\fexecutionRef\";\n" +
+	"\rexecution_ref\x18\x01 \x01(\tR\fexecutionRef\x12\x14\n" +
+	"\x05async\x18\x02 \x01(\bR\x05async\";\n" +
 	"\x1aHasActiveExecutionsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\"<\n" +

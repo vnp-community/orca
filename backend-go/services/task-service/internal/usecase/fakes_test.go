@@ -33,6 +33,17 @@ type fakeTaskRepository struct {
 	// recalculate_progress_test.go assert it's called exactly once (N+1
 	// regression guard).
 	batchUpdateProgressCalls []map[string]int
+	completeExecutionCalls   []completeExecutionCall
+	completeExecutionErr     error
+}
+
+// completeExecutionCall records one CompleteExecution invocation — used by
+// execute_task_test.go's inline-completion assertions.
+type completeExecutionCall struct {
+	tenantID    string
+	id          string
+	status      string
+	actualHours float64
 }
 
 // updateStatusCall records one UpdateStatus invocation — used by
@@ -280,6 +291,25 @@ func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID s
 			f.tasks[id] = t
 		}
 	}
+	return nil
+}
+
+// CompleteExecution mirrors the real repository's terminal write — mutates
+// status/actual_hours/agent_session_id in the fake's map and records the
+// call for TestExecuteTask's inline-completion assertions.
+func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+	f.completeExecutionCalls = append(f.completeExecutionCalls, completeExecutionCall{tenantID: tenantID, id: id, status: status, actualHours: actualHours})
+	if f.completeExecutionErr != nil {
+		return f.completeExecutionErr
+	}
+	t, ok := f.tasks[id]
+	if !ok || t.TenantID != tenantID {
+		return errNotFound
+	}
+	t.Status = status
+	t.ActualHours = &actualHours
+	t.AgentSessionID = ""
+	f.tasks[id] = t
 	return nil
 }
 
@@ -579,6 +609,26 @@ func (f *fakeShareLinkRepository) TaskIDFor(ctx context.Context, tenantID, linkI
 		return "", errNotFound
 	}
 	return l.taskID, nil
+}
+
+// fakeWorktreeProvisioner backs ExecuteTask's worktree-reuse-or-create
+// tests without a real git-gateway-service call.
+type fakeWorktreeProvisioner struct {
+	worktreeID string
+	path       string
+	err        error
+	called     bool
+}
+
+func (f *fakeWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (string, string, error) {
+	f.called = true
+	if f.err != nil {
+		return "", "", f.err
+	}
+	if task.WorktreeID != "" {
+		return task.WorktreeID, "", nil
+	}
+	return f.worktreeID, f.path, nil
 }
 
 type fakeExecutor struct {
