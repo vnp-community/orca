@@ -222,7 +222,11 @@ type SimpleExecutor interface {
 // returns a fixed placeholder execution ref without calling
 // orchestration-service — see this service's README.
 type ComplexExecutor interface {
-	Execute(ctx context.Context, tenantID, taskID, requestID string) (executionRef string, err error)
+	// worktreeID is resolved by ExecuteTask's own worktree reuse-or-create
+	// step (TASK-TG-04-02/03) before dispatch — threaded through so
+	// orchestration-service's coordinator_run knows which worktree its
+	// dispatched work runs in.
+	Execute(ctx context.Context, tenantID, taskID, requestID, worktreeID string) (executionRef string, err error)
 }
 
 // ProjectExecutionResolver resolves a project's execution target
