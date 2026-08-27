@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/automation_routes.go`
 **Depends on:** TASK-AT-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — automation_routes.go: handleListAutomations/handleUpdateAutomation (wrapperspb-optional PATCH, mirrors wscompat's automation.update channel)/handleDeleteAutomation added + mounted on GET/PATCH/DELETE `/v1/automations{,/{id}}`; automation_routes_test.go covers all three (round-trip, partial-edit-only-sets-provided-fields, gRPC-error-to-HTTP-status); `go build ./...` and `go test ./internal/adapter/httpgateway/...` clean across api-gateway.
 
 ---
 
