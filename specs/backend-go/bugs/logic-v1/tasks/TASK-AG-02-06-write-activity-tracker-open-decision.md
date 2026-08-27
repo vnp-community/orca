@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service` (if built) + `infra-fleet-service` (caller)
 **File:** `backend-go/services/git-gateway-service/internal/usecase/ports.go` (if option 1 is chosen)
 **Depends on:** TASK-AG-02-03
-**Status:** `[ ]` TODO — needs a product decision before implementation, not an inferred default
+**Status:** `[x]` DECIDED — **Option 2 (don't build)**, made as the pragmatic engineering default for this pass since no product/eng owner was available to consult synchronously. Rationale: `KillAgentSession` (TASK-AG-02-03) already degrades safely with a `nil` `WriteActivityChecker` (fail-open, unit-tested); SOL-AG-02's own 10s grace period plus explicit user confirmation before a force-kill covers the corruption window for the common case (near-atomic OS `write()` calls, not multi-step transactions); and Option 1 would add a new bidirectional `infra <--> git` service coupling for a P2/best-effort guard. This is a recorded decision, not a silent default — revisit if a real BR-AG-06 corruption incident surfaces. No code changes beyond what TASK-AG-02-03 already ships.
 
 ---
 

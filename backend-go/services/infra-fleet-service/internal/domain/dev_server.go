@@ -56,15 +56,21 @@ var (
 // (display name, bootstrap status, agent version are not modeled here; see
 // this service's README "Known gaps").
 type DevServer struct {
-	ID                string
-	TenantID          string
-	Host              string
-	Mode              ConnectionMode
-	SSHTargetID       string
-	Status            DevServerStatus
-	Platform          string
-	Arch              string
-	NodeVersion       string
+	ID          string
+	TenantID    string
+	Host        string
+	Mode        ConnectionMode
+	SSHTargetID string
+	Status      DevServerStatus
+	Platform    string
+	Arch        string
+	NodeVersion string
+	// AgentVersion is the dev server agent's reported build version — used by
+	// ResumeAgentSession (BR-AG-09) to detect a resume against a different
+	// agent build than the one a session was originally spawned with. Sourced
+	// from the agent's handshake (see adapter/devserveragent's HandshakeInfo)
+	// when a caller populates it; empty when unknown, which callers must
+	// treat as "skip the version check" rather than a mismatch.
 	AgentVersion      string
 	LastProvisionedAt *time.Time
 	// Tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east") —

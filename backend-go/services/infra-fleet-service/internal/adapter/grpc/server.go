@@ -94,6 +94,13 @@ type Server struct {
 	// --- Port-forward push notifications (TASK-SSH-04-08) --- shared with
 	// PollWorkspacePorts as its usecase.PortForwardEventPublisher.
 	portEvents *portevents.Broadcaster
+
+	// --- Agent sessions (TASK-AG-01..04) ---
+	startAgentSession  *usecase.StartAgentSession
+	stopAgentSession   *usecase.StopAgentSession
+	killAgentSession   *usecase.KillAgentSession
+	resumeAgentSession *usecase.ResumeAgentSession
+	switchAgentAccount *usecase.SwitchAgentAccount
 }
 
 func New(
@@ -143,6 +150,11 @@ func New(
 	listPortForwards *usecase.ListPortForwards,
 	deletePortForward *usecase.DeletePortForward,
 	portEvents *portevents.Broadcaster,
+	startAgentSession *usecase.StartAgentSession,
+	stopAgentSession *usecase.StopAgentSession,
+	killAgentSession *usecase.KillAgentSession,
+	resumeAgentSession *usecase.ResumeAgentSession,
+	switchAgentAccount *usecase.SwitchAgentAccount,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -197,6 +209,12 @@ func New(
 		listPortForwards:   listPortForwards,
 		deletePortForward:  deletePortForward,
 		portEvents:         portEvents,
+
+		startAgentSession:  startAgentSession,
+		stopAgentSession:   stopAgentSession,
+		killAgentSession:   killAgentSession,
+		resumeAgentSession: resumeAgentSession,
+		switchAgentAccount: switchAgentAccount,
 	}
 }
 
@@ -957,6 +975,77 @@ func toProtoBrowserProfile(p domain.BrowserProfile) *infrafleetv1.BrowserProfile
 		SourceBrowser: p.SourceBrowser,
 		IsDefault:     p.IsDefault,
 		CreatedAt:     timestamppb.New(p.CreatedAt),
+	}
+}
+
+// --- Agent sessions (TASK-AG-01..04) ---
+
+func (s *Server) StartAgentSession(ctx context.Context, req *infrafleetv1.StartAgentSessionRequest) (*infrafleetv1.AgentSession, error) {
+	session, err := s.startAgentSession.Execute(ctx, usecase.StartAgentSessionInput{
+		ConnectionID: req.GetConnectionId(),
+		WorktreeID:   req.GetWorktreeId(),
+		UserID:       req.GetUserId(),
+		Cwd:          req.GetCwd(),
+		ModelID:      req.GetModelId(),
+		AccountID:    req.GetAccountId(),
+		TrustPreset:  req.GetTrustPreset(),
+		Cols:         req.GetCols(),
+		Rows:         req.GetRows(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAgentSession(session), nil
+}
+
+func (s *Server) StopAgentSession(ctx context.Context, req *infrafleetv1.StopAgentSessionRequest) (*emptypb.Empty, error) {
+	if err := s.stopAgentSession.Execute(ctx, req.GetSessionId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) KillAgentSession(ctx context.Context, req *infrafleetv1.KillAgentSessionRequest) (*emptypb.Empty, error) {
+	if err := s.killAgentSession.Execute(ctx, req.GetSessionId(), req.GetSignal()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ResumeAgentSession(ctx context.Context, req *infrafleetv1.ResumeAgentSessionRequest) (*infrafleetv1.AgentSession, error) {
+	session, err := s.resumeAgentSession.Execute(ctx, usecase.ResumeAgentSessionInput{
+		ConnectionID: req.GetConnectionId(),
+		WorktreeID:   req.GetWorktreeId(),
+		UserID:       req.GetUserId(),
+		Cwd:          req.GetCwd(),
+		Cols:         req.GetCols(),
+		Rows:         req.GetRows(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAgentSession(session), nil
+}
+
+func (s *Server) SwitchAgentAccount(ctx context.Context, req *infrafleetv1.SwitchAgentAccountRequest) (*infrafleetv1.AgentSession, error) {
+	session, err := s.switchAgentAccount.Execute(ctx, usecase.SwitchAgentAccountInput{
+		ConnectionID: req.GetConnectionId(),
+		WorktreeID:   req.GetWorktreeId(),
+		UserID:       req.GetUserId(),
+		ProjectID:    req.GetProjectId(),
+		Cwd:          req.GetCwd(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAgentSession(session), nil
+}
+
+func toProtoAgentSession(s domain.AgentSession) *infrafleetv1.AgentSession {
+	return &infrafleetv1.AgentSession{
+		Id: s.ID, PtyId: s.PtyID, ConnectionId: s.ConnectionID, WorktreeId: s.WorktreeID, DevServerId: s.DevServerID,
+		UserId: s.UserID, ModelId: s.ModelID, AccountId: s.AccountID, Status: string(s.Status),
+		StartedAtUnixMs: s.StartedAt.UnixMilli(), LastActiveAtUnixMs: s.LastActiveAt.UnixMilli(),
 	}
 }
 

@@ -40,6 +40,7 @@ import (
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 	"google.golang.org/protobuf/proto"
 
+	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
@@ -88,6 +89,7 @@ func RegisterRealChannels(
 	credentialBrokerClient credentialbrokerv1.CredentialBrokerServiceClient, // NEW — SOL-INT-02/TASK-INT-02-01; not yet consumed, see TASK-INT-02-02's Status (BLOCKED)
 	rateLimits rateLimitReader,
 	fanOutUseCase *usecase.FanOutCreateWorktrees,
+	eventBusConsumer *commoneventbus.Consumer,
 ) {
 	registerAnnotationChannels(r, annotationClient)
 	registerAnnotationSendChannel(r, annotationClient, gitClient) // NEW — SOL-CR-03
@@ -132,6 +134,7 @@ func RegisterRealChannels(
 	registerTerminalScrollbackChannels(r, infraFleetClient)
 	registerTenantProjectChannels(r, tenantClient, projectClient)
 	registerWorkflowChannels(r, workflowClient)
+	registerAgentChannels(r, infraFleetClient, eventBusConsumer)
 }
 
 // ── annotation.* ────────────────────────────────────────────────────────

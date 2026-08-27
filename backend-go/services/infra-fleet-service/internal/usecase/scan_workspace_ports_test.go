@@ -69,6 +69,20 @@ type fakeDevServerAgentClient struct {
 	// cancelReconnectCalls records every CancelReconnect(devServerID) call —
 	// used by teardown_connection_test.go.
 	cancelReconnectCalls []string
+
+	// --- Agent sessions (TASK-AG-01..05) ---
+	spawnAgentResult SpawnAgentResult
+	spawnAgentErr    error
+	spawnAgentCalls  []SpawnAgentInput
+
+	killAgentErr   error
+	killAgentCalls []string // "ptyID:signal", for assertions
+
+	sendAgentInputErr   error
+	sendAgentInputCalls []string // "ptyID:data", for assertions
+
+	streamAgentHooksEvents chan AgentHookEvent
+	streamAgentHooksErr    error
 }
 
 // LastHandshakeInfo implements usecase.DevServerAgentClient.LastHandshakeInfo.
@@ -173,6 +187,41 @@ func (f *fakeDevServerAgentClient) CancelReconnect(devServerID string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.cancelReconnectCalls = append(f.cancelReconnectCalls, devServerID)
+}
+
+func (f *fakeDevServerAgentClient) SpawnAgent(ctx context.Context, devServer domain.DevServer, in SpawnAgentInput) (SpawnAgentResult, error) {
+	f.mu.Lock()
+	f.spawnAgentCalls = append(f.spawnAgentCalls, in)
+	f.mu.Unlock()
+	if f.spawnAgentErr != nil {
+		return SpawnAgentResult{}, f.spawnAgentErr
+	}
+	return f.spawnAgentResult, nil
+}
+
+func (f *fakeDevServerAgentClient) KillAgent(ctx context.Context, devServer domain.DevServer, ptyID, signal string) error {
+	f.mu.Lock()
+	f.killAgentCalls = append(f.killAgentCalls, ptyID+":"+signal)
+	f.mu.Unlock()
+	return f.killAgentErr
+}
+
+func (f *fakeDevServerAgentClient) SendAgentInput(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error {
+	f.mu.Lock()
+	f.sendAgentInputCalls = append(f.sendAgentInputCalls, ptyID+":"+string(data))
+	f.mu.Unlock()
+	return f.sendAgentInputErr
+}
+
+func (f *fakeDevServerAgentClient) StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan AgentHookEvent, func(), error) {
+	if f.streamAgentHooksErr != nil {
+		return nil, nil, f.streamAgentHooksErr
+	}
+	events := f.streamAgentHooksEvents
+	if events == nil {
+		events = make(chan AgentHookEvent)
+	}
+	return events, func() {}, nil
 }
 
 func TestScanWorkspacePorts_RequiresTenantContext(t *testing.T) {

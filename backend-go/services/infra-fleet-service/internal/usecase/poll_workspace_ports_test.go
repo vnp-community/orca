@@ -71,6 +71,18 @@ func (f *scriptedAgent) CancelReconnect(devServerID string) {}
 func (f *scriptedAgent) LastHandshakeInfo(devServerID string) (HandshakeInfo, bool) {
 	return HandshakeInfo{}, false
 }
+func (f *scriptedAgent) SpawnAgent(ctx context.Context, devServer domain.DevServer, in SpawnAgentInput) (SpawnAgentResult, error) {
+	return SpawnAgentResult{}, errors.New("not used")
+}
+func (f *scriptedAgent) KillAgent(ctx context.Context, devServer domain.DevServer, ptyID, signal string) error {
+	return errors.New("not used")
+}
+func (f *scriptedAgent) SendAgentInput(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error {
+	return errors.New("not used")
+}
+func (f *scriptedAgent) StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan AgentHookEvent, func(), error) {
+	return nil, nil, errors.New("not used")
+}
 
 // fakePortAllocator hands out sequential fake ports — no real net.Listen.
 type fakePortAllocator struct {

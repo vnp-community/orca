@@ -310,6 +310,31 @@ func (f *fakeInfraFleetServiceClient) RevokeAgentToken(context.Context, *infrafl
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
+// Agent sessions (TASK-AG-01..04): no httpgateway route exercises these
+// (they're wired through wscompat, per TASK-AG-01-08/02-05/04-04 — out of
+// this batch's scope), so these exist only to satisfy
+// infrafleetv1.InfraFleetServiceClient in full; unconditional Unimplemented
+// stubs, same convention as the Terminal/PTY/emulator stubs above.
+func (f *fakeInfraFleetServiceClient) StartAgentSession(context.Context, *infrafleetv1.StartAgentSessionRequest, ...grpc.CallOption) (*infrafleetv1.AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) StopAgentSession(context.Context, *infrafleetv1.StopAgentSessionRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) KillAgentSession(context.Context, *infrafleetv1.KillAgentSessionRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) ResumeAgentSession(context.Context, *infrafleetv1.ResumeAgentSessionRequest, ...grpc.CallOption) (*infrafleetv1.AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
+func (f *fakeInfraFleetServiceClient) SwitchAgentAccount(context.Context, *infrafleetv1.SwitchAgentAccountRequest, ...grpc.CallOption) (*infrafleetv1.AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+}
+
 // testInfraRouter mounts mountInfraRoutes alone on a fresh chi router — no
 // authMiddleware, since these tests inject identity into the request
 // context directly the way authMiddleware would (withIdentity), mirroring

@@ -72,9 +72,18 @@ type fakeAgentNotification struct {
 	ptyID    string
 	data     string
 	exitCode int32
+
+	// rawParams, if non-nil, overrides the default {id,data,exitCode}
+	// pty.* param shape — used by agent.hook tests (TASK-AG-03-03), whose
+	// params shape ({worktreeId, providerSession:{key,id}}) is unrelated to
+	// pty.* notifications.
+	rawParams json.RawMessage
 }
 
 func (n fakeAgentNotification) toJSONRPC() JSONRPCNotification {
+	if n.rawParams != nil {
+		return JSONRPCNotification{JSONRPC: "2.0", Method: n.method, Params: n.rawParams}
+	}
 	params, _ := json.Marshal(map[string]any{"id": n.ptyID, "data": n.data, "exitCode": n.exitCode})
 	return JSONRPCNotification{JSONRPC: "2.0", Method: n.method, Params: params}
 }

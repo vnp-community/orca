@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/agent_status_pattern.go` (new)
 **Depends on:** TASK-AG-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain/agent_status_pattern.go (RateLimitPatterns + ClassifyText) implemented verbatim; agent_status_pattern_test.go covers claude/codex/opencode rate-limit samples, waiting/completed matches, and an unrelated-string ok=false case — all passing.
 
 ---
 

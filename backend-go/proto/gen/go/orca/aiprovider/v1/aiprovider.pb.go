@@ -409,10 +409,11 @@ type ResolveProviderRequest struct {
 	// resolves directly (Case 2). Not a oneof, to keep wire compatibility
 	// trivial for existing callers that only ever set tenant_id/user_id/
 	// project_id today.
-	AccountId     string `protobuf:"bytes,6,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	ScopedRef     string `protobuf:"bytes,7,opt,name=scoped_ref,json=scopedRef,proto3" json:"scoped_ref,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	AccountId        string `protobuf:"bytes,6,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ScopedRef        string `protobuf:"bytes,7,opt,name=scoped_ref,json=scopedRef,proto3" json:"scoped_ref,omitempty"`
+	ExcludeAccountId string `protobuf:"bytes,8,opt,name=exclude_account_id,json=excludeAccountId,proto3" json:"exclude_account_id,omitempty"` // additive — "" = no exclusion, existing callers unaffected
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ResolveProviderRequest) Reset() {
@@ -490,6 +491,13 @@ func (x *ResolveProviderRequest) GetAccountId() string {
 func (x *ResolveProviderRequest) GetScopedRef() string {
 	if x != nil {
 		return x.ScopedRef
+	}
+	return ""
+}
+
+func (x *ResolveProviderRequest) GetExcludeAccountId() string {
+	if x != nil {
+		return x.ExcludeAccountId
 	}
 	return ""
 }
@@ -1349,7 +1357,7 @@ const file_orca_aiprovider_v1_aiprovider_proto_rawDesc = "" +
 	"\n" +
 	"is_default\x18\t \x01(\bR\tisDefault\"V\n" +
 	"\x15CreateAccountResponse\x12=\n" +
-	"\aaccount\x18\x01 \x01(\v2#.orca.aiprovider.v1.ProviderAccountR\aaccount\"\x82\x02\n" +
+	"\aaccount\x18\x01 \x01(\v2#.orca.aiprovider.v1.ProviderAccountR\aaccount\"\xb0\x02\n" +
 	"\x16ResolveProviderRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
@@ -1361,7 +1369,8 @@ const file_orca_aiprovider_v1_aiprovider_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x06 \x01(\tR\taccountId\x12\x1d\n" +
 	"\n" +
-	"scoped_ref\x18\a \x01(\tR\tscopedRefB\r\n" +
+	"scoped_ref\x18\a \x01(\tR\tscopedRef\x12,\n" +
+	"\x12exclude_account_id\x18\b \x01(\tR\x10excludeAccountIdB\r\n" +
 	"\v_model_hint\"X\n" +
 	"\x17ResolveProviderResponse\x12=\n" +
 	"\aaccount\x18\x01 \x01(\v2#.orca.aiprovider.v1.ProviderAccountR\aaccount\"1\n" +

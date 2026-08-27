@@ -46,6 +46,15 @@ type Config struct {
 	// an empty host.
 	InfraFleetHTTPAddr string
 
+	// NATSURL is where agent.subscribeStatus (TASK-AG-05-06) opens its
+	// per-WebSocket-connection commoneventbus.Consumer to forward
+	// infra-fleet-service's agent.statusChanged/agent.rateLimited events to
+	// the renderer — same env var convention as tenant-service/usage-service's
+	// NATSURL. Empty/unreachable degrades agent.subscribeStatus to a
+	// closed-immediately channel (see channels_agent.go's doc comment)
+	// rather than crashing api-gateway startup.
+	NATSURL string
+
 	// RateLimitRPS/RateLimitBurst configure the per-tenant in-memory
 	// token-bucket rate limiter (internal/usecase/rate_limit.go).
 	RateLimitRPS   float64
@@ -81,6 +90,7 @@ func Load() (Config, error) {
 		UsageServiceAddr:        commonconfig.StringEnv("USAGE_SERVICE_ADDR", "localhost:9101"),
 		NotificationServiceAddr: commonconfig.StringEnv("NOTIFICATION_SERVICE_ADDR", "localhost:9102"),
 		InfraFleetHTTPAddr:      commonconfig.StringEnv("INFRA_FLEET_SERVICE_HTTP_ADDR", ""),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		RateLimitRPS:            50,
 		RateLimitBurst:          100,
 		OtherServiceAddrs: map[string]string{

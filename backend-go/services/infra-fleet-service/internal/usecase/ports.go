@@ -344,6 +344,121 @@ type DevServerAgentClient interface {
 	// (BR-SSH-13). No-op if no reconnect loop is running or no session
 	// exists for devServerID.
 	CancelReconnect(devServerID string)
+
+	// --- Agent sessions (TASK-AG-01..05) ---
+	// SpawnAgent calls agent.spawn. Returns immediately once the agent
+	// accepts the request ({ok:true, ptyId}) — output/exit arrive later as
+	// agent.output/agent.exited notifications over the same StreamPty
+	// subscription used for plain PTYs.
+	SpawnAgent(ctx context.Context, devServer domain.DevServer, in SpawnAgentInput) (SpawnAgentResult, error)
+	// KillAgent calls agent.kill — signal is "SIGTERM" (graceful) or
+	// "SIGKILL" (force).
+	KillAgent(ctx context.Context, devServer domain.DevServer, ptyID, signal string) error
+	// SendAgentInput calls agent.sendInput — used for graceful Ctrl+C.
+	SendAgentInput(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error
+	// StreamAgentHooks subscribes to every agent.hook notification on
+	// devServer's persistent session — ONE long-lived subscription per
+	// devServer connection (not per AgentSession, unlike StreamPty),
+	// consumed by RecordAgentHookProviderSession.
+	StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan AgentHookEvent, func(), error)
+}
+
+// SpawnAgentInput mirrors agent.spawn's real param set 1:1
+// (agent-spawner.ts's AgentSpawnRequest) — resolvedApiKey intentionally
+// absent, see TASK-AG-01-04 (credential injection blocker).
+type SpawnAgentInput struct {
+	TaskID       string // this service's own session id, minted before calling
+	UserID       string
+	ModelID      string
+	AccountID    string
+	Cwd          string
+	ResumeID     string // "" for a fresh start; set by ResumeAgentSession
+	WorktreePath string
+	BranchName   string
+	Cols, Rows   int32
+	TrustPreset  string
+}
+
+type SpawnAgentResult struct {
+	PtyID string
+}
+
+// AgentHookEvent is one agent.hook notification, decoded from
+// agent-hook-server.ts's AgentHookRelayEnvelope (only the fields this
+// service consumes) — see DevServerAgentClient.StreamAgentHooks.
+type AgentHookEvent struct {
+	WorktreeID string
+	// PtyID — TASK-AG-03-07's exact correlation key, empty on older agent
+	// builds mid-rollout (the worktreeId fallback then applies, see
+	// RecordAgentHookProviderSession.Handle).
+	PtyID              string
+	ProviderSessionKey string
+	ProviderSessionID  string
+}
+
+// AgentSessionRepository persists AgentSession.
+type AgentSessionRepository interface {
+	// Create enforces BR-AG-01 (one non-terminal agent session per
+	// worktree+user) via a partial unique constraint at the DB layer —
+	// domain.ErrAgentAlreadyRunning on conflict, not a race-prone
+	// check-then-insert.
+	Create(ctx context.Context, s domain.AgentSession) (domain.AgentSession, error)
+	Get(ctx context.Context, tenantID, sessionID string) (found bool, s domain.AgentSession, err error)
+	// GetByPtyID — TASK-AG-03-07's exact join key: an agent.hook notification
+	// carrying a ptyId correlates to its AgentSession directly, no worktree
+	// fallback ambiguity. found=false, nil error means no session with this
+	// pty_id for this tenant (not an error worth failing the hook pump over).
+	GetByPtyID(ctx context.Context, tenantID, ptyID string) (found bool, s domain.AgentSession, err error)
+	// LatestForWorktree — SELECT ... ORDER BY started_at DESC LIMIT 1, used
+	// by ResumeAgentSession.
+	LatestForWorktree(ctx context.Context, tenantID, worktreeID string) (found bool, s domain.AgentSession, err error)
+	UpdateStatus(ctx context.Context, tenantID, sessionID string, status domain.AgentStatus, now time.Time) error
+	MarkStopped(ctx context.Context, tenantID, sessionID string, now time.Time) error
+	// MarkStoppedWithStatus is MarkStopped's exit-driven counterpart — sets
+	// a terminal status ('stopped' or 'error', decided by the caller from
+	// the pty's exit code) rather than always 'stopped'.
+	MarkStoppedWithStatus(ctx context.Context, tenantID, sessionID string, status domain.AgentStatus, now time.Time) error
+	// MostRecentActiveForWorktree — the agent.hook correlation fallback
+	// (TASK-AG-03-05's "genuine gap" option 2): most recent AgentSession in
+	// spawning/running/idle/waiting status for worktreeID. found=false, nil
+	// error means none — not an error worth failing the hook-notification
+	// pump over.
+	MostRecentActiveForWorktree(ctx context.Context, tenantID, worktreeID string) (found bool, s domain.AgentSession, err error)
+	// UpdateProviderSession persists the CLI's own resumable session id,
+	// captured from an agent.hook notification.
+	UpdateProviderSession(ctx context.Context, tenantID, sessionID, providerSessionKey, providerSessionID string) error
+}
+
+// AIProviderResolverClient — infra-fleet-service's own client of
+// ai-provider-service.ResolveProvider, same RPC
+// git-gateway-service/internal/adapter/grpcclient/aiprovider_client.go
+// already calls (second caller — a NEW edge on
+// 02-microservices-decomposition.md's dependency graph, infra --> aiprov),
+// extended with the projectID/excludeAccountID params SwitchAgentAccount
+// needs (TASK-AG-04-02's additive ResolveProviderRequest.exclude_account_id
+// field). The port is defined here but has no caller until TASK-AG-04-03
+// (SwitchAgentAccount) — StartAgentSession itself never calls Resolve, see
+// TASK-AG-01-07's context.
+type AIProviderResolverClient interface {
+	ResolveProvider(ctx context.Context, tenantID, userID, projectID, excludeAccountID string) (providerType, accountID, status string, err error)
+}
+
+// WriteActivityChecker answers "is this worktree mid-file-write right now?"
+// — BR-AG-06. No implementation exists in this pass; see TASK-AG-02-06 for
+// the open design question on where/whether to build one. A nil
+// WriteActivityChecker (or one returning an error) must never block a kill
+// — see KillAgentSession.Execute's fail-open handling below.
+type WriteActivityChecker interface {
+	HasInFlightWrite(ctx context.Context, worktreeID string) (bool, error)
+}
+
+// AgentStatusEventPublisher publishes agent-session lifecycle events for
+// real-time delivery to the renderer (and, per BUG-MB-04, eventually
+// mobile) — see TASK-AG-05-05 for the two concrete delivery paths
+// (direct in-process push for statusChanged, outbox for rateLimited).
+type AgentStatusEventPublisher interface {
+	PublishStatusChanged(ctx context.Context, tenantID, sessionID string, status domain.AgentStatus) error
+	PublishRateLimited(ctx context.Context, tenantID, sessionID string) error
 }
 
 // SpawnPtyInput carries pty.create's request fields.

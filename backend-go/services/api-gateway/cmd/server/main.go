@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
+	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/tracing"
@@ -257,6 +258,20 @@ func run() error {
 		fanout.NewGRPCPromptInjector(infraFleetClient),
 	)
 
+	// eventBusConsumer backs agent.subscribeStatus (TASK-AG-05-06) — this is
+	// api-gateway's first NATS-consuming channel, dialed the same
+	// lazy/non-blocking way as every gRPC downstream above: an unreachable
+	// NATS degrades that one channel to a closed-immediately push stream
+	// (see channels_agent.go's registerAgentStatusSubscribeChannel doc
+	// comment) rather than crashing startup.
+	_, eventBusConsumer, closeEventBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.Warn("eventbus unavailable — agent.subscribeStatus will not deliver push events", slog.Any("error", err))
+		eventBusConsumer = nil
+	} else {
+		defer func() { _ = closeEventBus() }()
+	}
+
 	// wscompat: the legacy channel-based RPC transport the deployed
 	// frontend/ actually speaks over /ws (see internal/adapter/wscompat's
 	// package doc and docs/execution-plan.md's frontend-compatibility-layer
@@ -272,6 +287,7 @@ func run() error {
 		credentialBrokerClient,
 		rateLimiter,
 		fanOutUseCase,
+		eventBusConsumer,
 	)
 	// RegisterPushChannels wires the StreamHandler-backed (push-capable)
 	// channels — a separate registration mechanism from RegisterRealChannels'

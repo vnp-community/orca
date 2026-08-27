@@ -36,7 +36,8 @@ func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sen
 		nil, nil, nil, // persistent agent-token usecases (BL-AWS-03), unused here
 		nil,           // teardown-connection usecase (BR-SSH-13), unused here
 		nil, nil, nil, // port-forward CRUD usecases (SOL-SSH-04), unused here
-		nil, // port-forward event broadcaster (TASK-SSH-04-08), unused here
+		nil,           // port-forward event broadcaster (TASK-SSH-04-08), unused here
+		nil, nil, nil, nil, nil, // agent-session usecases (TASK-AG-01..04), unused here
 	)
 }
 
@@ -139,6 +140,18 @@ func (f *fakeDevServerAgentClient) InspectProcess(ctx context.Context, devServer
 	return usecase.InspectProcessResult{}, nil
 }
 func (f *fakeDevServerAgentClient) CancelReconnect(devServerID string) {}
+func (f *fakeDevServerAgentClient) SpawnAgent(ctx context.Context, devServer domain.DevServer, in usecase.SpawnAgentInput) (usecase.SpawnAgentResult, error) {
+	return usecase.SpawnAgentResult{}, nil
+}
+func (f *fakeDevServerAgentClient) KillAgent(ctx context.Context, devServer domain.DevServer, ptyID, signal string) error {
+	return nil
+}
+func (f *fakeDevServerAgentClient) SendAgentInput(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error {
+	return nil
+}
+func (f *fakeDevServerAgentClient) StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan usecase.AgentHookEvent, func(), error) {
+	return nil, nil, nil
+}
 
 func withTenant(ctx context.Context, tenantID string) context.Context {
 	return tenant.WithTenantID(ctx, tenantID)
@@ -403,6 +416,18 @@ func (f *fakeDevServerAgent) InspectProcess(ctx context.Context, devServer domai
 	return usecase.InspectProcessResult{}, nil
 }
 func (f *fakeDevServerAgent) CancelReconnect(devServerID string) {}
+func (f *fakeDevServerAgent) SpawnAgent(ctx context.Context, devServer domain.DevServer, in usecase.SpawnAgentInput) (usecase.SpawnAgentResult, error) {
+	return usecase.SpawnAgentResult{}, nil
+}
+func (f *fakeDevServerAgent) KillAgent(ctx context.Context, devServer domain.DevServer, ptyID, signal string) error {
+	return nil
+}
+func (f *fakeDevServerAgent) SendAgentInput(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error {
+	return nil
+}
+func (f *fakeDevServerAgent) StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan usecase.AgentHookEvent, func(), error) {
+	return nil, nil, nil
+}
 
 func TestServer_DetectDevServerAgents_RequestToResponseMarshaling(t *testing.T) {
 	agent := &fakeDevServerAgent{execResult: map[string]any{"agents": []any{"claude"}, "platform": "linux"}}

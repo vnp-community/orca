@@ -108,6 +108,7 @@ message ResolveProviderRequest {
   // project_id today.
   string account_id = 6;
   string scoped_ref = 7;
+  string exclude_account_id = 8; // additive — "" = no exclusion, existing callers unaffected
 }
 
 message ResolveProviderResponse {

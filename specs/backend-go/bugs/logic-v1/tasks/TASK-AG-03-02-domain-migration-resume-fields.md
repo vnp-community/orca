@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/migrations/0008_agent_sessions_resume.up.sql` (new), `backend-go/services/infra-fleet-service/internal/domain/agent_session.go`, `backend-go/services/infra-fleet-service/internal/usecase/ports.go`
 **Depends on:** TASK-AG-01-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migrations/0008_agent_sessions_resume.{up,down}.sql added; domain.AgentSession extended with ResumeProviderSessionKey/ID + ErrAgentSessionExpired/ErrAgentVersionMismatch; AgentSessionRepository extended with MostRecentActiveForWorktree/UpdateProviderSession (+ GetByPtyID, added ahead of schedule per TASK-AG-03-07); AgentSessionStore implements all of them, agentSessionSelect/scanAgentSession updated. Verified via agent_session_repository_test.go's `-tags=integration` suite.
 
 ---
 

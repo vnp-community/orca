@@ -81,12 +81,13 @@ func (s *Server) CreateAccount(ctx context.Context, req *aiproviderv1.CreateAcco
 
 func (s *Server) ResolveProvider(ctx context.Context, req *aiproviderv1.ResolveProviderRequest) (*aiproviderv1.ResolveProviderResponse, error) {
 	account, err := s.resolveProvider.Resolve(ctx, usecase.ResolveProviderInput{
-		UserID:      req.GetUserId(),
-		ProjectID:   req.GetProjectId(),
-		DevServerID: req.GetDevServerId(),
-		ModelHint:   req.GetModelHint(),
-		AccountID:   req.GetAccountId(),
-		ScopedRef:   req.GetScopedRef(),
+		UserID:           req.GetUserId(),
+		ProjectID:        req.GetProjectId(),
+		DevServerID:      req.GetDevServerId(),
+		ModelHint:        req.GetModelHint(),
+		AccountID:        req.GetAccountId(),
+		ScopedRef:        req.GetScopedRef(),
+		ExcludeAccountID: req.GetExcludeAccountId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(mapDomainError(err))

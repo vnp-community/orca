@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_agent.go` (new)
 **Depends on:** TASK-AG-01-01, TASK-AG-01-07
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `channels_agent.go` registers `agent.start` via `RegisterStreamChannel`, reusing `terminalStreamRegistry`/`drainAttachPtyOutput`; wired into `registerAgentChannels`/`RegisterRealChannels`; `TestAgentStartChannel_*` pass (`go test ./services/api-gateway/internal/adapter/wscompat/... -run TestAgentStart -v`).
 
 ---
 

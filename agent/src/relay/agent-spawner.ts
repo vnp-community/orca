@@ -439,6 +439,13 @@ export async function handleAgentSpawn(
 
     // ORCH-011: ptyId includes userId to prevent cross-user collision
     const ptyId = `pty-${req.userId}-${req.taskId}-${Date.now()}`
+    // TASK-AG-03-07: stamp ptyId into the spawned process's own env, mirroring
+    // pty-handler.ts's ORCA_PANE_KEY/ORCA_TAB_ID/ORCA_WORKTREE_ID pattern for
+    // renderer-launched terminals — whatever in-process hook plugin/script
+    // reads process.env to build its POST body can now report an exact
+    // ptyId, closing the worktreeId-correlation fallback's race window
+    // (TASK-AG-03-05) once that script is updated to forward it.
+    env.ORCA_PTY_ID = ptyId
     // ORCH-012/004: Use buildAgentArgs (handles resume + correct args per model)
     const args = buildAgentArgs(spec, req)
 

@@ -168,6 +168,36 @@ service InfraFleetService {
   // / usecase.CheckDevServerPreflight doc comments.
   rpc DetectDevServerAgents(DetectDevServerAgentsRequest) returns (DetectDevServerAgentsResponse);
   rpc CheckDevServerPreflight(CheckDevServerPreflightRequest) returns (CheckDevServerPreflightResponse);
+
+  // --- Agent sessions (SOL-AG-01..05) --------------------------------------
+
+  // StartAgentSession spawns an AI-CLI agent (Claude Code, Codex, ...) via
+  // the Dev Server Agent's real agent.spawn RPC — sibling to
+  // SpawnTerminalSession, not a replacement (a bare shell PTY still uses
+  // SpawnTerminalSession).
+  rpc StartAgentSession(StartAgentSessionRequest) returns (AgentSession);
+
+  // StopAgentSession sends agent.sendInput('\x03') — graceful interrupt,
+  // BR-AG-05. Does not tear the session down; the transition to 'stopped'
+  // happens once agent.exited arrives (TASK-AG-05's classifier) — status
+  // transition is exit-driven, not request-driven.
+  rpc StopAgentSession(StopAgentSessionRequest) returns (google.protobuf.Empty);
+
+  // KillAgentSession sends agent.kill with the given signal (default
+  // SIGKILL) — full teardown, mirrors KillTerminalSession's "mark closed
+  // even if the agent call fails" discipline.
+  rpc KillAgentSession(KillAgentSessionRequest) returns (google.protobuf.Empty);
+
+  // ResumeAgentSession — loads the latest AgentSession for worktree_id,
+  // validates BR-AG-08 (7-day expiry) and BR-AG-09 (agent version match),
+  // then re-spawns via the same path as StartAgentSession with resume_id
+  // populated.
+  rpc ResumeAgentSession(ResumeAgentSessionRequest) returns (AgentSession);
+
+  // SwitchAgentAccount — BL-AG-04's saga: force-kill the current session,
+  // resolve a replacement account excluding the one just switched away
+  // from, then resume/start with the new account.
+  rpc SwitchAgentAccount(SwitchAgentAccountRequest) returns (AgentSession);
 }
 
 enum ConnectionMode {
@@ -766,3 +796,57 @@ message ListAgentTokensRequest  { string dev_server_id = 1; }
 message ListAgentTokensResponse { repeated AgentTokenSummary tokens = 1; }
 
 message RevokeAgentTokenRequest { string dev_server_id = 1; string id = 2; }
+
+// --- Agent sessions (SOL-AG-01..05) ---------------------------------------
+
+message StartAgentSessionRequest {
+  string connection_id = 1;     // -> DevServer, same resolution as SpawnTerminalSession
+  string worktree_id   = 2;     // logical FK -> project-service; BR-AG-01 scope key
+  string user_id       = 3;     // BR-AG-01: one agent per worktree PER USER
+  string cwd           = 4;     // worktree path on the dev server
+  string model_id      = 5;     // e.g. "claude", "gpt-4o", "gemini", "opencode", "ollama"
+  string account_id    = 6;     // ai_provider.accounts.id — from aiProvider.resolve; "" for localInference models
+  string trust_preset  = 7;     // "standard" | "full" | "none" — forwarded as-is, applied agent-side as CLI args
+  int32  cols          = 8;
+  int32  rows          = 9;
+  // resolved_api_key is DELIBERATELY ABSENT — see TASK-AG-01-04 (credential
+  // injection blocker). Adding it here would let a caller populate
+  // agent.spawn's resolvedApiKey param, silently reintroducing Gap 2.
+}
+
+message AgentSession {
+  string id              = 1;   // sessionId — agent_sessions.id
+  string pty_id          = 2;
+  string connection_id   = 3;   // -> DevServer, same resolution key as TerminalSession.connection_id
+  string worktree_id     = 4;
+  string dev_server_id   = 5;   // snapshot of the dev server resolved at spawn time, for display only
+  string user_id         = 6;
+  string model_id        = 7;
+  string account_id      = 8;
+  string status          = 9;   // spawning|idle|running|waiting|completed|error|stopped — see TASK-AG-05-*
+  int64  started_at_unix_ms      = 10;
+  int64  last_active_at_unix_ms  = 11;
+}
+
+message StopAgentSessionRequest { string session_id = 1; }
+message KillAgentSessionRequest {
+  string session_id = 1;
+  string signal      = 2; // "SIGTERM" | "SIGKILL", default SIGKILL — mirrors agent.kill's own default
+}
+
+message ResumeAgentSessionRequest {
+  string connection_id = 1;
+  string worktree_id   = 2;
+  string user_id       = 3;
+  string cwd           = 4;
+  int32  cols          = 5;
+  int32  rows          = 6;
+}
+
+message SwitchAgentAccountRequest {
+  string connection_id = 1;
+  string worktree_id   = 2;
+  string user_id       = 3;
+  string project_id    = 4; // threaded into ResolveProvider's cascade exclusion
+  string cwd           = 5;
+}

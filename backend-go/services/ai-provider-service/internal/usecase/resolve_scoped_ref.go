@@ -46,7 +46,7 @@ func (uc *ResolveProvider) resolveScopedRef(ctx context.Context, tenantID, ref s
 	if err != nil {
 		return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_RESOLVE_FAILED", "failed to list accounts for scoped_ref", err)
 	}
-	if acc, ok := firstResolvable(accounts); ok {
+	if acc, ok := firstResolvable(accounts, ""); ok {
 		return acc, nil
 	}
 	return domain.ProviderAccount{}, &domain.ErrNoProviderAvailable{Reason: domain.ReasonQuotaOrInactive}

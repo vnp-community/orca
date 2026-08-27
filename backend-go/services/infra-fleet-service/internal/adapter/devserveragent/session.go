@@ -115,6 +115,13 @@ type session struct {
 	ptyMu   sync.Mutex
 	ptySubs map[string][]chan rawPtyNotification
 
+	// hookMu/hookSubs implement TASK-AG-03-03's agent.hook fan-out — unkeyed
+	// (there is no ptyId/session correlation key on the wire yet, see
+	// TASK-AG-03-07), so every subscriber on this session gets every
+	// agent.hook notification, unlike ptySubs's per-pty-id keying.
+	hookMu   sync.Mutex
+	hookSubs []chan rawAgentHookNotification
+
 	reconnectAttempt int
 
 	closeCh chan struct{}
@@ -326,19 +333,28 @@ type ptyNotificationParams struct {
 	ExitCode int32  `json:"exitCode"`
 }
 
-// routeNotification decodes and fans out one pty.* notification to every
+// routeNotification demuxes an incoming notification by method — pty.*
+// notifications route by pty id (routePtyNotification), agent.hook fans out
+// to every subscriber on this session (routeAgentHookNotification, TASK-AG-03-03,
+// unkeyed — see hookSubs's doc comment).
+func (s *session) routeNotification(n JSONRPCNotification) {
+	switch n.Method {
+	case "pty.data", "pty.exit", "pty.replay":
+		s.routePtyNotification(n)
+	case "agent.hook":
+		s.routeAgentHookNotification(n)
+	default:
+		return // not a notification this client demuxes, see package doc comment's "Two RPC surfaces" note
+	}
+}
+
+// routePtyNotification decodes and fans out one pty.* notification to every
 // subscriber currently registered for its pty id (subscribePty/StreamPty).
 // A slow subscriber never blocks the read loop — see the non-blocking send
 // below, matching this adapter's "the read loop must never block on a
 // consumer" discipline (see keepAliveLoop's write-timeout, handleDisconnect's
 // unblocking of pending calls).
-func (s *session) routeNotification(n JSONRPCNotification) {
-	switch n.Method {
-	case "pty.data", "pty.exit", "pty.replay":
-	default:
-		return // not a pty notification this client demuxes, see package doc comment's "Two RPC surfaces" note
-	}
-
+func (s *session) routePtyNotification(n JSONRPCNotification) {
 	var p ptyNotificationParams
 	if len(n.Params) > 0 {
 		_ = json.Unmarshal(n.Params, &p) // best-effort, see ptyNotificationParams's FLAGGED doc comment
@@ -396,6 +412,85 @@ func (s *session) unsubscribePty(ptyID string, ch chan rawPtyNotification) {
 		delete(s.ptySubs, ptyID)
 	}
 	s.ptyMu.Unlock()
+	close(ch)
+}
+
+// rawAgentHookNotification is session.go's internal decoding of one
+// agent.hook notification — RecordAgentHookProviderSession (usecase layer)
+// wraps this into AgentHookEvent. providerSession fields are empty when the
+// hook event carried none (not every hook fires one).
+type rawAgentHookNotification struct {
+	WorktreeID         string
+	PtyID              string
+	ProviderSessionKey string
+	ProviderSessionID  string
+}
+
+// agentHookNotificationParams mirrors agent-hook-server.ts's
+// AgentHookRelayEnvelope's fields this client cares about — worktreeId for
+// the correlation fallback (TASK-AG-03-05), ptyId for the exact-match
+// correlation TASK-AG-03-07 added (empty on older agent builds mid-rollout
+// — RecordAgentHookProviderSession.Handle falls back to worktreeId when so),
+// providerSession.{key,id} for what to persist.
+type agentHookNotificationParams struct {
+	WorktreeID      string `json:"worktreeId"`
+	PtyID           string `json:"ptyId"`
+	ProviderSession *struct {
+		Key string `json:"key"`
+		ID  string `json:"id"`
+	} `json:"providerSession"`
+}
+
+// routeAgentHookNotification decodes and fans out one agent.hook
+// notification to every subscriber on this session — unkeyed, see
+// hookSubs's doc comment.
+func (s *session) routeAgentHookNotification(n JSONRPCNotification) {
+	var p agentHookNotificationParams
+	if len(n.Params) > 0 {
+		_ = json.Unmarshal(n.Params, &p)
+	}
+	raw := rawAgentHookNotification{WorktreeID: p.WorktreeID, PtyID: p.PtyID}
+	if p.ProviderSession != nil {
+		raw.ProviderSessionKey = p.ProviderSession.Key
+		raw.ProviderSessionID = p.ProviderSession.ID
+	}
+
+	s.hookMu.Lock()
+	subs := append([]chan rawAgentHookNotification(nil), s.hookSubs...)
+	s.hookMu.Unlock()
+
+	for _, ch := range subs {
+		select {
+		case ch <- raw:
+		default: // slow/gone consumer — drop rather than block the read loop
+		}
+	}
+}
+
+// subscribeAgentHooks registers a new listener for every agent.hook
+// notification on this session (unkeyed — see routeAgentHookNotification's
+// doc comment). Exactly one long-lived subscriber per devServer connection
+// is expected (usecase.RecordAgentHookProviderSession), not one per
+// AgentSession.
+func (s *session) subscribeAgentHooks() chan rawAgentHookNotification {
+	ch := make(chan rawAgentHookNotification, 64)
+	s.hookMu.Lock()
+	s.hookSubs = append(s.hookSubs, ch)
+	s.hookMu.Unlock()
+	return ch
+}
+
+// unsubscribeAgentHooks removes and closes ch — MUST be called exactly once
+// by whoever called subscribeAgentHooks.
+func (s *session) unsubscribeAgentHooks(ch chan rawAgentHookNotification) {
+	s.hookMu.Lock()
+	for i, c := range s.hookSubs {
+		if c == ch {
+			s.hookSubs = append(s.hookSubs[:i], s.hookSubs[i+1:]...)
+			break
+		}
+	}
+	s.hookMu.Unlock()
 	close(ch)
 }
 

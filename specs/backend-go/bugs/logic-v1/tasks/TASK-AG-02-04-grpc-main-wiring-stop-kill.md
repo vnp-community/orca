@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`, `backend-go/services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-AG-02-01, TASK-AG-02-02, TASK-AG-02-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — StopAgentSession/KillAgentSession gRPC handlers added to server.go; stopAgentSessionUC/killAgentSessionUC (writeActivity=nil, see TASK-AG-02-03/06) wired in main.go and passed into grpc.New. `go build`/`go vet` clean.
 
 ---
 

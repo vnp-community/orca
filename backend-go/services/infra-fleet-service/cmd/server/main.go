@@ -49,6 +49,7 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
@@ -101,6 +102,8 @@ func run() error {
 	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
 	scrollbackStore := infrapostgres.NewTerminalScrollbackSnapshotStore(pool)
 	agentTokenStore := infrapostgres.NewAgentTokenStore(pool)
+	agentSessionStore := infrapostgres.NewAgentSessionStore(pool)
+	agentRateLimitedOutboxStore := infrapostgres.NewAgentRateLimitedOutboxStore(pool)
 
 	// Transactional-outbox relay (Epic G, docs/execution-plan.md;
 	// TASK-AUTH-05-08): EstablishConnection durably enqueues an outbox row
@@ -307,6 +310,74 @@ func run() error {
 	// task owns is complete and ready for that wiring once it lands.
 	portEventsBroadcaster := infraportevents.NewBroadcaster()
 
+	// --- Agent sessions (TASK-AG-01..05) ---
+
+	// ai-provider-service dial — SwitchAgentAccount's first outbound call to
+	// ai-provider-service (TASK-AG-04-03, a new infra --> aiprov edge).
+	aiProviderConn, err := infragrpcclient.Dial(cfg.AIProviderServiceAddr)
+	if err != nil {
+		logger.Error("failed to dial ai-provider-service", slog.Any("error", err))
+		os.Exit(1)
+	}
+	defer func() { _ = aiProviderConn.Close() }()
+	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
+	aiProviderResolver := infragrpcclient.NewAIProviderResolver(aiProviderClient)
+
+	killAgentSessionUC := usecase.NewKillAgentSession(agentSessionStore, repo, agentClient, nil) // writeActivity: see TASK-AG-02-03/06
+
+	// TASK-AG-05-06: AgentOutputClassifier needs a real AgentStatusPublisher,
+	// which needs a live NATS connection — degrade gracefully (classifierUC
+	// stays nil, StartAgentSession skips launching it, see that usecase's
+	// nil-safe classifier field) rather than crash-looping this whole
+	// service over an optional event-delivery dependency, same posture
+	// every other NATS-consuming service in this codebase already takes
+	// (see e.g. usage-service's cmd/server/main.go).
+	var classifierUC *usecase.AgentOutputClassifier
+	natsPub, _, closeEventBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.Warn("eventbus unavailable — agent.statusChanged/agent.rateLimited will not be published", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeEventBus() }()
+		if err := natsPub.EnsureStream(ctx, "INFRA", []string{"orca.infra.agent.>"}); err != nil {
+			logger.Warn("failed to ensure jetstream stream for agent events", slog.Any("error", err))
+		} else {
+			agentStatusPublisher := infraeventbus.New(natsPub, agentRateLimitedOutboxStore)
+			classifierUC = usecase.NewAgentOutputClassifier(agentSessionStore, agentClient, agentStatusPublisher, killAgentSessionUC)
+
+			// agent:rateLimited outbox relay — mirrors usage-service's
+			// relay-startup call site's shape (cmd/server/main.go).
+			agentRateLimitedRelay := outbox.NewRelay(agentRateLimitedOutboxStore, natsPub, outbox.Config{PollInterval: 500 * time.Millisecond, BatchSize: 100}, logger)
+			go agentRateLimitedRelay.Run(ctx)
+		}
+	}
+
+	// TASK-AG-03-06: best-effort agent.hook consumer — one goroutine per dev
+	// server this process has resolved a connection for, guarded against
+	// duplicate starts. This is intentionally simple (a map + mutex in
+	// main.go, not a separate registry type) since it has exactly one
+	// caller today (StartAgentSession.Execute, via the callback below —
+	// covers ResumeAgentSession too, since it delegates to the same
+	// Execute).
+	var (
+		hookConsumersMu sync.Mutex
+		hookConsumers   = map[string]bool{} // dev server id -> already started
+	)
+	ensureAgentHookConsumer := func(ctx context.Context, tenantID string, devServer domain.DevServer) {
+		hookConsumersMu.Lock()
+		defer hookConsumersMu.Unlock()
+		if hookConsumers[devServer.ID] {
+			return
+		}
+		hookConsumers[devServer.ID] = true
+		recorder := usecase.NewRecordAgentHookProviderSession(agentSessionStore)
+		go recorder.Run(context.Background(), tenantID, devServer, agentClient)
+	}
+
+	startAgentSessionUC := usecase.NewStartAgentSession(repo, agentClient, agentSessionStore, classifierUC, ensureAgentHookConsumer)
+	stopAgentSessionUC := usecase.NewStopAgentSession(agentSessionStore, repo, agentClient)
+	resumeAgentSessionUC := usecase.NewResumeAgentSession(agentSessionStore, repo, startAgentSessionUC)
+	switchAgentAccountUC := usecase.NewSwitchAgentAccount(agentSessionStore, killAgentSessionUC, aiProviderResolver, startAgentSessionUC, resumeAgentSessionUC)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -355,6 +426,11 @@ func run() error {
 		listPortForwardsUC,
 		deletePortForwardUC,
 		portEventsBroadcaster,
+		startAgentSessionUC,
+		stopAgentSessionUC,
+		killAgentSessionUC,
+		resumeAgentSessionUC,
+		switchAgentAccountUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
