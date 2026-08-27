@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/registry_test.go` (new)
 **Depends on:** TASK-001
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE (2/3 tests) — `TestDispatch_AttachesIdentityToContext` and `TestDispatch_AppliesTimeoutToContext` implemented and passing in `registry_test.go`, plus one extra regression test not in the original plan: `TestDispatch_DoesNotClipLongerHandlerOwnedTimeout` (added after TASK-001's implementation surfaced the 60s-vs-5s timeout issue — see that task's Status note). `TestDispatch_EveryRegisteredChannel_AttachesIdentity` left `t.Skip`'d exactly as this doc anticipated — full `RegisterRealChannels` fake-client wiring is a larger follow-up. `go test ./services/api-gateway/... -count=1` clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `services/auth-service/internal/usecase/bootstrap_test.go`
 **Depends on:** TASK-003
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE (unit level) — `fakeTenantProvisioner` added, all 4 existing tests updated to the new signature/shape, plus 3 new tests (`TestBootstrap_ProvisionsTenantBeforeCreatingUser`, `TestBootstrap_CreateCompanyFailure_NeverCreatesUser`, `TestBootstrap_CreateUserFailure_AfterTenantProvisioned_ReturnsOriginalError`) and `TestDefaultCompanyName`, all passing. The real-Postgres/real-`tenant-service` integration check this doc's Testing Plan also calls for was **not run** — no live `tenant-service` instance available in this session's environment; flagged as a follow-up, not silently skipped.
 
 ---
 

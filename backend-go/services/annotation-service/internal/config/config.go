@@ -29,6 +29,6 @@ func Load() (Config, error) {
 	}
 	return Config{
 		Base:          base,
-		OPABundlePath: commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		OPABundlePath: commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
 	}, nil
 }

@@ -5,7 +5,7 @@
 **Service:** `common/policy` (shared), `auth-service`, `task-service`, `annotation-service`, `project-service`
 **File:** `common/policy/evaluator.go`, each service's `cmd/server/main.go`
 **Depends on:** none (independent of TASK-006; land together for one coherent PR per SOL-003's own recommendation)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `Evaluator.Warm` added to `common/policy/evaluator.go`; wired into all 4 services' `cmd/server/main.go` right after `policy.NewEvaluator(cfg.OPABundlePath)` with each service's own verified `decisionQuery` (auth: `data.orca.authz.admin.allow`, task: `data.orca.authz.task.allow`, annotation: `data.orca.authz.annotation.allow`, project: `data.orca.authz.project.allow`), each failing startup via `return fmt.Errorf(...)` on a `Warm` error. `go build`/`go vet`/`go test` all clean for `common/policy` + all 4 services.
 
 ---
 

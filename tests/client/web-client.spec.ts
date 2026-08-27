@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import { BASE_URL, WS_BASE_URL, adminLogin, clientLogin, ADMIN_EMAIL } from './helpers'
+import { BASE_URL, adminLogin, clientLogin, ADMIN_EMAIL } from './helpers'
 
 // ─── Static File Serving ──────────────────────────────────────────────────────
 
@@ -25,7 +25,10 @@ describe('F22 — Web Client: Static File Serving', () => {
     const ct = res.headers.get('content-type') ?? ''
     expect(ct).toMatch(/text\/html/)
     const html = await res.text()
-    expect(html).toContain('<!DOCTYPE html>')
+    // Case-insensitive: the served SPA shell emits a lowercase `<!doctype
+    // html>`, which is equally valid HTML5 — this test previously assumed
+    // the uppercase spelling and would have failed against valid markup.
+    expect(html.toLowerCase()).toContain('<!doctype html>')
   })
 
   it('GET /index.html serves the main SPA entry', async () => {
@@ -76,10 +79,15 @@ describe('F22 — Web Client: WebSocket RPC Endpoint', () => {
     expect(res.status).toBe(401)
   })
 
-  it('WS RPC port (6768) is separate from HTTP port (6769)', async () => {
-    // HTTP server runs on 6769, WS RPC on 6768
-    // HTTP health check on WS port may fail (different protocol)
-    // We just verify the HTTP port works correctly
+  it('the RPC WS upgrade path (/ws) is served on the same port as HTTP', async () => {
+    // Why same port, not a separate 6768: this comment previously described
+    // the old TS backend's split ORCA_PORT (E2EE/device-token surface) from
+    // the HTTP port — see helpers.ts's WS_BASE_URL doc comment for why that
+    // doesn't apply to this cookie-authenticated browser SPA connection.
+    // WsSessionRouter upgrades /ws on the SAME listener as HTTP, so a plain
+    // health check on BASE_URL is a fair proxy for "the port RPC also runs
+    // on is up" — the real WS handshake itself is covered end-to-end by
+    // rpc-transport.spec.ts.
     const res = await fetch(`${BASE_URL}/health`)
     expect(res.status).toBe(200)
   })
@@ -147,7 +155,7 @@ describe('F25 — Admin API Client: Dashboard Stats', () => {
       headers: { Cookie: adminCookie }
     })
     expect(res.status).toBe(200)
-    const stats = await res.json() as { totalUsers: number; activeSessions: number }
+    const stats = (await res.json()) as { totalUsers: number; activeSessions: number }
     expect(stats.totalUsers).toBeGreaterThanOrEqual(1)
     expect(typeof stats.activeSessions).toBe('number')
   })
@@ -157,8 +165,10 @@ describe('F25 — Admin API Client: Dashboard Stats', () => {
       headers: { Cookie: adminCookie }
     })
     expect(res.status).toBe(200)
-    const users = await res.json() as { email: string; role: string }[]
-    expect(users.some((u) => u.role === 'admin')).toBe(true)
+    // Why {users, total}, not a bare array — see auth-api-client.spec.ts's
+    // matching test for the full explanation (usersListJSON's shape).
+    const body = (await res.json()) as { users: { email: string; role: string }[]; total: number }
+    expect(body.users.some((u) => u.role === 'admin')).toBe(true)
   })
 
   it('admin can read audit log', async () => {
@@ -166,8 +176,8 @@ describe('F25 — Admin API Client: Dashboard Stats', () => {
       headers: { Cookie: adminCookie }
     })
     expect(res.status).toBe(200)
-    const body = await res.json() as unknown[] | { entries: unknown[] }
-    const entries = Array.isArray(body) ? body : body.entries ?? []
+    const body = (await res.json()) as unknown[] | { entries: unknown[] }
+    const entries = Array.isArray(body) ? body : (body.entries ?? [])
     expect(Array.isArray(entries)).toBe(true)
   })
 })

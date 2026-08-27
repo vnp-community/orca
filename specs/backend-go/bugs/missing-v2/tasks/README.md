@@ -13,10 +13,93 @@ at the cited line, including several places where doing so surfaced a
 detail the source solution's sketch got only approximately right, noted
 per-task below), and a "Verify" section with exact commands.
 
-> **Status: all 15 tasks `[ ]` TODO.** Nothing in this directory has been
-> implemented yet — these are ready-to-execute units, not a record of
-> completed work (contrast with `../../missing-v1/tasks/`'s banner, which
-> tracks 187/188 DONE).
+> **Status (updated 2026-08-27): all 15 tasks `[x]` DONE — 15/15.** Every
+> task file's own `**Status:**` line is authoritative — this banner
+> aggregates it. All Go code changes across 6 modules (`common/policy`,
+> `api-gateway`, `auth-service`, `task-service`, `annotation-service`,
+> `project-service`) build, vet, and pass their full test suites cleanly.
+>
+> **The 4 tasks originally left `[partial]` (TASK-006, TASK-007, TASK-014,
+> TASK-015) were finished by live-verifying against `deploy/dev` — the
+> repo's real Docker Compose deployment set, brought up locally end to
+> end**: `postgres`/`vault`/`nats`, all migrations, all 17 backend-go
+> services, and the frontend nginx container, all real, all healthy. This
+> surfaced that the original TASK-006/007 fix (editing
+> `services/*/deploy/Dockerfile`) was aimed at a path `deploy/dev` doesn't
+> actually use — it never builds a custom image for any service (see
+> `deploy/dev/README.md`: every container runs a stock
+> `gcr.io/distroless/static-debian12:nonroot` image with the binary
+> bind-mounted read-only). The Dockerfile edits are kept (real, correct,
+> may matter for a future image-build path) but the actual fix was a new
+> `policy/orca-authz` bind mount added to `deploy/dev/docker-compose.yml`
+> for the 4 OPA-embedding services. **Two more real, pre-existing bugs in
+> `deploy/dev/docker-compose.yml` were found and fixed along the way** (not
+> caused by this pass): a stale `BOOTSTRAP_TENANT_ID` env var left over
+> from before TASK-003 removed that config field (renamed to
+> `BOOTSTRAP_COMPANY_NAME`), and the checked-in CI script's hardcoded port
+> `8080`/unset `SERVER_BIND_IP` (fixed to read `FRONTEND_HTTP_PORT` and
+> override to `127.0.0.1` for a same-host check).
+>
+> **Live proof, not just "it builds":** `repo.list`/`worktree.list` against
+> a syntactically-valid nonexistent `projectId`, which previously returned
+> `PROJECT_POLICY_EVAL_FAILED` (BUG-003 — OPA bundle never loading), now
+> returns a clean `PROJECT_NOT_AUTHORIZED` policy decision. `GET
+> /admin/api/stats` and `POST /admin/api/users` through the real nginx
+> container, which previously returned `200 text/html`/`405` (BUG-007),
+> now return real `application/json` (`200`/`201`). `tests/client/rpc-catalog.spec.ts`
+> re-run against this live stack went from 12/22 to 20/22 passing (2 of the
+> fixed 8 were bugs in the test's own shape assertions, not the backend —
+> corrected in that file); the CI routing-check script now runs unattended
+> end-to-end (`docker compose up` → login → curl → assert → `docker
+> compose down`), exit 0.
+>
+> **3 findings surfaced by the `deploy/dev` live pass — all 3 now fixed
+> (updated 2026-08-27, second pass):**
+> 1. ✅ **Dockerfile go-version/build-context bug, all 17 services.** All 17
+>    `deploy/Dockerfile`s bumped `golang:1.23-bookworm` → `golang:1.25-bookworm`
+>    (`automation-service` already had this; the other 16 didn't) and
+>    `COPY services/<name> ./services/<name>` → `COPY services ./services`
+>    (the whole workspace, matching what every Dockerfile's own doc comment
+>    already claimed happens: `go.work` lists all 17 modules, so `go build`
+>    in workspace mode needs every one of them present, not just the target
+>    service's). **Live-verified**: real `docker build` for `auth-service`
+>    (has the OPA-bundle `COPY policy` step) and `project-service` (has a
+>    cross-service `depends_on`) both completed, exit 0, producing real
+>    ~53MB distroless images — not just "the Dockerfile parses."
+> 2. ✅ **`profile.getUserProfile`/`profile.listDepts` still failing** — root
+>    cause was **not** a missing bootstrap `UserProfile` row (the original
+>    hypothesis, wrong): `channels_tenant_project.go`'s handlers sent the
+>    caller's raw (usually omitted) `userId`/`companyId` param straight
+>    through — an empty string bound into tenant-service's UUID columns,
+>    erroring `TENANT_PROFILE_LOOKUP_FAILED`/`TENANT_LIST_DEPARTMENTS_FAILED`
+>    — instead of defaulting to the caller's own `id.UserID`/`id.TenantID`
+>    like `profile.getResolved` (right above both, in the same file)
+>    already correctly does. Same bug class as BUG-001/BUG-004. Fixed with
+>    `decodeOptionalArg` + `cmp.Or(param, id.X)`.
+> 3. ✅ **`/admin/api/*` response shape** (snake_case, numeric `role` enum,
+>    `/admin/api/users` structurally fine as `{users:[...]}` — that part
+>    was never wrong, confirmed against the old TS backend's own
+>    `res.json({ users, total: users.length })`). An initial fix made
+>    `writeJSON` protojson-aware globally — **reverted** after the real
+>    test suite showed it broke ~10 unrelated, already-passing tests in
+>    `ai_provider_routes.go`/`infra_routes.go`/`notification_routes.go`/
+>    `orchestration_routes.go` (this package's existing tests assert
+>    today's raw-proto-passthrough shape for those routes; changing the
+>    shared helper changed them all at once). Fixed instead with
+>    route-local shaping structs (`userJSON`/`usersListJSON`/
+>    `adminStatsJSON` in `auth_admin_routes.go`/`admin_routes.go`) scoped
+>    to only the routes named in the finding. Backend-go's `Role` enum is
+>    2-valued (`admin`/`user`), not the old TS backend's 3-valued
+>    (`admin`/`lead`/`developer`) — documented as a deliberate,
+>    non-lossless simplification, not silently pretended away.
+>
+> Both real deviations from each task's original code sketch (TASK-001's
+> timeout, TASK-010's proto-safety narrowing, TASK-003's `TenantID` field
+> removal) and these 3 findings (plus the protojson-blast-radius correction
+> above) were caught only by actually building/running things, not
+> guessed — see each affected task file / this section for the full detail.
+> `go build`/`go vet`/`go test` clean across all 6 touched Go modules after
+> every fix in this pass, re-verified directly.
 
 ## Solution → task index
 

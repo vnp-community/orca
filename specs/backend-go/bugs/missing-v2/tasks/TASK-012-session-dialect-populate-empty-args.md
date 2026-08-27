@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/session_dialect.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented exactly as this doc specifies in `session_dialect.go`. `go build`/`go vet`/`go test ./services/api-gateway/...` all clean.
 
 ---
 

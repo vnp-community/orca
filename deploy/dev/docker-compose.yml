@@ -208,19 +208,31 @@ services:
     container_name: orca-go-auth
     volumes:
       - ./bin/auth-service/orca:/app/bin/orca:ro
+      # OPA bundle for requireAdminActor's embedded evaluator — see
+      # specs/backend-go/bugs/missing-v2/BUG-003/SOL-003/TASK-006. Mounted
+      # at the same absolute path config.go's OPABundlePath now defaults
+      # to, so no OPA_BUNDLE_PATH override is needed here.
+      - ../../backend-go/policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/auth?sslmode=disable
       # First-boot admin bootstrap (internal/usecase/bootstrap.go) — no-op
       # once any user exists; leave BOOTSTRAP_ADMIN_PASSWORD unset to
       # auto-generate + log it once instead of setting it here.
-      BOOTSTRAP_TENANT_ID: ${BOOTSTRAP_TENANT_ID:-00000000-0000-0000-0000-000000000001}
+      # BOOTSTRAP_COMPANY_NAME (optional) replaces the old BOOTSTRAP_TENANT_ID
+      # — tenant-service now originates the tenant id itself via a
+      # CreateCompany call bootstrap.go makes at startup; see
+      # specs/backend-go/bugs/missing-v2/BUG-002/SOL-002/TASK-003. An
+      # operator-supplied BOOTSTRAP_TENANT_ID here would no longer do
+      # anything (the field was removed from BootstrapConfig).
+      BOOTSTRAP_COMPANY_NAME: ${BOOTSTRAP_COMPANY_NAME:-}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
     depends_on:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
       vault-init: { condition: service_completed_successfully }
+      tenant-service: { condition: service_started } # bootstrap.go now calls tenant-service.CreateCompany at startup
 
   tenant-service:
     <<: *go-defaults
@@ -239,6 +251,8 @@ services:
     container_name: orca-go-project
     volumes:
       - ./bin/project-service/orca:/app/bin/orca:ro
+      # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
+      - ../../backend-go/policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/project?sslmode=disable
@@ -297,6 +311,8 @@ services:
     container_name: orca-go-task
     volumes:
       - ./bin/task-service/orca:/app/bin/orca:ro
+      # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
+      - ../../backend-go/policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/task?sslmode=disable
@@ -335,6 +351,8 @@ services:
     container_name: orca-go-annotation
     volumes:
       - ./bin/annotation-service/orca:/app/bin/orca:ro
+      # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
+      - ../../backend-go/policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/annotation?sslmode=disable

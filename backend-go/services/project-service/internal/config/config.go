@@ -38,6 +38,6 @@ func Load() (Config, error) {
 		WorkflowServiceAddr:   commonconfig.StringEnv("WORKFLOW_SERVICE_ADDR", "workflow-service:9090"),
 		TaskServiceAddr:       commonconfig.StringEnv("TASK_SERVICE_ADDR", "task-service:9090"),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
-		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
 	}, nil
 }

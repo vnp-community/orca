@@ -112,7 +112,11 @@ func run() error {
 	// global-admin authorization — mirrors auth-service/annotation-service/
 	// task-service's own composition-root wiring. One Evaluator, pointed at
 	// the same orca-authz bundle, shared by every OPA-gated usecase below.
-	opa := projectopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
+	evaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	if err := evaluator.Warm(ctx, "data.orca.authz.project.allow"); err != nil {
+		return fmt.Errorf("project-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
+	}
+	opa := projectopaclient.New(evaluator)
 
 	createProjectUC := usecase.NewCreateProject(repo)
 	getProjectUC := usecase.NewGetProject(repo, opa)

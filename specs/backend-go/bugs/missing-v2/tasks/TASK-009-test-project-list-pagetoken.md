@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `internal/adapter/postgres/repository_test.go` (integration, real Postgres), `internal/usecase/list_projects_test.go` (new — no test file currently exists for this usecase)
 **Depends on:** TASK-008
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `TestRepository_List_EmptyPageToken_ReturnsFirstPage`/`TestRepository_List_ValidCursor_ReturnsNextPage` to `repository_test.go` (using this file's existing `setupRepository(t)`/`newTestProject` helpers) and new `internal/usecase/list_projects_test.go` with `TestListProjects_EmptyPageToken_Succeeds`/`TestListProjects_MalformedPageToken_ReturnsInvalidArgument`/`TestListProjects_ValidUUIDPageToken_ReachesRepository` (using the real `newFakeProjectRepository`/`withTenantAndUser`/`assertAppError` helpers — `assertAppError` asserts `*apperrors.AppError{Kind,Code}`, not the task doc's guessed `*apperrors.Error`). Docker was available: ran `go test -tags=integration ./internal/adapter/postgres/... -count=1` for real — both new tests pass individually and the full package integration suite passes (147.99s, exit 0). Unit suite (`go test ./services/project-service/... -count=1`) and `go build`/`go vet` (plain and `-tags=integration`) all clean.
 
 ---
 

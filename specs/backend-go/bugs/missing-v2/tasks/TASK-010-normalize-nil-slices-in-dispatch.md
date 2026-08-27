@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/registry.go`
 **Depends on:** TASK-001 (both edit `Dispatch`; land as one coordinated change per `solutions/README.md`'s grouping note)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE, with a correction found via the real test suite (not guessed) — implemented in `registry.go`. The original sketch's generic "walk into any `reflect.Ptr`/`reflect.Struct`/`reflect.Map`" approach broke ~35 existing tests: it dereferenced and copied real proto message pointers (e.g. `*projectv1.Project`), changing their type (pointer → value) and violating proto's own no-copy contract. Fixed by adding an explicit `proto.Message` guard (`google.golang.org/protobuf/proto`) that returns any proto message completely untouched, and dropping the `Ptr`/`Map` cases entirely (no confirmed BUG-005 instance needed them — `credentials.list`'s wrapper is a plain VALUE struct, not a pointer). Final scope: top-level `Slice` (fixes `projectGroup.list`/`ssh.listTargets`/`team.list`) + one-level-in `Struct` fields (fixes `credentials.list`). `go build`/`go vet`/`go test ./services/api-gateway/...` all clean after the fix.
 
 ---
 

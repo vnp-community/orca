@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `internal/adapter/postgres/repository.go`, `internal/usecase/list_projects.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `Repository.List` now branches on empty `pageToken` (no cursor comparison at all for the first page, matching AIP-158) and `ListProjects.Execute` rejects a malformed non-empty `page_token` with `PROJECT_INVALID_PAGE_TOKEN`; grep confirmed no other `id > $` unguarded-cursor occurrence exists in project-service's `internal/adapter/postgres/`. `go build`/`go vet`/`go test ./services/project-service/...` all clean.
 
 ---
 

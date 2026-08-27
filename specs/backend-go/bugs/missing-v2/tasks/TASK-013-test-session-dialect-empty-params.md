@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/handler_test.go`
 **Depends on:** TASK-012
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — all 4 tests (`TestSessionClientDialect_NoParams_ReachesHandlerWithEmptyArgs`, `TestSessionClientDialect_ExplicitNullParams_SameAsOmitted`, `TestNormalizeInboundMessage_NoParams_PopulatesEmptyObjectArg`, `TestNormalizeInboundMessage_RealParams_PassedThroughUnchanged`) implemented in `handler_test.go` exactly as specified and passing. `go test ./services/api-gateway/... -count=1` clean.
 
 ---
 

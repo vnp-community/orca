@@ -201,12 +201,17 @@ func TestHandleListUsers_SuccessRoundTrip(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
+	// usersListJSON's shape (camelCase nextPageToken, plus the total field
+	// the old raw-proto passthrough dropped) — see auth_admin_routes.go's
+	// doc comment (specs/backend-go/bugs/missing-v2/ follow-up).
 	var body struct {
 		Users []struct {
 			ID    string `json:"id"`
 			Email string `json:"email"`
+			Role  string `json:"role"`
 		} `json:"users"`
-		NextPageToken string `json:"next_page_token"`
+		Total         int    `json:"total"`
+		NextPageToken string `json:"nextPageToken"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("response body is not the expected JSON shape: %v; body=%s", err, rec.Body.String())
@@ -214,8 +219,14 @@ func TestHandleListUsers_SuccessRoundTrip(t *testing.T) {
 	if len(body.Users) != 1 || body.Users[0].ID != "user-1" || body.Users[0].Email != "a@example.com" {
 		t.Fatalf("unexpected users in response: %+v", body.Users)
 	}
+	if body.Users[0].Role != "admin" {
+		t.Fatalf("role = %q, want %q (string, not the numeric proto enum)", body.Users[0].Role, "admin")
+	}
+	if body.Total != 1 {
+		t.Fatalf("total = %d, want %d", body.Total, 1)
+	}
 	if body.NextPageToken != "next-token" {
-		t.Fatalf("next_page_token = %q, want %q", body.NextPageToken, "next-token")
+		t.Fatalf("nextPageToken = %q, want %q", body.NextPageToken, "next-token")
 	}
 }
 

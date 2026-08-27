@@ -1,6 +1,6 @@
 # Multi-stage build, static binary, distroless runtime — per
 # specs/backend-go/architecture/04-tech-stack.md's build conventions.
-FROM golang:1.23-bookworm AS build
+FROM golang:1.25-bookworm AS build
 WORKDIR /src
 
 # go.work-aware build: the whole workspace is needed at build time because
@@ -9,7 +9,7 @@ WORKDIR /src
 COPY go.work go.work.sum* ./
 COPY common ./common
 COPY proto ./proto
-COPY services/credential-broker-service ./services/credential-broker-service
+COPY services ./services
 
 WORKDIR /src/services/credential-broker-service
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION:-dev}" \

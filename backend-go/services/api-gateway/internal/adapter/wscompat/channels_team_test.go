@@ -2,6 +2,7 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -112,6 +113,33 @@ func TestTeamListChannel_Success(t *testing.T) {
 	}
 	if len(teams) != 2 {
 		t.Fatalf("expected 2 teams, got %d", len(teams))
+	}
+}
+
+// TestTeamListChannel_EmptyResult_ReturnsEmptyArrayNotNull is the direct
+// regression test for BUG-005 (specs/backend-go/bugs/missing-v2/): an
+// empty ListTeamsResponse leaves Teams as a nil slice, normalized to []
+// by Registry.Dispatch before it reaches the frontend.
+func TestTeamListChannel_EmptyResult_ReturnsEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeTenantServiceClient{
+		listTeamsFunc: func(ctx context.Context, in *tenantv1.ListTeamsRequest) (*tenantv1.ListTeamsResponse, error) {
+			return &tenantv1.ListTeamsResponse{}, nil // Teams left nil
+		},
+	}
+
+	r := NewRegistry()
+	registerTeamChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "team.list", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	b, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if string(b) != "[]" {
+		t.Errorf("expected [], got %s", b)
 	}
 }
 

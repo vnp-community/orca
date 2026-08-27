@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `services/auth-service/internal/usecase/bootstrap.go`, `services/auth-service/internal/adapter/grpcclient/tenant_provisioner.go` (new), `services/auth-service/internal/config/config.go`, `services/auth-service/cmd/server/main.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented exactly as specified: new `internal/adapter/grpcclient/tenant_provisioner.go`, `bootstrap.go`'s saga reorder (`BootstrapConfig.TenantID` removed, `CompanyName` added), `config.go`'s `BootstrapCompanyName`/`TenantServiceAddr` fields, `main.go`'s guarded dial+bootstrap block. `go build`/`go vet`/`go test ./services/auth-service/...` all clean.
 
 ---
 

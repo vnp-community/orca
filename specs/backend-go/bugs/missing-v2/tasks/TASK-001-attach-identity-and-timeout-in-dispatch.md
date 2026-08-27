@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/registry.go`, plus every `channels_*.go` file with a per-handler `gatewaygrpc.AttachIdentity` call (removal pass)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented in `registry.go`'s `Dispatch`/`DispatchStreamChannel`. Deviation from this doc's original sketch, found via the full test suite: `dispatchRPCTimeout` was raised from 5s to **60s** — a 5s outer bound clipped two handlers' documented, longer explicit overrides (`projectGroup.scanNested`/`projectHostSetup.setupExistingFolder`, both 30s; see `registry.go`'s updated doc comment for the full reasoning and the exact test that caught it). The "remove now-redundant per-handler `AttachIdentity` calls" cleanup pass (Step 3) was intentionally **not done** — those lines are harmless duplication (`AttachIdentity` overwrites, doesn't merge) and removing ~20+ call sites across many files was scoped out of this pass to keep it reviewable; safe follow-up. `go build`/`go vet`/`go test ./services/api-gateway/...` all clean.
 
 ---
 

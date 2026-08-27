@@ -72,13 +72,29 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Proje
 }
 
 func (r *Repository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+projectColumns+`
-		FROM project.projects
-		WHERE tenant_id = $1 AND id > $2
-		ORDER BY id
-		LIMIT $3
-	`, tenantID, pageToken, pageSize)
+	var rows pgx.Rows
+	var err error
+	if pageToken == "" {
+		// AIP-158: an empty/absent page_token means "from the beginning" —
+		// no cursor comparison at all. See specs/backend-go/bugs/missing-v2/BUG-004:
+		// binding "" into `id > $2` (id is UUID) previously errored on
+		// every first-page call.
+		rows, err = r.pool.Query(ctx, `
+			SELECT `+projectColumns+`
+			FROM project.projects
+			WHERE tenant_id = $1
+			ORDER BY id
+			LIMIT $2
+		`, tenantID, pageSize)
+	} else {
+		rows, err = r.pool.Query(ctx, `
+			SELECT `+projectColumns+`
+			FROM project.projects
+			WHERE tenant_id = $1 AND id > $2
+			ORDER BY id
+			LIMIT $3
+		`, tenantID, pageToken, pageSize)
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("postgres: query projects: %w", err)
 	}

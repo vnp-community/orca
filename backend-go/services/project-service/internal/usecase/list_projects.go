@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -30,6 +32,12 @@ func (uc *ListProjects) Execute(ctx context.Context, in ListProjectsInput) (List
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return ListProjectsOutput{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
+	}
+
+	if in.PageToken != "" {
+		if _, err := uuid.Parse(in.PageToken); err != nil {
+			return ListProjectsOutput{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_INVALID_PAGE_TOKEN", "page_token must be empty or a valid cursor", err)
+		}
 	}
 
 	pageSize := in.PageSize

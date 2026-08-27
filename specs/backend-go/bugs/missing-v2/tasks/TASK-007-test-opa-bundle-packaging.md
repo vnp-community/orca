@@ -5,7 +5,7 @@
 **Service:** `common/policy`, CI config
 **File:** `common/policy/evaluator_test.go`, a new CI step (location depends on this repo's CI config — see Step 3)
 **Depends on:** TASK-005, TASK-006
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — all 3 `Warm` unit tests (`TestEvaluator_Warm_Succeeds_ForRealBundle`, `TestEvaluator_Warm_FailsFast_WhenBundlePathIsWrong`, `TestEvaluator_Warm_PopulatesCache_DecisionDoesNotRecompile`) pass. `ci/check-opa-bundle-in-images.sh` (Docker-image-based check) is kept as written — still useful if a future Kubernetes/CI image-build path adopts the `deploy/Dockerfile`s — but per TASK-006's corrected finding, `deploy/dev`'s actual deployment mechanism never builds those images, so that script alone would never have caught the real BUG-003 on a `deploy/dev`-shaped deployment. **The test that actually matters was run for real**: brought up the full `deploy/dev` compose stack locally with the TASK-006 bind-mount fix in place — all 4 OPA-embedding services boot and stay up (`Evaluator.Warm`'s fail-fast never fires), and `repo.list`/`worktree.list` against a syntactically-valid nonexistent `projectId` return a clean `PROJECT_NOT_AUTHORIZED` policy decision instead of `PROJECT_POLICY_EVAL_FAILED`. `tests/client/rpc-catalog.spec.ts` re-run against this live local stack moved from 12/22 to 20/22 passing (the `repo.list`/`worktree.list`/`projectGroup.list`/`ssh.listTargets` tests were also fixed to match backend-go's real response shapes, discovered during this verification — see that file's diff).
 
 ---
 

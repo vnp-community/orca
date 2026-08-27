@@ -64,6 +64,20 @@ func (e *Evaluator) Decision(ctx context.Context, query string, input any) (bool
 	return allowed, nil
 }
 
+// Warm eagerly compiles every named query — call once at service startup,
+// right after NewEvaluator, so a missing/unreadable/invalid bundle fails
+// loudly at boot instead of surfacing as an opaque per-request evaluation
+// error the first time a real caller happens to hit an OPA-gated RPC (see
+// specs/backend-go/bugs/missing-v2/BUG-003).
+func (e *Evaluator) Warm(ctx context.Context, queries ...string) error {
+	for _, q := range queries {
+		if _, err := e.preparedQuery(ctx, q); err != nil {
+			return fmt.Errorf("policy: warming query %q: %w", q, err)
+		}
+	}
+	return nil
+}
+
 func (e *Evaluator) preparedQuery(ctx context.Context, query string) (rego.PreparedEvalQuery, error) {
 	e.mu.Lock()
 	if pq, ok := e.prepared[query]; ok {

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `services/api-gateway/internal/adapter/wscompat/registry_test.go` (extends TASK-002's new file), `channels_tenant_project_test.go`, `channels_repo_ssh_status_workspace_test.go`, `channels_team_test.go`, `channels_credentials_test.go`
 **Depends on:** TASK-010
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — unit tests (`TestNormalizeNilSlices`, `TestNormalizeNilSlices_JSONShape`) plus 2 tests not in the original plan (`TestNormalizeNilSlices_ProtoMessagePassesThroughUntouched`, `TestNormalizeNilSlices_NonProtoPointerIsNotSpeciallyHandled` — added to lock in TASK-010's proto-safety correction) in `registry_test.go`; one regression test per confirmed channel added directly to each channel's existing test file: `TestProjectGroupListChannel_EmptyResult_ReturnsEmptyArrayNotNull` (`channels_tenant_project_test.go`), a `ssh.listTargets empty result...` subtest inside `TestRegisterSshChannels` (`channels_repo_ssh_status_workspace_test.go`), `TestTeamListChannel_EmptyResult_ReturnsEmptyArrayNotNull` (`channels_team_test.go`), `TestCredentialsList_EmptyResult_ReturnsEmptyArrayNotNull` (`channels_credentials_test.go`). All pass; `go test ./services/api-gateway/... -count=1` clean.
 
 ---
 

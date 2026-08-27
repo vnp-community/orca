@@ -5,7 +5,7 @@
 **Service:** deploy config, CI
 **File:** a new CI script (location depends on this repo's CI tooling — see Step 1), `deploy/dev/README.md` (doc update, optional)
 **Depends on:** TASK-014
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — **the script now runs end to end successfully.** Two real bugs found and fixed in the script itself while actually running it against a live stack (not just syntax-checked): (1) it hardcoded port 8080, but `docker-compose.yml` publishes the frontend on `${FRONTEND_HTTP_PORT:-8080}` and this repo's checked-in `.env` sets that to `6769` — fixed to read the env var the same way compose does; (2) `docker compose up -d --wait` needs `SERVER_BIND_IP` overridden to `127.0.0.1` for a same-host check, since `.env`'s `SERVER_BIND_IP` targets the real remote deploy host's own address, not a loopback-reachable one from wherever the check runs. With both fixed: `bash backend-go/ci/check-nginx-admin-api-routing.sh` (run with `.env` sourced for `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`) brought the full stack up, logged in, curled `/admin/api/stats` through the real nginx container, printed `OK: /admin/api/stats reaches api-gateway (Content-Type: application/json)`, exited 0, and tore the stack down cleanly via its own `docker compose down` — a complete, unattended, real run. Step 2 (wiring into actual CI) remains a follow-up: no existing `.github/workflows/` job invokes `deploy/dev`'s compose stack to fold this into.
 
 ---
 

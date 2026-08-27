@@ -74,7 +74,11 @@ func run() error {
 	defer pool.Close()
 
 	repo := annotationpostgres.New(pool)
-	opa := opaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
+	evaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	if err := evaluator.Warm(ctx, "data.orca.authz.annotation.allow"); err != nil {
+		return fmt.Errorf("annotation-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
+	}
+	opa := opaclient.New(evaluator)
 
 	createUC := usecase.NewCreateAnnotation(repo)
 	listUC := usecase.NewListAnnotations(repo)

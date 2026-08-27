@@ -660,6 +660,33 @@ func TestProjectGroupListChannel_Success(t *testing.T) {
 	}
 }
 
+// TestProjectGroupListChannel_EmptyResult_ReturnsEmptyArrayNotNull is the
+// direct regression test for BUG-005 (specs/backend-go/bugs/missing-v2/):
+// an empty ListProjectGroupsResponse leaves Groups as a nil slice, which
+// must be normalized to [] (via Registry.Dispatch, not this handler
+// itself) before it reaches the frontend.
+func TestProjectGroupListChannel_EmptyResult_ReturnsEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeProjectServiceClient2{
+		listProjectGroupsFunc: func(ctx context.Context, in *projectv1.ListProjectGroupsRequest) (*projectv1.ListProjectGroupsResponse, error) {
+			return &projectv1.ListProjectGroupsResponse{}, nil // Groups left nil
+		},
+	}
+	r := NewRegistry()
+	registerProjectGroupChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "projectGroup.list", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	b, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if string(b) != "[]" {
+		t.Errorf("expected [], got %s", b)
+	}
+}
+
 func TestProjectGroupMoveProjectChannel_Success(t *testing.T) {
 	fake := &fakeProjectServiceClient2{
 		moveProjectFunc: func(ctx context.Context, in *projectv1.MoveProjectRequest) (*projectv1.MoveProjectResponse, error) {

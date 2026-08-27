@@ -51,7 +51,9 @@ export async function clientLogin(
     body: JSON.stringify({ email, password }),
     credentials: 'include'
   })
-  if (!res.ok) {throw new Error(`Login failed: ${res.status}`)}
+  if (!res.ok) {
+    throw new Error(`Login failed: ${res.status}`)
+  }
   const user = (await res.json()) as { id: string; email: string; role: string }
   const setCookie = res.headers.get('set-cookie') ?? ''
   const match = setCookie.match(/orca_session=[^;]+/)
@@ -67,7 +69,9 @@ export async function clientGetMe(
   const res = await fetch(`${BASE_URL}/auth/me`, {
     headers: { Cookie: cookie }
   })
-  if (!res.ok) {return null}
+  if (!res.ok) {
+    return null
+  }
   return (await res.json()) as { id: string; email: string; role: string }
 }
 
@@ -95,20 +99,31 @@ export async function adminLogin(): Promise<string> {
   return match ? match[0] : ''
 }
 
+// Why 'admin' | 'user', not 'developer': backend-go's Role enum is 2-valued
+// (ROLE_ADMIN/ROLE_USER, auth_admin_routes.go's parseRole/roleToString) — a
+// deliberate simplification from the old TS backend's 3-role model
+// (admin/lead/developer). Passing 'developer' here silently parses to
+// ROLE_UNSPECIFIED server-side instead of erroring, which is why this
+// default was wrong for a long time without a test ever catching it.
 export async function adminCreateUser(
   adminCookie: string,
   email: string,
   password: string,
-  role: 'admin' | 'developer' = 'developer'
-): Promise<{ id: string; email: string }> {
+  role: 'admin' | 'user' = 'user'
+): Promise<{ id: string; email: string; role: string }> {
   const res = await fetch(`${BASE_URL}/admin/api/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
     body: JSON.stringify({ email, password, role })
   })
-  return (await res.json()) as { id: string; email: string }
+  return (await res.json()) as { id: string; email: string; role: string }
 }
 
+// Why "delete": DELETE /admin/api/users/:id is a soft-delete
+// (handleDeactivateUser sets is_active=false, never a hard row delete —
+// see admin_routes.go's doc comment) — kept as test cleanup because it's
+// sufficient to stop the throwaway account from logging in again; it does
+// not remove the row.
 export async function adminDeleteUser(adminCookie: string, userId: string): Promise<void> {
   await fetch(`${BASE_URL}/admin/api/users/${userId}`, {
     method: 'DELETE',
