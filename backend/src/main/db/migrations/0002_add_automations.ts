@@ -5,12 +5,15 @@
  */
 
 import type { Migration } from './types'
+import { nowTextDefaultSql } from './sql-dialect'
 
 export const migration0002AddAutomations: Migration = {
   version: 2,
   name: 'add_automations',
 
   async up(db) {
+    // BUG-BE-RPC-003: datetime('now') is SQLite-only — see sql-dialect.ts.
+    const now = nowTextDefaultSql(db.capabilities.dialect)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS automations (
         id          TEXT PRIMARY KEY,
@@ -19,8 +22,8 @@ export const migration0002AddAutomations: Migration = {
         trigger     TEXT NOT NULL,
         config      TEXT NOT NULL DEFAULT '{}',
         enabled     INTEGER NOT NULL DEFAULT 1,
-        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at  TEXT NOT NULL DEFAULT ${now},
+        updated_at  TEXT NOT NULL DEFAULT ${now}
       )
     `)
     await db.exec(`

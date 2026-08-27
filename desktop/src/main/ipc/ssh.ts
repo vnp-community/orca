@@ -11,6 +11,7 @@ import { SshPortForwardManager } from '../ssh/ssh-port-forward'
 import type {
   DetectedPort,
   EnrichedDetectedPort,
+  PortForwardEntry,
   SavedPortForward,
   SshRepoReadoption,
   SshTarget,
@@ -114,6 +115,11 @@ export function listRegisteredSshTargets(): SshTarget[] {
   return sshStore?.listTargets() ?? []
 }
 
+/** Single target lookup for runtime RPC clients — undefined when unknown/unregistered. */
+export function getRegisteredSshTarget(targetId: string): SshTarget | undefined {
+  return sshStore?.getTarget(targetId)
+}
+
 /** Removed-target id → last known label, for ghost-host display on paired clients. */
 export function listRegisteredRemovedSshTargetLabels(): Record<string, string> {
   return sshStore?.listRemovedTargetLabels() ?? {}
@@ -152,6 +158,18 @@ export async function disconnectRegisteredSshTarget(targetId: string): Promise<v
   }
   await detachActiveSshSession(targetId)
   await connectionManager.disconnect(targetId)
+}
+
+// Why: mirrors the ssh:needsPassphrasePrompt IPC handler so runtime RPC callers
+// (paired/remote clients without direct IPC access) get the same auto-connect
+// prompt probe instead of the web client's always-false stub.
+export function needsRegisteredSshPassphrasePrompt(targetId: string): boolean {
+  const target = sshStore?.getTarget(targetId)
+  if (!target?.lastRequiredPassphrase) {
+    return false
+  }
+  const conn = connectionManager?.getConnection(targetId)
+  return !conn?.hasCachedCredential()
 }
 
 export async function removeRegisteredSshTarget(targetId: string): Promise<void> {
@@ -459,6 +477,91 @@ async function restorePortForwards(
 
   persistPortForwardsWithUnrestored(targetId)
   broadcastPortForwards(getMainWindow, targetId)
+}
+
+// Why: these mirror the ssh:addPortForward/updatePortForward/removePortForward/
+// listPortForwards/listDetectedPorts IPC handler bodies below, so runtime RPC
+// callers (paired/remote clients) get the same port-forward capability the
+// desktop IPC surface already provides instead of the web client's stubs.
+export async function addRegisteredSshPortForward(args: {
+  targetId: string
+  localPort: number
+  remoteHost: string
+  remotePort: number
+  label?: string
+}): Promise<PortForwardEntry> {
+  const conn = connectionManager?.getConnection(args.targetId)
+  if (!conn) {
+    throw new Error(`SSH connection "${args.targetId}" not found`)
+  }
+  const entry = await portForwardManager!.addForward(
+    args.targetId,
+    conn,
+    args.localPort,
+    args.remoteHost,
+    args.remotePort,
+    args.label
+  )
+  persistPortForwards(args.targetId)
+  broadcastPortForwards(getCurrentMainWindow, args.targetId)
+  return entry
+}
+
+export async function updateRegisteredSshPortForward(args: {
+  id: string
+  targetId: string
+  localPort: number
+  remoteHost: string
+  remotePort: number
+  label?: string
+}): Promise<PortForwardEntry> {
+  const conn = connectionManager?.getConnection(args.targetId)
+  if (!conn) {
+    throw new Error(`SSH connection "${args.targetId}" not found`)
+  }
+  try {
+    const entry = await portForwardManager!.updateForward(
+      args.id,
+      conn,
+      args.localPort,
+      args.remoteHost,
+      args.remotePort,
+      args.label
+    )
+    persistPortForwards(entry.connectionId)
+    broadcastPortForwards(getCurrentMainWindow, entry.connectionId)
+    return entry
+  } catch (err) {
+    // Why: if the edit failed (and rollback may also have failed), sync the
+    // caller with the actual runtime state so it doesn't show a forward that
+    // no longer exists — matches ssh:updatePortForward's IPC behavior.
+    persistPortForwards(args.targetId)
+    broadcastPortForwards(getCurrentMainWindow, args.targetId)
+    throw err
+  }
+}
+
+export async function removeRegisteredSshPortForward(id: string): Promise<PortForwardEntry | null> {
+  const removed = (await portForwardManager?.removeForwardAndWait(id)) ?? null
+  if (removed) {
+    persistPortForwards(removed.connectionId)
+    broadcastPortForwards(getCurrentMainWindow, removed.connectionId)
+  }
+  return removed
+}
+
+export function listRegisteredSshPortForwards(targetId?: string): PortForwardEntry[] {
+  const all = portForwardManager?.listForwards(targetId) ?? []
+  if (!persistedStore || !targetId) {
+    return all
+  }
+  return enrichSshForwardEntries(all, getWorktreeIdsForConnection(persistedStore, targetId))
+}
+
+export function listRegisteredSshDetectedPorts(targetId: string): EnrichedDetectedPort[] {
+  const session = activeSessions.get(targetId)
+  const ports = session?.getPortScanner()?.getDetectedPorts(targetId) ?? []
+  return enrichDetected(targetId, ports)
 }
 
 function registerAdvertisedUrlRefresh(getMainWindow: () => BrowserWindow | null): void {

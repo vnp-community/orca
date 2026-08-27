@@ -19,14 +19,20 @@ export type IssueCommandReadResult = {
   source: 'local' | 'shared' | 'none'
 }
 
+// Why: repo.hooksCheck (unlike the other 3 methods below) has no hostId param
+// on either the local desktop RPC registry or the remote-environment one — it
+// always resolves the repo's default host. The desktop-local ipc channel
+// (window.api.hooks.check) is the only path that honors an explicit hostId
+// (e.g. checking hooks for a WSL sub-host of a local repo), so that lane stays
+// split instead of unifying onto callRuntimeRpc like the others.
 export async function checkRuntimeHooks(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   repoId: string,
   hostId?: ExecutionHostId
 ): Promise<HookCheckResult> {
   const target = getActiveRuntimeTarget(settings)
-  if (target.kind !== 'environment') {
-    return window.api.hooks.check({ repoId, ...(hostId ? { hostId } : {}) })
+  if (target.kind !== 'environment' && hostId) {
+    return window.api.hooks.check({ repoId, hostId })
   }
   return callRuntimeRpc<HookCheckResult>(
     target,
@@ -41,9 +47,6 @@ export async function inspectRuntimeSetupScriptImports(
   repoId: string
 ): Promise<SetupScriptImportCandidate[]> {
   const target = getActiveRuntimeTarget(settings)
-  if (target.kind !== 'environment') {
-    return window.api.hooks.inspectSetupScriptImports({ repoId })
-  }
   return callRuntimeRpc<SetupScriptImportCandidate[]>(
     target,
     'repo.setupScriptImports',
@@ -57,9 +60,6 @@ export async function readRuntimeIssueCommand(
   repoId: string
 ): Promise<IssueCommandReadResult> {
   const target = getActiveRuntimeTarget(settings)
-  if (target.kind !== 'environment') {
-    return window.api.hooks.readIssueCommand({ repoId })
-  }
   return callRuntimeRpc<IssueCommandReadResult>(
     target,
     'repo.issueCommandRead',
@@ -74,10 +74,6 @@ export async function writeRuntimeIssueCommand(
   content: string
 ): Promise<void> {
   const target = getActiveRuntimeTarget(settings)
-  if (target.kind !== 'environment') {
-    await window.api.hooks.writeIssueCommand({ repoId, content })
-    return
-  }
   await callRuntimeRpc(
     target,
     'repo.issueCommandWrite',

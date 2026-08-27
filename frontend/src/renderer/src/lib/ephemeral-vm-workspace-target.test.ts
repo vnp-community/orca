@@ -6,7 +6,9 @@ import {
 import type { ProjectHostSetupResult } from '../../../shared/types'
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
-  assertRuntimeEnvironmentCapability: vi.fn()
+  assertRuntimeEnvironmentCapability: vi.fn(),
+  getActiveRuntimeTarget: () => ({ kind: 'local' }),
+  callRuntimeRpc: vi.fn()
 }))
 
 import { assertRuntimeEnvironmentCapability } from '@/runtime/runtime-rpc-client'

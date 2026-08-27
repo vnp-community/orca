@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Mail, RefreshCw, Users } from 'lucide-react'
+import { useAppStore } from '@/store'
+import {
+  listRuntimeOrcaProfileOrgMembers,
+  changeRuntimeOrcaProfileOrgMemberRole,
+  removeRuntimeOrcaProfileOrgMember,
+  revokeRuntimeOrcaProfileOrgInvite,
+  inviteRuntimeOrcaProfileOrgMember
+} from '@/runtime/runtime-orca-profiles-client'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -59,12 +67,13 @@ export function OrcaProfileOrgMembersDialog({
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<OrcaOrgRole>('member')
   const [inviting, setInviting] = useState(false)
+  const settings = useAppStore((s) => s.settings)
 
   const refresh = useCallback(async (): Promise<void> => {
     setLoading(true)
     setLoadError(false)
     setActionError(null)
-    const result = await window.api.orcaProfiles.orgMembersList({ orgId })
+    const result = await listRuntimeOrcaProfileOrgMembers(settings, { orgId })
     if (result.status === 'ok') {
       setRoster(result.roster)
     } else {
@@ -72,7 +81,7 @@ export function OrcaProfileOrgMembersDialog({
       setLoadError(true)
     }
     setLoading(false)
-  }, [orgId])
+  }, [orgId, settings])
 
   // Why: reload every time the dialog opens so a manager always acts on the
   // current roster, and clear transient dialog state when it closes.
@@ -107,7 +116,7 @@ export function OrcaProfileOrgMembersDialog({
     }
     setPendingMemberId(member.userId)
     await runMutation(
-      window.api.orcaProfiles.orgMemberChangeRole({ orgId, userId: member.userId, role })
+      changeRuntimeOrcaProfileOrgMemberRole(settings, { orgId, userId: member.userId, role })
     )
     setPendingMemberId(null)
   }
@@ -117,13 +126,13 @@ export function OrcaProfileOrgMembersDialog({
       return
     }
     setPendingMemberId(member.userId)
-    await runMutation(window.api.orcaProfiles.orgMemberRemove({ orgId, userId: member.userId }))
+    await runMutation(removeRuntimeOrcaProfileOrgMember(settings, { orgId, userId: member.userId }))
     setPendingMemberId(null)
   }
 
   const handleRevoke = async (email: string): Promise<void> => {
     setPendingInviteEmail(email)
-    await runMutation(window.api.orcaProfiles.orgInviteRevoke({ orgId, email }))
+    await runMutation(revokeRuntimeOrcaProfileOrgInvite(settings, { orgId, email }))
     setPendingInviteEmail(null)
   }
 
@@ -135,7 +144,7 @@ export function OrcaProfileOrgMembersDialog({
     }
     setInviting(true)
     const ok = await runMutation(
-      window.api.orcaProfiles.orgMemberInvite({ orgId, email, role: inviteRole })
+      inviteRuntimeOrcaProfileOrgMember(settings, { orgId, email, role: inviteRole })
     )
     setInviting(false)
     if (ok) {

@@ -3,6 +3,7 @@ import { Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 /**
  * Per-message copy affordance for the native chat. Copies the message's text to
  * the clipboard and briefly swaps the icon to a check tint as success feedback —
@@ -30,7 +31,7 @@ export function NativeChatCopyButton({
 
   const handleCopy = useCallback(async () => {
     try {
-      await window.api.ui.writeClipboardText(text)
+      await uiWriteClipboardText(text)
       setCopied(true)
       if (resetTimerRef.current !== null) {
         window.clearTimeout(resetTimerRef.current)

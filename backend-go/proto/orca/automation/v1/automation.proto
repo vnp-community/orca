@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package orca.automation.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+import "orca/workflow/v1/workflow.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1;automationv1";
+
+// AutomationService owns schedule/trigger definitions + run history. Execution
+// always delegates to workflow-service.ExecuteAdHocStep (closes TS Gap 3 —
+// automation.runNow had no working execution path in TS).
+// See specs/backend-go/services/automation-service.md.
+service AutomationService {
+  rpc CreateAutomation(CreateAutomationRequest) returns (CreateAutomationResponse);
+  rpc RunNow(RunNowRequest) returns (RunNowResponse);
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+
+  // HandleExternalTrigger maps an external trigger source's payload onto the
+  // same run interactor RunNow uses (trigger=external instead of manual) —
+  // see design doc's TS external-automations-handler.ts note. request_id is
+  // the external source's own idempotency key, reused as-is for
+  // automation_runs' (tenant_id, request_id) unique index.
+  rpc HandleExternalTrigger(HandleExternalTriggerRequest) returns (HandleExternalTriggerResponse);
+
+  rpc ListAutomations(ListAutomationsRequest) returns (ListAutomationsResponse);
+  rpc UpdateAutomation(UpdateAutomationRequest) returns (UpdateAutomationResponse);
+  rpc DeleteAutomation(DeleteAutomationRequest) returns (google.protobuf.Empty);
+}
+
+message Automation {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string rrule = 4;
+  string step_config_json = 5;
+  // step_type promotes what used to live only inside a "step_type" JSON key
+  // in step_config_json (domain.ParseStepType) to a first-class field —
+  // closes the Phase 2 execution-plan item. Reuses workflow-service's own
+  // StepType enum rather than defining a duplicate one, since automation's
+  // step_type must already match what ExecuteAdHocStepRequest.step_type
+  // expects on dispatch.
+  orca.workflow.v1.StepType step_type = 6;
+  bool enabled = 7;
+  string dtstart = 8; // RFC3339; empty = defaults to created_at at creation time
+  string timezone = 9; // IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
+}
+
+message CreateAutomationRequest {
+  string tenant_id = 1;
+  string name = 2;
+  string rrule = 3;
+  string step_config_json = 4;
+  orca.workflow.v1.StepType step_type = 5;
+  string dtstart = 6; // optional; empty = defaults to now at creation time
+  string timezone = 7; // optional; empty = UTC
+}
+
+message CreateAutomationResponse {
+  Automation automation = 1;
+}
+
+message RunNowRequest {
+  string automation_id = 1;
+  string request_id = 2; // idempotency, since scheduler ticks are at-least-once
+}
+
+message AutomationRun {
+  string id = 1;
+  string automation_id = 2;
+  string status = 3; // running|completed|failed
+}
+
+message RunNowResponse {
+  AutomationRun run = 1;
+}
+
+message ListRunsRequest {
+  string automation_id = 1;
+  string page_token = 2;
+  int32 page_size = 3;
+}
+
+message ListRunsResponse {
+  repeated AutomationRun runs = 1;
+  string next_page_token = 2;
+}
+
+message HandleExternalTriggerRequest {
+  string automation_id = 1;
+  string request_id = 2; // external source's idempotency key
+  string payload_json = 3; // opaque external payload; passed through as-is, not interpreted here
+}
+
+message HandleExternalTriggerResponse {
+  AutomationRun run = 1;
+}
+
+message ListAutomationsRequest {
+  string tenant_id = 1;
+  string page_token = 2;
+  int32 page_size = 3;
+}
+message ListAutomationsResponse {
+  repeated Automation automations = 1;
+  string next_page_token = 2;
+}
+
+// UpdateAutomationRequest uses optional (wrapper-typed) fields rather than
+// full-replace semantics — a partial edit (e.g. just toggling `enabled`) is
+// the frontend's real use case (an automation's on/off switch in the UI
+// list), and full-replace would force every caller to re-send fields it
+// isn't changing.
+message UpdateAutomationRequest {
+  string id = 1;
+  string tenant_id = 2;
+  google.protobuf.StringValue name = 3;
+  google.protobuf.StringValue rrule = 4;
+  google.protobuf.StringValue step_config_json = 5;
+  orca.workflow.v1.StepType step_type = 6; // 0 (unspecified) = no change
+  google.protobuf.BoolValue enabled = 7;
+  google.protobuf.StringValue dtstart = 8;
+  google.protobuf.StringValue timezone = 9;
+}
+message UpdateAutomationResponse {
+  Automation automation = 1;
+}
+
+message DeleteAutomationRequest {
+  string id = 1;
+  string tenant_id = 2;
+}

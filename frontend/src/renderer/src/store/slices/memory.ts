@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
 import type { MemorySnapshot } from '../../../../shared/types'
+import { getRuntimeMemorySnapshot } from '../../runtime/runtime-memory-client'
 
 export type MemorySlice = {
   memorySnapshot: MemorySnapshot | null
@@ -21,7 +22,7 @@ export const createMemorySlice: StateCreator<AppState, [], [], MemorySlice> = (s
       }
       const request = (async () => {
         try {
-          const snapshot = await window.api.memory.getSnapshot()
+          const snapshot = await getRuntimeMemorySnapshot()
           set({ memorySnapshot: snapshot, memorySnapshotError: null })
         } catch (err) {
           // Why: the always-on Resource Manager status-bar segment needs to know when

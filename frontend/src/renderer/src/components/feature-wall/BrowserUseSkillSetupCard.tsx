@@ -18,6 +18,7 @@ import {
 } from '@/components/settings/CliSkillRuntimeSetup'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
 
 export function BrowserUseSkillSetupCard(props: {
   compact?: boolean
@@ -66,10 +67,10 @@ export function BrowserUseSkillSetupCard(props: {
       preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
       getPrerequisiteStatus={() =>
         activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-          ? window.api.cli.getWslInstallStatus(
+          ? getRuntimeWslCliInstallStatus(
               getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
             )
-          : window.api.cli.getInstallStatus()
+          : getRuntimeCliInstallStatus()
       }
       onBeforeOpenTerminal={handleBeforeOpenTerminal}
       showRecheckWhenInstalled={false}

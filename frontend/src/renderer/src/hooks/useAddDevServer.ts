@@ -61,7 +61,7 @@ export function useAddDevServer(): UseAddDevServerReturn {
         const currentState = useAppStore.getState()
         if (!currentState.activeDevServerId) {
           setActiveDevServerId(server.id)
-          await window.api.settings.update?.({ activeDevServerId: server.id })
+          await window.api.settings.set({ activeDevServerId: server.id })
         }
 
         setState('idle')

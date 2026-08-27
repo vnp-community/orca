@@ -349,6 +349,48 @@ describe('PtyHandler', () => {
     expect(handler.retainedStartupCommandCount).toBe(0)
   })
 
+  // Why: BUG-BE-HLD-005's per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR isolation
+  // used to match `command === 'gh'` exactly. Once callers send the full
+  // command line (e.g. "gh auth login --hostname ...", shell-quoted) instead
+  // of just the bare binary name — see specs/agent/api/gaps-and-findings.md
+  // #5 — an exact match would silently stop isolating credentials per user.
+  // This locks in the prefix-match fix.
+  it('still isolates GH_CONFIG_DIR per user when command carries full gh args', async () => {
+    await dispatcher.callRequest('pty.spawn', {
+      command: 'gh auth login',
+      commandDelivery: 'provider',
+      userId: 'user-42'
+    })
+
+    const spawnCall = mockPtySpawn.mock.calls[0]
+    const env = spawnCall?.[2]?.env as Record<string, string>
+    expect(env.GH_CONFIG_DIR).toContain('/user-42/')
+  })
+
+  it('still isolates GLAB_CONFIG_DIR per user when command carries full glab args', async () => {
+    await dispatcher.callRequest('pty.spawn', {
+      command: 'glab auth login',
+      commandDelivery: 'provider',
+      userId: 'user-42'
+    })
+
+    const spawnCall = mockPtySpawn.mock.calls[0]
+    const env = spawnCall?.[2]?.env as Record<string, string>
+    expect(env.GLAB_CONFIG_DIR).toContain('/user-42/')
+  })
+
+  it('does not isolate GH_CONFIG_DIR for an unrelated command that happens to start with "gh"', async () => {
+    await dispatcher.callRequest('pty.spawn', {
+      command: 'ghost-binary --version',
+      commandDelivery: 'provider',
+      userId: 'user-42'
+    })
+
+    const spawnCall = mockPtySpawn.mock.calls[0]
+    const env = spawnCall?.[2]?.env as Record<string, string>
+    expect(env.GH_CONFIG_DIR).toBeUndefined()
+  })
+
   it.skipIf(process.platform === 'win32')(
     'emits shell-ready markers for renderer-delivered startup commands',
     async () => {

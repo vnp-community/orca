@@ -33,7 +33,9 @@ import {
 } from './CliSkillRuntimeSetup'
 import { WslCliRegistration } from './WslCliRegistration'
 import { translate } from '@/i18n/i18n'
+import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus, installRuntimeCli, removeRuntimeCli } from '@/runtime/runtime-cli-client'
 
+import { shellOpenPath } from '../../runtime/runtime-shell-client'
 type CliSectionProps = {
   currentPlatform: string
   settings: GlobalSettings
@@ -115,8 +117,8 @@ export function CliSection({
   const getCliSkillPrerequisiteStatus = useCallback(
     () =>
       agentRuntime.runtime === 'wsl'
-        ? window.api.cli.getWslInstallStatus(getWslCliDistroRequest(agentRuntime))
-        : window.api.cli.getInstallStatus(),
+        ? getRuntimeWslCliInstallStatus(getWslCliDistroRequest(agentRuntime))
+        : getRuntimeCliInstallStatus(),
     [agentRuntime]
   )
 
@@ -132,7 +134,7 @@ export function CliSection({
   const refreshStatus = useCallback(async (): Promise<void> => {
     setLoading(true)
     try {
-      handleStatusChange(await window.api.cli.getInstallStatus())
+      handleStatusChange(await getRuntimeCliInstallStatus())
     } catch (error) {
       if (mountedRef.current) {
         toast.error(
@@ -166,7 +168,7 @@ export function CliSection({
   const handleInstall = async (): Promise<void> => {
     setBusyAction('install')
     try {
-      const next = await window.api.cli.install()
+      const next = await installRuntimeCli()
       if (mountedRef.current) {
         setStatus(next)
         setDialogOpen(false)
@@ -200,7 +202,7 @@ export function CliSection({
   const handleRemove = async (): Promise<void> => {
     setBusyAction('remove')
     try {
-      const next = await window.api.cli.remove()
+      const next = await removeRuntimeCli()
       if (mountedRef.current) {
         setStatus(next)
         setDialogOpen(false)
@@ -338,7 +340,7 @@ export function CliSection({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => void window.api.shell.openPath(status.commandPath as string)}
+              onClick={() => void shellOpenPath(status.commandPath as string)}
               disabled={loading || !canRevealCommandPath}
               className="gap-2"
             >

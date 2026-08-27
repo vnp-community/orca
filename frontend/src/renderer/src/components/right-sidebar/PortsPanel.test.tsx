@@ -13,12 +13,19 @@ import {
   browserUrlForPortForwardEntry
 } from '@/lib/workspace-port-urls'
 
-const { activateAndRevealWorktreeMock } = vi.hoisted(() => ({
-  activateAndRevealWorktreeMock: vi.fn()
+const { activateAndRevealWorktreeMock, openUrl } = vi.hoisted(() => ({
+  activateAndRevealWorktreeMock: vi.fn(),
+  openUrl: vi.fn()
 }))
 
 vi.mock('@/lib/worktree-activation', () => ({
   activateAndRevealWorktree: activateAndRevealWorktreeMock
+}))
+
+// Why: workspace-port-actions now calls the shell wrapper
+// (runtime-shell-client), not window.api.shell directly.
+vi.mock('@/runtime/runtime-shell-client', () => ({
+  shellOpenUrl: openUrl
 }))
 
 import { getLocalWorkspacePortSections } from './PortsPanel'
@@ -68,7 +75,6 @@ const localScan = vi.fn()
 const localKill = vi.fn()
 const runtimeCall = vi.fn()
 const runtimeEnvironmentCall = vi.fn()
-const openUrl = vi.fn()
 
 function portOpenClick(
   overrides: Partial<Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>> = {}
@@ -101,9 +107,6 @@ beforeEach(() => {
       },
       runtimeEnvironments: {
         call: runtimeEnvironmentCall
-      },
-      shell: {
-        openUrl
       }
     }
   })

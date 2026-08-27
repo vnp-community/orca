@@ -7,21 +7,23 @@
  * - Submit → git.pr.create RPC
  * - Shows PR URL after creation
  *
+ * Why (unavailable, not fixed): 'git.diff'/'git.generateCommitMessage'/
+ * 'git.pr.create' below used a {projectId, worktreePath} shape this form's
+ * callers pass, but 'git.pr.create' has never existed as an RPC method
+ * (backend/src/main/runtime/rpc/methods/git.ts has no git.pr.* group — hosted
+ * PR creation is 'hostedReview.create', which needs a `repo` selector from the
+ * runtime's Repo/connection model that OrcaProject-scoped callers of this form
+ * don't have. Wiring this up for real is separate, scoped backend/design work
+ * — this form surfaces an honest "not available" error instead of the silent
+ * crash the rest of this panel had (same class of bug as GitPanel.tsx's push).
+ *
  * @module renderer/components/workspace/git/PullRequestForm
  */
 
 import { useState, useCallback } from 'react'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '../../../runtime/runtime-rpc-client'
-import { useAppStore } from '../../../store'
-import { useWorkspace } from '../../../context/WorkspaceContext'
-import { Tracers } from '../../../../../shared/trace/tracers'
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-type PrCreateResult = {
-  url: string
-  exitCode: number
-}
+const PR_CREATION_UNAVAILABLE_MESSAGE =
+  "Creating pull requests from a Project Workspace isn't supported yet."
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +32,7 @@ const S = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '12px',
-    padding: '4px 0',
+    padding: '4px 0'
   },
   field: { display: 'flex', flexDirection: 'column' as const, gap: '4px' },
   label: {
@@ -38,7 +40,7 @@ const S = {
     fontWeight: 600,
     color: '#6c7086',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    letterSpacing: '0.5px'
   },
   input: {
     padding: '7px 10px',
@@ -47,7 +49,7 @@ const S = {
     borderRadius: '5px',
     color: '#cdd6f4',
     fontSize: '13px',
-    fontFamily: 'inherit',
+    fontFamily: 'inherit'
   },
   textarea: {
     padding: '7px 10px',
@@ -58,7 +60,7 @@ const S = {
     fontSize: '13px',
     fontFamily: 'inherit',
     minHeight: '120px',
-    resize: 'vertical' as const,
+    resize: 'vertical' as const
   },
   buttonRow: { display: 'flex', gap: '8px', flexWrap: 'wrap' as const },
   btn: (variant: 'primary' | 'secondary') => ({
@@ -70,7 +72,7 @@ const S = {
     fontSize: '13px',
     background: variant === 'primary' ? '#89b4fa' : '#313244',
     color: variant === 'primary' ? '#1e1e2e' : '#cdd6f4',
-    transition: 'opacity 0.15s',
+    transition: 'opacity 0.15s'
   }),
   checkbox: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' },
   checkLabel: { color: '#cdd6f4', fontSize: '13px' },
@@ -81,25 +83,21 @@ const S = {
     border: '1px solid rgba(166,227,161,0.3)',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '6px',
+    gap: '6px'
   },
   prUrl: {
     color: '#89b4fa',
     textDecoration: 'underline',
     cursor: 'pointer',
     fontSize: '13px',
-    wordBreak: 'break-all' as const,
+    wordBreak: 'break-all' as const
   },
-  error: { color: '#f38ba8', fontSize: '12px', padding: '2px 0' },
+  error: { color: '#f38ba8', fontSize: '12px', padding: '2px 0' }
 }
 
 // ── PullRequestForm component ─────────────────────────────────────────────────
 
-export function PullRequestForm({
-  projectId,
-  worktreePath,
-  currentBranch = 'main',
-}: {
+export function PullRequestForm(_props: {
   projectId: string
   worktreePath: string
   currentBranch?: string
@@ -113,100 +111,40 @@ export function PullRequestForm({
   const [prUrl, setPrUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const { emit } = useWorkspace()
-
-  const rpcTarget = useCallback(
-    () => getActiveRuntimeTarget(useAppStore.getState().settings),
-    []
-  )
-
-  // Generate AI PR description
+  // Generate AI PR description — unavailable, see file header.
   const handleGenerateDescription = useCallback(async () => {
     setIsGenerating(true)
-    setError(null)
-    try {
-      // Get diff between current branch and base
-      const diffResult = await callRuntimeRpc<{ stdout: string }>(rpcTarget(), 'git.diff', {
-        projectId, worktreePath, staged: false
-      })
-      const diff = diffResult.stdout?.slice(0, 6000) ?? ''
+    setError(PR_CREATION_UNAVAILABLE_MESSAGE)
+    setIsGenerating(false)
+  }, [])
 
-      // Use git.generateCommitMessage as a proxy for AI description generation
-      const result = await callRuntimeRpc<{ message: string }>(
-        rpcTarget(), 'git.generateCommitMessage', {
-          projectId, worktreePath, devServerId: 'default'
-        }
-      ).catch((): { message: string } => ({ message: '' }))
-
-      // Build PR description from commit-message-style result
-      if (!title) {setTitle(result.message.split('\n')[0] ?? '')}
-      setBody([
-        '## Summary',
-        '',
-        result.message,
-        '',
-        '## Changes',
-        '',
-        `Branch: \`${currentBranch}\` → \`${base}\``,
-        '',
-        diff ? `<details><summary>Diff preview</summary>\n\n\`\`\`diff\n${diff.slice(0, 2000)}\n\`\`\`\n</details>` : '',
-      ].filter(l => l !== undefined).join('\n'))
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setIsGenerating(false)
-    }
-  }, [projectId, worktreePath, base, currentBranch, title, rpcTarget])
-
-  // Submit PR
+  // Submit PR — unavailable, see file header.
   const handleSubmit = useCallback(async () => {
     if (!title.trim()) {
       setError('PR title is required')
       return
     }
     setIsSubmitting(true)
-    setError(null)
-    const span = Tracers.codeReviewCreatePrFlow.start({ projectId, base, draft })
-    try {
-      const result = await callRuntimeRpc<PrCreateResult>(rpcTarget(), 'git.pr.create', {
-        projectId,
-        worktreePath,
-        title: title.trim(),
-        body: body.trim(),
-        base,
-        draft,
-        head: currentBranch,
-        traceId: span.id,
-      })
-      setPrUrl(result.url)
-      emit('git.pr.created', { projectId, url: result.url, title })
-      span.ok({ prUrl: result.url, exitCode: result.exitCode })
-    } catch (err) {
-      setError((err as Error).message)
-      span.fail(err, { projectId, base })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [title, body, base, draft, currentBranch, projectId, worktreePath, rpcTarget, emit])
+    setError(PR_CREATION_UNAVAILABLE_MESSAGE)
+    setIsSubmitting(false)
+  }, [title])
 
   // Success state
   if (prUrl) {
     return (
       <div id="git-pr-success" style={S.successBox}>
         <div style={{ color: '#a6e3a1', fontWeight: 700 }}>✓ Pull Request Created</div>
-        <a
-          id="git-pr-url"
-          href={prUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={S.prUrl}
-        >
+        <a id="git-pr-url" href={prUrl} target="_blank" rel="noopener noreferrer" style={S.prUrl}>
           {prUrl}
         </a>
         <button
           type="button"
           style={S.btn('secondary')}
-          onClick={() => { setPrUrl(null); setTitle(''); setBody('') }}
+          onClick={() => {
+            setPrUrl(null)
+            setTitle('')
+            setBody('')
+          }}
         >
           Create another
         </button>
@@ -218,38 +156,44 @@ export function PullRequestForm({
     <div id="git-pr-form" style={S.container}>
       {/* Title */}
       <div style={S.field}>
-        <label htmlFor="git-pr-title" style={S.label}>Title</label>
+        <label htmlFor="git-pr-title" style={S.label}>
+          Title
+        </label>
         <input
           id="git-pr-title"
           type="text"
           style={S.input}
           placeholder="PR title…"
           value={title}
-          onChange={e => setTitle(e.target.value)}
+          onChange={(e) => setTitle(e.target.value)}
         />
       </div>
 
       {/* Body */}
       <div style={S.field}>
-        <label htmlFor="git-pr-body" style={S.label}>Description</label>
+        <label htmlFor="git-pr-body" style={S.label}>
+          Description
+        </label>
         <textarea
           id="git-pr-body"
           style={S.textarea}
           placeholder="Describe your changes…"
           value={body}
-          onChange={e => setBody(e.target.value)}
+          onChange={(e) => setBody(e.target.value)}
         />
       </div>
 
       {/* Base branch */}
       <div style={S.field}>
-        <label htmlFor="git-pr-base" style={S.label}>Base Branch</label>
+        <label htmlFor="git-pr-base" style={S.label}>
+          Base Branch
+        </label>
         <input
           id="git-pr-base"
           type="text"
           style={S.input}
           value={base}
-          onChange={e => setBase(e.target.value)}
+          onChange={(e) => setBase(e.target.value)}
         />
       </div>
 
@@ -259,7 +203,7 @@ export function PullRequestForm({
           id="git-pr-draft"
           type="checkbox"
           checked={draft}
-          onChange={e => setDraft(e.target.checked)}
+          onChange={(e) => setDraft(e.target.checked)}
         />
         <span style={S.checkLabel}>Create as draft</span>
       </label>

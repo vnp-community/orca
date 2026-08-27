@@ -29,6 +29,7 @@ import { WorktreeCardAutomationDetailSection } from './WorktreeCardAutomationDet
 import { WorktreeCardIssueDetailSection } from './WorktreeCardIssueDetailSection'
 import { WorktreeCardHoverIdentityHeader } from './WorktreeCardHoverIdentityHeader'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export type {
   WorktreeCardIssueDisplay,
   WorktreeCardLinearIssueDisplay,
@@ -203,7 +204,7 @@ export function WorktreeCardDetailsHover({
     try {
       // Why: Electron clipboard IPC remains reliable from nested hover/dropdown
       // overlays where browser clipboard activation can be lost.
-      await window.api.ui.writeClipboardText(url)
+      await uiWriteClipboardText(url)
       toast.success(
         translate('auto.components.sidebar.WorktreeCardMeta.copyLinkSuccess', '{{value0}} copied', {
           value0: label

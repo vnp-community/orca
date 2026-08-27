@@ -7,6 +7,7 @@ import { useAppStore } from '@/store'
 import MermaidBlock from './MermaidBlock'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 /**
  * Common languages shown in the selector. The user can also type a language
  * name directly in the markdown fence (```rust) and it will be preserved —
@@ -206,8 +207,7 @@ export function RichMarkdownCodeBlock({
     (e: React.MouseEvent) => {
       e.stopPropagation()
       const text = node.textContent
-      void window.api.ui
-        .writeClipboardText(text)
+      void uiWriteClipboardText(text)
         .then(() => {
           if (!isMountedRef.current) {
             return

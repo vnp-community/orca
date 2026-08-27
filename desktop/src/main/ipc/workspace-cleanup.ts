@@ -6,19 +6,43 @@ import { listRegisteredPtys } from '../memory/pty-registry'
 import { getRemotePtyProvider } from './pty'
 import {
   WORKSPACE_CLEANUP_CLASSIFIER_VERSION,
+  type WorkspaceCleanupDismissal,
   type WorkspaceCleanupDismissArgs,
   type WorkspaceCleanupLocalProcessArgs,
   type WorkspaceCleanupLocalProcessResult,
   type WorkspaceCleanupScanArgs,
-  type WorkspaceCleanupScanResult
+  type WorkspaceCleanupScanResult,
+  type WorkspaceCleanupUIState
 } from '../../shared/workspace-cleanup'
 import { scanWorkspaceCleanup } from './workspace-cleanup-scan'
 
 export { scanWorkspaceCleanup }
 
+// Why: shared by the ipcMain handler and the workspaceCleanup.dismiss RPC
+// method so both accept/persist dismissals identically.
+export function mergeWorkspaceCleanupDismissals(
+  current: WorkspaceCleanupUIState['dismissals'],
+  dismissals: WorkspaceCleanupDismissal[] | undefined
+): WorkspaceCleanupUIState['dismissals'] {
+  const next = { ...current }
+  for (const dismissal of dismissals ?? []) {
+    if (
+      dismissal &&
+      dismissal.classifierVersion === WORKSPACE_CLEANUP_CLASSIFIER_VERSION &&
+      typeof dismissal.worktreeId === 'string' &&
+      typeof dismissal.fingerprint === 'string'
+    ) {
+      next[dismissal.worktreeId] = dismissal
+    }
+  }
+  return next
+}
+
 type WorkspaceCleanupHandlerDeps = {
   runtime?: OrcaRuntimeService
-  getLocalPtyProvider?: () => IPtyProvider
+  // Why: widened to allow RPC callers to pass `runtime.getLocalProvider()`
+  // (which returns null when unset) directly, without a throwaway wrapper.
+  getLocalPtyProvider?: () => IPtyProvider | null
 }
 
 export function registerWorkspaceCleanupHandlers(
@@ -42,18 +66,9 @@ export function registerWorkspaceCleanupHandlers(
 
   ipcMain.handle('workspaceCleanup:dismiss', (_event, args: WorkspaceCleanupDismissArgs) => {
     const current = store.getUI().workspaceCleanup?.dismissals ?? {}
-    const next = { ...current }
-    for (const dismissal of args.dismissals ?? []) {
-      if (
-        dismissal &&
-        dismissal.classifierVersion === WORKSPACE_CLEANUP_CLASSIFIER_VERSION &&
-        typeof dismissal.worktreeId === 'string' &&
-        typeof dismissal.fingerprint === 'string'
-      ) {
-        next[dismissal.worktreeId] = dismissal
-      }
-    }
-    store.updateUI({ workspaceCleanup: { dismissals: next } })
+    store.updateUI({
+      workspaceCleanup: { dismissals: mergeWorkspaceCleanupDismissals(current, args.dismissals) }
+    })
   })
 
   ipcMain.handle('workspaceCleanup:clearDismissals', () => {
@@ -71,7 +86,7 @@ export function registerWorkspaceCleanupHandlers(
   )
 }
 
-async function hasKillableProcesses(
+export async function hasKillableProcesses(
   args: WorkspaceCleanupLocalProcessArgs,
   deps: WorkspaceCleanupHandlerDeps
 ): Promise<boolean | null> {

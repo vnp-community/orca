@@ -168,6 +168,29 @@ export class AgentWebSocketServer {
           node: info.nodeVersion ?? 'unknown'
         })
 
+        // TEMP DIAG BUG-FE-PTY-001: tcpdump + agent-side instrumentation both
+        // point at the BACKEND initiating the close (agent's ws library
+        // auto-echoes a received CLOSE frame via Receiver.receiverOnConclude)
+        // — but no explicit ws.close() call site was found anywhere in this
+        // file, dev-server-relay-bridge.ts, or ssh-channel-multiplexer.ts
+        // that fires outside a reactive/handshake-time path. Wrap this
+        // session's own ws.close()/terminate() to catch it at the source.
+        const diagDevServerId = info.devServerId ?? 'unknown'
+        const diagOrigClose = ws.close.bind(ws)
+        const diagOrigTerminate = ws.terminate.bind(ws)
+        ;(ws as unknown as { close: typeof ws.close }).close = ((...args: Parameters<typeof diagOrigClose>) => {
+          console.error(
+            `[DIAG BUG-FE-PTY-001] backend ws.close() called devServerId=${diagDevServerId} args=${JSON.stringify(args)} readyState=${ws.readyState}\n${new Error('close call site').stack}`
+          )
+          return diagOrigClose(...args)
+        }) as typeof ws.close
+        ;(ws as unknown as { terminate: typeof ws.terminate }).terminate = (() => {
+          console.error(
+            `[DIAG BUG-FE-PTY-001] backend ws.terminate() called devServerId=${diagDevServerId} readyState=${ws.readyState}\n${new Error('terminate call site').stack}`
+          )
+          return diagOrigTerminate()
+        }) as typeof ws.terminate
+
         // Wire multiplexer and hand off to DevServerRelayBridge via callback
         // Why: agents connect via WebSocket (not SSH), so use a non-SSH error
         // message so users aren't confused by 'SSH connection lost' when the

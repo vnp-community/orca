@@ -36,43 +36,26 @@ export async function readWindowsTerminalCapabilities(
       }))
   }
 
-  if (target.kind === 'local') {
-    const [wslAvailable, wslDistros, pwshAvailable, gitBashAvailable, hostPlatform] =
-      await Promise.all([
-        window.api.wsl.isAvailable().catch(() => false),
-        window.api.wsl.listDistros().catch(() => []),
-        window.api.pwsh.isAvailable().catch(() => false),
-        window.api.gitBash.isAvailable().catch(() => false),
-        window.api.runtime
-          .getStatus()
-          .then((status) => status.hostPlatform ?? null)
-          .catch(() => null)
-      ])
-    return {
-      wslAvailable,
-      wslDistros,
-      pwshAvailable,
-      gitBashAvailable,
-      hostPlatform,
-      isLoading: false
-    }
-  }
-
+  // Why: local desktop and remote environments both expose the same host.*
+  // RPC surface (host-capabilities.ts), so one call shape covers both —
+  // callRuntimeRpc already branches window.api.runtime.call vs
+  // window.api.runtimeEnvironments.call based on target.kind.
+  const timeoutMs = target.kind === 'local' ? undefined : 15_000
   const [wslAvailable, wslDistros, pwshAvailable, gitBashAvailable, hostPlatform] =
     await Promise.all([
-      callRuntimeRpc<boolean>(target, 'host.wsl.isAvailable', undefined, {
-        timeoutMs: 15_000
-      }).catch(() => false),
-      callRuntimeRpc<string[]>(target, 'host.wsl.listDistros', undefined, {
-        timeoutMs: 15_000
-      }).catch(() => []),
-      callRuntimeRpc<boolean>(target, 'host.pwsh.isAvailable', undefined, {
-        timeoutMs: 15_000
-      }).catch(() => false),
-      callRuntimeRpc<boolean>(target, 'host.gitBash.isAvailable', undefined, {
-        timeoutMs: 15_000
-      }).catch(() => false),
-      callRuntimeRpc<RuntimeStatus>(target, 'status.get', undefined, { timeoutMs: 15_000 })
+      callRuntimeRpc<boolean>(target, 'host.wsl.isAvailable', undefined, { timeoutMs }).catch(
+        () => false
+      ),
+      callRuntimeRpc<string[]>(target, 'host.wsl.listDistros', undefined, { timeoutMs }).catch(
+        () => []
+      ),
+      callRuntimeRpc<boolean>(target, 'host.pwsh.isAvailable', undefined, { timeoutMs }).catch(
+        () => false
+      ),
+      callRuntimeRpc<boolean>(target, 'host.gitBash.isAvailable', undefined, { timeoutMs }).catch(
+        () => false
+      ),
+      callRuntimeRpc<RuntimeStatus>(target, 'status.get', undefined, { timeoutMs })
         .then((status) => status.hostPlatform ?? null)
         .catch(() => null)
     ])

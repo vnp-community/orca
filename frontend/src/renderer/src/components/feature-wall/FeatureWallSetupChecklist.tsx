@@ -15,6 +15,7 @@ import {
 } from './FeatureWallSetupWorkflowActions'
 import { ConnectIntegrationsList } from './ConnectIntegrationsList'
 import { BrowserAction } from './FeatureWallBrowserAction'
+import { FeatureWallConnectDevServerAction } from './FeatureWallConnectDevServerAction'
 import {
   SetupBrowserVisual,
   SetupMultipleReposVisual,
@@ -135,6 +136,9 @@ function SelectedStepAction(props: FeatureWallSetupChecklistProps): React.JSX.El
     return null
   }
   const activeDone = props.progress.stepDone[activeStep.id]
+  if (activeStep.id === 'connect-dev-server') {
+    return <FeatureWallConnectDevServerAction />
+  }
   if (activeStep.id === 'default-agent') {
     return <DefaultAgentAction />
   }

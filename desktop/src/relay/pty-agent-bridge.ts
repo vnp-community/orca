@@ -36,6 +36,7 @@
 
 import type { AgentLogger } from './agent-logger'
 import { Tracers } from '../shared/trace/tracers'
+import { getForegroundProcessName } from './pty-shell-utils'
 
 // ─── Trace propagation helper ───────────────────────────────────────────────
 // Agent WS JSON-RPC 2.0: traceId nested at params._trace.id (CR-TRACE-000 §3.3).
@@ -478,6 +479,34 @@ export async function handlePtySendSignal(
     span?.fail(err, { ptyId })
     return { jsonrpc: '2.0', id, error: { code: -32603, message: `pty.sendSignal failed: ${msg}` } }
   }
+}
+
+/**
+ * handlePtyListProcesses — Enumerate every PTY this daemon currently tracks.
+ *
+ * Why this exists: DevServerPtyProvider.listProcesses() (backend) used to
+ * always return [] with a "no agent-wide PTY enumeration RPC exists yet"
+ * comment — mirrors SshPtyProvider.listProcesses(), which has always called
+ * this same-named RPC against the SSH relay daemon (pty-handler.ts). Without
+ * it, the backend's liveness sweep (refreshPtyWorktreeRecordsFromController)
+ * could never learn a Dev-Server-hosted PTY died on its own: a dead ptyId
+ * stayed marked "ready" in session-tabs bookkeeping until the tab/leaf was
+ * closed outright, so every reattach attempt — fresh spawn included, since
+ * mirrored web tabs always ask "what handle is ready for this tab" — kept
+ * being handed back the same dead id (BUG-FE-PTY-001).
+ */
+export async function handlePtyListProcesses(
+  id:     string | number | null,
+  _params: Record<string, unknown>,
+  _log:   AgentLogger,
+): Promise<object> {
+  const results: { id: string; cwd: string; title: string }[] = []
+  for (const [ptyId, entry] of AGENT_PTY_MAP) {
+    const title =
+      (await getForegroundProcessName(entry.pty.pid, entry.pty.process || null)) || 'shell'
+    results.push({ id: ptyId, cwd: entry.cwd, title })
+  }
+  return { jsonrpc: '2.0', id, result: results }
 }
 
 /** Number of PTYs currently tracked — used by pty-daemon-server.ts to decide

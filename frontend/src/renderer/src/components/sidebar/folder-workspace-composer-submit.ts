@@ -21,6 +21,7 @@ import { resolveLocalWindowsAgentStartupShell } from '../../../../shared/windows
 import type { AgentStartupShell } from '../../../../shared/tui-agent-startup-shell'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
+import { markRuntimeAgentTrusted } from '@/runtime/runtime-agent-trust-client'
 import {
   getLinkedItemDisplayName,
   toFolderWorkspaceLinkedTask
@@ -130,7 +131,7 @@ async function preflightFolderWorkspaceAgentTrust(args: {
   workspacePath: string | null
   connectionId?: string | null
 }): Promise<void> {
-  if (!args.agent || !window.api.agentTrust?.markTrusted) {
+  if (!args.agent) {
     return
   }
   const preflight = TUI_AGENT_CONFIG[args.agent].preflightTrust
@@ -138,7 +139,7 @@ async function preflightFolderWorkspaceAgentTrust(args: {
     return
   }
   try {
-    await window.api.agentTrust.markTrusted({
+    await markRuntimeAgentTrusted({
       preset: preflight,
       workspacePath: args.workspacePath,
       ...(args.connectionId ? { connectionId: args.connectionId } : {})

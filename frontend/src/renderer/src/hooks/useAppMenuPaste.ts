@@ -3,11 +3,12 @@ import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { handleAppMenuPasteRequest } from '@/lib/app-menu-paste'
 
+import { uiReadClipboardText } from '@/runtime/runtime-ui-client'
 export function useAppMenuPaste(): void {
   useEffect(() => {
     const handlePaste = (options?: { mode?: 'paste' | 'paste-and-match-style' }): void => {
       void handleAppMenuPasteRequest({
-        readClipboardText: window.api.ui.readClipboardText,
+        readClipboardText: uiReadClipboardText,
         performNativePaste: window.api.ui.performNativePaste,
         nativePasteMode: options?.mode ?? 'paste'
       })

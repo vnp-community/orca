@@ -95,6 +95,8 @@ import { dirname } from '@/lib/path'
 import { relativePathInsideRoot } from '../../../../shared/cross-platform-path'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenFileUri, shellPathExists } from '../../runtime/runtime-shell-client'
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const EMPTY_MARKDOWN_DOCUMENTS: MarkdownDocument[] = []
 
 type MarkdownPreviewProps = {
@@ -928,7 +930,7 @@ export default function MarkdownPreview({
       const copied = await copyMarkdownReviewNotesForAgent({
         notes: markdownReviewNotes,
         content: renderedContent,
-        writeClipboardText: window.api.ui.writeClipboardText
+        writeClipboardText: uiWriteClipboardText
       })
       if (!copied || !reviewNotesCopyMountedRef.current) {
         return
@@ -950,7 +952,7 @@ export default function MarkdownPreview({
         const copied = await copyMarkdownReviewNotesForAgent({
           notes: [note],
           content: renderedContent,
-          writeClipboardText: window.api.ui.writeClipboardText
+          writeClipboardText: uiWriteClipboardText
         })
         if (!copied || !reviewNotesCopyMountedRef.current) {
           return
@@ -1345,7 +1347,7 @@ export default function MarkdownPreview({
                 // Why: use the classifier's stripped absolutePath (no `:line:col`
                 // or `#L10` suffix) so the OS handler receives a clean file URI.
                 const cleanUri = absolutePathToFileUri(classified.absolutePath)
-                void window.api.shell.pathExists(classified.absolutePath).then((exists) => {
+                void shellPathExists(classified.absolutePath).then((exists) => {
                   if (!exists) {
                     toast.error(
                       translate(
@@ -1356,11 +1358,11 @@ export default function MarkdownPreview({
                     )
                     return
                   }
-                  void window.api.shell.openFileUri(cleanUri)
+                  void shellOpenFileUri(cleanUri)
                 })
                 return
               }
-              void window.api.shell.openFileUri(parsed.toString())
+              void shellOpenFileUri(parsed.toString())
             }
             return
           }
@@ -1450,7 +1452,7 @@ export default function MarkdownPreview({
               showLocalPathOpenBlockedToast()
               return
             }
-            void window.api.shell.openFileUri(target.toString())
+            void shellOpenFileUri(target.toString())
             return
           }
 

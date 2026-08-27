@@ -516,6 +516,48 @@ describe('FsHandler', () => {
     await expect(dispatcher.callRequest('fs.createDirNoClobber', { dirPath })).rejects.toThrow()
   })
 
+  // Why: backend/src/main/runtime/rpc/methods/dev-server.ts's devServer.mkdir/
+  // rmdir call 'fs.mkdir'/'fs.rmdir' with { path } — these are name+param-shape
+  // adapters onto createDir/deletePath, not bare aliases. See
+  // specs/agent/api/gaps-and-findings.md #4.
+  describe('fs.mkdir / fs.rmdir (Part A name aliases)', () => {
+    it('fs.mkdir creates a directory and returns { path }', async () => {
+      const dirPath = path.join(tmpDir, 'aliased', 'mkdir')
+      const result = (await dispatcher.callRequest('fs.mkdir', { path: dirPath })) as {
+        path: string
+      }
+
+      expect(result).toEqual({ path: dirPath })
+      const stats = await fs.stat(dirPath)
+      expect(stats.isDirectory()).toBe(true)
+    })
+
+    it('fs.rmdir removes an empty directory', async () => {
+      const dirPath = path.join(tmpDir, 'aliased-rmdir')
+      mkdirSync(dirPath)
+
+      await dispatcher.callRequest('fs.rmdir', { path: dirPath })
+      await expect(fs.access(dirPath)).rejects.toThrow()
+    })
+
+    it('fs.rmdir refuses a non-empty directory without recursive:true', async () => {
+      const dirPath = path.join(tmpDir, 'aliased-rmdir-nonempty')
+      mkdirSync(dirPath)
+      writeFileSync(path.join(dirPath, 'file.txt'), 'x')
+
+      await expect(dispatcher.callRequest('fs.rmdir', { path: dirPath })).rejects.toThrow()
+    })
+
+    it('fs.rmdir removes a non-empty directory when recursive:true', async () => {
+      const dirPath = path.join(tmpDir, 'aliased-rmdir-recursive')
+      mkdirSync(dirPath)
+      writeFileSync(path.join(dirPath, 'file.txt'), 'x')
+
+      await dispatcher.callRequest('fs.rmdir', { path: dirPath, recursive: true })
+      await expect(fs.access(dirPath)).rejects.toThrow()
+    })
+  })
+
   it('rename moves files', async () => {
     const oldPath = path.join(tmpDir, 'old.txt')
     const newPath = path.join(tmpDir, 'new.txt')

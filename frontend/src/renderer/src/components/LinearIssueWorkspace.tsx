@@ -61,6 +61,7 @@ import type {
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type LinearIssueWorkspaceProps = {
   issue: LinearIssue | null
   onUse: (issue: LinearIssue) => void
@@ -73,7 +74,7 @@ type LinearIssueWorkspaceProps = {
 
 async function copyTextToClipboard(text: string, label: string): Promise<void> {
   try {
-    await window.api.ui.writeClipboardText(text)
+    await uiWriteClipboardText(text)
     toast.success(
       translate('auto.components.LinearIssueWorkspace.7835483c43', '{{value0}} copied', {
         value0: label

@@ -6,6 +6,14 @@ import { useAppStore } from '../store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
+import {
+  dismissRuntimeStarNag,
+  deferRuntimeStarNag,
+  openWebRuntimeStarNag,
+  starRuntimeOrcaFromNag,
+  subscribeToRuntimeStarNagVisibility
+} from '../runtime/runtime-star-nag-client'
 const ORCA_REPO_URL = 'https://github.com/stablyai/orca'
 type StarNagMode = 'gh' | 'web'
 
@@ -31,26 +39,25 @@ export function StarNagCard(): React.JSX.Element | null {
   // because that's a higher-priority action.
   const updateStatus = useAppStore((s) => s.updateStatus)
   const updateCardVisible = updateStatus.state !== 'idle' && updateStatus.state !== 'not-available'
+  const settings = useAppStore((s) => s.settings)
 
   useEffect(() => {
-    const unsubscribeShow = window.api.starNag.onShow((payload) => {
-      if (payload?.surface && payload.surface !== 'card') {
+    return subscribeToRuntimeStarNagVisibility(settings, {
+      onShow: (payload) => {
+        if (payload?.surface && payload.surface !== 'card') {
+          setBusy(false)
+          setVisible(false)
+          return
+        }
+        setMode(payload?.mode === 'web' ? 'web' : 'gh')
+        setVisible(true)
+      },
+      onHide: () => {
         setBusy(false)
         setVisible(false)
-        return
       }
-      setMode(payload?.mode === 'web' ? 'web' : 'gh')
-      setVisible(true)
     })
-    const unsubscribeHide = window.api.starNag.onHide(() => {
-      setBusy(false)
-      setVisible(false)
-    })
-    return () => {
-      unsubscribeShow()
-      unsubscribeHide()
-    }
-  }, [])
+  }, [settings])
 
   const handleClose = useCallback((): void => {
     if (busy) {
@@ -60,15 +67,15 @@ export function StarNagCard(): React.JSX.Element | null {
     // Why: fire-and-forget. If persisting the dismissal fails the worst case
     // is we re-fire the same threshold on next launch — not worth blocking
     // the close animation on.
-    void window.api.starNag.dismiss()
-  }, [busy])
+    void dismissRuntimeStarNag(settings)
+  }, [busy, settings])
 
   const handleLater = (): void => {
     if (busy) {
       return
     }
     setVisible(false)
-    void window.api.starNag.later()
+    void deferRuntimeStarNag(settings)
   }
 
   useEffect(() => {
@@ -97,8 +104,8 @@ export function StarNagCard(): React.JSX.Element | null {
     }
     const openGithubFallback = async (): Promise<boolean> => {
       try {
-        await window.api.shell.openUrl(ORCA_REPO_URL)
-        await window.api.starNag.openWeb()
+        await shellOpenUrl(ORCA_REPO_URL)
+        await openWebRuntimeStarNag(settings)
         if (mountedRef.current) {
           setVisible(false)
         }
@@ -123,7 +130,7 @@ export function StarNagCard(): React.JSX.Element | null {
     setBusy(true)
     let ok = false
     try {
-      ok = await window.api.starNag.starOrca()
+      ok = await starRuntimeOrcaFromNag(settings)
     } catch {
       ok = false
     }

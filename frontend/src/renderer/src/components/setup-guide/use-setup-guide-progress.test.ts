@@ -27,6 +27,8 @@ function makeProgress(overrides: Partial<FeatureWallSetupProgress> = {}): Featur
   return {
     ready: true,
     stepDone: {
+      'connect-dev-server': false,
+      'add-dev-server-repo': false,
       'default-agent': false,
       'add-two-repos': false,
       notifications: false,

@@ -12,6 +12,7 @@ import { useAppStore } from '@/store'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { resolveKnownWorktreeRootPathLink } from './terminal-worktree-path-link'
 
+import { shellOpenFilePath } from '../../runtime/runtime-shell-client'
 type TerminalFileOpenDeps = {
   worktreeId: string
   worktreePath: string
@@ -131,7 +132,7 @@ export function openDetectedFilePath(
     if (openWithSystemDefault && canOpenWithSystemDefault) {
       // Why: Shift+Cmd/Ctrl mirrors URL links by escaping Orca and honoring the
       // user's OS file associations without adding editor-specific settings.
-      const openedWithSystemDefault = await window.api.shell.openFilePath(filePath)
+      const openedWithSystemDefault = await shellOpenFilePath(filePath)
       if (openedWithSystemDefault || statResult.isDirectory) {
         return
       }
@@ -139,7 +140,7 @@ export function openDetectedFilePath(
 
     if (statResult.isDirectory) {
       if (canOpenWithSystemDefault) {
-        await window.api.shell.openFilePath(filePath)
+        await shellOpenFilePath(filePath)
       }
       return
     }

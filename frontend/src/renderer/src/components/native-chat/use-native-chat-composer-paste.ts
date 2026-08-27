@@ -9,6 +9,7 @@ import {
   type NativeChatAttachmentOwner
 } from './native-chat-attachment-upload'
 
+import { uiReadClipboardText, uiSaveClipboardImageAsTempFile } from '@/runtime/runtime-ui-client'
 export type UseNativeChatComposerPasteArgs = {
   agent: AgentType
   /** Live composer-disabled state (no pty / presence-lock); read at await-resume
@@ -76,7 +77,7 @@ export function useNativeChatComposerPaste({
       try {
         // SSH panes save the image on the remote host (SFTP) so the attached
         // path is readable by the remote agent, matching terminal image paste.
-        const tempPath = await window.api.ui.saveClipboardImageAsTempFile(
+        const tempPath = await uiSaveClipboardImageAsTempFile(
           owner.kind === 'ssh' ? { connectionId: owner.connectionId } : undefined
         )
         return tempPath ? { status: 'saved', tempPath } : { status: 'empty' }
@@ -176,9 +177,9 @@ export function useNativeChatComposerPaste({
         attachClipboardImageTempFile(saved.tempPath)
         return
       }
-      const text = await window.api.ui
-        .readClipboardText({ maxBytes: NATIVE_CHAT_CONTEXT_PASTE_MAX_BYTES })
-        .catch(() => '')
+      const text = await uiReadClipboardText({
+        maxBytes: NATIVE_CHAT_CONTEXT_PASTE_MAX_BYTES
+      }).catch(() => '')
       if (disabledRef.current) {
         return
       }

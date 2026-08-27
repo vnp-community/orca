@@ -3,7 +3,8 @@ import { toast } from 'sonner'
 import { FileText } from 'lucide-react'
 import type {
   DiagnosticsBundlePayload,
-  DiagnosticsStatusPayload
+  DiagnosticsStatusPayload,
+  DiagnosticsUploadPayload
 } from '../../../../preload/api-types'
 import { Label } from '../ui/label'
 import { Separator } from '../ui/separator'
@@ -13,6 +14,15 @@ import {
 } from './PrivacyDiagnosticBundleControls'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import {
+  collectRuntimeDiagnosticsBundle,
+  deleteRuntimeDiagnosticsBundle,
+  discardRuntimeDiagnosticsBundlePreview,
+  getRuntimeDiagnosticsStatus,
+  openRuntimeDiagnosticsBundlePreview,
+  uploadRuntimeDiagnosticsBundle
+} from '@/runtime/runtime-diagnostics-client'
 export function PrivacyDiagnosticsSection(): React.JSX.Element {
   const [status, setStatus] = useState<DiagnosticsStatusPayload | null>(null)
   const [bundle, setBundle] = useState<DiagnosticsBundlePayload | null>(null)
@@ -29,7 +39,7 @@ export function PrivacyDiagnosticsSection(): React.JSX.Element {
 
   const refreshStatus = useCallback(async (): Promise<void> => {
     try {
-      const next = await window.api.diagnostics.getStatus()
+      const next = (await getRuntimeDiagnosticsStatus()) as DiagnosticsStatusPayload | null
       if (mountedRef.current) {
         setStatus(next)
       }
@@ -47,7 +57,7 @@ export function PrivacyDiagnosticsSection(): React.JSX.Element {
     return () => {
       mountedRef.current = false
       if (activeBundleSubmissionIdRef.current) {
-        void window.api.diagnostics.discardBundlePreview(activeBundleSubmissionIdRef.current)
+        void discardRuntimeDiagnosticsBundlePreview(activeBundleSubmissionIdRef.current)
       }
     }
   }, [])
@@ -55,9 +65,12 @@ export function PrivacyDiagnosticsSection(): React.JSX.Element {
   const handleCollectBundle = useCallback(async (): Promise<void> => {
     setCollecting(true)
     try {
-      const nextBundle = await window.api.diagnostics.collectBundle()
+      const nextBundle = (await collectRuntimeDiagnosticsBundle()) as DiagnosticsBundlePayload | null
+      if (!nextBundle) {
+        throw new Error('Could not create review file')
+      }
       if (!mountedRef.current) {
-        await window.api.diagnostics.discardBundlePreview(nextBundle.bundleSubmissionId)
+        await discardRuntimeDiagnosticsBundlePreview(nextBundle.bundleSubmissionId)
         return
       }
       // Why: unmount cleanup may run before a passive ref mirror would fire;
@@ -89,7 +102,7 @@ export function PrivacyDiagnosticsSection(): React.JSX.Element {
     }
     setOpeningPreview(true)
     try {
-      await window.api.diagnostics.openBundlePreview(bundle.bundleSubmissionId)
+      await openRuntimeDiagnosticsBundlePreview(bundle.bundleSubmissionId)
       if (!mountedRef.current) {
         return
       }
@@ -117,11 +130,13 @@ export function PrivacyDiagnosticsSection(): React.JSX.Element {
     }
     setUploading(true)
     try {
-      const upload = await window.api.diagnostics.uploadBundle(bundle.bundleSubmissionId)
+      const upload = (await uploadRuntimeDiagnosticsBundle(
+        bundle.bundleSubmissionId
+      )) as DiagnosticsUploadPayload | null
       if (!mountedRef.current) {
         return
       }
-      if ('canceled' in upload) {
+      if (!upload || 'canceled' in upload) {
         return
       }
       activeBundleSubmissionIdRef.current = null
@@ -151,7 +166,7 @@ export function PrivacyDiagnosticsSection(): React.JSX.Element {
     }
     setDiscarding(true)
     try {
-      await window.api.diagnostics.discardBundlePreview(bundle.bundleSubmissionId)
+      await discardRuntimeDiagnosticsBundlePreview(bundle.bundleSubmissionId)
       if (!mountedRef.current) {
         return
       }
@@ -181,7 +196,7 @@ export function PrivacyDiagnosticsSection(): React.JSX.Element {
     }
     setCopyingTicket(true)
     try {
-      await window.api.ui.writeClipboardText(ticketId)
+      await uiWriteClipboardText(ticketId)
       if (!mountedRef.current) {
         return
       }
@@ -213,7 +228,7 @@ export function PrivacyDiagnosticsSection(): React.JSX.Element {
     }
     setDeletingTicket(true)
     try {
-      await window.api.diagnostics.deleteBundle(ticketId)
+      await deleteRuntimeDiagnosticsBundle(ticketId)
       if (!mountedRef.current) {
         return
       }

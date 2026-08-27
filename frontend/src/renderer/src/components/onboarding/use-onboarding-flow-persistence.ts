@@ -1,6 +1,8 @@
 import { useCallback, useRef } from 'react'
 import { track } from '@/lib/telemetry'
 import { useAppStore } from '@/store'
+import { notifyRuntimeStarNagOnboardingCompleted } from '@/runtime/runtime-star-nag-client'
+import { updateRuntimeOnboardingState } from '@/runtime/runtime-onboarding-client'
 import { ONBOARDING_FINAL_STEP, ONBOARDING_FLOW_VERSION } from '../../../../shared/constants'
 import type { EventProps } from '../../../../shared/telemetry-events'
 import type { GlobalSettings, OnboardingState, TuiAgent } from '../../../../shared/types'
@@ -11,7 +13,7 @@ export async function persistStep(
   stepNumber: number,
   updates: Partial<OnboardingState> = {}
 ): Promise<OnboardingState> {
-  return window.api.onboarding.update({
+  return updateRuntimeOnboardingState(useAppStore.getState().settings, {
     flowVersion: ONBOARDING_FLOW_VERSION,
     lastCompletedStep: Math.max(stepNumber, -1),
     ...updates
@@ -97,7 +99,7 @@ export function useCloseWith({
         // Why: main-process updateOnboarding already merges with current state,
         // so spreading the local (potentially stale) onboarding.checklist would
         // overwrite concurrent updates.
-        nextState = await window.api.onboarding.update({
+        nextState = await updateRuntimeOnboardingState(useAppStore.getState().settings, {
           flowVersion: ONBOARDING_FLOW_VERSION,
           closedAt: Date.now(),
           outcome,
@@ -145,7 +147,7 @@ export function useCloseWith({
         // Why: closeWith updates parent state synchronously from this hook's
         // perspective, but the modal unmounts on the next React commit.
         window.setTimeout(() => {
-          void window.api.starNag.onboardingCompleted()
+          void notifyRuntimeStarNagOnboardingCompleted(useAppStore.getState().settings)
         }, 0)
       } else if (outcome === 'dismissed') {
         trackOnboardingDismissed(lastStepReached, dismissedExtras)

@@ -40,6 +40,7 @@ import {
 } from '../../shared/cross-platform-path'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { invalidateAuthorizedRootsCache } from './filesystem-auth'
+import { notifySparsePresetsChangedListeners } from './sparse-presets-change-bus'
 import type { ChildProcess } from 'node:child_process'
 import { access, mkdir, readdir, rm } from 'node:fs/promises'
 import { gitExecFileAsync, gitSpawn } from '../git/runner'
@@ -2153,7 +2154,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   // immediately.
 
   ipcMain.handle('sparsePresets:list', (_event, args: { repoId: string }) => {
-    return store.getSparsePresets(args.repoId)
+    return listSparsePresetsForRepo(store, args.repoId)
   })
 
   ipcMain.handle(
@@ -2162,36 +2163,14 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       _event,
       args: { repoId: string; id?: string; name: string; directories: string[] }
     ): SparsePreset => {
-      const repo = store.getRepo(args.repoId)
-      if (!repo) {
-        throw new Error(`Repo "${args.repoId}" not found`)
-      }
-      const name = normalizeSparsePresetName(args.name)
-      const directories = normalizeSparsePresetDirectories(args.directories)
-      const now = Date.now()
-      const existing = args.id
-        ? store.getSparsePresets(args.repoId).find((preset) => preset.id === args.id)
-        : undefined
-      const preset: SparsePreset = {
-        id: existing?.id ?? randomUUID(),
-        repoId: args.repoId,
-        name,
-        directories,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now
-      }
-      const saved = store.saveSparsePreset(preset)
+      const saved = saveSparsePresetForRepo(store, args)
       notifySparsePresetsChanged(mainWindow, args.repoId)
       return saved
     }
   )
 
   ipcMain.handle('sparsePresets:remove', (_event, args: { repoId: string; presetId: string }) => {
-    const repo = store.getRepo(args.repoId)
-    if (!repo) {
-      throw new Error(`Repo "${args.repoId}" not found`)
-    }
-    store.removeSparsePreset(args.repoId, args.presetId)
+    removeSparsePresetForRepo(store, args)
     notifySparsePresetsChanged(mainWindow, args.repoId)
   })
 
@@ -2647,6 +2626,50 @@ function notifySparsePresetsChanged(mainWindow: BrowserWindow, repoId: string): 
   if (!mainWindow.isDestroyed()) {
     mainWindow.webContents.send('sparsePresets:changed', { repoId })
   }
+  notifySparsePresetsChangedListeners({ repoId })
+}
+
+/** Underlying implementation of `sparsePresets:list` — also called by the RPC method. */
+export function listSparsePresetsForRepo(store: Store, repoId: string): SparsePreset[] {
+  return store.getSparsePresets(repoId)
+}
+
+/** Underlying implementation of `sparsePresets:save` — also called by the RPC method. */
+export function saveSparsePresetForRepo(
+  store: Store,
+  args: { repoId: string; id?: string; name: string; directories: string[] }
+): SparsePreset {
+  const repo = store.getRepo(args.repoId)
+  if (!repo) {
+    throw new Error(`Repo "${args.repoId}" not found`)
+  }
+  const name = normalizeSparsePresetName(args.name)
+  const directories = normalizeSparsePresetDirectories(args.directories)
+  const now = Date.now()
+  const existing = args.id
+    ? store.getSparsePresets(args.repoId).find((preset) => preset.id === args.id)
+    : undefined
+  const preset: SparsePreset = {
+    id: existing?.id ?? randomUUID(),
+    repoId: args.repoId,
+    name,
+    directories,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  }
+  return store.saveSparsePreset(preset)
+}
+
+/** Underlying implementation of `sparsePresets:remove` — also called by the RPC method. */
+export function removeSparsePresetForRepo(
+  store: Store,
+  args: { repoId: string; presetId: string }
+): void {
+  const repo = store.getRepo(args.repoId)
+  if (!repo) {
+    throw new Error(`Repo "${args.repoId}" not found`)
+  }
+  store.removeSparsePreset(args.repoId, args.presetId)
 }
 
 function normalizeSparsePresetName(name: string): string {

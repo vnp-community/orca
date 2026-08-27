@@ -10,6 +10,7 @@ import {
 import { ensureAgentStartupInTerminal } from '@/lib/new-workspace'
 import { queueNewWorkspaceTerminalFocus } from '@/lib/new-workspace-terminal-focus'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { markRuntimeAgentTrusted } from '@/runtime/runtime-agent-trust-client'
 import {
   attachEphemeralVmRuntimeToWorkspace,
   cleanupEphemeralVmRuntimeForFailedCreate,
@@ -108,7 +109,7 @@ async function preflightAgentTrust(
   // as menu input on first launch. Pre-write the trust artifact before any
   // terminal spawns. Best-effort — the worktree already exists, so a failure
   // here must not strand it.
-  if (!request.agent || !window.api.agentTrust?.markTrusted) {
+  if (!request.agent) {
     return
   }
   const preflight = TUI_AGENT_CONFIG[request.agent].preflightTrust
@@ -116,7 +117,7 @@ async function preflightAgentTrust(
     return
   }
   try {
-    await window.api.agentTrust.markTrusted({
+    await markRuntimeAgentTrusted({
       preset: preflight,
       workspacePath: path,
       ...(connectionId ? { connectionId } : {})

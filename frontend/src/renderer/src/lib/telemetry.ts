@@ -14,6 +14,21 @@
 
 import type { EventName, EventProps } from '../../../shared/telemetry-events'
 import type { TelemetryConsentState } from '../../../shared/telemetry-consent-types'
+import { callRuntimeRpc } from '../runtime/runtime-rpc-client'
+
+// Why: telemetry had zero RPC coverage before this — `window.api.telemetryTrack`
+// etc are dedicated preload channels, not RPC methods. Routing through
+// window.api.runtime.call here (when the bridge is present) gives telemetry
+// the same uniform RPC calling convention as every other runtime-*-client,
+// without changing the fire-and-forget ergonomics below. Gated on
+// `window.api.agentTrust` — a desktop-only preload key, absent from
+// web-preload-api.ts — rather than `window.api.runtime`, which exists on web
+// too and would route into the backend RPC registry; that registry has no
+// `telemetry.*` methods (`window.api.telemetryTrack` etc are simply undefined
+// on web, so the existing `?.` fallback below already handles that path).
+function hasRuntimeBridge(): boolean {
+  return typeof window !== 'undefined' && Boolean(window.api?.agentTrust)
+}
 
 // Re-exported so renderer call sites can import the mapper from this lib
 // alongside `track`. The implementation lives in `src/shared/agent-kind.ts`
@@ -56,7 +71,15 @@ export function track<N extends EventName>(name: N, props: EventProps<N>): void 
   // the fire-and-forget contract — silent swallowing would let disk state
   // drift out of sync with UI state with zero signal to anyone debugging.
   try {
-    void window.api?.telemetryTrack?.(name, props as Record<string, unknown>)?.catch((err) => {
+    const send = hasRuntimeBridge()
+      ? callRuntimeRpc<void>(
+          { kind: 'local' },
+          'telemetry.track',
+          { name, props: props as Record<string, unknown> },
+          { timeoutMs: 5_000 }
+        )
+      : window.api?.telemetryTrack?.(name, props as Record<string, unknown>)
+    void send?.catch((err) => {
       console.warn('[telemetry] IPC track failed', err)
     })
   } catch (err) {
@@ -70,8 +93,16 @@ export function track<N extends EventName>(name: N, props: EventProps<N>): void 
 // (not rejecting) on any bridge error.
 export function setOptIn(optedIn: boolean): Promise<void> {
   try {
+    const send = hasRuntimeBridge()
+      ? callRuntimeRpc<void>(
+          { kind: 'local' },
+          'telemetry.setOptIn',
+          { optedIn },
+          { timeoutMs: 5_000 }
+        )
+      : window.api?.telemetrySetOptIn?.(optedIn)
     return (
-      window.api?.telemetrySetOptIn?.(optedIn)?.catch((err) => {
+      send?.catch((err) => {
         console.warn('[telemetry] IPC setOptIn failed', err)
       }) ?? Promise.resolve()
     )
@@ -87,7 +118,14 @@ export function setOptIn(optedIn: boolean): Promise<void> {
 // pretending the toggle is live when we cannot confirm consent.
 export async function getConsentState(): Promise<TelemetryConsentState> {
   try {
-    const result = await window.api?.telemetryGetConsentState?.()
+    const result = hasRuntimeBridge()
+      ? await callRuntimeRpc<TelemetryConsentState>(
+          { kind: 'local' },
+          'telemetry.getConsentState',
+          undefined,
+          { timeoutMs: 5_000 }
+        )
+      : await window.api?.telemetryGetConsentState?.()
     return isTelemetryConsentState(result) ? result : { effective: 'pending_banner' }
   } catch (err) {
     console.warn('[telemetry] IPC getConsentState failed', err)
@@ -111,8 +149,13 @@ export async function getConsentState(): Promise<TelemetryConsentState> {
 // preserved by resolving (not rejecting) on any bridge error.
 export function acknowledgeBanner(): Promise<void> {
   try {
+    const send = hasRuntimeBridge()
+      ? callRuntimeRpc<void>({ kind: 'local' }, 'telemetry.acknowledgeBanner', undefined, {
+          timeoutMs: 5_000
+        })
+      : window.api?.telemetryAcknowledgeBanner?.()
     return (
-      window.api?.telemetryAcknowledgeBanner?.()?.catch((err) => {
+      send?.catch((err) => {
         console.warn('[telemetry] IPC acknowledgeBanner failed', err)
       }) ?? Promise.resolve()
     )

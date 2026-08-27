@@ -2145,7 +2145,33 @@ const api = {
     }> => ipcRenderer.invoke('onboarding.detectAgents', params),
     detectAgentsAllServers: (): Promise<
       Record<string, { agents: string[]; platform: NodeJS.Platform | null; error?: string }>
-    > => ipcRenderer.invoke('onboarding.detectAgentsAllServers')
+    > => ipcRenderer.invoke('onboarding.detectAgentsAllServers'),
+    // Why (BUG-FE-RPC onboarding audit): these four were declared in
+    // api-types.ts and already called from renderer code (GitIdentityCard,
+    // useRemotePreflightStatus, useRemoteWindowsTerminalCapabilities,
+    // onboarding-checklist store slice) but were never wired to
+    // ipcRenderer.invoke here — every call threw "not a function" at runtime.
+    getPreflightStatus: (params: {
+      devServerId: string
+      force?: boolean
+    }): Promise<import('../shared/dev-server-types').RemotePreflightStatus> =>
+      ipcRenderer.invoke('onboarding.getPreflightStatus', params),
+    setGitIdentity: (params: { devServerId: string; name: string; email: string }): Promise<void> =>
+      ipcRenderer.invoke('onboarding.setGitIdentity', params),
+    openGhAuthTerminal: (params: {
+      devServerId: string
+    }): Promise<{ ptyId: string; devServerId: string }> =>
+      ipcRenderer.invoke('onboarding.openGhAuthTerminal', params),
+    detectGhosttyConfig: (params: {
+      devServerId: string
+    }): Promise<{ configPath: string | null; themeDir: string | null }> =>
+      ipcRenderer.invoke('onboarding.detectGhosttyConfig', params),
+    detectWindowsCapabilities: (params: {
+      devServerId: string
+    }): Promise<import('../shared/dev-server-types').WindowsTerminalCapabilities> =>
+      ipcRenderer.invoke('onboarding.detectWindowsCapabilities', params),
+    markChecklistItem: (params: { item: string; devServerId?: string; value?: boolean }): Promise<void> =>
+      ipcRenderer.invoke('onboarding.markChecklistItem', params)
   },
 
   developerPermissions: {

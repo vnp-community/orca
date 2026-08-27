@@ -62,6 +62,7 @@ import { markLiveCodexSessionsForRestart } from '@/lib/codex-session-restart'
 import { UpdateStatusSegment } from './UpdateStatusSegment'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provider-visibility'
+import { reauthenticateCodexAccount } from '@/runtime/runtime-codex-accounts-client'
 import { StatusBarUsageEmptyCta } from './StatusBarUsageEmptyCta'
 import { UsagePercentageDisplayChangeNotice } from './UsagePercentageDisplayChangeNotice'
 import { shouldOpenStatusBarContextMenu } from './status-bar-context-menu-policy'
@@ -1388,7 +1389,7 @@ function CodexSwitcherMenu({
     }
     setReauthenticatingAccountId(accountId)
     try {
-      const next = await window.api.codexAccounts.reauthenticate({ accountId })
+      const next = await reauthenticateCodexAccount(accountId)
       recordFeatureInteraction('codex-account-switching')
       if (mountedRef.current) {
         setAccounts(next)

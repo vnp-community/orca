@@ -14,6 +14,12 @@ export const Tracers = {
   mkdirFlow:     createTracer('devServer:mkdir'),
   /** Browser → RPC → IPC → Relay → Agent: rmdir */
   rmdirFlow:     createTracer('devServer:rmdir'),
+  /** Browser → RPC → IPC → Relay → Agent: path existence check */
+  pathExistsFlow: createTracer('devServer:pathExists'),
+  /** Browser → RPC → IPC → Relay → Agent: read file content */
+  readFileFlow:  createTracer('devServer:readFile'),
+  /** Browser → RPC → IPC → Relay → Agent: copy file */
+  copyFileFlow:  createTracer('devServer:copyFile'),
   /** Agent WebSocket lifecycle (connect / disconnect) */
   agentWsFlow:   createTracer('agentWs:lifecycle'),
   /** IPC proxy call from user-process to main-process */
@@ -216,6 +222,8 @@ export const Tracers = {
   // ─── CR-TRACE-017: Workflow Orchestration (Backend-side) ───────────────────
   /** BL-WF-01: template create/inherit */
   workflowTemplateCreateFlow: createTracer('workflow:templateCreate'),
+  /** BL-WF-01: template update — same write-path tracing convention as templateCreate */
+  workflowTemplateUpdateFlow: createTracer('workflow:templateUpdate'),
   /** BL-WF-02: span CHA — 1 per execution, sống suốt vòng đời execution */
   workflowExecuteFlow:        createTracer('workflow:execute'),
   /** BL-WF-02: span CON — 1 per step, mang field parentTraceId để group theo execution */
@@ -224,4 +232,11 @@ export const Tracers = {
    *  updateVisibility()/share-token/shared route nào trong code hiện tại. Khai báo tên
    *  tracer để sẵn sàng khi tính năng sharing tồn tại, KHÔNG viết call site nào cho nó. */
   workflowShareFlow:          createTracer('workflow:share'),
+
+  // ─── OrcaProject Sharing (Backend-side, cross-user read) ───────────────────
+  /** orcaProjects.linkSourceProject/unlinkSourceProject/getProjectData — audit
+   *  trail for the cross-user read path (orcaProjectId, actingUserId, ownerUserId,
+   *  projectId). See docs/guides/terminal-workspace-project-devserver-architecture.md
+   *  "Điểm cần thiết kế cẩn thận nhất". */
+  orcaProjectSharingFlow: createTracer('orcaProject:sharing'),
 } as const
