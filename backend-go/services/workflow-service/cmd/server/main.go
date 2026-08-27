@@ -160,6 +160,9 @@ func run() error {
 	publishTemplateUC := usecase.NewPublishTemplate(repo, approvalStore, opaChecker)
 	resolveApprovalUC := usecase.NewResolveApproval(approvalStore, opaChecker)
 	listPendingApprovalsUC := usecase.NewListPendingApprovals(approvalStore, opaChecker)
+	generateShareLinkUC := usecase.NewGenerateShareLink(repo)
+	previewSharedTemplateUC := usecase.NewPreviewSharedTemplate(repo)
+	importSharedTemplateUC := usecase.NewImportSharedTemplate(repo, resolveTemplateUC)
 	recoverExecutionsUC := usecase.NewRecoverExecutions(repo, repo, repo, registry)
 
 	// Boot-time recovery scan (workflow-service.md §8: "before accepting
@@ -179,6 +182,7 @@ func run() error {
 		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
 		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC, cloneTemplateUC,
 		publishTemplateUC, resolveApprovalUC, listPendingApprovalsUC,
+		generateShareLinkUC, previewSharedTemplateUC, importSharedTemplateUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

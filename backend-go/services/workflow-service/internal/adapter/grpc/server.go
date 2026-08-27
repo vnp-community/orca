@@ -37,6 +37,10 @@ type Server struct {
 	publishTemplate      *usecase.PublishTemplate
 	resolveApproval      *usecase.ResolveApproval
 	listPendingApprovals *usecase.ListPendingApprovals
+
+	generateShareLink     *usecase.GenerateShareLink
+	previewSharedTemplate *usecase.PreviewSharedTemplate
+	importSharedTemplate  *usecase.ImportSharedTemplate
 }
 
 func New(
@@ -55,23 +59,29 @@ func New(
 	publishTemplate *usecase.PublishTemplate,
 	resolveApproval *usecase.ResolveApproval,
 	listPendingApprovals *usecase.ListPendingApprovals,
+	generateShareLink *usecase.GenerateShareLink,
+	previewSharedTemplate *usecase.PreviewSharedTemplate,
+	importSharedTemplate *usecase.ImportSharedTemplate,
 ) *Server {
 	return &Server{
-		createTemplate:       createTemplate,
-		execute:              execute,
-		getExecution:         getExecution,
-		pauseExecution:       pauseExecution,
-		resumeExecution:      resumeExecution,
-		executeAdHocStep:     executeAdHocStep,
-		hasActiveExecutions:  hasActiveExecutions,
-		cancelExecution:      cancelExecution,
-		listTemplates:        listTemplates,
-		resolveTemplate:      resolveTemplate,
-		updateTemplate:       updateTemplate,
-		cloneTemplate:        cloneTemplate,
-		publishTemplate:      publishTemplate,
-		resolveApproval:      resolveApproval,
-		listPendingApprovals: listPendingApprovals,
+		createTemplate:        createTemplate,
+		execute:               execute,
+		getExecution:          getExecution,
+		pauseExecution:        pauseExecution,
+		resumeExecution:       resumeExecution,
+		executeAdHocStep:      executeAdHocStep,
+		hasActiveExecutions:   hasActiveExecutions,
+		cancelExecution:       cancelExecution,
+		listTemplates:         listTemplates,
+		resolveTemplate:       resolveTemplate,
+		updateTemplate:        updateTemplate,
+		cloneTemplate:         cloneTemplate,
+		publishTemplate:       publishTemplate,
+		resolveApproval:       resolveApproval,
+		listPendingApprovals:  listPendingApprovals,
+		generateShareLink:     generateShareLink,
+		previewSharedTemplate: previewSharedTemplate,
+		importSharedTemplate:  importSharedTemplate,
 	}
 }
 
@@ -259,6 +269,37 @@ func toProtoApproval(a domain.Approval) *workflowv1.Approval {
 		out.ResolvedAt = timestamppb.New(*a.ResolvedAt)
 	}
 	return out
+}
+
+func (s *Server) GenerateShareLink(ctx context.Context, req *workflowv1.GenerateShareLinkRequest) (*workflowv1.GenerateShareLinkResponse, error) {
+	token, err := s.generateShareLink.Execute(ctx, req.GetTemplateId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.GenerateShareLinkResponse{ShareToken: token}, nil
+}
+
+func (s *Server) PreviewSharedTemplate(ctx context.Context, req *workflowv1.PreviewSharedTemplateRequest) (*workflowv1.SharedTemplatePreview, error) {
+	preview, err := s.previewSharedTemplate.Execute(ctx, req.GetShareToken())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.SharedTemplatePreview{
+		Name:        preview.Name,
+		Description: preview.Description,
+		Tags:        preview.Tags,
+		DagJson:     preview.DAGJSON,
+		RatingSum:   preview.RatingSum,
+		RatingCount: preview.RatingCount,
+	}, nil
+}
+
+func (s *Server) ImportSharedTemplate(ctx context.Context, req *workflowv1.ImportSharedTemplateRequest) (*workflowv1.WorkflowTemplate, error) {
+	tmpl, err := s.importSharedTemplate.Execute(ctx, req.GetShareToken())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoTemplate(tmpl), nil
 }
 
 func toDomainStepType(t workflowv1.StepType) domain.StepType {
