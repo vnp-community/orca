@@ -36,6 +36,44 @@ type DevServerRepository interface {
 	// in the usecase layer, not this adapter, matching every other `New*`
 	// call site in this service.
 	FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (ds domain.DevServer, found bool, err error)
+	// UpdateProvisionResult persists the outcome of one provisioning
+	// attempt — status plus the handshake facts SOL-FLEET-04 needs
+	// surfaced. Called once per server at the end of bulkProvisionOne
+	// (TASK-FLEET-02-05) and after EstablishConnection's handshake
+	// (TASK-FLEET-04-03), success or failure.
+	UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info HandshakeInfo, provisionedAt time.Time) error
+}
+
+// HandshakeInfo is a usecase-owned mirror of
+// adapter/devserveragent.HandshakeInfo — duplicated here rather than
+// imported, since adapter/devserveragent already imports this package (to
+// implement DevServerAgentClient) and importing it back would create an
+// import cycle. adapter/devserveragent.Client.LastHandshakeInfo and
+// adapter/sshrelay's provisioner both convert into this shape at the
+// usecase boundary.
+type HandshakeInfo struct {
+	Platform     string
+	Arch         string
+	NodeVersion  string
+	AgentVersion string
+}
+
+// Provisioner is BulkProvisionFleet's narrow port onto relay-ssh
+// provisioning (adapter/sshrelay.Provisioner's SSH-connect ->
+// prereq-check -> deploy -> handshake pipeline) — deliberately not
+// DevServerAgentClient (whose Health/Exec double as an implicit
+// provision-on-demand for every OTHER usecase in this service):
+// BulkProvisionFleet needs the provisioning outcome itself (handshake
+// facts, prereq shortfall) as its primary result, not a side-effect of
+// some other call.
+type Provisioner interface {
+	// Provision runs the full pipeline for devServer. A prereq shortfall
+	// does NOT make this return an error — deploy is still attempted
+	// (BL-FLEET-02's "does not abort the pipeline"), and prereqsMet=false
+	// on an otherwise-successful call reports it, so bulkProvisionOne can
+	// tell "deployed but degraded" apart from "deploy/handshake genuinely
+	// failed" (a non-nil err, which DOES still consume a retry attempt).
+	Provision(ctx context.Context, devServer domain.DevServer) (info HandshakeInfo, prereqsMet bool, err error)
 }
 
 // SshTargetRepository is the persistence port for SSH target registration.

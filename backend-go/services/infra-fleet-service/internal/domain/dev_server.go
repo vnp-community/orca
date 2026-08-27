@@ -4,7 +4,10 @@
 // database, no gRPC, no framework.
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // ConnectionMode is the transport this service uses to reach a DevServer —
 // mirrors orca.infrafleet.v1.ConnectionMode and TS's provider registry
@@ -53,17 +56,37 @@ var (
 // (display name, bootstrap status, agent version are not modeled here; see
 // this service's README "Known gaps").
 type DevServer struct {
-	ID          string
-	TenantID    string
-	Host        string
-	Mode        ConnectionMode
-	SSHTargetID string
+	ID                string
+	TenantID          string
+	Host              string
+	Mode              ConnectionMode
+	SSHTargetID       string
+	Status            DevServerStatus
+	Platform          string
+	Arch              string
+	NodeVersion       string
+	AgentVersion      string
+	LastProvisionedAt *time.Time
 }
+
+// DevServerStatus is the provisioning/health lifecycle state a DevServer
+// sits in — closes BUG-FLEET-02's "no degraded/unhealthy status field to
+// persist into" gap. BulkProvisionFleet (TASK-FLEET-02-05) is the primary
+// writer; SOL-FLEET-03's health poller also transitions Healthy<->Degraded.
+type DevServerStatus string
+
+const (
+	DevServerStatusPending   DevServerStatus = "pending" // registered, never provisioned
+	DevServerStatusHealthy   DevServerStatus = "healthy"
+	DevServerStatusDegraded  DevServerStatus = "degraded"  // prerequisites marginal or health degraded
+	DevServerStatusUnhealthy DevServerStatus = "unhealthy" // provisioning/deploy failed after retries
+)
 
 // NewDevServer constructs a DevServer, enforcing the invariants a record
 // must satisfy to be meaningful — this is where "infra-fleet-service owns
 // this data's correctness" actually lives, not scattered validation in the
-// gRPC handler.
+// gRPC handler. Status defaults to DevServerStatusPending — registration
+// alone doesn't provision, so "pending" is the honest initial value.
 func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID string) (DevServer, error) {
 	if tenantID == "" {
 		return DevServer{}, ErrEmptyDevServerTenant
@@ -77,7 +100,7 @@ func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID st
 	if mode == ConnectionModeRelaySSH && sshTargetID == "" {
 		return DevServer{}, ErrMissingSSHTargetForRelaySSH
 	}
-	return DevServer{ID: id, TenantID: tenantID, Host: host, Mode: mode, SSHTargetID: sshTargetID}, nil
+	return DevServer{ID: id, TenantID: tenantID, Host: host, Mode: mode, SSHTargetID: sshTargetID, Status: DevServerStatusPending}, nil
 }
 
 // IsZero reports whether ds is the zero-value DevServer — used by

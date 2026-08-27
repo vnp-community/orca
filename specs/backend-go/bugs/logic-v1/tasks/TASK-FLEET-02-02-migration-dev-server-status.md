@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (postgres migration)
 **File:** `backend-go/services/infra-fleet-service/migrations/0008_dev_server_status.up.sql` (new, plus matching `.down.sql`)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added 0008 up/down migration (0007 already taken by TASK-FLEET-01-02); no duplicate numbering.
 
 ---
 

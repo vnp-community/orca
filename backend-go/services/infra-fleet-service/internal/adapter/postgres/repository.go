@@ -13,11 +13,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 // Repository implements usecase.DevServerRepository, usecase.ConnectionRepository,
@@ -362,6 +364,20 @@ func (r *Repository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID 
 	}
 	ds.Mode = domain.ConnectionMode(mode)
 	return ds, true, nil
+}
+
+// UpdateProvisionResult persists the outcome of one provisioning attempt —
+// see usecase.DevServerRepository.UpdateProvisionResult's doc comment.
+func (r *Repository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info usecase.HandshakeInfo, provisionedAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE infra.dev_servers
+		SET status = $3, platform = $4, arch = $5, node_version = $6, agent_version = $7, last_provisioned_at = $8
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, id, string(status), info.Platform, info.Arch, info.NodeVersion, info.AgentVersion, provisionedAt)
+	if err != nil {
+		return fmt.Errorf("postgres: update dev server provision result: %w", err)
+	}
+	return nil
 }
 
 // GetFleetHealth returns the latest fleet-health sample per dev server for

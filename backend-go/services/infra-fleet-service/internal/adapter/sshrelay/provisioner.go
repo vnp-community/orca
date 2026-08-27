@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
@@ -67,12 +68,33 @@ type Provisioner struct {
 	connector Connector
 	resolver  SshTargetResolver
 	cfg       Config
+
+	// prereqMu/lastPrereq is a side-channel, not a return value from
+	// Provision: a prereq shortfall must not make Provision return a
+	// non-nil error, since devserveragent.Client.getOrProvisionSession
+	// treats any non-nil error as "provisioning failed, discard the
+	// transport" and would leak a live, successfully-deployed connection.
+	// TASK-FLEET-02-05's BulkProvisionFleet reads this via
+	// LastPrereqResult after a successful Provision call.
+	prereqMu   sync.Mutex
+	lastPrereq map[string]PrereqResult
 }
 
 // NewProvisioner builds a Provisioner. connector is typically
 // sshconn.NewConnector(...); resolver is typically postgres.SshTargetStore.
 func NewProvisioner(connector Connector, resolver SshTargetResolver, cfg Config) *Provisioner {
-	return &Provisioner{connector: connector, resolver: resolver, cfg: cfg}
+	return &Provisioner{connector: connector, resolver: resolver, cfg: cfg, lastPrereq: make(map[string]PrereqResult)}
+}
+
+// LastPrereqResult returns the PrereqResult captured at the most recent
+// Provision call for devServerID, if one has run. false means no
+// provisioning attempt has completed the prerequisite-check step for this
+// dev server yet.
+func (p *Provisioner) LastPrereqResult(devServerID string) (PrereqResult, bool) {
+	p.prereqMu.Lock()
+	defer p.prereqMu.Unlock()
+	result, ok := p.lastPrereq[devServerID]
+	return result, ok
 }
 
 // Provision resolves devServer.SSHTargetID, dials it, deploys+launches
@@ -91,6 +113,18 @@ func (p *Provisioner) Provision(ctx context.Context, devServer domain.DevServer)
 	conn, err := p.connector.Connect(ctx, target)
 	if err != nil {
 		return nil, devserveragent.HandshakeInfo{}, fmt.Errorf("sshrelay: dialing ssh target %q: %w", devServer.SSHTargetID, err)
+	}
+
+	// Prerequisite checks run over the raw SSH connection, before the agent
+	// exists to relay a JSON-RPC call to — matches BL-FLEET-02's step
+	// ordering. A shortfall does not abort the pipeline (deploy is still
+	// attempted below); it's recorded for LastPrereqResult's side-channel
+	// instead of failing this call, see Provisioner.lastPrereq's doc
+	// comment for why.
+	if prereq, prereqErr := checkPrerequisites(ctx, conn); prereqErr == nil {
+		p.prereqMu.Lock()
+		p.lastPrereq[devServer.ID] = prereq
+		p.prereqMu.Unlock()
 	}
 
 	remoteDir, err := deploy(ctx, conn, p.cfg)

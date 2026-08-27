@@ -25,6 +25,7 @@ import (
 
 	"github.com/stablyai/orca-go/common/testutil"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 const (
@@ -265,5 +266,61 @@ func TestRepository_RegisterAndGet_PersistsSSHTargetID(t *testing.T) {
 	}
 	if len(list) != 1 || list[0].SSHTargetID != testSshTarget2 {
 		t.Errorf("expected List to also carry SSHTargetID, got %+v", list)
+	}
+}
+
+// TestRepository_UpdateProvisionResult covers migrations/0008's status/
+// platform columns — persists status/platform/node_version/
+// last_provisioned_at, and a second call updates the same row in place
+// (idempotent, no duplicate row).
+func TestRepository_UpdateProvisionResult(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.9", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, ds); err != nil {
+		t.Fatalf("registering dev server: %v", err)
+	}
+
+	provisionedAt := time.Now().UTC().Truncate(time.Millisecond)
+	info := usecase.HandshakeInfo{Platform: "linux", Arch: "x64", NodeVersion: "v22.0.0", AgentVersion: "5.0.0"}
+	if err := repo.UpdateProvisionResult(ctx, testTenant1, testDevServer1, domain.DevServerStatusHealthy, info, provisionedAt); err != nil {
+		t.Fatalf("update provision result: %v", err)
+	}
+
+	var status, platform, arch, nodeVersion, agentVersion string
+	var lastProvisionedAt time.Time
+	row := repo.pool.QueryRow(ctx, `SELECT status, platform, arch, node_version, agent_version, last_provisioned_at FROM infra.dev_servers WHERE tenant_id = $1 AND id = $2`, testTenant1, testDevServer1)
+	if err := row.Scan(&status, &platform, &arch, &nodeVersion, &agentVersion, &lastProvisionedAt); err != nil {
+		t.Fatalf("scanning updated row: %v", err)
+	}
+	if status != string(domain.DevServerStatusHealthy) || platform != "linux" || nodeVersion != "v22.0.0" {
+		t.Errorf("expected persisted status/platform/node_version, got status=%q platform=%q node_version=%q", status, platform, nodeVersion)
+	}
+	if !lastProvisionedAt.Equal(provisionedAt) {
+		t.Errorf("expected last_provisioned_at %v, got %v", provisionedAt, lastProvisionedAt)
+	}
+
+	// Second call updates the same row in place — no duplicate row, status
+	// transitions cleanly.
+	if err := repo.UpdateProvisionResult(ctx, testTenant1, testDevServer1, domain.DevServerStatusDegraded, info, provisionedAt.Add(time.Minute)); err != nil {
+		t.Fatalf("second update provision result: %v", err)
+	}
+	var count int
+	if err := repo.pool.QueryRow(ctx, `SELECT count(*) FROM infra.dev_servers WHERE tenant_id = $1 AND id = $2`, testTenant1, testDevServer1).Scan(&count); err != nil {
+		t.Fatalf("counting rows: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected exactly 1 row after two updates, got %d", count)
+	}
+	var status2 string
+	if err := repo.pool.QueryRow(ctx, `SELECT status FROM infra.dev_servers WHERE tenant_id = $1 AND id = $2`, testTenant1, testDevServer1).Scan(&status2); err != nil {
+		t.Fatalf("scanning updated status: %v", err)
+	}
+	if status2 != string(domain.DevServerStatusDegraded) {
+		t.Errorf("expected status to have transitioned to degraded, got %q", status2)
 	}
 }
