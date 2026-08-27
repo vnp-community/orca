@@ -12,9 +12,8 @@ export type McpServerConfig = {
 export type OrcaProfile = {
   agent?: {
     preferredModel?:     string
-    trustPreset?:        'strict' | 'standard' | 'relaxed' | 'custom'
+    trustPreset?:        'minimal' | 'standard' | 'full'
     customInstructions?: string
-    approvedModels?:     string[]  // user-level override (subset of company approved)
   }
   editor?: {
     theme?:     string
@@ -41,10 +40,10 @@ export type OrcaProfile = {
     defaultConnectionType?:  'ssh' | 'local'
   }
   security?: {
-    approvedModels?:  string[]   // glob patterns, e.g. 'claude-*'
-    disallowedCmds?:  string[]
-    require2FA?:      boolean
-    sessionTimeoutHours?: number
+    approvedModels?:      string[]   // glob patterns, e.g. 'claude-*'
+    disallowedCommands?:  string[]
+    require2FA?:          boolean
+    maxSessionHours?:     number
   }
 }
 

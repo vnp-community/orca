@@ -37,8 +37,11 @@ type RegisterAppHandlersOptions = {
   onBeforeRelaunch?: () => void | Promise<void>
 }
 
-async function pickFloatingMarkdownDocument(
-  event: IpcMainInvokeEvent
+// Why: RPC callers (window.api.runtime.call) have no IpcMainInvokeEvent to
+// resolve a parent window from, so this takes an already-resolved
+// BrowserWindow (or none) instead — same dialog fallback either path took.
+export async function pickFloatingMarkdownDocument(
+  parentWindow?: BrowserWindow | null
 ): Promise<MarkdownDocument | null> {
   const cwd = await ensureDefaultFloatingWorkspacePath()
   const options = {
@@ -46,7 +49,6 @@ async function pickFloatingMarkdownDocument(
     properties: ['openFile'],
     filters: [{ name: 'Markdown', extensions: ['md', 'mdx', 'markdown'] }]
   } satisfies Electron.OpenDialogOptions
-  const parentWindow = BrowserWindow.fromWebContents(event.sender)
   const result = parentWindow
     ? await dialog.showOpenDialog(parentWindow, options)
     : await dialog.showOpenDialog(options)
@@ -84,7 +86,7 @@ async function pickFloatingWorkspaceDirectory(
   return selectedDir
 }
 
-function getFeatureWallAssetBaseUrl(): string {
+export function getFeatureWallAssetBaseUrl(): string {
   const assetDir = app.isPackaged
     ? path.join(process.resourcesPath, 'onboarding', 'feature-wall')
     : resolveDevFeatureWallAssetDir()
@@ -243,7 +245,7 @@ function readKeyboardLayoutInputSourceId(): Promise<string> {
   )
 }
 
-async function readKeyboardInputSourceId(): Promise<string | null> {
+export async function readKeyboardInputSourceId(): Promise<string | null> {
   const selectedInputSourceId = await readSelectedKeyboardInputSourceId()
   if (selectedInputSourceId) {
     return selectedInputSourceId
@@ -340,7 +342,9 @@ export function registerAppHandlers(store: Store, options: RegisterAppHandlersOp
 
   ipcMain.handle('app:getFloatingMarkdownDirectory', () => ensureDefaultFloatingWorkspacePath())
 
-  ipcMain.handle('app:pickFloatingMarkdownDocument', (event) => pickFloatingMarkdownDocument(event))
+  ipcMain.handle('app:pickFloatingMarkdownDocument', (event) =>
+    pickFloatingMarkdownDocument(BrowserWindow.fromWebContents(event.sender))
+  )
 
   ipcMain.handle('app:pickFloatingWorkspaceDirectory', (event) =>
     pickFloatingWorkspaceDirectory(event, store)

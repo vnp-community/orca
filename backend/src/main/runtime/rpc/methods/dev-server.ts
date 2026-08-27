@@ -9,40 +9,8 @@ import { z } from 'zod'
 import { defineMethod } from '../core'
 import type { DevServer, DevServerInput } from '../../../../shared/dev-server-types'
 import { Tracers } from '../../../../shared/trace/tracers'
-
-// ─── Error helpers ────────────────────────────────────────────────────────────
-
-/**
- * Classifies and re-throws errors from relay.call() with a clear prefix so
- * the UI can distinguish between:
- *   - Connection / backend errors  → "Dev server not connected"
- *   - Agent-side method errors     → "[Agent: fs.readDir] No such file..."
- *   - Transport timeouts           → "[Agent: fs.readDir] timed out..."
- *
- * The prefix is intentionally human-readable: it appears verbatim in the
- * RemoteFileBrowser error pane and any toast notifications.
- */
-function wrapAgentError(agentMethod: string, err: unknown, devServerId: string): never {
-  const raw = err instanceof Error ? err.message : String(err)
-  const rawLower = raw.toLowerCase()
-
-  // Relay / transport errors — not agent logic errors.
-  // Why toLowerCase(): SshChannelMultiplexer may emit 'SSH connection lost...' or
-  // 'Connection lost...' depending on caller context; we must catch both variants.
-  const isConnectionError =
-    raw === 'Not connected' ||
-    rawLower.includes('connection lost') ||
-    rawLower.includes('timed out') ||
-    rawLower.includes('multiplexer disposed') ||
-    rawLower.includes('ipc channel not available') ||
-    rawLower.includes('ipc request timeout')
-
-  const message = isConnectionError
-    ? `Dev server '${devServerId}' connection error: ${raw}`
-    : `[Agent: ${agentMethod}] ${raw}`
-
-  throw new Error(message)
-}
+import { wrapAgentError } from './dev-server-relay-error'
+import { DEV_SERVER_SHELL_METHODS } from './dev-server-shell'
 
 // ─── Param schemas ────────────────────────────────────────────────────────────
 
@@ -342,5 +310,11 @@ export const DEV_SERVER_METHODS = [
         wrapAgentError('fs.rmdir', err, params.id)
       }
     }
-  })
+  }),
+
+  // ── devServer.pathExists / devServer.readFile / devServer.copyFile ────────
+  // Split into dev-server-shell.ts to keep this file under the max-lines
+  // budget — see that file for the shell.pathExists/shell.copyFile parity
+  // rationale.
+  ...DEV_SERVER_SHELL_METHODS
 ]

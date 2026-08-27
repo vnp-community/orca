@@ -138,6 +138,7 @@ import {
   listAutomationRunsForTarget,
   listAutomationsForTarget,
   runAutomationNowForTarget,
+  updateAutomationByIdForTarget,
   updateAutomationForTarget
 } from './automation-host-client'
 import { getExternalAutomationScheduleDisplay } from './external-automation-schedule-display'
@@ -145,7 +146,9 @@ import { ExternalAutomationManagers } from './ExternalAutomationManagers'
 import type { FetchExternalAutomationRuns } from './ExternalAutomationRunTable'
 import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
 import { translate } from '@/i18n/i18n'
+import { connectRuntimeSsh } from '@/runtime/runtime-ssh-client'
 
+import { uiGet } from '@/runtime/runtime-ui-client'
 const AGENTS = getAgentCatalog().map((agent) => agent.id)
 const DEFAULT_TIME = '09:00'
 const AUTOMATIONS_CHANGED_EVENT = 'orca:automations-changed'
@@ -1047,7 +1050,7 @@ export default function AutomationsPage(): React.JSX.Element {
   }, [automationHostTargetKey, isLoading, pendingAutomationRunNavigation, refresh])
 
   const hydratePersistedUIState = useCallback(async (): Promise<void> => {
-    useAppStore.getState().hydratePersistedUI(await window.api.ui.get(), 'sync')
+    useAppStore.getState().hydratePersistedUI(await uiGet(), 'sync')
   }, [])
 
   useEffect(() => {
@@ -1312,8 +1315,9 @@ export default function AutomationsPage(): React.JSX.Element {
     let latest = automation
     try {
       latest =
-        (await window.api.automations.list()).find((entry) => entry.id === automation.id) ??
-        automation
+        (
+          await listAutomationsForTarget(getAutomationOwnerTarget(automation, automationHostTarget))
+        ).find((entry) => entry.id === automation.id) ?? automation
     } catch {
       latest = automation
     }
@@ -1656,10 +1660,7 @@ export default function AutomationsPage(): React.JSX.Element {
       const automation = editingAutomationId
         ? currentAutomation
           ? await updateAutomationForTarget(currentAutomation, updates, automationHostTarget)
-          : await window.api.automations.update({
-              id: editingAutomationId,
-              updates
-            })
+          : await updateAutomationByIdForTarget(automationHostTarget, editingAutomationId, updates)
         : await createAutomationForTarget({
             name: draft.name,
             prompt: draft.prompt,
@@ -1992,7 +1993,7 @@ export default function AutomationsPage(): React.JSX.Element {
         )
         return
       }
-      const state = await window.api.ssh.connect({ targetId: manager.target.connectionId })
+      const state = await connectRuntimeSsh(settings, manager.target.connectionId)
       if (!state || state.status !== 'connected') {
         toast.error(
           state?.error ??

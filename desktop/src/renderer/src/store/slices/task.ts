@@ -1,4 +1,4 @@
-import type { OrcaTask, TaskStatus } from '@shared/task-types'
+import type { OrcaTask, TaskStatus } from '../../../../shared/task-types'
 
 export type TaskSlice = {
   tasks:        OrcaTask[]

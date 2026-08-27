@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { listRuntimePairedDevices } from '@/runtime/runtime-mobile-client'
 
 const DISMISS_KEY = 'orca.mobile.sidebar-onboarding-dismissed'
 
@@ -34,7 +35,7 @@ export function useMobileSidebarOnboardingBadge(enabled = true): {
     let cancelled = false
     void (async () => {
       try {
-        const result = await window.api.mobile.listDevices()
+        const result = await listRuntimePairedDevices()
         if (!cancelled) {
           setHasPairedDevice(result.devices.length > 0)
         }

@@ -130,7 +130,7 @@ import {
   attachClaudeLivePtyPersistence,
   seedLiveClaudePtysFromPersistence
 } from './claude-accounts/live-pty-gate'
-import { StarNagService } from './star-nag/service'
+import { StarNagService, setActiveStarNagService } from './star-nag/service'
 import { agentHookServer } from './agent-hooks/server'
 import { wslHookRelayManager } from './agent-hooks/wsl-hook-relay-manager'
 import { maybeAutoRenameBranchOnFirstWork } from './agent-hooks/first-work-branch-rename'
@@ -863,7 +863,12 @@ function openMainWindow(): BrowserWindow {
     onBeforeRecoveryReload: (webContentsId) => {
       markRecoveryReloadInFlight(webContentsId)
       recordCrashBreadcrumb('renderer_recovery_reload')
-    }
+    },
+    // Why: `runtime` is reassigned once OrcaRuntimeService is constructed
+    // below; these callbacks close over the module-level binding so they
+    // resolve it lazily at call time, once shortcuts/window events can fire.
+    onMenuCommand: (payload) => runtime?.notifyMenuCommand(payload),
+    onWindowStateChanged: (state) => runtime?.notifyWindowStateChanged(state)
   })
   recordCrashBreadcrumb('main_window_created')
   logStartupMilestone('window-created')
@@ -1100,14 +1105,19 @@ function sendOpenFeatureTour(targetWindow?: BrowserWindow | null): void {
   const webContents =
     targetWindow && !targetWindow.isDestroyed() ? targetWindow.webContents : mainWindow?.webContents
   webContents?.send('ui:openFeatureTour')
+  runtime?.notifyMenuCommand({ command: 'openFeatureTour' })
 }
 
 function sendOpenSetupGuide(targetWindow?: BrowserWindow | null): void {
   const webContents =
     targetWindow && !targetWindow.isDestroyed() ? targetWindow.webContents : mainWindow?.webContents
   webContents?.send('ui:openSetupGuide')
+  runtime?.notifyMenuCommand({ command: 'openSetupGuide' })
 }
 
+// Why: crash reports are read from this device's local crash-report files
+// (window.api.crashReports.*) — meaningless to mirror to a paired client
+// that has no access to this host's local disk. Native-only.
 function sendOpenCrashReport(targetWindow?: BrowserWindow | null): void {
   const webContents =
     targetWindow && !targetWindow.isDestroyed() ? targetWindow.webContents : mainWindow?.webContents
@@ -1902,6 +1912,7 @@ app.whenReady().then(async () => {
   })
   runtimeService.setAutomationService(automations)
   runtimeService.setAccountServices({ claudeAccounts, codexAccounts, rateLimits })
+  runtimeService.setUsageServices({ claudeUsage, codexUsage, openCodeUsage })
   runtimeService.setCommitMessageAgentEnvironmentResolvers({
     // Why: local Codex hooks and auth now live in Orca's managed runtime home
     // even for the system-default path, so every Orca-launched Codex process
@@ -1910,6 +1921,7 @@ app.whenReady().then(async () => {
     prepareForClaudeLaunch: (target) => claudeRuntimeAuth!.prepareForClaudeLaunch(target)
   })
   starNag = new StarNagService(store, stats)
+  setActiveStarNagService(starNag)
   starNag.start()
   starNag.registerIpcHandlers()
   runtimeService.setAgentBrowserBridge(
@@ -1978,6 +1990,7 @@ app.whenReady().then(async () => {
     onOpenSettings: () => {
       recordCrashBreadcrumb('settings_opened')
       mainWindow?.webContents.send('ui:openSettings')
+      runtime?.notifyMenuCommand({ command: 'openSettings' })
     },
     onOpenSetupGuide: (targetWindow) => {
       recordCrashBreadcrumb('setup_guide_opened')
@@ -1997,6 +2010,8 @@ app.whenReady().then(async () => {
       const targetBrowserWindow = targetWindow instanceof BrowserWindow ? targetWindow : null
       sendOpenFeatureTour(targetBrowserWindow)
     },
+    // Why: terminal-zoom resolution is local-DOM-focus-dependent (see the
+    // matching comment in createMainWindow.ts) — native-only, not bridged.
     onZoomIn: () => {
       mainWindow?.webContents.send('terminal:zoom', 'in')
     },
@@ -2008,9 +2023,11 @@ app.whenReady().then(async () => {
     },
     onToggleLeftSidebar: () => {
       mainWindow?.webContents.send('ui:toggleLeftSidebar')
+      runtime?.notifyMenuCommand({ command: 'toggleLeftSidebar' })
     },
     onToggleRightSidebar: () => {
       mainWindow?.webContents.send('ui:toggleRightSidebar')
+      runtime?.notifyMenuCommand({ command: 'toggleRightSidebar' })
     },
     onToggleAppearance: (key) => {
       if (!store) {
@@ -2022,6 +2039,7 @@ app.whenReady().then(async () => {
         // toggle logic (it knows the current value and persists it back), so
         // we forward the event and let it flip + store.
         mainWindow?.webContents.send('ui:toggleStatusBar')
+        runtime?.notifyMenuCommand({ command: 'toggleStatusBar' })
         return
       }
       const current = store.getSettings()
@@ -2253,6 +2271,7 @@ app.on('will-quit', (e) => {
   // so without this ordering, running agents would produce orphaned
   // agent_start events with no matching stops.
   starNag?.stop()
+  setActiveStarNagService(null)
   automations?.stop()
   setUnreadDockBadgeCount(0)
   agentHookServer.stop()

@@ -37,7 +37,7 @@ export class AuthUserStore {
     `)
     await stmt.run(id, input.email, input.name, passwordHash, input.role, now)
 
-    return { id, email: input.email, name: input.name, role: input.role, provider: 'none' }
+    return { id, email: input.email, name: input.name, role: input.role, provider: 'none', departmentId: null }
   }
 
   /**
@@ -47,7 +47,7 @@ export class AuthUserStore {
    */
   async verifyPassword(email: string, password: string): Promise<OrcaSessionUser | null> {
     const stmt = await this.db.prepare(`
-      SELECT id, email, name, role, provider, password_hash, is_active
+      SELECT id, email, name, role, provider, password_hash, is_active, department_id
       FROM orca_users
       WHERE email = ? AND provider = 'none'
     `)
@@ -59,11 +59,12 @@ export class AuthUserStore {
     if (!isValid) {return null}
 
     return {
-      id:       row['id']       as string,
-      email:    row['email']    as string,
-      name:     row['name']     as string,
-      role:     row['role']     as OrcaUser['role'],
-      provider: 'none'
+      id:           row['id']            as string,
+      email:        row['email']         as string,
+      name:         row['name']          as string,
+      role:         row['role']          as OrcaUser['role'],
+      provider:     'none',
+      departmentId: (row['department_id'] as string | null) ?? null
     }
   }
 
@@ -73,7 +74,7 @@ export class AuthUserStore {
    */
   async upsertSsoUser(input: SsoUserInput): Promise<OrcaSessionUser> {
     const existingStmt = await this.db.prepare(`
-      SELECT id, role
+      SELECT id, role, department_id
       FROM orca_users
       WHERE provider = ? AND provider_user_id = ?
     `)
@@ -87,11 +88,12 @@ export class AuthUserStore {
       `)
       await updateStmt.run(input.name, input.avatarUrl ?? null, Date.now(), existing['id'])
       return {
-        id:       existing['id']   as string,
-        email:    input.email,
-        name:     input.name,
-        role:     existing['role'] as OrcaUser['role'],
-        provider: input.provider
+        id:           existing['id']   as string,
+        email:        input.email,
+        name:         input.name,
+        role:         existing['role'] as OrcaUser['role'],
+        provider:     input.provider,
+        departmentId: (existing['department_id'] as string | null) ?? null
       }
     }
 
@@ -105,13 +107,13 @@ export class AuthUserStore {
     `)
     await insertStmt.run(id, input.email, input.name, input.provider, input.providerUserId, input.avatarUrl ?? null, now)
 
-    return { id, email: input.email, name: input.name, role: 'developer', provider: input.provider }
+    return { id, email: input.email, name: input.name, role: 'developer', provider: input.provider, departmentId: null }
   }
 
   /** Get user by ID (returns null if not found). */
   async getUser(id: string): Promise<OrcaSessionUser | null> {
     const stmt = await this.db.prepare(`
-      SELECT id, email, name, role, provider
+      SELECT id, email, name, role, provider, department_id
       FROM orca_users
       WHERE id = ?
     `)
@@ -122,7 +124,7 @@ export class AuthUserStore {
   /** List ALL users (including inactive), ordered by created_at DESC. */
   async listUsers(): Promise<OrcaSessionUser[]> {
     const stmt = await this.db.prepare(`
-      SELECT id, email, name, role, provider
+      SELECT id, email, name, role, provider, department_id
       FROM orca_users
       ORDER BY created_at DESC
     `)
@@ -133,7 +135,7 @@ export class AuthUserStore {
   /** List only active users (is_active = 1). */
   async listActiveUsers(): Promise<OrcaSessionUser[]> {
     const stmt = await this.db.prepare(`
-      SELECT id, email, name, role, provider
+      SELECT id, email, name, role, provider, department_id
       FROM orca_users
       WHERE is_active = 1
       ORDER BY created_at DESC
@@ -159,11 +161,14 @@ export class AuthUserStore {
 
   private rowToUser(row: Record<string, unknown>): OrcaSessionUser {
     return {
-      id:       row['id']       as string,
-      email:    row['email']    as string,
-      name:     row['name']     as string,
-      role:     row['role']     as OrcaUser['role'],
-      provider: row['provider'] as OrcaUser['provider']
+      id:           row['id']             as string,
+      email:        row['email']          as string,
+      name:         row['name']           as string,
+      role:         row['role']           as OrcaUser['role'],
+      provider:     row['provider']       as OrcaUser['provider'],
+      // department_id column added by migration 0006 but was never SELECTed or
+      // mapped here — bug: OrcaUser.departmentId silently stayed unset for every caller.
+      departmentId: (row['department_id'] as string | null) ?? null
     }
   }
 }

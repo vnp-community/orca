@@ -11,6 +11,7 @@ import { translate } from '@/i18n/i18n'
 import { GitIdentityCard } from './GitIdentityCard'
 import { useRemotePreflightStatus } from '../../hooks/useRemotePreflightStatus'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 type GitHubSetupState = 'checking' | 'connected' | 'not-installed' | 'not-authenticated'
 
 function getGitHubSetupState(
@@ -85,7 +86,7 @@ export function GitHubRow(props: { compact?: boolean } = {}): React.JSX.Element 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.api.shell.openUrl('https://cli.github.com')}
+              onClick={() => shellOpenUrl('https://cli.github.com')}
             >
               <ExternalLink className="size-3.5" />
               {translate('auto.components.onboarding.IntegrationsStep.bd5d976fb2', 'Install gh')}
@@ -226,7 +227,11 @@ const CAPABILITIES = [
   'Read, comment on, and merge pull requests without leaving Orca'
 ] as const
 
-export function IntegrationsStep({ activeDevServerId }: { activeDevServerId?: string | null }): React.JSX.Element {
+export function IntegrationsStep({
+  activeDevServerId
+}: {
+  activeDevServerId?: string | null
+}): React.JSX.Element {
   const refreshPreflightStatus = useAppStore((s) => s.refreshPreflightStatus)
   const { status: remoteStatus, refresh: refreshRemote } = useRemotePreflightStatus(
     activeDevServerId ?? null

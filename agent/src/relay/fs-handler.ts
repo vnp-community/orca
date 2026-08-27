@@ -1,6 +1,17 @@
 /* eslint-disable max-lines -- Why: relay filesystem request handling shares
    path expansion, file IO, search, streaming reads, and Space scans. */
-import { readdir, writeFile, stat, lstat, mkdir, rename, cp, rm, realpath } from 'node:fs/promises'
+import {
+  readdir,
+  writeFile,
+  stat,
+  lstat,
+  mkdir,
+  rename,
+  cp,
+  rm,
+  rmdir,
+  realpath
+} from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -110,6 +121,31 @@ export class FsHandler {
     this.dispatcher.onRequest('fs.createFile', (p) => this.createFile(p))
     this.dispatcher.onRequest('fs.createDir', (p) => this.createDir(p))
     this.dispatcher.onRequest('fs.createDirNoClobber', (p) => this.createDirNoClobber(p))
+    // Aliases: backend/src/main/runtime/rpc/methods/dev-server.ts's devServer.mkdir/
+    // rmdir call 'fs.mkdir'/'fs.rmdir' (Part A's method names, params: { path }) via
+    // a raw relay.call() reachable on either connection type — register the same
+    // names here so they don't MethodNotFound on a relay-ssh-shaped connection.
+    // createDir/deletePath read dirPath/targetPath, not path, and createDir returns
+    // void where fs.mkdir's caller expects { path } — adapt rather than bare-alias.
+    // See specs/agent/api/gaps-and-findings.md #4.
+    this.dispatcher.onRequest('fs.mkdir', async (p) => {
+      const dirPath = p.path as string
+      await this.createDir({ dirPath })
+      return { path: dirPath }
+    })
+    this.dispatcher.onRequest('fs.rmdir', async (p) => {
+      const targetPath = expandTilde(p.path as string)
+      // deletePath() requires recursive:true for *any* directory, even an empty
+      // one — Part A's fs.rmdir default (recursive not passed) only requires the
+      // directory to be empty, so fall back to Node's rmdir() for that case
+      // rather than forcing every non-recursive caller through deletePath's
+      // stricter guard.
+      if (p.recursive === true) {
+        await this.deletePath({ targetPath, recursive: true })
+      } else {
+        await rmdir(targetPath)
+      }
+    })
     this.dispatcher.onRequest('fs.rename', (p) => this.rename(p))
     this.dispatcher.onRequest('fs.renameNoClobber', (p) => this.renameNoClobber(p))
     this.dispatcher.onRequest('fs.copy', (p) => this.copy(p))

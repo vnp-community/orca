@@ -1,0 +1,39 @@
+# Shared lint config every service and common/proto module uses — one
+# config, not reinvented per service, per
+# specs/backend-go/standards/go-coding-standards.md.
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - bodyclose
+    - noctx
+    - errorlint
+    - gocritic
+
+linters-settings:
+  errorlint:
+    errorf: true
+  gocritic:
+    disabled-checks:
+      - ifElseChain
+
+issues:
+  exclude-dirs:
+    - gen # generated protobuf/grpc code
+  exclude-rules:
+    # Test files commonly construct fakes/mocks with patterns gocritic flags
+    # (e.g. named returns for readability in table-driven tests) — not worth
+    # the noise per standards/testing-strategy.md's table-driven convention.
+    - path: _test\.go
+      linters:
+        - gocritic

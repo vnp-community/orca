@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
-import type { OrcaTask } from '../types/task-types'
+import type { OrcaTask } from '../../../shared/task-types'
 
 export function useTasks(projectId: string) {
   // Use Option B: flat filter since store doesn't have tasksByProject index yet
@@ -22,7 +22,7 @@ export function useTasks(projectId: string) {
     if (!projectId) {return}
     setIsLoading(true)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    callRuntimeRpc<OrcaTask[]>(target, 'tasks.list', { projectId })
+    callRuntimeRpc<OrcaTask[]>(target, 'task.list', { projectId })
       .then(tasks => {
         if (typeof setTasks === 'function') {
           // Since our setTasks currently replaces all tasks in the store (as per Option B flat approach),

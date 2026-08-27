@@ -8,6 +8,7 @@ import {
 } from '../core'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
 import { Tracers } from '../../../../shared/trace/tracers'
+import { stripAnsiControlSequences } from '../../../../shared/commit-message-agent-output'
 import type { DriverState, OrcaRuntimeService } from '../../orca-runtime'
 import {
   TerminalStreamOpcode,
@@ -2512,8 +2513,61 @@ export const TERMINAL_METHODS: RpcAnyMethod[] = [
           outputBatcher = createTerminalOutputBatcher((chunk) => {
             emit({ type: 'data', chunk })
           })
-          const unsubscribeStreamData = runtime.subscribeToTerminalData(ptyId, (data) => {
-            outputBatcher?.push(data)
+          // FIX (double-prompt report): unlike terminal.multiplex just below,
+          // this JSON fallback used to forward every live chunk unfiltered,
+          // even though read.tail/serialized.data above already covers
+          // whatever the PTY had already printed by the time this handler
+          // ran (e.g. a shell's startup prompt on a terminal a sibling
+          // client just spawned). subscribeToTerminalData's listener always
+          // carried seq/rawLength metadata -- this handler just never read
+          // it. Reuse the same getOutputAfterSnapshotSeq the binary path
+          // already relies on, so a chunk fully covered by the scrollback
+          // snapshot's seq is dropped, and a chunk straddling the boundary
+          // is trimmed to only its uncovered tail. Falls through to
+          // "forward everything" unchanged when seq isn't available
+          // (serialized === null), so this can only remove duplicates,
+          // never drop genuinely-new output.
+          const snapshotOutputSeq = serialized?.seq
+          // Why (double-prompt follow-up): seq is not populated for
+          // devServer/SSH-relayed PTYs (serializeTerminalBufferFromAvailableState
+          // leaves it undefined for headless/agent-backed hosts), so the
+          // seq-based filter above is a no-op there -- confirmed live via the
+          // client always seeing meta.seq=undefined on this exact path. Fall
+          // back to a content-based check for ONLY the very first live chunk:
+          // it can be an exact re-print of the prompt line the scrollback
+          // snapshot already sent (fix #13's own scenario -- attaching to a
+          // PTY a sibling client just spawned moments earlier). Exact-match
+          // (not prefix/fuzzy) against the snapshot's own last line, checked
+          // once, so this can only ever drop a full duplicate -- never trim
+          // or mangle genuinely new output mixed in with it.
+          const scrollbackTailLine = read.tail.at(-1)?.trim()
+          let firstLiveChunkChecked = false
+          const unsubscribeStreamData = runtime.subscribeToTerminalData(ptyId, (data, meta) => {
+            let forwardData = getOutputAfterSnapshotSeq(
+              { data, bytes: data.length, meta },
+              snapshotOutputSeq
+            )
+            if (forwardData && !firstLiveChunkChecked) {
+              const stripped = stripAnsiControlSequences(forwardData).trim()
+              const matched = Boolean(scrollbackTailLine) && stripped === scrollbackTailLine
+              // TEMP DIAG (double-prompt follow-up): the exact-match compare
+              // deployed in 5ad32a049 didn't trigger on the next live repro.
+              // Log the untruncated raw data, the stripped result, and the
+              // scrollback tail line so a byte-level diff finds whatever the
+              // strip regex is missing (a different OSC terminator, a bare
+              // 2-byte escape like charset-select, stray whitespace, etc.)
+              // before trying another guess.
+              console.error(
+                `[DIAG double-prompt] ptyId=${ptyId} matched=${matched} scrollbackTailLine=${JSON.stringify(scrollbackTailLine)} rawData=${JSON.stringify(forwardData)} strippedData=${JSON.stringify(stripped)}`
+              )
+              if (matched) {
+                forwardData = null
+              }
+            }
+            firstLiveChunkChecked = true
+            if (forwardData) {
+              outputBatcher?.push(forwardData, meta)
+            }
           })
           // Why: this legacy JSON stream can feed a live xterm view too
           // (older web/desktop subscribers), so it conservatively registers

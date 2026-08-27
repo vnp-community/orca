@@ -27,7 +27,8 @@ import {
   getRecipeRepo,
   listRecipeCatalog,
   listRecipes,
-  type EphemeralVmRecipeCatalogEntry
+  type EphemeralVmRecipeCatalogEntry,
+  type EphemeralVmRecipeStore
 } from './ephemeral-vm-recipe-context'
 import { registerEphemeralVmRuntimeHandlers } from './ephemeral-vm-runtime-handlers'
 
@@ -57,6 +58,22 @@ export type EphemeralVmProvisionIpcResult =
       stdout: string
     }
 
+export function doctorEphemeralVmRecipeForRepo(
+  store: EphemeralVmRecipeStore,
+  args: { repoId: string; recipeId: string }
+): EphemeralVmRecipeDoctorResult {
+  const repo = getRecipeRepo(store, args.repoId)
+  if (!repo.ok) {
+    return repo.doctor(args.recipeId)
+  }
+  return doctorEphemeralVmRecipe({
+    repoPath: repo.repo.path,
+    recipeId: args.recipeId,
+    recipes: loadHooks(repo.repo.path)?.environmentRecipes ?? [],
+    localExecutionSupported: true
+  })
+}
+
 export function registerEphemeralVmHandlers(store: Store): void {
   ipcMain.removeHandler('ephemeralVm:listRecipes')
   ipcMain.removeHandler('ephemeralVm:listRecipeCatalog')
@@ -75,18 +92,8 @@ export function registerEphemeralVmHandlers(store: Store): void {
 
   ipcMain.handle(
     'ephemeralVm:doctor',
-    (_event, args: { repoId: string; recipeId: string }): EphemeralVmRecipeDoctorResult => {
-      const repo = getRecipeRepo(store, args.repoId)
-      if (!repo.ok) {
-        return repo.doctor(args.recipeId)
-      }
-      return doctorEphemeralVmRecipe({
-        repoPath: repo.repo.path,
-        recipeId: args.recipeId,
-        recipes: loadHooks(repo.repo.path)?.environmentRecipes ?? [],
-        localExecutionSupported: true
-      })
-    }
+    (_event, args: { repoId: string; recipeId: string }): EphemeralVmRecipeDoctorResult =>
+      doctorEphemeralVmRecipeForRepo(store, args)
   )
 
   ipcMain.handle(

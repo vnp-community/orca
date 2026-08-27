@@ -210,17 +210,24 @@ export async function resolveIssueSource(
   }
 }
 
+// ADR-018: glabExecFileAsync (src/main/git/runner.ts) now routes every call
+// through the connectionId's agent — connectionId must always flow through
+// here (previously dropped when set, since exec ran locally instead). cwd
+// stays repoPath unconditionally: for connection-bound repos this is
+// already the agent-side path, the same one git.exec already uses
+// successfully for these repos. See specs/agent/api/gaps-and-findings.md.
 export function glabRepoExecOptions(
   repoPath: string,
   connectionId?: string | null,
-  localGitOptions: LocalGitExecOptions = {}
-): { cwd?: string; wslDistro?: string } {
-  return connectionId
-    ? {}
-    : {
-        cwd: repoPath,
-        ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {})
-      }
+  localGitOptions: LocalGitExecOptions = {},
+  userId?: string
+): { cwd?: string; wslDistro?: string; connectionId?: string; userId?: string } {
+  return {
+    cwd: repoPath,
+    ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {}),
+    ...(connectionId ? { connectionId } : {}),
+    ...(userId ? { userId } : {})
+  }
 }
 
 export function glabHostnameArgs(

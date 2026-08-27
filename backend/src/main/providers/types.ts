@@ -66,6 +66,13 @@ export type PtySpawnOptions = {
   command?: string
   commandDelivery?: 'renderer' | 'provider'
   startupCommandDelivery?: StartupCommandDelivery
+  /** Authenticated caller identity — currently only consumed by the
+   *  gh/glab auth-login flow (github.startAuthLogin, gitlab.startAuthLogin,
+   *  onboarding.openGhAuthTerminal) so the remote agent/relay can namespace
+   *  GH_CONFIG_DIR/GLAB_CONFIG_DIR per user instead of sharing one default
+   *  config on a shared Dev Server. See BUG-BE-HLD-005 and
+   *  specs/agent/api/gaps-and-findings.md #5. */
+  userId?: string
   /** Minimal allowlisted launch ownership preserved by daemon reattach. */
   launchAgent?: TuiAgent
   /** Orca worktree identity. When present, the local provider scopes shell
@@ -461,6 +468,30 @@ export type IGitProvider = {
   /** OS/arch of the provider's host, when known. Optional — SSH-specific
    *  transport metadata; dev-server hosts don't negotiate this today. */
   getHostPlatform?(): RemoteHostPlatform | null
+}
+
+// ─── Hosted CLI Provider (gh/glab) ────────────────────────────────────
+//
+// ADR-018: backend must never execute gh/glab itself — ghExecFileAsync/
+// glabExecFileAsync (src/main/git/runner.ts) route through this instead of
+// spawning locally. Throws on a non-zero exit, matching execFile's
+// convention (the ~130 existing callers all `try { await ghExecFileAsync(...)
+// } catch`). See specs/agent/api/gaps-and-findings.md.
+
+export type IHostedCliProvider = {
+  exec(
+    args: string[],
+    cwd: string | undefined,
+    userId: string | undefined,
+    options?: {
+      timeoutMs?: number
+      idempotent?: boolean
+      /** Small, explicit env overrides (e.g. GITLAB_HOST for a ported
+       *  self-hosted instance) — NOT the caller's full process.env, which
+       *  stays backend-local and is never forwarded over the RPC wire. */
+      env?: Record<string, string>
+    }
+  ): Promise<{ stdout: string; stderr: string }>
 }
 
 // ─── Provider Registry ──────────────────────────────────────────────

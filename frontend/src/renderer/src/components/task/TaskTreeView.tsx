@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { OrcaTask } from '@shared/task-types'
+import type { OrcaTask } from '../../../../shared/task-types'
 import { TaskCard } from './TaskCard'
 
 // Recursive tree render from flat list using parentId

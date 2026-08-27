@@ -9,6 +9,24 @@ import {
   getFirstIncompleteFeatureWallSetupStepId
 } from '../../../../shared/feature-wall-setup-steps'
 import type { Worktree } from '../../../../shared/types'
+import type { DevServer } from '../../../../shared/dev-server-types'
+
+function makeConnectedDevServer(): DevServer {
+  return {
+    id: 'ds-1',
+    name: 'Dev Box',
+    connectionType: 'relay-ssh',
+    status: 'connected',
+    platform: 'linux',
+    arch: 'x64',
+    nodeVersion: '20.0.0',
+    lastConnectedAt: 1_700_000_000_000,
+    lastError: null,
+    workspaceDir: null,
+    addedAt: 1_700_000_000_000,
+    capabilities: null
+  }
+}
 
 function makeInput(
   overrides: Partial<FeatureWallSetupProgressInput> = {}
@@ -24,6 +42,9 @@ function makeInput(
     gitRepoCount: 0,
     worktreesByRepo: {},
     hasSetupScript: false,
+    devServers: [],
+    repos: [],
+    activeDevServerId: null,
     ...overrides
   }
 }
@@ -49,11 +70,12 @@ describe('getFeatureWallSetupProgress', () => {
     const progress = getFeatureWallSetupProgress(makeInput({ gitRepoCount: 2 }))
 
     expect(progress.stepDone['add-two-repos']).toBe(true)
-    expect(progress.coreTotal).toBe(8)
+    expect(progress.coreTotal).toBe(9)
   })
 
   it('preserves the durable setup step definition order', () => {
     expect(getFeatureWallSetupSteps().map((step) => step.id)).toEqual([
+      'connect-dev-server',
       'two-worktrees',
       'browser',
       'notifications',
@@ -71,6 +93,7 @@ describe('getFeatureWallSetupProgress', () => {
       'browser'
     ])
     expect(getFeatureWallSetupStepsForSection('setup').map((step) => step.id)).toEqual([
+      'connect-dev-server',
       'notifications',
       'default-agent',
       'agent-capabilities',
@@ -106,7 +129,8 @@ describe('getFeatureWallSetupProgress', () => {
         browserUseSkillInstalled: true,
         computerUseSkillInstalled: true,
         computerUsePermissionsReady: true,
-        orchestrationSkillInstalled: true
+        orchestrationSkillInstalled: true,
+        devServers: [makeConnectedDevServer()]
       })
     )
 
@@ -123,7 +147,7 @@ describe('getFeatureWallSetupProgress', () => {
     )
 
     expect(Object.hasOwn(progress.stepDone, 'split-terminal')).toBe(false)
-    expect(progress.coreTotal).toBe(8)
+    expect(progress.coreTotal).toBe(9)
   })
 
   it('marks all active steps complete without historical terminal split interaction', () => {
@@ -145,12 +169,20 @@ describe('getFeatureWallSetupProgress', () => {
         browserUseSkillInstalled: true,
         computerUseSkillInstalled: true,
         computerUsePermissionsReady: true,
-        orchestrationSkillInstalled: true
+        orchestrationSkillInstalled: true,
+        devServers: [makeConnectedDevServer()]
       })
     )
 
-    expect(progress.coreDoneCount).toBe(8)
-    expect(Object.values(progress.stepDone).every(Boolean)).toBe(true)
+    expect(progress.coreDoneCount).toBe(9)
+    // Why: 'add-dev-server-repo' is computed but not a displayed step (see
+    // FEATURE_WALL_SETUP_STEPS) and this fixture has no repos, so it's
+    // deliberately excluded from the "every step is done" check below.
+    expect(
+      Object.entries(progress.stepDone)
+        .filter(([id]) => id !== 'add-dev-server-repo')
+        .every(([, done]) => done)
+    ).toBe(true)
   })
 
   it('does not mark the step complete from the main checkout alone', () => {

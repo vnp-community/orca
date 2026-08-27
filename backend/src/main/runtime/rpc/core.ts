@@ -85,6 +85,15 @@ export type RpcContext = {
   // Each user-process in ORCA_MULTI_USER=1 mode has a distinct userId injected
   // via ORCA_USER_ID env var and forwarded here from the session router.
   userId?: string
+  // Why (ADR-021 §3 — multi-tenant data isolation): resolved once per
+  // user-process at bootstrap from `userId` via TenantResolver
+  // (main/tenancy/tenant-resolver.ts → ProfileService.getCompanyIdForUser()),
+  // forwarded here the same way `userId` already is — same single-user-per-
+  // process assumption, same reason it's safe to resolve once instead of per
+  // request. Undefined when `userId` is undefined (Electron/local mode has no
+  // tenant concept — see specs/backend/models/08-postgres-microservices-target-architecture.md
+  // §"Server mode only") or when the user has no department/company assigned yet.
+  tenantId?: string
 }
 
 export type RpcHandler<TParams> = (params: TParams, ctx: RpcContext) => Promise<unknown> | unknown

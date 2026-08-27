@@ -27,7 +27,7 @@ export function useProfile() {
 
     Promise.all([
       callRuntimeRpc<ResolvedProfile>(target, 'profile.getResolved', { traceId: span.id }),
-      callRuntimeRpc<OrcaProfile>(target, 'profile.getUser', { traceId: span.id }),
+      callRuntimeRpc<OrcaProfile>(target, 'profile.getUserProfile', { traceId: span.id }),
     ])
       .then(([resolved, user]) => {
         store.setResolved(resolved)

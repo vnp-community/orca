@@ -222,7 +222,10 @@ import {
 } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
+import type { ItemDialogTab } from './github-item-dialog-shared'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 // Why: the GH item dialog can be opened from any work-item list surface and
 // doesn't have the full owner/repo context the list's cache entry carries.
 // Parsing the canonical `https://github.com/{owner}/{repo}/...` URL is the
@@ -246,8 +249,6 @@ function parseOwnerRepoFromItemUrl(url: string): GitHubOwnerRepo | null {
 }
 
 const MonacoCodeExcerpt = lazy(() => import('@/components/editor/MonacoCodeExcerpt'))
-
-export type ItemDialogTab = 'conversation' | 'checks' | 'files'
 
 type MentionOption = {
   login: string
@@ -2688,7 +2689,7 @@ function PRFilesCombinedDiffViewer({
   )
 
   const openFilesOnGitHub = useCallback(() => {
-    void window.api.shell.openUrl(`${prUrl.replace(/\/$/, '')}/files`)
+    void shellOpenUrl(`${prUrl.replace(/\/$/, '')}/files`)
   }, [prUrl])
 
   const handleAddLineComment = useCallback(
@@ -3526,7 +3527,7 @@ function ConversationTab({
                   variant="ghost"
                   size="icon-xs"
                   className="size-7"
-                  onClick={() => window.api.shell.openUrl(comment.url)}
+                  onClick={() => shellOpenUrl(comment.url)}
                   aria-label={translate(
                     'auto.components.PullRequestPage.0ac19bb52e',
                     'Open comment on GitHub'
@@ -4139,7 +4140,7 @@ function PRActionsPanel({
                 {label}
               </DropdownMenuItem>
             ))}
-            <DropdownMenuItem onSelect={() => window.api.shell.openUrl(item.url)}>
+            <DropdownMenuItem onSelect={() => shellOpenUrl(item.url)}>
               <ExternalLink className="size-4" />
               {translate('auto.components.PullRequestPage.7df8d5fc60', 'Open GitHub merge box')}
             </DropdownMenuItem>
@@ -5192,7 +5193,7 @@ function ChecksTab({
                   variant="ghost"
                   size="xs"
                   className="h-7 gap-1 px-2 text-[11px]"
-                  onClick={() => window.api.shell.openUrl(openUrl)}
+                  onClick={() => shellOpenUrl(openUrl)}
                 >
                   {translate('auto.components.PullRequestPage.1b14d0a69c', 'Open in GitHub')}
                   <ExternalLink className="size-3" />
@@ -6845,7 +6846,7 @@ export default function PullRequestPage({
     try {
       // Why: Electron's clipboard IPC is reliable even when browser clipboard
       // APIs lose focus/activation inside nested overlay surfaces.
-      await window.api.ui.writeClipboardText(workItem.url)
+      await uiWriteClipboardText(workItem.url)
       if (!linkCopyMountedRef.current) {
         return
       }
@@ -7056,7 +7057,7 @@ export default function PullRequestPage({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => window.api.shell.openUrl(workItem.url)}
+                  onClick={() => shellOpenUrl(workItem.url)}
                   aria-label={translate(
                     'auto.components.PullRequestPage.8ecda455a0',
                     'Open on GitHub'
@@ -7128,7 +7129,7 @@ export default function PullRequestPage({
                     {translate('auto.components.PullRequestPage.1a2570e18e', 'Start new workspace')}
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuItem onSelect={() => window.api.shell.openUrl(workItem.url)}>
+                <DropdownMenuItem onSelect={() => shellOpenUrl(workItem.url)}>
                   <ExternalLink className="size-4" />
                   {translate('auto.components.PullRequestPage.8ecda455a0', 'Open on GitHub')}
                 </DropdownMenuItem>

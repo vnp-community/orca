@@ -11,12 +11,15 @@
  */
 
 import type { Migration } from './types'
+import { autoIncrementPrimaryKeySql } from './sql-dialect'
 
 export const migration0005AddAuthSchema: Migration = {
   version: 5,
   name: 'add_auth_schema',
 
   async up(db) {
+    // BUG-BE-RPC-003: AUTOINCREMENT is SQLite-only — see sql-dialect.ts.
+    const autoIncrementPk = autoIncrementPrimaryKeySql(db.capabilities.dialect)
     // ── orca_users ───────────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS orca_users (
@@ -30,8 +33,8 @@ export const migration0005AddAuthSchema: Migration = {
         avatar_url       TEXT,
         teams            TEXT    NOT NULL DEFAULT '[]',
         projects         TEXT    NOT NULL DEFAULT '[]',
-        created_at       INTEGER NOT NULL,
-        last_login_at    INTEGER,
+        created_at       BIGINT NOT NULL,
+        last_login_at    BIGINT,
         is_active        INTEGER NOT NULL DEFAULT 1
       )
     `)
@@ -41,9 +44,9 @@ export const migration0005AddAuthSchema: Migration = {
       CREATE TABLE IF NOT EXISTS orca_sessions (
         session_id    TEXT    PRIMARY KEY,
         user_id       TEXT    NOT NULL REFERENCES orca_users(id) ON DELETE CASCADE,
-        created_at    INTEGER NOT NULL,
-        expires_at    INTEGER NOT NULL,
-        last_seen_at  INTEGER,
+        created_at    BIGINT NOT NULL,
+        expires_at    BIGINT NOT NULL,
+        last_seen_at  BIGINT,
         ip_address    TEXT,
         user_agent    TEXT
       )
@@ -60,8 +63,8 @@ export const migration0005AddAuthSchema: Migration = {
     // ── orca_audit_log ───────────────────────────────────────────────────────
     await db.exec(`
       CREATE TABLE IF NOT EXISTS orca_audit_log (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        created_at  INTEGER NOT NULL,
+        id          ${autoIncrementPk},
+        created_at  BIGINT NOT NULL,
         user_id     TEXT,
         user_email  TEXT,
         action      TEXT    NOT NULL,
@@ -92,8 +95,8 @@ export const migration0005AddAuthSchema: Migration = {
         can_create_worktrees   INTEGER NOT NULL DEFAULT 1,
         can_delete_worktrees   INTEGER NOT NULL DEFAULT 1,
         can_access_production  INTEGER NOT NULL DEFAULT 0,
-        created_at             INTEGER NOT NULL,
-        updated_at             INTEGER NOT NULL
+        created_at             BIGINT NOT NULL,
+        updated_at             BIGINT NOT NULL
       )
     `)
   },

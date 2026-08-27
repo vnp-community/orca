@@ -222,6 +222,17 @@ describe('LinearAgentSkillSetupPrompt', () => {
         cli: {
           getInstallStatus: mocks.getCliStatus,
           getWslInstallStatus: mocks.getWslCliStatus
+        },
+        runtime: {
+          call: vi.fn(async ({ method, params }: { method: string; params?: unknown }) => {
+            if (method === 'cli.getInstallStatus') {
+              return { ok: true, result: await mocks.getCliStatus() }
+            }
+            if (method === 'cli.getWslInstallStatus') {
+              return { ok: true, result: await mocks.getWslCliStatus(params) }
+            }
+            throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+          })
         }
       }
     })

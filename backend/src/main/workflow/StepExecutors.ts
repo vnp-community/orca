@@ -2,7 +2,7 @@
  * StepExecutors — Routes workflow step execution to the correct dev server relay (TDD-17)
  *
  * Supports step types:
- * - agent:        relay.call('agent.exec', { prompt, worktreePath, trustPreset })
+ * - agent:        relay.call('agent.execPrompt', { prompt, worktreePath, trustPreset })
  * - shell:        relay.call('git.exec', { script, env }) or generic shell
  * - webhook:      native fetch() with AbortSignal
  * - notification: relay.call('notification.send', { channel, message })
@@ -10,6 +10,13 @@
  *
  * Timeout: each step races against step.timeout (default 30 min).
  * Abort: checks signal.aborted before dispatch.
+ *
+ * agent.execPrompt (not agent.exec): agent.exec is a generic "run this binary"
+ * RPC ({binary, args, cwd, stdin, env, timeoutMs}) with no concept of a
+ * prompt/model/trustPreset — sending this step's domain-shaped payload to it
+ * always failed with InvalidParams. agent.execPrompt resolves the AI-CLI
+ * binary/args/credentials from {prompt, worktreePath, trustPreset, model,
+ * accountId} agent-side. See specs/agent/api/gaps-and-findings.md.
  *
  * @module main/workflow/StepExecutors
  */
@@ -104,7 +111,7 @@ export class StepExecutors {
     // use-case (Claude ở bước 1, GPT-4o ở bước 2 trong CÙNG 1 workflow).
     const resolved = await this.resolveAgentProvider(step, triggeredBy)
 
-    const result = (await relay.call('agent.exec', {
+    const result = (await relay.call('agent.execPrompt', {
       stepId: step.id,
       prompt: step.config['prompt'],
       worktreePath: step.config['worktreePath'],

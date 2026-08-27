@@ -1,0 +1,790 @@
+syntax = "proto3";
+
+package orca.gitgateway.v1;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1;gitgatewayv1";
+
+// GitGatewayService is a stateless dispatcher: resolve the worktree's owning
+// host via infra-fleet-service, execute locally or relay. Owns no data.
+// See specs/backend-go/services/git-gateway-service.md.
+//
+// NOTE (SOL-031 / TASK-192): this file is being edited concurrently by
+// another work group adding git.*/files.* RPCs — the worktree.* RPCs below
+// were added against the pre-existing (GetStatus..GenerateCommitMessage)
+// service surface only, and will need a manual merge against that group's
+// changes to this same file.
+service GitGatewayService {
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc GetDiff(GetDiffRequest) returns (GetDiffResponse);
+  rpc Commit(CommitRequest) returns (CommitResponse);
+  rpc Push(PushRequest) returns (PushResponse);
+  rpc Pull(PullRequest) returns (PullResponse);
+  rpc GenerateCommitMessage(GenerateCommitMessageRequest) returns (GenerateCommitMessageResponse);
+
+  // ── Group B (TASK-208) — staging. Both always relay to the agent's bulk
+  // variant regardless of path count — see RelayExecutor.Stage/Unstage. ──
+  rpc Stage(StageRequest) returns (StageResponse);
+  rpc Unstage(UnstageRequest) returns (UnstageResponse);
+
+  // ── Group C (TASK-209) — history/compare. commitCompare/branchCompare/
+  // commitDiff/branchDiff/submoduleStatus were BLOCKED pending a real shape
+  // redesign; now implemented for real against the confirmed agent contract
+  // (specs/agent/api/agent-rpc-catalog-git-fs.md:49-55/143-147) — see each
+  // message's own doc comment for citations. ───────────────────────────────
+  rpc History(HistoryRequest) returns (HistoryResponse);
+  rpc CheckIgnored(CheckIgnoredRequest) returns (CheckIgnoredResponse);
+  rpc ForkSync(ForkSyncRequest) returns (ForkSyncResponse);
+  rpc UpstreamStatus(UpstreamStatusRequest) returns (UpstreamStatusResponse);
+  rpc CommitCompare(CommitCompareRequest) returns (CommitCompareResponse);
+  rpc BranchCompare(BranchCompareRequest) returns (BranchCompareResponse);
+  rpc CommitDiff(CommitDiffRequest) returns (FileDiffResponse);
+  rpc BranchDiff(BranchDiffRequest) returns (FileDiffResponse);
+  rpc SubmoduleStatus(SubmoduleStatusRequest) returns (GetStatusResponse);
+
+  // ── Group D (TASK-210) — remote. fetch was BLOCKED on the pushTarget
+  // design question and TASK-227 reachability — both now resolved. ───────
+  rpc RemoteCommitUrl(RemoteCommitUrlRequest) returns (RemoteUrlResponse);
+  rpc RemoteFileUrl(RemoteFileUrlRequest) returns (RemoteUrlResponse);
+  rpc Fetch(FetchRequest) returns (FetchResponse);
+
+  // ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
+  rpc GeneratePullRequestFields(GeneratePullRequestFieldsRequest) returns (GeneratePullRequestFieldsResponse);
+  rpc DiscoverCommitMessageModels(DiscoverCommitMessageModelsRequest) returns (DiscoverCommitMessageModelsResponse);
+
+  // ── File I/O (TASK-049) — resolve worktree_id -> host -> local exec or
+  // relay, identical dispatch shape to every git.* RPC above. ─────────────
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  rpc ReadFileChunk(ReadFileChunkRequest) returns (ReadFileChunkResponse);
+  rpc ReadFilePreview(ReadFilePreviewRequest) returns (ReadFilePreviewResponse);
+  rpc ReadDir(ReadDirRequest) returns (ReadDirResponse);
+  rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
+  rpc WriteFileChunk(WriteFileChunkRequest) returns (WriteFileChunkResponse);
+  rpc CreateDir(CreateDirRequest) returns (CreateDirResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (google.protobuf.Empty);
+  rpc StatFile(StatFileRequest) returns (StatFileResponse);
+  rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse);
+  rpc ListAllFiles(ListAllFilesRequest) returns (ListAllFilesResponse);
+  rpc ListMarkdownDocuments(ListMarkdownDocumentsRequest) returns (ListMarkdownDocumentsResponse);
+  // Known gaps carried forward from the old backend — both RPCs exist so
+  // the contract is honest, but return FAILED_PRECONDITION whenever
+  // dispatch resolves to a relay target, never a silent no-op.
+  rpc RenameFile(RenameFileRequest) returns (RenameFileResponse);
+  rpc CopyFile(CopyFileRequest) returns (CopyFileResponse);
+  // repo.*-owned RPCs (TASK-156) — file/host operations against a repo's
+  // working tree, not the repos Postgres table (that's project-service's
+  // UpdateRepo). See SOL-023 Bucket 3.
+  rpc Clone(CloneRequest) returns (CloneResponse);
+  rpc BaseRefDefault(BaseRefDefaultRequest) returns (BaseRefDefaultResponse);
+  rpc SearchRefs(SearchRefsRequest) returns (SearchRefsResponse);
+  rpc InitRepo(InitRepoRequest) returns (InitRepoResponse);          // repo.create
+  rpc CheckHooks(CheckHooksRequest) returns (CheckHooksResponse);     // repo.hooksCheck
+  rpc ReadIssueCommand(ReadIssueCommandRequest) returns (ReadIssueCommandResponse);
+  rpc WriteIssueCommand(WriteIssueCommandRequest) returns (google.protobuf.Empty);
+  rpc ScanSetupScriptImports(ScanSetupScriptImportsRequest) returns (ScanSetupScriptImportsResponse);
+  rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
+  rpc RemoveWorktree(RemoveWorktreeRequest) returns (google.protobuf.Empty);
+  // Required on every GitExecutor implementation from day one — TASK-194
+  // makes it a required interface method, not an optional one, closing the
+  // old TS backend's crash-bug class (forceDeletePreservedBranch? was
+  // optional and only one provider implemented it).
+  rpc ForceDeleteBranch(ForceDeleteBranchRequest) returns (google.protobuf.Empty);
+
+  // DetectWorktrees is the concrete form of project-service.md §4's
+  // "git-gateway-service reconciles on demand" — returns raw on-disk
+  // paths, no bookkeeping join (that diff happens at api-gateway's edge
+  // layer, TASK-195, per 05-data-architecture.md's cross-service
+  // aggregation rule).
+  rpc DetectWorktrees(DetectWorktreesRequest) returns (DetectWorktreesResponse);
+
+  rpc PrefetchCreateBase(PrefetchCreateBaseRequest) returns (PrefetchCreateBaseResponse);
+  rpc ResolvePrBase(ResolvePrBaseRequest) returns (ResolveBaseResponse);
+  rpc ResolveMrBase(ResolveMrBaseRequest) returns (ResolveBaseResponse);
+
+  // ── Group A — branch/ref operations (TASK-207) ───────────────────────────
+  // 4 of these methods (Checkout/ListLocalBranches/FastForward/
+  // ConflictOperation) needed a genuine shape redesign against the
+  // confirmed real agent contract (specs/agent/api/agent-rpc-catalog-git-fs.md)
+  // rather than the mechanical param rename the other 5 got — see each
+  // message's own doc comment below for citations. ConflictOperation's
+  // original single-RPC design is replaced by two RPCs: ConflictOperation
+  // (a pure detector, matching the real agent) and ResolveConflict (the
+  // per-file resolve op the real agent does not implement).
+  rpc Checkout(CheckoutRequest) returns (CheckoutResponse);
+  rpc ListLocalBranches(ListLocalBranchesRequest) returns (ListLocalBranchesResponse);
+  rpc FastForward(FastForwardRequest) returns (FastForwardResponse);
+  rpc RebaseFromBase(RebaseFromBaseRequest) returns (RebaseFromBaseResponse);
+  rpc AbortRebase(AbortRebaseRequest) returns (AbortRebaseResponse);
+  rpc AbortMerge(AbortMergeRequest) returns (AbortMergeResponse);
+  rpc ConflictOperation(ConflictOperationRequest) returns (ConflictOperationResponse);
+  rpc ResolveConflict(ResolveConflictRequest) returns (ResolveConflictResponse);
+  rpc Discard(DiscardRequest) returns (DiscardResponse);
+  rpc BulkDiscard(BulkDiscardRequest) returns (BulkDiscardResponse);
+}
+
+message GetStatusRequest {
+  string worktree_id = 1;
+}
+
+message FileStatus {
+  string path = 1;
+  string state = 2; // modified/added/deleted/untracked/conflicted
+}
+
+message GetStatusResponse {
+  repeated FileStatus files = 1;
+  string branch = 2;
+}
+
+message GetDiffRequest {
+  string worktree_id = 1;
+  string file_path = 2; // required — real git.diff is a per-file operation, see TASK-228
+  bool staged = 3;
+}
+
+message GetDiffResponse {
+  string unified_diff = 1;
+}
+
+message CommitRequest {
+  string worktree_id = 1;
+  string message = 2;
+  repeated string paths = 3; // empty = all staged
+}
+
+message CommitResponse {
+  string commit_sha = 1;
+}
+
+message PushRequest {
+  string worktree_id = 1;
+  string remote = 2;
+  string branch = 3;
+}
+
+message PushResponse {
+  bool success = 1;
+}
+
+message PullRequest {
+  string worktree_id = 1;
+}
+
+message PullResponse {
+  bool success = 1;
+  bool had_conflicts = 2;
+}
+
+// GenerateCommitMessage relays to wherever AI inference happens (execution
+// plane) — this service never runs inference itself.
+message GenerateCommitMessageRequest {
+  string worktree_id = 1;
+}
+
+message GenerateCommitMessageResponse {
+  string message = 1;
+}
+
+// ── Group B — staging (TASK-208) ──────────────────────────────────────────
+
+message StageRequest {
+  string worktree_id = 1;
+  repeated string paths = 2; // single-element for git.stage, full selection for git.bulkStage
+}
+message StageResponse {
+  bool success = 1;
+}
+
+message UnstageRequest {
+  string worktree_id = 1;
+  repeated string paths = 2; // single-element for git.unstage, full selection for git.bulkUnstage
+}
+message UnstageResponse {
+  bool success = 1;
+}
+
+// ── Group C — history/compare (TASK-209, shippable-now subset only) ──────
+
+message CommitRef {
+  string sha = 1;
+  string author = 2;
+  string committer = 3;
+  string message = 4;
+  int64 timestamp = 5; // unix seconds
+  repeated string parent_shas = 6;
+}
+
+// cursor/pagination dropped — the real agent has no pagination concept.
+// ref renamed to base_ref to match the field name the real agent reads.
+message HistoryRequest {
+  string worktree_id = 1;
+  string base_ref = 2; // empty = current branch
+  int32 limit = 3;
+}
+message HistoryResponse {
+  repeated CommitRef commits = 1;
+}
+
+// Response shape matches the real agent: only the ignored subset, not a
+// {path, ignored} pair for every input path.
+message CheckIgnoredRequest {
+  string worktree_id = 1;
+  repeated string paths = 2;
+}
+message CheckIgnoredResponse {
+  repeated string ignored_paths = 1;
+}
+
+// expected_upstream is required — the real git.forkSync rejects calls
+// without it.
+message ForkSyncRequest {
+  string worktree_id = 1;
+  string expected_upstream = 2;
+}
+message ForkSyncResponse {
+  int32 ahead = 1;
+  int32 behind = 2;
+  bool diverged = 3;
+}
+
+// push_target is now the real, structured PushTargetInput (declared below
+// under Group A, TASK-207's type) — replaces TASK-209's original placeholder
+// string field now that SOL-032 §0 open question #1 is resolved for this
+// method the same way FastForwardRequest's already was.
+message UpstreamStatusRequest {
+  string worktree_id = 1;
+  PushTargetInput push_target = 2; // optional; unset = agent resolves configured push target
+}
+message UpstreamStatusResponse {
+  bool has_upstream = 1;
+  int32 ahead = 2;
+  int32 behind = 3;
+}
+
+// GitChangeEntry is one changed file's status within a CommitCompare/
+// BranchCompare result — mirrors parseBranchDiff's real entry shape
+// (agent/src/relay/git-handler-utils.ts:107-134).
+message GitChangeEntry {
+  string path = 1;
+  string status = 2; // "modified" | "added" | "deleted" | "renamed" | "copied"
+  string old_path = 3;
+  int32 added = 4;
+  int32 removed = 5;
+}
+
+// CommitCompare diffs ONE commit against its own parent (or the empty tree
+// for a root commit) — matches the real agent's git.commitCompare exactly
+// (agent/src/relay/git-handler-commit-diff-ops.ts:15-122,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:50/144). commit_id must be a
+// full 40/64-hex object id. Replaces TASK-209's original ❌ BLOCKED
+// two-arbitrary-commits (base_sha/head_sha) design.
+message CommitCompareRequest {
+  string worktree_id = 1;
+  string commit_id = 2;
+}
+message CommitCompareResponse {
+  string commit_oid = 1;
+  string parent_oid = 2; // empty = root commit, diffed against the empty tree
+  string compare_ref = 3;
+  string base_ref = 4;
+  int32 changed_files = 5;
+  string status = 6; // "ready" | "invalid-commit" | "error"
+  string error_message = 7;
+  repeated GitChangeEntry entries = 8;
+}
+
+// BranchCompare diffs current HEAD against ONE base_ref's merge-base —
+// matches the real agent's git.branchCompare exactly
+// (agent/src/relay/git-handler-ops.ts:124-214,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:49/143). Replaces TASK-209's
+// original ❌ BLOCKED two-arbitrary-branches (base_branch/head_branch)
+// design.
+message BranchCompareRequest {
+  string worktree_id = 1;
+  string base_ref = 2;
+}
+message BranchCompareResponse {
+  string base_ref = 1;
+  string base_oid = 2;
+  string compare_ref = 3;
+  string head_oid = 4;
+  string merge_base = 5;
+  int32 changed_files = 6;
+  int32 commits_ahead = 7;
+  string status = 8; // "ready" | "invalid-base" | "unborn-head" | "no-merge-base" | "loading" | "error"
+  string error_message = 9;
+  repeated GitChangeEntry entries = 10;
+}
+
+// FileDiffResponse is a single file's before/after content — the real
+// agent's git.commitDiff/git.branchDiff response shape (buildDiffResult,
+// agent/src/relay/git-diff-result.ts:5-38), NOT a unified-diff text blob
+// like GetDiffResponse. Binary content is intentionally left empty even for
+// a previewable image/PDF — a raw binary blob can't round-trip through a
+// proto string field (see localgit.buildFileDiffResult's doc comment).
+message FileDiffResponse {
+  string kind = 1; // "text" | "binary"
+  string original_content = 2;
+  string modified_content = 3;
+  bool original_is_binary = 4;
+  bool modified_is_binary = 5;
+}
+
+// CommitDiff is a single REQUIRED file's before/after content at one commit
+// vs. its optional parent — matches the real agent's git.commitDiff exactly
+// (agent/src/relay/git-handler-commit-diff-ops.ts:124-160,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:52/146). Same class of
+// per-file fix as GetDiffRequest's own TASK-228 correction — TASK-209's
+// original ❌ BLOCKED design had no file_path at all and assumed a
+// whole-commit diff. commit_oid/parent_oid must be full 40/64-hex object
+// ids; parent_oid empty = root commit.
+message CommitDiffRequest {
+  string worktree_id = 1;
+  string commit_oid = 2;
+  string parent_oid = 3;
+  string file_path = 4;
+  string old_path = 5;
+}
+
+// BranchDiff is a single REQUIRED file's before/after content vs. one
+// base_ref's merge-base — matches the real agent's git.branchDiff exactly
+// (agent/src/relay/git-handler-ops.ts:218-288,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:51/145). Same per-file fix as
+// CommitDiffRequest, plus the same base-ref-only-vs-two-sided fix as
+// BranchCompareRequest.
+message BranchDiffRequest {
+  string worktree_id = 1;
+  string base_ref = 2;
+  string file_path = 3;
+  string old_path = 4;
+}
+
+// SubmoduleStatus operates on ONE submodule per call — matches the real
+// agent's git.submoduleStatus exactly
+// (agent/src/relay/agent-git-handler-extended.ts:196-230,
+// specs/agent/api/agent-rpc-catalog-git-fs.md:55/123). SOL-032 §0 open
+// question #3 resolved: the real frontend caller
+// (frontend/src/renderer/src/runtime/runtime-git-client.ts:152-176) already
+// knows every dirty submodule's path from the parent git.status response
+// and only ever fetches one submodule's status on lazy expansion — there is
+// no "list every submodule" caller to build an aggregation for, so
+// TASK-209's original ❌ BLOCKED repeated-response design solved a problem
+// the real frontend doesn't have. Reuses GetStatusResponse since the real
+// agent composes a submodule's status the same way as a top-level
+// worktree's.
+message SubmoduleStatusRequest {
+  string worktree_id = 1;
+  string submodule_path = 2;
+  string area = 3; // "staged" | "untracked" | "unstaged" (default) — matches the real agent's own default
+}
+
+// ── Group D — remote (TASK-210) ───────────────────────────────────────────
+
+message RemoteCommitUrlRequest { string worktree_id = 1; string sha = 2; }
+message RemoteFileUrlRequest   { string worktree_id = 1; string path = 2; string ref = 3; }
+message RemoteUrlResponse      { string url = 1; }
+
+// Fetch runs `git fetch --prune [remote]` — matches the real agent's
+// git.fetch exactly (specs/agent/api/agent-rpc-catalog-git-fs.md:155): it
+// always prunes, with no separate prune flag, and takes the same optional
+// structured push_target as FastForward/UpstreamStatus (SOL-032 §0 open
+// question #1). Replaces TASK-210's original ❌ BLOCKED remote/prune-bool
+// design.
+message FetchRequest {
+  string worktree_id = 1;
+  PushTargetInput push_target = 2;
+}
+message FetchResponse {
+  bool success = 1;
+}
+
+// ── Group E — AI-assist (TASK-211) ────────────────────────────────────────
+
+message GeneratePullRequestFieldsRequest {
+  string worktree_id = 1;
+  string base_branch = 2;
+}
+message GeneratePullRequestFieldsResponse {
+  string title = 1;
+  string description = 2;
+}
+
+message ModelInfo {
+  string provider_type = 1; // mirrors orca.aiprovider.v1.ProviderType's string name
+  string account_id = 2;
+  string status = 3; // active | rotating | revoked
+}
+message DiscoverCommitMessageModelsRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+}
+message DiscoverCommitMessageModelsResponse {
+  repeated ModelInfo models = 1; // 0 or 1 entries today — see DiscoverCommitMessageModels usecase doc comment
+}
+
+// ── File I/O (TASK-049) ───────────────────────────────────────────────────
+
+message ReadFileRequest {
+  string worktree_id = 1;
+  string path = 2;       // worktree-relative
+}
+message ReadFileResponse {
+  bytes content = 1;
+  string encoding = 2;   // "utf8" | "base64" — binary files come back base64
+}
+
+message ReadFileChunkRequest {
+  string worktree_id = 1;
+  string path = 2;
+  int64 offset_bytes = 3;
+  int64 length_bytes = 4;
+}
+message ReadFileChunkResponse {
+  bytes content = 1;
+  bool eof = 2;
+}
+
+message ReadFilePreviewRequest {
+  string worktree_id = 1;
+  string path = 2;
+  int64 max_bytes = 3;
+}
+message ReadFilePreviewResponse {
+  bytes content = 1;
+  bool truncated = 2;
+}
+
+message ReadDirRequest {
+  string worktree_id = 1;
+  string path = 2;
+}
+message DirEntry {
+  string name = 1;
+  bool is_directory = 2;
+}
+message ReadDirResponse {
+  repeated DirEntry entries = 1;
+}
+
+message WriteFileRequest {
+  string worktree_id = 1;
+  string path = 2;
+  bytes content = 3;
+  string encoding = 4;   // mirrors ReadFileResponse.encoding
+  bool create_parents = 5;
+}
+message WriteFileResponse {
+  int64 bytes_written = 1;
+}
+
+message WriteFileChunkRequest {
+  string worktree_id = 1;
+  string path = 2;
+  int64 offset_bytes = 3;
+  bytes content = 4;      // base64-decoded before this RPC is called
+  bool is_final = 5;
+}
+message WriteFileChunkResponse {
+  int64 bytes_written = 1;
+}
+
+message CreateDirRequest {
+  string worktree_id = 1;
+  string path = 2;
+  bool recursive = 3;
+  bool no_clobber = 4;   // files.createDirNoClobber collapses onto this field
+}
+message CreateDirResponse {}
+
+message DeleteFileRequest {
+  string worktree_id = 1;
+  string path = 2;
+  bool recursive = 3;
+}
+
+message StatFileRequest {
+  string worktree_id = 1;
+  string path = 2;
+}
+message StatFileResponse {
+  bool exists = 1;
+  bool is_directory = 2;
+  int64 size_bytes = 3;
+  int64 modified_at_unix_ms = 4;
+}
+
+message SearchFilesRequest {
+  string worktree_id = 1;
+  string pattern = 2;
+  bool is_regex = 3;
+  string path_glob = 4;
+  int32 max_results = 5;
+}
+message SearchMatch {
+  string path = 1;
+  int32 line = 2;
+  string line_text = 3;
+}
+message SearchFilesResponse {
+  repeated SearchMatch matches = 1;
+}
+
+message ListAllFilesRequest {
+  string worktree_id = 1;
+  string path_glob = 2;
+  int32 max_results = 3;
+}
+message ListAllFilesResponse {
+  repeated string paths = 1;
+}
+
+message ListMarkdownDocumentsRequest {
+  string worktree_id = 1;
+  int32 max_results = 2;
+}
+message ListMarkdownDocumentsResponse {
+  repeated string paths = 1;
+}
+
+message RenameFileRequest {
+  string worktree_id = 1;
+  string from_path = 2;
+  string to_path = 3;
+}
+message RenameFileResponse {}
+
+message CopyFileRequest {
+  string worktree_id = 1;
+  string from_path = 2;
+  string to_path = 3;
+}
+message CopyFileResponse {}
+message CloneRequest {
+  string dev_server_id = 1; // which host to clone onto — resolved via infra-fleet-service by the caller (project-service context) before this call
+  string url = 2;
+  string dest_path = 3;
+}
+message CloneResponse {
+  string worktree_path = 1;
+  string default_branch = 2;
+}
+
+message BaseRefDefaultRequest { string worktree_id = 1; }
+message BaseRefDefaultResponse { string ref = 1; }
+
+message SearchRefsRequest { string worktree_id = 1; string query = 2; }
+message SearchRefsResponse { repeated string refs = 1; }
+
+// InitRepo runs `git init` at dest_path on the resolved host and returns
+// enough for the caller to then call ProjectService.AddRepo — mirrors
+// project-service.md §2's "git-gateway-service does the git op, then
+// writes back metadata" saga already established for worktrees
+// (RecordWorktreeCreated), applied here to repo creation instead.
+message InitRepoRequest {
+  string dev_server_id = 1;
+  string dest_path = 2;
+  string default_branch = 3; // empty = git's own default
+}
+message InitRepoResponse {
+  string path = 1;
+  string default_branch = 2;
+}
+
+message CheckHooksRequest { string worktree_id = 1; }
+message CheckHooksResponse { repeated string installed_hooks = 1; bool orca_hooks_current = 2; }
+
+message ReadIssueCommandRequest { string worktree_id = 1; }
+message ReadIssueCommandResponse { string content = 1; bool exists = 2; }
+
+message WriteIssueCommandRequest { string worktree_id = 1; string content = 2; }
+
+message ScanSetupScriptImportsRequest { string worktree_id = 1; }
+message ScanSetupScriptImportsResponse { repeated string imported_paths = 1; }
+message CreateWorktreeRequest {
+  string project_id = 1;
+  string repo_id = 2;
+  string branch = 3;      // new branch name for the worktree
+  string base_ref = 4;    // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
+}
+message CreateWorktreeResponse {
+  string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)
+  string path = 2;
+  string head_sha = 3;
+}
+
+message RemoveWorktreeRequest {
+  string worktree_id = 1;
+  bool   force = 2;       // maps to `git worktree remove --force` (uncommitted changes present)
+}
+
+message ForceDeleteBranchRequest {
+  string worktree_id = 1;
+  string branch = 2;
+}
+
+message DetectWorktreesRequest  { string repo_id = 1; }
+message DetectWorktreesResponse {
+  repeated string on_disk_paths = 1; // raw `git worktree list --porcelain` result for the repo
+}
+
+message PrefetchCreateBaseRequest  { string repo_id = 1; string base_ref = 2; }
+message PrefetchCreateBaseResponse { string resolved_sha = 1; } // ensures base_ref is fetched/up to date
+
+message ResolvePrBaseRequest { string repo_id = 1; int32 pr_number = 2; }
+message ResolveMrBaseRequest { string repo_id = 1; int32 mr_number = 2; }
+message ResolveBaseResponse  { string base_branch = 1; string base_sha = 2; }
+
+// ── Group A — branch/ref operations (TASK-207) ──────────────────────────────
+
+// Checkout switches to an existing ref. The original design's `create`
+// (git checkout -b) field was dropped: the real agent's git.checkout has no
+// create-branch semantics at all — `git checkout <branch> --` only
+// (specs/agent/api/agent-rpc-catalog-git-fs.md:132,
+// agent/src/relay/git-handler.ts:702-719). A caller that wants
+// checkout-with-create composes it as a separate branch-creation step
+// (e.g. `git.exec` with the `branch` subcommand, whitelisted on both Part A
+// and Part B per that same spec) followed by this RPC — not this RPC's
+// scope.
+message CheckoutRequest {
+  string worktree_id = 1;
+  string branch = 2; // ref to switch to; field named to match the real agent's own param name
+}
+message CheckoutResponse {
+  bool success = 1;
+  string branch = 2; // resolved current branch after the operation
+}
+
+// BranchInfo is one local branch's tracking state. The real agent's own
+// git.localBranches RPC only returns {current, branches[]} (names only,
+// agent-rpc-catalog-git-fs.md:133, agent/src/relay/git-handler.ts:721-744) —
+// this richer per-branch shape is instead composed by RelayExecutor via
+// git.exec's for-each-ref subcommand, confirmed whitelisted with no extra
+// restriction on Part B's stricter exec whitelist — the whitelist
+// RelayExecutor's SSH-relay calls actually reach
+// (agent-rpc-catalog-git-fs.md:203-206). is_remote is always false today:
+// this RPC only lists refs/heads/ (local branches); kept for proto
+// forward-compat with a possible future refs/remotes/ listing.
+message BranchInfo {
+  string name = 1;
+  string upstream = 2; // empty = no upstream configured
+  int32 ahead = 3;
+  int32 behind = 4;
+  bool is_current = 5;
+  bool is_remote = 6;
+}
+message ListLocalBranchesRequest {
+  string worktree_id = 1;
+}
+message ListLocalBranchesResponse {
+  repeated BranchInfo branches = 1;
+}
+
+// PushTargetInput mirrors the real agent's GitPushTarget wire shape
+// (agent/src/shared/types.ts:551-557, validated by
+// agent/src/shared/git-push-target-validation.ts) — the same structured
+// shape push/pull/fetch/fastForward all take on the real contract instead
+// of a bare remote/branch string pair (SOL-032 §0 open question #1).
+// Unset (nil) means "let the agent resolve the worktree's configured push
+// target", matching resolveRelayPushTarget's undefined-pushTarget branch
+// (agent/src/relay/git-handler-push-target.ts:159-166).
+message PushTargetInput {
+  string remote_name = 1;
+  string branch_name = 2;
+  string remote_url = 3;    // optional; validated against a github.com https/ssh clone URL pattern when present
+  bool remote_created = 4;  // true when Orca added this remote while preparing a fork-PR worktree
+}
+
+// FastForward runs a fast-forward-only pull. push_target is optional — see
+// PushTargetInput's doc comment; the real agent's git.fastForward is
+// `pullWithArgs(['--ff-only'])` (agent-rpc-catalog-git-fs.md:160,
+// agent/src/relay/git-handler.ts:1190-1192), taking the same optional
+// pushTarget as push/pull/fetch, not a plain branch string.
+message FastForwardRequest {
+  string worktree_id = 1;
+  PushTargetInput push_target = 2;
+}
+message FastForwardResponse {
+  bool success = 1;
+}
+
+message RebaseFromBaseRequest {
+  string worktree_id = 1;
+  string base_branch = 2;
+}
+message RebaseFromBaseResponse {
+  bool success = 1;
+  bool had_conflicts = 2;
+}
+
+message AbortRebaseRequest {
+  string worktree_id = 1;
+}
+message AbortRebaseResponse {
+  bool success = 1;
+}
+
+// AbortMerge matches git-gateway-service.md §3's own AbortMerge name exactly.
+message AbortMergeRequest {
+  string worktree_id = 1;
+}
+message AbortMergeResponse {
+  bool success = 1;
+}
+
+// ConflictOperation is a DETECTOR ONLY, matching the real agent exactly:
+// worktree_id -> which operation (if any) left the worktree in a
+// conflicted state. The original design conflated this with a per-file
+// resolver — the real git.conflictOperation takes only worktreePath and
+// returns 'merge'|'rebase'|'cherry-pick'|'unknown'
+// (agent-rpc-catalog-git-fs.md:136, agent/src/relay/git-handler.ts:886-889,
+// agent/src/relay/git-handler-status-ops.ts:38-57). See ResolveConflict
+// below for the per-file resolve operation, which the real agent does not
+// implement as one RPC.
+message ConflictOperationRequest {
+  string worktree_id = 1;
+}
+message ConflictOperationResponse {
+  string operation = 1; // "merge" | "rebase" | "cherry-pick" | "unknown"
+}
+
+// ResolveConflict is a git-gateway-service-only composition (ours/theirs/
+// markResolved for one conflicted path) with no real agent RPC backing it
+// — git.exec's Part B whitelist explicitly excludes both `checkout` and
+// `add` (agent-rpc-catalog-git-fs.md:203-227's "Not allowed at all" list),
+// so a relay-connected (SSH) worktree cannot support this operation at all;
+// RelayExecutor returns a typed FailedPrecondition
+// (domain.ErrConflictResolveUnsupportedOverRelay) rather than guessing an
+// unsupported RPC call. Local (unconnected) worktrees run this directly
+// against the host git binary. No confirmed live caller was found in
+// today's frontend (backend/src/main/providers/*.ts has no ours/theirs/
+// markResolved call site) — this exists for the source-control UI to grow
+// into, following the field names (path/operation) the original design
+// sketch used.
+message ResolveConflictRequest {
+  string worktree_id = 1;
+  string path = 2;
+  string operation = 3; // "ours" | "theirs" | "markResolved"
+}
+message ResolveConflictResponse {
+  bool success = 1;
+}
+
+message DiscardRequest {
+  string worktree_id = 1;
+  string path = 2;
+}
+message DiscardResponse {
+  bool success = 1;
+}
+
+// BulkDiscard reports partial failure rather than all-or-nothing, since a
+// mixed batch (some tracked, some already-clean) is a real case.
+message BulkDiscardRequest {
+  string worktree_id = 1;
+  repeated string paths = 2;
+}
+message BulkDiscardResponse {
+  bool success = 1;
+  repeated string failed_paths = 2;
+}

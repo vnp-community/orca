@@ -22,6 +22,10 @@ import {
   normalizeExternalBrowserUrl
 } from '../../shared/browser-url'
 import { ORCA_BROWSER_GUEST_WEB_PREFERENCES } from '../../shared/browser-guest-web-preferences'
+import type {
+  MenuCommandPayload,
+  WindowStateChangedState
+} from '../../shared/runtime-client-events'
 import { isCrashReportReason } from '../../shared/crash-reporting'
 import {
   DEFAULT_RENDERER_RECOVERY_MAX_RECOVERIES,
@@ -137,6 +141,16 @@ type CreateMainWindowOptions = {
    *  before session restore re-attaches them (#5787). This callback lets the host
    *  mark that one reload so the sweep can be skipped for it. */
   onBeforeRecoveryReload?: (webContentsId: number) => void
+  /** Why: bridges the window-shortcut/App-Menu command surface onto the runtime
+   *  client-events stream (OrcaRuntimeService.notifyMenuCommand) so a paired
+   *  client mirroring this host's session sees the same commands, alongside
+   *  the existing native webContents.send this function already performs. */
+  onMenuCommand?: (payload: MenuCommandPayload) => void
+  /** Why: bridges BrowserWindow maximize/fullscreen transitions and the
+   *  powerMonitor resume signal onto the runtime client-events stream
+   *  (OrcaRuntimeService.notifyWindowStateChanged), alongside the existing
+   *  native webContents.send this function already performs. */
+  onWindowStateChanged?: (state: WindowStateChangedState) => void
 }
 
 export function loadMainWindow(mainWindow: BrowserWindow): void {
@@ -317,6 +331,7 @@ export function createMainWindow(
     }
     forceRepaint(mainWindow)
     mainWindow.webContents.send('system:resumed')
+    opts?.onWindowStateChanged?.('systemResumed')
   }
   powerMonitor.on('resume', onSystemResume)
 
@@ -451,12 +466,14 @@ export function createMainWindow(
     }
     store?.updateUI({ windowMaximized: true })
     mainWindow.webContents.send('window:maximize-changed', true)
+    opts?.onWindowStateChanged?.('maximized')
   })
   mainWindow.on('unmaximize', () => {
     if (windowClosing) {
       return
     }
     mainWindow.webContents.send('window:maximize-changed', false)
+    opts?.onWindowStateChanged?.('unmaximized')
     const bounds = mainWindow.getBounds()
     // Why: mirror the saveBounds guard — unmaximize during teardown can land
     // at MIN_WIDTH × MIN_HEIGHT and we must not persist those as the user's
@@ -471,10 +488,12 @@ export function createMainWindow(
 
   mainWindow.on('enter-full-screen', () => {
     mainWindow.webContents.send('window:fullscreen-changed', true)
+    opts?.onWindowStateChanged?.('enteredFullScreen')
   })
 
   mainWindow.on('leave-full-screen', () => {
     mainWindow.webContents.send('window:fullscreen-changed', false)
+    opts?.onWindowStateChanged?.('leftFullScreen')
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -742,15 +761,22 @@ export function createMainWindow(
   const sendResolvedWindowShortcutAction = (action: WindowShortcutAction): void => {
     switch (action.type) {
       // The renderer's DictationController re-checks enabled/sttModel and ignores
-      // hold mode, so this path needs no voice guards.
+      // hold mode, so this path needs no voice guards. Raw-input-timing-sensitive
+      // (auto-repeat/hold-mode gating above depends on this firing on every
+      // keydown with no added latency), so it stays native-only — not bridged
+      // onto the runtime client-events stream.
       case 'dictationKeyDown':
         mainWindow.webContents.send('ui:dictationKeyDown')
         return
+      // Why: terminal-zoom resolution depends on document.activeElement in the
+      // renderer (resolveZoomTarget) — a purely local DOM-focus concern with
+      // no meaning to a remote paired client, so it stays native-only.
       case 'zoom':
         mainWindow.webContents.send('terminal:zoom', action.direction)
         return
       case 'openSettings':
         mainWindow.webContents.send('ui:openSettings')
+        opts?.onMenuCommand?.({ command: 'openSettings' })
         return
       case 'forceReload':
         opts?.onBeforeReload?.({ ignoreCache: true, webContentsId: mainWindow.webContents.id })
@@ -758,45 +784,63 @@ export function createMainWindow(
         return
       case 'toggleLeftSidebar':
         mainWindow.webContents.send('ui:toggleLeftSidebar')
+        opts?.onMenuCommand?.({ command: 'toggleLeftSidebar' })
         return
       case 'toggleRightSidebar':
         mainWindow.webContents.send('ui:toggleRightSidebar')
+        opts?.onMenuCommand?.({ command: 'toggleRightSidebar' })
         return
       case 'toggleWorktreePalette':
         mainWindow.webContents.send('ui:toggleWorktreePalette')
+        opts?.onMenuCommand?.({ command: 'toggleWorktreePalette' })
         return
       case 'toggleFloatingTerminal':
         mainWindow.webContents.send('ui:toggleFloatingTerminal')
+        opts?.onMenuCommand?.({ command: 'toggleFloatingTerminal' })
         return
       case 'openQuickOpen':
         mainWindow.webContents.send('ui:openQuickOpen')
+        opts?.onMenuCommand?.({ command: 'openQuickOpen' })
         return
       case 'toggleQuickCommandsMenu':
         mainWindow.webContents.send('ui:toggleQuickCommandsMenu')
+        opts?.onMenuCommand?.({ command: 'toggleQuickCommandsMenu' })
         return
       case 'openNewWorkspace':
         mainWindow.webContents.send('ui:openNewWorkspace')
+        opts?.onMenuCommand?.({ command: 'openNewWorkspace' })
         return
+      // Why: deletes whatever worktree is "current" on THIS device — a
+      // paired client resolves "current" from its own independently
+      // navigable local state, so mirroring the bare command risks deleting
+      // a different worktree there than the one the desktop user intended.
+      // Native-only until this ships with an explicit worktreeId target.
       case 'deleteCurrentWorkspace':
         mainWindow.webContents.send('ui:deleteCurrentWorkspace')
         return
       case 'openWorkspaceBoard':
         mainWindow.webContents.send('ui:openWorkspaceBoard')
+        opts?.onMenuCommand?.({ command: 'openWorkspaceBoard' })
         return
       case 'openTasks':
         mainWindow.webContents.send('ui:openTasks')
+        opts?.onMenuCommand?.({ command: 'openTasks' })
         return
       case 'switchRecentTab':
         mainWindow.webContents.send('ui:switchRecentTab')
+        opts?.onMenuCommand?.({ command: 'switchRecentTab' })
         return
       case 'jumpToWorktreeIndex':
         mainWindow.webContents.send('ui:jumpToWorktreeIndex', action.index)
+        opts?.onMenuCommand?.({ command: 'jumpToWorktreeIndex', index: action.index })
         return
       case 'jumpToTabIndex':
         mainWindow.webContents.send('ui:jumpToTabIndex', action.index)
+        opts?.onMenuCommand?.({ command: 'jumpToTabIndex', index: action.index })
         return
       case 'worktreeHistoryNavigate':
         mainWindow.webContents.send('ui:worktreeHistoryNavigate', action.direction)
+        opts?.onMenuCommand?.({ command: 'worktreeHistoryNavigate', direction: action.direction })
     }
   }
 

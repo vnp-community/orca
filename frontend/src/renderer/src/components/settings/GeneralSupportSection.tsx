@@ -2,6 +2,9 @@ import type React from 'react'
 import { useEffect, useState } from 'react'
 import { ExternalLink, Loader2, Star } from 'lucide-react'
 import { useMountedRef } from '@/hooks/useMountedRef'
+import { useAppStore } from '@/store'
+import { checkRuntimeOrcaStarred, starRuntimeOrca } from '@/runtime/runtime-github-client'
+import { completeRuntimeStarNag } from '@/runtime/runtime-star-nag-client'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Separator } from '../ui/separator'
@@ -9,6 +12,7 @@ import { SearchableSetting } from './SearchableSetting'
 import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 const ORCA_STARGAZERS_URL = 'https://github.com/stablyai/orca/stargazers'
 
 type SupportState =
@@ -37,10 +41,11 @@ export function GeneralSupportSection({
   // placeholder collapses with a grid-rows transition so content above it
   // doesn't shift; anything below (nothing today, but future-proof) eases up.
   const [starState, setStarState] = useState<SupportState>('loading')
+  const settings = useAppStore((s) => s.settings)
 
   useEffect(() => {
     let cancelled = false
-    void window.api.gh.checkOrcaStarred().then((result) => {
+    void checkRuntimeOrcaStarred(settings).then((result) => {
       if (cancelled) {
         return
       }
@@ -58,7 +63,7 @@ export function GeneralSupportSection({
   const handleStarClick = async (): Promise<void> => {
     if (starState === 'web-fallback') {
       setStarState('opening-github')
-      await window.api.shell.openUrl(ORCA_STARGAZERS_URL)
+      await shellOpenUrl(ORCA_STARGAZERS_URL)
       if (mountedRef.current) {
         setStarState('web-fallback')
       }
@@ -68,7 +73,7 @@ export function GeneralSupportSection({
       return
     }
     setStarState('starring')
-    const ok = await window.api.gh.starOrca('settings')
+    const ok = await starRuntimeOrca(settings, 'settings')
     if (!ok) {
       if (mountedRef.current) {
         setStarState('web-fallback')
@@ -80,7 +85,7 @@ export function GeneralSupportSection({
     }
     // Why: clicking star anywhere should also permanently mute the
     // threshold-based nag so the user isn't re-prompted via the popup.
-    await window.api.starNag.complete()
+    await completeRuntimeStarNag(settings)
   }
 
   return (

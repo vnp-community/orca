@@ -62,6 +62,246 @@ export const PREFLIGHT_CACHE_TTL_MS = 30_000
 
 // ── Registration ──────────────────────────────────────────────────────────────
 
+// ── Extracted handler bodies ─────────────────────────────────────────────────
+// Why: pulled out of the ipcMain.handle callbacks so the RPC wrapper
+// (runtime/rpc/methods/onboarding.ts) can call the exact same logic —
+// including the module-level TTL caches above — instead of duplicating it.
+
+export async function detectAgentsForDevServer(
+  devServerManager: DevServerManager,
+  params: { devServerId: string | null }
+): Promise<{
+  agents: string[]
+  platform: NodeJS.Platform | null
+  devServerId: string | null
+}> {
+  const { devServerId } = params
+
+  if (!devServerId) {
+    return { agents: [], platform: null, devServerId: null }
+  }
+
+  // Check cache first (TTL 60s)
+  const cached = getCachedDetection(devServerId)
+  if (cached) {
+    return { ...cached, devServerId }
+  }
+
+  const relay = devServerManager.getRelay(devServerId)
+  if (!relay) {
+    throw new Error(`Dev server '${devServerId}' not connected`)
+  }
+
+  const commands = buildAgentDetectionCommands()
+  const result = await relay.detectAgents(commands)
+
+  // Store in cache only on success
+  agentDetectionCache.set(devServerId, {
+    result: { agents: result.agents, platform: result.platform },
+    cachedAt: Date.now()
+  })
+
+  return {
+    agents: result.agents,
+    platform: result.platform,
+    devServerId
+  }
+}
+
+export async function detectAgentsAllDevServers(
+  devServerManager: DevServerManager
+): Promise<
+  Record<
+    string,
+    {
+      agents: string[]
+      platform: NodeJS.Platform | null
+      error?: string
+    }
+  >
+> {
+  // Only query servers that are currently connected
+  const servers = devServerManager.list().filter((ds) => ds.status === 'connected')
+
+  const results = await Promise.allSettled(
+    servers.map(async (ds) => {
+      const relay = devServerManager.getRelay(ds.id)!
+      const commands = buildAgentDetectionCommands()
+      const result = await relay.detectAgents(commands)
+      return { id: ds.id, agents: result.agents, platform: ds.platform }
+    })
+  )
+
+  const out: Record<string, { agents: string[]; platform: NodeJS.Platform | null; error?: string }> =
+    {}
+  results.forEach((r, i) => {
+    const serverId = servers[i].id
+    if (r.status === 'fulfilled') {
+      out[serverId] = { agents: r.value.agents, platform: r.value.platform }
+    } else {
+      out[serverId] = {
+        agents: [],
+        platform: servers[i].platform,
+        error: (r.reason as Error)?.message ?? 'Unknown error'
+      }
+    }
+  })
+  return out
+}
+
+export async function getPreflightStatusForDevServer(
+  devServerManager: DevServerManager,
+  params: { devServerId: string; force?: boolean }
+): Promise<RemotePreflightStatus> {
+  const { devServerId, force = false } = params
+
+  // Cache hit: skip relay call unless force=true
+  if (!force) {
+    const cached = preflightCache.get(devServerId)
+    if (cached && Date.now() - cached.cachedAt < PREFLIGHT_CACHE_TTL_MS) {
+      return cached.result
+    }
+  }
+
+  const relay = devServerManager.getRelay(devServerId)
+  if (!relay) {throw new Error(`Dev server '${devServerId}' not connected`)}
+
+  const raw = await relay.call<{
+    platform: NodeJS.Platform
+    gh: { installed: boolean; authenticated: boolean; version?: string }
+    git: { installed: boolean; version?: string; hasUserName: boolean; hasUserEmail: boolean }
+  }>('preflight.check', {}, 30_000)
+
+  const result: RemotePreflightStatus = {
+    devServerId,
+    platform: raw.platform,
+    checkedAt: Date.now(),
+    gh: raw.gh,
+    git: raw.git
+  }
+  preflightCache.set(devServerId, { result, cachedAt: Date.now() })
+  return result
+}
+
+export async function setGitIdentityForDevServer(
+  devServerManager: DevServerManager,
+  params: { devServerId: string; name: string; email: string }
+): Promise<void> {
+  const relay = devServerManager.getRelay(params.devServerId)
+  if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
+  await relay.call('preflight.setGitIdentity', {
+    name: params.name,
+    email: params.email
+  })
+  // Invalidate preflight cache so next getPreflightStatus is fresh
+  preflightCache.delete(params.devServerId)
+}
+
+export async function detectGhosttyConfigForDevServer(
+  devServerManager: DevServerManager,
+  params: { devServerId: string }
+): Promise<{ configPath: string | null; themeDir: string | null }> {
+  const relay = devServerManager.getRelay(params.devServerId)
+  if (!relay) {throw new Error('Dev server not connected')}
+  return relay.call<{ configPath: string | null; themeDir: string | null }>(
+    'preflight.detectGhosttyConfig',
+    {}
+  )
+}
+
+// Why: gh auth login is interactive — run it in a remote PTY on the dev server
+// and stream the output back to the renderer via the existing PTY bridge.
+// The relay's 'pty.create' method is used (same as terminal PTY sessions).
+export async function openGhAuthTerminalForDevServer(
+  devServerManager: DevServerManager,
+  params: { devServerId: string }
+): Promise<{ ptyId: string; devServerId: string }> {
+  const relay = devServerManager.getRelay(params.devServerId)
+  if (!relay) {throw new Error('Dev server not connected')}
+  // Why: call the relay's pty.spawn to spawn 'gh auth login' in a remote PTY.
+  // The ptyId is returned to the renderer to subscribe to pty output events.
+  const ptyId = await relay.call<string>('pty.spawn', {
+    command: 'gh',
+    args: ['auth', 'login'],
+    env: {},
+    cols: 120,
+    rows: 30
+  })
+  return { ptyId, devServerId: params.devServerId }
+}
+
+// Why: Windows terminal configuration differs per dev server. This enforces
+// that only win32 dev servers can be queried, and caches results for 60s to
+// avoid repeated relay calls from the UI polling.
+export async function detectWindowsCapabilitiesForDevServer(
+  devServerManager: DevServerManager,
+  params: { devServerId: string }
+): Promise<WindowsTerminalCapabilities> {
+  const devServer = devServerManager.get(params.devServerId)
+  if (!devServer) {throw new Error(`Dev server '${params.devServerId}' not found`)}
+  if (devServer.platform !== 'win32') {
+    throw new Error(
+      `Dev server '${params.devServerId}' is not Windows (platform: ${devServer.platform ?? 'unknown'})`
+    )
+  }
+
+  const relay = devServerManager.getRelay(params.devServerId)
+  if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
+
+  // Cache hit: serve from cache if still fresh
+  const cacheKey = params.devServerId
+  const cached = windowsCapsCache.get(cacheKey)
+  if (cached && Date.now() - cached.cachedAt < WINDOWS_CAPS_CACHE_TTL_MS) {
+    return cached.result
+  }
+
+  const result = await relay.call<WindowsTerminalCapabilities>(
+    'preflight.detectWindowsTerminalCapabilities',
+    {}
+  )
+  windowsCapsCache.set(cacheKey, { result, cachedAt: Date.now() })
+  return result
+}
+
+// TASK-039: mark a global or per-server checklist item.
+// devServerId absent → global item; present → per-server item.
+export function markOnboardingChecklistItem(
+  store: Store | undefined,
+  params: {
+    item: keyof OnboardingChecklistState | keyof PerServerChecklistState
+    devServerId?: string
+    value?: boolean
+  }
+): void {
+  if (!store) {
+    // store is optional for backward compat — skip silently in headless tests
+    return
+  }
+  const { item, devServerId, value = true } = params
+  store.mutate((state) => {
+    const cl = state.onboarding?.checklist ?? {}
+    if (devServerId) {
+      // Per-server item
+      cl.perServer = cl.perServer ?? {}
+      cl.perServer[devServerId] = cl.perServer[devServerId] ?? {}
+      ;(cl.perServer[devServerId] as Record<string, unknown>)[item] = value
+    } else {
+      // Global item
+      ;(cl as Record<string, unknown>)[item] = value
+    }
+    if (!state.onboarding) {
+      state.onboarding = {
+        flowVersion: 1,
+        closedAt: null,
+        outcome: null,
+        lastCompletedStep: -1,
+        checklist: cl as OnboardingChecklistState
+      }
+    }
+    state.onboarding.checklist = cl as OnboardingChecklistState
+  })
+}
+
 export function registerOnboardingIpcHandlers(
   devServerManager: DevServerManager,
   store?: Store
@@ -75,236 +315,57 @@ export function registerOnboardingIpcHandlers(
 
   ipcMain.handle(
     'onboarding.detectAgents',
-    async (
-      _event,
-      params: { devServerId: string | null }
-    ): Promise<{
-      agents: string[]
-      platform: NodeJS.Platform | null
-      devServerId: string | null
-    }> => {
-      const { devServerId } = params
-
-      if (!devServerId) {
-        return { agents: [], platform: null, devServerId: null }
-      }
-
-      // Check cache first (TTL 60s)
-      const cached = getCachedDetection(devServerId)
-      if (cached) {
-        return { ...cached, devServerId }
-      }
-
-      const relay = devServerManager.getRelay(devServerId)
-      if (!relay) {
-        throw new Error(`Dev server '${devServerId}' not connected`)
-      }
-
-      const commands = buildAgentDetectionCommands()
-      const result = await relay.detectAgents(commands)
-
-      // Store in cache only on success
-      agentDetectionCache.set(devServerId, {
-        result: { agents: result.agents, platform: result.platform },
-        cachedAt: Date.now()
-      })
-
-      return {
-        agents: result.agents,
-        platform: result.platform,
-        devServerId
-      }
-    }
+    async (_event, params: { devServerId: string | null }) =>
+      detectAgentsForDevServer(devServerManager, params)
   )
 
   // ── onboarding.detectAgentsAllServers ───────────────────────────────────────
 
-  ipcMain.handle(
-    'onboarding.detectAgentsAllServers',
-    async (): Promise<
-      Record<
-        string,
-        {
-          agents: string[]
-          platform: NodeJS.Platform | null
-          error?: string
-        }
-      >
-    > => {
-      // Only query servers that are currently connected
-      const servers = devServerManager.list().filter((ds) => ds.status === 'connected')
-
-      const results = await Promise.allSettled(
-        servers.map(async (ds) => {
-          const relay = devServerManager.getRelay(ds.id)!
-          const commands = buildAgentDetectionCommands()
-          const result = await relay.detectAgents(commands)
-          return { id: ds.id, agents: result.agents, platform: ds.platform }
-        })
-      )
-
-      const out: Record<
-        string,
-        { agents: string[]; platform: NodeJS.Platform | null; error?: string }
-      > = {}
-      results.forEach((r, i) => {
-        const serverId = servers[i].id
-        if (r.status === 'fulfilled') {
-          out[serverId] = { agents: r.value.agents, platform: r.value.platform }
-        } else {
-          out[serverId] = {
-            agents: [],
-            platform: servers[i].platform,
-            error: (r.reason as Error)?.message ?? 'Unknown error'
-          }
-        }
-      })
-      return out
-    }
+  ipcMain.handle('onboarding.detectAgentsAllServers', async () =>
+    detectAgentsAllDevServers(devServerManager)
   )
 
   // ── onboarding.getPreflightStatus (Phase 2) ─────────────────────────────────
 
   ipcMain.handle(
     'onboarding.getPreflightStatus',
-    async (
-      _event,
-      params: { devServerId: string; force?: boolean }
-    ): Promise<RemotePreflightStatus> => {
-      const { devServerId, force = false } = params
-
-      // Cache hit: skip relay call unless force=true
-      if (!force) {
-        const cached = preflightCache.get(devServerId)
-        if (cached && Date.now() - cached.cachedAt < PREFLIGHT_CACHE_TTL_MS) {
-          return cached.result
-        }
-      }
-
-      const relay = devServerManager.getRelay(devServerId)
-      if (!relay) {throw new Error(`Dev server '${devServerId}' not connected`)}
-
-      const raw = await relay.call<{
-        platform: NodeJS.Platform
-        gh: { installed: boolean; authenticated: boolean; version?: string }
-        git: { installed: boolean; version?: string; hasUserName: boolean; hasUserEmail: boolean }
-      }>('preflight.check', {}, 30_000)
-
-      const result: RemotePreflightStatus = {
-        devServerId,
-        platform: raw.platform,
-        checkedAt: Date.now(),
-        gh: raw.gh,
-        git: raw.git
-      }
-      preflightCache.set(devServerId, { result, cachedAt: Date.now() })
-      return result
-    }
+    async (_event, params: { devServerId: string; force?: boolean }) =>
+      getPreflightStatusForDevServer(devServerManager, params)
   )
 
   // ── onboarding.setGitIdentity (Phase 2) ─────────────────────────────────────
 
   ipcMain.handle(
     'onboarding.setGitIdentity',
-    async (
-      _event,
-      params: { devServerId: string; name: string; email: string }
-    ): Promise<void> => {
-      const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
-      await relay.call('preflight.setGitIdentity', {
-        name: params.name,
-        email: params.email
-      })
-      // Invalidate preflight cache so next getPreflightStatus is fresh
-      preflightCache.delete(params.devServerId)
-    }
+    async (_event, params: { devServerId: string; name: string; email: string }) =>
+      setGitIdentityForDevServer(devServerManager, params)
   )
 
   // ── onboarding.detectGhosttyConfig (Phase 2) ─────────────────────────────────
 
   ipcMain.handle(
     'onboarding.detectGhosttyConfig',
-    async (
-      _event,
-      params: { devServerId: string }
-    ): Promise<{ configPath: string | null; themeDir: string | null }> => {
-      const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) {throw new Error('Dev server not connected')}
-      return relay.call<{ configPath: string | null; themeDir: string | null }>(
-        'preflight.detectGhosttyConfig',
-        {}
-      )
-    }
+    async (_event, params: { devServerId: string }) =>
+      detectGhosttyConfigForDevServer(devServerManager, params)
   )
 
   // ── onboarding.openGhAuthTerminal (Phase 2) ──────────────────────────────────
-  // Why: gh auth login is interactive — run it in a remote PTY on the dev server
-  // and stream the output back to the renderer via the existing PTY bridge.
-  // The relay's 'pty.create' method is used (same as terminal PTY sessions).
 
   ipcMain.handle(
     'onboarding.openGhAuthTerminal',
-    async (
-      _event,
-      params: { devServerId: string }
-    ): Promise<{ ptyId: string; devServerId: string }> => {
-      const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) {throw new Error('Dev server not connected')}
-      // Why: call the relay's pty.spawn to spawn 'gh auth login' in a remote PTY.
-      // The ptyId is returned to the renderer to subscribe to pty output events.
-      const ptyId = await relay.call<string>('pty.spawn', {
-        command: 'gh',
-        args: ['auth', 'login'],
-        env: {},
-        cols: 120,
-        rows: 30
-      })
-      return { ptyId, devServerId: params.devServerId }
-    }
+    async (_event, params: { devServerId: string }) =>
+      openGhAuthTerminalForDevServer(devServerManager, params)
   )
 
   // ── onboarding.detectWindowsCapabilities (Phase 3) ───────────────────────────
-  // Why: Windows terminal configuration differs per dev server. This handler
-  // enforces that only win32 dev servers can be queried, and caches results
-  // for 60s to avoid repeated relay calls from the UI polling.
 
   ipcMain.handle(
     'onboarding.detectWindowsCapabilities',
-    async (
-      _event,
-      params: { devServerId: string }
-    ): Promise<WindowsTerminalCapabilities> => {
-      const devServer = devServerManager.get(params.devServerId)
-      if (!devServer) {throw new Error(`Dev server '${params.devServerId}' not found`)}
-      if (devServer.platform !== 'win32') {
-        throw new Error(
-          `Dev server '${params.devServerId}' is not Windows (platform: ${devServer.platform ?? 'unknown'})`
-        )
-      }
-
-      const relay = devServerManager.getRelay(params.devServerId)
-      if (!relay) {throw new Error(`Dev server '${params.devServerId}' not connected`)}
-
-      // Cache hit: serve from cache if still fresh
-      const cacheKey = params.devServerId
-      const cached = windowsCapsCache.get(cacheKey)
-      if (cached && Date.now() - cached.cachedAt < WINDOWS_CAPS_CACHE_TTL_MS) {
-        return cached.result
-      }
-
-      const result = await relay.call<WindowsTerminalCapabilities>(
-        'preflight.detectWindowsTerminalCapabilities',
-        {}
-      )
-      windowsCapsCache.set(cacheKey, { result, cachedAt: Date.now() })
-      return result
-    }
+    async (_event, params: { devServerId: string }) =>
+      detectWindowsCapabilitiesForDevServer(devServerManager, params)
   )
 
   // ── onboarding.markChecklistItem ────────────────────────────────────────────
-  // TASK-039: mark a global or per-server checklist item.
-  // devServerId absent → global item; present → per-server item.
 
   ipcMain.handle(
     'onboarding.markChecklistItem',
@@ -315,34 +376,6 @@ export function registerOnboardingIpcHandlers(
         devServerId?: string
         value?: boolean
       }
-    ): Promise<void> => {
-      if (!store) {
-        // store is optional for backward compat — skip silently in headless tests
-        return
-      }
-      const { item, devServerId, value = true } = params
-      store.mutate((state) => {
-        const cl = state.onboarding?.checklist ?? {}
-        if (devServerId) {
-          // Per-server item
-          cl.perServer = cl.perServer ?? {}
-          cl.perServer[devServerId] = cl.perServer[devServerId] ?? {}
-          ;(cl.perServer[devServerId] as Record<string, unknown>)[item] = value
-        } else {
-          // Global item
-          ;(cl as Record<string, unknown>)[item] = value
-        }
-        if (!state.onboarding) {
-          state.onboarding = {
-            flowVersion: 1,
-            closedAt: null,
-            outcome: null,
-            lastCompletedStep: -1,
-            checklist: cl as OnboardingChecklistState
-          }
-        }
-        state.onboarding.checklist = cl as OnboardingChecklistState
-      })
-    }
+    ) => markOnboardingChecklistItem(store, params)
   )
 }
