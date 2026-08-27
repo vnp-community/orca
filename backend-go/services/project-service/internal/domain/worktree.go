@@ -29,6 +29,7 @@ type Worktree struct {
 	Path      string
 	Branch    string
 	Active    bool
+	BaseRef   *string // NEW (SOL-WT-04) — the branch/tag/sha this worktree was created from; nil for worktrees created before this backfill
 }
 
 // NewWorktree constructs a Worktree, enforcing the invariants a metadata
@@ -36,7 +37,7 @@ type Worktree struct {
 // Active — RecordWorktreeCreated is only ever called after the real `git
 // worktree add` already succeeded, so there is no "created but inactive"
 // state to represent at construction time.
-func NewWorktree(id, projectID, repoID, path, branch string) (Worktree, error) {
+func NewWorktree(id, projectID, repoID, path, branch, baseRef string) (Worktree, error) {
 	if projectID == "" {
 		return Worktree{}, ErrEmptyProjectID
 	}
@@ -49,5 +50,9 @@ func NewWorktree(id, projectID, repoID, path, branch string) (Worktree, error) {
 	if branch == "" {
 		return Worktree{}, ErrEmptyWorktreeBranch
 	}
-	return Worktree{ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true}, nil
+	wt := Worktree{ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true}
+	if baseRef != "" {
+		wt.BaseRef = &baseRef
+	}
+	return wt, nil
 }

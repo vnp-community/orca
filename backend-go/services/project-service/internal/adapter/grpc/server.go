@@ -43,6 +43,7 @@ type Server struct {
 	recordWorktreeCreated *usecase.RecordWorktreeCreated
 	recordWorktreeRemoved *usecase.RecordWorktreeRemoved
 	listWorktrees         *usecase.ListWorktrees
+	getWorktree           *usecase.GetWorktree
 	setWorktreeActivation *usecase.SetWorktreeActivation
 	renameWorktree        *usecase.RenameWorktree
 
@@ -88,6 +89,7 @@ type Deps struct {
 	RecordWorktreeCreated *usecase.RecordWorktreeCreated
 	RecordWorktreeRemoved *usecase.RecordWorktreeRemoved
 	ListWorktrees         *usecase.ListWorktrees
+	GetWorktree           *usecase.GetWorktree
 	SetWorktreeActivation *usecase.SetWorktreeActivation
 	RenameWorktree        *usecase.RenameWorktree
 
@@ -131,6 +133,7 @@ func New(deps Deps) *Server {
 		recordWorktreeCreated: deps.RecordWorktreeCreated,
 		recordWorktreeRemoved: deps.RecordWorktreeRemoved,
 		listWorktrees:         deps.ListWorktrees,
+		getWorktree:           deps.GetWorktree,
 		setWorktreeActivation: deps.SetWorktreeActivation,
 		renameWorktree:        deps.RenameWorktree,
 
@@ -331,11 +334,20 @@ func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.Recor
 		RepoID:    req.GetRepoId(),
 		Path:      req.GetPath(),
 		Branch:    req.GetBranch(),
+		BaseRef:   req.GetBaseRef(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.RecordWorktreeCreatedResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) GetWorktree(ctx context.Context, req *projectv1.GetWorktreeRequest) (*projectv1.Worktree, error) {
+	wt, err := s.getWorktree.Execute(ctx, req.GetWorktreeId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoWorktree(wt), nil
 }
 
 func (s *Server) RecordWorktreeRemoved(ctx context.Context, req *projectv1.RecordWorktreeRemovedRequest) (*projectv1.RecordWorktreeRemovedResponse, error) {
@@ -584,6 +596,7 @@ func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 		Path:      wt.Path,
 		Branch:    wt.Branch,
 		Active:    wt.Active,
+		BaseRef:   wt.BaseRef, // NEW (SOL-WT-04)
 	}
 }
 

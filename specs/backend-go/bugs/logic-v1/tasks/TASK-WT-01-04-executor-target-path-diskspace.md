@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/adapter/localgit/executor.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — GitExecutor.CreateWorktree gained targetPath param (localgit+relay+ports); added diskspace.go's checkFreeSpace (unwired soft-check helper, tested directly per TASK-WT-01-07); go build clean.
 
 ---
 

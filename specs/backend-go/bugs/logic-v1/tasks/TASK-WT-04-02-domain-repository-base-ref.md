@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/domain/worktree.go`
 **Depends on:** TASK-WT-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain.Worktree.BaseRef + NewWorktree(...,baseRef); worktree_repository.go base_ref column + GetWorktree; ports.go WorktreeRepository.GetWorktree. go build+test clean (integration test against real Postgres passes).
 
 ---
 

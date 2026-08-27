@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/record_worktree_created.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Migrations 0009 (base_ref)/0010 (outbox) — 0009 not 0010 since TASK-WT-04-01 wasn't pre-landed; outbox.go domain type, WorktreeRepository outbox tx + Fetch/MarkPublished, main.go relay wiring (NATSURL config added). Integration tests pass against real testcontainers Postgres.
 
 ---
 

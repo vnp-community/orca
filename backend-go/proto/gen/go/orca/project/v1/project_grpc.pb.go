@@ -37,6 +37,7 @@ const (
 	ProjectService_RecordWorktreeCreated_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
 	ProjectService_RecordWorktreeRemoved_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
 	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
+	ProjectService_GetWorktree_FullMethodName                  = "/orca.project.v1.ProjectService/GetWorktree"
 	ProjectService_SetWorktreeActivation_FullMethodName        = "/orca.project.v1.ProjectService/SetWorktreeActivation"
 	ProjectService_RenameWorktree_FullMethodName               = "/orca.project.v1.ProjectService/RenameWorktree"
 	ProjectService_CreateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/CreateProjectGroup"
@@ -91,6 +92,11 @@ type ProjectServiceClient interface {
 	RecordWorktreeCreated(ctx context.Context, in *RecordWorktreeCreatedRequest, opts ...grpc.CallOption) (*RecordWorktreeCreatedResponse, error)
 	RecordWorktreeRemoved(ctx context.Context, in *RecordWorktreeRemovedRequest, opts ...grpc.CallOption) (*RecordWorktreeRemovedResponse, error)
 	ListWorktrees(ctx context.Context, in *ListWorktreesRequest, opts ...grpc.CallOption) (*ListWorktreesResponse, error)
+	// NEW (SOL-WT-04) — single-worktree lookup, the same class of gap SOL-031
+	// already flagged for GetRepo ("project.proto has no single-repo-by-id
+	// lookup RPC"). CompareWorktrees (git-gateway-service) uses this to look
+	// up each compared worktree's repo_id/branch/base_ref.
+	GetWorktree(ctx context.Context, in *GetWorktreeRequest, opts ...grpc.CallOption) (*Worktree, error)
 	SetWorktreeActivation(ctx context.Context, in *SetWorktreeActivationRequest, opts ...grpc.CallOption) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(ctx context.Context, in *RenameWorktreeRequest, opts ...grpc.CallOption) (*RenameWorktreeResponse, error)
 	// ProjectGroup surface — self-referential tree via parent_group_id, per
@@ -306,6 +312,16 @@ func (c *projectServiceClient) ListWorktrees(ctx context.Context, in *ListWorktr
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListWorktreesResponse)
 	err := c.cc.Invoke(ctx, ProjectService_ListWorktrees_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetWorktree(ctx context.Context, in *GetWorktreeRequest, opts ...grpc.CallOption) (*Worktree, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Worktree)
+	err := c.cc.Invoke(ctx, ProjectService_GetWorktree_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -535,6 +551,11 @@ type ProjectServiceServer interface {
 	RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error)
 	RecordWorktreeRemoved(context.Context, *RecordWorktreeRemovedRequest) (*RecordWorktreeRemovedResponse, error)
 	ListWorktrees(context.Context, *ListWorktreesRequest) (*ListWorktreesResponse, error)
+	// NEW (SOL-WT-04) — single-worktree lookup, the same class of gap SOL-031
+	// already flagged for GetRepo ("project.proto has no single-repo-by-id
+	// lookup RPC"). CompareWorktrees (git-gateway-service) uses this to look
+	// up each compared worktree's repo_id/branch/base_ref.
+	GetWorktree(context.Context, *GetWorktreeRequest) (*Worktree, error)
 	SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error)
 	// ProjectGroup surface — self-referential tree via parent_group_id, per
@@ -629,6 +650,9 @@ func (UnimplementedProjectServiceServer) RecordWorktreeRemoved(context.Context, 
 }
 func (UnimplementedProjectServiceServer) ListWorktrees(context.Context, *ListWorktreesRequest) (*ListWorktreesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorktrees not implemented")
+}
+func (UnimplementedProjectServiceServer) GetWorktree(context.Context, *GetWorktreeRequest) (*Worktree, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorktree not implemented")
 }
 func (UnimplementedProjectServiceServer) SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetWorktreeActivation not implemented")
@@ -1028,6 +1052,24 @@ func _ProjectService_ListWorktrees_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).ListWorktrees(ctx, req.(*ListWorktreesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetWorktree(ctx, req.(*GetWorktreeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1452,6 +1494,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListWorktrees",
 			Handler:    _ProjectService_ListWorktrees_Handler,
+		},
+		{
+			MethodName: "GetWorktree",
+			Handler:    _ProjectService_GetWorktree_Handler,
 		},
 		{
 			MethodName: "SetWorktreeActivation",

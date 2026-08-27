@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/adapter/localgit/executor.go`
 **Depends on:** TASK-WT-05-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — localgit.Executor.MergeBranch (merge --no-ff / --squash+commit) + conflictedPaths helper (git diff --name-only --diff-filter=U, no pre-existing helper found); RelayExecutor.MergeBranch stub relaying to git.merge. go build clean.
 
 ---
 

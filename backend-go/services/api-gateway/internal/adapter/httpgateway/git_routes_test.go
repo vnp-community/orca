@@ -62,7 +62,7 @@ type fakeGitGatewayServiceClient struct {
 	writeIssueCommandFunc      func(ctx context.Context, in *gitgatewayv1.WriteIssueCommandRequest) (*emptypb.Empty, error)
 	scanSetupScriptImportsFunc func(ctx context.Context, in *gitgatewayv1.ScanSetupScriptImportsRequest) (*gitgatewayv1.ScanSetupScriptImportsResponse, error)
 	createWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error)
-	removeWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error)
+	removeWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error)
 	forceDeleteBranchFunc  func(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error)
 	detectWorktreesFunc    func(ctx context.Context, in *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error)
 	prefetchCreateBaseFunc func(ctx context.Context, in *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error)
@@ -175,7 +175,7 @@ func (f *fakeGitGatewayServiceClient) CreateWorktree(ctx context.Context, in *gi
 	return f.createWorktreeFunc(ctx, in)
 }
 
-func (f *fakeGitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+func (f *fakeGitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.RemoveWorktreeResponse, error) {
 	if f.removeWorktreeFunc == nil {
 		f.t.Fatal("unexpected call to RemoveWorktree")
 	}

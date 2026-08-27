@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/domain/worktree_test.go`
 **Depends on:** TASK-WT-04-02, TASK-WT-04-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added TestNewWorktree_RoundTripsBaseRef, TestRecordWorktreeCreated_PersistsAndReturnsBaseRef, TestGetWorktree_ReturnsByID, TestMigration0009_UpDown. All pass against real testcontainers Postgres (-tags integration).
 
 ---
 

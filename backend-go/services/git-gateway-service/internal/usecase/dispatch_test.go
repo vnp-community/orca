@@ -140,10 +140,17 @@ type fakeGitExecutor struct {
 	fetchAndResolveRefSHA string
 	listWorktreePathsOut  []string
 
-	createWorktreeCallCount int
-	removeWorktreeCallCount int
-	gotRemoveWorktreePath   string
-	gotRemoveWorktreeForce  bool
+	createWorktreeCallCount     int
+	gotCreateWorktreeTargetPath string
+	removeWorktreeCallCount     int
+	gotRemoveWorktreePath       string
+	gotRemoveWorktreeForce      bool
+
+	calledMergeBranch      bool
+	gotMergeBranchStrategy string
+	gotMergeBranchMessage  string
+	mergeBranchResult      domain.MergeResult
+	mergeBranchErr         error
 }
 
 func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
@@ -381,17 +388,22 @@ func (f *fakeDevServerReachability) IsReachable(ctx context.Context, devServerID
 	return f.reachable, f.err
 }
 
-func (f *fakeGitExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error) {
+func (f *fakeGitExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef, targetPath string) (domain.WorktreeCreateResult, error) {
 	f.calledCreateWorktree = true
 	f.createWorktreeCallCount++
 	f.gotRepoPath = repoPath
+	f.gotCreateWorktreeTargetPath = targetPath
 	if f.createWorktreeErr != nil {
 		return domain.WorktreeCreateResult{}, f.createWorktreeErr
 	}
 	if f.createWorktreeResult != (domain.WorktreeCreateResult{}) {
 		return f.createWorktreeResult, nil
 	}
-	return domain.WorktreeCreateResult{Path: repoPath + "-" + branch, HeadSHA: "deadbeef"}, nil
+	path := targetPath
+	if path == "" {
+		path = repoPath + "-" + branch
+	}
+	return domain.WorktreeCreateResult{Path: path, HeadSHA: "deadbeef"}, nil
 }
 
 func (f *fakeGitExecutor) RemoveWorktree(ctx context.Context, worktreePath string, force bool) error {
@@ -486,6 +498,20 @@ func (f *fakeGitExecutor) AbortMerge(ctx context.Context, repoPath string) (doma
 	f.calledAbortMerge = true
 	f.gotRepoPath = repoPath
 	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) MergeBranch(ctx context.Context, repoPath, branch, strategy, commitMessage string) (domain.MergeResult, error) {
+	f.calledMergeBranch = true
+	f.gotRepoPath = repoPath
+	f.gotMergeBranchStrategy = strategy
+	f.gotMergeBranchMessage = commitMessage
+	if f.mergeBranchErr != nil {
+		return domain.MergeResult{}, f.mergeBranchErr
+	}
+	if f.mergeBranchResult.ResultSHA != "" || f.mergeBranchResult.HasConflicts {
+		return f.mergeBranchResult, nil
+	}
+	return domain.MergeResult{ResultSHA: "deadbeef"}, nil
 }
 
 func (f *fakeGitExecutor) ConflictOperation(ctx context.Context, repoPath string) (string, error) {

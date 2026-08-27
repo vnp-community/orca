@@ -244,11 +244,81 @@ type RepoInfo struct {
 }
 
 // WorktreeRecord mirrors project-service's Worktree message — the
-// bookkeeping row RecordWorktreeCreated/SetWorktreeActivation return.
+// bookkeeping row RecordWorktreeCreated/SetWorktreeActivation/ListWorktrees
+// return. RepoID/Active added for BR-WT-04's per-repo active-count cap.
 type WorktreeRecord struct {
 	ID     string
+	RepoID string
 	Path   string
 	Branch string
+	Active bool
+}
+
+// WorktreeInfo is project-service's GetWorktree answer — the richer shape
+// CompareWorktrees needs (RepoID + Branch + BaseRef), vs. WorktreeRecord's
+// narrower ID/Path/Branch used by CreateWorktree's own bookkeeping call.
+type WorktreeInfo struct {
+	ID      string
+	RepoID  string
+	Branch  string
+	BaseRef string // empty = never backfilled (worktree created before base_ref was added)
+}
+
+// TerminalSessionRef is one active PTY session, as reported by
+// infra-fleet-service.ListTerminalSessions — the subset CheckWorktreeDeleteSafety/
+// RemoveWorktree need to determine whether a session's cwd falls under a
+// worktree's path.
+type TerminalSessionRef struct {
+	PtyID string
+	Cwd   string
+}
+
+// DeleteSafetyReport is CheckWorktreeDeleteSafety's answer — see that
+// usecase's doc comment for AgentRunning's heuristic-not-precise caveat.
+type DeleteSafetyReport struct {
+	UncommittedFiles int
+	UntrackedFiles   int
+	AgentRunning     bool
+	ActivePtyIDs     []string
+	SafeToDelete     bool
+}
+
+// RemoveWorktreeResult is RemoveWorktree's answer — UncommittedFilesDiscarded
+// is only meaningful when Force was true (echoes what was overridden, for
+// the UI's post-delete confirmation toast).
+type RemoveWorktreeResult struct {
+	UncommittedFilesDiscarded int
+	StoppedPtyIDs             []string
+}
+
+// WorktreeComparison is one worktree's entry within CompareWorktrees'
+// aggregated answer.
+type WorktreeComparison struct {
+	WorktreeID   string
+	ChangedFiles int
+	AddedLines   int
+	RemovedLines int
+	MergeBase    string
+	Status       string
+	ErrorMessage string
+}
+
+// CompareWorktreesResult is CompareWorktrees' full answer.
+type CompareWorktreesResult struct {
+	BaseRef   string
+	Worktrees []WorktreeComparison
+}
+
+// MergeResult reflects a MergeBranch operation's outcome. A conflict is
+// reported via HasConflicts, not an error — the repo is left in the
+// conflicted state for the client to resolve via the existing
+// ConflictOperation/ResolveConflict/AbortMerge RPCs (BR-WT-17: manual
+// resolution only, never auto-resolved or auto-aborted).
+type MergeResult struct {
+	ResultSHA           string
+	HasConflicts        bool
+	ConflictedPaths     []string
+	ConflictDispatchKey string
 }
 
 // ResolvedBase is PrefetchCreateBase/ResolvePrBase/ResolveMrBase's answer:
@@ -295,7 +365,8 @@ type PushTargetInput struct {
 
 // FastForwardResult reflects whether a FastForward operation succeeded.
 type FastForwardResult struct {
-	Success bool
+	Success   bool
+	ResultSHA string // NEW — HEAD's SHA after a successful fast-forward
 }
 
 // RebaseResult reflects whether a RebaseFromBase operation succeeded, and

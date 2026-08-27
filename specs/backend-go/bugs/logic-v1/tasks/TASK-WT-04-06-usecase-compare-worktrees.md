@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/compare_worktrees.go` (new)
 **Depends on:** TASK-WT-04-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Created compare_worktrees.go (BR-WT-13/14/15) using errgroup fail-fast; gRPC handler wired via positional New(...) in main.go; wscompat worktree.compare channel added as a straight passthrough. go build+test clean across git-gateway-service and api-gateway.
 
 ---
 

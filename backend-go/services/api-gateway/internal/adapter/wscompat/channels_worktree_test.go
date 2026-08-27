@@ -20,12 +20,13 @@ type fakeGitGatewayServiceClient struct {
 	gitgatewayv1.GitGatewayServiceClient
 
 	createWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error)
-	removeWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error)
+	removeWorktreeFunc     func(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error)
 	forceDeleteBranchFunc  func(ctx context.Context, in *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error)
 	prefetchCreateBaseFunc func(ctx context.Context, in *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error)
 	resolvePrBaseFunc      func(ctx context.Context, in *gitgatewayv1.ResolvePrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
 	resolveMrBaseFunc      func(ctx context.Context, in *gitgatewayv1.ResolveMrBaseRequest) (*gitgatewayv1.ResolveBaseResponse, error)
 	detectWorktreesFunc    func(ctx context.Context, in *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error)
+	compareWorktreesFunc   func(ctx context.Context, in *gitgatewayv1.CompareWorktreesRequest) (*gitgatewayv1.CompareWorktreesResponse, error)
 
 	calledCreateWorktree     bool
 	calledRemoveWorktree     bool
@@ -34,6 +35,12 @@ type fakeGitGatewayServiceClient struct {
 	calledResolvePrBase      bool
 	calledResolveMrBase      bool
 	calledDetectWorktrees    bool
+	calledCompareWorktrees   bool
+}
+
+func (f *fakeGitGatewayServiceClient) CompareWorktrees(ctx context.Context, in *gitgatewayv1.CompareWorktreesRequest, _ ...grpc.CallOption) (*gitgatewayv1.CompareWorktreesResponse, error) {
+	f.calledCompareWorktrees = true
+	return f.compareWorktreesFunc(ctx, in)
 }
 
 func (f *fakeGitGatewayServiceClient) CreateWorktree(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateWorktreeResponse, error) {
@@ -41,7 +48,7 @@ func (f *fakeGitGatewayServiceClient) CreateWorktree(ctx context.Context, in *gi
 	return f.createWorktreeFunc(ctx, in)
 }
 
-func (f *fakeGitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+func (f *fakeGitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *gitgatewayv1.RemoveWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.RemoveWorktreeResponse, error) {
 	f.calledRemoveWorktree = true
 	return f.removeWorktreeFunc(ctx, in)
 }
@@ -120,9 +127,9 @@ func TestWorktreeCreateChannel_Success(t *testing.T) {
 func TestWorktreeRmChannel_Success(t *testing.T) {
 	var gotReq *gitgatewayv1.RemoveWorktreeRequest
 	git := &fakeGitGatewayServiceClient{
-		removeWorktreeFunc: func(_ context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error) {
+		removeWorktreeFunc: func(_ context.Context, in *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error) {
 			gotReq = in
-			return &emptypb.Empty{}, nil
+			return &gitgatewayv1.RemoveWorktreeResponse{UncommittedFilesDiscarded: 3}, nil
 		},
 	}
 	project := &fakeProjectServiceClient{}
@@ -137,8 +144,35 @@ func TestWorktreeRmChannel_Success(t *testing.T) {
 	if gotReq.GetWorktreeId() != "wt-1" || !gotReq.GetForce() {
 		t.Errorf("unexpected request: %+v", gotReq)
 	}
-	if v, ok := result.(map[string]bool); !ok || !v["ok"] {
-		t.Errorf("expected {ok:true}, got %+v", result)
+	resp, ok := result.(*gitgatewayv1.RemoveWorktreeResponse)
+	if !ok || resp.GetUncommittedFilesDiscarded() != 3 {
+		t.Errorf("expected response to be returned unmodified, got %+v", result)
+	}
+}
+
+func TestWorktreeCompareChannel_Success(t *testing.T) {
+	var gotReq *gitgatewayv1.CompareWorktreesRequest
+	git := &fakeGitGatewayServiceClient{
+		compareWorktreesFunc: func(_ context.Context, in *gitgatewayv1.CompareWorktreesRequest) (*gitgatewayv1.CompareWorktreesResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CompareWorktreesResponse{BaseRef: "main"}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.compare",
+		argsJSON(t, map[string]any{"worktreeIds": []string{"wt-1", "wt-2"}}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(gotReq.GetWorktreeIds()) != 2 {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	resp, ok := result.(*gitgatewayv1.CompareWorktreesResponse)
+	if !ok || resp.GetBaseRef() != "main" {
+		t.Errorf("expected response to be returned unmodified, got %+v", result)
 	}
 }
 

@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/ports.go`
 **Depends on:** none — `project-service.ListWorktrees(project_id)` already exists in `project.proto` (verified: `service ProjectService` line 40), so no proto change is needed
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added ProjectClient.ListWorktrees, WorktreeRecord.RepoID/Active; go build + go test ./services/git-gateway-service/... clean.
 
 ---
 

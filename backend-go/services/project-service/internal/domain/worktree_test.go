@@ -20,7 +20,7 @@ func TestNewWorktree_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewWorktree("w1", tt.projectID, tt.repoID, tt.path, tt.branch)
+			_, err := NewWorktree("w1", tt.projectID, tt.repoID, tt.path, tt.branch, "main")
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -32,11 +32,33 @@ func TestNewWorktree_ValidatesInvariants(t *testing.T) {
 }
 
 func TestNewWorktree_StartsActive(t *testing.T) {
-	wt, err := NewWorktree("w1", "p1", "r1", "/srv/worktrees/w1", "main")
+	wt, err := NewWorktree("w1", "p1", "r1", "/srv/worktrees/w1", "main", "main")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !wt.Active {
 		t.Error("expected a freshly recorded worktree to start active")
+	}
+}
+
+// TestNewWorktree_RoundTripsBaseRef (SOL-WT-04): a non-empty baseRef round
+// trips to a non-nil pointer; an empty one leaves BaseRef nil — matches
+// nonEmptyPtr's existing convention for every other optional field on this
+// type (mirrored inline here since NewWorktree sets BaseRef directly).
+func TestNewWorktree_RoundTripsBaseRef(t *testing.T) {
+	wt, err := NewWorktree("w1", "p1", "r1", "/srv/worktrees/w1", "main", "develop")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt.BaseRef == nil || *wt.BaseRef != "develop" {
+		t.Fatalf("expected BaseRef to round-trip to %q, got %v", "develop", wt.BaseRef)
+	}
+
+	wt, err = NewWorktree("w2", "p1", "r1", "/srv/worktrees/w2", "main", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt.BaseRef != nil {
+		t.Fatalf("expected BaseRef to be nil for an empty baseRef, got %v", *wt.BaseRef)
 	}
 }

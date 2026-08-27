@@ -84,7 +84,17 @@ service GitGatewayService {
   rpc WriteIssueCommand(WriteIssueCommandRequest) returns (google.protobuf.Empty);
   rpc ScanSetupScriptImports(ScanSetupScriptImportsRequest) returns (ScanSetupScriptImportsResponse);
   rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
-  rpc RemoveWorktree(RemoveWorktreeRequest) returns (google.protobuf.Empty);
+  rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse);
+  // NEW — read-only pre-delete check, called by the client before rendering
+  // the confirm dialog (mirrors worktree.detectedList's separate-read-call
+  // shape).
+  rpc CheckWorktreeDeleteSafety(CheckWorktreeDeleteSafetyRequest) returns (CheckWorktreeDeleteSafetyResponse);
+  // NEW (SOL-WT-04) — aggregates each compared worktree's BranchCompare
+  // stats plus BR-WT-13's shared-base_ref cross-check.
+  rpc CompareWorktrees(CompareWorktreesRequest) returns (CompareWorktreesResponse);
+  // NEW (SOL-WT-05) — completes an RPC git-gateway-service.md §3 already
+  // named but was never added to the real proto.
+  rpc MergeBranch(MergeBranchRequest) returns (MergeBranchResponse);
   // Required on every GitExecutor implementation from day one — TASK-194
   // makes it a required interface method, not an optional one, closing the
   // old TS backend's crash-bug class (forceDeletePreservedBranch? was
@@ -601,21 +611,85 @@ message WriteIssueCommandRequest { string worktree_id = 1; string content = 2; }
 
 message ScanSetupScriptImportsRequest { string worktree_id = 1; }
 message ScanSetupScriptImportsResponse { repeated string imported_paths = 1; }
+// CreateWorktree's usecase may fail with (via apperrors.Code, not a proto
+// field): WORKTREE_NAME_INVALID (BR-WT-01 charset), WORKTREE_PATH_EXISTS
+// ([A1], response still carries suggested_name), WORKTREE_BASE_REF_NOT_FOUND
+// ([A2]), WORKTREE_LIMIT_EXCEEDED (BR-WT-04, cap 20/repo). See
+// specs/backend-go/bugs/logic-v1/solutions/SOL-WT-01-tao-worktree.md.
 message CreateWorktreeRequest {
   string project_id = 1;
   string repo_id = 2;
   string branch = 3;      // new branch name for the worktree
   string base_ref = 4;    // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
+
+  // NEW (BL-WT-01 Input contract, SOL-WT-01) — empty means "derive a
+  // sanitized default": name defaults to a sanitized branch name, path
+  // defaults to the existing repoPath+"-"+name convention.
+  optional string name = 5;
+  optional string path = 6;
 }
 message CreateWorktreeResponse {
   string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)
   string path = 2;
   string head_sha = 3;
+  // NEW — populated only when the call fails with WORKTREE_PATH_EXISTS, so
+  // a client that reads a non-OK response can still recover the suggestion.
+  optional string suggested_name = 4;
 }
 
 message RemoveWorktreeRequest {
   string worktree_id = 1;
-  bool   force = 2;       // maps to `git worktree remove --force` (uncommitted changes present)
+  bool   force = 2;        // maps to `git worktree remove --force` (uncommitted changes present)
+  bool   stop_agents = 3;  // NEW — spec's "Stop & Delete" choice: kill active PTY sessions found in this worktree before removing it
+}
+message RemoveWorktreeResponse {  // NEW — replaces google.protobuf.Empty
+  int32 uncommitted_files_discarded = 1; // echoes the safety-check count that was overridden by force, for the UI's post-delete confirmation toast
+  repeated string stopped_pty_ids = 2;
+}
+
+message CheckWorktreeDeleteSafetyRequest { string worktree_id = 1; }
+message CheckWorktreeDeleteSafetyResponse {
+  int32 uncommitted_files = 1;   // modified + added + deleted + conflicted, per FileStatus.state
+  int32 untracked_files = 2;
+  bool agent_running = 3;        // heuristic: any active PTY session whose cwd is under this worktree's path — see SOL-WT-03's rationale for why this isn't a precise "is this an agent" check
+  repeated string active_pty_ids = 4;
+  bool safe_to_delete = 5;       // true iff all counts are zero and !agent_running
+}
+
+// CompareWorktrees aggregates each compared worktree's BranchCompare stats
+// (already-real: file count, lines added/removed, per-file status) plus
+// BR-WT-13's shared-base_ref cross-check across all compared worktrees.
+message CompareWorktreesRequest {
+  repeated string worktree_ids = 1; // 2..N worktrees being compared
+}
+message CompareWorktreesResponse {
+  string base_ref = 1;              // the shared base branch (BR-WT-13)
+  repeated WorktreeComparison worktrees = 2;
+}
+message WorktreeComparison {
+  string worktree_id = 1;
+  int32 changed_files = 2;
+  int32 added_lines = 3;
+  int32 removed_lines = 4;
+  string merge_base = 5;   // for BR-WT-14 cross-checking — see compare_worktrees.go's usecase comment
+  string status = 6;       // BranchCompareResponse.status passthrough
+  string error_message = 7;
+}
+
+// MergeBranch completes an RPC git-gateway-service.md §3 already named but
+// was never added to the real proto. See merge_worktree_into_base.go's
+// usecase doc comment for the "merge"/"squash"/"rebase" strategy split.
+message MergeBranchRequest {
+  string worktree_id = 1;    // the WINNING worktree; its branch is merged INTO base_branch
+  string base_branch = 2;    // typically the repo's default branch
+  string strategy = 3;       // "merge" | "squash" | "rebase"
+  string commit_message = 4; // optional override for the merge-commit/squash commit
+}
+message MergeBranchResponse {
+  string result_sha = 1;
+  bool   has_conflicts = 2;
+  repeated string conflicted_paths = 3;
+  string conflict_dispatch_key = 4; // pass this to AbortMerge/ConflictOperation/ResolveConflict's worktree_id field when has_conflicts=true — see merge_worktree_into_base.go's usecase doc comment
 }
 
 message ForceDeleteBranchRequest {
@@ -706,6 +780,7 @@ message FastForwardRequest {
 }
 message FastForwardResponse {
   bool success = 1;
+  string result_sha = 2; // NEW — HEAD's SHA after a successful fast-forward; needed by MergeBranch's "rebase" strategy to report result_sha
 }
 
 message RebaseFromBaseRequest {

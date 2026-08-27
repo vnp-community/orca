@@ -370,19 +370,36 @@ type fakeWorktreeRepository struct {
 	recordCreatedErr error
 	recordRemovedErr error
 	listErr          error
+	getWorktreeErr   error
 	setActivationErr error
 	renameErr        error
+
+	// lastOutboxEvent captures RecordWorktreeCreated's event arg — asserted
+	// by TestRecordWorktreeCreated_WritesOutboxEventInSameTransaction.
+	lastOutboxEvent domain.OutboxEvent
 }
 
 func newFakeWorktreeRepository() *fakeWorktreeRepository {
 	return &fakeWorktreeRepository{worktrees: map[string]domain.Worktree{}}
 }
 
-func (f *fakeWorktreeRepository) RecordWorktreeCreated(ctx context.Context, wt domain.Worktree) (domain.Worktree, error) {
+func (f *fakeWorktreeRepository) RecordWorktreeCreated(ctx context.Context, wt domain.Worktree, event domain.OutboxEvent) (domain.Worktree, error) {
 	if f.recordCreatedErr != nil {
 		return domain.Worktree{}, f.recordCreatedErr
 	}
+	f.lastOutboxEvent = event
 	f.worktrees[wt.ID] = wt
+	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) GetWorktree(ctx context.Context, worktreeID string) (domain.Worktree, error) {
+	if f.getWorktreeErr != nil {
+		return domain.Worktree{}, f.getWorktreeErr
+	}
+	wt, ok := f.worktrees[worktreeID]
+	if !ok {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
 	return wt, nil
 }
 

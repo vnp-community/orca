@@ -166,8 +166,10 @@ type GitExecutor interface {
 	WriteIssueCommand(ctx context.Context, repoPath, content string) error
 	ScanSetupScriptImports(ctx context.Context, repoPath string) (importedPaths []string, err error)
 
-	// New, SOL-031 (TASK-193):
-	CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error)
+	// New, SOL-031 (TASK-193). targetPath, if non-empty, overrides the
+	// default repoPath+"-"+sanitize(branch) convention — see SOL-WT-01's
+	// custom name/path input support.
+	CreateWorktree(ctx context.Context, repoPath, branch, baseRef, targetPath string) (domain.WorktreeCreateResult, error)
 	RemoveWorktree(ctx context.Context, worktreePath string, force bool) error
 	// FetchAndResolveRef ensures ref is fetched/up to date in repoPath's
 	// local clone and returns its resolved SHA — shared by
@@ -223,6 +225,14 @@ type GitExecutor interface {
 	RebaseFromBase(ctx context.Context, repoPath, baseRef string) (domain.RebaseResult, error)
 	AbortRebase(ctx context.Context, repoPath string) (domain.SimpleResult, error)
 	AbortMerge(ctx context.Context, repoPath string) (domain.SimpleResult, error)
+	// MergeBranch runs `git merge --no-ff <branch>` ("merge" strategy) or
+	// `git merge --squash <branch>` followed by a commit ("squash"
+	// strategy). NEVER called for the "rebase" strategy — see
+	// MergeWorktreeIntoBase.Execute, which composes RebaseFromBase+FastForward
+	// for that case instead. A real conflict is a domain outcome
+	// (HasConflicts=true), not a Go error — same posture as
+	// RebaseFromBase/Pull's conflict handling.
+	MergeBranch(ctx context.Context, repoPath, branch, strategy, commitMessage string) (domain.MergeResult, error)
 	// ConflictOperation is a DETECTOR ONLY, matching the real agent exactly
 	// — returns which operation (if any) left repoPath conflicted
 	// ("merge"/"rebase"/"cherry-pick"/"unknown"). See ResolveConflict below
@@ -340,8 +350,30 @@ func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver
 // real answer, until project-service grows one.
 type ProjectClient interface {
 	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
-	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error)
+	// RecordWorktreeCreated's baseRef param is forwarded onto
+	// RecordWorktreeCreatedRequest.base_ref (SOL-WT-04's base_ref backfill)
+	// — the branch/tag/sha this worktree was created from, so it can later
+	// be persisted and used by CompareWorktrees' BR-WT-13 check.
+	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch, baseRef string) (domain.WorktreeRecord, error)
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
+	// ListWorktrees backs BR-WT-04's count cap (max 20 active worktrees per
+	// repo) — project-service.ListWorktrees(project_id) already exists
+	// (proto/orca/project/v1/project.proto); this is a new call on an
+	// existing RPC, not a new proto surface.
+	ListWorktrees(ctx context.Context, projectID string) ([]domain.WorktreeRecord, error)
+	// GetWorktree wraps project-service's new GetWorktree RPC (added
+	// alongside base_ref persistence) — CompareWorktrees uses it to look up
+	// each compared worktree's repo_id/branch/base_ref.
+	GetWorktree(ctx context.Context, worktreeID string) (domain.WorktreeInfo, error)
+}
+
+// TerminalSessionLister wraps infra-fleet-service's ListTerminalSessions/
+// KillTerminalSession — both already-real RPCs (infra-fleet-service.md
+// :131-132) — reusing the existing git-gateway-service --> infra-fleet-service
+// dependency edge (git-gateway-service.md §7), not a new one.
+type TerminalSessionLister interface {
+	ListSessions(ctx context.Context, connectionID string) ([]domain.TerminalSessionRef, error)
+	Kill(ctx context.Context, ptyID string) error
 }
 
 // SCMClient wraps scm-integration-service's PR/MR base-branch lookups — a

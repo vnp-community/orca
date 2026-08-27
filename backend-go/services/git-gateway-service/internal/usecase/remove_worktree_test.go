@@ -13,9 +13,10 @@ func TestRemoveWorktree_HappyPath(t *testing.T) {
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
-	uc := NewRemoveWorktree(resolver, projects, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, local, relay, terminals)
 
-	err := uc.Execute(context.Background(), "wt-1", true)
+	_, err := uc.Execute(context.Background(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -35,9 +36,10 @@ func TestRemoveWorktree_BookkeepingFails_NoCompensatingGitOperation(t *testing.T
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{recordRemovedErr: errors.New("project-service unreachable")}
-	uc := NewRemoveWorktree(resolver, projects, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, local, relay, terminals)
 
-	err := uc.Execute(context.Background(), "wt-1", true)
+	_, err := uc.Execute(context.Background(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -62,9 +64,10 @@ func TestRemoveWorktree_GitRemoveFails_BookkeepingNeverCalled(t *testing.T) {
 	local := &fakeGitExecutor{removeWorktreeErr: errors.New("git worktree remove failed: dirty worktree")}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
-	uc := NewRemoveWorktree(resolver, projects, local, relay)
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, local, relay, terminals)
 
-	err := uc.Execute(context.Background(), "wt-1", false)
+	_, err := uc.Execute(context.Background(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: true})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -74,5 +77,29 @@ func TestRemoveWorktree_GitRemoveFails_BookkeepingNeverCalled(t *testing.T) {
 	}
 	if projects.calledRecordRemoved {
 		t.Error("expected RecordWorktreeRemoved NOT to be called when git worktree remove itself fails")
+	}
+}
+
+// TestRemoveWorktree_UncommittedChanges_RejectsWithoutForce is BR-WT-09's
+// server-side re-check — a dirty worktree without force=true is rejected
+// before any removal is attempted.
+func TestRemoveWorktree_UncommittedChanges_RejectsWithoutForce(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutor{} // GetStatus's fake default returns one changed file
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	terminals := &fakeTerminalSessionLister{}
+	uc := NewRemoveWorktree(resolver, projects, local, relay, terminals)
+
+	_, err := uc.Execute(context.Background(), RemoveWorktreeInput{WorktreeID: "wt-1", Force: false})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_HAS_UNCOMMITTED_CHANGES" {
+		t.Fatalf("expected WORKTREE_HAS_UNCOMMITTED_CHANGES, got %v", err)
+	}
+	if local.calledRemoveWorktree {
+		t.Error("expected RemoveWorktree NOT to be called when uncommitted changes block the removal")
 	}
 }

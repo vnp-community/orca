@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/record_worktree_created.go`
 **Depends on:** TASK-WT-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — RecordWorktreeCreatedInput.BaseRef threaded through; get_worktree.go usecase; server.go GetWorktree handler + toProtoWorktree BaseRef; wired in main.go. go build+test clean.
 
 ---
 

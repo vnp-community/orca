@@ -131,7 +131,10 @@ type RepoRepository interface {
 // project.worktrees. See domain.Worktree's doc comment: never authoritative
 // for on-disk existence.
 type WorktreeRepository interface {
-	RecordWorktreeCreated(ctx context.Context, worktree domain.Worktree) (domain.Worktree, error)
+	// RecordWorktreeCreated inserts the worktree row and durably enqueues
+	// event as an outbox row, in the SAME transaction — the
+	// transactional-outbox pattern (05-data-architecture.md).
+	RecordWorktreeCreated(ctx context.Context, worktree domain.Worktree, event domain.OutboxEvent) (domain.Worktree, error)
 	// RecordWorktreeRemoved hard-deletes the worktree row — a deliberate
 	// choice over a soft-removed flag: this table is disposable metadata
 	// with git-gateway-service as the source of truth for lineage/history,
@@ -139,6 +142,9 @@ type WorktreeRepository interface {
 	// this service's README for the explicit decision record.
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
 	ListWorktrees(ctx context.Context, projectID string) ([]domain.Worktree, error)
+	// GetWorktree looks up a single worktree by id — backs the new
+	// GetWorktree RPC (SOL-WT-04).
+	GetWorktree(ctx context.Context, worktreeID string) (domain.Worktree, error)
 	SetWorktreeActivation(ctx context.Context, worktreeID string, active bool) (domain.Worktree, error)
 	RenameWorktree(ctx context.Context, worktreeID, branch string) (domain.Worktree, error)
 }

@@ -32,6 +32,16 @@ import (
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
+// nonEmptyPtr returns nil for an empty string, otherwise a pointer to s —
+// this file's convention for populating a proto `optional string` field
+// from a plain Go string decoded off the wire.
+func nonEmptyPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServiceClient, projectClient projectv1.ProjectServiceClient) {
 	r.Register("worktree.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
@@ -39,6 +49,8 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 			RepoID    string `json:"repoId"`
 			Branch    string `json:"branch"`
 			BaseRef   string `json:"baseRef"`
+			Name      string `json:"name"`
+			Path      string `json:"path"`
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
@@ -47,6 +59,7 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		resp, err := gitClient.CreateWorktree(ctx, &gitgatewayv1.CreateWorktreeRequest{
 			ProjectId: in.ProjectID, RepoId: in.RepoID, Branch: in.Branch, BaseRef: in.BaseRef,
+			Name: nonEmptyPtr(in.Name), Path: nonEmptyPtr(in.Path),
 		})
 		if err != nil {
 			return nil, err
@@ -58,16 +71,18 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 		type rmArgs struct {
 			WorktreeID string `json:"worktreeId"`
 			Force      bool   `json:"force"`
+			StopAgents bool   `json:"stopAgents"`
 		}
 		in, err := decodeArg[rmArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		if _, err := gitClient.RemoveWorktree(ctx, &gitgatewayv1.RemoveWorktreeRequest{WorktreeId: in.WorktreeID, Force: in.Force}); err != nil {
+		resp, err := gitClient.RemoveWorktree(ctx, &gitgatewayv1.RemoveWorktreeRequest{WorktreeId: in.WorktreeID, Force: in.Force, StopAgents: in.StopAgents})
+		if err != nil {
 			return nil, err
 		}
-		return map[string]bool{"ok": true}, nil
+		return resp, nil
 	})
 
 	r.Register("worktree.forceDeleteBranch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -84,6 +99,25 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil
+	})
+
+	// worktree.compare — a straight passthrough, no aggregation needed at
+	// the edge since CompareWorktrees already does its own fan-in
+	// (SOL-WT-04).
+	r.Register("worktree.compare", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type compareArgs struct {
+			WorktreeIDs []string `json:"worktreeIds"`
+		}
+		in, err := decodeArg[compareArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		resp, err := gitClient.CompareWorktrees(ctx, &gitgatewayv1.CompareWorktreesRequest{WorktreeIds: in.WorktreeIDs})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
 	})
 
 	r.Register("worktree.prefetchCreateBase", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {

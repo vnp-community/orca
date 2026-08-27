@@ -154,10 +154,10 @@ func (r *RelayExecutor) Stage(ctx context.Context, repoPath string, paths []stri
 // git.worktreeRemove/git.fetchRef/git.worktreeList are not verified against
 // a real Dev Server Agent handler; reconcile before removing this note.
 
-func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error) {
+func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef, targetPath string) (domain.WorktreeCreateResult, error) {
 	var result domain.WorktreeCreateResult
 	err := r.relay(ctx, repoPath, "git.worktreeAdd", map[string]any{
-		"repoPath": repoPath, "branch": branch, "baseRef": baseRef,
+		"repoPath": repoPath, "branch": branch, "baseRef": baseRef, "targetPath": targetPath,
 	}, &result)
 	return result, err
 }
@@ -705,6 +705,18 @@ func (r *RelayExecutor) AbortRebase(ctx context.Context, repoPath string) (domai
 func (r *RelayExecutor) AbortMerge(ctx context.Context, repoPath string) (domain.SimpleResult, error) {
 	var result domain.SimpleResult
 	err := r.relay(ctx, repoPath, "git.abortMerge", map[string]any{"worktreePath": repoPath}, &result)
+	return result, err
+}
+
+// MergeBranch relays to "git.merge" — following this file's existing
+// relay(...) helper pattern (see CreateWorktree above). Flagged as
+// unverified against a real Dev Server Agent handler, matching this file's
+// own existing doc-comment caveat for CreateWorktree/RemoveWorktree/etc.
+func (r *RelayExecutor) MergeBranch(ctx context.Context, repoPath, branch, strategy, commitMessage string) (domain.MergeResult, error) {
+	var result domain.MergeResult
+	err := r.relay(ctx, repoPath, "git.merge", map[string]any{
+		"repoPath": repoPath, "branch": branch, "strategy": strategy, "commitMessage": commitMessage,
+	}, &result)
 	return result, err
 }
 
