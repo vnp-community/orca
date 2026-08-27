@@ -97,7 +97,10 @@ func NewRouter(deps Deps) http.Handler {
 	r := chi.NewRouter()
 
 	if deps.AuthClient != nil {
-		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator)
+		// 10 attempts/min per IP, burst 10 — spec's literal figure
+		// (docs/logic/auth/BL-AUTH-01-local-login.md).
+		loginRateLimiter := usecase.NewRateLimiter(10.0/60.0, 10)
+		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator, loginRateLimiter)
 	}
 	mountTraceRoutes(r)
 	// mountPushRoutes is unauthenticated by design (see its doc comment) —

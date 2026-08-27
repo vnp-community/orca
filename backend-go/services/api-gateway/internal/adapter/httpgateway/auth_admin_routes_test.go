@@ -1,11 +1,13 @@
 package httpgateway
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"google.golang.org/grpc"
@@ -27,8 +29,23 @@ type fakeAdminAuthServiceClient struct {
 	listUsersResp *authv1.ListUsersResponse
 	err           error
 
+	loginResp      *authv1.LoginResponse
+	loginErr       error
+	lastLoginReq   *authv1.LoginRequest
+	loginCallCount int
+
+	updateUserResp         *authv1.UpdateUserResponse
+	lastUpdateUserReq      *authv1.UpdateUserRequest
+	listSessionsAllResp    *authv1.ListSessionsResponse
+	lastListSessionsAllReq *authv1.ListSessionsRequest
+
+	createUserResp    *authv1.CreateUserResponse
+	lastCreateUserReq *authv1.CreateUserRequest
+
 	statsResp             *authv1.GetAdminStatsResponse
 	queryAuditLogResp     *authv1.QueryAuditLogResponse
+	queryAuditLogResps    []*authv1.QueryAuditLogResponse // consumed in order, one per call, for multi-page export tests
+	lastQueryAuditLogReq  *authv1.QueryAuditLogRequest
 	deactivateUserResp    *authv1.DeactivateUserResponse
 	listSessionsResp      *authv1.ListSessionsForUserResponse
 	forceRevokeAllResp    *authv1.ForceRevokeAllSessionsForUserResponse
@@ -44,6 +61,14 @@ type fakeAdminAuthServiceClient struct {
 }
 
 func (f *fakeAdminAuthServiceClient) Login(ctx context.Context, in *authv1.LoginRequest, opts ...grpc.CallOption) (*authv1.LoginResponse, error) {
+	f.loginCallCount++
+	f.lastLoginReq = in
+	if f.loginErr != nil {
+		return nil, f.loginErr
+	}
+	if f.loginResp != nil {
+		return f.loginResp, nil
+	}
 	return nil, status.Error(codes.Unimplemented, "not used by this test")
 }
 
@@ -64,7 +89,14 @@ func (f *fakeAdminAuthServiceClient) GetJWKS(ctx context.Context, in *authv1.Get
 }
 
 func (f *fakeAdminAuthServiceClient) CreateUser(ctx context.Context, in *authv1.CreateUserRequest, opts ...grpc.CallOption) (*authv1.CreateUserResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by this test")
+	f.lastCreateUserReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.createUserResp != nil {
+		return f.createUserResp, nil
+	}
+	return &authv1.CreateUserResponse{}, nil
 }
 
 func (f *fakeAdminAuthServiceClient) ListUsers(ctx context.Context, in *authv1.ListUsersRequest, opts ...grpc.CallOption) (*authv1.ListUsersResponse, error) {
@@ -86,8 +118,14 @@ func (f *fakeAdminAuthServiceClient) RevokeSession(ctx context.Context, in *auth
 }
 
 func (f *fakeAdminAuthServiceClient) QueryAuditLog(ctx context.Context, in *authv1.QueryAuditLogRequest, opts ...grpc.CallOption) (*authv1.QueryAuditLogResponse, error) {
+	f.lastQueryAuditLogReq = in
 	if f.err != nil {
 		return nil, f.err
+	}
+	if len(f.queryAuditLogResps) > 0 {
+		resp := f.queryAuditLogResps[0]
+		f.queryAuditLogResps = f.queryAuditLogResps[1:]
+		return resp, nil
 	}
 	if f.queryAuditLogResp != nil {
 		return f.queryAuditLogResp, nil
@@ -166,14 +204,28 @@ func (f *fakeAdminAuthServiceClient) GetAdminStats(ctx context.Context, in *auth
 }
 
 // ListSessions/UpdateUser: added to authv1.AuthServiceClient by SOL-AUTH-04
-// (TASK-AUTH-04-01) — not used by this file's tests, same "not used by this
-// test" stub as every other not-yet-exercised method above.
+// (TASK-AUTH-04-01); exercised by admin_routes_test.go's cross-user-sessions
+// and update-user tests (TASK-AUTH-04-07).
 func (f *fakeAdminAuthServiceClient) ListSessions(ctx context.Context, in *authv1.ListSessionsRequest, opts ...grpc.CallOption) (*authv1.ListSessionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by this test")
+	f.lastListSessionsAllReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.listSessionsAllResp != nil {
+		return f.listSessionsAllResp, nil
+	}
+	return &authv1.ListSessionsResponse{}, nil
 }
 
 func (f *fakeAdminAuthServiceClient) UpdateUser(ctx context.Context, in *authv1.UpdateUserRequest, opts ...grpc.CallOption) (*authv1.UpdateUserResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by this test")
+	f.lastUpdateUserReq = in
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.updateUserResp != nil {
+		return f.updateUserResp, nil
+	}
+	return &authv1.UpdateUserResponse{}, nil
 }
 
 var _ authv1.AuthServiceClient = (*fakeAdminAuthServiceClient)(nil)
@@ -249,5 +301,70 @@ func TestHandleListUsers_PermissionDeniedMapsTo403(t *testing.T) {
 	}
 	if body.Error.Code != codes.PermissionDenied.String() {
 		t.Fatalf("error.code = %q, want %q", body.Error.Code, codes.PermissionDenied.String())
+	}
+}
+
+// TestAuthAdminRoutes_CreateUserForwardsPassword is the end-to-end
+// regression guard for the bug's headline symptom ("that account is
+// permanently unusable") — POST /v1/auth/users with a password in the body
+// must reach CreateUser with that exact plaintext in req.Password.
+func TestAuthAdminRoutes_CreateUserForwardsPassword(t *testing.T) {
+	client := &fakeAdminAuthServiceClient{
+		createUserResp: &authv1.CreateUserResponse{User: &authv1.User{Id: "u1", Email: "new@example.com"}},
+	}
+	router := testAuthAdminRouter(client)
+
+	body, _ := json.Marshal(createUserRequestBody{Email: "new@example.com", Name: "New", Role: "user", Password: "s3cret-pw"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/auth/users", bytes.NewReader(body)))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+	if client.lastCreateUserReq.GetPassword() != "s3cret-pw" {
+		t.Fatalf("CreateUser called with Password = %q, want %q", client.lastCreateUserReq.GetPassword(), "s3cret-pw")
+	}
+}
+
+// TestAuthAdminRoutes_QueryAuditLog_ForwardsActionUserIDAndTo verifies
+// GET /admin/api/audit?action=...&userId=...&to=... forwards all three
+// filters unchanged into the RPC request ("userId" is the spec's literal
+// wire name, mapped onto ActorId).
+func TestAuthAdminRoutes_QueryAuditLog_ForwardsActionUserIDAndTo(t *testing.T) {
+	client := &fakeAdminAuthServiceClient{}
+	router := testAuthAdminRouter(client)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/auth/audit-log?action=login.fail&userId=X&to=2026-01-01T00:00:00Z", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if client.lastQueryAuditLogReq.GetAction() != "login.fail" {
+		t.Fatalf("Action = %q, want %q", client.lastQueryAuditLogReq.GetAction(), "login.fail")
+	}
+	if client.lastQueryAuditLogReq.GetActorId() != "X" {
+		t.Fatalf("ActorId = %q, want %q", client.lastQueryAuditLogReq.GetActorId(), "X")
+	}
+	wantTo, _ := time.Parse(time.RFC3339, "2026-01-01T00:00:00Z")
+	if !client.lastQueryAuditLogReq.GetTo().AsTime().Equal(wantTo) {
+		t.Fatalf("To = %v, want %v", client.lastQueryAuditLogReq.GetTo().AsTime(), wantTo)
+	}
+}
+
+// TestAuthAdminRoutes_QueryAuditLog_MalformedToRejectedBeforeRPC verifies a
+// malformed `to` value 400s before the RPC call is ever made.
+func TestAuthAdminRoutes_QueryAuditLog_MalformedToRejectedBeforeRPC(t *testing.T) {
+	client := &fakeAdminAuthServiceClient{}
+	router := testAuthAdminRouter(client)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/auth/audit-log?to=not-a-timestamp", nil))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	if client.lastQueryAuditLogReq != nil {
+		t.Fatal("expected QueryAuditLog RPC not to be called for a malformed `to` value")
 	}
 }
