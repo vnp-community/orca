@@ -59,6 +59,22 @@ func (f *fakeProjectClient) RecordWorktreeRemoved(ctx context.Context, worktreeI
 	return f.recordRemovedErr
 }
 
+// fakeScrollbackCleaner is an in-memory ScrollbackCleaner — used by
+// remove_worktree_test.go to assert RemoveWorktree's best-effort cleanup
+// call is made with the removed worktree's ID, and that a cleanup RPC
+// failure does not fail RemoveWorktree itself.
+type fakeScrollbackCleaner struct {
+	err           error
+	called        bool
+	gotWorktreeID string
+}
+
+func (f *fakeScrollbackCleaner) DeleteTerminalScrollbackSnapshots(ctx context.Context, worktreeID string) error {
+	f.called = true
+	f.gotWorktreeID = worktreeID
+	return f.err
+}
+
 // fakeSCMClient is an in-memory SCMClient — shared by resolve_pr_base_test.go
 // and resolve_mr_base_test.go.
 type fakeSCMClient struct {

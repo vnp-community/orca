@@ -344,6 +344,12 @@ type ProjectClient interface {
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
 }
 
+// ScrollbackCleaner wraps infra-fleet-service's DeleteTerminalScrollbackSnapshots
+// RPC — called best-effort by RemoveWorktree; see that usecase's doc comment.
+type ScrollbackCleaner interface {
+	DeleteTerminalScrollbackSnapshots(ctx context.Context, worktreeID string) error
+}
+
 // SCMClient wraps scm-integration-service's PR/MR base-branch lookups — a
 // new outbound dependency edge git-gateway-service --> scm-integration-service
 // that git-gateway-service.md §7's current dependency list (project-service,

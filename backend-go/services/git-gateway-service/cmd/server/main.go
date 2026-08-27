@@ -178,8 +178,10 @@ func run() error {
 	writeIssueCommandUC := usecase.NewWriteIssueCommand(resolver, local, relay)
 	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(resolver, local, relay)
 
+	scrollbackCleaner := grpcclient.NewScrollbackCleaner(infraFleetClient)
+
 	createWorktreeUC := usecase.NewCreateWorktree(resolver, projectClient, local, relay)
-	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, local, relay)
+	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, scrollbackCleaner, local, relay)
 	forceDeleteBranchUC := usecase.NewForceDeleteBranch(resolver, local, relay)
 	detectWorktreesUC := usecase.NewDetectWorktrees(resolver, projectClient, local, relay)
 	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)

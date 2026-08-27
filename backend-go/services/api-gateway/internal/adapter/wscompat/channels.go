@@ -121,6 +121,7 @@ func RegisterRealChannels(
 	registerEmulatorFolderWorkspaceHostChannels(r, projectClient, infraFleetClient)
 	registerTeamChannels(r, tenantClient)
 	registerTerminalChannels(r, infraFleetClient)
+	registerTerminalScrollbackChannels(r, infraFleetClient)
 	registerTenantProjectChannels(r, tenantClient, projectClient)
 	registerWorkflowChannels(r, workflowClient)
 }
