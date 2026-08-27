@@ -49,7 +49,7 @@ func TestAttachPty_UnknownPtyID_ReturnsError(t *testing.T) {
 // (attach/wait/resize/kill/...) needs.
 func seedSession(t *testing.T, sessions *fakeTerminalSessionRepository, resolver *fakeConnectionResolver, tenantID, ptyID, connectionID string) domain.DevServer {
 	t.Helper()
-	ds, err := domain.NewDevServer("ds1", tenantID, "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", tenantID, "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 
@@ -21,6 +22,11 @@ type ExecuteInput struct {
 	ProjectID   string
 	RootTraceID string
 	RequestID   string
+	// InputsJSON is caller-supplied {{...}} values (TASK-WF-02-06) — e.g.
+	// {"feature_description": "..."} — available to every step's Config as
+	// {{feature_description}}. Malformed JSON fails Execute synchronously
+	// (same as an invalid dag_json), not silently at dispatch time.
+	InputsJSON string
 }
 
 // Execute resolves a template, validates and wave-computes its DAG,
@@ -97,6 +103,19 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindFailedPrecondition, "WORKFLOW_DAG_CYCLIC", err.Error(), err)
 	}
 
+	var inputs map[string]any
+	if in.InputsJSON != "" {
+		if err := json.Unmarshal([]byte(in.InputsJSON), &inputs); err != nil {
+			return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_INPUTS", "inputs_json must be a valid JSON object", err)
+		}
+	}
+	// userID is captured from the INBOUND ctx (the acting caller, per
+	// common/tenant's identity-forwarding convention) before dispatchCtx
+	// below detaches from it — see domain.ExecutionContext.UserID's doc
+	// comment and execute.go's own doc comment on why dispatch uses its
+	// own context.
+	userID, _ := tenant.UserID(ctx)
+
 	rootTraceID := in.RootTraceID
 	if rootTraceID == "" {
 		// No caller-supplied trace to resume against — mint a fresh one so
@@ -120,7 +139,12 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 	// StepExecutionRepository/ExecutionRepository calls made from the
 	// background goroutine still need it — see this type's doc comment.
 	dispatchCtx := tenant.WithTenantID(context.Background(), tenantID)
-	go uc.runToCompletion(dispatchCtx, exec, waves)
+	execCtx := newExecutionContext(domain.ExecutionContext{
+		Inputs:    inputs,
+		ProjectID: in.ProjectID,
+		UserID:    userID,
+	})
+	go uc.runToCompletion(dispatchCtx, exec, waves, execCtx)
 
 	return exec, nil
 }
@@ -129,8 +153,8 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 // final status (completed if every wave succeeded, failed if any step
 // did not — see waveDispatcher's doc comment for the failure-semantics
 // rationale). Runs entirely off the originating RPC's goroutine.
-func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step) {
-	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves)
+func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step, execCtx *executionContext) {
+	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves, execCtx)
 
 	exec.Status = domain.StatusCompleted
 	if !succeeded {

@@ -47,9 +47,9 @@ func New(pool *pgxpool.Pool) *Repository {
 // a NULL text) into a uuid column.
 func (r *Repository) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO infra.dev_servers (id, tenant_id, host, connection_mode, ssh_target_id)
-		VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid)
-	`, ds.ID, ds.TenantID, ds.Host, string(ds.Mode), ds.SSHTargetID)
+		INSERT INTO infra.dev_servers (id, tenant_id, host, connection_mode, ssh_target_id, tags)
+		VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, COALESCE($6, '{}'::text[]))
+	`, ds.ID, ds.TenantID, ds.Host, string(ds.Mode), ds.SSHTargetID, ds.Tags)
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("postgres: insert dev server: %w", err)
 	}
@@ -61,7 +61,7 @@ func (r *Repository) Register(ctx context.Context, ds domain.DevServer) (domain.
 // specs/backend-go/services/infra-fleet-service.md §9.
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevServer, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags
 		FROM infra.dev_servers
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
@@ -69,7 +69,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 	var ds domain.DevServer
 	var mode string
 	var sshTargetID *string
-	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID)
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.DevServer{}, fmt.Errorf("postgres: dev server %q not found for tenant: %w", id, err)
 	}
@@ -86,7 +86,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 // List returns every dev server registered for tenantID.
 func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevServer, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags
 		FROM infra.dev_servers
 		WHERE tenant_id = $1
 		ORDER BY created_at DESC
@@ -101,7 +101,42 @@ func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevSer
 		var ds domain.DevServer
 		var mode string
 		var sshTargetID *string
-		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID); err != nil {
+		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags); err != nil {
+			return nil, fmt.Errorf("postgres: scan dev server row: %w", err)
+		}
+		ds.Mode = domain.ConnectionMode(mode)
+		if sshTargetID != nil {
+			ds.SSHTargetID = *sshTargetID
+		}
+		out = append(out, ds)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate dev server rows: %w", err)
+	}
+	return out, nil
+}
+
+// ListByTag returns tenantID's dev servers carrying tag exactly — backs
+// usecase.ListDevServersByTag / workflow-service's "fleet:tag:<tag>"
+// dispatch-target shape (TASK-WF-02-02).
+func (r *Repository) ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags
+		FROM infra.dev_servers
+		WHERE tenant_id = $1 AND $2 = ANY(tags)
+		ORDER BY created_at DESC
+	`, tenantID, tag)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query dev servers by tag: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.DevServer
+	for rows.Next() {
+		var ds domain.DevServer
+		var mode string
+		var sshTargetID *string
+		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags); err != nil {
 			return nil, fmt.Errorf("postgres: scan dev server row: %w", err)
 		}
 		ds.Mode = domain.ConnectionMode(mode)

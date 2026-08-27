@@ -26,7 +26,7 @@ func TestNewDevServer_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ds, err := NewDevServer("ds1", tt.tenantID, tt.host, tt.mode, tt.sshTargetID)
+			ds, err := NewDevServer("ds1", tt.tenantID, tt.host, tt.mode, tt.sshTargetID, nil)
 			if tt.wantErr == nil {
 				if err != nil {
 					t.Fatalf("expected no error, got %v", err)
@@ -47,7 +47,7 @@ func TestNewDevServer_ValidatesInvariants(t *testing.T) {
 // for the invariant above — relay-ssh mode with a blank SSHTargetID must
 // never construct a DevServer sshconn.Connector can't dial.
 func TestNewDevServer_RelaySSHRequiresSSHTargetID(t *testing.T) {
-	_, err := NewDevServer("ds1", "t1", "10.0.0.1", ConnectionModeRelaySSH, "")
+	_, err := NewDevServer("ds1", "t1", "10.0.0.1", ConnectionModeRelaySSH, "", nil)
 	if !errors.Is(err, ErrMissingSSHTargetForRelaySSH) {
 		t.Fatalf("expected ErrMissingSSHTargetForRelaySSH, got %v", err)
 	}
@@ -72,7 +72,7 @@ func TestDevServer_IsZero(t *testing.T) {
 	if !(DevServer{}).IsZero() {
 		t.Error("expected zero-value DevServer to report IsZero")
 	}
-	ds, err := NewDevServer("ds1", "t1", "host", ConnectionModeRelaySSH, "ssht1")
+	ds, err := NewDevServer("ds1", "t1", "host", ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

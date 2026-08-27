@@ -27,7 +27,7 @@ import (
 // need those fields instead.
 func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sendTerminalInput *usecase.SendTerminalInput, getTerminalScrollback *usecase.GetTerminalScrollback) *Server {
 	return New(
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		nil, nil,
 		nil, nil, nil, // scrollback-snapshot usecases (SOL-TM-03), unused by this package's tests
@@ -309,6 +309,9 @@ func (f *fakeDevServerRepo) UpdateProvisionResult(ctx context.Context, tenantID,
 	return nil
 }
 func (f *fakeDevServerRepo) ListAllForPolling(ctx context.Context) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeDevServerRepo) ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error) {
 	return nil, nil
 }
 

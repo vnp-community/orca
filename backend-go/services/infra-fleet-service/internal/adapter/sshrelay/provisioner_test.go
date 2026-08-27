@@ -386,7 +386,7 @@ func TestProvision_SucceedsAgainstFakeServer(t *testing.T) {
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
 	})
 
-	devServer, err := domain.NewDevServer("ds-1", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1")
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -422,7 +422,7 @@ func TestProvision_FailsOnChecksumMismatch(t *testing.T) {
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
 	})
 
-	devServer, err := domain.NewDevServer("ds-2", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-2")
+	devServer, err := domain.NewDevServer("ds-2", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-2", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -450,7 +450,7 @@ func TestProvision_FailsWhenBundlePathNotConfigured(t *testing.T) {
 	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{HandshakeTimeout: 5 * time.Second}) // no BundlePath
 
-	devServer, err := domain.NewDevServer("ds-3", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-3")
+	devServer, err := domain.NewDevServer("ds-3", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-3", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -468,7 +468,7 @@ func TestProvision_FailsWhenSshTargetUnresolvable(t *testing.T) {
 	connector := sshconn.NewConnector(&fakeIssuer{}, nil, sshconn.Config{}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{BundlePath: "/nonexistent", HandshakeTimeout: time.Second})
 
-	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-missing")
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-missing", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -498,7 +498,7 @@ func TestProvision_VersionMatches_SkipsDeploy(t *testing.T) {
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "2.1.0",
 	})
 
-	devServer, err := domain.NewDevServer("ds-version-match", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-version-match")
+	devServer, err := domain.NewDevServer("ds-version-match", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-version-match", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -537,7 +537,7 @@ func TestProvision_VersionMismatch_StillDeploys(t *testing.T) {
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "2.1.0",
 	})
 
-	devServer, err := domain.NewDevServer("ds-version-mismatch", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-version-mismatch")
+	devServer, err := domain.NewDevServer("ds-version-mismatch", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-version-mismatch", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -574,7 +574,7 @@ func TestProvision_HandshakeTimeout_IncludesDiagnostics(t *testing.T) {
 		BundlePath: bundlePath, HandshakeTimeout: 500 * time.Millisecond, OrcaVersion: "test",
 	})
 
-	devServer, err := domain.NewDevServer("ds-handshake-timeout", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-handshake-timeout")
+	devServer, err := domain.NewDevServer("ds-handshake-timeout", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-handshake-timeout", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

@@ -25,14 +25,15 @@ import (
 // shape as the fakes usage_routes tests would use, hand-rolled here since
 // there's no generated mock for this client.
 type fakeInfraFleetServiceClient struct {
-	registerDevServerFn  func(*infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
-	resolveConnectionFn  func(*infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error)
-	createSshTargetFn    func(*infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error)
-	getFleetHealthFn     func(*infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error)
-	scanWorkspacePortsFn func(*infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error)
-	listDevServersFn     func(*infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
-	createConnectionFn   func(*infrafleetv1.CreateConnectionRequest) (*infrafleetv1.CreateConnectionResponse, error)
-	relayFn              func(*infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+	registerDevServerFn   func(*infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
+	resolveConnectionFn   func(*infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error)
+	createSshTargetFn     func(*infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error)
+	getFleetHealthFn      func(*infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error)
+	scanWorkspacePortsFn  func(*infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error)
+	listDevServersFn      func(*infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
+	listDevServersByTagFn func(*infrafleetv1.ListDevServersByTagRequest) (*infrafleetv1.ListDevServersByTagResponse, error)
+	createConnectionFn    func(*infrafleetv1.CreateConnectionRequest) (*infrafleetv1.CreateConnectionResponse, error)
+	relayFn               func(*infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
 
 	listSshTargetsFn      func(*infrafleetv1.ListSshTargetsRequest) (*infrafleetv1.ListSshTargetsResponse, error)
 	getSshStateFn         func(*infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error)
@@ -74,6 +75,15 @@ func (f *fakeInfraFleetServiceClient) ScanWorkspacePorts(_ context.Context, in *
 
 func (f *fakeInfraFleetServiceClient) ListDevServers(_ context.Context, in *infrafleetv1.ListDevServersRequest, _ ...grpc.CallOption) (*infrafleetv1.ListDevServersResponse, error) {
 	return f.listDevServersFn(in)
+}
+
+// ListDevServersByTag (TASK-WF-02-03): no route in this package calls it
+// yet, so no test sets listDevServersByTagFn — a nil-func panic here would
+// be the correct loud failure if that ever changes without a fake update,
+// same "fake the port, not the transport" convention as this type's own
+// doc comment.
+func (f *fakeInfraFleetServiceClient) ListDevServersByTag(_ context.Context, in *infrafleetv1.ListDevServersByTagRequest, _ ...grpc.CallOption) (*infrafleetv1.ListDevServersByTagResponse, error) {
+	return f.listDevServersByTagFn(in)
 }
 
 func (f *fakeInfraFleetServiceClient) CreateConnection(_ context.Context, in *infrafleetv1.CreateConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.CreateConnectionResponse, error) {

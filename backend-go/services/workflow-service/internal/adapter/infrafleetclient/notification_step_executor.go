@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
 
 // notificationSendMethod is the Relay method name NotificationExecutor
@@ -45,14 +47,16 @@ type notificationResultOutput struct {
 // NotificationExecutor is the real Notification step executor — relays a
 // channel+message notification to infra-fleet-service's Relay RPC.
 type NotificationExecutor struct {
-	client infrafleetv1.InfraFleetServiceClient
+	client   infrafleetv1.InfraFleetServiceClient
+	resolver usecase.ServerResolver
 }
 
-// NewNotificationExecutor wraps an already-constructed infrafleetv1
-// client — used by cmd/server/main.go (real dial) and by tests (fake
-// client).
-func NewNotificationExecutor(client infrafleetv1.InfraFleetServiceClient) *NotificationExecutor {
-	return &NotificationExecutor{client: client}
+// NewNotificationExecutor wraps an already-constructed infrafleetv1 client
+// and a ServerResolver (see domain.NotificationStepConfig.EffectiveTarget) —
+// used by cmd/server/main.go (real dial + internal/adapter/serverresolver)
+// and by tests (fakes).
+func NewNotificationExecutor(client infrafleetv1.InfraFleetServiceClient, resolver usecase.ServerResolver) *NotificationExecutor {
+	return &NotificationExecutor{client: client, resolver: resolver}
 }
 
 var _ domain.StepExecutor = (*NotificationExecutor)(nil)
@@ -63,8 +67,17 @@ func (e *NotificationExecutor) Execute(ctx context.Context, stepConfigJSON strin
 		return domain.StepResult{}, fmt.Errorf("infrafleetclient: notification: invalid step config JSON: %w", err)
 	}
 
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: notification: %w", err)
+	}
+	connectionID, err := e.resolver.Resolve(ctx, tenantID, cfg.EffectiveTarget())
+	if err != nil {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: notification: resolve target: %w", err)
+	}
+
 	var result notificationResult
-	if err := relay(ctx, e.client, cfg.ConnectionID, notificationSendMethod, notificationSendParams{
+	if err := relay(ctx, e.client, connectionID, notificationSendMethod, notificationSendParams{
 		Channel: cfg.Channel,
 		Message: cfg.Message,
 	}, &result); err != nil {

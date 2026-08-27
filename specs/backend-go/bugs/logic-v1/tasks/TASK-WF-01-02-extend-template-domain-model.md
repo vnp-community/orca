@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/domain/template.go`
 **Depends on:** TASK-WF-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — struct extended, `NewWorkflowTemplate` gained required `ownerID` + variadic `TemplateOption`s (`WithDescription`/`WithTags`/`WithUsageCount`/`WithClonedFrom`/`WithOverrides`/`WithInjectSteps`/`WithRemoveSteps`) for parseability-only JSON validation; all call sites updated; new `domain/template_test.go` table test passes (`go test ./internal/domain/... -run TestNewWorkflowTemplate`); full `go build ./... && go vet ./... && go test ./...` green. Note: found pre-existing bug in `postgres.Repository.Update` (`parent_template_id = NULLIF($4, '')` fails Postgres uuid-cast on a non-empty value) unrelated to this task — left as-is since Update isn't in this task's scope; likely needs fixing when TASK-WF-01-06 touches version-bump-on-write.
 
 ---
 

@@ -20,6 +20,10 @@ service InfraFleetService {
   // DevServerRepository.List method already existed but was never exposed
   // over gRPC before Epic A's second pass.
   rpc ListDevServers(ListDevServersRequest) returns (ListDevServersResponse);
+  // ListDevServersByTag backs workflow-service's "fleet:tag:<tag>"
+  // dispatch-target shape (TASK-WF-02-02/04) — load-balance across this
+  // tenant's healthy dev servers carrying tag.
+  rpc ListDevServersByTag(ListDevServersByTagRequest) returns (ListDevServersByTagResponse);
   // CreateConnection is the write path for infra.connections
   // (migrations/0002_connections) — binds a dev server to a worktree/repo
   // path, producing the connectionId ResolveConnection/Relay resolve
@@ -195,7 +199,10 @@ message DevServer {
   string arch = 8;
   string node_version = 9;
   string agent_version = 10;
-  repeated string tags = 11; // BL-PRF-03's allowedServerTags match target
+  // tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east"); also
+  // BL-PRF-03's allowedServerTags match target and WF's ListDevServersByTag
+  // dispatch-target key.
+  repeated string tags = 11;
 }
 
 message RegisterDevServerRequest {
@@ -265,6 +272,15 @@ message ListDevServersRequest {
 }
 
 message ListDevServersResponse {
+  repeated DevServer dev_servers = 1;
+}
+
+message ListDevServersByTagRequest {
+  string tag = 1;
+  bool healthy_only = 2; // filters against GetFleetHealth's own reachability check
+}
+
+message ListDevServersByTagResponse {
   repeated DevServer dev_servers = 1;
 }
 

@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/domain/step.go`
 **Depends on:** TASK-WF-02-01, TASK-WF-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `StepTypeAction`/`StepTypeParallel` + `ActionStepConfig`/`ParallelStepConfig` added to `step.go`, `StepType.Valid()` extended to seven types. New `stepexecutors.ActionExecutor` (map[string]ActionHandler, empty at construction, returns `usecase.ErrNoActionHandlerRegistered` for any name) and `stepexecutors.ParallelExecutor` (allSettled fan-out via the injected `StepExecutorRegistry`, two-phase `SetRegistry` init since it's one of the registry's own entries). Aggregate output uses a small `subStepOutcome` struct (status+output+error per sub-step) rather than the pseudocode's raw `StepResult` — carries the failure reason too, still satisfies "failed sub-step's outcome still present." Wired into `cmd/server/main.go`'s registry and `grpc.toDomainStepType`. New tests: `action_test.go` (unregistered->typed error, registered handler runs, invalid config JSON) + `parallel_test.go` (all-succeed, one-fails-no-partial->aggregate fails but every sub-step still ran assert via call-count, one-fails-allow-partial->aggregate completes with the failure visible, hard executor error counts as failure, unresolved sub-step type counts as failure) — 8/8 pass under `-race`. `go build/vet/test ./... -race` green for workflow-service; api-gateway still builds.
 
 ---
 

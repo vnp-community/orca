@@ -30,11 +30,16 @@ import (
 
 	workflowgrpc "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/infrafleetclient"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/opachecker"
 	workflowpostgres "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/postgres"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/providerresolver"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serverresolver"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serviceclients"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/stepexecutors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
+	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -82,6 +87,7 @@ func run() error {
 	defer pool.Close()
 
 	repo := workflowpostgres.New(pool)
+	approvalStore := workflowpostgres.NewApprovalStore(pool)
 
 	infraFleetConn, err := infrafleetclient.Dial(cfg.InfraFleetServiceAddr)
 	if err != nil {
@@ -90,11 +96,10 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
 
-	// NEW — tenant-service/project-service dials for AgentExecutor's
-	// profile-aware env injection (TASK-PRF-04-05/06). infrafleetclient.Dial
-	// is reused (same insecure-transport-credentials dial helper, this
-	// package's only Dial func) rather than duplicating it per remote
-	// service.
+	// NEW — tenant-service dial for AgentExecutor's profile-aware env
+	// injection (TASK-PRF-04-05/06). infrafleetclient.Dial is reused (same
+	// insecure-transport-credentials dial helper, this package's only Dial
+	// func) rather than duplicating it per remote service.
 	tenantConn, err := infrafleetclient.Dial(cfg.TenantServiceAddr)
 	if err != nil {
 		return fmt.Errorf("dialing tenant-service: %w", err)
@@ -102,40 +107,73 @@ func run() error {
 	defer func() { _ = tenantConn.Close() }()
 	tenantClient := tenantv1.NewTenantServiceClient(tenantConn)
 
-	projectContextConn, err := infrafleetclient.Dial(cfg.ProjectServiceAddr)
+	// project-service is dialed ONCE and the raw client shared across every
+	// port that talks to it (ProjectContextResolver, ServerResolver's
+	// "project:<id>" Target resolution, and CleanupWorktreesStepExecutor's
+	// candidate-worktree listing below) — all three take the same
+	// projectv1.ProjectServiceClient shape, so there is no reason to open
+	// three separate connections to the same address.
+	projectConn, err := infrafleetclient.Dial(cfg.ProjectServiceAddr)
 	if err != nil {
 		return fmt.Errorf("dialing project-service: %w", err)
 	}
-	defer func() { _ = projectContextConn.Close() }()
-	projectContextGrpcClient := projectv1.NewProjectServiceClient(projectContextConn)
+	defer func() { _ = projectConn.Close() }()
+	projectClient := projectv1.NewProjectServiceClient(projectConn)
+
+	aiProviderConn, err := infrafleetclient.Dial(cfg.AIProviderServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing ai-provider-service: %w", err)
+	}
+	defer func() { _ = aiProviderConn.Close() }()
+	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
+
+	authConn, err := infrafleetclient.Dial(cfg.AuthServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing auth-service: %w", err)
+	}
+	defer func() { _ = authConn.Close() }()
+	authClient := authv1.NewAuthServiceClient(authConn)
 
 	profileResolver := infrafleetclient.NewProfileResolver(tenantClient)
-	projectContextResolver := infrafleetclient.NewProjectContextResolver(projectContextGrpcClient)
+	projectContextResolver := infrafleetclient.NewProjectContextResolver(projectClient)
+	// ServerResolver turns a step's Target string into a connectionId —
+	// see domain.AgentStepConfig.Target's doc comment for the four accepted
+	// shapes and internal/adapter/serverresolver's doc comment.
+	resolver := serverresolver.New(projectClient, infraFleetClient)
+	// ProviderResolver picks which ai-provider-service account an Agent
+	// step uses — see internal/adapter/providerresolver's doc comment.
+	provider := providerresolver.New(aiProviderClient)
+	// OPAChecker answers "is this user an admin" for BUG-WF-03's
+	// publish-approval gate — see internal/adapter/opachecker's doc comment.
+	opaChecker := opachecker.New(authClient)
 
-	// StepExecutorRegistry wiring — all five step types, per
+	// StepExecutorRegistry wiring — all eight step types, per
 	// workflow-service.md §4: Condition and Webhook are real, in-process
 	// implementations; Agent/Shell/Notification relay to infra-fleet-
 	// service's generic Relay RPC (internal/adapter/infrafleetclient) —
 	// see that package's doc comments for the best-effort method-name/
 	// param-shape caveats (no live Dev Server Agent to verify against).
+	// Action/Parallel (TASK-WF-02-07) round out the proto's StepType enum.
 	registry := stepexecutors.NewRegistry()
 	registry.Register(domain.StepTypeCondition, stepexecutors.NewConditionExecutor())
 	registry.Register(domain.StepTypeWebhook, stepexecutors.NewWebhookExecutor(cfg.WebhookAllowlistHosts, &http.Client{Timeout: 30 * time.Second}))
-	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, profileResolver, projectContextResolver))
-	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient))
-	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient))
+	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, resolver, provider, profileResolver, projectContextResolver))
+	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient, resolver))
+	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient, resolver))
+	registry.Register(domain.StepTypeAction, stepexecutors.NewActionExecutor())
+	// Two-phase init: ParallelExecutor needs a reference back to the SAME
+	// registry it's about to be registered into (to recursively resolve
+	// each sub-step's own executor) — see ParallelExecutor's doc comment.
+	parallelExecutor := stepexecutors.NewParallelExecutor()
+	parallelExecutor.SetRegistry(registry)
+	registry.Register(domain.StepTypeParallel, parallelExecutor)
 
-	// STEP_TYPE_CLEANUP_WORKTREES (BL-AT-04, TASK-AT-04-05) — a sixth
+	// STEP_TYPE_CLEANUP_WORKTREES (BL-AT-04, TASK-AT-04-05) — a further
 	// StepExecutor, in-process like Condition/Webhook (no execution-plane
-	// relay needed), but with its own three new outbound dependency edges:
-	// project-service (candidate worktrees), git-gateway-service (the
-	// actual delete, with BR-AT-11/BR-AT-12 enforced server-side), and
-	// automation-service (BR-AT-14's audit report).
-	projectConn, err := serviceclients.Dial(cfg.ProjectServiceAddr)
-	if err != nil {
-		return fmt.Errorf("dialing project-service: %w", err)
-	}
-	defer func() { _ = projectConn.Close() }()
+	// relay needed), but with its own two further outbound dependency
+	// edges: git-gateway-service (the actual delete, with BR-AT-11/BR-AT-12
+	// enforced server-side) and automation-service (BR-AT-14's audit
+	// report) — project-service reuses the projectClient dialed above.
 	gitGatewayConn, err := serviceclients.Dial(cfg.GitGatewayServiceAddr)
 	if err != nil {
 		return fmt.Errorf("dialing git-gateway-service: %w", err)
@@ -147,10 +185,10 @@ func run() error {
 	}
 	defer func() { _ = automationConn.Close() }()
 
-	projectClient := serviceclients.NewProjectClient(projectv1.NewProjectServiceClient(projectConn))
+	cleanupProjectClient := serviceclients.NewProjectClient(projectClient)
 	gitGatewayClient := serviceclients.NewGitGatewayClient(gitgatewayv1.NewGitGatewayServiceClient(gitGatewayConn))
 	cleanupAuditClient := serviceclients.NewCleanupAuditClient(automationv1.NewAutomationServiceClient(automationConn))
-	registry.Register(domain.StepTypeCleanupWorktrees, usecase.NewCleanupWorktreesStepExecutor(projectClient, gitGatewayClient, cleanupAuditClient))
+	registry.Register(domain.StepTypeCleanupWorktrees, usecase.NewCleanupWorktreesStepExecutor(cleanupProjectClient, gitGatewayClient, cleanupAuditClient))
 
 	createTemplateUC := usecase.NewCreateTemplate(repo)
 	executeUC := usecase.NewExecute(repo, repo, repo, registry)
@@ -163,6 +201,14 @@ func run() error {
 	listTemplatesUC := usecase.NewListTemplates(repo)
 	resolveTemplateUC := usecase.NewResolveTemplate(repo)
 	updateTemplateUC := usecase.NewUpdateTemplate(repo)
+	cloneTemplateUC := usecase.NewCloneTemplate(resolveTemplateUC, repo)
+	publishTemplateUC := usecase.NewPublishTemplate(repo, approvalStore, opaChecker)
+	resolveApprovalUC := usecase.NewResolveApproval(approvalStore, opaChecker)
+	listPendingApprovalsUC := usecase.NewListPendingApprovals(approvalStore, opaChecker)
+	generateShareLinkUC := usecase.NewGenerateShareLink(repo)
+	rateTemplateUC := usecase.NewRateTemplate(repo)
+	previewSharedTemplateUC := usecase.NewPreviewSharedTemplate(repo)
+	importSharedTemplateUC := usecase.NewImportSharedTemplate(repo, resolveTemplateUC)
 	recoverExecutionsUC := usecase.NewRecoverExecutions(repo, repo, repo, registry)
 
 	// Boot-time recovery scan (workflow-service.md §8: "before accepting
@@ -180,7 +226,9 @@ func run() error {
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowgrpc.New(
 		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
-		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC,
+		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC, cloneTemplateUC,
+		publishTemplateUC, resolveApprovalUC, listPendingApprovalsUC,
+		generateShareLinkUC, previewSharedTemplateUC, importSharedTemplateUC, rateTemplateUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

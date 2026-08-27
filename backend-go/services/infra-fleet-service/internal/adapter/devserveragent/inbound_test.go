@@ -21,7 +21,7 @@ func TestClient_DirectWebSocket_NoInboundSession_ReturnsClearError(t *testing.T)
 	client := New(DefaultConfig(), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-direct", "tenant-1", "unused.invalid", domain.ConnectionModeDirectWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-direct", "tenant-1", "unused.invalid", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestClient_AttachInboundSession_MakesExecAndHealthWork(t *testing.T) {
 	client := New(DefaultConfig(), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-direct-2", "tenant-1", "unused.invalid", domain.ConnectionModeDirectWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-direct-2", "tenant-1", "unused.invalid", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestClient_CloseSessionsForDevServerToken_ClosesActiveSession(t *testing.T)
 	client := New(DefaultConfig(), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-close", "tenant-1", "unused.invalid", domain.ConnectionModeDirectWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-close", "tenant-1", "unused.invalid", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

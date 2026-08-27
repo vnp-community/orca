@@ -105,7 +105,7 @@ func (uc *BulkProvisionFleet) bulkProvisionOne(ctx context.Context, tenantID str
 		return ProvisionOutcome{Host: target.Host, Status: string(domain.DevServerStatusUnhealthy), Error: err.Error()}
 	}
 	if !found {
-		devServer, err = domain.NewDevServer(uuid.NewString(), tenantID, target.Host, domain.ConnectionModeRelaySSH, target.ID)
+		devServer, err = domain.NewDevServer(uuid.NewString(), tenantID, target.Host, domain.ConnectionModeRelaySSH, target.ID, nil)
 		if err == nil {
 			devServer, err = uc.devServers.Register(ctx, devServer)
 		}

@@ -10,7 +10,7 @@ import (
 )
 
 func TestTeardownConnection_MarksClosedAndCancelsReconnect(t *testing.T) {
-	devServer, err := domain.NewDevServer("ds-1", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1")
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

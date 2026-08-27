@@ -26,6 +26,7 @@ const (
 	InfraFleetService_GetFleetHealth_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
 	InfraFleetService_ScanWorkspacePorts_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
 	InfraFleetService_ListDevServers_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
+	InfraFleetService_ListDevServersByTag_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/ListDevServersByTag"
 	InfraFleetService_CreateConnection_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
 	InfraFleetService_Relay_FullMethodName                             = "/orca.infrafleet.v1.InfraFleetService/Relay"
 	InfraFleetService_ListSshTargets_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
@@ -91,6 +92,10 @@ type InfraFleetServiceClient interface {
 	// DevServerRepository.List method already existed but was never exposed
 	// over gRPC before Epic A's second pass.
 	ListDevServers(ctx context.Context, in *ListDevServersRequest, opts ...grpc.CallOption) (*ListDevServersResponse, error)
+	// ListDevServersByTag backs workflow-service's "fleet:tag:<tag>"
+	// dispatch-target shape (TASK-WF-02-02/04) — load-balance across this
+	// tenant's healthy dev servers carrying tag.
+	ListDevServersByTag(ctx context.Context, in *ListDevServersByTagRequest, opts ...grpc.CallOption) (*ListDevServersByTagResponse, error)
 	// CreateConnection is the write path for infra.connections
 	// (migrations/0002_connections) — binds a dev server to a worktree/repo
 	// path, producing the connectionId ResolveConnection/Relay resolve
@@ -285,6 +290,16 @@ func (c *infraFleetServiceClient) ListDevServers(ctx context.Context, in *ListDe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListDevServersResponse)
 	err := c.cc.Invoke(ctx, InfraFleetService_ListDevServers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ListDevServersByTag(ctx context.Context, in *ListDevServersByTagRequest, opts ...grpc.CallOption) (*ListDevServersByTagResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDevServersByTagResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListDevServersByTag_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -780,6 +795,10 @@ type InfraFleetServiceServer interface {
 	// DevServerRepository.List method already existed but was never exposed
 	// over gRPC before Epic A's second pass.
 	ListDevServers(context.Context, *ListDevServersRequest) (*ListDevServersResponse, error)
+	// ListDevServersByTag backs workflow-service's "fleet:tag:<tag>"
+	// dispatch-target shape (TASK-WF-02-02/04) — load-balance across this
+	// tenant's healthy dev servers carrying tag.
+	ListDevServersByTag(context.Context, *ListDevServersByTagRequest) (*ListDevServersByTagResponse, error)
 	// CreateConnection is the write path for infra.connections
 	// (migrations/0002_connections) — binds a dev server to a worktree/repo
 	// path, producing the connectionId ResolveConnection/Relay resolve
@@ -937,6 +956,9 @@ func (UnimplementedInfraFleetServiceServer) ScanWorkspacePorts(context.Context, 
 }
 func (UnimplementedInfraFleetServiceServer) ListDevServers(context.Context, *ListDevServersRequest) (*ListDevServersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListDevServers not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListDevServersByTag(context.Context, *ListDevServersByTagRequest) (*ListDevServersByTagResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDevServersByTag not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) CreateConnection(context.Context, *CreateConnectionRequest) (*CreateConnectionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateConnection not implemented")
@@ -1201,6 +1223,24 @@ func _InfraFleetService_ListDevServers_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InfraFleetServiceServer).ListDevServers(ctx, req.(*ListDevServersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ListDevServersByTag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDevServersByTagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListDevServersByTag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListDevServersByTag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListDevServersByTag(ctx, req.(*ListDevServersByTagRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2045,6 +2085,10 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListDevServers",
 			Handler:    _InfraFleetService_ListDevServers_Handler,
+		},
+		{
+			MethodName: "ListDevServersByTag",
+			Handler:    _InfraFleetService_ListDevServersByTag_Handler,
 		},
 		{
 			MethodName: "CreateConnection",

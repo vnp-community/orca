@@ -8,6 +8,8 @@ package grpc
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
@@ -30,6 +32,16 @@ type Server struct {
 	listTemplates       *usecase.ListTemplates
 	resolveTemplate     *usecase.ResolveTemplate
 	updateTemplate      *usecase.UpdateTemplate
+	cloneTemplate       *usecase.CloneTemplate
+
+	publishTemplate      *usecase.PublishTemplate
+	resolveApproval      *usecase.ResolveApproval
+	listPendingApprovals *usecase.ListPendingApprovals
+
+	generateShareLink     *usecase.GenerateShareLink
+	previewSharedTemplate *usecase.PreviewSharedTemplate
+	importSharedTemplate  *usecase.ImportSharedTemplate
+	rateTemplate          *usecase.RateTemplate
 }
 
 func New(
@@ -44,19 +56,35 @@ func New(
 	listTemplates *usecase.ListTemplates,
 	resolveTemplate *usecase.ResolveTemplate,
 	updateTemplate *usecase.UpdateTemplate,
+	cloneTemplate *usecase.CloneTemplate,
+	publishTemplate *usecase.PublishTemplate,
+	resolveApproval *usecase.ResolveApproval,
+	listPendingApprovals *usecase.ListPendingApprovals,
+	generateShareLink *usecase.GenerateShareLink,
+	previewSharedTemplate *usecase.PreviewSharedTemplate,
+	importSharedTemplate *usecase.ImportSharedTemplate,
+	rateTemplate *usecase.RateTemplate,
 ) *Server {
 	return &Server{
-		createTemplate:      createTemplate,
-		execute:             execute,
-		getExecution:        getExecution,
-		pauseExecution:      pauseExecution,
-		resumeExecution:     resumeExecution,
-		executeAdHocStep:    executeAdHocStep,
-		hasActiveExecutions: hasActiveExecutions,
-		cancelExecution:     cancelExecution,
-		listTemplates:       listTemplates,
-		resolveTemplate:     resolveTemplate,
-		updateTemplate:      updateTemplate,
+		createTemplate:        createTemplate,
+		execute:               execute,
+		getExecution:          getExecution,
+		pauseExecution:        pauseExecution,
+		resumeExecution:       resumeExecution,
+		executeAdHocStep:      executeAdHocStep,
+		hasActiveExecutions:   hasActiveExecutions,
+		cancelExecution:       cancelExecution,
+		listTemplates:         listTemplates,
+		resolveTemplate:       resolveTemplate,
+		updateTemplate:        updateTemplate,
+		cloneTemplate:         cloneTemplate,
+		publishTemplate:       publishTemplate,
+		resolveApproval:       resolveApproval,
+		listPendingApprovals:  listPendingApprovals,
+		generateShareLink:     generateShareLink,
+		previewSharedTemplate: previewSharedTemplate,
+		importSharedTemplate:  importSharedTemplate,
+		rateTemplate:          rateTemplate,
 	}
 }
 
@@ -79,6 +107,7 @@ func (s *Server) Execute(ctx context.Context, req *workflowv1.ExecuteRequest) (*
 		ProjectID:   req.GetProjectId(),
 		RootTraceID: req.GetRootTraceId(),
 		RequestID:   req.GetRequestId(),
+		InputsJSON:  req.GetInputsJson(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -141,6 +170,9 @@ func (s *Server) CancelExecution(ctx context.Context, req *workflowv1.CancelExec
 func (s *Server) ListTemplates(ctx context.Context, req *workflowv1.ListTemplatesRequest) (*workflowv1.ListTemplatesResponse, error) {
 	out, err := s.listTemplates.Execute(ctx, usecase.ListTemplatesInput{
 		Scope:     req.GetScope(),
+		Query:     req.GetQuery(),
+		Tags:      req.GetTags(),
+		Sort:      req.GetSort(),
 		PageToken: req.GetPageToken(),
 		PageSize:  req.GetPageSize(),
 	})
@@ -181,6 +213,109 @@ func (s *Server) UpdateTemplate(ctx context.Context, req *workflowv1.UpdateTempl
 	return &workflowv1.UpdateTemplateResponse{Template: toProtoTemplate(updated)}, nil
 }
 
+func (s *Server) CloneTemplate(ctx context.Context, req *workflowv1.CloneTemplateRequest) (*workflowv1.CloneTemplateResponse, error) {
+	tmpl, err := s.cloneTemplate.Execute(ctx, usecase.CloneTemplateInput{
+		SourceTemplateID: req.GetSourceTemplateId(),
+		Name:             req.GetName(),
+		Description:      req.GetDescription(),
+		Tags:             req.GetTags(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.CloneTemplateResponse{Template: toProtoTemplate(tmpl)}, nil
+}
+
+func (s *Server) PublishTemplate(ctx context.Context, req *workflowv1.PublishTemplateRequest) (*workflowv1.WorkflowTemplate, error) {
+	tmpl, err := s.publishTemplate.Execute(ctx, usecase.PublishTemplateInput{
+		TemplateID:    req.GetTemplateId(),
+		NewVisibility: domain.Visibility(req.GetNewVisibility()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoTemplate(tmpl), nil
+}
+
+func (s *Server) ListPendingApprovals(ctx context.Context, req *workflowv1.ListPendingApprovalsRequest) (*workflowv1.ListPendingApprovalsResponse, error) {
+	out, err := s.listPendingApprovals.Execute(ctx, usecase.ListPendingApprovalsInput{
+		PageToken: req.GetPageToken(),
+		PageSize:  req.GetPageSize(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	approvals := make([]*workflowv1.Approval, 0, len(out.Approvals))
+	for _, a := range out.Approvals {
+		approvals = append(approvals, toProtoApproval(a))
+	}
+	return &workflowv1.ListPendingApprovalsResponse{Approvals: approvals, NextPageToken: out.NextPageToken}, nil
+}
+
+func (s *Server) ResolveApproval(ctx context.Context, req *workflowv1.ResolveApprovalRequest) (*workflowv1.Approval, error) {
+	approval, err := s.resolveApproval.Execute(ctx, usecase.ResolveApprovalInput{
+		ApprovalID: req.GetApprovalId(),
+		Decision:   domain.ApprovalStatus(req.GetDecision()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoApproval(approval), nil
+}
+
+func toProtoApproval(a domain.Approval) *workflowv1.Approval {
+	out := &workflowv1.Approval{
+		Id:          a.ID,
+		TemplateId:  a.TemplateID,
+		RequestedBy: a.RequestedBy,
+		Status:      string(a.Status),
+		ResolvedBy:  a.ResolvedBy,
+	}
+	if a.ResolvedAt != nil {
+		out.ResolvedAt = timestamppb.New(*a.ResolvedAt)
+	}
+	return out
+}
+
+func (s *Server) GenerateShareLink(ctx context.Context, req *workflowv1.GenerateShareLinkRequest) (*workflowv1.GenerateShareLinkResponse, error) {
+	token, err := s.generateShareLink.Execute(ctx, req.GetTemplateId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.GenerateShareLinkResponse{ShareToken: token}, nil
+}
+
+func (s *Server) PreviewSharedTemplate(ctx context.Context, req *workflowv1.PreviewSharedTemplateRequest) (*workflowv1.SharedTemplatePreview, error) {
+	preview, err := s.previewSharedTemplate.Execute(ctx, req.GetShareToken())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.SharedTemplatePreview{
+		Name:        preview.Name,
+		Description: preview.Description,
+		Tags:        preview.Tags,
+		DagJson:     preview.DAGJSON,
+		RatingSum:   preview.RatingSum,
+		RatingCount: preview.RatingCount,
+	}, nil
+}
+
+func (s *Server) ImportSharedTemplate(ctx context.Context, req *workflowv1.ImportSharedTemplateRequest) (*workflowv1.WorkflowTemplate, error) {
+	tmpl, err := s.importSharedTemplate.Execute(ctx, req.GetShareToken())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoTemplate(tmpl), nil
+}
+
+func (s *Server) RateTemplate(ctx context.Context, req *workflowv1.RateTemplateRequest) (*workflowv1.RateTemplateResponse, error) {
+	result, err := s.rateTemplate.Execute(ctx, req.GetTemplateId(), req.GetStars())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.RateTemplateResponse{RatingSum: result.RatingSum, RatingCount: result.RatingCount}, nil
+}
+
 func toDomainStepType(t workflowv1.StepType) domain.StepType {
 	switch t {
 	case workflowv1.StepType_STEP_TYPE_AGENT:
@@ -195,6 +330,10 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 		return domain.StepTypeCondition
 	case workflowv1.StepType_STEP_TYPE_CLEANUP_WORKTREES:
 		return domain.StepTypeCleanupWorktrees
+	case workflowv1.StepType_STEP_TYPE_ACTION:
+		return domain.StepTypeAction
+	case workflowv1.StepType_STEP_TYPE_PARALLEL:
+		return domain.StepTypeParallel
 	default:
 		return domain.StepTypeUnspecified
 	}
@@ -202,13 +341,25 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 
 func toProtoTemplate(t domain.WorkflowTemplate) *workflowv1.WorkflowTemplate {
 	return &workflowv1.WorkflowTemplate{
-		Id:               t.ID,
-		TenantId:         t.TenantID,
-		Name:             t.Name,
-		DagJson:          t.DAGJSON,
-		Scope:            string(t.Scope),
-		ParentTemplateId: t.ParentTemplateID,
-		Version:          t.Version,
+		Id:                   t.ID,
+		TenantId:             t.TenantID,
+		Name:                 t.Name,
+		DagJson:              t.DAGJSON,
+		Scope:                string(t.Scope),
+		ParentTemplateId:     t.ParentTemplateID,
+		Version:              t.Version,
+		OwnerId:              t.OwnerID,
+		Description:          t.Description,
+		Tags:                 t.Tags,
+		OverridesJson:        t.OverridesJSON,
+		InjectStepsJson:      t.InjectStepsJSON,
+		RemoveStepsJson:      t.RemoveStepsJSON,
+		UsageCount:           t.UsageCount,
+		ClonedFromTemplateId: t.ClonedFromTemplateID,
+		Visibility:           string(t.Visibility),
+		ShareToken:           t.ShareToken,
+		RatingSum:            t.RatingSum,
+		RatingCount:          t.RatingCount,
 	}
 }
 

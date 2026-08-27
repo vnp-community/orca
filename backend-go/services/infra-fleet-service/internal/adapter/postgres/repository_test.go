@@ -35,6 +35,7 @@ const (
 
 	testDevServer1  = "33333333-3333-3333-3333-333333333333"
 	testDevServer2  = "44444444-4444-4444-4444-444444444444"
+	testDevServer3  = "88888888-8888-8888-8888-888888888888"
 	testDevServerRS = "77777777-7777-7777-7777-777777777777"
 	testUnknownID   = "99999999-9999-9999-9999-999999999999"
 
@@ -86,7 +87,7 @@ func TestRepository_ResolveConnection_FoundAndNotFound(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
-	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -124,8 +125,8 @@ func TestRepository_List_FiltersByTenant(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
-	ds1, _ := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
-	ds2, _ := domain.NewDevServer(testDevServer2, testTenant2, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "")
+	ds1, _ := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
+	ds2, _ := domain.NewDevServer(testDevServer2, testTenant2, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "", nil)
 	_, _ = repo.Register(ctx, ds1)
 	_, _ = repo.Register(ctx, ds2)
 
@@ -308,7 +309,7 @@ func TestRepository_UpdateStatusAndGetDevServerByConnection(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
-	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.9", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.9", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -374,7 +375,7 @@ func TestPortForwardStore_CreateThenListActiveByConnection_RoundTripsProcessName
 	if _, err := sshTargetStore.Create(ctx, sshTarget); err != nil {
 		t.Fatalf("creating ssh target: %v", err)
 	}
-	ds, err := domain.NewDevServer(testDevServerRS, testTenant1, "10.0.0.5", domain.ConnectionModeRelaySSH, testSshTarget1)
+	ds, err := domain.NewDevServer(testDevServerRS, testTenant1, "10.0.0.5", domain.ConnectionModeRelaySSH, testSshTarget1, nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -441,7 +442,7 @@ func TestRepository_RegisterAndGet_PersistsSSHTargetID(t *testing.T) {
 		t.Fatalf("creating ssh target: %v", err)
 	}
 
-	ds, err := domain.NewDevServer(testDevServerRS, testTenant1, "10.0.0.5", domain.ConnectionModeRelaySSH, testSshTarget2)
+	ds, err := domain.NewDevServer(testDevServerRS, testTenant1, "10.0.0.5", domain.ConnectionModeRelaySSH, testSshTarget2, nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -477,7 +478,7 @@ func TestRepository_Outbox_EnqueueFetchMarkPublished(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
-	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -534,7 +535,7 @@ func TestRepository_UpdateProvisionResult(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
-	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.9", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.9", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -587,7 +588,7 @@ func TestRepository_UpdateProvisionResult(t *testing.T) {
 // fleet_health's FK, but don't care about its ssh_target/mode details.
 func registerTestDevServer(t *testing.T, repo *Repository, id string) domain.DevServer {
 	t.Helper()
-	ds, err := domain.NewDevServer(id, testTenant1, "10.0.0.77", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer(id, testTenant1, "10.0.0.77", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -699,14 +700,14 @@ func TestListAllForPolling_IsCrossTenant(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
-	ds1, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds1, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server 1: %v", err)
 	}
 	if _, err := repo.Register(ctx, ds1); err != nil {
 		t.Fatalf("registering dev server 1: %v", err)
 	}
-	ds2, err := domain.NewDevServer(testDevServer2, testTenant2, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "")
+	ds2, err := domain.NewDevServer(testDevServer2, testTenant2, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server 2: %v", err)
 	}
@@ -778,5 +779,54 @@ func TestOutboxEnqueueFetchMarkPublished(t *testing.T) {
 	}
 	if len(stillUnpublished) != 0 {
 		t.Errorf("expected zero unpublished rows after MarkPublished, got %d", len(stillUnpublished))
+	}
+}
+
+func TestRepository_ListByTag_FiltersByTagAndTenant(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	gpuServer, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", []string{"gpu", "region:us-east"})
+	if err != nil {
+		t.Fatalf("building gpu dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, gpuServer); err != nil {
+		t.Fatalf("registering gpu dev server: %v", err)
+	}
+
+	plainServer, err := domain.NewDevServer(testDevServer2, testTenant1, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("building plain dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, plainServer); err != nil {
+		t.Fatalf("registering plain dev server: %v", err)
+	}
+
+	// Same tag, different tenant — must not leak across tenants.
+	otherTenantGPU, err := domain.NewDevServer(testDevServer3, testTenant2, "10.0.0.3", domain.ConnectionModeRelayWebSocket, "", []string{"gpu"})
+	if err != nil {
+		t.Fatalf("building other-tenant gpu dev server: %v", err)
+	}
+	if _, err := repo.Register(ctx, otherTenantGPU); err != nil {
+		t.Fatalf("registering other-tenant gpu dev server: %v", err)
+	}
+
+	got, err := repo.ListByTag(ctx, testTenant1, "gpu")
+	if err != nil {
+		t.Fatalf("list by tag: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != testDevServer1 {
+		t.Fatalf("expected exactly [%s], got %+v", testDevServer1, got)
+	}
+	if len(got[0].Tags) != 2 {
+		t.Errorf("expected Tags to round-trip, got %v", got[0].Tags)
+	}
+
+	none, err := repo.ListByTag(ctx, testTenant1, "does-not-exist")
+	if err != nil {
+		t.Fatalf("list by unknown tag: %v", err)
+	}
+	if len(none) != 0 {
+		t.Errorf("expected no matches for an unused tag, got %+v", none)
 	}
 }

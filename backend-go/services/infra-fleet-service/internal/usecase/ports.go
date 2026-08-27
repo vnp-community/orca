@@ -46,6 +46,10 @@ type DevServerRepository interface {
 	// answering one tenant's request), unlike every other
 	// DevServerRepository method's tenantID parameter.
 	ListAllForPolling(ctx context.Context) ([]domain.DevServer, error)
+	// ListByTag returns tenantID's dev servers carrying tag exactly — backs
+	// usecase.ListDevServersByTag / workflow-service's "fleet:tag:<tag>"
+	// dispatch-target shape (TASK-WF-02-02).
+	ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error)
 }
 
 // HandshakeInfo is a usecase-owned mirror of

@@ -207,7 +207,7 @@ func waitForCondition(t *testing.T, timeout time.Duration, cond func() bool) {
 
 func newTestPollWorkspacePorts(t *testing.T, agent *scriptedAgent, alloc *fakePortAllocator, tunnelOpener *fakeTunnelOpener, repo *fakePortForwardRepository, events *fakePortForwardEventPublisher) *PollWorkspacePorts {
 	t.Helper()
-	ds, err := domain.NewDevServer("ds-1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht-1")
+	ds, err := domain.NewDevServer("ds-1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht-1", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

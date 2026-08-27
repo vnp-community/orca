@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/migrations/0008_template_visibility_sharing.up.sql`
 **Depends on:** TASK-WF-01-01 (this migration builds on the `templates.owner_id`/`usage_count`/`tags` columns SOL-WF-01's `0007_template_authoring_fields` migration adds — `0007` must land first)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0008 added (schema-qualified `workflow.templates`/`workflow.ratings`/`workflow.approvals`, spec's bare table names fixed, same as 0007); `ratings` RLS via `template_id` join (no direct `tenant_id`, mirroring 0004's `execution_id`-join idiom), `approvals` RLS direct on its own `tenant_id`. Verified with a throwaway integration test (removed after passing): `up`/`down`/`up` round-trips cleanly against a real Postgres testcontainer, and `idx_workflow_approvals_one_pending_per_template` genuinely rejects a second concurrent pending approval row for the same template. `go test -tags=integration -run TestRepository_CreateAndGetTemplate` (which runs every migration via the shared harness) also passes, confirming 0008 applies cleanly on top of 0007.
 
 ---
 

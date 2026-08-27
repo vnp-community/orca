@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `ExecuteRequest.inputs_json`, `STEP_TYPE_ACTION`/`STEP_TYPE_PARALLEL`, `StreamExecutionEvents` RPC + `StreamExecutionEventsRequest`/`ExecutionEvent` messages added, all additive. `make proto-gen` regenerated stubs; `go build ./...` clean for `proto`, `workflow-service`, `api-gateway`. (Same `buf breaking` git-ref caveat as TASK-WF-01-03 — verified additivity by inspection.)
 
 ---
 

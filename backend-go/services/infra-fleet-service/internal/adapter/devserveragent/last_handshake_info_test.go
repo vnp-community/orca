@@ -40,7 +40,7 @@ func TestLastHandshakeInfo_HandshakedSessionReturnsInfo(t *testing.T) {
 	client := New(DefaultConfig(), slog.Default())
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-handshake-1", "tenant-1", "unused.invalid", domain.ConnectionModeDirectWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-handshake-1", "tenant-1", "unused.invalid", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

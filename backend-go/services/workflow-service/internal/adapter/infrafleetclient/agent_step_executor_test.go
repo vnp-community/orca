@@ -10,9 +10,38 @@ import (
 
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serverresolver"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
+
+// testResolver is the real serverresolver.New with nil project/infra
+// clients — safe here because every fixture in this package's tests uses
+// only the "connection:"/legacy-ConnectionID/empty Target shapes, none of
+// which ever touch those clients (see resolver.Resolve's switch). Testing
+// the RPC-calling shapes (server:/project:/fleet:tag:) is
+// internal/adapter/serverresolver's own job.
+func testResolver() usecase.ServerResolver {
+	return serverresolver.New(nil, nil)
+}
+
+// fakeProviderResolver is a minimal usecase.ProviderResolver — resolving
+// which ai-provider-service account to use is
+// internal/adapter/providerresolver's own job to test; AgentExecutor's
+// tests only need SOME resolution to succeed (or fail, via err) so the
+// relay call's AccountID param is exercised.
+type fakeProviderResolver struct {
+	accountID string
+	err       error
+}
+
+func (f *fakeProviderResolver) Resolve(ctx context.Context, tenantID, userID, projectID string, pin *domain.ProviderPin) (string, error) {
+	return f.accountID, f.err
+}
+
+func testProviderResolver() usecase.ProviderResolver {
+	return &fakeProviderResolver{accountID: "acct-1"}
+}
 
 // fakeInfraFleetClient implements infrafleetv1.InfraFleetServiceClient
 // directly — embedding the (nil) interface means any RPC this package's
@@ -72,7 +101,7 @@ func TestAgentExecutor_SuccessfulRelayProducesCompletedStepResult(t *testing.T) 
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewAgentExecutor(fake, &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing", WorktreePath: "/wt"})
@@ -110,7 +139,7 @@ func TestAgentExecutor_MethodIsAlwaysAgentExecPrompt(t *testing.T) {
 				return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 			},
 		}
-		exec := NewAgentExecutor(fake, &fakeAgentProfileResolver{settings: map[string]any{}}, &fakeAgentProjectContextResolver{})
+		exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{settings: map[string]any{}}, &fakeAgentProjectContextResolver{})
 		ctx := withTenantContext(context.Background(), "tenant-1")
 
 		cfgJSON, _ := json.Marshal(cfg)
@@ -130,7 +159,7 @@ func TestAgentExecutor_NonZeroExitCodeProducesFailedStepResult(t *testing.T) {
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewAgentExecutor(fake, &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
@@ -149,7 +178,7 @@ func TestAgentExecutor_RelayErrorPropagates(t *testing.T) {
 			return nil, errors.New("dev server unreachable")
 		},
 	}
-	exec := NewAgentExecutor(fake, &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
@@ -166,7 +195,7 @@ func TestAgentExecutor_MissingConnectionIDErrorsWithoutCallingRelay(t *testing.T
 			return nil, nil
 		},
 	}
-	exec := NewAgentExecutor(fake, &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{Prompt: "do the thing"})
@@ -183,7 +212,7 @@ func TestAgentExecutor_NoTenantInContextErrorsWithoutCallingRelay(t *testing.T) 
 			return nil, nil
 		},
 	}
-	exec := NewAgentExecutor(fake, &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
 	_, err := exec.Execute(context.Background(), string(cfg))
@@ -205,7 +234,7 @@ func TestAgentExecutor_EmptyUserID_LegacyPassthrough(t *testing.T) {
 		},
 	}
 	profiles := &fakeAgentProfileResolver{}
-	exec := NewAgentExecutor(fake, profiles, &fakeAgentProjectContextResolver{})
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), profiles, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
@@ -239,7 +268,7 @@ func TestAgentExecutor_UserIDSet_ResolvesProfileAndPopulatesEnv(t *testing.T) {
 	profiles := &fakeAgentProfileResolver{settings: map[string]any{
 		"agent": map[string]any{"preferredModel": "claude-opus-4-5"},
 	}}
-	exec := NewAgentExecutor(fake, profiles, &fakeAgentProjectContextResolver{})
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), profiles, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing", UserID: "user-42"})
@@ -273,7 +302,7 @@ func TestAgentExecutor_ProjectContextResolverFailure_BestEffort(t *testing.T) {
 	}
 	profiles := &fakeAgentProfileResolver{settings: map[string]any{}}
 	projects := &fakeAgentProjectContextResolver{err: errors.New("project-service unreachable")}
-	exec := NewAgentExecutor(fake, profiles, projects)
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), profiles, projects)
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing", UserID: "user-1", ProjectID: "proj-1"})

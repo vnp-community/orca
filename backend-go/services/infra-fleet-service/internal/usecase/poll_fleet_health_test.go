@@ -116,7 +116,7 @@ func healthyExecResult() map[string]any {
 }
 
 func TestPollFleetHealth_HealthyServerWritesOneUpsert(t *testing.T) {
-	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
 	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
 	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
@@ -139,7 +139,7 @@ func TestPollFleetHealth_HealthyServerWritesOneUpsert(t *testing.T) {
 }
 
 func TestPollFleetHealth_UpdatesMetricsCollectorWhenPresent(t *testing.T) {
-	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
 	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
 	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
@@ -163,7 +163,7 @@ func TestPollFleetHealth_UpdatesMetricsCollectorWhenPresent(t *testing.T) {
 // fine before TASK-FLEET-03-08's metrics wiring lands anywhere that
 // constructs it without one.
 func TestPollFleetHealth_NilCollectorNeverPanics(t *testing.T) {
-	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
 	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
 	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
@@ -172,7 +172,7 @@ func TestPollFleetHealth_NilCollectorNeverPanics(t *testing.T) {
 }
 
 func TestPollFleetHealth_StatusTransitionTriggersExactlyOneEventAndWebhookCall(t *testing.T) {
-	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
 	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{
 		"ds1": {DevServerID: "ds1", Status: domain.HealthStatusHealthy},
@@ -203,7 +203,7 @@ func TestPollFleetHealth_StatusTransitionTriggersExactlyOneEventAndWebhookCall(t
 }
 
 func TestPollFleetHealth_NoTransitionTriggersNoEventOrWebhookCall(t *testing.T) {
-	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
 	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{
 		"ds1": {DevServerID: "ds1", Status: domain.HealthStatusHealthy},
@@ -222,7 +222,7 @@ func TestPollFleetHealth_NoTransitionTriggersNoEventOrWebhookCall(t *testing.T) 
 }
 
 func TestPollFleetHealth_LockedFalseSkipsAgentCallsEntirely(t *testing.T) {
-	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
 	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
 	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
@@ -245,7 +245,7 @@ func TestPollFleetHealth_LockedFalseSkipsAgentCallsEntirely(t *testing.T) {
 }
 
 func TestPollFleetHealth_UnreachableServerRecordsUnreachableStatus(t *testing.T) {
-	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
 	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
 	agent := &fakeDevServerAgentClient{healthy: false, healthErr: errors.New("connection refused")}

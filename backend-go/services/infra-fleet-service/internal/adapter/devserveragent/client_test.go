@@ -225,7 +225,7 @@ func TestClientExecSucceedsAgainstFakeAgent(t *testing.T) {
 	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestClientExecTranslatesMethodNotFound(t *testing.T) {
 	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-mnf", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-mnf", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestClientHealthReflectsHandshake(t *testing.T) {
 	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -296,7 +296,7 @@ func TestClientHealthFalseOnAuthFailure(t *testing.T) {
 	client := newTestClientWithToken(port, "wrong-token")
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestClientExecReturnsClearErrorForUnimplementedMode(t *testing.T) {
 	client := newTestClientWithToken(0, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "example.invalid", domain.ConnectionModeDirectWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "example.invalid", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestClient_NoRegisteredToken_FailsWithoutDialing(t *testing.T) {
 	client := New(testConfig(port), slog.Default(), WithAgentTokens(tokens))
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-no-token", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-no-token", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -387,11 +387,11 @@ func TestClient_TwoDevServers_TwoTokens_ProduceTwoAuthHeaders(t *testing.T) {
 	client := New(testConfig(port), slog.Default(), WithAgentTokens(tokens))
 	t.Cleanup(client.Close)
 
-	devA, err := domain.NewDevServer("ds-a", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devA, err := domain.NewDevServer("ds-a", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer(ds-a): %v", err)
 	}
-	devB, err := domain.NewDevServer("ds-b", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devB, err := domain.NewDevServer("ds-b", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer(ds-b): %v", err)
 	}
@@ -435,7 +435,7 @@ func TestClient_RevokedToken_NextDialAttemptFailsClosed(t *testing.T) {
 	client := New(cfg, slog.Default(), WithAgentTokens(tokens))
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-revoke", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-revoke", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

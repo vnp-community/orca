@@ -51,7 +51,7 @@ func TestSpawnTerminalSession_UnresolvedConnection_ReturnsNotFoundError(t *testi
 }
 
 func TestSpawnTerminalSession_ResolvedConnection_SpawnsAndPersists(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestSpawnTerminalSession_ResolvedConnection_SpawnsAndPersists(t *testing.T)
 // boolean), execution decides how — this usecase must forward
 // ShellIntegration unexamined.
 func TestSpawnTerminalSession_ShellIntegration_ReachesSpawnPtyInputUnmodified(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestSpawnTerminalSession_ShellIntegration_ReachesSpawnPtyInputUnmodified(t 
 // callers that never set ShellIntegration keep seeing false — no behavior
 // change for callers unaware of BR-TM-13.
 func TestSpawnTerminalSession_ShellIntegration_DefaultsFalse(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestSpawnTerminalSession_ShellIntegration_DefaultsFalse(t *testing.T) {
 }
 
 func TestSpawnTerminalSession_AgentFailurePropagates(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
