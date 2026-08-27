@@ -4,7 +4,9 @@ package command
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -55,6 +57,8 @@ func NewRootCmd(clientFactory func() (*apiclient.Client, error)) (*cobra.Command
 	root.PersistentFlags().BoolVar(&jsonOutput, "json", false, "emit machine-readable JSON output")
 
 	root.AddCommand(newWorktreeCmd(clientFactory, &jsonOutput, exitCode))
+	root.AddCommand(newAgentCmd(clientFactory, &jsonOutput, exitCode))
+	root.AddCommand(newSnapshotCmd(clientFactory, &jsonOutput, exitCode))
 	return root, exitCode
 }
 
@@ -81,6 +85,86 @@ func newWorktreeCreateCmd(clientFactory func() (*apiclient.Client, error), jsonO
 	cmd.Flags().StringVar(&opts.Agent, "agent", "", "agent type to best-effort spawn in the new worktree")
 	cmd.Flags().StringVar(&opts.Prompt, "prompt", "", "initial prompt to send the spawned agent")
 	cmd.Flags().StringVar(&opts.IdempotencyKeyOverride, "idempotency-key", "", "override the auto-derived idempotency key (BR-CLI-01)")
+	return cmd
+}
+
+func newAgentCmd(clientFactory func() (*apiclient.Client, error), jsonOutput *bool, exitCode *int) *cobra.Command {
+	cmd := &cobra.Command{Use: "agent", Short: "interact with a worktree's running agent"}
+	cmd.AddCommand(newAgentStatusCmd(clientFactory, jsonOutput, exitCode))
+	cmd.AddCommand(newAgentWaitCmd(clientFactory, jsonOutput, exitCode))
+	cmd.AddCommand(newAgentSendCmd(clientFactory, jsonOutput, exitCode))
+	return cmd
+}
+
+func newAgentStatusCmd(clientFactory func() (*apiclient.Client, error), jsonOutput *bool, exitCode *int) *cobra.Command {
+	var worktreeID string
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "report whether an agent is running in a worktree, and whether it's ready for input",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			*exitCode = ExecuteAgentStatus(cmd.Context(), clientFactory, worktreeID, *jsonOutput)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&worktreeID, "worktree", "", "worktree ID (required)")
+	return cmd
+}
+
+func newAgentWaitCmd(clientFactory func() (*apiclient.Client, error), jsonOutput *bool, exitCode *int) *cobra.Command {
+	var worktreeID string
+	var timeout time.Duration
+	cmd := &cobra.Command{
+		Use:   "wait",
+		Short: "block until the worktree's agent exits or --timeout elapses (BR-CLI-05: a timeout exits 2)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			*exitCode = ExecuteAgentWait(cmd.Context(), clientFactory, worktreeID, timeout, *jsonOutput)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&worktreeID, "worktree", "", "worktree ID (required)")
+	cmd.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "how long to wait before giving up (e.g. 30s, 5m)")
+	return cmd
+}
+
+func newAgentSendCmd(clientFactory func() (*apiclient.Client, error), jsonOutput *bool, exitCode *int) *cobra.Command {
+	var worktreeID, text string
+	cmd := &cobra.Command{
+		Use:   "send",
+		Short: "send text input to the worktree's running agent",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			resolved := text
+			if resolved == "" {
+				// No --text: fall back to stdin, matching every other
+				// `orca ... send`-shaped CLI's convention (e.g. `kubectl
+				// apply -f -`) so this composes in a shell pipeline.
+				data, err := io.ReadAll(cmd.InOrStdin())
+				if err != nil {
+					*exitCode = output.ReportError(err, *jsonOutput)
+					return nil
+				}
+				resolved = string(data)
+			}
+			*exitCode = ExecuteAgentSend(cmd.Context(), clientFactory, worktreeID, resolved, *jsonOutput)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&worktreeID, "worktree", "", "worktree ID (required)")
+	cmd.Flags().StringVar(&text, "text", "", "text to send (default: read from stdin)")
+	return cmd
+}
+
+func newSnapshotCmd(clientFactory func() (*apiclient.Client, error), jsonOutput *bool, exitCode *int) *cobra.Command {
+	var worktreeID, outputPath string
+	cmd := &cobra.Command{
+		Use:   "snapshot",
+		Short: "capture a worktree's agent scrollback as a flat text file (BR-CLI-06)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			*exitCode = ExecuteSnapshot(cmd.Context(), clientFactory, worktreeID, outputPath, *jsonOutput)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&worktreeID, "worktree", "", "worktree ID (required)")
+	cmd.Flags().StringVar(&outputPath, "output", "", "file to write the snapshot to (default: stdout)")
 	return cmd
 }
 

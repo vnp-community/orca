@@ -38,6 +38,18 @@ type fakeInfraFleetServiceClient struct {
 	getSshStateFn         func(*infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error)
 	establishConnectionFn func(*infrafleetv1.EstablishConnectionRequest) (*infrafleetv1.Connection, error)
 	killWorkspacePortFn   func(*infrafleetv1.KillWorkspacePortRequest) (*infrafleetv1.KillWorkspacePortResponse, error)
+
+	// Agent-route hooks (TASK-CLI-02-05): unlike this fake's other
+	// Terminal/PTY methods below (unconditional Unimplemented stubs — no
+	// httpgateway route exercised them before this task), these five back
+	// /v1/worktrees/{worktreeId}/agent/* and need per-test configurability.
+	// A nil hook panics loudly (regression guard: proves a resolve failure
+	// short-circuits before any of these are reached).
+	getAgentTerminalSessionFn func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error)
+	getTerminalAgentStatusFn  func(*infrafleetv1.GetTerminalAgentStatusRequest) (*infrafleetv1.GetTerminalAgentStatusResponse, error)
+	waitTerminalSessionFn     func(*infrafleetv1.WaitTerminalSessionRequest) (*infrafleetv1.WaitTerminalSessionResponse, error)
+	sendTerminalInputFn       func(*infrafleetv1.SendTerminalInputRequest) (*emptypb.Empty, error)
+	getTerminalScrollbackFn   func(*infrafleetv1.GetTerminalScrollbackRequest) (*infrafleetv1.GetTerminalScrollbackResponse, error)
 }
 
 func (f *fakeInfraFleetServiceClient) RegisterDevServer(_ context.Context, in *infrafleetv1.RegisterDevServerRequest, _ ...grpc.CallOption) (*infrafleetv1.RegisterDevServerResponse, error) {
@@ -113,32 +125,47 @@ func (f *fakeInfraFleetServiceClient) ListTerminalSessions(context.Context, *inf
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
-func (f *fakeInfraFleetServiceClient) WaitTerminalSession(context.Context, *infrafleetv1.WaitTerminalSessionRequest, ...grpc.CallOption) (*infrafleetv1.WaitTerminalSessionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+func (f *fakeInfraFleetServiceClient) WaitTerminalSession(_ context.Context, in *infrafleetv1.WaitTerminalSessionRequest, _ ...grpc.CallOption) (*infrafleetv1.WaitTerminalSessionResponse, error) {
+	if f.waitTerminalSessionFn == nil {
+		panic("unexpected call to WaitTerminalSession")
+	}
+	return f.waitTerminalSessionFn(in)
 }
 
 func (f *fakeInfraFleetServiceClient) FocusTerminalSession(context.Context, *infrafleetv1.FocusTerminalSessionRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
-func (f *fakeInfraFleetServiceClient) GetTerminalAgentStatus(context.Context, *infrafleetv1.GetTerminalAgentStatusRequest, ...grpc.CallOption) (*infrafleetv1.GetTerminalAgentStatusResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+func (f *fakeInfraFleetServiceClient) GetTerminalAgentStatus(_ context.Context, in *infrafleetv1.GetTerminalAgentStatusRequest, _ ...grpc.CallOption) (*infrafleetv1.GetTerminalAgentStatusResponse, error) {
+	if f.getTerminalAgentStatusFn == nil {
+		panic("unexpected call to GetTerminalAgentStatus")
+	}
+	return f.getTerminalAgentStatusFn(in)
 }
 
 func (f *fakeInfraFleetServiceClient) InspectTerminalProcess(context.Context, *infrafleetv1.InspectTerminalProcessRequest, ...grpc.CallOption) (*infrafleetv1.InspectTerminalProcessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
 }
 
-func (f *fakeInfraFleetServiceClient) GetAgentTerminalSession(context.Context, *infrafleetv1.GetAgentTerminalSessionRequest, ...grpc.CallOption) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+func (f *fakeInfraFleetServiceClient) GetAgentTerminalSession(_ context.Context, in *infrafleetv1.GetAgentTerminalSessionRequest, _ ...grpc.CallOption) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+	if f.getAgentTerminalSessionFn == nil {
+		panic("unexpected call to GetAgentTerminalSession")
+	}
+	return f.getAgentTerminalSessionFn(in)
 }
 
-func (f *fakeInfraFleetServiceClient) SendTerminalInput(context.Context, *infrafleetv1.SendTerminalInputRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+func (f *fakeInfraFleetServiceClient) SendTerminalInput(_ context.Context, in *infrafleetv1.SendTerminalInputRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	if f.sendTerminalInputFn == nil {
+		panic("unexpected call to SendTerminalInput")
+	}
+	return f.sendTerminalInputFn(in)
 }
 
-func (f *fakeInfraFleetServiceClient) GetTerminalScrollback(context.Context, *infrafleetv1.GetTerminalScrollbackRequest, ...grpc.CallOption) (*infrafleetv1.GetTerminalScrollbackResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by infra_routes_test.go")
+func (f *fakeInfraFleetServiceClient) GetTerminalScrollback(_ context.Context, in *infrafleetv1.GetTerminalScrollbackRequest, _ ...grpc.CallOption) (*infrafleetv1.GetTerminalScrollbackResponse, error) {
+	if f.getTerminalScrollbackFn == nil {
+		panic("unexpected call to GetTerminalScrollback")
+	}
+	return f.getTerminalScrollbackFn(in)
 }
 
 func (f *fakeInfraFleetServiceClient) AttachPty(context.Context, ...grpc.CallOption) (grpc.BidiStreamingClient[infrafleetv1.PtyClientFrame, infrafleetv1.PtyServerFrame], error) {
@@ -384,5 +411,250 @@ func TestMountInfraRoutes_Relay_SuccessRoundTrip(t *testing.T) {
 	}
 	if got.ResultJson != `{"ok":true}` {
 		t.Fatalf("ResultJson = %q, want %q", got.ResultJson, `{"ok":true}`)
+	}
+}
+
+// TestMountInfraRoutes_AgentStatus_NoActiveSession_Returns404WithoutCallingStatus
+// proves resolveAgentPtyID's found=false path returns 404 NOT_FOUND and
+// short-circuits before GetTerminalAgentStatus is ever called — the fake's
+// getTerminalAgentStatusFn is left nil, so any call to it panics the test.
+func TestMountInfraRoutes_AgentStatus_NoActiveSession_Returns404WithoutCallingStatus(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(req *infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			if req.GetWorktreeId() != "wt-1" {
+				t.Fatalf("WorktreeId = %q, want wt-1", req.GetWorktreeId())
+			}
+			return &infrafleetv1.GetAgentTerminalSessionResponse{Found: false}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodGet, "/v1/worktrees/wt-1/agent/status", identity, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+	var body errorBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decoding error body: %v", err)
+	}
+	if body.Error.Code != "NOT_FOUND" {
+		t.Fatalf("error.code = %q, want NOT_FOUND", body.Error.Code)
+	}
+}
+
+func TestMountInfraRoutes_AgentStatus_SuccessRoundTrip(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			return &infrafleetv1.GetAgentTerminalSessionResponse{
+				Found: true, Session: &infrafleetv1.TerminalSession{PtyId: "pty-1"},
+			}, nil
+		},
+		getTerminalAgentStatusFn: func(req *infrafleetv1.GetTerminalAgentStatusRequest) (*infrafleetv1.GetTerminalAgentStatusResponse, error) {
+			if req.GetPtyId() != "pty-1" {
+				t.Fatalf("PtyId = %q, want pty-1", req.GetPtyId())
+			}
+			return &infrafleetv1.GetTerminalAgentStatusResponse{AgentRunning: true, AgentKind: "claude", ReadyForInput: true}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodGet, "/v1/worktrees/wt-1/agent/status", identity, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+}
+
+// TestMountInfraRoutes_WaitAgent_NoActiveSession_Returns404WithoutCallingWait
+// mirrors the AgentStatus 404 test for POST .../agent/wait —
+// waitTerminalSessionFn is left nil.
+func TestMountInfraRoutes_WaitAgent_NoActiveSession_Returns404WithoutCallingWait(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			return &infrafleetv1.GetAgentTerminalSessionResponse{Found: false}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodPost, "/v1/worktrees/wt-1/agent/wait", identity, waitAgentRequestBody{TimeoutMs: 5000})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+}
+
+func TestMountInfraRoutes_WaitAgent_SuccessRoundTrip(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			return &infrafleetv1.GetAgentTerminalSessionResponse{
+				Found: true, Session: &infrafleetv1.TerminalSession{PtyId: "pty-1"},
+			}, nil
+		},
+		waitTerminalSessionFn: func(req *infrafleetv1.WaitTerminalSessionRequest) (*infrafleetv1.WaitTerminalSessionResponse, error) {
+			if req.GetPtyId() != "pty-1" || req.GetTimeoutMs() != 5000 {
+				t.Fatalf("unexpected request: %+v", req)
+			}
+			return &infrafleetv1.WaitTerminalSessionResponse{}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodPost, "/v1/worktrees/wt-1/agent/wait", identity, waitAgentRequestBody{TimeoutMs: 5000})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+}
+
+// TestMountInfraRoutes_SendAgentInput_NoActiveSession_Returns404WithoutCallingSend
+// mirrors the AgentStatus 404 test for POST .../agent/send —
+// sendTerminalInputFn is left nil.
+func TestMountInfraRoutes_SendAgentInput_NoActiveSession_Returns404WithoutCallingSend(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			return &infrafleetv1.GetAgentTerminalSessionResponse{Found: false}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodPost, "/v1/worktrees/wt-1/agent/send", identity, sendAgentInputRequestBody{Text: "hello"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+}
+
+func TestMountInfraRoutes_SendAgentInput_SuccessRoundTrip(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	var gotData []byte
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			return &infrafleetv1.GetAgentTerminalSessionResponse{
+				Found: true, Session: &infrafleetv1.TerminalSession{PtyId: "pty-1"},
+			}, nil
+		},
+		sendTerminalInputFn: func(req *infrafleetv1.SendTerminalInputRequest) (*emptypb.Empty, error) {
+			if req.GetPtyId() != "pty-1" {
+				t.Fatalf("PtyId = %q, want pty-1", req.GetPtyId())
+			}
+			gotData = req.GetData()
+			return &emptypb.Empty{}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodPost, "/v1/worktrees/wt-1/agent/send", identity, sendAgentInputRequestBody{Text: "hello"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if string(gotData) != "hello" {
+		t.Fatalf("Data = %q, want %q", gotData, "hello")
+	}
+}
+
+// TestMountInfraRoutes_AgentSnapshot_NoActiveSession_Returns404WithoutCallingScrollback
+// mirrors the AgentStatus 404 test for GET .../agent/snapshot —
+// getTerminalScrollbackFn is left nil.
+func TestMountInfraRoutes_AgentSnapshot_NoActiveSession_Returns404WithoutCallingScrollback(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			return &infrafleetv1.GetAgentTerminalSessionResponse{Found: false}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodGet, "/v1/worktrees/wt-1/agent/snapshot", identity, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+}
+
+// TestMountInfraRoutes_AgentSnapshot_SuccessRoundTrip_NotTruncated proves
+// the happy path: text/plain body, literal scrollback text, and no
+// X-Orca-Snapshot-Truncated header when the RPC reports truncated=false.
+func TestMountInfraRoutes_AgentSnapshot_SuccessRoundTrip_NotTruncated(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			return &infrafleetv1.GetAgentTerminalSessionResponse{
+				Found: true, Session: &infrafleetv1.TerminalSession{PtyId: "pty-1"},
+			}, nil
+		},
+		getTerminalScrollbackFn: func(req *infrafleetv1.GetTerminalScrollbackRequest) (*infrafleetv1.GetTerminalScrollbackResponse, error) {
+			if req.GetPtyId() != "pty-1" {
+				t.Fatalf("PtyId = %q, want pty-1", req.GetPtyId())
+			}
+			return &infrafleetv1.GetTerminalScrollbackResponse{Text: "line1\nline2\n", Truncated: false}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodGet, "/v1/worktrees/wt-1/agent/snapshot", identity, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
+		t.Fatalf("Content-Type = %q, want %q", ct, "text/plain; charset=utf-8")
+	}
+	if rec.Body.String() != "line1\nline2\n" {
+		t.Fatalf("body = %q, want %q", rec.Body.String(), "line1\nline2\n")
+	}
+	if rec.Header().Get("X-Orca-Snapshot-Truncated") != "" {
+		t.Fatalf("X-Orca-Snapshot-Truncated header set, want unset when truncated=false")
+	}
+}
+
+// TestMountInfraRoutes_AgentSnapshot_TruncatedSetsHeader proves the
+// X-Orca-Snapshot-Truncated header is set only when the RPC reports
+// truncated=true.
+func TestMountInfraRoutes_AgentSnapshot_TruncatedSetsHeader(t *testing.T) {
+	identity := usecase.Identity{TenantID: "tenant-1", UserID: "user-1"}
+	client := &fakeInfraFleetServiceClient{
+		getAgentTerminalSessionFn: func(*infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+			return &infrafleetv1.GetAgentTerminalSessionResponse{
+				Found: true, Session: &infrafleetv1.TerminalSession{PtyId: "pty-1"},
+			}, nil
+		},
+		getTerminalScrollbackFn: func(*infrafleetv1.GetTerminalScrollbackRequest) (*infrafleetv1.GetTerminalScrollbackResponse, error) {
+			return &infrafleetv1.GetTerminalScrollbackResponse{Text: "partial...", Truncated: true}, nil
+		},
+	}
+	router := testInfraRouter(client)
+
+	req := newInfraRequest(t, http.MethodGet, "/v1/worktrees/wt-1/agent/snapshot", identity, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if rec.Header().Get("X-Orca-Snapshot-Truncated") != "true" {
+		t.Fatalf("X-Orca-Snapshot-Truncated = %q, want %q", rec.Header().Get("X-Orca-Snapshot-Truncated"), "true")
 	}
 }
