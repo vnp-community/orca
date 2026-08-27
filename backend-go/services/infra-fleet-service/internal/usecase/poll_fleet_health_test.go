@@ -97,6 +97,18 @@ func (f *fakeWebhookAlerter) NotifyStatusChange(ctx context.Context, ds domain.D
 	f.calls = append(f.calls, statusChangeCall{devServerID: ds.ID, from: from, to: to})
 }
 
+// fakeMetricsCollector is an in-memory MetricsCollector.
+type fakeMetricsCollector struct {
+	mu      sync.Mutex
+	updates []domain.DevServerHealth
+}
+
+func (f *fakeMetricsCollector) Update(devServerID, host string, sample domain.DevServerHealth) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.updates = append(f.updates, sample)
+}
+
 func healthyExecResult() map[string]any {
 	return map[string]any{
 		"stdout": "cpu  100 0 50 850 0 0 0 0 0 0\n---\nMem: 1000 300 700 0 0 700\n---\nFilesystem 1024-blocks Used Available Capacity Mounted-on\n/dev/sda1 1000 100 900 10% /\n",
@@ -112,7 +124,7 @@ func TestPollFleetHealth_HealthyServerWritesOneUpsert(t *testing.T) {
 	events := &fakeHealthEventPublisher{}
 	webhook := &fakeWebhookAlerter{}
 
-	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, discardLogger())
+	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, nil, discardLogger())
 	uc.pollOnce(context.Background())
 
 	if len(health.upserted) != 1 {
@@ -124,6 +136,39 @@ func TestPollFleetHealth_HealthyServerWritesOneUpsert(t *testing.T) {
 	if len(events.calls) != 0 || len(webhook.calls) != 0 {
 		t.Errorf("expected no status-change calls on a first-ever sample, got events=%d webhook=%d", len(events.calls), len(webhook.calls))
 	}
+}
+
+func TestPollFleetHealth_UpdatesMetricsCollectorWhenPresent(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
+	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
+	lock := &fakePollLock{}
+	events := &fakeHealthEventPublisher{}
+	webhook := &fakeWebhookAlerter{}
+	collector := &fakeMetricsCollector{}
+
+	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, collector, discardLogger())
+	uc.pollOnce(context.Background())
+
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	if len(collector.updates) != 1 || collector.updates[0].Status != domain.HealthStatusHealthy {
+		t.Errorf("expected exactly 1 collector.Update call with status=healthy, got %+v", collector.updates)
+	}
+}
+
+// TestPollFleetHealth_NilCollectorNeverPanics covers the every-other-test's
+// implicit nil-collector coverage explicitly — PollFleetHealth must work
+// fine before TASK-FLEET-03-08's metrics wiring lands anywhere that
+// constructs it without one.
+func TestPollFleetHealth_NilCollectorNeverPanics(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	devRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"ds1": ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
+	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
+	uc := NewPollFleetHealth(devRepo, health, agent, &fakePollLock{}, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, discardLogger())
+	uc.pollOnce(context.Background())
 }
 
 func TestPollFleetHealth_StatusTransitionTriggersExactlyOneEventAndWebhookCall(t *testing.T) {
@@ -140,7 +185,7 @@ func TestPollFleetHealth_StatusTransitionTriggersExactlyOneEventAndWebhookCall(t
 	events := &fakeHealthEventPublisher{}
 	webhook := &fakeWebhookAlerter{}
 
-	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, discardLogger())
+	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, nil, discardLogger())
 	uc.pollOnce(context.Background())
 
 	if len(health.upserted) != 1 || health.upserted[0].Status != domain.HealthStatusDegraded {
@@ -168,7 +213,7 @@ func TestPollFleetHealth_NoTransitionTriggersNoEventOrWebhookCall(t *testing.T) 
 	events := &fakeHealthEventPublisher{}
 	webhook := &fakeWebhookAlerter{}
 
-	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, discardLogger())
+	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, nil, discardLogger())
 	uc.pollOnce(context.Background())
 
 	if len(events.calls) != 0 || len(webhook.calls) != 0 {
@@ -185,7 +230,7 @@ func TestPollFleetHealth_LockedFalseSkipsAgentCallsEntirely(t *testing.T) {
 	events := &fakeHealthEventPublisher{}
 	webhook := &fakeWebhookAlerter{}
 
-	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, discardLogger())
+	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, nil, discardLogger())
 	uc.pollOnce(context.Background())
 
 	if len(health.upserted) != 0 {
@@ -208,7 +253,7 @@ func TestPollFleetHealth_UnreachableServerRecordsUnreachableStatus(t *testing.T)
 	events := &fakeHealthEventPublisher{}
 	webhook := &fakeWebhookAlerter{}
 
-	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, discardLogger())
+	uc := NewPollFleetHealth(devRepo, health, agent, lock, events, webhook, nil, discardLogger())
 	uc.pollOnce(context.Background())
 
 	if len(health.upserted) != 1 || health.upserted[0].Status != domain.HealthStatusUnreachable {

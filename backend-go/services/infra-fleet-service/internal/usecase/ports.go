@@ -193,6 +193,15 @@ type WebhookAlerter interface {
 	NotifyStatusChange(ctx context.Context, ds domain.DevServer, from, to domain.HealthStatus, sample domain.DevServerHealth)
 }
 
+// MetricsCollector receives every poll sample so Prometheus scrapes read
+// from an in-process cache instead of re-querying Postgres per scrape —
+// declared here (consumer-side), implemented by
+// adapter/metrics.FleetCollector, per this codebase's Dependency Inversion
+// convention (usecase must not import adapter packages).
+type MetricsCollector interface {
+	Update(devServerID, host string, sample domain.DevServerHealth)
+}
+
 // BrowserProfileRepository is the persistence port for browser profile
 // metadata (infra.browser_profiles, TASK-032) — Postgres-only; the 3
 // live-agent profile operations (profileClearDefaultCookies/

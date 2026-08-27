@@ -12,17 +12,22 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
@@ -30,10 +35,13 @@ import (
 
 	infraagentwsserver "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/agentwsserver"
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
+	infraeventbus "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
+	inframetrics "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/metrics"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
+	infrawebhook "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/webhook"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
@@ -177,6 +185,50 @@ func run() error {
 	importFleetInventoryUC := usecase.NewImportFleetInventory(sshTargetStore)
 	bulkProvisionFleetUC := usecase.NewBulkProvisionFleet(sshTargetStore, repo, bulkProvisioner)
 
+	// --- Fleet health polling (SOL-FLEET-03) ---------------------------
+	// Transactional-outbox relay for dev_server.health_degraded — same
+	// eventbus.Connect/outbox.Relay pattern as usage-service's identical
+	// wiring (see that service's cmd/server/main.go). infra-fleet-service
+	// carried no outbox/NATS infrastructure before this pass
+	// (migrations/0010_outbox); if NATS is unreachable at startup, outbox
+	// rows still get written durably, they just queue up unpublished until
+	// a future restart.
+	var outboxRelay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, fleet health-change events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "INFRA_FLEET", []string{"orca.infra_fleet.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			outboxRelay = outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+		}
+	}
+	var outboxRelayWG sync.WaitGroup
+	if outboxRelay != nil {
+		outboxRelayWG.Add(1)
+		go func() {
+			defer outboxRelayWG.Done()
+			outboxRelay.Run(ctx)
+		}()
+	}
+
+	healthEventPublisherUC := infraeventbus.NewHealthPublisher(repo, logger)
+	webhookAlerterUC := infrawebhook.NewAlerter(cfg.FleetWebhookURL, nil)
+	if cfg.FleetWebhookURL == "" {
+		logger.Info("FLEET_WEBHOOK_URL is not set — fleet status-change webhook alerts are disabled")
+	}
+
+	fleetMetricsRegistry := prometheus.NewRegistry()
+	fleetCollector := inframetrics.NewFleetCollector()
+	fleetMetricsRegistry.MustRegister(fleetCollector)
+
+	pollFleetHealthUC := usecase.NewPollFleetHealth(
+		repo, repo, agentClient, repo, healthEventPublisherUC, webhookAlerterUC, fleetCollector, logger,
+	)
+	go pollFleetHealthUC.Run(ctx, cfg.FleetPollInterval)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -237,6 +289,9 @@ func run() error {
 	mux.Handle("/", healthSrv.Handler())
 	mux.Handle("/agent", agentWSServer)
 	mux.Handle("/api/agent-token", agentTokenIssuer)
+	// Same port as the liveness/agent-WS endpoints above, not a new one —
+	// see TASK-FLEET-03-08.
+	mux.Handle("/health/metrics", promhttp.HandlerFor(fleetMetricsRegistry, promhttp.HandlerOpts{}))
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
@@ -278,6 +333,7 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+	outboxRelayWG.Wait() // outboxRelay.Run already returned once ctx was cancelled above
 
 	return nil
 }

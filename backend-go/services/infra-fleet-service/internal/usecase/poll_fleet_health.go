@@ -44,6 +44,7 @@ type PollFleetHealth struct {
 	lock       PollLockPort
 	events     HealthEventPublisher
 	webhook    WebhookAlerter
+	collector  MetricsCollector
 	logger     *slog.Logger
 }
 
@@ -54,9 +55,10 @@ func NewPollFleetHealth(
 	lock PollLockPort,
 	events HealthEventPublisher,
 	webhook WebhookAlerter,
+	collector MetricsCollector,
 	logger *slog.Logger,
 ) *PollFleetHealth {
-	return &PollFleetHealth{devServers: devServers, health: health, agent: agent, lock: lock, events: events, webhook: webhook, logger: logger}
+	return &PollFleetHealth{devServers: devServers, health: health, agent: agent, lock: lock, events: events, webhook: webhook, collector: collector, logger: logger}
 }
 
 // Run ticks every interval until ctx is cancelled — called once from
@@ -127,6 +129,9 @@ func (uc *PollFleetHealth) pollOne(ctx context.Context, ds domain.DevServer) {
 	sample := domain.DevServerHealth{
 		DevServerID: ds.ID, Reachable: reachable, CPUPercent: cpu, RAMPercent: ram, DiskPercent: disk,
 		LatencyMS: latencyMS, Status: status,
+	}
+	if uc.collector != nil {
+		uc.collector.Update(ds.ID, ds.Host, sample)
 	}
 
 	previous, hadPrevious, _ := uc.health.GetPrevious(ctx, ds.ID)

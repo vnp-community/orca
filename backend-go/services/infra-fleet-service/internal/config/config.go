@@ -5,6 +5,8 @@ package config
 
 import (
 	"os"
+	"strconv"
+	"time"
 
 	commonconfig "github.com/stablyai/orca-go/common/config"
 )
@@ -31,7 +33,18 @@ type Config struct {
 	// cmd/server/main.go), they just queue up unpublished until a future
 	// restart.
 	NATSURL string
+	// FleetPollInterval is BL-FLEET-03's poll cadence — read from
+	// FLEET_POLL_INTERVAL_SEC (default 30). An unparseable or non-positive
+	// value falls back to the default, fail-safe: a misconfigured interval
+	// should not silently disable polling (0) or spin (negative).
+	FleetPollInterval time.Duration
+	// FleetWebhookURL is BL-FLEET-03's status-change alert target — read
+	// from FLEET_WEBHOOK_URL, empty (the default) disables webhook.Alerter
+	// entirely (see that package's doc comment).
+	FleetWebhookURL string
 }
+
+const defaultFleetPollIntervalSec = 30
 
 func Load() (Config, error) {
 	base, err := commonconfig.LoadBase("infra-fleet-service")
@@ -39,8 +52,20 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:             base,
-		ServerDeployment: os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
-		NATSURL:          commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		Base:              base,
+		ServerDeployment:  os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		NATSURL:           commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		FleetPollInterval: fleetPollIntervalFromEnv(),
+		FleetWebhookURL:   os.Getenv("FLEET_WEBHOOK_URL"),
 	}, nil
+}
+
+func fleetPollIntervalFromEnv() time.Duration {
+	sec := defaultFleetPollIntervalSec
+	if raw := os.Getenv("FLEET_POLL_INTERVAL_SEC"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			sec = parsed
+		}
+	}
+	return time.Duration(sec) * time.Second
 }
